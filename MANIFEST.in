@@ -1,0 +1,11 @@
+include pyproject.toml
+include setup.cfg
+include LICENSE
+include README.md
+
+recursive-include pytestf90 *.f90
+recursive-include docs *
+
+prune build
+prune docs/_build
+prune docs/api

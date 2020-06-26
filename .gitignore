@@ -1,0 +1,9 @@
+**.DS_Store
+**.so
+**._*
+*.pyc
+
+docs/_build
+docs/_api
+.tox
+*.egg-info
