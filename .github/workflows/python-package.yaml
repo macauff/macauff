@@ -1,0 +1,25 @@
+name: Python package
+
+on: [push, pull_request]
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v2
+      - name: Setup Python
+        uses: actions/setup-python@v2
+        with:
+          python-version: 3.7
+
+      - name: Install Tox and any other packages
+        run: |
+          sudo ln -s /usr/bin/gfortran-9 /usr/bin/gfortran
+          pip install numpy
+          pip install tox
+      - name: Run tests
+        run: tox -e test
+      - name: Run documentation
+        run: tox -e build_docs
