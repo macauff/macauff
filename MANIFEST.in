@@ -3,7 +3,7 @@ include setup.cfg
 include LICENSE
 include README.md
 
-recursive-include pytestf90 *.f90
+recursive-include macauff *.f90
 recursive-include docs *
 
 prune build
