@@ -47,6 +47,19 @@ class CrossMatch():
                                  "if a sub-process is set to run that all subsequent "
                                  "processes are also set to run.")
 
+    def _replace_line(self, file_name, line_num, text, out_file=None):
+        '''
+        Helper function to update the metadata file on-the-fly, allowing for
+        "run" flags to be set from run to no run once they have finished.
+        '''
+        if out_file is None:
+            out_file = file_name
+        lines = open(file_name, 'r').readlines()
+        lines[line_num] = text
+        out = open(out_file, 'w')
+        out.writelines(lines)
+        out.close()
+
     def _str2bool(self, v):
         '''
         Convenience function to convert strings to boolean values.
