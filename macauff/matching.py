@@ -3,6 +3,8 @@
 This module provides the high-level framework for performing catalogue-catalogue cross-matches.
 '''
 
+import os
+
 __all__ = ['CrossMatch']
 
 
@@ -20,3 +22,8 @@ class CrossMatch():
     file_path : string
         A path to the location of the file containing the cross-match metadata.
     '''
+
+    def __init__(self, file_path):
+        if not os.path.isfile(file_path):
+            raise FileNotFoundError("Metadata file could not be found at "
+                                    "specified location.")
