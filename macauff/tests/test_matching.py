@@ -21,29 +21,13 @@ def test_crossmatch_input():
     assert cm.run_star is True
 
     f = open(os.path.join(os.path.dirname(__file__), 'data/metadata.txt')).readlines()
-    miss_key_idx = np.where(['run_cf = yes' in line for line in f])[0][0]
-    CrossMatch._replace_line(cm, os.path.join(os.path.dirname(__file__), 'data/metadata.txt'),
-                             miss_key_idx, '',
-                             out_file=os.path.join(os.path.dirname(__file__),
-                                                   'data/metadata_missing_key.txt'))
+    for old_line, new_line in zip(['run_cf = yes', 'run_auf = no', 'run_auf = no'],
+                                  ['', 'run_auf = aye\n', 'run_auf = yes\n']):
+        miss_key_idx = np.where([old_line in line for line in f])[0][0]
+        CrossMatch._replace_line(cm, os.path.join(os.path.dirname(__file__), 'data/metadata.txt'),
+                                 miss_key_idx, new_line,
+                                 out_file=os.path.join(os.path.dirname(__file__),
+                                                       'data/metadata_.txt'))
 
-    with pytest.raises(ValueError):
-        cm = CrossMatch(os.path.join(os.path.dirname(__file__), 'data/metadata_missing_key.txt'))
-
-    bad_type_idx = np.where(['run_auf = no' in line for line in f])[0][0]
-    CrossMatch._replace_line(cm, os.path.join(os.path.dirname(__file__), 'data/metadata.txt'),
-                             bad_type_idx, 'run_auf = aye\n',
-                             out_file=os.path.join(os.path.dirname(__file__),
-                                                   'data/metadata_bad_type.txt'))
-
-    with pytest.raises(ValueError):
-        cm = CrossMatch(os.path.join(os.path.dirname(__file__), 'data/metadata_bad_type.txt'))
-
-    bad_order_idx = np.where(['run_auf = no' in line for line in f])[0][0]
-    CrossMatch._replace_line(cm, os.path.join(os.path.dirname(__file__), 'data/metadata.txt'),
-                             bad_order_idx, 'run_auf = yes\n',
-                             out_file=os.path.join(os.path.dirname(__file__),
-                                                   'data/metadata_bad_order.txt'))
-
-    with pytest.raises(ValueError):
-        cm = CrossMatch(os.path.join(os.path.dirname(__file__), 'data/metadata_bad_order.txt'))
+        with pytest.raises(ValueError):
+            cm = CrossMatch(os.path.join(os.path.dirname(__file__), 'data/metadata_.txt'))
