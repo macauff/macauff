@@ -79,14 +79,11 @@ class CrossMatch():
             config.read_string('[config]\n' + f.read())
         config = config['config']
 
-        for run_flag in ['include_perturb_auf', 'include_phot_like']:
-            if run_flag in config:
-                setattr(self, run_flag, self._str2bool(config[run_flag]))
-            else:
-                raise ValueError("Missing key {} from metadata file.".format(run_flag))
+        for check_flag in ['include_perturb_auf', 'include_phot_like', 'run_auf', 'run_group',
+                           'run_cf', 'run_star']:
+            if check_flag not in config:
+                raise ValueError("Missing key {} from metadata file.".format(check_flag))
 
-        for run_flag in ['run_auf', 'run_group', 'run_cf', 'run_star']:
-            if run_flag in config:
-                setattr(self, run_flag, self._str2bool(config[run_flag]))
-            else:
-                raise ValueError("Missing key {} from metadata file.".format(run_flag))
+        for run_flag in ['include_perturb_auf', 'include_phot_like', 'run_auf', 'run_group',
+                         'run_cf', 'run_star']:
+            setattr(self, run_flag, self._str2bool(config[run_flag]))
