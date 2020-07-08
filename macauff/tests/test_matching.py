@@ -32,22 +32,22 @@ def test_crossmatch_auf_input():
 
     # List of simple one line config file replacements for error message checking
     f = open(os.path.join(os.path.dirname(__file__), 'data/metadata.txt')).readlines()
-    for old_line, new_line in zip(['run_cf = yes', 'run_auf = no', 'run_auf = no',
-                                   'auf_region_type = rectangle', 'auf_region_type = rectangle',
-                                   'auf_region_points = 131 134 4 -1 1 3',
-                                   'auf_region_points = 131 134 4 -1 1 3',
-                                   'auf_region_frame = equatorial'],
-                                  ['', 'run_auf = aye\n', 'run_auf = yes\n',
-                                   '', 'auf_region_type = triangle\n',
-                                   'auf_region_points = 131 134 4 -1 1 a\n',
-                                   'auf_region_points = 131 134 4 -1 1\n',
-                                   'auf_region_frame = ecliptic\n']):
+    for old_line, new_line, match_text in zip(
+        ['run_cf = yes', 'run_auf = no', 'run_auf = no', 'auf_region_type = rectangle',
+         'auf_region_type = rectangle', 'auf_region_points = 131 134 4 -1 1 3',
+         'auf_region_points = 131 134 4 -1 1 3', 'auf_region_frame = equatorial'],
+        ['', 'run_auf = aye\n', 'run_auf = yes\n', '', 'auf_region_type = triangle\n',
+         'auf_region_points = 131 134 4 -1 1 a\n', 'auf_region_points = 131 134 4 -1 1\n',
+         'auf_region_frame = ecliptic\n'],
+        ['Missing key', 'Boolean flag key not set', 'Inconsistency between run/no run',
+         'Missing key', "should either be 'rectangle' or", 'should be 6 numbers',
+         'should be 6 numbers', "should either be 'equatorial' or"]):
         idx = np.where([old_line in line for line in f])[0][0]
         CrossMatch._replace_line(cm, os.path.join(os.path.dirname(__file__), 'data/metadata.txt'),
                                  idx, new_line, out_file=os.path.join(os.path.dirname(__file__),
                                                                       'data/metadata_.txt'))
 
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError, match=match_text):
             cm = CrossMatch(os.path.join(os.path.dirname(__file__), 'data/metadata_.txt'))
 
     # Check correct and incorrect auf_region_points when auf_region_type is 'points'

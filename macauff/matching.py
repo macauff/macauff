@@ -70,6 +70,52 @@ class CrossMatch():
         else:
             return v.lower() in ("yes", "true", "t", "1")
 
+    def _make_regions_points(self, region_type, region_frame, region_points):
+        '''
+        Wrapper function for the creation of "region" coordinate tuples,
+        given either a set of rectangular points or a list of coordinates.
+        '''
+        rt = region_type[1].lower()
+        if rt == 'rectangle':
+            try:
+                a = region_points[1].split()
+                a = [float(point) for point in a]
+            except ValueError:
+                raise ValueError("{} should be 6 numbers separated "
+                                 "by spaces.".format(region_points[0]))
+            if len(a) == 6:
+                if not a[2].is_integer() or not a[5].is_integer():
+                    raise ValueError("Number of steps between start and stop values for "
+                                     "{} should be integers.".format(region_points[0]))
+                ax1_p = np.linspace(a[0], a[1], int(a[2]))
+                ax2_p = np.linspace(a[3], a[4], int(a[5]))
+                points = np.stack(np.meshgrid(ax1_p, ax2_p), -1).reshape(-1, 2)
+            else:
+                raise ValueError("{} should be 6 numbers separated "
+                                 "by spaces.".format(region_points[0]))
+        elif rt == 'points':
+            try:
+                a = region_points[1].replace('(', ')').split('), )')
+                # Remove the first ( and final ) that weren't split by "), (" -> "), )"
+                a[0] = a[0][1:]
+                a[-1] = a[-1][:-1]
+                b = [q.split(', ') for q in a]
+                points = np.array(b, dtype=float)
+            except ValueError:
+                raise ValueError("{} should be a list of '(a, b), (c, d)' tuples, "
+                                 "separated by a comma.".format(region_points[0]))
+        else:
+            raise ValueError("{} should either be 'rectangle' or 'points'.".format(region_type[0]))
+
+        setattr(self, region_points[0], points)
+
+        rf = region_frame[1].lower()
+        if rf == 'equatorial' or rf == 'galactic':
+            setattr(self, region_frame[0], region_frame[1])
+        else:
+            raise ValueError("{} should either be 'equatorial' or 'galactic'.".format(
+                             region_frame[0]))
+
     def read_metadata(self):
         '''
         Helper function to read in metadata and set various class attributes.
@@ -89,42 +135,6 @@ class CrossMatch():
                          'run_cf', 'run_star']:
             setattr(self, run_flag, self._str2bool(config[run_flag]))
 
-        art = config['auf_region_type'].lower()
-        if art == 'rectangle':
-            try:
-                a = config['auf_region_points'].split()
-                a = [float(point) for point in a]
-            except ValueError:
-                raise ValueError("auf_region_points should be 6 numbers separated "
-                                 "by spaces.")
-            if len(a) == 6:
-                if not a[2].is_integer() or not a[5].is_integer():
-                    raise ValueError("Number of steps between start and stop values for "
-                                     "auf_region_points should be integers.")
-                ax1_p = np.linspace(a[0], a[1], int(a[2]))
-                ax2_p = np.linspace(a[3], a[4], int(a[5]))
-                points = np.stack(np.meshgrid(ax1_p, ax2_p), -1).reshape(-1, 2)
-            else:
-                raise ValueError("auf_region_points should be 6 numbers separated "
-                                 "by spaces.")
-        elif art == 'points':
-            try:
-                a = config['auf_region_points'].replace('(', ')').split('), )')
-                # Remove the first ( and final ) that weren't split by "), (" -> "), )"
-                a[0] = a[0][1:]
-                a[-1] = a[-1][:-1]
-                b = [q.split(', ') for q in a]
-                points = np.array(b, dtype=float)
-            except ValueError:
-                raise ValueError("auf_region_points should be a list of '(a, b), (c, d)' tuples, "
-                                 "separated by a comma.")
-        else:
-            raise ValueError("auf_region_type should either be 'rectangle' or 'points'.")
-
-        self.auf_region_points = points
-
-        arf = config['auf_region_frame'].lower()
-        if arf == 'equatorial' or arf == 'galactic':
-            self.auf_region_frame = arf
-        else:
-            raise ValueError("auf_region_frame should either be 'equatorial' or 'galactic'.")
+        self._make_regions_points(['auf_region_type', config['auf_region_type']],
+                                  ['auf_region_frame', config['auf_region_frame']],
+                                  ['auf_region_points', config['auf_region_points']])
