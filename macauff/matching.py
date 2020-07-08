@@ -127,7 +127,8 @@ class CrossMatch():
 
         for check_flag in ['include_perturb_auf', 'include_phot_like', 'run_auf', 'run_group',
                            'run_cf', 'run_star', 'auf_region_type', 'auf_region_frame',
-                           'auf_region_points']:
+                           'auf_region_points', 'cf_region_type', 'cf_region_frame',
+                           'cf_region_points']:
             if check_flag not in config:
                 raise ValueError("Missing key {} from metadata file.".format(check_flag))
 
@@ -138,3 +139,7 @@ class CrossMatch():
         self._make_regions_points(['auf_region_type', config['auf_region_type']],
                                   ['auf_region_frame', config['auf_region_frame']],
                                   ['auf_region_points', config['auf_region_points']])
+
+        self._make_regions_points(['cf_region_type', config['cf_region_type']],
+                                  ['cf_region_frame', config['cf_region_frame']],
+                                  ['cf_region_points', config['cf_region_points']])
