@@ -11,7 +11,7 @@ import numpy as np
 from ..matching import CrossMatch
 
 
-def test_crossmatch_input():
+def test_crossmatch_run_input():
     with pytest.raises(FileNotFoundError):
         cm = CrossMatch('./file.txt')
 
@@ -21,6 +21,9 @@ def test_crossmatch_input():
     assert cm.run_cf is True
     assert cm.run_star is True
 
+
+def test_crossmatch_auf_input():
+    cm = CrossMatch(os.path.join(os.path.dirname(__file__), 'data/metadata.txt'))
     assert cm.auf_region_frame == 'equatorial'
     assert_almost_equal(cm.auf_region_points,
                         np.array([[131, -1], [132, -1], [133, -1], [134, -1],
