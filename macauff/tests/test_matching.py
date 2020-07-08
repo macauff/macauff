@@ -21,6 +21,20 @@ def test_crossmatch_run_input():
     assert cm.run_cf is True
     assert cm.run_star is True
 
+    # List of simple one line config file replacements for error message checking
+    f = open(os.path.join(os.path.dirname(__file__), 'data/metadata.txt')).readlines()
+    for old_line, new_line, match_text in zip(['run_cf = yes', 'run_auf = no', 'run_auf = no'],
+                                              ['', 'run_auf = aye\n', 'run_auf = yes\n'],
+                                              ['Missing key', 'Boolean flag key not set',
+                                               'Inconsistency between run/no run']):
+        idx = np.where([old_line in line for line in f])[0][0]
+        CrossMatch._replace_line(cm, os.path.join(os.path.dirname(__file__), 'data/metadata.txt'),
+                                 idx, new_line, out_file=os.path.join(os.path.dirname(__file__),
+                                                                      'data/metadata_.txt'))
+
+        with pytest.raises(ValueError, match=match_text):
+            cm = CrossMatch(os.path.join(os.path.dirname(__file__), 'data/metadata_.txt'))
+
 
 def test_crossmatch_auf_input():
     cm = CrossMatch(os.path.join(os.path.dirname(__file__), 'data/metadata.txt'))
@@ -33,14 +47,12 @@ def test_crossmatch_auf_input():
     # List of simple one line config file replacements for error message checking
     f = open(os.path.join(os.path.dirname(__file__), 'data/metadata.txt')).readlines()
     for old_line, new_line, match_text in zip(
-        ['run_cf = yes', 'run_auf = no', 'run_auf = no', 'auf_region_type = rectangle',
-         'auf_region_type = rectangle', 'auf_region_points = 131 134 4 -1 1 3',
-         'auf_region_points = 131 134 4 -1 1 3', 'auf_region_frame = equatorial'],
-        ['', 'run_auf = aye\n', 'run_auf = yes\n', '', 'auf_region_type = triangle\n',
-         'auf_region_points = 131 134 4 -1 1 a\n', 'auf_region_points = 131 134 4 -1 1\n',
-         'auf_region_frame = ecliptic\n'],
-        ['Missing key', 'Boolean flag key not set', 'Inconsistency between run/no run',
-         'Missing key', "should either be 'rectangle' or", 'should be 6 numbers',
+        ['auf_region_type = rectangle', 'auf_region_type = rectangle',
+         'auf_region_points = 131 134 4 -1 1 3', 'auf_region_points = 131 134 4 -1 1 3',
+         'auf_region_frame = equatorial'],
+        ['', 'auf_region_type = triangle\n', 'auf_region_points = 131 134 4 -1 1 a\n',
+         'auf_region_points = 131 134 4 -1 1\n', 'auf_region_frame = ecliptic\n'],
+        ['Missing key', "should either be 'rectangle' or", 'should be 6 numbers',
          'should be 6 numbers', "should either be 'equatorial' or"]):
         idx = np.where([old_line in line for line in f])[0][0]
         CrossMatch._replace_line(cm, os.path.join(os.path.dirname(__file__), 'data/metadata.txt'),
