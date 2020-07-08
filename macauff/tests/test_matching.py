@@ -49,11 +49,13 @@ def test_crossmatch_auf_input():
     for old_line, new_line, match_text in zip(
         ['auf_region_type = rectangle', 'auf_region_type = rectangle',
          'auf_region_points = 131 134 4 -1 1 3', 'auf_region_points = 131 134 4 -1 1 3',
-         'auf_region_frame = equatorial'],
+         'auf_region_frame = equatorial', 'auf_region_points = 131 134 4 -1 1 3'],
         ['', 'auf_region_type = triangle\n', 'auf_region_points = 131 134 4 -1 1 a\n',
-         'auf_region_points = 131 134 4 -1 1\n', 'auf_region_frame = ecliptic\n'],
+         'auf_region_points = 131 134 4 -1 1\n', 'auf_region_frame = ecliptic\n',
+         'auf_region_points = 131 134 4 -1 1 3.4\n'],
         ['Missing key', "should either be 'rectangle' or", 'should be 6 numbers',
-         'should be 6 numbers', "should either be 'equatorial' or"]):
+         'should be 6 numbers', "should either be 'equatorial' or",
+         'start and stop values for ']):
         idx = np.where([old_line in line for line in f])[0][0]
         CrossMatch._replace_line(cm, os.path.join(os.path.dirname(__file__), 'data/metadata.txt'),
                                  idx, new_line, out_file=os.path.join(os.path.dirname(__file__),
