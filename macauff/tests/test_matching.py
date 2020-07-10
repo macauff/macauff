@@ -144,3 +144,23 @@ def test_crossmatch_auf_cf_input():
 
         cm = CrossMatch(os.path.join(os.path.dirname(__file__), 'data/metadata_2.txt'))
         assert_almost_equal(getattr(cm, '{}points'.format(kind)), np.array([[131, 0]]))
+
+
+def test_crossmatch_folder_path_inputs():
+    cm = CrossMatch(os.path.join(os.path.dirname(__file__), 'data/metadata.txt'))
+    assert cm.folder_path == os.path.join(os.getcwd(), 'test_path')
+    assert os.path.isdir(os.path.join(os.getcwd(), 'test_path'))
+    f = open(os.path.join(os.path.dirname(__file__), 'data/metadata.txt')).readlines()
+    # List of simple one line config file replacements for error message checking
+    for old_line, new_line, match_text, error in zip(
+            ['folder_path = test_path', 'folder_path = test_path'],
+            ['', 'folder_path = /User/test/some/path/\n'],
+            ['Missing key', 'Error when trying to create temporary'],
+            [ValueError, OSError]):
+        idx = np.where([old_line in line for line in f])[0][0]
+        CrossMatch._replace_line(cm, os.path.join(os.path.dirname(__file__),
+                                 'data/metadata.txt'), idx, new_line, out_file=os.path.join(
+                                 os.path.dirname(__file__), 'data/metadata_.txt'))
+
+        with pytest.raises(error, match=match_text):
+            cm = CrossMatch(os.path.join(os.path.dirname(__file__), 'data/metadata_.txt'))

@@ -47,6 +47,13 @@ class CrossMatch():
                                  "if a sub-process is set to run that all subsequent "
                                  "processes are also set to run.")
 
+        # Ensure that we can create the folder for outputs.
+        try:
+            os.makedirs(self.folder_path, exist_ok=True)
+        except OSError:
+            raise OSError("Error when trying to create temporary folder for outputs. "
+                          "Please ensure that folder_path is correct.")
+
     def _replace_line(self, file_name, line_num, text, out_file=None):
         '''
         Helper function to update the metadata file on-the-fly, allowing for
@@ -128,7 +135,7 @@ class CrossMatch():
         for check_flag in ['include_perturb_auf', 'include_phot_like', 'run_auf', 'run_group',
                            'run_cf', 'run_star', 'auf_region_type', 'auf_region_frame',
                            'auf_region_points', 'cf_region_type', 'cf_region_frame',
-                           'cf_region_points']:
+                           'cf_region_points', 'folder_path']:
             if check_flag not in config:
                 raise ValueError("Missing key {} from metadata file.".format(check_flag))
 
@@ -143,3 +150,5 @@ class CrossMatch():
         self._make_regions_points(['cf_region_type', config['cf_region_type']],
                                   ['cf_region_frame', config['cf_region_frame']],
                                   ['cf_region_points', config['cf_region_points']])
+
+        self.folder_path = os.path.abspath(config['folder_path'])

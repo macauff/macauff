@@ -3,7 +3,8 @@ include_perturb_auf = no
 include_phot_like = no
 
 # File paths
-cat_file_paths = test, path
+# Top-level folder for all subsequent files to be created in. Should be absolute path, or relative to folder script called in
+folder_path = test_path
 
 # Flags for each stage of the match process - must be "yes"/"no", "true"/"false", "t"/"f", or "1"/"0"
 run_auf = no
