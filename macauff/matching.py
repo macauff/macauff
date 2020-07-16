@@ -152,3 +152,24 @@ class CrossMatch():
                                   ['cf_region_points', config['cf_region_points']])
 
         self.folder_path = os.path.abspath(config['folder_path'])
+
+        # Only have to check for the existence of Pertubation AUF-related
+        # parameters if we are using the perturbation AUF component.
+        if self.include_perturb_auf:
+            for check_flag in ['a_tri_set_name', 'b_tri_set_name', 'a_tri_filt_names',
+                               'b_tri_filt_names']:
+                if check_flag not in config:
+                    raise ValueError("Missing key {} from metadata file.".format(check_flag))
+            self.a_tri_set_name = config['a_tri_set_name']
+            self.b_tri_set_name = config['b_tri_set_name']
+            self.a_tri_filt_names = np.array(config['a_tri_filt_names'].split())
+            self.b_tri_filt_names = np.array(config['b_tri_filt_names'].split())
+            for flag in ['a_tri_filt_num', 'b_tri_filt_num']:
+                try:
+                    a = config[flag]
+                    if float(a).is_integer():
+                        setattr(self, flag, int(a))
+                    else:
+                        raise ValueError("{} should be a single integer number.".format(flag))
+                except ValueError:
+                    raise ValueError("{} should be a single integer number.".format(flag))

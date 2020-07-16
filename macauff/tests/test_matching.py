@@ -164,3 +164,35 @@ def test_crossmatch_folder_path_inputs():
 
         with pytest.raises(error, match=match_text):
             cm = CrossMatch(os.path.join(os.path.dirname(__file__), 'data/metadata_.txt'))
+
+
+def test_crossmatch_tri_inputs():
+    cm = CrossMatch(os.path.join(os.path.dirname(__file__), 'data/metadata.txt'))
+    assert not hasattr(cm, 'a_tri_set_name')
+
+    f = open(os.path.join(os.path.dirname(__file__), 'data/metadata.txt')).readlines()
+    old_line = 'include_perturb_auf = no'
+    new_line = 'include_perturb_auf = yes\n'
+    idx = np.where([old_line in line for line in f])[0][0]
+    CrossMatch._replace_line(cm, os.path.join(os.path.dirname(__file__),
+                             'data/metadata.txt'), idx, new_line, out_file=os.path.join(
+                             os.path.dirname(__file__), 'data/metadata_.txt'))
+
+    cm = CrossMatch(os.path.join(os.path.dirname(__file__), 'data/metadata_.txt'))
+    assert cm.a_tri_set_name == 'gaiadr2'
+    assert np.all(cm.b_tri_filt_names == np.array(['W1', 'W2', 'W3', 'W4']))
+    assert cm.a_tri_filt_num == 1
+
+    # List of simple one line config file replacements for error message checking
+    for old_line, new_line, match_text in zip(
+        ['a_tri_set_name = gaiadr2', 'b_tri_filt_num = 11', 'b_tri_filt_num = 11'],
+        ['', 'b_tri_filt_num = a\n', 'b_tri_filt_num = 3.4\n'],
+        ['Missing key a_tri_set_name', 'b_tri_filt_num should be a single',
+         'b_tri_filt_num should be a single']):
+        idx = np.where([old_line in line for line in f])[0][0]
+        CrossMatch._replace_line(cm, os.path.join(os.path.dirname(__file__),
+                                 'data/metadata_.txt'), idx, new_line, out_file=os.path.join(
+                                 os.path.dirname(__file__), 'data/metadata_2.txt'))
+
+        with pytest.raises(ValueError, match=match_text):
+            cm = CrossMatch(os.path.join(os.path.dirname(__file__), 'data/metadata_2.txt'))
