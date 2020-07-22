@@ -199,6 +199,21 @@ def test_crossmatch_tri_inputs():
         with pytest.raises(ValueError, match=match_text):
             cm = CrossMatch(os.path.join(os.path.dirname(__file__), 'data/metadata_2.txt'))
 
+    old_line = 'include_perturb_auf = no'
+    new_line = 'include_perturb_auf = yes\n'
+    idx = np.where([old_line in line for line in f])[0][0]
+    CrossMatch._replace_line(cm, os.path.join(os.path.dirname(__file__),
+                             'data/metadata.txt'), idx, new_line, out_file=os.path.join(
+                             os.path.dirname(__file__), 'data/metadata_.txt'))
+    old_line = 'download_tri = no'
+    new_line = 'download_tri = yes\n'
+    idx = np.where([old_line in line for line in f])[0][0]
+    CrossMatch._replace_line(cm, os.path.join(os.path.dirname(__file__),
+                             'data/metadata_.txt'), idx, new_line, out_file=os.path.join(
+                             os.path.dirname(__file__), 'data/metadata_.txt'))
+    with pytest.raises(ValueError, match="download_tri is True and run_auf is False"):
+        cm = CrossMatch(os.path.join(os.path.dirname(__file__), 'data/metadata_.txt'))
+
 
 def test_crossmatch_psf_param_inputs():
     cm = CrossMatch(os.path.join(os.path.dirname(__file__), 'data/metadata.txt'))

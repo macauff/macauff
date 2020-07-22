@@ -61,6 +61,10 @@ class CrossMatch():
                 raise OSError("Error when trying to create temporary folder for catalogue-level "
                               "outputs. Please ensure that catalogue folder names are correct.")
 
+        if self.include_perturb_auf and self.download_tri and not self.run_auf:
+            raise ValueError("download_tri is True and run_auf is False. Please ensure that "
+                             "run_auf is True if new TRILEGAL simulations are to be downloaded.")
+
     def _replace_line(self, file_name, line_num, text, out_file=None):
         '''
         Helper function to update the metadata file on-the-fly, allowing for
