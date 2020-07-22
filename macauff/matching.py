@@ -54,6 +54,13 @@ class CrossMatch():
             raise OSError("Error when trying to create temporary folder for outputs. "
                           "Please ensure that folder_path is correct.")
 
+        for folder in [self.a_cat_name, self.b_cat_name]:
+            try:
+                os.makedirs('{}/{}'.format(self.folder_path, folder), exist_ok=True)
+            except OSError:
+                raise OSError("Error when trying to create temporary folder for catalogue-level "
+                              "outputs. Please ensure that catalogue folder names are correct.")
+
     def _replace_line(self, file_name, line_num, text, out_file=None):
         '''
         Helper function to update the metadata file on-the-fly, allowing for
@@ -135,7 +142,8 @@ class CrossMatch():
         for check_flag in ['include_perturb_auf', 'include_phot_like', 'run_auf', 'run_group',
                            'run_cf', 'run_star', 'auf_region_type', 'auf_region_frame',
                            'auf_region_points', 'cf_region_type', 'cf_region_frame',
-                           'cf_region_points', 'folder_path', 'a_filt_names', 'b_filt_names']:
+                           'cf_region_points', 'folder_path', 'a_filt_names', 'b_filt_names',
+                           'a_cat_name', 'b_cat_name']:
             if check_flag not in config:
                 raise ValueError("Missing key {} from metadata file.".format(check_flag))
 
@@ -196,3 +204,6 @@ class CrossMatch():
                     raise ValueError('{}filt_names and {}tri_filt_names should contain '
                                      'the same number of entries.'.format(flag, flag))
             setattr(self, '{}filt_names'.format(flag), a)
+
+        self.a_cat_name = config['a_cat_name']
+        self.b_cat_name = config['b_cat_name']

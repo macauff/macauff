@@ -12,6 +12,10 @@ run_group = no
 run_cf = yes
 run_star = yes
 
+# Catalogue names -- used both for folder creation and output file names. Can be created during the cross-match process if AUF simulations have not been performed independently
+a_cat_name = Gaia
+b_cat_name = WISE
+
 # AUF region definition - either "rectangle" for NxM evenly spaced grid points, or "points" to define a list of two-point tuple coordinates, separated by a comma
 auf_region_type = rectangle
 # Frame of the coordinates must be specified -- either "equatorial" or "galactic"

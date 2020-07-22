@@ -232,3 +232,21 @@ def test_crossmatch_psf_param_inputs():
 
         with pytest.raises(ValueError, match=match_text):
             cm = CrossMatch(os.path.join(os.path.dirname(__file__), 'data/metadata_2.txt'))
+
+
+def test_crossmatch_cat_name_inputs():
+    cm = CrossMatch(os.path.join(os.path.dirname(__file__), 'data/metadata.txt'))
+    assert cm.b_cat_name == 'WISE'
+    assert os.path.exists('{}/test_path/WISE'.format(os.getcwd()))
+
+    f = open(os.path.join(os.path.dirname(__file__), 'data/metadata.txt')).readlines()
+    old_line = 'a_cat_name = Gaia'
+    new_line = ''
+    idx = np.where([old_line in line for line in f])[0][0]
+    CrossMatch._replace_line(cm, os.path.join(os.path.dirname(__file__),
+                             'data/metadata.txt'), idx, new_line, out_file=os.path.join(
+                             os.path.dirname(__file__), 'data/metadata_.txt'))
+
+    match_text = 'Missing key a_cat_name'
+    with pytest.raises(ValueError, match=match_text):
+        cm = CrossMatch(os.path.join(os.path.dirname(__file__), 'data/metadata_.txt'))
