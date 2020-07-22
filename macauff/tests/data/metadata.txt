@@ -37,3 +37,14 @@ b_tri_filt_names = W1 W2 W3 W4
 # Filter number to define limiting magnitude of TRILEGAL simulation in, based on output data file column (one-indexed) number
 a_tri_filt_num = 1
 b_tri_filt_num = 11
+
+# Catalogue PSF parameters
+# Filter names are also used in any output file created
+a_filt_names = G G_BP G_RP
+# Full-width at half maximums for each filter, in order, in arcseconds
+a_psf_fwhms = 0.12 0.12 0.12
+# The source count vs magnitude scaling relations z for bright sources, following the geometric series z^mag
+a_norm_scale_laws = 2 2 2
+b_filt_names = W1 W2 W3 W4
+b_psf_fwhms = 6.08 6.84 7.36 11.99
+b_norm_scale_laws = 2 2 2 2

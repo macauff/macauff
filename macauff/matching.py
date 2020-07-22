@@ -135,7 +135,7 @@ class CrossMatch():
         for check_flag in ['include_perturb_auf', 'include_phot_like', 'run_auf', 'run_group',
                            'run_cf', 'run_star', 'auf_region_type', 'auf_region_frame',
                            'auf_region_points', 'cf_region_type', 'cf_region_frame',
-                           'cf_region_points', 'folder_path']:
+                           'cf_region_points', 'folder_path', 'a_filt_names', 'b_filt_names']:
             if check_flag not in config:
                 raise ValueError("Missing key {} from metadata file.".format(check_flag))
 
@@ -157,7 +157,8 @@ class CrossMatch():
         # parameters if we are using the perturbation AUF component.
         if self.include_perturb_auf:
             for check_flag in ['a_tri_set_name', 'b_tri_set_name', 'a_tri_filt_names',
-                               'b_tri_filt_names']:
+                               'b_tri_filt_names', 'a_psf_fwhms', 'a_norm_scale_laws',
+                               'b_psf_fwhms', 'b_norm_scale_laws']:
                 if check_flag not in config:
                     raise ValueError("Missing key {} from metadata file.".format(check_flag))
             self.a_tri_set_name = config['a_tri_set_name']
@@ -173,3 +174,25 @@ class CrossMatch():
                         raise ValueError("{} should be a single integer number.".format(flag))
                 except ValueError:
                     raise ValueError("{} should be a single integer number.".format(flag))
+
+            # These parameters are also only used if we are using the
+            # Perturbation AUF component.
+            for flag in ['a_', 'b_']:
+                for name in ['psf_fwhms', 'norm_scale_laws']:
+                    a = config['{}{}'.format(flag, name)].split()
+                    try:
+                        b = np.array([float(f) for f in a])
+                    except ValueError:
+                        raise ValueError('{}{} should be a list of floats.'.format(flag, name))
+                    if len(b) != len(getattr(self, '{}tri_filt_names'.format(flag))):
+                        raise ValueError('{}{} and {}tri_filt_names should contain the '
+                                         'same number of entries.'.format(flag, name, flag))
+                    setattr(self, '{}{}'.format(flag, name), b)
+
+        for flag in ['a_', 'b_']:
+            a = config['{}filt_names'.format(flag)].split()
+            if self.include_perturb_auf:
+                if len(a) != len(getattr(self, '{}tri_filt_names'.format(flag))):
+                    raise ValueError('{}filt_names and {}tri_filt_names should contain '
+                                     'the same number of entries.'.format(flag, flag))
+            setattr(self, '{}filt_names'.format(flag), a)

@@ -196,3 +196,39 @@ def test_crossmatch_tri_inputs():
 
         with pytest.raises(ValueError, match=match_text):
             cm = CrossMatch(os.path.join(os.path.dirname(__file__), 'data/metadata_2.txt'))
+
+
+def test_crossmatch_psf_param_inputs():
+    cm = CrossMatch(os.path.join(os.path.dirname(__file__), 'data/metadata.txt'))
+    assert not hasattr(cm, 'a_psf_fwhms')
+    assert np.all(cm.b_filt_names == np.array(['W1', 'W2', 'W3', 'W4']))
+
+    f = open(os.path.join(os.path.dirname(__file__), 'data/metadata.txt')).readlines()
+    old_line = 'include_perturb_auf = no'
+    new_line = 'include_perturb_auf = yes\n'
+    idx = np.where([old_line in line for line in f])[0][0]
+    CrossMatch._replace_line(cm, os.path.join(os.path.dirname(__file__),
+                             'data/metadata.txt'), idx, new_line, out_file=os.path.join(
+                             os.path.dirname(__file__), 'data/metadata_.txt'))
+
+    cm = CrossMatch(os.path.join(os.path.dirname(__file__), 'data/metadata_.txt'))
+    assert np.all(cm.a_psf_fwhms == np.array([0.12, 0.12, 0.12]))
+    assert np.all(cm.b_norm_scale_laws == np.array([2, 2, 2, 2]))
+
+    # List of simple one line config file replacements for error message checking
+    for old_line, new_line, match_text in zip(
+        ['a_filt_names = G G_BP G_RP', 'a_filt_names = G G_BP G_RP', 'a_norm_scale_laws = 2 2 2',
+         'b_psf_fwhms = 6.08 6.84 7.36 11.99', 'b_psf_fwhms = 6.08 6.84 7.36 11.99'],
+        ['', 'a_filt_names = G G_BP\n', 'a_norm_scale_laws = 2 2 a\n',
+         'b_psf_fwhms = 6.08 6.84 7.36\n', 'b_psf_fwhms = 6.08 6.84 7.36 word\n'],
+        ['Missing key a_filt_names', 'a_filt_names and a_tri_filt_names should contain the same',
+         'a_norm_scale_laws should be a list of floats.',
+         'b_psf_fwhms and b_tri_filt_names should contain the same',
+         'b_psf_fwhms should be a list of floats.']):
+        idx = np.where([old_line in line for line in f])[0][0]
+        CrossMatch._replace_line(cm, os.path.join(os.path.dirname(__file__),
+                                 'data/metadata_.txt'), idx, new_line, out_file=os.path.join(
+                                 os.path.dirname(__file__), 'data/metadata_2.txt'))
+
+        with pytest.raises(ValueError, match=match_text):
+            cm = CrossMatch(os.path.join(os.path.dirname(__file__), 'data/metadata_2.txt'))
