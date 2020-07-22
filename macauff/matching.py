@@ -166,9 +166,10 @@ class CrossMatch():
         if self.include_perturb_auf:
             for check_flag in ['a_tri_set_name', 'b_tri_set_name', 'a_tri_filt_names',
                                'b_tri_filt_names', 'a_psf_fwhms', 'a_norm_scale_laws',
-                               'b_psf_fwhms', 'b_norm_scale_laws']:
+                               'b_psf_fwhms', 'b_norm_scale_laws', 'download_tri']:
                 if check_flag not in config:
                     raise ValueError("Missing key {} from metadata file.".format(check_flag))
+            self.download_tri = self._str2bool(config['download_tri'])
             self.a_tri_set_name = config['a_tri_set_name']
             self.b_tri_set_name = config['b_tri_set_name']
             self.a_tri_filt_names = np.array(config['a_tri_filt_names'].split())

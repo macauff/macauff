@@ -41,6 +41,8 @@ b_tri_filt_names = W1 W2 W3 W4
 # Filter number to define limiting magnitude of TRILEGAL simulation in, based on output data file column (one-indexed) number
 a_tri_filt_num = 1
 b_tri_filt_num = 11
+# Flag to determine whether to re-download TRILEGAL simulations if they exist - must be "yes"/"no", "true"/"false", "t"/"f", or "1"/"0"
+download_tri = no
 
 # Catalogue PSF parameters
 # Filter names are also used in any output file created

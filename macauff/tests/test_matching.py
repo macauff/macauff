@@ -182,13 +182,15 @@ def test_crossmatch_tri_inputs():
     assert cm.a_tri_set_name == 'gaiadr2'
     assert np.all(cm.b_tri_filt_names == np.array(['W1', 'W2', 'W3', 'W4']))
     assert cm.a_tri_filt_num == 1
+    assert not cm.download_tri
 
     # List of simple one line config file replacements for error message checking
     for old_line, new_line, match_text in zip(
-        ['a_tri_set_name = gaiadr2', 'b_tri_filt_num = 11', 'b_tri_filt_num = 11'],
-        ['', 'b_tri_filt_num = a\n', 'b_tri_filt_num = 3.4\n'],
+        ['a_tri_set_name = gaiadr2', 'b_tri_filt_num = 11', 'b_tri_filt_num = 11',
+         'download_tri = no'],
+        ['', 'b_tri_filt_num = a\n', 'b_tri_filt_num = 3.4\n', 'download_tri = aye\n'],
         ['Missing key a_tri_set_name', 'b_tri_filt_num should be a single',
-         'b_tri_filt_num should be a single']):
+         'b_tri_filt_num should be a single', 'Boolean flag key not set']):
         idx = np.where([old_line in line for line in f])[0][0]
         CrossMatch._replace_line(cm, os.path.join(os.path.dirname(__file__),
                                  'data/metadata_.txt'), idx, new_line, out_file=os.path.join(
