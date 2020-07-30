@@ -21,18 +21,27 @@ class CrossMatch():
 
     Parameters
     ----------
-    file_path : string
+    joint_file_path : string
         A path to the location of the file containing the cross-match metadata.
+    cat_a_file_path : string
+        A path to the location of the file containing the catalogue "a" specific
+        metadata.
+    cat_b_file_path : string
+        A path to the location of the file containing the catalogue "b" specific
+        metadata.
     '''
 
-    def __init__(self, file_path):
+    def __init__(self, joint_file_path, cat_a_file_path, cat_b_file_path):
         '''
         Initialisation function for cross-match class.
         '''
-        if not os.path.isfile(file_path):
-            raise FileNotFoundError("Metadata file could not be found at specified location.")
+        for f in [joint_file_path, cat_a_file_path, cat_b_file_path]:
+            if not os.path.isfile(f):
+                raise FileNotFoundError("Input parameter file {} could not be found.".format(f))
 
-        self.file_path = file_path
+        self.joint_file_path = joint_file_path
+        self.cat_a_file_path = cat_a_file_path
+        self.cat_b_file_path = cat_b_file_path
 
         self.read_metadata()
 
@@ -49,21 +58,24 @@ class CrossMatch():
 
         # Ensure that we can create the folder for outputs.
         try:
-            os.makedirs(self.folder_path, exist_ok=True)
+            os.makedirs(self.joint_folder_path, exist_ok=True)
         except OSError:
-            raise OSError("Error when trying to create temporary folder for outputs. "
-                          "Please ensure that folder_path is correct.")
+            raise OSError("Error when trying to create temporary folder for joint outputs. "
+                          "Please ensure that joint_folder_path is correct.")
 
         for folder in [self.a_cat_name, self.b_cat_name]:
             try:
-                os.makedirs('{}/{}'.format(self.folder_path, folder), exist_ok=True)
+                os.makedirs('{}/{}'.format(self.joint_folder_path, folder), exist_ok=True)
             except OSError:
                 raise OSError("Error when trying to create temporary folder for catalogue-level "
                               "outputs. Please ensure that catalogue folder names are correct.")
 
-        if self.include_perturb_auf and self.download_tri and not self.run_auf:
-            raise ValueError("download_tri is True and run_auf is False. Please ensure that "
-                             "run_auf is True if new TRILEGAL simulations are to be downloaded.")
+        if self.include_perturb_auf:
+            for tri_flag, catname in zip([self.a_download_tri, self.b_download_tri], ['a_', 'b_']):
+                if tri_flag and not self.run_auf:
+                    raise ValueError("{}download_tri is True and run_auf is False. Please ensure "
+                                     "that run_auf is True if new TRILEGAL simulations are to be "
+                                     "downloaded.".format(catname))
 
     def _replace_line(self, file_name, line_num, text, out_file=None):
         '''
@@ -138,77 +150,102 @@ class CrossMatch():
         '''
         Helper function to read in metadata and set various class attributes.
         '''
-        config = ConfigParser()
-        with open(self.file_path) as f:
-            config.read_string('[config]\n' + f.read())
-        config = config['config']
+        joint_config = ConfigParser()
+        with open(self.joint_file_path) as f:
+            joint_config.read_string('[config]\n' + f.read())
+        joint_config = joint_config['config']
+        cat_a_config = ConfigParser()
+        with open(self.cat_a_file_path) as f:
+            cat_a_config.read_string('[config]\n' + f.read())
+        cat_a_config = cat_a_config['config']
+        cat_b_config = ConfigParser()
+        with open(self.cat_b_file_path) as f:
+            cat_b_config.read_string('[config]\n' + f.read())
+        cat_b_config = cat_b_config['config']
 
         for check_flag in ['include_perturb_auf', 'include_phot_like', 'run_auf', 'run_group',
-                           'run_cf', 'run_star', 'auf_region_type', 'auf_region_frame',
-                           'auf_region_points', 'cf_region_type', 'cf_region_frame',
-                           'cf_region_points', 'folder_path', 'a_filt_names', 'b_filt_names',
-                           'a_cat_name', 'b_cat_name']:
-            if check_flag not in config:
-                raise ValueError("Missing key {} from metadata file.".format(check_flag))
+                           'run_cf', 'run_star', 'cf_region_type', 'cf_region_frame',
+                           'cf_region_points', 'folder_path']:
+            if check_flag not in joint_config:
+                raise ValueError("Missing key {} from joint metadata file.".format(check_flag))
+
+        for config, catname in zip([cat_a_config, cat_b_config], ['"a"', '"b"']):
+            for check_flag in ['auf_region_type', 'auf_region_frame', 'auf_region_points',
+                               'filt_names', 'cat_name']:
+                if check_flag not in config:
+                    raise ValueError("Missing key {} from catalogue {} metadata file.".format(
+                                     check_flag, catname))
 
         for run_flag in ['include_perturb_auf', 'include_phot_like', 'run_auf', 'run_group',
                          'run_cf', 'run_star']:
-            setattr(self, run_flag, self._str2bool(config[run_flag]))
+            setattr(self, run_flag, self._str2bool(joint_config[run_flag]))
 
-        self._make_regions_points(['auf_region_type', config['auf_region_type']],
-                                  ['auf_region_frame', config['auf_region_frame']],
-                                  ['auf_region_points', config['auf_region_points']])
+        for config, catname in zip([cat_a_config, cat_b_config], ['a_', 'b_']):
+            self._make_regions_points(['{}auf_region_type'.format(catname),
+                                       config['auf_region_type']],
+                                      ['{}auf_region_frame'.format(catname),
+                                       config['auf_region_frame']],
+                                      ['{}auf_region_points'.format(catname),
+                                       config['auf_region_points']])
 
-        self._make_regions_points(['cf_region_type', config['cf_region_type']],
-                                  ['cf_region_frame', config['cf_region_frame']],
-                                  ['cf_region_points', config['cf_region_points']])
+        self._make_regions_points(['cf_region_type', joint_config['cf_region_type']],
+                                  ['cf_region_frame', joint_config['cf_region_frame']],
+                                  ['cf_region_points', joint_config['cf_region_points']])
 
-        self.folder_path = os.path.abspath(config['folder_path'])
+        self.joint_folder_path = os.path.abspath(joint_config['folder_path'])
+
+        self.a_filt_names = np.array(cat_a_config['filt_names'].split())
+        self.b_filt_names = np.array(cat_b_config['filt_names'].split())
 
         # Only have to check for the existence of Pertubation AUF-related
         # parameters if we are using the perturbation AUF component.
         if self.include_perturb_auf:
-            for check_flag in ['a_tri_set_name', 'b_tri_set_name', 'a_tri_filt_names',
-                               'b_tri_filt_names', 'a_psf_fwhms', 'a_norm_scale_laws',
-                               'b_psf_fwhms', 'b_norm_scale_laws', 'download_tri']:
-                if check_flag not in config:
-                    raise ValueError("Missing key {} from metadata file.".format(check_flag))
-            self.download_tri = self._str2bool(config['download_tri'])
-            self.a_tri_set_name = config['a_tri_set_name']
-            self.b_tri_set_name = config['b_tri_set_name']
-            self.a_tri_filt_names = np.array(config['a_tri_filt_names'].split())
-            self.b_tri_filt_names = np.array(config['b_tri_filt_names'].split())
-            for flag in ['a_tri_filt_num', 'b_tri_filt_num']:
+            for config, catname in zip([cat_a_config, cat_b_config], ['"a"', '"b"']):
+                for check_flag in ['tri_set_name', 'tri_filt_names', 'psf_fwhms',
+                                   'norm_scale_laws', 'download_tri']:
+                    if check_flag not in config:
+                        raise ValueError("Missing key {} from catalogue {} metadata file.".format(
+                                         check_flag, catname))
+            self.a_download_tri = self._str2bool(cat_a_config['download_tri'])
+            self.b_download_tri = self._str2bool(cat_b_config['download_tri'])
+            self.a_tri_set_name = cat_a_config['tri_set_name']
+            self.b_tri_set_name = cat_b_config['tri_set_name']
+            for config, flag in zip([cat_a_config, cat_b_config], ['a_', 'b_']):
+                a = config['tri_filt_names'].split()
+                if len(a) != len(getattr(self, '{}filt_names'.format(flag))):
+                    raise ValueError('{}tri_filt_names and {}filt_names should contain the '
+                                     'same number of entries.'.format(flag, flag))
+                setattr(self, '{}tri_filt_names'.format(flag),
+                        np.array(config['tri_filt_names'].split()))
+
+            for config, catname, flag in zip([cat_a_config, cat_b_config], ['"a"', '"b"'],
+                                             ['a_', 'b_']):
                 try:
-                    a = config[flag]
+                    a = config['tri_filt_num']
                     if float(a).is_integer():
-                        setattr(self, flag, int(a))
+                        setattr(self, '{}tri_filt_num'.format(flag), int(a))
                     else:
-                        raise ValueError("{} should be a single integer number.".format(flag))
+                        raise ValueError("tri_filt_num should be a single integer number in "
+                                         "catalogue {} metadata file.".format(catname))
                 except ValueError:
-                    raise ValueError("{} should be a single integer number.".format(flag))
+                    raise ValueError("tri_filt_num should be a single integer number in "
+                                     "catalogue {} metadata file.".format(catname))
 
             # These parameters are also only used if we are using the
             # Perturbation AUF component.
-            for flag in ['a_', 'b_']:
+            for config, catname, flag in zip([cat_a_config, cat_b_config], ['"a"', '"b"'],
+                                             ['a_', 'b_']):
                 for name in ['psf_fwhms', 'norm_scale_laws']:
-                    a = config['{}{}'.format(flag, name)].split()
+                    a = config[name].split()
                     try:
                         b = np.array([float(f) for f in a])
                     except ValueError:
-                        raise ValueError('{}{} should be a list of floats.'.format(flag, name))
-                    if len(b) != len(getattr(self, '{}tri_filt_names'.format(flag))):
-                        raise ValueError('{}{} and {}tri_filt_names should contain the '
+                        raise ValueError('{} should be a list of floats in catalogue {} metadata '
+                                         'file.'.format(name, catname))
+                    if len(b) != len(getattr(self, '{}filt_names'.format(flag))):
+                        raise ValueError('{}{} and {}filt_names should contain the '
                                          'same number of entries.'.format(flag, name, flag))
                     setattr(self, '{}{}'.format(flag, name), b)
 
-        for flag in ['a_', 'b_']:
-            a = config['{}filt_names'.format(flag)].split()
-            if self.include_perturb_auf:
-                if len(a) != len(getattr(self, '{}tri_filt_names'.format(flag))):
-                    raise ValueError('{}filt_names and {}tri_filt_names should contain '
-                                     'the same number of entries.'.format(flag, flag))
-            setattr(self, '{}filt_names'.format(flag), a)
-
-        self.a_cat_name = config['a_cat_name']
-        self.b_cat_name = config['b_cat_name']
+        self.a_cat_name = cat_a_config['cat_name']
+        self.b_cat_name = cat_b_config['cat_name']
