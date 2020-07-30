@@ -16,7 +16,7 @@ jobs:
 
       - name: Install Tox and any other packages
         run: |
-          sudo ln -s /usr/bin/gfortran-9 /usr/bin/gfortran
+          sudo ln -sf /usr/bin/gfortran-9 /usr/bin/gfortran
           pip install numpy
           pip install tox
       - name: Run tests
