@@ -25,3 +25,6 @@ auf_region_frame = equatorial
 # For "points" this should be individually specified (ra, dec) or (l, b) coordinates [as "(a, b), (c, d)"]
 # For "rectangle" this should be 6 numbers: start coordinate, end coordinate, integer number of data points from start to end (inclusive of both start and end), first for ra/l, then for dec/b (depending on auf_region_type), all separated by spaces
 auf_region_points = 131 134 4 -1 1 4
+
+# Local density calculation radius, in arcseconds
+dens_dist = 900

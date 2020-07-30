@@ -165,13 +165,13 @@ class CrossMatch():
 
         for check_flag in ['include_perturb_auf', 'include_phot_like', 'run_auf', 'run_group',
                            'run_cf', 'run_star', 'cf_region_type', 'cf_region_frame',
-                           'cf_region_points', 'folder_path']:
+                           'cf_region_points', 'folder_path', 'pos_corr_dist']:
             if check_flag not in joint_config:
                 raise ValueError("Missing key {} from joint metadata file.".format(check_flag))
 
         for config, catname in zip([cat_a_config, cat_b_config], ['"a"', '"b"']):
             for check_flag in ['auf_region_type', 'auf_region_frame', 'auf_region_points',
-                               'filt_names', 'cat_name']:
+                               'filt_names', 'cat_name', 'dens_dist']:
                 if check_flag not in config:
                     raise ValueError("Missing key {} from catalogue {} metadata file.".format(
                                      check_flag, catname))
@@ -249,3 +249,15 @@ class CrossMatch():
 
         self.a_cat_name = cat_a_config['cat_name']
         self.b_cat_name = cat_b_config['cat_name']
+
+        try:
+            self.pos_corr_dist = float(joint_config['pos_corr_dist'])
+        except ValueError:
+            raise ValueError("pos_corr_dist must be a float.")
+
+        for config, catname, flag in zip([cat_a_config, cat_b_config], ['"a"', '"b"'],
+                                         ['a_', 'b_']):
+            try:
+                setattr(self, '{}dens_dist'.format(flag), float(config['dens_dist']))
+            except ValueError:
+                raise ValueError("dens_dist in catalogue {} must be a float.".format(catname))
