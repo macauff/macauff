@@ -4,7 +4,7 @@ include_phot_like = no
 
 # File paths
 # Top-level folder for all temporary cross-match files to be created in. Should be absolute path, or relative to folder script called in
-folder_path = test_path
+joint_folder_path = test_path
 
 # Flags for each stage of the match process - must be "yes"/"no", "true"/"false", "t"/"f", or "1"/"0"
 run_auf = no

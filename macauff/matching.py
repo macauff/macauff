@@ -63,6 +63,15 @@ class CrossMatch():
             raise OSError("Error when trying to create temporary folder for joint outputs. "
                           "Please ensure that joint_folder_path is correct.")
 
+        for path, catname, flag in zip([self.a_auf_folder_path, self.b_auf_folder_path],
+                                       ['"a"', '"b"'], ['a_', 'b_']):
+            try:
+                os.makedirs(path, exist_ok=True)
+            except OSError:
+                raise OSError("Error when trying to create temporary folder for catalogue {} AUF "
+                              "outputs. Please ensure that {}auf_folder_path is correct."
+                              .format(catname, flag))
+
         for folder in [self.a_cat_name, self.b_cat_name]:
             try:
                 os.makedirs('{}/{}'.format(self.joint_folder_path, folder), exist_ok=True)
@@ -165,13 +174,13 @@ class CrossMatch():
 
         for check_flag in ['include_perturb_auf', 'include_phot_like', 'run_auf', 'run_group',
                            'run_cf', 'run_star', 'cf_region_type', 'cf_region_frame',
-                           'cf_region_points', 'folder_path', 'pos_corr_dist']:
+                           'cf_region_points', 'joint_folder_path', 'pos_corr_dist']:
             if check_flag not in joint_config:
                 raise ValueError("Missing key {} from joint metadata file.".format(check_flag))
 
         for config, catname in zip([cat_a_config, cat_b_config], ['"a"', '"b"']):
             for check_flag in ['auf_region_type', 'auf_region_frame', 'auf_region_points',
-                               'filt_names', 'cat_name', 'dens_dist']:
+                               'filt_names', 'cat_name', 'dens_dist', 'auf_folder_path']:
                 if check_flag not in config:
                     raise ValueError("Missing key {} from catalogue {} metadata file.".format(
                                      check_flag, catname))
@@ -192,7 +201,9 @@ class CrossMatch():
                                   ['cf_region_frame', joint_config['cf_region_frame']],
                                   ['cf_region_points', joint_config['cf_region_points']])
 
-        self.joint_folder_path = os.path.abspath(joint_config['folder_path'])
+        self.joint_folder_path = os.path.abspath(joint_config['joint_folder_path'])
+        self.a_auf_folder_path = os.path.abspath(cat_a_config['auf_folder_path'])
+        self.b_auf_folder_path = os.path.abspath(cat_b_config['auf_folder_path'])
 
         self.a_filt_names = np.array(cat_a_config['filt_names'].split())
         self.b_filt_names = np.array(cat_b_config['filt_names'].split())

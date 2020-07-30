@@ -220,23 +220,36 @@ def test_crossmatch_folder_path_inputs():
                     os.path.join(os.path.dirname(__file__), 'data/cat_b_params.txt'))
     assert cm.joint_folder_path == os.path.join(os.getcwd(), 'test_path')
     assert os.path.isdir(os.path.join(os.getcwd(), 'test_path'))
-    f = open(os.path.join(os.path.dirname(__file__), 'data/crossmatch_params.txt')).readlines()
+    assert cm.a_auf_folder_path == os.path.join(os.getcwd(), 'gaia_auf_folder')
+    assert cm.b_auf_folder_path == os.path.join(os.getcwd(), 'wise_auf_folder')
+
     # List of simple one line config file replacements for error message checking
-    for old_line, new_line, match_text, error in zip(
-            ['folder_path = test_path', 'folder_path = test_path'],
-            ['', 'folder_path = /User/test/some/path/\n'],
-            ['Missing key', 'Error when trying to create temporary'],
-            [ValueError, OSError]):
+    for old_line, new_line, match_text, error, in_file in zip(
+            ['joint_folder_path = test_path', 'joint_folder_path = test_path',
+             'auf_folder_path = gaia_auf_folder', 'auf_folder_path = wise_auf_folder'],
+            ['', 'joint_folder_path = /User/test/some/path/\n', '',
+             'auf_folder_path = /User/test/some/path\n'],
+            ['Missing key', 'Error when trying to create temporary',
+             'Missing key auf_folder_path from catalogue "a"',
+             'folder for catalogue "b" AUF outputs. Please ensure that b_auf_folder_path'],
+            [ValueError, OSError, ValueError, OSError],
+            ['crossmatch_params', 'crossmatch_params', 'cat_a_params', 'cat_b_params']):
+        f = open(os.path.join(os.path.dirname(__file__),
+                 'data/{}.txt'.format(in_file))).readlines()
         idx = np.where([old_line in line for line in f])[0][0]
         CrossMatch._replace_line(cm, os.path.join(os.path.dirname(__file__),
-                                 'data/crossmatch_params.txt'), idx, new_line,
+                                 'data/{}.txt'.format(in_file)), idx, new_line,
                                  out_file=os.path.join(
-                                 os.path.dirname(__file__), 'data/crossmatch_params_.txt'))
+                                 os.path.dirname(__file__), 'data/{}_.txt'.format(in_file)))
 
         with pytest.raises(error, match=match_text):
-            cm = CrossMatch(os.path.join(os.path.dirname(__file__), 'data/crossmatch_params_.txt'),
-                            os.path.join(os.path.dirname(__file__), 'data/cat_a_params.txt'),
-                            os.path.join(os.path.dirname(__file__), 'data/cat_b_params.txt'))
+            cm = CrossMatch(os.path.join(os.path.dirname(__file__),
+                            'data/crossmatch_params{}.txt'.format(
+                            '_' if 'h_p' in in_file else '')),
+                            os.path.join(os.path.dirname(__file__),
+                            'data/cat_a_params{}.txt'.format('_' if '_a_' in in_file else '')),
+                            os.path.join(os.path.dirname(__file__),
+                            'data/cat_b_params{}.txt'.format('_' if '_b_' in in_file else '')))
 
 
 def test_crossmatch_tri_inputs():
