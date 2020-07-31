@@ -404,3 +404,31 @@ def test_crossmatch_search_inputs():
                             'data/cat_a_params{}.txt'.format('_' if '_a_' in in_file else '')),
                             os.path.join(os.path.dirname(__file__),
                             'data/cat_b_params{}.txt'.format('_' if '_b_' in in_file else '')))
+
+
+def test_crossmatch_fourier_inputs():
+    cm = CrossMatch(os.path.join(os.path.dirname(__file__), 'data/crossmatch_params.txt'),
+                    os.path.join(os.path.dirname(__file__), 'data/cat_a_params.txt'),
+                    os.path.join(os.path.dirname(__file__), 'data/cat_b_params.txt'))
+    assert cm.real_hankel_points == 10000
+    assert cm.four_hankel_points == 10000
+    assert cm.four_max_rho == 100
+
+    # List of simple one line config file replacements for error message checking
+    for old_line, new_line, match_text in zip(
+            ['real_hankel_points = 10000', 'four_hankel_points = 10000', 'four_max_rho = 100'],
+            ['', 'four_hankel_points = 10000.1\n', 'four_max_rho = word\n'],
+            ['Missing key real_hankel_points', 'four_hankel_points should be an integer.',
+             'four_max_rho should be an integer.']):
+        f = open(os.path.join(os.path.dirname(__file__),
+                              'data/crossmatch_params.txt')).readlines()
+        idx = np.where([old_line in line for line in f])[0][0]
+        CrossMatch._replace_line(cm, os.path.join(os.path.dirname(__file__),
+                                 'data/crossmatch_params.txt'), idx, new_line,
+                                 out_file=os.path.join(
+                                 os.path.dirname(__file__), 'data/crossmatch_params_.txt'))
+
+        with pytest.raises(ValueError, match=match_text):
+            cm = CrossMatch(os.path.join(os.path.dirname(__file__), 'data/crossmatch_params_.txt'),
+                            os.path.join(os.path.dirname(__file__), 'data/cat_a_params.txt'),
+                            os.path.join(os.path.dirname(__file__), 'data/cat_b_params.txt'))

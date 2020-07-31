@@ -22,3 +22,11 @@ cf_region_points = 131 134 4 -1 1 3
 
 # Maximum separation, in arcseconds, between two sources for them to be deemed positionally correlated
 pos_corr_dist = 11
+
+# Convolution (fourier transform) parameters
+# Integer number of real space grid points, for Hankel transformations
+real_hankel_points = 10000
+# Integer number of fourier space grid points
+four_hankel_points = 10000
+# Maximum fourier space "rho" parameter considered (typically larger than the inverse of the smallest Gaussian sigma)
+four_max_rho = 100

@@ -174,7 +174,8 @@ class CrossMatch():
 
         for check_flag in ['include_perturb_auf', 'include_phot_like', 'run_auf', 'run_group',
                            'run_cf', 'run_star', 'cf_region_type', 'cf_region_frame',
-                           'cf_region_points', 'joint_folder_path', 'pos_corr_dist']:
+                           'cf_region_points', 'joint_folder_path', 'pos_corr_dist',
+                           'real_hankel_points', 'four_hankel_points', 'four_max_rho']:
             if check_flag not in joint_config:
                 raise ValueError("Missing key {} from joint metadata file.".format(check_flag))
 
@@ -272,3 +273,13 @@ class CrossMatch():
                 setattr(self, '{}dens_dist'.format(flag), float(config['dens_dist']))
             except ValueError:
                 raise ValueError("dens_dist in catalogue {} must be a float.".format(catname))
+
+        for flag in ['real_hankel_points', 'four_hankel_points', 'four_max_rho']:
+            a = joint_config[flag]
+            try:
+                a = float(a)
+            except ValueError:
+                raise ValueError("{} should be an integer.".format(flag))
+            if not a.is_integer():
+                raise ValueError("{} should be an integer.".format(flag))
+            setattr(self, flag, int(a))
