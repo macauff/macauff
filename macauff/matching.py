@@ -86,6 +86,8 @@ class CrossMatch():
                                      "that run_auf is True if new TRILEGAL simulations are to be "
                                      "downloaded.".format(catname))
 
+        self.make_shared_data()
+
     def _replace_line(self, file_name, line_num, text, out_file=None):
         '''
         Helper function to update the metadata file on-the-fly, allowing for
@@ -254,17 +256,29 @@ class CrossMatch():
             # Perturbation AUF component.
             for config, catname, flag in zip([cat_a_config, cat_b_config], ['"a"', '"b"'],
                                              ['a_', 'b_']):
-                for name in ['psf_fwhms', 'norm_scale_laws']:
-                    a = config[name].split()
-                    try:
-                        b = np.array([float(f) for f in a])
-                    except ValueError:
-                        raise ValueError('{} should be a list of floats in catalogue {} metadata '
-                                         'file.'.format(name, catname))
-                    if len(b) != len(getattr(self, '{}filt_names'.format(flag))):
-                        raise ValueError('{}{} and {}filt_names should contain the '
-                                         'same number of entries.'.format(flag, name, flag))
-                    setattr(self, '{}{}'.format(flag, name), b)
+                a = config['norm_scale_laws'].split()
+                try:
+                    b = np.array([float(f) for f in a])
+                except ValueError:
+                    raise ValueError('norm_scale_laws should be a list of floats in '
+                                     'catalogue {} metadata file.'.format(catname))
+                if len(b) != len(getattr(self, '{}filt_names'.format(flag))):
+                    raise ValueError('{}norm_scale_laws and {}filt_names should contain the '
+                                     'same number of entries.'.format(flag, flag))
+                setattr(self, '{}norm_scale_laws'.format(flag), b)
+
+        for config, catname, flag in zip([cat_a_config, cat_b_config], ['"a"', '"b"'],
+                                         ['a_', 'b_']):
+            a = config['psf_fwhms'].split()
+            try:
+                b = np.array([float(f) for f in a])
+            except ValueError:
+                raise ValueError('psf_fwhms should be a list of floats in catalogue {} metadata '
+                                 'file.'.format(catname))
+            if len(b) != len(getattr(self, '{}filt_names'.format(flag))):
+                raise ValueError('{}psf_fwhms and {}filt_names should contain the '
+                                 'same number of entries.'.format(flag, flag))
+            setattr(self, '{}psf_fwhms'.format(flag), b)
 
         self.a_cat_name = cat_a_config['cat_name']
         self.b_cat_name = cat_b_config['cat_name']
@@ -308,3 +322,10 @@ class CrossMatch():
                 raise ValueError("mem_chunk_num should be a single integer number.")
         except ValueError:
             raise ValueError("mem_chunk_num should be a single integer number.")
+
+    def make_shared_data(self):
+        maximumoffset = 1.185 * max([np.amax(self.a_psf_fwhms), np.amax(self.b_psf_fwhms)])
+        self.r = np.linspace(0, maximumoffset, self.real_hankel_points)
+        self.dr = np.diff(self.r)
+        self.rho = np.linspace(0, self.four_max_rho, self.four_hankel_points)
+        self.drho = np.diff(self.rho)
