@@ -175,7 +175,8 @@ class CrossMatch():
         for check_flag in ['include_perturb_auf', 'include_phot_like', 'run_auf', 'run_group',
                            'run_cf', 'run_star', 'cf_region_type', 'cf_region_frame',
                            'cf_region_points', 'joint_folder_path', 'pos_corr_dist',
-                           'real_hankel_points', 'four_hankel_points', 'four_max_rho']:
+                           'real_hankel_points', 'four_hankel_points', 'four_max_rho',
+                           'cross_match_extent']:
             if check_flag not in joint_config:
                 raise ValueError("Missing key {} from joint metadata file.".format(check_flag))
 
@@ -289,3 +290,12 @@ class CrossMatch():
             if not a.is_integer():
                 raise ValueError("{} should be an integer.".format(flag))
             setattr(self, flag, int(a))
+
+        a = joint_config['cross_match_extent'].split()
+        try:
+            b = np.array([float(f) for f in a])
+        except ValueError:
+            raise ValueError("All elements of cross_match_extent should be floats.")
+        if len(b) != 4:
+            raise ValueError("cross_match_extent should contain four elements.")
+        self.cross_match_extent = b

@@ -30,3 +30,6 @@ real_hankel_points = 10000
 four_hankel_points = 10000
 # Maximum fourier space "rho" parameter considered (typically larger than the inverse of the smallest Gaussian sigma)
 four_max_rho = 100
+
+# Maximum extent of cross-match, used in non-all-sky cases to remove sources suffering potential edge effects -- min/max first axis coordinates (ra/l) then min/max second axis coordinates (dec/b)
+cross_match_extent = 131 138 -3 3

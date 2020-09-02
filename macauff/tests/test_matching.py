@@ -470,3 +470,35 @@ def test_crossmatch_frame_equality():
                             'data/cat_a_params{}.txt'.format('_' if '_a_' in in_file else '')),
                             os.path.join(os.path.dirname(__file__),
                             'data/cat_b_params{}.txt'.format('_' if '_b_' in in_file else '')))
+
+
+def test_cross_match_extent():
+    cm = CrossMatch(os.path.join(os.path.dirname(__file__), 'data/crossmatch_params.txt'),
+                    os.path.join(os.path.dirname(__file__), 'data/cat_a_params.txt'),
+                    os.path.join(os.path.dirname(__file__), 'data/cat_b_params.txt'))
+    assert np.all(cm.cross_match_extent == np.array([131, 138, -3, 3]))
+
+    # List of simple one line config file replacements for error message checking
+    in_file = 'crossmatch_params'
+    f = open(os.path.join(os.path.dirname(__file__),
+                          'data/{}.txt'.format(in_file))).readlines()
+    old_line = 'cross_match_extent = 131 138 -3 3'
+    for new_line, match_text in zip(
+            ['', 'cross_match_extent = 131 138 -3 word\n', 'cross_match_extent = 131 138 -3\n',
+             'cross_match_extent = 131 138 -3 3 1'],
+            ['Missing key cross_match_extent', 'All elements of cross_match_extent should be',
+             'cross_match_extent should contain.', 'cross_match_extent should contain']):
+        idx = np.where([old_line in line for line in f])[0][0]
+        CrossMatch._replace_line(cm, os.path.join(os.path.dirname(__file__),
+                                 'data/{}.txt'.format(in_file)), idx, new_line,
+                                 out_file=os.path.join(
+                                 os.path.dirname(__file__), 'data/{}_.txt'.format(in_file)))
+
+        with pytest.raises(ValueError, match=match_text):
+            cm = CrossMatch(os.path.join(os.path.dirname(__file__),
+                            'data/crossmatch_params{}.txt'.format(
+                            '_' if 'h_p' in in_file else '')),
+                            os.path.join(os.path.dirname(__file__),
+                            'data/cat_a_params{}.txt'.format('_' if '_a_' in in_file else '')),
+                            os.path.join(os.path.dirname(__file__),
+                            'data/cat_b_params{}.txt'.format('_' if '_b_' in in_file else '')))
