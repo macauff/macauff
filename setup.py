@@ -3,5 +3,6 @@ from numpy.distutils.core import Extension, setup
 
 extension = []
 
-setup(name="pytestf90", packages=find_packages(),
+setup(name="macauff", packages=find_packages(),
+      package_data={'macauff': ['tests/data/*']},
       ext_modules=extension)
