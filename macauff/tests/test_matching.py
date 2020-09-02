@@ -310,7 +310,7 @@ def test_crossmatch_psf_param_inputs():
     cm = CrossMatch(os.path.join(os.path.dirname(__file__), 'data/crossmatch_params.txt'),
                     os.path.join(os.path.dirname(__file__), 'data/cat_a_params.txt'),
                     os.path.join(os.path.dirname(__file__), 'data/cat_b_params.txt'))
-    assert not hasattr(cm, 'a_psf_fwhms')
+    assert not hasattr(cm, 'a_norm_scale_laws')
     assert np.all(cm.b_filt_names == np.array(['W1', 'W2', 'W3', 'W4']))
 
     f = open(os.path.join(os.path.dirname(__file__), 'data/crossmatch_params.txt')).readlines()
@@ -533,3 +533,13 @@ def test_crossmatch_chunk_num():
                             'data/cat_a_params{}.txt'.format('_' if '_a_' in in_file else '')),
                             os.path.join(os.path.dirname(__file__),
                             'data/cat_b_params{}.txt'.format('_' if '_b_' in in_file else '')))
+
+
+def test_crossmatch_shared_data():
+    cm = CrossMatch(os.path.join(os.path.dirname(__file__), 'data/crossmatch_params.txt'),
+                    os.path.join(os.path.dirname(__file__), 'data/cat_a_params.txt'),
+                    os.path.join(os.path.dirname(__file__), 'data/cat_b_params.txt'))
+    assert np.all(cm.r == np.linspace(0, 1.185 * 11.99, 10000))
+    assert_almost_equal(cm.dr, np.ones(9999, float) * 1.185*11.99/9999)
+    assert np.all(cm.rho == np.linspace(0, 100, 10000))
+    assert_almost_equal(cm.drho, np.ones(9999, float) * 100/9999)
