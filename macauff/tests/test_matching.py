@@ -156,25 +156,6 @@ def test_crossmatch_auf_cf_input():
                                              '_2' if 'cf' not in kind else '')),
                                 os.path.join(os.path.dirname(__file__), 'data/cat_b_params.txt'))
 
-        # Check galactic run is also fine
-        idx = np.where(['{}frame = equatorial'.format(kind) in line for line in f])[0][0]
-        CrossMatch._replace_line(cm, os.path.join(os.path.dirname(__file__),
-                                 'data/{}.txt'.format(in_file)),
-                                 idx, '{}frame = galactic\n'.format(kind),
-                                 out_file=os.path.join(os.path.dirname(__file__),
-                                                       'data/{}_.txt'.format(in_file)))
-
-        cm = CrossMatch(os.path.join(os.path.dirname(__file__),
-                        'data/crossmatch_params{}.txt'.format('_' if 'cf' in kind else '')),
-                        os.path.join(os.path.dirname(__file__),
-                        'data/cat_a_params{}.txt'.format('_' if 'cf' not in kind else '')),
-                        os.path.join(os.path.dirname(__file__), 'data/cat_b_params.txt'))
-        assert getattr(cm, '{}{}frame'.format('' if 'cf' in kind else 'a_', kind)) == 'galactic'
-        assert_almost_equal(getattr(cm, '{}{}points'.format('' if 'cf' in kind else 'a_', kind)),
-                            np.array([[131, -1], [132, -1], [133, -1], [134, -1],
-                                      [131, 0], [132, 0], [133, 0], [134, 0],
-                                      [131, 1], [132, 1], [133, 1], [134, 1]]))
-
         # Check single-length point grids are fine
         idx = np.where(['{}points = 131 134 4 -1 1 3'.format(kind) in line for line in f])[0][0]
         CrossMatch._replace_line(cm, os.path.join(os.path.dirname(__file__),
@@ -212,6 +193,29 @@ def test_crossmatch_auf_cf_input():
                         os.path.join(os.path.dirname(__file__), 'data/cat_b_params.txt'))
         assert_almost_equal(getattr(cm, '{}{}points'.format('' if 'cf' in kind else 'a_', kind)),
                             np.array([[131, 0]]))
+
+    # Check galactic run is also fine -- here we have to replace all 3 parameter
+    # options with "galactic", however.
+    for in_file in ['crossmatch_params', 'cat_a_params', 'cat_b_params']:
+        kind = 'cf_region_' if 'h_p' in in_file else 'auf_region_'
+        f = open(os.path.join(os.path.dirname(__file__),
+                              'data/{}.txt'.format(in_file))).readlines()
+        idx = np.where(['{}frame = equatorial'.format(kind) in line for line in f])[0][0]
+        CrossMatch._replace_line(cm, os.path.join(os.path.dirname(__file__),
+                                 'data/{}.txt'.format(in_file)),
+                                 idx, '{}frame = galactic\n'.format(kind),
+                                 out_file=os.path.join(os.path.dirname(__file__),
+                                                       'data/{}_.txt'.format(in_file)))
+
+    cm = CrossMatch(os.path.join(os.path.dirname(__file__), 'data/crossmatch_params_.txt'),
+                    os.path.join(os.path.dirname(__file__), 'data/cat_a_params_.txt'),
+                    os.path.join(os.path.dirname(__file__), 'data/cat_b_params_.txt'))
+    for kind in ['auf_region_', 'cf_region_']:
+        assert getattr(cm, '{}{}frame'.format('' if 'cf' in kind else 'a_', kind)) == 'galactic'
+        assert_almost_equal(getattr(cm, '{}{}points'.format('' if 'cf' in kind else 'a_', kind)),
+                            np.array([[131, -1], [132, -1], [133, -1], [134, -1],
+                                      [131, 0], [132, 0], [133, 0], [134, 0],
+                                      [131, 1], [132, 1], [133, 1], [134, 1]]))
 
 
 def test_crossmatch_folder_path_inputs():
@@ -432,3 +436,37 @@ def test_crossmatch_fourier_inputs():
             cm = CrossMatch(os.path.join(os.path.dirname(__file__), 'data/crossmatch_params_.txt'),
                             os.path.join(os.path.dirname(__file__), 'data/cat_a_params.txt'),
                             os.path.join(os.path.dirname(__file__), 'data/cat_b_params.txt'))
+
+
+def test_crossmatch_frame_equality():
+    cm = CrossMatch(os.path.join(os.path.dirname(__file__), 'data/crossmatch_params.txt'),
+                    os.path.join(os.path.dirname(__file__), 'data/cat_a_params.txt'),
+                    os.path.join(os.path.dirname(__file__), 'data/cat_b_params.txt'))
+    assert cm.a_auf_region_frame == 'equatorial'
+    assert cm.b_auf_region_frame == 'equatorial'
+    assert cm.cf_region_frame == 'equatorial'
+
+    # List of simple one line config file replacements for error message checking
+    match_text = 'Region frames for c/f and AUF creation must all be the same.'
+    for old_line, new_line, in_file in zip(
+            ['cf_region_frame = equatorial', 'auf_region_frame = equatorial',
+             'auf_region_frame = equatorial'],
+            ['cf_region_frame = galactic\n', 'auf_region_frame = galactic\n',
+             'auf_region_frame = galactic\n'],
+            ['crossmatch_params', 'cat_a_params', 'cat_b_params']):
+        f = open(os.path.join(os.path.dirname(__file__),
+                              'data/{}.txt'.format(in_file))).readlines()
+        idx = np.where([old_line in line for line in f])[0][0]
+        CrossMatch._replace_line(cm, os.path.join(os.path.dirname(__file__),
+                                 'data/{}.txt'.format(in_file)), idx, new_line,
+                                 out_file=os.path.join(
+                                 os.path.dirname(__file__), 'data/{}_.txt'.format(in_file)))
+
+        with pytest.raises(ValueError, match=match_text):
+            cm = CrossMatch(os.path.join(os.path.dirname(__file__),
+                            'data/crossmatch_params{}.txt'.format(
+                            '_' if 'h_p' in in_file else '')),
+                            os.path.join(os.path.dirname(__file__),
+                            'data/cat_a_params{}.txt'.format('_' if '_a_' in in_file else '')),
+                            os.path.join(os.path.dirname(__file__),
+                            'data/cat_b_params{}.txt'.format('_' if '_b_' in in_file else '')))

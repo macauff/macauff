@@ -202,6 +202,12 @@ class CrossMatch():
                                   ['cf_region_frame', joint_config['cf_region_frame']],
                                   ['cf_region_points', joint_config['cf_region_points']])
 
+        # If the frame of the two AUF parameter files and the 'cf' frame are
+        # not all the same then we have to raise an error.
+        if (self.a_auf_region_frame != self.b_auf_region_frame or
+                self.a_auf_region_frame != self.cf_region_frame):
+            raise ValueError("Region frames for c/f and AUF creation must all be the same.")
+
         self.joint_folder_path = os.path.abspath(joint_config['joint_folder_path'])
         self.a_auf_folder_path = os.path.abspath(cat_a_config['auf_folder_path'])
         self.b_auf_folder_path = os.path.abspath(cat_b_config['auf_folder_path'])
