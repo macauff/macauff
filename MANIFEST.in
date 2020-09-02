@@ -1,6 +1,7 @@
 include pyproject.toml
 include setup.cfg
 include LICENSE
+include CHANGES.rst
 include README.md
 
 recursive-include macauff *.f90
