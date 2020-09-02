@@ -176,7 +176,7 @@ class CrossMatch():
                            'run_cf', 'run_star', 'cf_region_type', 'cf_region_frame',
                            'cf_region_points', 'joint_folder_path', 'pos_corr_dist',
                            'real_hankel_points', 'four_hankel_points', 'four_max_rho',
-                           'cross_match_extent']:
+                           'cross_match_extent', 'mem_chunk_num']:
             if check_flag not in joint_config:
                 raise ValueError("Missing key {} from joint metadata file.".format(check_flag))
 
@@ -299,3 +299,12 @@ class CrossMatch():
         if len(b) != 4:
             raise ValueError("cross_match_extent should contain four elements.")
         self.cross_match_extent = b
+
+        try:
+            a = joint_config['mem_chunk_num']
+            if float(a).is_integer():
+                self.mem_chunk_num = int(a)
+            else:
+                raise ValueError("mem_chunk_num should be a single integer number.")
+        except ValueError:
+            raise ValueError("mem_chunk_num should be a single integer number.")

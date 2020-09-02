@@ -33,3 +33,6 @@ four_max_rho = 100
 
 # Maximum extent of cross-match, used in non-all-sky cases to remove sources suffering potential edge effects -- min/max first axis coordinates (ra/l) then min/max second axis coordinates (dec/b)
 cross_match_extent = 131 138 -3 3
+
+# Number of chunks to break each catalogue into when splitting larger catalogues up for memory reasons
+mem_chunk_num = 10

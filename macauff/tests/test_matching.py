@@ -502,3 +502,34 @@ def test_cross_match_extent():
                             'data/cat_a_params{}.txt'.format('_' if '_a_' in in_file else '')),
                             os.path.join(os.path.dirname(__file__),
                             'data/cat_b_params{}.txt'.format('_' if '_b_' in in_file else '')))
+
+
+def test_crossmatch_chunk_num():
+    cm = CrossMatch(os.path.join(os.path.dirname(__file__), 'data/crossmatch_params.txt'),
+                    os.path.join(os.path.dirname(__file__), 'data/cat_a_params.txt'),
+                    os.path.join(os.path.dirname(__file__), 'data/cat_b_params.txt'))
+    assert np.all(cm.mem_chunk_num == 10)
+
+    # List of simple one line config file replacements for error message checking
+    in_file = 'crossmatch_params'
+    f = open(os.path.join(os.path.dirname(__file__),
+                          'data/{}.txt'.format(in_file))).readlines()
+    old_line = 'mem_chunk_num = 10'
+    for new_line, match_text in zip(
+            ['', 'mem_chunk_num = word\n', 'mem_chunk_num = 10.1\n'],
+            ['Missing key mem_chunk_num', 'mem_chunk_num should be a single integer',
+             'mem_chunk_num should be a single integer']):
+        idx = np.where([old_line in line for line in f])[0][0]
+        CrossMatch._replace_line(cm, os.path.join(os.path.dirname(__file__),
+                                 'data/{}.txt'.format(in_file)), idx, new_line,
+                                 out_file=os.path.join(
+                                 os.path.dirname(__file__), 'data/{}_.txt'.format(in_file)))
+
+        with pytest.raises(ValueError, match=match_text):
+            cm = CrossMatch(os.path.join(os.path.dirname(__file__),
+                            'data/crossmatch_params{}.txt'.format(
+                            '_' if 'h_p' in in_file else '')),
+                            os.path.join(os.path.dirname(__file__),
+                            'data/cat_a_params{}.txt'.format('_' if '_a_' in in_file else '')),
+                            os.path.join(os.path.dirname(__file__),
+                            'data/cat_b_params{}.txt'.format('_' if '_b_' in in_file else '')))
