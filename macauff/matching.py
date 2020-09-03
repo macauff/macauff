@@ -114,6 +114,9 @@ class CrossMatch():
     def _str2bool(self, v):
         '''
         Convenience function to convert strings to boolean values.
+
+        v : string
+            String entry to be converted to ``True`` or ``False``.
         '''
         val = v.lower()
         if val not in ("yes", "true", "t", "1", "no", "false", "f", "0"):
