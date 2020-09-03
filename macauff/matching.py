@@ -92,6 +92,16 @@ class CrossMatch():
         '''
         Helper function to update the metadata file on-the-fly, allowing for
         "run" flags to be set from run to no run once they have finished.
+
+        file_name : string
+            Name of the file to read in and change lines of.
+        line_num : integer
+            Line number of line to edit in ``file_name``.
+        text : string
+            New line to replace original line in ``file_name`` with.
+        out_file : string, optional
+            Name of the file to save new, edited version of ``file_name`` to.
+            If ``None`` then ``file_name`` is overwritten.
         '''
         if out_file is None:
             out_file = file_name
