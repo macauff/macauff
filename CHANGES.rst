@@ -20,3 +20,8 @@ API Changes
 
 - Preliminary API established, with parameters ingested from several
   input files. [#7]
+
+Other Changes
+^^^^^^^^^^^^^
+
+- Consistency within documentation strings for ``CrossMatch`` [#11]
