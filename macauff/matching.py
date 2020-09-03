@@ -92,6 +92,16 @@ class CrossMatch():
         '''
         Helper function to update the metadata file on-the-fly, allowing for
         "run" flags to be set from run to no run once they have finished.
+
+        file_name : string
+            Name of the file to read in and change lines of.
+        line_num : integer
+            Line number of line to edit in ``file_name``.
+        text : string
+            New line to replace original line in ``file_name`` with.
+        out_file : string, optional
+            Name of the file to save new, edited version of ``file_name`` to.
+            If ``None`` then ``file_name`` is overwritten.
         '''
         if out_file is None:
             out_file = file_name
@@ -104,6 +114,9 @@ class CrossMatch():
     def _str2bool(self, v):
         '''
         Convenience function to convert strings to boolean values.
+
+        v : string
+            String entry to be converted to ``True`` or ``False``.
         '''
         val = v.lower()
         if val not in ("yes", "true", "t", "1", "no", "false", "f", "0"):
@@ -115,6 +128,20 @@ class CrossMatch():
         '''
         Wrapper function for the creation of "region" coordinate tuples,
         given either a set of rectangular points or a list of coordinates.
+
+        region_type : string
+            String containing the kind of system the region pointings are in.
+            Should be "rectangle", regularly sampled points in the two sky
+            coordinates, or "points", individually specified sky coordinates.
+        region_Frame : string
+            String containing the coordinate system the points are in. Should
+            be either "equatorial" or "galactic".
+        region_points : string
+            String containing the evaluation points. If ``region_type`` is
+            "rectangle", should be six values, the start and stop values and
+            number of entries of the respective sky coordinates; and if
+            ``region_type`` is "points", ``region_points`` should be tuples
+            of the form ``(a, b)`` separated by whitespace.
         '''
         rt = region_type[1].lower()
         if rt == 'rectangle':
@@ -324,6 +351,9 @@ class CrossMatch():
             raise ValueError("mem_chunk_num should be a single integer number.")
 
     def make_shared_data(self):
+        """
+        Function to initialise the shared variables used in the cross-match process.
+        """
         maximumoffset = 1.185 * max([np.amax(self.a_psf_fwhms), np.amax(self.b_psf_fwhms)])
         self.r = np.linspace(0, maximumoffset, self.real_hankel_points)
         self.dr = np.diff(self.r)
