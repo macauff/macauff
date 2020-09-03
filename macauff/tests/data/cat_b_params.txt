@@ -13,7 +13,7 @@ psf_fwhms = 6.08 6.84 7.36 11.99
 norm_scale_laws = 2 2 2 2
 
 # TRILEGAL Perturbation AUF parameters
-# Names of TRILEGAL filter sets for the two catalogues
+# Names of TRILEGAL filter sets for the catalogue
 tri_set_name = 2mass_spitzer_wise
 tri_filt_names = W1 W2 W3 W4
 # Filter number to define limiting magnitude of TRILEGAL simulation in, based on output data file column (one-indexed) number
