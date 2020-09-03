@@ -351,6 +351,9 @@ class CrossMatch():
             raise ValueError("mem_chunk_num should be a single integer number.")
 
     def make_shared_data(self):
+        """
+        Function to initialise the shared variables used in the cross-match process.
+        """
         maximumoffset = 1.185 * max([np.amax(self.a_psf_fwhms), np.amax(self.b_psf_fwhms)])
         self.r = np.linspace(0, maximumoffset, self.real_hankel_points)
         self.dr = np.diff(self.r)
