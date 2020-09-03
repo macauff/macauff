@@ -4,6 +4,7 @@ This module provides the high-level framework for performing catalogue-catalogue
 '''
 
 import os
+import sys
 import warnings
 from configparser import ConfigParser
 import numpy as np
@@ -394,6 +395,9 @@ class CrossMatch():
                               'AUF simulation folder. Deleting all files and re-running.')
             os.system("rm -rf {}/*".format(self.a_auf_folder_path))
             create_perturb_auf()
+        else:
+            print('Loading empirical crowding AUFs for catalogue "a"...')
+            sys.stdout.flush()
 
         b_expected_files = 1 + len(self.b_auf_region_points) + (files_per_auf_sim *
                                                                 len(self.b_auf_region_points))
@@ -407,3 +411,6 @@ class CrossMatch():
                               'AUF simulation folder. Deleting all files and re-running.')
             os.system("rm -rf {}/*".format(self.b_auf_folder_path))
             create_perturb_auf()
+        else:
+            print('Loading empirical crowding AUFs for catalogue "b"...')
+            sys.stdout.flush()
