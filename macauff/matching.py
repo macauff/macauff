@@ -4,6 +4,7 @@ This module provides the high-level framework for performing catalogue-catalogue
 '''
 
 import os
+import warnings
 from configparser import ConfigParser
 import numpy as np
 
@@ -87,6 +88,13 @@ class CrossMatch():
                                      "downloaded.".format(catname))
 
         self.make_shared_data()
+
+    def __call__(self):
+        # The first step is to create the perturbation AUF components, if needed.
+        # If run_auf is set to True or if there are not the appropriate number of
+        # pre-saved outputs from a previous run then run perturbation AUF creation.
+        self.create_auf()
+
 
     def _replace_line(self, file_name, line_num, text, out_file=None):
         '''
@@ -359,3 +367,33 @@ class CrossMatch():
         self.dr = np.diff(self.r)
         self.rho = np.linspace(0, self.four_max_rho, self.four_hankel_points)
         self.drho = np.diff(self.rho)
+
+    def create_auf(self, files_per_auf_sim):
+        # Each catalogue has in its auf_folder_path a single file, a local
+        # normalising density, plus -- per AUF "pointing" -- a simulation file
+        # and N simulation files per filter.
+        a_expected_files = 1 + len(self.a_auf_region_points) + (files_per_auf_sim *
+                                                                len(self.a_auf_region_points))
+        a_file_number = np.sum([len(files) for _, _, files in
+                                os.walk(self.a_auf_folder_path)])
+        a_correct_file_number = a_expected_files == a_file_number
+
+        if self.run_auf or not a_correct_file_number:
+            if not a_correct_file_number:
+                warnings.warn('Incorrect number of files in catalogue "a" perturbation'
+                              'AUF simulation folder. Deleting all files and re-running.')
+            os.system("rm -rf {}/*".format(self.a_auf_folder_path))
+            # TODO: put call to function here
+
+        b_expected_files = 1 + len(self.b_auf_region_points) + (files_per_auf_sim *
+                                                                len(self.b_auf_region_points))
+        b_file_number = np.sum([len(files) for _, _, files in
+                                os.walk(self.b_auf_folder_path)])
+        b_correct_file_number = b_expected_files == b_file_number
+
+        if self.run_auf or not b_correct_file_number:
+            if not b_correct_file_number:
+                warnings.warn('Incorrect number of files in catalogue "b" perturbation'
+                              'AUF simulation folder. Deleting all files and re-running.')
+            os.system("rm -rf {}/*".format(self.b_auf_folder_path))
+            # TODO: put call to function here
