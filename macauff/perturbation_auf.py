@@ -1,6 +1,7 @@
 # Licensed under a 3-clause BSD style license - see LICENSE
 '''
-This module provides the high-level framework for performing catalogue-catalogue cross-matches.
+This module provides the framework to handle the creation of the perturbation
+component of the astrometric uncertainty function.
 '''
 
 import os
@@ -100,7 +101,7 @@ def create_perturb_auf(auf_folder, filters, auf_points, psf_fwhms, tri_download_
                 offset = np.zeros((len(r)-1, num_N_mag), float, order='F')
                 # Fix offsets such that the probability density function looks like
                 # a delta function, such that a two-dimensional circular coordinate
-                # integral would evaluate to one at every point, cf. ``cumuative``.
+                # integral would evaluate to one at every point, cf. ``cumulative``.
                 offset[0, :] = 1 / (2 * np.pi * (r[0] + dr[0]/2) * dr[0])
                 np.save('{}/{}/offset.npy'.format(filt_folder), offset)
                 # The cumulative integral of a delta function is always unity.
