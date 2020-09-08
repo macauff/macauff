@@ -67,7 +67,7 @@ def create_perturb_auf(auf_folder, filters, auf_points, psf_fwhms, tri_download_
             os.makedirs(ax_folder, exist_ok=True)
         if include_perturb_auf:
             # TODO: download TRILEGAL simulation here
-            raise NotImplementedError("Perturbation AUF components are not currently"
+            raise NotImplementedError("Perturbation AUF components are not currently "
                                       "included in the cross-match process.")
 
         for j in range(len(filters)):
@@ -79,7 +79,7 @@ def create_perturb_auf(auf_folder, filters, auf_points, psf_fwhms, tri_download_
 
             if include_perturb_auf:
                 # TODO: extend with create_single_auf
-                raise NotImplementedError("Perturbation AUF components are not currently"
+                raise NotImplementedError("Perturbation AUF components are not currently "
                                           "included in the cross-match process.")
             else:
                 # Without the simulations to force local normalising density N or
