@@ -392,7 +392,10 @@ class CrossMatch():
         if self.run_auf or not a_correct_file_number:
             if not a_correct_file_number:
                 warnings.warn('Incorrect number of files in catalogue "a" perturbation'
-                              'AUF simulation folder. Deleting all files and re-running.')
+                              'AUF simulation folder. Deleting all files and re-running '
+                              'cross-match process.')
+                # Once run AUf flag is updated, all other flags need to be set to run
+                self.run_group, self.run_cf, self.run_star = True, True, True
             os.system("rm -rf {}/*".format(self.a_auf_folder_path))
             create_perturb_auf()
         else:
@@ -408,7 +411,9 @@ class CrossMatch():
         if self.run_auf or not b_correct_file_number:
             if not b_correct_file_number:
                 warnings.warn('Incorrect number of files in catalogue "b" perturbation'
-                              'AUF simulation folder. Deleting all files and re-running.')
+                              'AUF simulation folder. Deleting all files and re-running '
+                              'cross-match process.')
+                self.run_group, self.run_cf, self.run_star = True, True, True
             os.system("rm -rf {}/*".format(self.b_auf_folder_path))
             create_perturb_auf()
         else:
