@@ -382,8 +382,10 @@ class CrossMatch():
         '''
         # Each catalogue has in its auf_folder_path a single file, a local
         # normalising density, plus -- per AUF "pointing" -- a simulation file
-        # and N simulation files per filter.
-        a_expected_files = 1 + len(self.a_auf_region_points) + (files_per_auf_sim *
+        # and N simulation files per filter. Additionally, it will contain a
+        # single file with each source's index reference into the cube of AUFs,
+        # and a convenience cube for each N-m combination array's length.
+        a_expected_files = 3 + len(self.a_auf_region_points) + (files_per_auf_sim *
                                                                 len(self.a_auf_region_points))
         a_file_number = np.sum([len(files) for _, _, files in
                                 os.walk(self.a_auf_folder_path)])
@@ -402,7 +404,7 @@ class CrossMatch():
             print('Loading empirical crowding AUFs for catalogue "a"...')
             sys.stdout.flush()
 
-        b_expected_files = 1 + len(self.b_auf_region_points) + (files_per_auf_sim *
+        b_expected_files = 3 + len(self.b_auf_region_points) + (files_per_auf_sim *
                                                                 len(self.b_auf_region_points))
         b_file_number = np.sum([len(files) for _, _, files in
                                 os.walk(self.b_auf_folder_path)])

@@ -12,7 +12,7 @@ __all__ = ['create_perturb_auf']
 
 
 def create_perturb_auf(auf_folder, filters, auf_points, psf_fwhms, tri_download_flag, ax_lims,
-                       r, dr, rho, drho, which_cat, include_perturb_auf):
+                       r, dr, rho, drho, which_cat, include_perturb_auf, n_sources):
     """
     Function to perform the creation of the blended object perturbation component
     of the AUF.
@@ -48,6 +48,8 @@ def create_perturb_auf(auf_folder, filters, auf_points, psf_fwhms, tri_download_
     include_perturb_auf : boolean
         ``True`` or ``False`` flag indicating whether perturbation component of the
         AUF should be used or not within the cross-match process.
+    n_sources : int
+        Number of sources in the main catalogue to be simulated.
     """
     print('Creating empirical crowding AUFs for catalogue "{}"...'.format(which_cat))
     sys.stdout.flush()
@@ -59,6 +61,12 @@ def create_perturb_auf(auf_folder, filters, auf_points, psf_fwhms, tri_download_
     # to inform the fraction of simulations with a contaminant above these relative
     # fluxes.
     delta_mag_cuts = np.array([2.5, 5])
+
+    # Store the length of the density-magnitude combinations in each sky/filter
+    # combination for future loading purposes.
+    arraylengths = np.lib.format.open_memmap('{}/arraylengths.npy'.format(auf_folder), mode='w+',
+                                             dtype=int, shape=(len(filters), len(auf_points)),
+                                             fortran_order=True)
 
     for i in range(len(auf_points)):
         ax1, ax2 = auf_points[i]
@@ -119,3 +127,22 @@ def create_perturb_auf(auf_folder, filters, auf_points, psf_fwhms, tri_download_
                 np.save('{}/{}/N.npy'.format(filt_folder), Narray)
                 magarray = np.array([[1]], float)
                 np.save('{}/{}/mag.npy'.format(filt_folder), magarray)
+            arraylengths[j, i] = len(Narray)
+
+    # Once the individual AUF simulations are saved, we also need to calculate
+    # the indices each source references when slicing into the 4-D cubes
+    # created by [1-D array] x N-m combination x filter x sky position iteration.
+
+    print('Creating crowding AUFs indices for catalogue "{}"...'.format(which_cat))
+    sys.stdout.flush()
+
+    modelrefinds = np.lib.format.open_memmap('{}/modelrefinds.npy'.format(auf_folder),
+                                             mode='w+', dtype=int, shape=(4, n_sources),
+                                             fortran_order=True)
+
+    if include_perturb_auf:
+        # TODO: load 3-D cube of N-m combinations for unique sky/filter pairs.
+        raise NotImplementedError("Perturbation AUF components are not currently "
+                                  "included in the cross-match process.")
+    else:
+
