@@ -11,8 +11,9 @@ import numpy as np
 __all__ = ['create_perturb_auf']
 
 
-def create_perturb_auf(auf_folder, filters, auf_points, psf_fwhms, tri_download_flag, ax_lims,
-                       r, dr, rho, drho, which_cat, include_perturb_auf, n_sources):
+def create_perturb_auf(auf_folder, cat_folder, filters, auf_points, psf_fwhms, tri_download_flag,
+                       ax_lims, r, dr, rho, drho, which_cat, include_perturb_auf, n_sources,
+                       mem_chunk_num):
     """
     Function to perform the creation of the blended object perturbation component
     of the AUF.
@@ -20,6 +21,9 @@ def create_perturb_auf(auf_folder, filters, auf_points, psf_fwhms, tri_download_
     auf_folder : string
         The overall folder into which to create filter-pointing folders and save
         individual simulation files.
+    cat_folder : string
+        The folder that the photometric catalogue being simulated for perturbation
+        AUF component is stored in.
     filters : list of strings or numpy.ndarray of strings
         An array containing the list of filters in this catalogue to create
         simulated AUF components for.
@@ -50,6 +54,9 @@ def create_perturb_auf(auf_folder, filters, auf_points, psf_fwhms, tri_download_
         AUF should be used or not within the cross-match process.
     n_sources : int
         Number of sources in the main catalogue to be simulated.
+    mem_chunk_num : int
+        Number of individual sub-sections to break catalogue into for memory
+        saving purposes.
     """
     print('Creating empirical crowding AUFs for catalogue "{}"...'.format(which_cat))
     sys.stdout.flush()
@@ -140,9 +147,30 @@ def create_perturb_auf(auf_folder, filters, auf_points, psf_fwhms, tri_download_
                                              mode='w+', dtype=int, shape=(4, n_sources),
                                              fortran_order=True)
 
-    if include_perturb_auf:
-        # TODO: load 3-D cube of N-m combinations for unique sky/filter pairs.
-        raise NotImplementedError("Perturbation AUF components are not currently "
-                                  "included in the cross-match process.")
-    else:
+    for cnum in range(0, mem_chunk_num):
+        lowind = np.floor(n_sources*cnum/mem_chunk_num).astype(int)
+        highind = np.floor(n_sources*(cnum+1)/mem_chunk_num).astype(int)
+        a = np.load('{}/con_cat_astro.npy'.format(cat_folder), mmap_mode='r')[lowind:highind]
+        magref = np.load('{}/magref.npy'.format(cat_folder), mmap_mode='r')[lowind:highind]
+        # As we chunk in even steps through the files this is simple for now,
+        # but could be replaced with a more complex mapping in the future.
+        indexmap = np.arange(lowind, highind+1, 1)
+
+        if include_perturb_auf:
+            # TODO: load 3-D cube of N-m combinations for unique sky/filter pairs.
+            raise NotImplementedError("Perturbation AUF components are not currently "
+                                      "included in the cross-match process.")
+        else:
+            # For the case that we do not use the perturbation AUF component,
+            # our dummy N-m files are all one-length arrays, so we can
+            # trivially index them, regardless of specifics.
+            modelrefinds[0, indexmap] = 0
+
+        # The mapping of which filter to use is straightforward: simply pick
+        # the filter index of the "best" filter for each source, from magref.
+        modelrefinds[1, indexmap] = magref
+
+        # Which sky position to use is more complex; this involves determining
+        # the smallest great-circle distance to each auf_point AUF mapping for
+        # each source.
 
