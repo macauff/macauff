@@ -7,3 +7,4 @@ docs/_build
 docs/_api
 .tox
 *.egg-info
+build/*
