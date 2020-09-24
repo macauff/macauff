@@ -25,7 +25,7 @@ dlat_rad = (lat1 - lat2) / 180.0_dp * pi
 lat1_rad = lat1 / 180.0_dp * pi
 lat2_rad = lat2 / 180.0_dp * pi
 
-hav_dist = 2.0_dp * asin(sqrt((sin(dlat_rad/2.0_dp))**2 + cos(lat1_rad)*cos(lat2_rad)*(sin(dlon_rad)/2.0_dp)**2))
+hav_dist = 2.0_dp * asin(min(1.0_dp, sqrt((sin(dlat_rad/2.0_dp))**2 + cos(lat1_rad)*cos(lat2_rad)*(sin(dlon_rad)/2.0_dp)**2)))
 hav_dist = hav_dist * 180.0_dp / pi  ! convert radians to degrees
 
 end subroutine haversine
