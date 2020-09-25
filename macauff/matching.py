@@ -76,6 +76,44 @@ class CrossMatch():
                               "outputs. Please ensure that {}auf_folder_path is correct."
                               .format(catname, flag))
 
+        # Unlike the AUF folder paths, which are allowed to not exist at
+        # runtime, we simply check that cat_folder_path exists for both
+        # input catalogues, with three appropriately shaped arrays in it,
+        # and error if not.
+        for path, catname, flag in zip([self.a_cat_folder_path, self.b_cat_folder_path],
+                                       ['"a"', '"b"'], ['a_', 'b_']):
+            if not os.path.exists(path):
+                raise OSError('{}cat_folder_path does not exist. Please ensure that '
+                              'path for catalogue {} is correct.'.format(flag, catname))
+            else:
+                # Currently forcing hard-coded three-part numpy array names,
+                # to come out of "skinny table" consolidated catalogue
+                # generation.
+                for file_name in ['con_cat_astro', 'con_cat_photo', 'magref']:
+                    if not os.path.isfile('{}/{}.npy'.format(path, file_name)):
+                        raise FileNotFoundError('{} file not found in catalogue {} path. '
+                                                'Please run catalogue consolidation'.format(
+                                                    file_name, catname))
+                # Shape, mapped to each of astro/photo/magref respectively,
+                # should map to 3, number of magnitudes, and 1, where magref is
+                # a 1-D array but the other two are 2-D.
+                fn_a = np.load('{}/con_cat_astro.npy'.format(path), mmap_mode='r')
+                fn_p = np.load('{}/con_cat_photo.npy'.format(path), mmap_mode='r')
+                fn_m = np.load('{}/magref.npy'.format(path), mmap_mode='r')
+                if len(fn_a.shape) != 2 or len(fn_p.shape) != 2 or len(fn_m.shape) != 1:
+                    raise ValueError("Incorrect number of dimensions in consolidated "
+                                     "catalogue {} files.".format(catname))
+                if fn_a.shape[1] != 3:
+                    raise ValueError("Second dimension of con_cat_astro in catalogue {} "
+                                     "should be 3.".format(catname))
+                if fn_p.shape[1] != len(getattr(self, '{}filt_names'.format(flag))):
+                    raise ValueError("Second dimension of con_cat_photo in catalogue {} "
+                                     "should be the same as the number of filters listed "
+                                     "in {}filt_names.".format(catname, flag))
+                if fn_m.shape[0] != fn_a.shape[0] or fn_p.shape[0] != fn_a.shape[0]:
+                    raise ValueError("Consolidated catalogue arrays for catalogue {} should "
+                                     "all be consistent lengths.".format(catname))
+
         for folder in [self.a_cat_name, self.b_cat_name]:
             try:
                 os.makedirs('{}/{}'.format(self.joint_folder_path, folder), exist_ok=True)
@@ -221,7 +259,8 @@ class CrossMatch():
 
         for config, catname in zip([cat_a_config, cat_b_config], ['"a"', '"b"']):
             for check_flag in ['auf_region_type', 'auf_region_frame', 'auf_region_points',
-                               'filt_names', 'cat_name', 'dens_dist', 'auf_folder_path']:
+                               'filt_names', 'cat_name', 'dens_dist', 'auf_folder_path',
+                               'cat_folder_path']:
                 if check_flag not in config:
                     raise ValueError("Missing key {} from catalogue {} metadata file.".format(
                                      check_flag, catname))
@@ -251,6 +290,9 @@ class CrossMatch():
         self.joint_folder_path = os.path.abspath(joint_config['joint_folder_path'])
         self.a_auf_folder_path = os.path.abspath(cat_a_config['auf_folder_path'])
         self.b_auf_folder_path = os.path.abspath(cat_b_config['auf_folder_path'])
+
+        self.a_cat_folder_path = os.path.abspath(cat_a_config['cat_folder_path'])
+        self.b_cat_folder_path = os.path.abspath(cat_b_config['cat_folder_path'])
 
         self.a_filt_names = np.array(cat_a_config['filt_names'].split())
         self.b_filt_names = np.array(cat_b_config['filt_names'].split())
