@@ -1,5 +1,6 @@
 # Catalogue name -- used both for folder creation and output file names
 cat_name = WISE
+cat_folder_path = wise_folder
 # Folder for all AUF-related files to be created in. Should be an absolute path, or relative to folder script called in.
 auf_folder_path = wise_auf_folder
 
