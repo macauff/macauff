@@ -134,7 +134,8 @@ class CrossMatch():
         # The first step is to create the perturbation AUF components, if needed.
         # If run_auf is set to True or if there are not the appropriate number of
         # pre-saved outputs from a previous run then run perturbation AUF creation.
-        self.create_perturb_auf()
+        # TODO: generalise the number of files per AUF simulation as input arg.
+        self.create_perturb_auf(7)
 
     def _replace_line(self, file_name, line_num, text, out_file=None):
         '''

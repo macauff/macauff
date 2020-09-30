@@ -63,6 +63,7 @@ def make_perturb_aufs(auf_folder, cat_folder, filters, auf_points, psf_fwhms, tr
     print('Creating empirical crowding AUFs for catalogue "{}"...'.format(which_cat))
     sys.stdout.flush()
 
+    # TODO: assign these variables as input args.
     # The number of simulated PSFs to create for statistical purposes
     N_trials = 1000000
     # Magnitude offsets corresponding to relative fluxes of perturbing sources; here
