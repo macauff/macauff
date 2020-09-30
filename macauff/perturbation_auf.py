@@ -8,7 +8,7 @@ import os
 import sys
 import numpy as np
 
-import perturbation_auf_fortran as paf
+from .perturbation_auf_fortran import perturbation_auf_fortran as paf
 
 __all__ = ['make_perturb_aufs']
 
