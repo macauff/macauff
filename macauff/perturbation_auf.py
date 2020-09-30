@@ -10,12 +10,12 @@ import numpy as np
 
 import perturbation_auf_fortran as paf
 
-__all__ = ['create_perturb_auf']
+__all__ = ['make_perturb_aufs']
 
 
-def create_perturb_auf(auf_folder, cat_folder, filters, auf_points, psf_fwhms, tri_download_flag,
-                       ax_lims, r, dr, rho, drho, which_cat, include_perturb_auf, n_sources,
-                       mem_chunk_num):
+def make_perturb_aufs(auf_folder, cat_folder, filters, auf_points, psf_fwhms, tri_download_flag,
+                      ax_lims, r, dr, rho, drho, which_cat, include_perturb_auf, n_sources,
+                      mem_chunk_num):
     """
     Function to perform the creation of the blended object perturbation component
     of the AUF.
