@@ -433,6 +433,8 @@ class CrossMatch():
                                 os.walk(self.a_auf_folder_path)])
         a_correct_file_number = a_expected_files == a_file_number
 
+        a_n_sources = len(np.load('{}/magref.npy'.format(self.a_cat_folder_path), mmap_mode='r'))
+
         if self.run_auf or not a_correct_file_number:
             if not a_correct_file_number:
                 warnings.warn('Incorrect number of files in catalogue "a" perturbation'
@@ -441,7 +443,10 @@ class CrossMatch():
                 # Once run AUf flag is updated, all other flags need to be set to run
                 self.run_group, self.run_cf, self.run_star = True, True, True
             os.system("rm -rf {}/*".format(self.a_auf_folder_path))
-            create_perturb_auf()
+            create_perturb_auf(self.a_auf_folder_path, self.a_cat_folder_path, self.a_filt_names,
+                               self.a_auf_region_points, self.a_psf_fwhms, self.a_download_tri,
+                               self.cross_match_extent, self.r, self.dr, self.rho, self.drho,
+                               'a', self.include_perturb_auf, a_n_sources, self.mem_chunk_num)
         else:
             print('Loading empirical crowding AUFs for catalogue "a"...')
             sys.stdout.flush()
@@ -452,6 +457,8 @@ class CrossMatch():
                                 os.walk(self.b_auf_folder_path)])
         b_correct_file_number = b_expected_files == b_file_number
 
+        b_n_sources = len(np.load('{}/magref.npy'.format(self.b_cat_folder_path), mmap_mode='r'))
+
         if self.run_auf or not b_correct_file_number:
             if not b_correct_file_number:
                 warnings.warn('Incorrect number of files in catalogue "b" perturbation'
@@ -459,7 +466,10 @@ class CrossMatch():
                               'cross-match process.')
                 self.run_group, self.run_cf, self.run_star = True, True, True
             os.system("rm -rf {}/*".format(self.b_auf_folder_path))
-            create_perturb_auf()
+            create_perturb_auf(self.b_auf_folder_path, self.b_cat_folder_path, self.b_filt_names,
+                               self.b_auf_region_points, self.b_psf_fwhms, self.b_download_tri,
+                               self.cross_match_extent, self.r, self.dr, self.rho, self.drho,
+                               'b', self.include_perturb_auf, b_n_sources, self.mem_chunk_num)
         else:
             print('Loading empirical crowding AUFs for catalogue "b"...')
             sys.stdout.flush()

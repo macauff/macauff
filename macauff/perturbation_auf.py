@@ -8,6 +8,8 @@ import os
 import sys
 import numpy as np
 
+import perturbation_auf_fortran as paf
+
 __all__ = ['create_perturb_auf']
 
 
@@ -144,7 +146,7 @@ def create_perturb_auf(auf_folder, cat_folder, filters, auf_points, psf_fwhms, t
     sys.stdout.flush()
 
     modelrefinds = np.lib.format.open_memmap('{}/modelrefinds.npy'.format(auf_folder),
-                                             mode='w+', dtype=int, shape=(4, n_sources),
+                                             mode='w+', dtype=int, shape=(3, n_sources),
                                              fortran_order=True)
 
     for cnum in range(0, mem_chunk_num):
@@ -173,4 +175,5 @@ def create_perturb_auf(auf_folder, cat_folder, filters, auf_points, psf_fwhms, t
         # Which sky position to use is more complex; this involves determining
         # the smallest great-circle distance to each auf_point AUF mapping for
         # each source.
-
+        modelrefinds[2, indexmap] = paf.find_nearest_auf_point(a[:, 0], a[:, 1],
+                                                               auf_points[:, 0], auf_points[:, 1])
