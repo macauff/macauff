@@ -412,7 +412,7 @@ class CrossMatch():
         self.rho = np.linspace(0, self.four_max_rho, self.four_hankel_points)
         self.drho = np.diff(self.rho)
 
-    def create_perturb_auf(self, files_per_auf_sim, perturb_auf_func=create_perturb_auf):
+    def create_perturb_auf(self, files_per_auf_sim, perturb_auf_func=make_perturb_aufs):
         '''
         Function wrapping the main perturbation AUF component creation routines.
 
@@ -443,10 +443,10 @@ class CrossMatch():
                 # Once run AUf flag is updated, all other flags need to be set to run
                 self.run_group, self.run_cf, self.run_star = True, True, True
             os.system("rm -rf {}/*".format(self.a_auf_folder_path))
-            make_perturb_aufs(self.a_auf_folder_path, self.a_cat_folder_path, self.a_filt_names,
-                              self.a_auf_region_points, self.a_psf_fwhms, self.a_download_tri,
-                              self.cross_match_extent, self.r, self.dr, self.rho, self.drho,
-                              'a', self.include_perturb_auf, a_n_sources, self.mem_chunk_num)
+            perturb_auf_func(self.a_auf_folder_path, self.a_cat_folder_path, self.a_filt_names,
+                             self.a_auf_region_points, self.a_psf_fwhms, self.a_download_tri,
+                             self.cross_match_extent, self.r, self.dr, self.rho, self.drho,
+                             'a', self.include_perturb_auf, a_n_sources, self.mem_chunk_num)
         else:
             print('Loading empirical crowding AUFs for catalogue "a"...')
             sys.stdout.flush()
@@ -466,10 +466,10 @@ class CrossMatch():
                               'cross-match process.')
                 self.run_group, self.run_cf, self.run_star = True, True, True
             os.system("rm -rf {}/*".format(self.b_auf_folder_path))
-            make_perturb_aufs(self.b_auf_folder_path, self.b_cat_folder_path, self.b_filt_names,
-                              self.b_auf_region_points, self.b_psf_fwhms, self.b_download_tri,
-                              self.cross_match_extent, self.r, self.dr, self.rho, self.drho,
-                              'b', self.include_perturb_auf, b_n_sources, self.mem_chunk_num)
+            perturb_auf_func(self.b_auf_folder_path, self.b_cat_folder_path, self.b_filt_names,
+                             self.b_auf_region_points, self.b_psf_fwhms, self.b_download_tri,
+                             self.cross_match_extent, self.r, self.dr, self.rho, self.drho,
+                             'b', self.include_perturb_auf, b_n_sources, self.mem_chunk_num)
         else:
             print('Loading empirical crowding AUFs for catalogue "b"...')
             sys.stdout.flush()
