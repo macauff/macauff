@@ -13,9 +13,9 @@ from .perturbation_auf_fortran import perturbation_auf_fortran as paf
 __all__ = ['make_perturb_aufs']
 
 
-def make_perturb_aufs(auf_folder, cat_folder, filters, auf_points, psf_fwhms, tri_download_flag,
-                      ax_lims, r, dr, rho, drho, which_cat, include_perturb_auf, n_sources,
-                      mem_chunk_num):
+def make_perturb_aufs(auf_folder, cat_folder, filters, auf_points, ax_lims, r, dr, rho,
+                      drho, which_cat, include_perturb_auf, n_sources, mem_chunk_num,
+                      psf_fwhms=None, tri_download_flag=False):
     """
     Function to perform the creation of the blended object perturbation component
     of the AUF.
@@ -32,11 +32,6 @@ def make_perturb_aufs(auf_folder, cat_folder, filters, auf_points, psf_fwhms, tr
     auf_points : numpy.ndarray
         Two-dimensional array containing pairs of coordinates at which to evaluate
         the perturbation AUF components.
-    psf_fwhms : numpy.ndarray
-        Array of full width at half-maximums for each filter in ``filters``.
-    tri_download_flag : boolean
-        A ``True``/``False`` flag, whether to re-download TRILEGAL simulated star
-        counts or not if a simulation already exists in a given folder.
     ax_lims : numpy.ndarray
         Array containing the four sky coordinate limits of the cross-match region.
     r : numpy.ndarray
@@ -59,6 +54,13 @@ def make_perturb_aufs(auf_folder, cat_folder, filters, auf_points, psf_fwhms, tr
     mem_chunk_num : int
         Number of individual sub-sections to break catalogue into for memory
         saving purposes.
+    psf_fwhms : numpy.ndarray, optional
+        Array of full width at half-maximums for each filter in ``filters``. Only
+        required if ``include_perturb_auf`` is True; defaults to ``None``.
+    tri_download_flag : boolean, optional
+        A ``True``/``False`` flag, whether to re-download TRILEGAL simulated star
+        counts or not if a simulation already exists in a given folder. Only
+        needed if ``include_perturb_auf`` is True.
     """
     print('Creating empirical crowding AUFs for catalogue "{}"...'.format(which_cat))
     sys.stdout.flush()
