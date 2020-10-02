@@ -9,6 +9,9 @@ General
 New Features
 ^^^^^^^^^^^^
 
+- Creation of the perturbation aspect of the AUF, in the limit that it is
+  unused (i.e., the AUF is assumed to be Gaussian). [#12]
+
 Bug Fixes
 ^^^^^^^^^
 
