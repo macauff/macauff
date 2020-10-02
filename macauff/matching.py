@@ -428,8 +428,8 @@ class CrossMatch():
         # and N simulation files per filter. Additionally, it will contain a
         # single file with each source's index reference into the cube of AUFs,
         # and a convenience cube for each N-m combination array's length.
-        a_expected_files = 3 + len(self.a_auf_region_points) + (files_per_auf_sim *
-                                                                len(self.a_auf_region_points))
+        a_expected_files = 3 + len(self.a_auf_region_points) + (
+            files_per_auf_sim * len(self.a_filt_names) * len(self.a_auf_region_points))
         a_file_number = np.sum([len(files) for _, _, files in
                                 os.walk(self.a_auf_folder_path)])
         a_correct_file_number = a_expected_files == a_file_number
@@ -437,7 +437,9 @@ class CrossMatch():
         a_n_sources = len(np.load('{}/magref.npy'.format(self.a_cat_folder_path), mmap_mode='r'))
 
         if self.run_auf or not a_correct_file_number:
-            if not a_correct_file_number:
+            # Only warn if we did NOT choose to run AUF, but DID hit wrong file
+            # number.
+            if not a_correct_file_number and not self.run_auf:
                 warnings.warn('Incorrect number of files in catalogue "a" perturbation'
                               'AUF simulation folder. Deleting all files and re-running '
                               'cross-match process.')
@@ -456,8 +458,8 @@ class CrossMatch():
             print('Loading empirical crowding AUFs for catalogue "a"...')
             sys.stdout.flush()
 
-        b_expected_files = 3 + len(self.b_auf_region_points) + (files_per_auf_sim *
-                                                                len(self.b_auf_region_points))
+        b_expected_files = 3 + len(self.b_auf_region_points) + (
+            files_per_auf_sim * len(self.b_filt_names) * len(self.b_auf_region_points))
         b_file_number = np.sum([len(files) for _, _, files in
                                 os.walk(self.b_auf_folder_path)])
         b_correct_file_number = b_expected_files == b_file_number
@@ -465,7 +467,7 @@ class CrossMatch():
         b_n_sources = len(np.load('{}/magref.npy'.format(self.b_cat_folder_path), mmap_mode='r'))
 
         if self.run_auf or not b_correct_file_number:
-            if not b_correct_file_number:
+            if not b_correct_file_number and not self.run_auf:
                 warnings.warn('Incorrect number of files in catalogue "b" perturbation'
                               'AUF simulation folder. Deleting all files and re-running '
                               'cross-match process.')

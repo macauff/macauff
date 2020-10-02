@@ -113,9 +113,9 @@ def make_perturb_aufs(auf_folder, cat_folder, filters, auf_points, ax_lims, r, d
                 # subroutines to create the perturbation simulations, so we make
                 # f-ordered dummy parameters.
                 Frac = np.zeros((len(delta_mag_cuts), num_N_mag), float, order='F')
-                np.save('{}/{}/frac.npy'.format(filt_folder), Frac)
+                np.save('{}/frac.npy'.format(filt_folder), Frac)
                 Flux = np.zeros(num_N_mag, float, order='F')
-                np.save('{}/{}/flux.npy'.format(filt_folder), Flux)
+                np.save('{}/flux.npy'.format(filt_folder), Flux)
                 # Remember that r is bins, so the evaluations at bin middle are one
                 # shorter in length.
                 offset = np.zeros((len(r)-1, num_N_mag), float, order='F')
@@ -123,22 +123,22 @@ def make_perturb_aufs(auf_folder, cat_folder, filters, auf_points, ax_lims, r, d
                 # a delta function, such that a two-dimensional circular coordinate
                 # integral would evaluate to one at every point, cf. ``cumulative``.
                 offset[0, :] = 1 / (2 * np.pi * (r[0] + dr[0]/2) * dr[0])
-                np.save('{}/{}/offset.npy'.format(filt_folder), offset)
+                np.save('{}/offset.npy'.format(filt_folder), offset)
                 # The cumulative integral of a delta function is always unity.
                 cumulative = np.ones((len(r)-1, num_N_mag), float, order='F')
-                np.save('{}/{}/cumulative.npy'.format(filt_folder), cumulative)
+                np.save('{}/cumulative.npy'.format(filt_folder), cumulative)
                 # The Hankel transform of a delta function is a flat line; this
                 # then preserves the convolution being multiplication in fourier
                 # space, as F(x) x 1 = F(x), similar to how f(x) * d(0) = f(x).
                 fourieroffset = np.ones((len(rho)-1, num_N_mag), float, order='F')
-                np.save('{}/{}/fourier.npy'.format(filt_folder), fourieroffset)
+                np.save('{}/fourier.npy'.format(filt_folder), fourieroffset)
                 # Both normalising density and magnitude arrays can be proxied
                 # with a dummy parameter, as any minimisation of N-m distance
                 # must pick the single value anyway.
                 Narray = np.array([[1]], float)
-                np.save('{}/{}/N.npy'.format(filt_folder), Narray)
+                np.save('{}/N.npy'.format(filt_folder), Narray)
                 magarray = np.array([[1]], float)
-                np.save('{}/{}/mag.npy'.format(filt_folder), magarray)
+                np.save('{}/mag.npy'.format(filt_folder), magarray)
             arraylengths[j, i] = len(Narray)
 
     # Once the individual AUF simulations are saved, we also need to calculate
@@ -159,7 +159,7 @@ def make_perturb_aufs(auf_folder, cat_folder, filters, auf_points, ax_lims, r, d
         magref = np.load('{}/magref.npy'.format(cat_folder), mmap_mode='r')[lowind:highind]
         # As we chunk in even steps through the files this is simple for now,
         # but could be replaced with a more complex mapping in the future.
-        indexmap = np.arange(lowind, highind+1, 1)
+        indexmap = np.arange(lowind, highind, 1)
 
         if include_perturb_auf:
             # TODO: load 3-D cube of N-m combinations for unique sky/filter pairs.
