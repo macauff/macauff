@@ -1,5 +1,6 @@
 # Catalogue name -- used both for folder creation and output file names
 cat_name = Gaia
+cat_folder_path = gaia_folder
 # Folder for all AUF-related files to be created in. Should be an absolute path, or relative to folder script called in.
 auf_folder_path = gaia_auf_folder
 
@@ -13,7 +14,7 @@ psf_fwhms = 0.12 0.12 0.12
 norm_scale_laws = 2 2 2
 
 # TRILEGAL Perturbation AUF parameters
-# Names of TRILEGAL filter sets for the two catalogues
+# Names of TRILEGAL filter sets for the catalogue
 tri_set_name = gaiadr2
 tri_filt_names = G G_BP G_RP
 # Filter number to define limiting magnitude of TRILEGAL simulation in, based on output data file column (one-indexed) number
