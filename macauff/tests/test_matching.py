@@ -6,7 +6,7 @@ Tests for the "matching" module.
 import pytest
 import os
 from configparser import ConfigParser
-from numpy.testing import assert_almost_equal
+from numpy.testing import assert_allclose
 import numpy as np
 
 from ..matching import CrossMatch
@@ -83,10 +83,10 @@ class TestInputs:
                         os.path.join(os.path.dirname(__file__), 'data/cat_a_params.txt'),
                         os.path.join(os.path.dirname(__file__), 'data/cat_b_params.txt'))
         assert cm.cf_region_frame == 'equatorial'
-        assert_almost_equal(cm.cf_region_points,
-                            np.array([[131, -1], [132, -1], [133, -1], [134, -1],
-                                      [131, 0], [132, 0], [133, 0], [134, 0],
-                                      [131, 1], [132, 1], [133, 1], [134, 1]]))
+        assert_allclose(cm.cf_region_points,
+                        np.array([[131, -1], [132, -1], [133, -1], [134, -1],
+                                  [131, 0], [132, 0], [133, 0], [134, 0],
+                                  [131, 1], [132, 1], [133, 1], [134, 1]]))
 
         f = open(os.path.join(os.path.dirname(__file__), 'data/crossmatch_params.txt')).readlines()
         old_line = 'include_perturb_auf = no'
@@ -100,15 +100,15 @@ class TestInputs:
                         os.path.join(os.path.dirname(__file__), 'data/cat_a_params.txt'),
                         os.path.join(os.path.dirname(__file__), 'data/cat_b_params.txt'))
         assert cm.a_auf_region_frame == 'equatorial'
-        assert_almost_equal(cm.a_auf_region_points,
-                            np.array([[131, -1], [132, -1], [133, -1], [134, -1],
-                                      [131, 0], [132, 0], [133, 0], [134, 0],
-                                      [131, 1], [132, 1], [133, 1], [134, 1]]))
-        assert_almost_equal(cm.b_auf_region_points,
-                            np.array([[131, -1], [132, -1], [133, -1], [134, -1],
-                                      [131, -1/3], [132, -1/3], [133, -1/3], [134, -1/3],
-                                      [131, 1/3], [132, 1/3], [133, 1/3], [134, 1/3],
-                                      [131, 1], [132, 1], [133, 1], [134, 1]]))
+        assert_allclose(cm.a_auf_region_points,
+                        np.array([[131, -1], [132, -1], [133, -1], [134, -1],
+                                  [131, 0], [132, 0], [133, 0], [134, 0],
+                                  [131, 1], [132, 1], [133, 1], [134, 1]]))
+        assert_allclose(cm.b_auf_region_points,
+                        np.array([[131, -1], [132, -1], [133, -1], [134, -1],
+                                  [131, -1/3], [132, -1/3], [133, -1/3], [134, -1/3],
+                                  [131, 1/3], [132, 1/3], [133, 1/3], [134, 1/3],
+                                  [131, 1], [132, 1], [133, 1], [134, 1]]))
 
         for kind in ['auf_region_', 'cf_region_']:
             in_file = 'crossmatch_params' if 'cf' in kind else 'cat_a_params'
@@ -170,8 +170,8 @@ class TestInputs:
                             os.path.join(os.path.dirname(__file__),
                             'data/cat_a_params{}.txt'.format('_2' if 'cf' not in kind else '')),
                             os.path.join(os.path.dirname(__file__), 'data/cat_b_params.txt'))
-            assert_almost_equal(getattr(cm, '{}{}points'.format('' if 'cf' in kind
-                                else 'a_', kind)), np.array([[131, 0], [133, 0], [132, -1]]))
+            assert_allclose(getattr(cm, '{}{}points'.format('' if 'cf' in kind
+                            else 'a_', kind)), np.array([[131, 0], [133, 0], [132, -1]]))
 
             old_line = '{}points = 131 134 4 -1 1 3'.format(kind)
             for new_line in ['{}points = (131, 0), (131, )\n'.format(kind),
@@ -208,8 +208,8 @@ class TestInputs:
                             os.path.join(os.path.dirname(__file__),
                             'data/cat_a_params{}.txt'.format('_' if 'cf' not in kind else '')),
                             os.path.join(os.path.dirname(__file__), 'data/cat_b_params.txt'))
-            assert_almost_equal(getattr(cm, '{}{}points'.format('' if 'cf' in kind
-                                else 'a_', kind)), np.array([[131, 0]]))
+            assert_allclose(getattr(cm, '{}{}points'.format('' if 'cf' in kind
+                            else 'a_', kind)), np.array([[131, 0]]))
 
             idx = np.where(['{}type = rectangle'.format(kind) in line for line in f])[0][0]
             CrossMatch._replace_line(cm, os.path.join(os.path.dirname(__file__),
@@ -231,8 +231,8 @@ class TestInputs:
                             os.path.join(os.path.dirname(__file__),
                             'data/cat_a_params{}.txt'.format('_2' if 'cf' not in kind else '')),
                             os.path.join(os.path.dirname(__file__), 'data/cat_b_params.txt'))
-            assert_almost_equal(getattr(cm, '{}{}points'.format('' if 'cf' in kind
-                                else 'a_', kind)), np.array([[131, 0]]))
+            assert_allclose(getattr(cm, '{}{}points'.format('' if 'cf' in kind
+                            else 'a_', kind)), np.array([[131, 0]]))
 
         # Check galactic run is also fine -- here we have to replace all 3 parameter
         # options with "galactic", however.
@@ -253,11 +253,11 @@ class TestInputs:
         for kind in ['auf_region_', 'cf_region_']:
             assert getattr(cm, '{}{}frame'.format('' if 'cf' in kind
                                                   else 'a_', kind)) == 'galactic'
-            assert_almost_equal(getattr(cm, '{}{}points'.format('' if 'cf' in kind
-                                                                else 'a_', kind)),
-                                np.array([[131, -1], [132, -1], [133, -1], [134, -1],
-                                          [131, 0], [132, 0], [133, 0], [134, 0],
-                                          [131, 1], [132, 1], [133, 1], [134, 1]]))
+            assert_allclose(getattr(cm, '{}{}points'.format('' if 'cf' in kind
+                                                            else 'a_', kind)),
+                            np.array([[131, -1], [132, -1], [133, -1], [134, -1],
+                                      [131, 0], [132, 0], [133, 0], [134, 0],
+                                      [131, 1], [132, 1], [133, 1], [134, 1]]))
 
     def test_crossmatch_folder_path_inputs(self):
         cm = CrossMatch(os.path.join(os.path.dirname(__file__), 'data/crossmatch_params.txt'),
@@ -575,9 +575,9 @@ class TestInputs:
                         os.path.join(os.path.dirname(__file__), 'data/cat_a_params.txt'),
                         os.path.join(os.path.dirname(__file__), 'data/cat_b_params.txt'))
         assert np.all(cm.r == np.linspace(0, 1.185 * 11.99, 10000))
-        assert_almost_equal(cm.dr, np.ones(9999, float) * 1.185*11.99/9999)
+        assert_allclose(cm.dr, np.ones(9999, float) * 1.185*11.99/9999)
         assert np.all(cm.rho == np.linspace(0, 100, 10000))
-        assert_almost_equal(cm.drho, np.ones(9999, float) * 100/9999)
+        assert_allclose(cm.drho, np.ones(9999, float) * 100/9999)
 
     def test_cat_folder_path(self):
         cm = CrossMatch(os.path.join(os.path.dirname(__file__), 'data/crossmatch_params.txt'),
