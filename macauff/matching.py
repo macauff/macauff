@@ -174,12 +174,18 @@ class CrossMatch():
         ----------
         v : string
             String entry to be converted to ``True`` or ``False``.
+
+        Returns
+        -------
+        flag_val : boolean
+            Boolean-converted value that ``v`` represents.
         '''
         val = v.lower()
         if val not in ("yes", "true", "t", "1", "no", "false", "f", "0"):
             raise ValueError('Boolean flag key not set to allowed value.')
         else:
-            return v.lower() in ("yes", "true", "t", "1")
+            flag_val = v.lower() in ("yes", "true", "t", "1")
+            return flag_val
 
     def _make_regions_points(self, region_type, region_frame, region_points):
         '''
