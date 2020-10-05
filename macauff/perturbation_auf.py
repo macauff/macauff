@@ -20,6 +20,8 @@ def make_perturb_aufs(auf_folder, cat_folder, filters, auf_points, ax_lims, r, d
     Function to perform the creation of the blended object perturbation component
     of the AUF.
 
+    Parameters
+    ----------
     auf_folder : string
         The overall folder into which to create filter-pointing folders and save
         individual simulation files.

@@ -1,4 +1,8 @@
+! Licensed under a 3-clause BSD style license - see LICENSE
+
 module perturbation_auf_fortran
+! This module provides the Fortran code for the handling of the creation of the perturbation
+! component of the AUF.
 implicit none
 private
 public haversine, find_nearest_auf_point

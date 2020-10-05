@@ -131,6 +131,10 @@ class CrossMatch():
         self.make_shared_data()
 
     def __call__(self):
+        '''
+        Call function for CrossMatch, to run the various stages of cross-matching
+        two photometric catalogues.
+        '''
         # The first step is to create the perturbation AUF components, if needed.
         # If run_auf is set to True or if there are not the appropriate number of
         # pre-saved outputs from a previous run then run perturbation AUF creation.
@@ -142,6 +146,8 @@ class CrossMatch():
         Helper function to update the metadata file on-the-fly, allowing for
         "run" flags to be set from run to no run once they have finished.
 
+        Parameters
+        ----------
         file_name : string
             Name of the file to read in and change lines of.
         line_num : integer
@@ -164,20 +170,30 @@ class CrossMatch():
         '''
         Convenience function to convert strings to boolean values.
 
+        Parameters
+        ----------
         v : string
             String entry to be converted to ``True`` or ``False``.
+
+        Returns
+        -------
+        flag_val : boolean
+            Boolean-converted value that ``v`` represents.
         '''
         val = v.lower()
         if val not in ("yes", "true", "t", "1", "no", "false", "f", "0"):
             raise ValueError('Boolean flag key not set to allowed value.')
         else:
-            return v.lower() in ("yes", "true", "t", "1")
+            flag_val = v.lower() in ("yes", "true", "t", "1")
+            return flag_val
 
     def _make_regions_points(self, region_type, region_frame, region_points):
         '''
         Wrapper function for the creation of "region" coordinate tuples,
         given either a set of rectangular points or a list of coordinates.
 
+        Parameters
+        ----------
         region_type : string
             String containing the kind of system the region pointings are in.
             Should be "rectangle", regularly sampled points in the two sky
@@ -417,6 +433,8 @@ class CrossMatch():
         '''
         Function wrapping the main perturbation AUF component creation routines.
 
+        Parameters
+        ----------
         files_per_auf_sim : integer
             The number of output files for each individual perturbation simulation.
         perturb_auf_func : callable, optional
