@@ -18,7 +18,7 @@ Bug Fixes
 API Changes
 ^^^^^^^^^^^
 
-- Require `psf_fwhms` regardless of whether `include_perturb_auf` is yes or
+- Require ``psf_fwhms`` regardless of whether ``include_perturb_auf`` is yes or
   not. [#9, #10]
 
 - Preliminary API established, with parameters ingested from several
@@ -26,5 +26,3 @@ API Changes
 
 Other Changes
 ^^^^^^^^^^^^^
-
-- Consistency within documentation strings for ``CrossMatch`` [#11]
