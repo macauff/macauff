@@ -539,7 +539,7 @@ class CrossMatch():
         b_expected_files = files_per_grouping
         b_file_number = np.sum([len(files) for _, _, files in
                                 os.walk('{}/group'.format(self.joint_folder_path))])
-        b_correct_file_number = a_expected_files == a_file_number
+        b_correct_file_number = b_expected_files == b_file_number
 
         # First check whether we actually need to dip into the group sources
         # routine or not.
@@ -550,7 +550,7 @@ class CrossMatch():
                 warnings.warn('Incorrect number of grouping files for catalogue "a". Deleting '
                               'all grouping files and re-running cross-match process.')
                 self.run_cf, self.run_source = True, True
-            else if not b_correct_file_number and not self.run_group:
+            elif not b_correct_file_number and not self.run_group:
                 warnings.warn('Incorrect number of grouping files for catalogue "b". Deleting '
                               'all grouping files and re-running cross-match process.')
                 self.run_cf, self.run_source = True, True
