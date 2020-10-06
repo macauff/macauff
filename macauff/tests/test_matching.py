@@ -57,7 +57,7 @@ class TestInputs:
         assert cm.run_auf is False
         assert cm.run_group is False
         assert cm.run_cf is True
-        assert cm.run_star is True
+        assert cm.run_source is True
 
         # List of simple one line config file replacements for error message checking
         f = open(os.path.join(os.path.dirname(__file__), 'data/crossmatch_params.txt')).readlines()
