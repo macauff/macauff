@@ -20,6 +20,9 @@ Bug Fixes
 API Changes
 ^^^^^^^^^^^
 
+- Update ``run_star`` to ``run_source``, avoiding any specific match
+  implication. [#15]
+
 - Require ``psf_fwhms`` regardless of whether ``include_perturb_auf`` is yes or
   not. [#9, #10]
 

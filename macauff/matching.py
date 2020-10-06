@@ -10,6 +10,7 @@ from configparser import ConfigParser
 import numpy as np
 
 from .perturbation_auf import make_perturb_aufs
+from .group_sources import make_island_groupings
 
 __all__ = ['CrossMatch']
 
@@ -53,7 +54,7 @@ class CrossMatch():
         # AUF creation, island splitting, c/f creation, star pairing. We have
         # to check if any later stages are flagged to not run (i.e., they are
         # the starting point) than earlier stages, and raise an error.
-        flags = np.array([self.run_auf, self.run_group, self.run_cf, self.run_star])
+        flags = np.array([self.run_auf, self.run_group, self.run_cf, self.run_source])
         for i in range(3):
             if flags[i] and np.any(~flags[i+1:]):
                 raise ValueError("Inconsistency between run/no run flags; please ensure that "
@@ -140,6 +141,11 @@ class CrossMatch():
         # pre-saved outputs from a previous run then run perturbation AUF creation.
         # TODO: generalise the number of files per AUF simulation as input arg.
         self.create_perturb_auf(7)
+
+        # Once AUF components are assembled, we now group sources based on
+        # convolved AUF integration lengths, to get "common overlap" sources
+        # and merge such overlaps into distinct "islands" of sources to match.
+        self.group_sources()
 
     def _replace_line(self, file_name, line_num, text, out_file=None):
         '''
@@ -267,7 +273,7 @@ class CrossMatch():
         cat_b_config = cat_b_config['config']
 
         for check_flag in ['include_perturb_auf', 'include_phot_like', 'run_auf', 'run_group',
-                           'run_cf', 'run_star', 'cf_region_type', 'cf_region_frame',
+                           'run_cf', 'run_source', 'cf_region_type', 'cf_region_frame',
                            'cf_region_points', 'joint_folder_path', 'pos_corr_dist',
                            'real_hankel_points', 'four_hankel_points', 'four_max_rho',
                            'cross_match_extent', 'mem_chunk_num']:
@@ -283,7 +289,7 @@ class CrossMatch():
                                      check_flag, catname))
 
         for run_flag in ['include_perturb_auf', 'include_phot_like', 'run_auf', 'run_group',
-                         'run_cf', 'run_star']:
+                         'run_cf', 'run_source']:
             setattr(self, run_flag, self._str2bool(joint_config[run_flag]))
 
         for config, catname in zip([cat_a_config, cat_b_config], ['a_', 'b_']):
@@ -462,7 +468,7 @@ class CrossMatch():
                               'AUF simulation folder. Deleting all files and re-running '
                               'cross-match process.')
                 # Once run AUf flag is updated, all other flags need to be set to run
-                self.run_group, self.run_cf, self.run_star = True, True, True
+                self.run_group, self.run_cf, self.run_source = True, True, True
             os.system("rm -rf {}/*".format(self.a_auf_folder_path))
             if self.include_perturb_auf:
                 _kwargs = {'psf_fwhms': self.a_psf_fwhms, 'tri_download_flag': self.a_download_tri}
@@ -489,7 +495,7 @@ class CrossMatch():
                 warnings.warn('Incorrect number of files in catalogue "b" perturbation'
                               'AUF simulation folder. Deleting all files and re-running '
                               'cross-match process.')
-                self.run_group, self.run_cf, self.run_star = True, True, True
+                self.run_group, self.run_cf, self.run_source = True, True, True
             os.system("rm -rf {}/*".format(self.b_auf_folder_path))
             if self.include_perturb_auf:
                 _kwargs = {'psf_fwhms': self.b_psf_fwhms, 'tri_download_flag': self.b_download_tri}
@@ -501,4 +507,55 @@ class CrossMatch():
                              self.mem_chunk_num, **_kwargs)
         else:
             print('Loading empirical crowding AUFs for catalogue "b"...')
+            sys.stdout.flush()
+
+    def group_sources(self, files_per_grouping, group_func=make_island_groupings):
+        '''
+        Function to handle the creation of catalogue "islands" and potential
+        astrometrically related sources across the two catalogues.
+
+        Parameters
+        ----------
+        files_per_grouping : integer
+            The number of output files from each catalogue, made during the
+            island and overlap creation process.
+        group_func : callable, optional
+            ``group_func`` should create the various island- and overlap-related
+            files by which objects across the two catalogues are assigned as
+            potentially counterparts to one another.
+        '''
+
+        # Each catalogue should expect 7 files in "group/": "bright" source
+        # integral lengths, "field" source integral lengths, island lengths,
+        # indices into the opposite catalogue for each source, the indices
+        # of sources in this catalogue in each island, the number of
+        # opposing catalogue overlaps for each source, and the list of any
+        # "rejected" source indices.
+        a_expected_files = files_per_grouping
+        a_file_number = np.sum([len(files) for _, _, files in
+                                os.walk('{}/group'.format(self.joint_folder_path))])
+        a_correct_file_number = a_expected_files == a_file_number
+
+        b_expected_files = files_per_grouping
+        b_file_number = np.sum([len(files) for _, _, files in
+                                os.walk('{}/group'.format(self.joint_folder_path))])
+        b_correct_file_number = a_expected_files == a_file_number
+
+        # First check whether we actually need to dip into the group sources
+        # routine or not.
+        if self.run_group or not a_correct_file_number or not b_correct_file_number:
+            # Only worry about the warning if we didn't choose to run the grouping
+            # but hit incorrect file numbers for either catalogue.
+            if not a_correct_file_number and not self.run_group:
+                warnings.warn('Incorrect number of grouping files for catalogue "a". Deleting '
+                              'all grouping files and re-running cross-match process.')
+                self.run_cf, self.run_source = True, True
+            else if not b_correct_file_number and not self.run_group:
+                warnings.warn('Incorrect number of grouping files for catalogue "b". Deleting '
+                              'all grouping files and re-running cross-match process.')
+                self.run_cf, self.run_source = True, True
+            os.system('rm -rf {}/group/*'.format(self.joint_folder_path))
+            group_func()
+        else:
+            print('Loading catalogue islands and overlaps...')
             sys.stdout.flush()

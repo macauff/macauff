@@ -10,7 +10,7 @@ joint_folder_path = test_path
 run_auf = no
 run_group = no
 run_cf = yes
-run_star = yes
+run_source = yes
 
 # c/f region definition for photometric likelihood - either "rectangle" for NxM evenly spaced grid points, or "points" to define a list of two-point tuple coordinates, separated by a comma
 cf_region_type = rectangle
