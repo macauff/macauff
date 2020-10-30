@@ -15,6 +15,8 @@ New Features
 Bug Fixes
 ^^^^^^^^^
 
+- Fix mistake in ``haversine`` formula in ``perturbation_auf_fortran``. [#15]
+
 API Changes
 ^^^^^^^^^^^
 
