@@ -27,8 +27,7 @@ def test_haversine_formula():
 
     a, b, c, d = 25.10573, 25.30573, 15.48349, 15.48349
     e = paf.haversine(b, a, c, d)
-    # Reduce tolerance with DeltaRA cos(Dec) a worse approximation at larger Dec.
-    assert_allclose(e, 0.2*np.cos(np.radians(c)), rtol=1e-5)
+    assert_allclose(e, 0.2*np.cos(np.radians(c)))
 
     a, b, c, d = 51.45734, 51.45734, 0, 1/3600
     e = paf.haversine(a, b, c, d)
@@ -39,6 +38,19 @@ def test_haversine_formula():
     c, d = 86.47239, 85.47239
     e = paf.haversine(a, b, d, c)
     assert_allclose(e, 1)
+
+    a, b, c, d = 0, 180, -45, 45
+    e = paf.haversine(a, b, c, d)
+    assert_allclose(e, 180)
+
+    a, b, c, d = 10, 250, -50, 65
+    e = paf.haversine(a, b, c, d)
+    sin_half_lat = np.sin(np.radians((c - d)/2))
+    cos_lat_1 = np.cos(np.radians(c))
+    cos_lat_2 = np.cos(np.radians(d))
+    sin_half_lon = np.sin(np.radians((a - b)/2))
+    assert_allclose(e, 2 * np.degrees(np.arcsin(np.sqrt(sin_half_lat**2 +
+                    cos_lat_1*cos_lat_2*sin_half_lon**2))))
 
 
 def test_closest_auf_point():
