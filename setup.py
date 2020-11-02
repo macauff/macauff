@@ -12,6 +12,12 @@ extension = [Extension(name='macauff.perturbation_auf_fortran',
                        extra_link_args=["-lgomp"],
                        extra_f90_compile_args=["-Wall", "-Wextra", "-Werror", "-pedantic",
                                                "-fbacktrace", "-O0", "-g", "-fcheck=all",
+                                               "-fopenmp"]),
+             Extension(name='macauff.misc_functions_fortran',
+                       sources=['macauff/misc_functions_fortran.f90'], language='f90',
+                       extra_link_args=["-lgomp"],
+                       extra_f90_compile_args=["-Wall", "-Wextra", "-Werror", "-pedantic",
+                                               "-fbacktrace", "-O0", "-g", "-fcheck=all",
                                                "-fopenmp"])]
 
 setup(name="macauff", packages=find_packages(),
