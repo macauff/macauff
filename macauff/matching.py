@@ -61,12 +61,13 @@ class CrossMatch():
                                  "if a sub-process is set to run that all subsequent "
                                  "processes are also set to run.")
 
-        # Ensure that we can create the folder for outputs.
-        try:
-            os.makedirs(self.joint_folder_path, exist_ok=True)
-        except OSError:
-            raise OSError("Error when trying to create temporary folder for joint outputs. "
-                          "Please ensure that joint_folder_path is correct.")
+        # Ensure that we can create the folders for outputs.
+        for path in ['group', 'reject']:
+            try:
+                os.makedirs('{}/{}'.format(self.joint_folder_path, path), exist_ok=True)
+            except OSError:
+                raise OSError("Error when trying to create temporary folder for joint outputs. "
+                              "Please ensure that joint_folder_path is correct.")
 
         for path, catname, flag in zip([self.a_auf_folder_path, self.b_auf_folder_path],
                                        ['"a"', '"b"'], ['a_', 'b_']):
@@ -525,36 +526,27 @@ class CrossMatch():
             potentially counterparts to one another.
         '''
 
-        # Each catalogue should expect 7 files in "group/": "bright" source
-        # integral lengths, "field" source integral lengths, island lengths,
+        # Each catalogue should expect 5 files in "group/": island lengths,
         # indices into the opposite catalogue for each source, the indices
         # of sources in this catalogue in each island, the number of
         # opposing catalogue overlaps for each source, and the list of any
         # "rejected" source indices.
-        a_expected_files = files_per_grouping
-        a_file_number = np.sum([len(files) for _, _, files in
-                                os.walk('{}/group'.format(self.joint_folder_path))])
-        a_correct_file_number = a_expected_files == a_file_number
-
-        b_expected_files = files_per_grouping
-        b_file_number = np.sum([len(files) for _, _, files in
-                                os.walk('{}/group'.format(self.joint_folder_path))])
-        b_correct_file_number = b_expected_files == b_file_number
+        expected_files = files_per_grouping * 2
+        file_number = np.sum([len(files) for _, _, files in
+                              os.walk('{}/group'.format(self.joint_folder_path))])
+        correct_file_number = expected_files == file_number
 
         # First check whether we actually need to dip into the group sources
         # routine or not.
-        if self.run_group or not a_correct_file_number or not b_correct_file_number:
+        if self.run_group or not correct_file_number:
             # Only worry about the warning if we didn't choose to run the grouping
-            # but hit incorrect file numbers for either catalogue.
-            if not a_correct_file_number and not self.run_group:
-                warnings.warn('Incorrect number of grouping files for catalogue "a". Deleting '
-                              'all grouping files and re-running cross-match process.')
-                self.run_cf, self.run_source = True, True
-            elif not b_correct_file_number and not self.run_group:
-                warnings.warn('Incorrect number of grouping files for catalogue "b". Deleting '
-                              'all grouping files and re-running cross-match process.')
+            # but hit incorrect file numbers.
+            if not correct_file_number and not self.run_group:
+                warnings.warn('Incorrect number of grouping files. Deleting all '
+                              'grouping files and re-running cross-match process.')
                 self.run_cf, self.run_source = True, True
             os.system('rm -rf {}/group/*'.format(self.joint_folder_path))
+            os.system('rm -rf {}/reject/*'.format(self.joint_folder_path))
             group_func()
         else:
             print('Loading catalogue islands and overlaps...')
