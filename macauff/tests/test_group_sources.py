@@ -105,55 +105,86 @@ def test_cumulative_fourier_transform():
         assert_allclose(p, 1 - np.exp(-0.5 * dist**2 / sigma**2), rtol=1e-3, atol=1e-4)
 
 
-def test_get_max_overlap_fortran():
-    # Create 24 sources, of which 15 are common and 5/4 are separate in each
-    # catalogue.
-    common_position = np.array([[10, 0], [10.3, 0], [10.5, 0], [10.7, 0], [10.9, 0],
-                                [10, 0.5], [10.3, 0.5], [10.5, 0.5], [10.7, 0.5], [10.9, 0.5],
-                                [10, 1], [10.3, 1], [10.5, 1], [10.7, 1], [10.9, 1]])
-    a_off = np.array([[0.04, 0.07], [-0.03, -0.06], [-0.1, -0.02], [-0.07, 0.06], [-0.01, 0.02],
-                      [0, 0.01], [-0.02, -0.015], [-0.1, 0.01], [0.08, -0.02], [-0.05, 0.05],
-                      [0.02, -0.01], [-0.01, -0.01], [0.03, 0], [0.02, 0.02], [-0.01, -0.03]])
+class TestOverlap():
+    def setup_class(self):
+        # Create 24 sources, of which 15 are common and 5/4 are separate in each
+        # catalogue.
+        common_position = np.array([[10, 0], [10.3, 0], [10.5, 0], [10.7, 0], [10.9, 0],
+                                    [10, 0.5], [10.3, 0.5], [10.5, 0.5], [10.7, 0.5], [10.9, 0.5],
+                                    [10, 1], [10.3, 1], [10.5, 1], [10.7, 1], [10.9, 1]])
+        a_off = np.array(
+            [[0.04, 0.07], [-0.03, -0.06], [-0.1, -0.02], [-0.07, 0.06], [-0.01, 0.02],
+             [0, 0.01], [-0.02, -0.015], [-0.1, 0.01], [0.08, -0.02], [-0.05, 0.05],
+             [0.02, -0.01], [-0.01, -0.01], [0.03, 0], [0.02, 0.02], [-0.01, -0.03]])
 
-    # Place three "a" sources definitely out of the way, and two to overlap "b"
-    # sources, with 2/2 "b" sources split by no overlap and overlap respectively.
-    a_separate_position = np.array([[10, 3], [10.3, 3], [10.5, 3],
-                                    [10+0.04/3600, -0.02/3600], [10.5-0.03/3600, 1+0.08/3600]])
+        # Place three "a" sources definitely out of the way, and two to overlap "b"
+        # sources, with 2/2 "b" sources split by no overlap and overlap respectively.
+        a_separate_position = np.array([[10, 3], [10.3, 3], [10.5, 3],
+                                        [10+0.04/3600, -0.02/3600], [10.5-0.03/3600, 1+0.08/3600]])
 
-    b_separate_position = np.array([[8, 0], [9, 0],
-                                    [10.5+0.05/3600, 1-0.03/3600], [10.7+0.03/3600, 0.04/3600]])
+        b_separate_position = np.array([[8, 0], [9, 0], [10.5+0.05/3600, 1-0.03/3600],
+                                        [10.7+0.03/3600, 0.04/3600]])
 
-    a_position = np.append(common_position + a_off/3600, a_separate_position, axis=0)
-    b_position = np.append(common_position, b_separate_position, axis=0)
+        a_position = np.append(common_position + a_off/3600, a_separate_position, axis=0)
+        b_position = np.append(common_position, b_separate_position, axis=0)
 
-    a_axerr = np.array([0.03]*len(a_position))
-    b_axerr = np.array([0.03]*len(b_position))
+        self.a_axerr = np.array([0.03]*len(a_position))
+        self.b_axerr = np.array([0.03]*len(b_position))
 
-    max_sep = 0.25  # 6-sigma distance is basically 100% integral for pure 2-D Gaussian
-    max_frac = 0.99  # Slightly more than 3-sigma for 2-D Gaussian
+        self.max_sep = 0.25  # 6-sigma distance is basically 100% integral for pure 2-D Gaussian
+        self.max_frac = 0.99  # Slightly more than 3-sigma for 2-D Gaussian
 
-    a_ax_1, a_ax_2 = a_position[:, 0], a_position[:, 1]
-    b_ax_1, b_ax_2 = b_position[:, 0], b_position[:, 1]
+        self.a_ax_1, self.a_ax_2 = a_position[:, 0], a_position[:, 1]
+        self.b_ax_1, self.b_ax_2 = b_position[:, 0], b_position[:, 1]
 
-    r = np.linspace(0, max_sep, 9000)
-    dr = np.diff(r)
-    r = r[:-1] + dr/2
-    rho = np.linspace(0, 100, 10000)
-    drho = np.diff(rho)
-    rho = rho[:-1] + drho/2
+        self.r = np.linspace(0, self.max_sep, 9000)
+        self.dr = np.diff(self.r)
+        self.r = self.r[:-1] + self.dr/2
+        self.rho = np.linspace(0, 100, 10000)
+        self.drho = np.diff(self.rho)
+        self.rho = self.rho[:-1] + self.drho/2
 
-    j0s = mff.calc_j0(rho, r)
+        self.j0s = mff.calc_j0(self.rho, self.r)
 
-    amodrefind = np.zeros((4, len(a_ax_1)), int)
-    bmodrefind = np.zeros((4, len(b_ax_1)), int)
-    afouriergrid = np.ones((len(rho), 1, 1, 1, 1), float)
-    bfouriergrid = np.ones((len(rho), 1, 1, 1, 1), float)
+        self.amodrefind = np.zeros((4, len(self.a_ax_1)), int)
+        self.bmodrefind = np.zeros((4, len(self.b_ax_1)), int)
+        self.afouriergrid = np.ones((len(self.rho), 1, 1, 1, 1), float)
+        self.bfouriergrid = np.ones((len(self.rho), 1, 1, 1, 1), float)
 
-    a_num, b_num = gsf.get_max_overlap(a_ax_1, a_ax_2, b_ax_1, b_ax_2, max_sep, a_axerr, b_axerr,
-                                       r, dr, rho, drho, j0s, afouriergrid, bfouriergrid,
-                                       amodrefind, bmodrefind, max_frac)
+    def test_get_max_overlap_fortran(self):
+        a_num, b_num = gsf.get_max_overlap(
+            self.a_ax_1, self.a_ax_2, self.b_ax_1, self.b_ax_2, self.max_sep, self.a_axerr,
+            self.b_axerr, self.r, self.dr, self.rho, self.drho, self.j0s, self.afouriergrid,
+            self.bfouriergrid, self.amodrefind, self.bmodrefind, self.max_frac)
 
-    assert np.all(a_num.shape == (20,))
-    assert np.all(b_num.shape == (19,))
-    assert np.all(a_num == np.array([1, 1, 1, 2, 1, 1, 1, 1, 1, 1, 1, 1, 2, 1, 1, 0, 0, 0, 1, 1]))
-    assert np.all(b_num == np.array([2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 1, 1, 0, 0, 1, 1]))
+        assert np.all(a_num.shape == (20,))
+        assert np.all(b_num.shape == (19,))
+        assert np.all(a_num ==
+                      np.array([1, 1, 1, 2, 1, 1, 1, 1, 1, 1, 1, 1, 2, 1, 1, 0, 0, 0, 1, 1]))
+        assert np.all(b_num ==
+                      np.array([2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 1, 1, 0, 0, 1, 1]))
+
+    def test_get_overlap_indices_fortran(self):
+        a_max, b_max = 2, 2
+        a_inds, b_inds, a_num, b_num = gsf.get_overlap_indices(
+            self.a_ax_1, self.a_ax_2, self.b_ax_1, self.b_ax_2, self.max_sep, a_max, b_max,
+            self.a_axerr, self.b_axerr, self.r, self.dr, self.rho, self.drho, self.j0s,
+            self.afouriergrid, self.bfouriergrid, self.amodrefind, self.bmodrefind, self.max_frac)
+
+        assert np.all(a_num.shape == (20,))
+        assert np.all(b_num.shape == (19,))
+        assert np.all(a_num ==
+                      np.array([1, 1, 1, 2, 1, 1, 1, 1, 1, 1, 1, 1, 2, 1, 1, 0, 0, 0, 1, 1]))
+        assert np.all(b_num ==
+                      np.array([2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 1, 1, 0, 0, 1, 1]))
+
+        a_overlaps = -1*np.ones((2, 20), int)
+        for _i, _inds in enumerate([[0], [1], [2], [3, 18], [4], [5], [6], [7], [8], [9], [10],
+                                    [11], [12, 17], [13], [14], [], [], [], [0], [12]]):
+            a_overlaps[:len(_inds), _i] = 1+np.array(_inds)
+        b_overlaps = -1*np.ones((2, 19), int)
+        for _i, _inds in enumerate([[0, 18], [1], [2], [3], [4], [5], [6], [7], [8], [9], [10],
+                                    [11], [12, 19], [13], [14], [], [], [12], [3]]):
+            b_overlaps[:len(_inds), _i] = 1+np.array(_inds)
+        assert np.all(a_inds == a_overlaps)
+        assert np.all(b_inds == b_overlaps)
