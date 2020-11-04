@@ -8,7 +8,7 @@ import numpy as np
 from numpy.testing import assert_allclose
 import scipy.special
 
-from ..misc_functions import (create_cumulative_offsets_grid, load_small_ref_ind_cumulative_grid,
+from ..misc_functions import (create_fourier_offsets_grid, load_small_ref_ind_fourier_grid,
                               hav_dist_constant_lat)
 from ..misc_functions_fortran import misc_functions_fortran as mff
 from ..perturbation_auf_fortran import perturbation_auf_fortran as paf
@@ -22,7 +22,7 @@ def test_calc_j0():
                     rtol=1e-5)
 
 
-def test_create_cumulative_offsets_grid():
+def test_create_fourier_offsets_grid():
     a_len = np.array([[5, 10, 5], [15, 4, 8]], order='F')
     np.save('arraylengths.npy', a_len)
     auf_pointings = np.array([[10, 20], [50, 50], [100, -40]])
@@ -33,11 +33,11 @@ def test_create_cumulative_offsets_grid():
         for i in range(0, len(filt_names)):
             filt = filt_names[i]
             os.makedirs('{}/{}/{}'.format(ax1, ax2, filt), exist_ok=True)
-            np.save('{}/{}/{}/cumulative.npy'.format(ax1, ax2, filt),
+            np.save('{}/{}/{}/fourier.npy'.format(ax1, ax2, filt),
                     (i + len(filt_names)*j)*np.ones((len(r[:-1]), a_len[i, j]), float))
 
-    create_cumulative_offsets_grid('.', auf_pointings, filt_names, r)
-    a = np.lib.format.open_memmap('{}/cumulative_grid.npy'.format(
+    create_fourier_offsets_grid('.', auf_pointings, filt_names, r)
+    a = np.lib.format.open_memmap('{}/fourier_grid.npy'.format(
         '.'), mode='r', dtype=float, shape=(9, 15, 2, 3), fortran_order=True)
     assert np.all(a.shape == (9, 15, 2, 3))
     a_manual = -1*np.ones((9, 15, 2, 3), float, order='F')
@@ -47,11 +47,11 @@ def test_create_cumulative_offsets_grid():
     assert np.all(a == a_manual)
 
 
-def test_load_small_ref_ind_cumulative_grid():
+def test_load_small_ref_ind_fourier_grid():
     a_len = np.array([[6, 10, 7], [15, 9, 8], [7, 10, 12], [8, 8, 11]], order='F')
     auf_pointings = np.array([[10, 20], [50, 50], [100, -40]])
     filt_names = ['W1', 'W2', 'W3', 'W4']
-    a = np.lib.format.open_memmap('{}/cumulative_grid.npy'.format(
+    a = np.lib.format.open_memmap('{}/fourier_grid.npy'.format(
         '.'), mode='w+', dtype=float, shape=(9, 15, 4, 3), fortran_order=True)
     for j in range(0, len(auf_pointings)):
         for i in range(0, len(filt_names)):
@@ -61,20 +61,20 @@ def test_load_small_ref_ind_cumulative_grid():
     # Unique indices: 0, 1, 2, 5; 0, 3; 0, 1, 2
     # These map to 0, 1, 2, 3; 0, 1; 0, 1, 2
     modrefind = np.array([[0, 2, 0, 2, 1, 5], [0, 3, 3, 3, 3, 0], [0, 1, 2, 1, 2, 1]])
-    a, b = load_small_ref_ind_cumulative_grid(modrefind, '.')
+    a, b = load_small_ref_ind_fourier_grid(modrefind, '.')
 
     new_small_modrefind = np.array([[0, 2, 0, 2, 1, 3], [0, 1, 1, 1, 1, 0], [0, 1, 2, 1, 2, 1]])
-    new_small_cumulativeoffgrid = np.empty((9, 4, 2, 3), float, order='F')
+    new_small_fouriergrid = np.empty((9, 4, 2, 3), float, order='F')
     for j, j_old in enumerate([0, 1, 2]):
         for i, i_old in enumerate([0, 3]):
             for k, k_old in enumerate([0, 1, 2, 5]):
-                new_small_cumulativeoffgrid[:, k, i, j] = (
+                new_small_fouriergrid[:, k, i, j] = (
                     k_old + i_old*a_len[i_old, j_old] + a_len[i_old, j_old]*len(filt_names)*j_old)
 
     assert np.all(b.shape == (3, 6))
     assert np.all(a.shape == (9, 4, 2, 3))
     assert np.all(b == new_small_modrefind)
-    assert np.all(a == new_small_cumulativeoffgrid)
+    assert np.all(a == new_small_fouriergrid)
 
 
 def test_hav_dist_constant_lat():

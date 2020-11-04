@@ -9,13 +9,13 @@ from numpy.testing import assert_allclose
 import numpy as np
 
 from ..matching import CrossMatch
-from ..group_sources import make_island_groupings, _load_cumulative_grid_cutouts
-from ..misc_functions import create_cumulative_offsets_grid
+from ..group_sources import make_island_groupings, _load_fourier_grid_cutouts
+from ..misc_functions import create_fourier_offsets_grid
 from ..group_sources_fortran import group_sources_fortran as gsf
 from ..misc_functions_fortran import misc_functions_fortran as mff
 
 
-def test_load_cumulative_grid_cutouts():
+def test_load_fourier_grid_cutouts():
     lena = 100000
     a = np.lib.format.open_memmap('con_cat_astro.npy', mode='w+', dtype=float, shape=(lena, 3))
     for i in range(0, lena, 10000):
@@ -27,7 +27,7 @@ def test_load_cumulative_grid_cutouts():
 
     del a
 
-    grid = np.lib.format.open_memmap('cumulative_grid.npy', mode='w+', dtype=float,
+    grid = np.lib.format.open_memmap('fourier_grid.npy', mode='w+', dtype=float,
                                      shape=(100, 2, 3, 2),
                                      fortran_order=True)
 
@@ -53,7 +53,7 @@ def test_load_cumulative_grid_cutouts():
     rect = np.array([40, 60, 40, 60])
 
     padding = 0.1
-    _a, _b, _c, _ = _load_cumulative_grid_cutouts(a, rect, '.', '.', '.', padding)
+    _a, _b, _c, _ = _load_fourier_grid_cutouts(a, rect, '.', '.', '.', padding)
     assert np.all(_a.shape == (4, 3))
     assert np.all(_a == np.array([[50, 50, 0.1], [48, 59, 0.5], [39.98, 43, 0.2], [45, 45, 0.2]]))
     assert np.all(_b.shape == (100, 1, 2, 2))
@@ -74,7 +74,7 @@ def test_load_cumulative_grid_cutouts():
     # This should not return source #555 above, removing its potential reference index.
     # Hence we only have one unique grid reference now.
     padding = 0
-    _a, _b, _c, _ = _load_cumulative_grid_cutouts(a, rect, '.', '.', '.', padding)
+    _a, _b, _c, _ = _load_fourier_grid_cutouts(a, rect, '.', '.', '.', padding)
     assert np.all(_a.shape == (3, 3))
     assert np.all(_a == np.array([[50, 50, 0.1], [48, 59, 0.5], [45, 45, 0.2]]))
     assert np.all(_b.shape == (100, 1, 1, 1))

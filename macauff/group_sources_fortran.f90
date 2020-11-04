@@ -18,7 +18,7 @@ subroutine get_max_overlap(a_ax_1, a_ax_2, b_ax_1, b_ax_2, max_sep, a_axerr, b_a
 
     integer, parameter :: dp = kind(0.0d0)  ! double precision
 
-    ! 4-D index maps from each source into the cumulative offset perturbation AUF component grids.
+    ! 4-D index maps from each source into the fourier-space perturbation AUF component grids.
     integer, intent(in) :: amodrefind(:, :), bmodrefind(:, :)
     ! Orthogonal sky coordinate arrays and circular coordinate uncertainties for catalogue a and b.
     real(dp), intent(in) :: a_ax_1(:), a_ax_2(:), b_ax_1(:), b_ax_2(:), a_axerr(:), b_axerr(:)
@@ -126,7 +126,7 @@ subroutine get_overlap_indices(a_ax_1, a_ax_2, b_ax_1, b_ax_2, max_sep, amax, bm
 
     integer, parameter :: dp = kind(0.0d0)  ! double precision
 
-    ! 4-D index maps from each source into the cumulative offset perturbation AUF component grids.
+    ! 4-D index maps from each source into the fourier-space perturbation AUF component grids.
     integer, intent(in) :: amodrefind(:, :), bmodrefind(:, :)
     ! Largest size of overlaps of each catalogue, from getmaxn.
     integer, intent(in) :: amax, bmax
