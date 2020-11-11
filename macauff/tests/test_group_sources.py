@@ -9,8 +9,7 @@ from numpy.testing import assert_allclose
 import numpy as np
 
 from ..matching import CrossMatch
-from ..group_sources import make_island_groupings, _load_fourier_grid_cutouts
-from ..misc_functions import create_fourier_offsets_grid
+from ..group_sources import make_island_groupings, _load_fourier_grid_cutouts, _clean_overlaps
 from ..group_sources_fortran import group_sources_fortran as gsf
 from ..misc_functions_fortran import misc_functions_fortran as mff
 
@@ -21,7 +20,7 @@ def test_load_fourier_grid_cutouts():
     for i in range(0, lena, 10000):
         a[i:i+10000, :] = 0
     a[0, :] = [50, 50, 0.1]
-    a[123, :] = [48, 59, 0.5]
+    a[123, :] = [48, 60.02, 0.5]
     a[555, :] = [39.98, 43, 0.2]
     a[1000, :] = [45, 45, 0.2]
 
@@ -53,9 +52,10 @@ def test_load_fourier_grid_cutouts():
     rect = np.array([40, 60, 40, 60])
 
     padding = 0.1
-    _a, _b, _c, _ = _load_fourier_grid_cutouts(a, rect, '.', '.', '.', padding)
+    _a, _b, _c, _ = _load_fourier_grid_cutouts(a, rect, '.', '.', '.', padding, 'check')
     assert np.all(_a.shape == (4, 3))
-    assert np.all(_a == np.array([[50, 50, 0.1], [48, 59, 0.5], [39.98, 43, 0.2], [45, 45, 0.2]]))
+    assert np.all(_a ==
+                  np.array([[50, 50, 0.1], [48, 60.02, 0.5], [39.98, 43, 0.2], [45, 45, 0.2]]))
     assert np.all(_b.shape == (100, 1, 2, 2))
     b_guess = np.empty((100, 1, 2, 2), float)
     b_guess[:, 0, 0, 0] = 0 + 1 * 2 + 0 * 6
@@ -71,37 +71,34 @@ def test_load_fourier_grid_cutouts():
     c_guess[:, 3] = [0, 1, 1]
     assert np.all(_c == c_guess)
 
-    # This should not return source #555 above, removing its potential reference index.
-    # Hence we only have one unique grid reference now.
+    # This should not return sources 123 and 555 above, removing a potential
+    # reference index. Hence we only have one unique grid reference now.
     padding = 0
-    _a, _b, _c, _ = _load_fourier_grid_cutouts(a, rect, '.', '.', '.', padding)
-    assert np.all(_a.shape == (3, 3))
-    assert np.all(_a == np.array([[50, 50, 0.1], [48, 59, 0.5], [45, 45, 0.2]]))
+    _a, _b, _c, _ = _load_fourier_grid_cutouts(a, rect, '.', '.', '.', padding, 'check')
+    assert np.all(_a.shape == (2, 3))
+    assert np.all(_a == np.array([[50, 50, 0.1], [45, 45, 0.2]]))
     assert np.all(_b.shape == (100, 1, 1, 1))
     b_guess = np.empty((100, 1, 1, 1), float)
     b_guess[:, 0, 0, 0] = 0 + 2 * 2 + 1 * 6
     assert np.all(_b == b_guess)
-    assert np.all(_c.shape == (3, 3))
-    c_guess = np.empty((3, 3), int)
+    assert np.all(_c.shape == (3, 2))
+    c_guess = np.empty((3, 2), int)
     c_guess[:, 0] = [0, 0, 0]
     c_guess[:, 1] = [0, 0, 0]
-    c_guess[:, 2] = [0, 0, 0]
     assert np.all(_c == c_guess)
 
 
 def test_cumulative_fourier_transform():
     r = np.linspace(0, 5, 10000)
     dr = np.diff(r)
-    r = r[:-1] + dr/2
     rho = np.linspace(0, 100, 10000)
     drho = np.diff(rho)
-    rho = rho[:-1] + drho/2
     sigma = 0.3
-    f = np.exp(-2 * np.pi**2 * rho**2 * sigma**2)
+    f = np.exp(-2 * np.pi**2 * (rho[:-1]+drho/2)**2 * sigma**2)
 
-    j0s = mff.calc_j0(rho, r)
+    j0s = mff.calc_j0(rho[:-1]+drho/2, r[:-1]+dr/2)
     for dist in [0, 0.1, 0.5, 1, 3]:
-        p = gsf.cumulative_fourier_transform(f, r, dr, rho, drho, dist, j0s)
+        p = gsf.cumulative_fourier_transform(f, r[:-1], dr, rho[:-1], drho, dist, j0s)
         assert_allclose(p, 1 - np.exp(-0.5 * dist**2 / sigma**2), rtol=1e-3, atol=1e-4)
 
 
@@ -139,23 +136,21 @@ class TestOverlap():
 
         self.r = np.linspace(0, self.max_sep, 9000)
         self.dr = np.diff(self.r)
-        self.r = self.r[:-1] + self.dr/2
         self.rho = np.linspace(0, 100, 10000)
         self.drho = np.diff(self.rho)
-        self.rho = self.rho[:-1] + self.drho/2
 
-        self.j0s = mff.calc_j0(self.rho, self.r)
+        self.j0s = mff.calc_j0(self.rho[:-1] + self.drho/2, self.r[:-1] + self.dr/2)
 
-        self.amodrefind = np.zeros((4, len(self.a_ax_1)), int)
-        self.bmodrefind = np.zeros((4, len(self.b_ax_1)), int)
-        self.afouriergrid = np.ones((len(self.rho), 1, 1, 1, 1), float)
-        self.bfouriergrid = np.ones((len(self.rho), 1, 1, 1, 1), float)
+        self.amodrefind = np.zeros((3, len(self.a_ax_1)), int)
+        self.bmodrefind = np.zeros((3, len(self.b_ax_1)), int)
+        self.afouriergrid = np.ones((len(self.rho) - 1, 1, 1, 1), float)
+        self.bfouriergrid = np.ones((len(self.rho) - 1, 1, 1, 1), float)
 
     def test_get_max_overlap_fortran(self):
         a_num, b_num = gsf.get_max_overlap(
-            self.a_ax_1, self.a_ax_2, self.b_ax_1, self.b_ax_2, self.max_sep, self.a_axerr,
-            self.b_axerr, self.r, self.dr, self.rho, self.drho, self.j0s, self.afouriergrid,
-            self.bfouriergrid, self.amodrefind, self.bmodrefind, self.max_frac)
+            self.a_ax_1, self.a_ax_2, self.b_ax_1, self.b_ax_2, self.max_sep/3600, self.a_axerr,
+            self.b_axerr, self.r[:-1], self.dr, self.rho[:-1], self.drho, self.j0s,
+            self.afouriergrid, self.bfouriergrid, self.amodrefind, self.bmodrefind, self.max_frac)
 
         assert np.all(a_num.shape == (20,))
         assert np.all(b_num.shape == (19,))
@@ -167,8 +162,8 @@ class TestOverlap():
     def test_get_overlap_indices_fortran(self):
         a_max, b_max = 2, 2
         a_inds, b_inds, a_num, b_num = gsf.get_overlap_indices(
-            self.a_ax_1, self.a_ax_2, self.b_ax_1, self.b_ax_2, self.max_sep, a_max, b_max,
-            self.a_axerr, self.b_axerr, self.r, self.dr, self.rho, self.drho, self.j0s,
+            self.a_ax_1, self.a_ax_2, self.b_ax_1, self.b_ax_2, self.max_sep/3600, a_max, b_max,
+            self.a_axerr, self.b_axerr, self.r[:-1], self.dr, self.rho[:-1], self.drho, self.j0s,
             self.afouriergrid, self.bfouriergrid, self.amodrefind, self.bmodrefind, self.max_frac)
 
         assert np.all(a_num.shape == (20,))
@@ -188,3 +183,252 @@ class TestOverlap():
             b_overlaps[:len(_inds), _i] = 1+np.array(_inds)
         assert np.all(a_inds == a_overlaps)
         assert np.all(b_inds == b_overlaps)
+
+
+def test_clean_overlaps():
+    joint_folder_path, filename = '.', 'list'
+    os.makedirs('group', exist_ok=True)
+    maxsize, size = 5, np.array([3, 5, 3, 4, 4, 5, 4, 2, 5, 4]*3)
+    inds = np.lib.format.open_memmap('{}/group/{}.npy'.format(joint_folder_path, filename),
+                                     mode='w+', dtype=int, shape=(maxsize, len(size)),
+                                     fortran_order=True)
+    for i in range(0, 3):
+        inds[:, 0+10*i] = [0, 1, 0, -1, -1]
+        inds[:, 1+10*i] = [3, 4, 1, 1, 4]
+        inds[:, 2+10*i] = [2, 3, 4, -1, -1]
+        inds[:, 3+10*i] = [0, 0, 0, 1, -1]
+        inds[:, 4+10*i] = [0, 1, 2, 3, -1]
+        inds[:, 5+10*i] = [0, 0, 1, 1, 2]
+        inds[:, 6+10*i] = [3, 4, 3, 4, -1]
+        inds[:, 7+10*i] = [0, 1, -1, -1, -1]
+        inds[:, 8+10*i] = [2, 2, 2, 2, 2]
+        inds[:, 9+10*i] = [1, 1, 2, 3, -1]
+
+    inds2, size2 = _clean_overlaps(inds, size, joint_folder_path, filename)
+    compare_inds2 = np.empty((4, 30), int)
+    for i in range(0, 3):
+        compare_inds2[:, 0+10*i] = [0, 1, -1, -1]
+        compare_inds2[:, 1+10*i] = [1, 3, 4, -1]
+        compare_inds2[:, 2+10*i] = [2, 3, 4, -1]
+        compare_inds2[:, 3+10*i] = [0, 1, -1, -1]
+        compare_inds2[:, 4+10*i] = [0, 1, 2, 3]
+        compare_inds2[:, 5+10*i] = [0, 1, 2, -1]
+        compare_inds2[:, 6+10*i] = [3, 4, -1, -1]
+        compare_inds2[:, 7+10*i] = [0, 1, -1, -1]
+        compare_inds2[:, 8+10*i] = [2, -1, -1, -1]
+        compare_inds2[:, 9+10*i] = [1, 2, 3, -1]
+    assert np.all(inds2 == compare_inds2)
+    assert np.all(size2 == np.array([2, 3, 3, 2, 4, 3, 2, 2, 1, 3]*3))
+
+
+class TestMakeIslandGroupings():
+    def setup_class(self):
+        self.mem_chunk_num, self.include_phot_like = 2, False
+        self.max_sep, self.int_fracs = 11, [0.63, 0.9, 0.99]  # max_sep in arcseconds
+        self.a_filt_names, self.b_filt_names = ['G', 'RP'], ['W1', 'W2', 'W3']
+        self.a_title, self.b_title = 'gaia', 'wise'
+        self.a_cat_folder_path, self.b_cat_folder_path = 'gaia_cat', 'wise_cat'
+        self.a_auf_folder_path, self.b_auf_folder_path = 'gaia_auf', 'wise_auf'
+        self.joint_folder_path = 'joint'
+        for folder in [self.a_cat_folder_path, self.b_cat_folder_path, self.joint_folder_path,
+                       self.a_auf_folder_path, self.b_auf_folder_path]:
+            os.makedirs(folder, exist_ok=True)
+        for folder in ['group', 'reject']:
+            os.makedirs('{}/{}'.format(self.joint_folder_path, folder), exist_ok=True)
+        self.r = np.linspace(0, self.max_sep, 10000)
+        self.dr = np.diff(self.r)
+        self.rho = np.linspace(0, 100, 9900)
+        self.drho = np.diff(self.rho)
+
+        self.j0s = mff.calc_j0(self.rho[:-1]+self.drho/2, self.r[:-1]+self.dr/2)
+
+        self.a_auf_pointings = np.array([[10, -20], [12, -22], [15, -25]])
+        self.b_auf_pointings = np.array([[11, -21], [14, -22], [14, -24]])
+
+        self.N_a, self.N_b = 30, 45
+
+        self.ax_lims = np.array([8, 16, -26, -19])
+
+        # Fake fourier grid, in this case under the assumption that there
+        # is no extra AUF component:
+        for auf_folder, auf_points, filters, N in zip(
+                [self.a_auf_folder_path, self.b_auf_folder_path],
+                [self.a_auf_pointings, self.b_auf_pointings],
+                [self.a_filt_names, self.b_filt_names], [self.N_a, self.N_b]):
+            np.save('{}/modelrefinds.npy'.format(auf_folder), np.zeros((3, N), int))
+            np.save('{}/arraylengths.npy'.format(auf_folder),
+                    np.ones((len(filters), len(auf_points)), int))
+            for i in range(len(auf_points)):
+                ax1, ax2 = auf_points[i]
+                ax_folder = '{}/{}/{}'.format(auf_folder, ax1, ax2)
+                if not os.path.exists(ax_folder):
+                    os.makedirs(ax_folder, exist_ok=True)
+                for j in range(len(filters)):
+                    filt = filters[j]
+                    filt_folder = '{}/{}'.format(ax_folder, filt)
+                    if not os.path.exists(filt_folder):
+                        os.makedirs(filt_folder, exist_ok=True)
+                    fourieroffset = np.ones((len(self.rho) - 1, 1), float, order='F')
+                    np.save('{}/fourier.npy'.format(filt_folder), fourieroffset)
+        # 99% is slightly more than 3-sigma of a 2-D Gaussian integral, for
+        # int_frac[2] = 0.99
+        self.sigma = 0.1
+        seed = 123456  # reproducible seed!
+        self.rng = np.random.default_rng(seed)
+
+        a_coords = np.empty((self.N_a, 3), float)
+        a_coords[:, 0] = self.rng.uniform(self.ax_lims[0]+0.5, self.ax_lims[1]-0.5, self.N_a)
+        a_coords[:, 1] = self.rng.uniform(self.ax_lims[2]+0.5, self.ax_lims[3]-0.5, self.N_a)
+        a_coords[:, 2] = self.sigma
+        # Move one source to have a forced overlap of objects
+        a_coords[-1, :2] = a_coords[0, :2] + [0.01*self.sigma/3600, 0.02*self.sigma/3600]
+        b_coords = np.empty((self.N_b, 3), float)
+        # Make sure that the N_b-20=25 matches all return based on Gaussian integrals.
+        b_coords[:self.N_b-20, 0] = a_coords[:self.N_b-20, 0] + self.rng.uniform(
+            -2, 2, self.N_b-20)*self.sigma/3600
+        b_coords[:self.N_b-20, 1] = a_coords[:self.N_b-20, 1] + self.rng.uniform(
+            -2, 2, self.N_b-20)*self.sigma/3600
+        # This should leave us with 4 "a" and 20 "b" singular matches.
+        b_coords[self.N_b-20:, 0] = self.rng.uniform(self.ax_lims[0]+0.5, self.ax_lims[1]-0.5, 20)
+        b_coords[self.N_b-20:, 1] = self.rng.uniform(self.ax_lims[2]+0.5, self.ax_lims[3]-0.5, 20)
+        b_coords[:, 2] = self.sigma
+
+        self.a_coords, self.b_coords = a_coords, b_coords
+
+    def test_make_island_groupings(self):
+        N_a, N_b = self.N_a, self.N_b
+        np.save('{}/con_cat_astro.npy'.format(self.a_cat_folder_path), self.a_coords)
+        np.save('{}/con_cat_astro.npy'.format(self.b_cat_folder_path), self.b_coords)
+        make_island_groupings(
+            self.max_sep, self.ax_lims, self.int_fracs, self.a_filt_names, self.b_filt_names,
+            self.a_title, self.b_title, self.r, self.dr, self.rho, self.drho, self.j0s,
+            self.a_auf_folder_path, self.b_auf_folder_path, self.a_auf_pointings,
+            self.b_auf_pointings, self.a_cat_folder_path, self.b_cat_folder_path,
+            self.joint_folder_path, self.mem_chunk_num, self.include_phot_like)
+
+        alist, blist = np.load('joint/group/alist.npy'), np.load('joint/group/blist.npy')
+        agrplen, bgrplen = np.load('joint/group/agrplen.npy'), np.load('joint/group/bgrplen.npy')
+        assert np.all(alist.shape == (2, N_a - 1))
+        assert np.all(blist.shape == (1, N_a - 1))
+        assert np.all(agrplen.shape == (N_a - 1,))
+        assert np.all(bgrplen.shape == (N_a - 1,))
+        a_list_fix = -1*np.ones((2, N_a - 1), int)
+        a_list_fix[0, :] = np.append(np.arange(1, N_a - 1), [0])
+        a_list_fix[1, -1] = N_a - 1
+        assert np.all(agrplen == np.append(np.ones((N_a - 2), int), [2]))
+        # Because we only keep groups with "a" sources in them, we have the full 25
+        # (plus one!) joint matches, then N_a-25(-1!)=4 "lonely" "a" objects. Remember
+        # that the three-source group goes last, beyond the empty "b" groups.
+        assert np.all(bgrplen == np.append(np.ones((N_b-21), int), [0, 0, 0, 0, 1]))
+        assert np.all(alist == a_list_fix)
+        # Here we mapped one-to-one for "b" sources that are matched to "a" objects,
+        # and by default the empty groups have the null "-1" index. Also remember that
+        # the arrays should be f-ordered, and here are (1, N) shape.
+        assert np.all(blist == np.append(np.arange(1, N_b-20),
+                                         np.array([-1, -1, -1, -1, 0]))).reshape(1, -1)
+
+    def test_mig_extra_reject(self):
+        N_a, N_b = self.N_a, self.N_b
+        ax_lims = self.ax_lims
+        # Pretend like there's already removed objects due to group length being
+        # exceeded during make_set_list even though there won't be.
+        np.save('joint/reject/areject.npy', np.arange(N_a, N_a+5))
+        np.save('joint/reject/breject.npy', np.arange(N_b, N_b+4))
+        # Fake moving some sources to within max_sep of the axlims edges, to
+        # test the removal of these objects -- combined with the above sources.
+        a_coords, b_coords = np.copy(self.a_coords), np.copy(self.b_coords)
+        a_c_diff = a_coords[3:6, 0] - (ax_lims[0] + self.max_sep/3600 - 1/3600)
+        a_coords[3:6, 0] = ax_lims[0] + self.max_sep/3600 - 1/3600
+        b_coords[3:6, 0] -= a_c_diff
+        np.save('{}/con_cat_astro.npy'.format(self.a_cat_folder_path), a_coords)
+        np.save('{}/con_cat_astro.npy'.format(self.b_cat_folder_path), b_coords)
+
+        make_island_groupings(
+            self.max_sep, ax_lims, self.int_fracs, self.a_filt_names, self.b_filt_names,
+            self.a_title, self.b_title, self.r, self.dr, self.rho, self.drho, self.j0s,
+            self.a_auf_folder_path, self.b_auf_folder_path, self.a_auf_pointings,
+            self.b_auf_pointings, self.a_cat_folder_path, self.b_cat_folder_path,
+            self.joint_folder_path, self.mem_chunk_num, self.include_phot_like)
+
+        alist, blist = np.load('joint/group/alist.npy'), np.load('joint/group/blist.npy')
+        agrplen, bgrplen = np.load('joint/group/agrplen.npy'), np.load('joint/group/bgrplen.npy')
+        # We removed 3 extra sources this time around, which should all be 1:1 islands.
+        assert np.all(alist.shape == (2, N_a - 4))
+        assert np.all(blist.shape == (1, N_a - 4))
+        assert np.all(agrplen.shape == (N_a - 4,))
+        assert np.all(bgrplen.shape == (N_a - 4,))
+        a_list_fix = -1*np.ones((2, N_a - 4), int)
+        a_list_fix[0, :2] = [1, 2]
+        a_list_fix[0, 2:] = np.append(np.arange(6, N_a - 1), [0])
+        a_list_fix[1, -1] = N_a - 1
+        assert np.all(agrplen == np.append(np.ones((N_a - 5), int), [2]))
+        assert np.all(bgrplen == np.append(np.ones((N_b-21-3), int), [0, 0, 0, 0, 1]))
+        assert np.all(alist == a_list_fix)
+        assert np.all(blist == np.append(np.append([1, 2], np.arange(6, N_b-20)),
+                                         np.array([-1, -1, -1, -1, 0]))).reshape(1, -1)
+
+        areject = np.load('joint/reject/reject_a.npy')
+        breject = np.load('joint/reject/reject_b.npy')
+        assert np.all(areject.shape == (5+3,))
+        assert np.all(breject.shape == (4+3,))
+        assert np.all(areject == np.array([3, 4, 5, N_a, N_a+1, N_a+2, N_a+3, N_a+4]))
+        assert np.all(breject == np.array([3, 4, 5, N_b, N_b+1, N_b+2, N_b+3]))
+
+    def test_mig_no_reject_ax_lims(self):
+        N_a, N_b = self.N_a, self.N_b
+        ax_lims = np.array([0, 360, -90, -19])
+        # Check if axlims are changed to include wrap-around 0/360, or +-90 latitude,
+        # then we don't reject any sources.
+        a_coords, b_coords = np.copy(self.a_coords), np.copy(self.b_coords)
+        a_c_diff = a_coords[3:6, 0] - (ax_lims[0] + self.max_sep/3600 - 1/3600)
+        a_coords[3:6, 0] = ax_lims[0] + self.max_sep/3600 - 1/3600
+        b_coords[3:6, 0] -= a_c_diff
+        a_coords[7, :2] = [15, -90+(self.max_sep-3)/3600]
+        b_coords[7, :2] = a_coords[7, :2] + [0.2*self.sigma/3600, -0.15*self.sigma/3600]
+        np.save('{}/con_cat_astro.npy'.format(self.a_cat_folder_path), a_coords)
+        np.save('{}/con_cat_astro.npy'.format(self.b_cat_folder_path), b_coords)
+        np.save('joint/reject/areject.npy', np.arange(N_a, N_a+5))
+        np.save('joint/reject/breject.npy', np.arange(N_b, N_b+4))
+
+        make_island_groupings(
+            self.max_sep, ax_lims, self.int_fracs, self.a_filt_names, self.b_filt_names,
+            self.a_title, self.b_title, self.r, self.dr, self.rho, self.drho, self.j0s,
+            self.a_auf_folder_path, self.b_auf_folder_path, self.a_auf_pointings,
+            self.b_auf_pointings, self.a_cat_folder_path, self.b_cat_folder_path,
+            self.joint_folder_path, self.mem_chunk_num, self.include_phot_like)
+
+        alist, blist = np.load('joint/group/alist.npy'), np.load('joint/group/blist.npy')
+        agrplen, bgrplen = np.load('joint/group/agrplen.npy'), np.load('joint/group/bgrplen.npy')
+
+        assert np.all(alist.shape == (2, N_a - 1))
+        assert np.all(blist.shape == (1, N_a - 1))
+        assert np.all(agrplen.shape == (N_a - 1,))
+        assert np.all(bgrplen.shape == (N_a - 1,))
+        a_list_fix = -1*np.ones((2, N_a - 1), int)
+        a_list_fix[0, :] = np.append(np.arange(1, N_a - 1), [0])
+        a_list_fix[1, -1] = N_a - 1
+        assert np.all(agrplen == np.append(np.ones((N_a - 2), int), [2]))
+        assert np.all(bgrplen == np.append(np.ones((N_b-21), int), [0, 0, 0, 0, 1]))
+        assert np.all(alist == a_list_fix)
+        assert np.all(blist == np.append(np.arange(1, N_b-20),
+                                         np.array([-1, -1, -1, -1, 0]))).reshape(1, -1)
+        areject = np.load('joint/reject/reject_a.npy')
+        breject = np.load('joint/reject/reject_b.npy')
+        assert np.all(areject.shape == (5,))
+        assert np.all(breject.shape == (4,))
+        assert np.all(areject == np.array([N_a, N_a+1, N_a+2, N_a+3, N_a+4]))
+        assert np.all(breject == np.array([N_b, N_b+1, N_b+2, N_b+3]))
+
+    def test_island_no_phot_like(self):
+        ax_lims = self.ax_lims
+        # Finally, check that we correctly raise an error if trying to calculate
+        # photometric-likelihood related values.
+        include_phot_like = True
+        with pytest.raises(NotImplementedError,
+                           match='not currently implemented. Please set include_phot_like'):
+            make_island_groupings(
+                self.max_sep, ax_lims, self.int_fracs, self.a_filt_names, self.b_filt_names,
+                self.a_title, self.b_title, self.r, self.dr, self.rho, self.drho, self.j0s,
+                self.a_auf_folder_path, self.b_auf_folder_path, self.a_auf_pointings,
+                self.b_auf_pointings, self.a_cat_folder_path, self.b_cat_folder_path,
+                self.joint_folder_path, self.mem_chunk_num, include_phot_like)

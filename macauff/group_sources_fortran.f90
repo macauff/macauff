@@ -30,7 +30,7 @@ subroutine get_max_overlap(a_ax_1, a_ax_2, b_ax_1, b_ax_2, max_sep, a_axerr, b_a
     ! J0, the Bessel Function of First Kind of Zeroth Order, evaluated at all r-rho combinations.
     real(dp), intent(in) :: j0s(:, :)
     ! Grid of fourier-space representations of the perturbation components of each AUF.
-    real(dp), intent(in) :: afouriergrid(:, :, :, :, :), bfouriergrid(:, :, :, :, :)
+    real(dp), intent(in) :: afouriergrid(:, :, :, :), bfouriergrid(:, :, :, :)
     ! Largest considered AUF integral to be considered as potential counterparts.
     real(dp), intent(in) :: max_frac
     ! Number of sources overlapping each source in a given catalogue from the opposing catalogue.
@@ -60,17 +60,14 @@ subroutine get_max_overlap(a_ax_1, a_ax_2, b_ax_1, b_ax_2, max_sep, a_axerr, b_a
             dax2 = a_ax_2(j) - b_ax_2(i)
             if (abs(dax2) <= max_sep) then
                 call haversine(a_ax_1(j), b_ax_1(i), a_ax_2(j), b_ax_2(i), dist)
-                dist = dist * 3600.0_dp  ! haversine returns distance in degrees
                 if (max_sep2 >= dist**2) then
                     ! Calculate the cumulative integral probability by inverse Fourier transforming
                     ! the multiplication of the various Fourier-space PDFs of each convolution
                     ! component.
-                    afourier = afouriergrid(:, amodrefind(1, j)+1, amodrefind(2, j)+1, &
-                                               amodrefind(3, j)+1, amodrefind(4, j)+1)
-                    bfourier = bfouriergrid(:, bmodrefind(1, i)+1, bmodrefind(2, i)+1, &
-                                                   bmodrefind(3, i)+1, bmodrefind(4, i)+1)
-                    four = afourier*bfourier*exp(-2.0_dp * pi**2 * rho**2 * (oa**2 + ob**2))
-                    call cumulative_fourier_transform(four, r, dr, rho, drho, dist, j0s, cumulative)
+                    afourier = afouriergrid(:, amodrefind(1, j)+1, amodrefind(2, j)+1, amodrefind(3, j)+1)
+                    bfourier = bfouriergrid(:, bmodrefind(1, i)+1, bmodrefind(2, i)+1, bmodrefind(3, i)+1)
+                    four = afourier*bfourier*exp(-2.0_dp * pi**2 * (rho+drho/2.0_dp)**2 * (oa**2 + ob**2))
+                    call cumulative_fourier_transform(four, r, dr, rho, drho, dist*3600.0_dp, j0s, cumulative)
                     if (cumulative < max_frac) then
                         anumoverlap(j) = anumoverlap(j) + 1
                         bnumoverlap(i) = bnumoverlap(i) + 1
@@ -107,12 +104,12 @@ subroutine cumulative_fourier_transform(f, r, dr, rho, drho, dist, j0s, cumulati
         end if
         pr = 0.0_dp
         do i = 1, size(rho)
-            pr = pr + rho(i) * f(i) * j0s(i, j) * drho(i)
+            pr = pr + (rho(i)+drho(i)/2.0_dp) * f(i) * j0s(i, j) * drho(i)
         end do
         ! pr, the fourier transform of f, ends up being in probability density of per
         ! unit area, so we have to account for that when integrating. The final term
         ! is, essentially, 2 pi r dr
-        cumulative_prob = cumulative_prob + 2.0_dp * pi * pr * (pi * ((r(j)+dr(j)/2.0_dp)**2 - (r(j)-dr(j)/2.0_dp)**2))
+        cumulative_prob = cumulative_prob + 2.0_dp * pi * pr * (pi * ((r(j)+dr(j))**2 - r(j)**2))
     end do
 
 end subroutine cumulative_fourier_transform
@@ -140,7 +137,7 @@ subroutine get_overlap_indices(a_ax_1, a_ax_2, b_ax_1, b_ax_2, max_sep, amax, bm
     ! J0, the Bessel Function of First Kind of Zeroth Order, evaluated at all r-rho combinations.
     real(dp), intent(in) :: j0s(:, :)
     ! Grid of fourier-space representations of the perturbation components of each AUF.
-    real(dp), intent(in) :: afouriergrid(:, :, :, :, :), bfouriergrid(:, :, :, :, :)
+    real(dp), intent(in) :: afouriergrid(:, :, :, :), bfouriergrid(:, :, :, :)
     ! Largest considered AUF integral to be considered as potential counterparts.
     real(dp), intent(in) :: max_frac
     ! Indices of overlaps from catalogue a into b (and b into a).
@@ -184,14 +181,11 @@ subroutine get_overlap_indices(a_ax_1, a_ax_2, b_ax_1, b_ax_2, max_sep, amax, bm
             dax2 = a_ax_2(j) - b_ax_2(i)
             if (abs(dax2) <= max_sep) then
                 call haversine(a_ax_1(j), b_ax_1(i), a_ax_2(j), b_ax_2(i), dist)
-                dist = dist * 3600.0_dp  ! haversine returns distance in degrees
                 if (max_sep2 >= dist**2) then
-                    afourier = afouriergrid(:, amodrefind(1, j)+1, amodrefind(2, j)+1, &
-                                               amodrefind(3, j)+1, amodrefind(4, j)+1)
-                    bfourier = bfouriergrid(:, bmodrefind(1, i)+1, bmodrefind(2, i)+1, &
-                                                   bmodrefind(3, i)+1, bmodrefind(4, i)+1)
+                    afourier = afouriergrid(:, amodrefind(1, j)+1, amodrefind(2, j)+1, amodrefind(3, j)+1)
+                    bfourier = bfouriergrid(:, bmodrefind(1, i)+1, bmodrefind(2, i)+1, bmodrefind(3, i)+1)
                     four = afourier*bfourier*exp(-2.0_dp * pi**2 * rho**2 * (oa**2 + ob**2))
-                    call cumulative_fourier_transform(four, r, dr, rho, drho, dist, j0s, cumulative)
+                    call cumulative_fourier_transform(four, r, dr, rho, drho, dist*3600.0_dp, j0s, cumulative)
                     if (cumulative < max_frac) then
                         tempind(tempcounter) = i
                         tempcounter = tempcounter + 1
@@ -223,14 +217,11 @@ subroutine get_overlap_indices(a_ax_1, a_ax_2, b_ax_1, b_ax_2, max_sep, amax, bm
             dax2 = a_ax_2(j) - b_ax_2(i)
             if (abs(dax2) <= max_sep) then
                 call haversine(a_ax_1(j), b_ax_1(i), a_ax_2(j), b_ax_2(i), dist)
-                dist = dist * 3600.0_dp  ! haversine returns distance in degrees
                 if (max_sep2 >= dist**2) then
-                    afourier = afouriergrid(:, amodrefind(1, j)+1, amodrefind(2, j)+1, &
-                                               amodrefind(3, j)+1, amodrefind(4, j)+1)
-                    bfourier = bfouriergrid(:, bmodrefind(1, i)+1, bmodrefind(2, i)+1, &
-                                                   bmodrefind(3, i)+1, bmodrefind(4, i)+1)
+                    afourier = afouriergrid(:, amodrefind(1, j)+1, amodrefind(2, j)+1, amodrefind(3, j)+1)
+                    bfourier = bfouriergrid(:, bmodrefind(1, i)+1, bmodrefind(2, i)+1, bmodrefind(3, i)+1)
                     four = afourier*bfourier*exp(-2.0_dp * pi**2 * rho**2 * (oa**2 + ob**2))
-                    call cumulative_fourier_transform(four, r, dr, rho, drho, dist, j0s, cumulative)
+                    call cumulative_fourier_transform(four, r, dr, rho, drho, dist*3600.0_dp, j0s, cumulative)
                     if (cumulative < max_frac) then
                         tempind(tempcounter) = j
                         tempcounter = tempcounter + 1

@@ -7,11 +7,11 @@ framework.
 import numpy as np
 
 
-def create_fourier_offsets_grid(auf_folder_path, auf_pointings, filt_names, r):
+def create_fourier_offsets_grid(auf_folder_path, auf_pointings, filt_names, rho):
     arraylengths = np.load('{}/arraylengths.npy'.format(auf_folder_path))
     longestNm = np.amax(arraylengths)
     fouriergrid = np.lib.format.open_memmap('{}/fourier_grid.npy'.format(
-        auf_folder_path), mode='w+', dtype=float, shape=(len(r)-1, longestNm, len(filt_names),
+        auf_folder_path), mode='w+', dtype=float, shape=(len(rho)-1, longestNm, len(filt_names),
                                                          len(auf_pointings)), fortran_order=True)
     fouriergrid[:, :, :, :] = -1
     for j in range(0, len(auf_pointings)):
