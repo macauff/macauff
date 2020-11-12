@@ -574,8 +574,8 @@ class TestInputs:
         cm = CrossMatch(os.path.join(os.path.dirname(__file__), 'data/crossmatch_params.txt'),
                         os.path.join(os.path.dirname(__file__), 'data/cat_a_params.txt'),
                         os.path.join(os.path.dirname(__file__), 'data/cat_b_params.txt'))
-        assert np.all(cm.r == np.linspace(0, 1.185 * 11.99, 10000))
-        assert_allclose(cm.dr, np.ones(9999, float) * 1.185*11.99/9999)
+        assert np.all(cm.r == np.linspace(0, 11, 10000))
+        assert_allclose(cm.dr, np.ones(9999, float) * 11/9999)
         assert np.all(cm.rho == np.linspace(0, 100, 10000))
         assert_allclose(cm.drho, np.ones(9999, float) * 100/9999)
 

@@ -253,9 +253,10 @@ def make_island_groupings(max_sep, ax_lims, int_fracs, a_filt_names, b_filt_name
                                            mmap_mode='r'))
     else:
         a_first_rejected_len = 0
-    reject_a = np.lib.format.open_memmap(
-        '{}/reject/reject_a.npy'.format(joint_folder_path), mode='w+', dtype=int,
-        shape=(num_a_failed_checks+a_first_rejected_len,))
+    if num_a_failed_checks + a_first_rejected_len > 0:
+        reject_a = np.lib.format.open_memmap(
+            '{}/reject/reject_a.npy'.format(joint_folder_path), mode='w+', dtype=int,
+            shape=(num_a_failed_checks+a_first_rejected_len,))
     if os.path.isfile('{}/reject/areject.npy'.format(joint_folder_path)):
         reject_a[num_a_failed_checks:] = np.load('{}/reject/areject.npy'.format(joint_folder_path),
                                                  mmap_mode='r')
@@ -265,9 +266,10 @@ def make_island_groupings(max_sep, ax_lims, int_fracs, a_filt_names, b_filt_name
                                            mmap_mode='r'))
     else:
         b_first_rejected_len = 0
-    reject_b = np.lib.format.open_memmap(
-        '{}/reject/reject_b.npy'.format(joint_folder_path), mode='w+', dtype=int,
-        shape=(num_b_failed_checks+b_first_rejected_len,))
+    if num_b_failed_checks + b_first_rejected_len > 0:
+        reject_b = np.lib.format.open_memmap(
+            '{}/reject/reject_b.npy'.format(joint_folder_path), mode='w+', dtype=int,
+            shape=(num_b_failed_checks+b_first_rejected_len,))
     if os.path.isfile('{}/reject/breject.npy'.format(joint_folder_path)):
         reject_b[num_b_failed_checks:] = np.load('{}/reject/breject.npy'.format(joint_folder_path),
                                                  mmap_mode='r')
@@ -299,10 +301,12 @@ def make_island_groupings(max_sep, ax_lims, int_fracs, a_filt_names, b_filt_name
         alist_cut = alist_cut[alist_cut > -1]
         blist_cut = blist[:, i:i+di][:, failed_check_cut]
         blist_cut = blist_cut[blist_cut > -1]
-        reject_a[a_fail_count:a_fail_count+len(alist_cut)] = alist_cut
-        a_fail_count += len(alist_cut)
-        reject_b[b_fail_count:b_fail_count+len(blist_cut)] = blist_cut
-        b_fail_count += len(blist_cut)
+        if len(alist_cut) > 0:
+            reject_a[a_fail_count:a_fail_count+len(alist_cut)] = alist_cut
+            a_fail_count += len(alist_cut)
+        if len(blist_cut) > 0:
+            reject_b[b_fail_count:b_fail_count+len(blist_cut)] = blist_cut
+            b_fail_count += len(blist_cut)
 
         # This should basically be alist = alist[:, passed_check] and
         # agrplen = agrplen[passed_check], simply removing those above failed

@@ -11,6 +11,7 @@ import numpy as np
 
 from .perturbation_auf import make_perturb_aufs
 from .group_sources import make_island_groupings
+from .misc_functions_fortran import misc_functions_fortran as mff
 
 __all__ = ['CrossMatch']
 
@@ -146,7 +147,7 @@ class CrossMatch():
         # Once AUF components are assembled, we now group sources based on
         # convolved AUF integration lengths, to get "common overlap" sources
         # and merge such overlaps into distinct "islands" of sources to match.
-        self.group_sources()
+        self.group_sources(5)
 
     def _replace_line(self, file_name, line_num, text, out_file=None):
         '''
@@ -430,11 +431,13 @@ class CrossMatch():
         """
         Function to initialise the shared variables used in the cross-match process.
         """
-        maximumoffset = 1.185 * max([np.amax(self.a_psf_fwhms), np.amax(self.b_psf_fwhms)])
-        self.r = np.linspace(0, maximumoffset, self.real_hankel_points)
+
+        self.r = np.linspace(0, self.pos_corr_dist, self.real_hankel_points)
         self.dr = np.diff(self.r)
         self.rho = np.linspace(0, self.four_max_rho, self.four_hankel_points)
         self.drho = np.diff(self.rho)
+        # Only need to calculate this the first time we need it, so buffer for now.
+        self.j0s = None
 
     def create_perturb_auf(self, files_per_auf_sim, perturb_auf_func=make_perturb_aufs):
         '''
@@ -526,19 +529,32 @@ class CrossMatch():
             potentially counterparts to one another.
         '''
 
-        # Each catalogue should expect 5 files in "group/": island lengths,
-        # indices into the opposite catalogue for each source, the indices
-        # of sources in this catalogue in each island, the number of
+        # Each catalogue should expect 5 files in "group/" or "reject/": island
+        # lengths, indices into the opposite catalogue for each source, the
+        # indices of sources in this catalogue in each island, the number of
         # opposing catalogue overlaps for each source, and the list of any
-        # "rejected" source indices.
-        expected_files = files_per_grouping * 2
+        # "rejected" source indices. However, there may be no "reject" arrays,
+        # so we might expect two fewer files.
+        if (np.all(['reject_a' not in f for f in
+                    os.listdir('{}/reject'.format(self.joint_folder_path))]) and
+            np.all(['reject_b' not in f for f in
+                    os.listdir('{}/reject'.format(self.joint_folder_path))])):
+            expected_files = (files_per_grouping - 1) * 2
+        else:
+            expected_files = files_per_grouping * 2
         file_number = np.sum([len(files) for _, _, files in
-                              os.walk('{}/group'.format(self.joint_folder_path))])
+                              os.walk('{}/group'.format(self.joint_folder_path))]) + np.sum(
+            [len(files) for _, _, files in os.walk('{}/reject'.format(self.joint_folder_path))])
         correct_file_number = expected_files == file_number
+
+        # Currently hard-code the integral fractions used in group_sources:
+        int_fracs = np.array([0.63, 0.9, 0.99])
 
         # First check whether we actually need to dip into the group sources
         # routine or not.
         if self.run_group or not correct_file_number:
+            if self.j0s is None:
+                self.j0s = mff.calc_j0(self.rho[:-1]+self.drho/2, self.r[:-1]+self.dr/2)
             # Only worry about the warning if we didn't choose to run the grouping
             # but hit incorrect file numbers.
             if not correct_file_number and not self.run_group:
@@ -547,7 +563,12 @@ class CrossMatch():
                 self.run_cf, self.run_source = True, True
             os.system('rm -rf {}/group/*'.format(self.joint_folder_path))
             os.system('rm -rf {}/reject/*'.format(self.joint_folder_path))
-            group_func()
+            group_func(self.pos_corr_dist, self.cross_match_extent, int_fracs, self.a_filt_names,
+                       self.b_filt_names, self.a_cat_name, self.b_cat_name, self.r, self.dr,
+                       self.rho, self.drho, self.j0s, self.a_auf_folder_path,
+                       self.b_auf_folder_path, self.a_auf_region_points, self.b_auf_region_points,
+                       self.a_cat_folder_path, self.b_cat_folder_path, self.joint_folder_path,
+                       self.mem_chunk_num, self.include_phot_like)
         else:
             print('Loading catalogue islands and overlaps...')
             sys.stdout.flush()

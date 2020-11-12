@@ -261,13 +261,10 @@ class TestMakeIslandGroupings():
             for i in range(len(auf_points)):
                 ax1, ax2 = auf_points[i]
                 ax_folder = '{}/{}/{}'.format(auf_folder, ax1, ax2)
-                if not os.path.exists(ax_folder):
-                    os.makedirs(ax_folder, exist_ok=True)
                 for j in range(len(filters)):
                     filt = filters[j]
                     filt_folder = '{}/{}'.format(ax_folder, filt)
-                    if not os.path.exists(filt_folder):
-                        os.makedirs(filt_folder, exist_ok=True)
+                    os.makedirs(filt_folder, exist_ok=True)
                     fourieroffset = np.ones((len(self.rho) - 1, 1), float, order='F')
                     np.save('{}/fourier.npy'.format(filt_folder), fourieroffset)
         # 99% is slightly more than 3-sigma of a 2-D Gaussian integral, for
@@ -295,16 +292,38 @@ class TestMakeIslandGroupings():
 
         self.a_coords, self.b_coords = a_coords, b_coords
 
+        # Also set up an instance of CrossMatch at the same time.
+        self.cm = CrossMatch(os.path.join(os.path.dirname(__file__), 'data/crossmatch_params.txt'),
+                             os.path.join(os.path.dirname(__file__), 'data/cat_a_params.txt'),
+                             os.path.join(os.path.dirname(__file__), 'data/cat_b_params.txt'))
+        self.files_per_island_sim = 5
+        self.cm.pos_corr_dist = self.max_sep
+        self.cm.cross_match_extent = self.ax_lims
+        self.cm.a_filt_names = self.a_filt_names
+        self.cm.b_filt_names = self.b_filt_names
+        self.cm.a_cat_name = self.a_title
+        self.cm.b_cat_name = self.b_title
+        self.cm.r, self.cm.dr, self.cm.rho, self.cm.drho = self.r, self.dr, self.rho, self.drho
+        self.cm.a_auf_folder_path = self.a_auf_folder_path
+        self.cm.b_auf_folder_path = self.b_auf_folder_path
+        self.cm.a_auf_region_points = self.a_auf_pointings
+        self.cm.b_auf_region_points = self.b_auf_pointings
+        self.cm.a_cat_folder_path = self.a_cat_folder_path
+        self.cm.b_cat_folder_path = self.b_cat_folder_path
+        self.cm.joint_folder_path = self.joint_folder_path
+        self.cm.mem_chunk_num = self.mem_chunk_num
+        self.cm.include_phot_like = self.include_phot_like
+
     def test_make_island_groupings(self):
+        os.system('rm -rf {}/group/*'.format(self.joint_folder_path))
+        os.system('rm -rf {}/reject/*'.format(self.joint_folder_path))
         N_a, N_b = self.N_a, self.N_b
         np.save('{}/con_cat_astro.npy'.format(self.a_cat_folder_path), self.a_coords)
         np.save('{}/con_cat_astro.npy'.format(self.b_cat_folder_path), self.b_coords)
-        make_island_groupings(
-            self.max_sep, self.ax_lims, self.int_fracs, self.a_filt_names, self.b_filt_names,
-            self.a_title, self.b_title, self.r, self.dr, self.rho, self.drho, self.j0s,
-            self.a_auf_folder_path, self.b_auf_folder_path, self.a_auf_pointings,
-            self.b_auf_pointings, self.a_cat_folder_path, self.b_cat_folder_path,
-            self.joint_folder_path, self.mem_chunk_num, self.include_phot_like)
+        # For the first, full runthrough call the CrossMatch function instead of
+        # directly calling make_island_groupings to test group_sources as well.
+        self.cm.run_group = True
+        self.cm.group_sources(self.files_per_island_sim)
 
         alist, blist = np.load('joint/group/alist.npy'), np.load('joint/group/blist.npy')
         agrplen, bgrplen = np.load('joint/group/agrplen.npy'), np.load('joint/group/bgrplen.npy')
@@ -326,8 +345,14 @@ class TestMakeIslandGroupings():
         # the arrays should be f-ordered, and here are (1, N) shape.
         assert np.all(blist == np.append(np.arange(1, N_b-20),
                                          np.array([-1, -1, -1, -1, 0]))).reshape(1, -1)
+        # Should correctly save 4 files per catalogue in 'group', not saving any
+        # rejection arrays.
+        assert len(os.listdir('{}/group'.format(self.joint_folder_path))) == 8
+        assert len(os.listdir('{}/reject'.format(self.joint_folder_path))) == 0
 
     def test_mig_extra_reject(self):
+        os.system('rm -rf {}/group/*'.format(self.joint_folder_path))
+        os.system('rm -rf {}/reject/*'.format(self.joint_folder_path))
         N_a, N_b = self.N_a, self.N_b
         ax_lims = self.ax_lims
         # Pretend like there's already removed objects due to group length being
@@ -373,8 +398,13 @@ class TestMakeIslandGroupings():
         assert np.all(breject.shape == (4+3,))
         assert np.all(areject == np.array([3, 4, 5, N_a, N_a+1, N_a+2, N_a+3, N_a+4]))
         assert np.all(breject == np.array([3, 4, 5, N_b, N_b+1, N_b+2, N_b+3]))
+        # This time with rejection arrays we need to look for 10 files instead of 8.
+        assert len(os.listdir('{}/group'.format(self.joint_folder_path))) == 8
+        assert len(os.listdir('{}/reject'.format(self.joint_folder_path))) == 2
 
     def test_mig_no_reject_ax_lims(self):
+        os.system('rm -rf {}/group/*'.format(self.joint_folder_path))
+        os.system('rm -rf {}/reject/*'.format(self.joint_folder_path))
         N_a, N_b = self.N_a, self.N_b
         ax_lims = np.array([0, 360, -90, -19])
         # Check if axlims are changed to include wrap-around 0/360, or +-90 latitude,
@@ -418,8 +448,12 @@ class TestMakeIslandGroupings():
         assert np.all(breject.shape == (4,))
         assert np.all(areject == np.array([N_a, N_a+1, N_a+2, N_a+3, N_a+4]))
         assert np.all(breject == np.array([N_b, N_b+1, N_b+2, N_b+3]))
+        assert len(os.listdir('{}/group'.format(self.joint_folder_path))) == 8
+        assert len(os.listdir('{}/reject'.format(self.joint_folder_path))) == 2
 
     def test_island_no_phot_like(self):
+        os.system('rm -rf {}/group/*'.format(self.joint_folder_path))
+        os.system('rm -rf {}/reject/*'.format(self.joint_folder_path))
         ax_lims = self.ax_lims
         # Finally, check that we correctly raise an error if trying to calculate
         # photometric-likelihood related values.
@@ -432,3 +466,37 @@ class TestMakeIslandGroupings():
                 self.a_auf_folder_path, self.b_auf_folder_path, self.a_auf_pointings,
                 self.b_auf_pointings, self.a_cat_folder_path, self.b_cat_folder_path,
                 self.joint_folder_path, self.mem_chunk_num, include_phot_like)
+
+    def test_correct_file_number(self):
+        os.system('rm -rf {}/group/*'.format(self.joint_folder_path))
+        os.system('rm -rf {}/reject/*'.format(self.joint_folder_path))
+        np.save('{}/con_cat_astro.npy'.format(self.a_cat_folder_path), self.a_coords)
+        np.save('{}/con_cat_astro.npy'.format(self.b_cat_folder_path), self.b_coords)
+        self.cm.run_group = False
+        self.cm.j0s = self.j0s
+        # Dummy variables to represent the incorrect number of outputs
+        for i in range(9):
+            np.save('{}/group/{}.npy'.format(self.joint_folder_path, i), np.array([i]))
+        with pytest.warns(UserWarning, match='Incorrect number of grouping files.'):
+            self.cm.group_sources(self.files_per_island_sim)
+        assert len(os.listdir('{}/group'.format(self.joint_folder_path))) == 8
+        assert len(os.listdir('{}/reject'.format(self.joint_folder_path))) == 0
+
+    def test_load_group_sources_files(self, capsys):
+        os.system('rm -rf {}/group/*'.format(self.joint_folder_path))
+        os.system('rm -rf {}/reject/*'.format(self.joint_folder_path))
+        np.save('{}/con_cat_astro.npy'.format(self.a_cat_folder_path), self.a_coords)
+        np.save('{}/con_cat_astro.npy'.format(self.b_cat_folder_path), self.b_coords)
+        self.cm.run_group = False
+        self.cm.j0s = self.j0s
+        # Dummy variables to represent the correct number of outputs
+        for i in range(8):
+            np.save('{}/group/{}.npy'.format(self.joint_folder_path, i), np.array([i]))
+        np.save('{}/reject/reject_a.npy'.format(self.joint_folder_path), np.array([8]))
+        np.save('{}/reject/reject_b.npy'.format(self.joint_folder_path), np.array([9]))
+        capsys.readouterr()
+        self.cm.group_sources(self.files_per_island_sim)
+        output = capsys.readouterr().out
+        assert 'Loading catalogue islands and' in output
+        assert len(os.listdir('{}/group'.format(self.joint_folder_path))) == 8
+        assert len(os.listdir('{}/reject'.format(self.joint_folder_path))) == 2
