@@ -9,6 +9,9 @@ General
 New Features
 ^^^^^^^^^^^^
 
+- Functionality added to create "island" groupings of sources across the two
+  catalogues. [#16]
+
 - Creation of the perturbation aspect of the AUF, in the limit that it is
   unused (i.e., the AUF is assumed to be Gaussian). [#12]
 
