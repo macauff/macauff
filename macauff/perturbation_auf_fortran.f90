@@ -4,8 +4,6 @@ module perturbation_auf_fortran
 ! This module provides the Fortran code for the handling of the creation of the perturbation
 ! component of the AUF.
 implicit none
-private
-public haversine, find_nearest_auf_point
 integer, parameter :: dp = kind(0.0d0)  ! double precision
 real(dp), parameter :: pi = 4.0_dp*atan(1.0_dp)
 
