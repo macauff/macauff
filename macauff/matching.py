@@ -563,11 +563,11 @@ class CrossMatch():
                 self.run_cf, self.run_source = True, True
             os.system('rm -rf {}/group/*'.format(self.joint_folder_path))
             os.system('rm -rf {}/reject/*'.format(self.joint_folder_path))
-            group_func(self.pos_corr_dist, self.cross_match_extent, int_fracs, self.a_filt_names,
-                       self.b_filt_names, self.a_cat_name, self.b_cat_name, self.r, self.dr,
-                       self.rho, self.drho, self.j0s, self.a_auf_folder_path,
-                       self.b_auf_folder_path, self.a_auf_region_points, self.b_auf_region_points,
-                       self.a_cat_folder_path, self.b_cat_folder_path, self.joint_folder_path,
+            group_func(self.joint_folder_path, self.a_cat_folder_path, self.b_cat_folder_path,
+                       self.a_auf_folder_path, self.b_auf_folder_path, self.a_auf_region_points,
+                       self.b_auf_region_points, self.a_filt_names, self.b_filt_names,
+                       self.a_cat_name, self.b_cat_name, self.r, self.dr, self.rho, self.drho,
+                       self.j0s, self.pos_corr_dist, self.cross_match_extent, int_fracs,
                        self.mem_chunk_num, self.include_phot_like)
         else:
             print('Loading catalogue islands and overlaps...')

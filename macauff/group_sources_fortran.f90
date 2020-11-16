@@ -81,6 +81,9 @@ subroutine get_max_overlap(a_ax_1, a_ax_2, b_ax_1, b_ax_2, max_sep, a_axerr, b_a
 end subroutine get_max_overlap
 
 subroutine cumulative_fourier_transform(f, r, dr, rho, drho, dist, j0s, cumulative_prob)
+    ! Calculates the cumulative 2-D spacial integral of the convolved AUFs of two sources,
+    ! based on an inverse 2-D Fourier (Hankel) transform of the fourier-space representation
+    ! of the individual AUF components.
     integer, parameter :: dp = kind(0.0d0)  ! double precision
     ! Fourier-space representation of PDF to be fourier transformed.
     real(dp), intent(in) :: f(:)
@@ -115,8 +118,7 @@ subroutine cumulative_fourier_transform(f, r, dr, rho, drho, dist, j0s, cumulati
 end subroutine cumulative_fourier_transform
 
 subroutine get_overlap_indices(a_ax_1, a_ax_2, b_ax_1, b_ax_2, max_sep, amax, bmax, a_axerr, b_axerr, r, dr, rho, drho, j0s, &
-                               afouriergrid, bfouriergrid, amodrefind, bmodrefind, max_frac, aindices, bindices, anumoverlap, &
-                               bnumoverlap)
+    afouriergrid, bfouriergrid, amodrefind, bmodrefind, max_frac, aindices, bindices, anumoverlap, bnumoverlap)
     ! Once total potential overlap is found in getmaxn, we can keep track of each individual
     ! source overlap between the two catalogues, storing their respective indices to keep
     ! links of potential counterparts between the two catalogues.

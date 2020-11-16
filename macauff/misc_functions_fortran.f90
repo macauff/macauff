@@ -1,7 +1,7 @@
 ! Licensed under a 3-clause BSD style license - see LICENSE
 
 module misc_functions_fortran
-! This module provides the Fortran code for the handling of various miscenalleous functions,
+! This module provides the Fortran code for the handling of various miscellaneous functions,
 ! not tied to one specific sub-section of the codebase.
 implicit none
 integer, parameter :: dp = kind(0.0d0)  ! double precision

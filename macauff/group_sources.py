@@ -18,14 +18,75 @@ from .make_set_list import set_list
 __all__ = ['make_island_groupings']
 
 
-def make_island_groupings(max_sep, ax_lims, int_fracs, a_filt_names, b_filt_names, a_title,
-                          b_title, r, dr, rho, drho, j0s, a_auf_folder_path, b_auf_folder_path,
-                          a_auf_pointings, b_auf_pointings, a_cat_folder_path, b_cat_folder_path,
-                          joint_folder_path, mem_chunk_num, include_phot_like):
+def make_island_groupings(joint_folder_path, a_cat_folder_path, b_cat_folder_path,
+                          a_auf_folder_path, b_auf_folder_path, a_auf_pointings, b_auf_pointings,
+                          a_filt_names, b_filt_names, a_title, b_title, r, dr, rho, drho, j0s,
+                          max_sep, ax_lims, int_fracs, mem_chunk_num, include_phot_like):
     '''
     Function to handle the creation of "islands" of astrometrically coeval
     sources, and identify which overlap to some probability based on their
     combined AUFs.
+
+    Parameters
+    ----------
+    joint_folder_path : string
+        Folder on disk containing the files related to the cross-match between
+        the two catalogues.
+    a_cat_folder_path : string
+        Folder on disk where catalogue "a" files have been stored.
+    b_cat_folder_path : string
+        Folder on disk where catalogue "b" files are saved.
+    a_auf_folder_path : string
+        Folder on disk where perturbation AUF component files for catalogue "a"
+        are located.
+    b_auf_folder_path : string
+        Folder on disk where perturbation AUF component files for catalogue "b"
+        are located.
+    a_auf_pointings : 2-D numpy.ndarray
+        Array containing the listings of longitude, latitude pointings at which
+        the perturbation AUF components were computed for catalogue "a".
+    b_auf_pointings : 2-D numpy.ndarray
+        Array containing the listings of longitude, latitude pointings at which
+        the perturbation AUF components were computed for catalogue "b".
+    a_filt_names : list of string
+        List of ordered names for filters used in catalogue "a" cross-match.
+    b_filt_names : list of string
+        List of filters in catalogue "b" matching.
+    a_title : string
+        Name used to describe catalogue "a" in the cross-match.
+    b_title : string
+        Catalogue "b" description, for identifying its given folder.
+    r : numpy.ndarray
+        Array of real-space distances, in arcseconds, used in the evaluation of
+        convolved AUF integrals; represent bin edges.
+    dr : numpy.ndarray
+        Widths of real-space bins in ``r``. Will have shape one shorter than ``r``,
+        due to ``r`` requiring an additional right-hand bin edge.
+    rho : numpy.ndarray
+        Fourier-space array, used in handling the Hankel transformation for
+        convolution of AUFs. As with ``r``, represents bin edges.
+    drho : numpy.ndarray
+        Array representing the bin widths of ``rho``. As with ``dr``, is one
+        shorter than ``rho`` due to its additional bin edge.
+    j0s : 2-D numpy.ndarray
+        Array holding the evaluations of the Bessel Function of First kind of
+        Zeroth Order, evaluated at all ``r`` and ``rho`` bin-middle combination.
+    max_sep : float
+        The maximum allowed sky separation between two sources in opposing
+        catalogues for consideration as potential counterparts.
+    ax_lims : list of floats, or numpy.ndarray
+        The four limits of the cross-match between catalogues "a" and "b",
+        as lower and upper longitudinal coordinate, lower and upper latitudinal
+        coordinates respectively.
+    int_fracs : list of floats, or numpy.ndarray
+        List of integral limits used in evaluating probability of match based on
+        separation distance.
+    mem_chunk_num : integer
+        Number of sub-arrays to break larger array computations into for memory
+        limiting purposes.
+    include_phot_like : boolean
+        Flag indicating whether to perform additional computations required for
+        the future calculation of photometric likelihoods.
     '''
 
     # Convert from arcseconds to degrees internally.
@@ -338,6 +399,31 @@ def _load_fourier_grid_cutouts(a, sky_rect_coords, joint_folder_path, cat_folder
     Function to load a sub-set of a given catalogue's astrometry, slicing it
     in a given sky coordinate rectangle, and load the appropriate sub-array
     of the perturbation AUF's fourier-space PDF.
+
+    Parameters
+    ----------
+    a : numpy.ndarray
+        Array containing the full entries for a given catalogue.
+    sky_rect_coords : numpy.ndarray or list
+        Array with the rectangular extents of the cutout to be performed, in the
+        order lower longitudinal coordinate, upper longitudinal coordinate,
+        lower latitudinal coordinate, and upper latitudinal coordinate.
+    joint_folder_path : string
+        Folder on disk indicating where to store files related to the joint
+        cross-match being performed.
+    cat_folder_path : string
+        Location on disk where catalogues for the same dataset given in ``a``
+        are stored.
+    auf_folder_path : string
+        Folder on disk for where catalogue ``a``'s perturbation AUF components
+        are saved.
+    padding : float
+        Maximum allowed sky separation the "wrong" side of ``sky_rect_coords``,
+        allowing for an increase in sky box size which ensures that all overlaps
+        get caught in ``get_max_overlap`` and ``get_max_indices``.
+    cat_name : string
+        String indicating whether we are loading cutouts from catalogue "a" or
+        "b".
     '''
 
     lon1, lon2, lat1, lat2 = sky_rect_coords
@@ -384,6 +470,29 @@ def _lon_cut(i, lena, di, lon, padding, sky_cut, cat_folder_path, inequality):
     '''
     Function to calculate the longitude inequality criterion for astrometric
     sources relative to a rectangle defining boundary limits.
+
+    Parameters
+    ----------
+    i : integer
+        Index into ``sky_cut`` for slicing.
+    lena : integer
+        Number of rows in main catalogue.
+    di : integer
+        Index stride value, for slicing.
+    lon : float
+        Longitude at which to cut sources, either above or below, in degrees.
+    padding : float
+        Maximum allowed sky separation the "wrong" side of ``lon``, to allow
+        for an increase in sky box size to ensure all overlaps are caught in
+        ``get_max_overlap`` or ``get_max_indices``.
+    sky_cut : numpy.ndarray
+        Array into which to store boolean flags for whether source meets the
+        sky position criterion.
+    cat_folder_path : string
+        Folder on disk where main catalogue being cross-matched is stored.
+    inequaility : ``operator.le`` or ``operator.ge``
+        Function to determine whether a source is either above or below the
+        given ``lon`` value.
     '''
     a = np.lib.format.open_memmap('{}/con_cat_astro.npy'.format(cat_folder_path), mode='r',
                                   dtype=float, shape=(lena, 3))
@@ -406,6 +515,29 @@ def _lat_cut(i, lena, di, lat, padding, sky_cut, cat_folder_path, inequality):
     '''
     Function to calculate the latitude inequality criterion for astrometric
     sources relative to a rectangle defining boundary limits.
+
+    Parameters
+    ----------
+    i : integer
+        Index into ``sky_cut`` for slicing.
+    lena : integer
+        Number of rows in main catalogue.
+    di : integer
+        Index stride value, for slicing.
+    lat : float
+        Latitude at which to cut sources, either above or below, in degrees.
+    padding : float
+        Maximum allowed sky separation the "wrong" side of ``lat``, to allow
+        for an increase in sky box size to ensure all overlaps are caught in
+        ``get_max_overlap`` or ``get_max_indices``.
+    sky_cut : numpy.ndarray
+        Array into which to store boolean flags for whether source meets the
+        sky position criterion.
+    cat_folder_path : string
+        Folder on disk where main catalogue being cross-matched is stored.
+    inequaility : ``operator.le`` or ``operator.ge``
+        Function to determine whether a source is either above or below the
+        given ``lat`` value.
     '''
     a = np.lib.format.open_memmap('{}/con_cat_astro.npy'.format(cat_folder_path), mode='r',
                                   dtype=float, shape=(lena, 3))
@@ -427,6 +559,29 @@ def _clean_overlaps(inds, size, joint_folder_path, filename):
     Convenience function to parse either catalogue's indices array for
     duplicate references to the opposing array on a per-source basis,
     and filter duplications in the memmapped file.
+
+    Parameters
+    ----------
+    inds : numpy.ndarray
+        Array containing the indices of overlap between this catalogue, for each
+        source, and the opposing catalogue, including potential duplication.
+    size : numpy.ndarray
+        Array containing the number of overlaps between this catalogue and the
+        opposing catalogue prior to duplication removal.
+    joint_folder_path : string
+        The top-level folder containing the "group" folder into which the
+        index arrays are saved.
+    filename : string
+        The name of the ``inds`` array saved to disk.
+
+    Returns
+    -------
+    inds : numpy.ndarray
+        The unique indices of overlap into the opposing catalogue for each
+        source in a given catalogue, stripped of potential duplicates.
+    size : numpy.ndarray
+        Newly updated ``size`` array, containing the lengths of the unique
+        indices of overlap into the opposing catalogue for each source.
     '''
     maxsize = 0
     size[:] = 0

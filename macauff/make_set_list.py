@@ -15,6 +15,41 @@ __all__ = ['set_list']
 
 
 def set_list(aindices, bindices, aoverlap, boverlap, joint_folder_path):
+    '''
+    Creates the inter-catalogue groupings between catalogues "a" and "b", based
+    on previously determined individual source "overlaps" in astrometry.
+
+    Parameters
+    ----------
+    aindices : numpy.ndarray
+        The indices into catalogue "b", for each catalogue "a" source, that have
+        been determined to be potentially positionally correlated.
+    bindices : numpy.ndarray
+        The equivalent to ``aindices``, but mapping the overlaps in catalogue "a"
+        for each catalogue "b" source.
+    aoverlap : numpy.ndarray
+        The number of overlaps for each catalogue "a" source (i.e., the length
+        of each row in ``aindices`` for each source).
+    boverlap : numpy.ndarray
+        The equivalent number of overlaps for each catalogue "b" object.
+    joint_folder_path : string
+        Location of top-level folder containing the "group" folder in which
+        index and overlap arrays are stored.
+
+    Returns
+    -------
+    alist : numpy.ndarray
+        The indices of all catalogue "a" sources that are in a common "island"
+        group together. Each row of ``alist`` indicates all "a" sources
+        potentially positionally correlated.
+    blist : numpy.ndarray
+        The indices of all catalogue "b" objects in the same groups (as other
+        "b" sources, as well as mapping to catalogue "a" objects).
+    agrouplengths : numpy.ndarray
+        The number of catalogue "a" sources in each unique "island".
+    bgrouplengths : numpy.ndarray
+        The number of catalogue "b" sources in each island grouping.
+    '''
     agroup, bgroup = _initial_group_numbering(aindices, bindices, aoverlap, boverlap,
                                               joint_folder_path)
     groupmax = max(np.amax(agroup), np.amax(bgroup))
@@ -160,6 +195,38 @@ def set_list(aindices, bindices, aoverlap, boverlap, joint_folder_path):
 
 
 def _initial_group_numbering(aindices, bindices, aoverlap, boverlap, joint_folder_path):
+    '''
+    Iterates over the indices mapping overlaps between the two catalogues,
+    assigning initial group numbers to sources to be placed in "islands".
+
+    Loops through all "lonely", single-source islands in each catalogue, and
+    those with a one-to-one mapping of a single "a" object and one "b" source,
+    before iteratively grouping all multi-object islands together.
+
+    Parameters
+    ----------
+    aindices : numpy.ndarray
+        The indices into catalogue "b", for each catalogue "a" source, that have
+        been determined to be potentially positionally correlated.
+    bindices : numpy.ndarray
+        The equivalent to ``aindices``, but mapping the overlaps in catalogue "a"
+        for each catalogue "b" source.
+    aoverlap : numpy.ndarray
+        The number of overlaps for each catalogue "a" source (i.e., the length
+        of each row in ``aindices`` for each source).
+    boverlap : numpy.ndarray
+        The equivalent number of overlaps for each catalogue "b" object.
+    joint_folder_path : string
+        Location of top-level folder containing the "group" folder in which
+        index and overlap arrays are stored.
+
+    Returns
+    -------
+    agroup : numpy.ndarray
+        Array detailing the group number of each catalogue "a" source.
+    bgroup : numpy.ndarray
+        Array detailing the group number of each catalogue "b" source.
+    '''
     agroup = np.lib.format.open_memmap('{}/group/agroup.npy'.format(joint_folder_path), mode='w+',
                                        dtype=int, shape=(len(aoverlap),))
     bgroup = np.lib.format.open_memmap('{}/group/bgroup.npy'.format(joint_folder_path), mode='w+',
@@ -197,6 +264,39 @@ def _initial_group_numbering(aindices, bindices, aoverlap, boverlap, joint_folde
 
 
 def _a_to_b(ind, grp, N, aindices, bindices, aoverlap, boverlap, agroup, bgroup):
+    '''
+    Iterative function, along with ``_b_to_a``, to assign all sources overlapping
+    this catalogue "a" object in catalogue "b" as being in the same group as it.
+
+    This subsequently calls ``_b_to_a`` for each of those "b" sources, to
+    assign any "a" sources that overlap those objects to the same group, until
+    there are no more overlaps.
+
+    Parameters
+    ----------
+    ind : integer
+        The index into ``agroup``, the specific source in question to be assigned
+        this group number.
+    grp : integer
+        The group number of this "island" to be assigned.
+    N : integer
+        The number of sources that overlap this catalogue "a" source.
+    aindices : numpy.ndarray
+        The indices into catalogue "b", for each catalogue "a" source, that have
+        been determined to be potentially positionally correlated.
+    bindices : numpy.ndarray
+        The equivalent to ``aindices``, but mapping the overlaps in catalogue "a"
+        for each catalogue "b" source.
+    aoverlap : numpy.ndarray
+        The number of overlaps for each catalogue "a" source (i.e., the length
+        of each row in ``aindices`` for each source).
+    boverlap : numpy.ndarray
+        The equivalent number of overlaps for each catalogue "b" object.
+    agroup : numpy.ndarray
+        Array detailing the group number of each catalogue "a" source.
+    bgroup : numpy.ndarray
+        Array detailing the group number of each catalogue "b" source.
+    '''
     agroup[ind] = grp
     for q in aindices[:N, ind]:
         if bgroup[q] != grp:
@@ -205,6 +305,35 @@ def _a_to_b(ind, grp, N, aindices, bindices, aoverlap, boverlap, agroup, bgroup)
 
 
 def _b_to_a(ind, grp, N, aindices, bindices, aoverlap, boverlap, agroup, bgroup):
+    '''
+    Iterative function, equivalent to ``_a_to_b``, to assign all sources
+    overlapping this catalogue "b" object in catalogue "a" with its group number.
+
+    Parameters
+    ----------
+    ind : integer
+        The index into ``bgroup``, the specific source in question to be assigned
+        this group number.
+    grp : integer
+        The group number of this "island" to be assigned.
+    N : integer
+        The number of sources that overlap this catalogue "b" source.
+    aindices : numpy.ndarray
+        The indices into catalogue "b", for each catalogue "a" source, that have
+        been determined to be potentially positionally correlated.
+    bindices : numpy.ndarray
+        The equivalent to ``aindices``, but mapping the overlaps in catalogue "a"
+        for each catalogue "b" source.
+    aoverlap : numpy.ndarray
+        The number of overlaps for each catalogue "a" source (i.e., the length
+        of each row in ``aindices`` for each source).
+    boverlap : numpy.ndarray
+        The equivalent number of overlaps for each catalogue "b" object.
+    agroup : numpy.ndarray
+        Array detailing the group number of each catalogue "a" source.
+    bgroup : numpy.ndarray
+        Array detailing the group number of each catalogue "b" source.
+    '''
     bgroup[ind] = grp
     for f in bindices[:N, ind]:
         if agroup[f] != grp:

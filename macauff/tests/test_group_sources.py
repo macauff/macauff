@@ -369,11 +369,11 @@ class TestMakeIslandGroupings():
         np.save('{}/con_cat_astro.npy'.format(self.b_cat_folder_path), b_coords)
 
         make_island_groupings(
-            self.max_sep, ax_lims, self.int_fracs, self.a_filt_names, self.b_filt_names,
-            self.a_title, self.b_title, self.r, self.dr, self.rho, self.drho, self.j0s,
+            self.joint_folder_path, self.a_cat_folder_path, self.b_cat_folder_path,
             self.a_auf_folder_path, self.b_auf_folder_path, self.a_auf_pointings,
-            self.b_auf_pointings, self.a_cat_folder_path, self.b_cat_folder_path,
-            self.joint_folder_path, self.mem_chunk_num, self.include_phot_like)
+            self.b_auf_pointings, self.a_filt_names, self.b_filt_names, self.a_title, self.b_title,
+            self.r, self.dr, self.rho, self.drho, self.j0s, self.max_sep, ax_lims,
+            self.int_fracs, self.mem_chunk_num, self.include_phot_like)
 
         alist, blist = np.load('joint/group/alist.npy'), np.load('joint/group/blist.npy')
         agrplen, bgrplen = np.load('joint/group/agrplen.npy'), np.load('joint/group/bgrplen.npy')
@@ -421,11 +421,11 @@ class TestMakeIslandGroupings():
         np.save('joint/reject/breject.npy', np.arange(N_b, N_b+4))
 
         make_island_groupings(
-            self.max_sep, ax_lims, self.int_fracs, self.a_filt_names, self.b_filt_names,
-            self.a_title, self.b_title, self.r, self.dr, self.rho, self.drho, self.j0s,
+            self.joint_folder_path, self.a_cat_folder_path, self.b_cat_folder_path,
             self.a_auf_folder_path, self.b_auf_folder_path, self.a_auf_pointings,
-            self.b_auf_pointings, self.a_cat_folder_path, self.b_cat_folder_path,
-            self.joint_folder_path, self.mem_chunk_num, self.include_phot_like)
+            self.b_auf_pointings, self.a_filt_names, self.b_filt_names, self.a_title, self.b_title,
+            self.r, self.dr, self.rho, self.drho, self.j0s, self.max_sep, ax_lims,
+            self.int_fracs, self.mem_chunk_num, self.include_phot_like)
 
         alist, blist = np.load('joint/group/alist.npy'), np.load('joint/group/blist.npy')
         agrplen, bgrplen = np.load('joint/group/agrplen.npy'), np.load('joint/group/bgrplen.npy')
@@ -461,11 +461,11 @@ class TestMakeIslandGroupings():
         with pytest.raises(NotImplementedError,
                            match='not currently implemented. Please set include_phot_like'):
             make_island_groupings(
-                self.max_sep, ax_lims, self.int_fracs, self.a_filt_names, self.b_filt_names,
-                self.a_title, self.b_title, self.r, self.dr, self.rho, self.drho, self.j0s,
+                self.joint_folder_path, self.a_cat_folder_path, self.b_cat_folder_path,
                 self.a_auf_folder_path, self.b_auf_folder_path, self.a_auf_pointings,
-                self.b_auf_pointings, self.a_cat_folder_path, self.b_cat_folder_path,
-                self.joint_folder_path, self.mem_chunk_num, include_phot_like)
+                self.b_auf_pointings, self.a_filt_names, self.b_filt_names, self.a_title,
+                self.b_title, self.r, self.dr, self.rho, self.drho, self.j0s, self.max_sep,
+                ax_lims, self.int_fracs, self.mem_chunk_num, include_phot_like)
 
     def test_correct_file_number(self):
         os.system('rm -rf {}/group/*'.format(self.joint_folder_path))
