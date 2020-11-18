@@ -12,6 +12,32 @@ import numpy as np
 from ..matching import CrossMatch
 
 
+def _replace_line(file_name, line_num, text, out_file=None):
+    '''
+    Helper function to update the metadata file on-the-fly, allowing for
+    "run" flags to be set from run to no run once they have finished.
+
+    Parameters
+    ----------
+    file_name : string
+        Name of the file to read in and change lines of.
+    line_num : integer
+        Line number of line to edit in ``file_name``.
+    text : string
+        New line to replace original line in ``file_name`` with.
+    out_file : string, optional
+        Name of the file to save new, edited version of ``file_name`` to.
+        If ``None`` then ``file_name`` is overwritten.
+    '''
+    if out_file is None:
+        out_file = file_name
+    lines = open(file_name, 'r').readlines()
+    lines[line_num] = text
+    out = open(out_file, 'w')
+    out.writelines(lines)
+    out.close()
+
+
 class TestInputs:
     def setup_class(self):
         joint_config = ConfigParser()
@@ -66,11 +92,10 @@ class TestInputs:
                                                   ['Missing key', 'Boolean flag key not set',
                                                    'Inconsistency between run/no run']):
             idx = np.where([old_line in line for line in f])[0][0]
-            CrossMatch._replace_line(cm, os.path.join(os.path.dirname(__file__),
-                                                      'data/crossmatch_params.txt'),
-                                     idx, new_line,
-                                     out_file=os.path.join(os.path.dirname(__file__),
-                                     'data/crossmatch_params_.txt'))
+            _replace_line(os.path.join(os.path.dirname(__file__),
+                          'data/crossmatch_params.txt'), idx, new_line,
+                          out_file=os.path.join(os.path.dirname(__file__),
+                          'data/crossmatch_params_.txt'))
 
             with pytest.raises(ValueError, match=match_text):
                 cm = CrossMatch(os.path.join(os.path.dirname(__file__),
@@ -92,10 +117,9 @@ class TestInputs:
         old_line = 'include_perturb_auf = no'
         new_line = 'include_perturb_auf = yes\n'
         idx = np.where([old_line in line for line in f])[0][0]
-        CrossMatch._replace_line(cm, os.path.join(os.path.dirname(__file__),
-                                 'data/crossmatch_params.txt'), idx, new_line,
-                                 out_file=os.path.join(
-                                 os.path.dirname(__file__), 'data/crossmatch_params_.txt'))
+        _replace_line(os.path.join(os.path.dirname(__file__), 'data/crossmatch_params.txt'),
+                      idx, new_line, out_file=os.path.join(
+                      os.path.dirname(__file__), 'data/crossmatch_params_.txt'))
         cm = CrossMatch(os.path.join(os.path.dirname(__file__), 'data/crossmatch_params_.txt'),
                         os.path.join(os.path.dirname(__file__), 'data/cat_a_params.txt'),
                         os.path.join(os.path.dirname(__file__), 'data/cat_b_params.txt'))
@@ -134,10 +158,10 @@ class TestInputs:
                  'start and stop values for {}{}points'.format('' if 'cf' in kind
                                                                else 'a_', kind)]):
                 idx = np.where([old_line in line for line in f])[0][0]
-                CrossMatch._replace_line(cm, os.path.join(os.path.dirname(__file__),
-                                         'data/{}.txt'.format(in_file)), idx, new_line,
-                                         out_file=os.path.join(os.path.dirname(__file__),
-                                                               'data/{}_.txt'.format(in_file)))
+                _replace_line(os.path.join(os.path.dirname(__file__),
+                              'data/{}.txt'.format(in_file)), idx, new_line,
+                              out_file=os.path.join(os.path.dirname(__file__),
+                              'data/{}_.txt'.format(in_file)))
 
                 with pytest.raises(ValueError, match=match_text):
                     cm = CrossMatch(os.path.join(os.path.dirname(__file__),
@@ -151,19 +175,18 @@ class TestInputs:
 
             # Check correct and incorrect *_region_points when *_region_type is 'points'
             idx = np.where(['{}type = rectangle'.format(kind) in line for line in f])[0][0]
-            CrossMatch._replace_line(cm, os.path.join(os.path.dirname(__file__),
-                                                      'data/{}.txt'.format(in_file)),
-                                     idx, '{}type = points\n'.format(kind),
-                                     out_file=os.path.join(os.path.dirname(__file__),
-                                                           'data/{}_.txt'.format(in_file)))
+            _replace_line(os.path.join(os.path.dirname(__file__),
+                          'data/{}.txt'.format(in_file)), idx, '{}type = points\n'.format(kind),
+                          out_file=os.path.join(os.path.dirname(__file__),
+                                                'data/{}_.txt'.format(in_file)))
 
             idx = np.where(['{}points = 131 134 4 -1 1 3'.format(kind) in line for
                             line in f])[0][0]
-            CrossMatch._replace_line(cm, os.path.join(os.path.dirname(__file__),
-                                     'data/{}_.txt'.format(in_file)), idx,
-                                     '{}points = (131, 0), (133, 0), (132, -1)\n'.format(kind),
-                                     out_file=os.path.join(os.path.dirname(__file__),
-                                                           'data/{}_2.txt'.format(in_file)))
+            _replace_line(os.path.join(os.path.dirname(__file__),
+                          'data/{}_.txt'.format(in_file)), idx,
+                          '{}points = (131, 0), (133, 0), (132, -1)\n'.format(kind),
+                          out_file=os.path.join(os.path.dirname(__file__),
+                                                'data/{}_2.txt'.format(in_file)))
 
             cm = CrossMatch(os.path.join(os.path.dirname(__file__),
                             'data/crossmatch_params{}.txt'.format('_2' if 'cf' in kind else '')),
@@ -178,11 +201,10 @@ class TestInputs:
                              '{}points = (131, 0), (131, 1, 2)\n'.format(kind),
                              '{}points = (131, 0), (131, a)\n'.format(kind)]:
                 idx = np.where([old_line in line for line in f])[0][0]
-                CrossMatch._replace_line(cm, os.path.join(os.path.dirname(__file__),
-                                         'data/{}_.txt'.format(in_file)), idx, new_line,
-                                         out_file=os.path.join(
-                                         os.path.dirname(__file__),
-                                         'data/{}_2.txt'.format(in_file)))
+                _replace_line(os.path.join(os.path.dirname(__file__),
+                              'data/{}_.txt'.format(in_file)), idx, new_line,
+                              out_file=os.path.join(os.path.dirname(__file__),
+                                                    'data/{}_2.txt'.format(in_file)))
 
                 with pytest.raises(ValueError):
                     cm = CrossMatch(os.path.join(os.path.dirname(__file__),
@@ -197,11 +219,11 @@ class TestInputs:
             # Check single-length point grids are fine
             idx = np.where(['{}points = 131 134 4 -1 1 3'.format(kind) in line
                             for line in f])[0][0]
-            CrossMatch._replace_line(cm, os.path.join(os.path.dirname(__file__),
-                                     'data/{}.txt'.format(in_file)),
-                                     idx, '{}points = 131 131 1 0 0 1\n'.format(kind),
-                                     out_file=os.path.join(os.path.dirname(__file__),
-                                                           'data/{}_.txt'.format(in_file)))
+            _replace_line(os.path.join(os.path.dirname(__file__),
+                          'data/{}.txt'.format(in_file)), idx,
+                          '{}points = 131 131 1 0 0 1\n'.format(kind),
+                          out_file=os.path.join(os.path.dirname(__file__),
+                                                'data/{}_.txt'.format(in_file)))
 
             cm = CrossMatch(os.path.join(os.path.dirname(__file__),
                             'data/crossmatch_params{}.txt'.format('_' if 'cf' in kind else '')),
@@ -212,19 +234,19 @@ class TestInputs:
                             else 'a_', kind)), np.array([[131, 0]]))
 
             idx = np.where(['{}type = rectangle'.format(kind) in line for line in f])[0][0]
-            CrossMatch._replace_line(cm, os.path.join(os.path.dirname(__file__),
-                                     'data/{}.txt'.format(in_file)),
-                                     idx, '{}type = points\n'.format(kind),
-                                     out_file=os.path.join(os.path.dirname(__file__),
-                                                           'data/{}_.txt'.format(in_file)))
+            _replace_line(os.path.join(os.path.dirname(__file__),
+                          'data/{}.txt'.format(in_file)), idx,
+                          '{}type = points\n'.format(kind),
+                          out_file=os.path.join(os.path.dirname(__file__),
+                                                'data/{}_.txt'.format(in_file)))
 
             idx = np.where(['{}points = 131 134 4 -1 1 3'.format(kind) in
                             line for line in f])[0][0]
-            CrossMatch._replace_line(cm, os.path.join(os.path.dirname(__file__),
-                                     'data/{}_.txt'.format(in_file)),
-                                     idx, '{}points = (131, 0)\n'.format(kind),
-                                     out_file=os.path.join(os.path.dirname(__file__),
-                                                           'data/{}_2.txt'.format(in_file)))
+            _replace_line(os.path.join(os.path.dirname(__file__),
+                          'data/{}_.txt'.format(in_file)), idx,
+                          '{}points = (131, 0)\n'.format(kind),
+                          out_file=os.path.join(os.path.dirname(__file__),
+                                                'data/{}_2.txt'.format(in_file)))
 
             cm = CrossMatch(os.path.join(os.path.dirname(__file__),
                             'data/crossmatch_params{}.txt'.format('_2' if 'cf' in kind else '')),
@@ -241,11 +263,10 @@ class TestInputs:
             f = open(os.path.join(os.path.dirname(__file__),
                                   'data/{}.txt'.format(in_file))).readlines()
             idx = np.where(['{}frame = equatorial'.format(kind) in line for line in f])[0][0]
-            CrossMatch._replace_line(cm, os.path.join(os.path.dirname(__file__),
-                                     'data/{}.txt'.format(in_file)),
-                                     idx, '{}frame = galactic\n'.format(kind),
-                                     out_file=os.path.join(os.path.dirname(__file__),
-                                                           'data/{}_.txt'.format(in_file)))
+            _replace_line(os.path.join(os.path.dirname(__file__),
+                          'data/{}.txt'.format(in_file)), idx, '{}frame = galactic\n'.format(kind),
+                          out_file=os.path.join(os.path.dirname(__file__),
+                                                'data/{}_.txt'.format(in_file)))
 
         cm = CrossMatch(os.path.join(os.path.dirname(__file__), 'data/crossmatch_params_.txt'),
                         os.path.join(os.path.dirname(__file__), 'data/cat_a_params_.txt'),
@@ -282,10 +303,9 @@ class TestInputs:
             f = open(os.path.join(os.path.dirname(__file__),
                      'data/{}.txt'.format(in_file))).readlines()
             idx = np.where([old_line in line for line in f])[0][0]
-            CrossMatch._replace_line(cm, os.path.join(os.path.dirname(__file__),
-                                     'data/{}.txt'.format(in_file)), idx, new_line,
-                                     out_file=os.path.join(
-                                     os.path.dirname(__file__), 'data/{}_.txt'.format(in_file)))
+            _replace_line(os.path.join(os.path.dirname(__file__),
+                          'data/{}.txt'.format(in_file)), idx, new_line, out_file=os.path.join(
+                          os.path.dirname(__file__), 'data/{}_.txt'.format(in_file)))
 
             with pytest.raises(error, match=match_text):
                 cm = CrossMatch(os.path.join(os.path.dirname(__file__),
@@ -306,10 +326,9 @@ class TestInputs:
         old_line = 'include_perturb_auf = no'
         new_line = 'include_perturb_auf = yes\n'
         idx = np.where([old_line in line for line in f])[0][0]
-        CrossMatch._replace_line(cm, os.path.join(os.path.dirname(__file__),
-                                 'data/crossmatch_params.txt'), idx, new_line,
-                                 out_file=os.path.join(
-                                 os.path.dirname(__file__), 'data/crossmatch_params_.txt'))
+        _replace_line(os.path.join(os.path.dirname(__file__),
+                      'data/crossmatch_params.txt'), idx, new_line, out_file=os.path.join(
+                      os.path.dirname(__file__), 'data/crossmatch_params_.txt'))
 
         cm = CrossMatch(os.path.join(os.path.dirname(__file__), 'data/crossmatch_params_.txt'),
                         os.path.join(os.path.dirname(__file__), 'data/cat_a_params.txt'),
@@ -333,10 +352,9 @@ class TestInputs:
             f = open(os.path.join(os.path.dirname(__file__),
                                   'data/{}.txt'.format(in_file))).readlines()
             idx = np.where([old_line in line for line in f])[0][0]
-            CrossMatch._replace_line(cm, os.path.join(os.path.dirname(__file__),
-                                     'data/{}.txt'.format(in_file)), idx, new_line,
-                                     out_file=os.path.join(
-                                     os.path.dirname(__file__), 'data/{}_.txt'.format(in_file)))
+            _replace_line(os.path.join(os.path.dirname(__file__),
+                          'data/{}.txt'.format(in_file)), idx, new_line, out_file=os.path.join(
+                          os.path.dirname(__file__), 'data/{}_.txt'.format(in_file)))
 
             with pytest.raises(ValueError, match=match_text):
                 cm = CrossMatch(os.path.join(os.path.dirname(__file__),
@@ -357,10 +375,9 @@ class TestInputs:
         old_line = 'include_perturb_auf = no'
         new_line = 'include_perturb_auf = yes\n'
         idx = np.where([old_line in line for line in f])[0][0]
-        CrossMatch._replace_line(cm, os.path.join(os.path.dirname(__file__),
-                                 'data/crossmatch_params.txt'), idx, new_line,
-                                 out_file=os.path.join(
-                                 os.path.dirname(__file__), 'data/crossmatch_params_.txt'))
+        _replace_line(os.path.join(os.path.dirname(__file__),
+                      'data/crossmatch_params.txt'), idx, new_line, out_file=os.path.join(
+                      os.path.dirname(__file__), 'data/crossmatch_params_.txt'))
 
         cm = CrossMatch(os.path.join(os.path.dirname(__file__), 'data/crossmatch_params_.txt'),
                         os.path.join(os.path.dirname(__file__), 'data/cat_a_params.txt'),
@@ -383,10 +400,9 @@ class TestInputs:
             f = open(os.path.join(os.path.dirname(__file__),
                                   'data/{}.txt'.format(in_file))).readlines()
             idx = np.where([old_line in line for line in f])[0][0]
-            CrossMatch._replace_line(cm, os.path.join(os.path.dirname(__file__),
-                                     'data/{}.txt'.format(in_file)), idx, new_line,
-                                     out_file=os.path.join(
-                                     os.path.dirname(__file__), 'data/{}_.txt'.format(in_file)))
+            _replace_line(os.path.join(os.path.dirname(__file__),
+                          'data/{}.txt'.format(in_file)), idx, new_line, out_file=os.path.join(
+                          os.path.dirname(__file__), 'data/{}_.txt'.format(in_file)))
 
             with pytest.raises(ValueError, match=match_text):
                 cm = CrossMatch(os.path.join(os.path.dirname(__file__),
@@ -407,9 +423,9 @@ class TestInputs:
         old_line = 'cat_name = Gaia'
         new_line = ''
         idx = np.where([old_line in line for line in f])[0][0]
-        CrossMatch._replace_line(cm, os.path.join(os.path.dirname(__file__),
-                                 'data/cat_a_params.txt'), idx, new_line, out_file=os.path.join(
-                                 os.path.dirname(__file__), 'data/cat_a_params_.txt'))
+        _replace_line(os.path.join(os.path.dirname(__file__),
+                      'data/cat_a_params.txt'), idx, new_line, out_file=os.path.join(
+                      os.path.dirname(__file__), 'data/cat_a_params_.txt'))
 
         match_text = 'Missing key cat_name from catalogue "a"'
         with pytest.raises(ValueError, match=match_text):
@@ -434,10 +450,9 @@ class TestInputs:
             f = open(os.path.join(os.path.dirname(__file__),
                                   'data/{}.txt'.format(in_file))).readlines()
             idx = np.where([old_line in line for line in f])[0][0]
-            CrossMatch._replace_line(cm, os.path.join(os.path.dirname(__file__),
-                                     'data/{}.txt'.format(in_file)), idx, new_line,
-                                     out_file=os.path.join(
-                                     os.path.dirname(__file__), 'data/{}_.txt'.format(in_file)))
+            _replace_line(os.path.join(os.path.dirname(__file__),
+                          'data/{}.txt'.format(in_file)), idx, new_line, out_file=os.path.join(
+                          os.path.dirname(__file__), 'data/{}_.txt'.format(in_file)))
 
             with pytest.raises(ValueError, match=match_text):
                 cm = CrossMatch(os.path.join(os.path.dirname(__file__),
@@ -465,10 +480,9 @@ class TestInputs:
             f = open(os.path.join(os.path.dirname(__file__),
                                   'data/crossmatch_params.txt')).readlines()
             idx = np.where([old_line in line for line in f])[0][0]
-            CrossMatch._replace_line(cm, os.path.join(os.path.dirname(__file__),
-                                     'data/crossmatch_params.txt'), idx, new_line,
-                                     out_file=os.path.join(
-                                     os.path.dirname(__file__), 'data/crossmatch_params_.txt'))
+            _replace_line(os.path.join(os.path.dirname(__file__),
+                          'data/crossmatch_params.txt'), idx, new_line, out_file=os.path.join(
+                          os.path.dirname(__file__), 'data/crossmatch_params_.txt'))
 
             with pytest.raises(ValueError, match=match_text):
                 cm = CrossMatch(os.path.join(os.path.dirname(__file__),
@@ -495,10 +509,9 @@ class TestInputs:
             f = open(os.path.join(os.path.dirname(__file__),
                                   'data/{}.txt'.format(in_file))).readlines()
             idx = np.where([old_line in line for line in f])[0][0]
-            CrossMatch._replace_line(cm, os.path.join(os.path.dirname(__file__),
-                                     'data/{}.txt'.format(in_file)), idx, new_line,
-                                     out_file=os.path.join(
-                                     os.path.dirname(__file__), 'data/{}_.txt'.format(in_file)))
+            _replace_line(os.path.join(os.path.dirname(__file__),
+                          'data/{}.txt'.format(in_file)), idx, new_line, out_file=os.path.join(
+                          os.path.dirname(__file__), 'data/{}_.txt'.format(in_file)))
 
             with pytest.raises(ValueError, match=match_text):
                 cm = CrossMatch(os.path.join(os.path.dirname(__file__),
@@ -526,10 +539,9 @@ class TestInputs:
                 ['Missing key cross_match_extent', 'All elements of cross_match_extent should be',
                  'cross_match_extent should contain.', 'cross_match_extent should contain']):
             idx = np.where([old_line in line for line in f])[0][0]
-            CrossMatch._replace_line(cm, os.path.join(os.path.dirname(__file__),
-                                     'data/{}.txt'.format(in_file)), idx, new_line,
-                                     out_file=os.path.join(
-                                     os.path.dirname(__file__), 'data/{}_.txt'.format(in_file)))
+            _replace_line(os.path.join(os.path.dirname(__file__),
+                          'data/{}.txt'.format(in_file)), idx, new_line, out_file=os.path.join(
+                          os.path.dirname(__file__), 'data/{}_.txt'.format(in_file)))
 
             with pytest.raises(ValueError, match=match_text):
                 cm = CrossMatch(os.path.join(os.path.dirname(__file__),
@@ -556,10 +568,9 @@ class TestInputs:
                 ['Missing key mem_chunk_num', 'mem_chunk_num should be a single integer',
                  'mem_chunk_num should be a single integer']):
             idx = np.where([old_line in line for line in f])[0][0]
-            CrossMatch._replace_line(cm, os.path.join(os.path.dirname(__file__),
-                                     'data/{}.txt'.format(in_file)), idx, new_line,
-                                     out_file=os.path.join(
-                                     os.path.dirname(__file__), 'data/{}_.txt'.format(in_file)))
+            _replace_line(os.path.join(os.path.dirname(__file__),
+                          'data/{}.txt'.format(in_file)), idx, new_line, out_file=os.path.join(
+                          os.path.dirname(__file__), 'data/{}_.txt'.format(in_file)))
 
             with pytest.raises(ValueError, match=match_text):
                 cm = CrossMatch(os.path.join(os.path.dirname(__file__),

@@ -149,31 +149,6 @@ class CrossMatch():
         # and merge such overlaps into distinct "islands" of sources to match.
         self.group_sources(5)
 
-    def _replace_line(self, file_name, line_num, text, out_file=None):
-        '''
-        Helper function to update the metadata file on-the-fly, allowing for
-        "run" flags to be set from run to no run once they have finished.
-
-        Parameters
-        ----------
-        file_name : string
-            Name of the file to read in and change lines of.
-        line_num : integer
-            Line number of line to edit in ``file_name``.
-        text : string
-            New line to replace original line in ``file_name`` with.
-        out_file : string, optional
-            Name of the file to save new, edited version of ``file_name`` to.
-            If ``None`` then ``file_name`` is overwritten.
-        '''
-        if out_file is None:
-            out_file = file_name
-        lines = open(file_name, 'r').readlines()
-        lines[line_num] = text
-        out = open(out_file, 'w')
-        out.writelines(lines)
-        out.close()
-
     def _str2bool(self, v):
         '''
         Convenience function to convert strings to boolean values.

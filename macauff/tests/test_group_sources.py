@@ -12,6 +12,7 @@ from ..matching import CrossMatch
 from ..group_sources import make_island_groupings, _load_fourier_grid_cutouts, _clean_overlaps
 from ..group_sources_fortran import group_sources_fortran as gsf
 from ..misc_functions_fortran import misc_functions_fortran as mff
+from .test_matching import _replace_line
 
 
 def test_load_fourier_grid_cutouts():
@@ -292,10 +293,28 @@ class TestMakeIslandGroupings():
 
         self.a_coords, self.b_coords = a_coords, b_coords
 
-        # Initialise the catalogue folders now to avoid an error message in
+        # Set the catalogue folders now to avoid an error message in
         # CrossMatch's __init__ call.
-        os.makedirs(self.a_cat_folder_path, exist_ok=True)
-        os.makedirs(self.b_cat_folder_path, exist_ok=True)
+        old_line = 'cat_folder_path = gaia_folder'
+        new_line = 'cat_folder_path = {}\n'.format(self.a_cat_folder_path)
+        f = open(os.path.join(os.path.dirname(__file__), 'data/cat_a_params.txt')).readlines()
+        idx = np.where([old_line in line for line in f])[0][0]
+        _replace_line(os.path.join(os.path.dirname(__file__), 'data/cat_a_params.txt'),
+                      idx, new_line, out_file=os.path.join(os.path.dirname(__file__),
+                      'data/cat_a_params.txt'))
+        old_line = 'cat_folder_path = wise_folder'
+        new_line = 'cat_folder_path = {}\n'.format(self.b_cat_folder_path)
+        f = open(os.path.join(os.path.dirname(__file__), 'data/cat_b_params.txt')).readlines()
+        idx = np.where([old_line in line for line in f])[0][0]
+        _replace_line(os.path.join(os.path.dirname(__file__), 'data/cat_b_params.txt'),
+                      idx, new_line, out_file=os.path.join(os.path.dirname(__file__),
+                      'data/cat_b_params.txt'))
+
+        # Save dummy files into each catalogue folder as well.
+        for folder, N in zip([self.a_cat_folder_path, self.b_cat_folder_path], [3, 4]):
+            np.save('{}/con-cat_astro.npy'.format(folder), np.zeros((10, 3), float))
+            np.save('{}/con-cat_photo.npy'.format(folder), np.zeros((10, N), float))
+            np.save('{}/magrefind.npy'.format(folder), np.zeros((10,), int))
 
         # Also set up an instance of CrossMatch at the same time.
         self.cm = CrossMatch(os.path.join(os.path.dirname(__file__), 'data/crossmatch_params.txt'),
