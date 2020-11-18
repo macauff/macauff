@@ -312,9 +312,9 @@ class TestMakeIslandGroupings():
 
         # Save dummy files into each catalogue folder as well.
         for folder, N in zip([self.a_cat_folder_path, self.b_cat_folder_path], [3, 4]):
-            np.save('{}/con-cat_astro.npy'.format(folder), np.zeros((10, 3), float))
-            np.save('{}/con-cat_photo.npy'.format(folder), np.zeros((10, N), float))
-            np.save('{}/magrefind.npy'.format(folder), np.zeros((10,), int))
+            np.save('{}/con_cat_astro.npy'.format(folder), np.zeros((10, 3), float))
+            np.save('{}/con_cat_photo.npy'.format(folder), np.zeros((10, N), float))
+            np.save('{}/magref.npy'.format(folder), np.zeros((10,), int))
 
         # Also set up an instance of CrossMatch at the same time.
         self.cm = CrossMatch(os.path.join(os.path.dirname(__file__), 'data/crossmatch_params.txt'),
