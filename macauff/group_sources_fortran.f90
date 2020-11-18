@@ -3,8 +3,9 @@
 module group_sources_fortran
 ! This module provides the Fortran code for the handling of the grouping of sources between
 ! the two catalogues being cross-matched, identifying astrometric overlaps.
-use perturbation_auf_fortran, only: haversine
+
 implicit none
+
 integer, parameter :: dp = kind(0.0d0)  ! double precision
 real(dp), parameter :: pi = 4.0_dp*atan(1.0_dp)
 
