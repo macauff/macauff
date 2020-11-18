@@ -10,6 +10,8 @@ from configparser import ConfigParser
 import numpy as np
 
 from .perturbation_auf import make_perturb_aufs
+from .group_sources import make_island_groupings
+from .misc_functions_fortran import misc_functions_fortran as mff
 
 __all__ = ['CrossMatch']
 
@@ -53,19 +55,20 @@ class CrossMatch():
         # AUF creation, island splitting, c/f creation, star pairing. We have
         # to check if any later stages are flagged to not run (i.e., they are
         # the starting point) than earlier stages, and raise an error.
-        flags = np.array([self.run_auf, self.run_group, self.run_cf, self.run_star])
+        flags = np.array([self.run_auf, self.run_group, self.run_cf, self.run_source])
         for i in range(3):
             if flags[i] and np.any(~flags[i+1:]):
                 raise ValueError("Inconsistency between run/no run flags; please ensure that "
                                  "if a sub-process is set to run that all subsequent "
                                  "processes are also set to run.")
 
-        # Ensure that we can create the folder for outputs.
-        try:
-            os.makedirs(self.joint_folder_path, exist_ok=True)
-        except OSError:
-            raise OSError("Error when trying to create temporary folder for joint outputs. "
-                          "Please ensure that joint_folder_path is correct.")
+        # Ensure that we can create the folders for outputs.
+        for path in ['group', 'reject']:
+            try:
+                os.makedirs('{}/{}'.format(self.joint_folder_path, path), exist_ok=True)
+            except OSError:
+                raise OSError("Error when trying to create temporary folder for joint outputs. "
+                              "Please ensure that joint_folder_path is correct.")
 
         for path, catname, flag in zip([self.a_auf_folder_path, self.b_auf_folder_path],
                                        ['"a"', '"b"'], ['a_', 'b_']):
@@ -141,30 +144,10 @@ class CrossMatch():
         # TODO: generalise the number of files per AUF simulation as input arg.
         self.create_perturb_auf(7)
 
-    def _replace_line(self, file_name, line_num, text, out_file=None):
-        '''
-        Helper function to update the metadata file on-the-fly, allowing for
-        "run" flags to be set from run to no run once they have finished.
-
-        Parameters
-        ----------
-        file_name : string
-            Name of the file to read in and change lines of.
-        line_num : integer
-            Line number of line to edit in ``file_name``.
-        text : string
-            New line to replace original line in ``file_name`` with.
-        out_file : string, optional
-            Name of the file to save new, edited version of ``file_name`` to.
-            If ``None`` then ``file_name`` is overwritten.
-        '''
-        if out_file is None:
-            out_file = file_name
-        lines = open(file_name, 'r').readlines()
-        lines[line_num] = text
-        out = open(out_file, 'w')
-        out.writelines(lines)
-        out.close()
+        # Once AUF components are assembled, we now group sources based on
+        # convolved AUF integration lengths, to get "common overlap" sources
+        # and merge such overlaps into distinct "islands" of sources to match.
+        self.group_sources(5)
 
     def _str2bool(self, v):
         '''
@@ -267,7 +250,7 @@ class CrossMatch():
         cat_b_config = cat_b_config['config']
 
         for check_flag in ['include_perturb_auf', 'include_phot_like', 'run_auf', 'run_group',
-                           'run_cf', 'run_star', 'cf_region_type', 'cf_region_frame',
+                           'run_cf', 'run_source', 'cf_region_type', 'cf_region_frame',
                            'cf_region_points', 'joint_folder_path', 'pos_corr_dist',
                            'real_hankel_points', 'four_hankel_points', 'four_max_rho',
                            'cross_match_extent', 'mem_chunk_num']:
@@ -283,7 +266,7 @@ class CrossMatch():
                                      check_flag, catname))
 
         for run_flag in ['include_perturb_auf', 'include_phot_like', 'run_auf', 'run_group',
-                         'run_cf', 'run_star']:
+                         'run_cf', 'run_source']:
             setattr(self, run_flag, self._str2bool(joint_config[run_flag]))
 
         for config, catname in zip([cat_a_config, cat_b_config], ['a_', 'b_']):
@@ -423,11 +406,13 @@ class CrossMatch():
         """
         Function to initialise the shared variables used in the cross-match process.
         """
-        maximumoffset = 1.185 * max([np.amax(self.a_psf_fwhms), np.amax(self.b_psf_fwhms)])
-        self.r = np.linspace(0, maximumoffset, self.real_hankel_points)
+
+        self.r = np.linspace(0, self.pos_corr_dist, self.real_hankel_points)
         self.dr = np.diff(self.r)
         self.rho = np.linspace(0, self.four_max_rho, self.four_hankel_points)
         self.drho = np.diff(self.rho)
+        # Only need to calculate this the first time we need it, so buffer for now.
+        self.j0s = None
 
     def create_perturb_auf(self, files_per_auf_sim, perturb_auf_func=make_perturb_aufs):
         '''
@@ -462,7 +447,7 @@ class CrossMatch():
                               'AUF simulation folder. Deleting all files and re-running '
                               'cross-match process.')
                 # Once run AUf flag is updated, all other flags need to be set to run
-                self.run_group, self.run_cf, self.run_star = True, True, True
+                self.run_group, self.run_cf, self.run_source = True, True, True
             os.system("rm -rf {}/*".format(self.a_auf_folder_path))
             if self.include_perturb_auf:
                 _kwargs = {'psf_fwhms': self.a_psf_fwhms, 'tri_download_flag': self.a_download_tri}
@@ -489,7 +474,7 @@ class CrossMatch():
                 warnings.warn('Incorrect number of files in catalogue "b" perturbation'
                               'AUF simulation folder. Deleting all files and re-running '
                               'cross-match process.')
-                self.run_group, self.run_cf, self.run_star = True, True, True
+                self.run_group, self.run_cf, self.run_source = True, True, True
             os.system("rm -rf {}/*".format(self.b_auf_folder_path))
             if self.include_perturb_auf:
                 _kwargs = {'psf_fwhms': self.b_psf_fwhms, 'tri_download_flag': self.b_download_tri}
@@ -501,4 +486,64 @@ class CrossMatch():
                              self.mem_chunk_num, **_kwargs)
         else:
             print('Loading empirical crowding AUFs for catalogue "b"...')
+            sys.stdout.flush()
+
+    def group_sources(self, files_per_grouping, group_func=make_island_groupings):
+        '''
+        Function to handle the creation of catalogue "islands" and potential
+        astrometrically related sources across the two catalogues.
+
+        Parameters
+        ----------
+        files_per_grouping : integer
+            The number of output files from each catalogue, made during the
+            island and overlap creation process.
+        group_func : callable, optional
+            ``group_func`` should create the various island- and overlap-related
+            files by which objects across the two catalogues are assigned as
+            potentially counterparts to one another.
+        '''
+
+        # Each catalogue should expect 5 files in "group/" or "reject/": island
+        # lengths, indices into the opposite catalogue for each source, the
+        # indices of sources in this catalogue in each island, the number of
+        # opposing catalogue overlaps for each source, and the list of any
+        # "rejected" source indices. However, there may be no "reject" arrays,
+        # so we might expect two fewer files.
+        if (np.all(['reject_a' not in f for f in
+                    os.listdir('{}/reject'.format(self.joint_folder_path))]) and
+            np.all(['reject_b' not in f for f in
+                    os.listdir('{}/reject'.format(self.joint_folder_path))])):
+            expected_files = (files_per_grouping - 1) * 2
+        else:
+            expected_files = files_per_grouping * 2
+        file_number = np.sum([len(files) for _, _, files in
+                              os.walk('{}/group'.format(self.joint_folder_path))]) + np.sum(
+            [len(files) for _, _, files in os.walk('{}/reject'.format(self.joint_folder_path))])
+        correct_file_number = expected_files == file_number
+
+        # Currently hard-code the integral fractions used in group_sources:
+        int_fracs = np.array([0.63, 0.9, 0.99])
+
+        # First check whether we actually need to dip into the group sources
+        # routine or not.
+        if self.run_group or not correct_file_number:
+            if self.j0s is None:
+                self.j0s = mff.calc_j0(self.rho[:-1]+self.drho/2, self.r[:-1]+self.dr/2)
+            # Only worry about the warning if we didn't choose to run the grouping
+            # but hit incorrect file numbers.
+            if not correct_file_number and not self.run_group:
+                warnings.warn('Incorrect number of grouping files. Deleting all '
+                              'grouping files and re-running cross-match process.')
+                self.run_cf, self.run_source = True, True
+            os.system('rm -rf {}/group/*'.format(self.joint_folder_path))
+            os.system('rm -rf {}/reject/*'.format(self.joint_folder_path))
+            group_func(self.joint_folder_path, self.a_cat_folder_path, self.b_cat_folder_path,
+                       self.a_auf_folder_path, self.b_auf_folder_path, self.a_auf_region_points,
+                       self.b_auf_region_points, self.a_filt_names, self.b_filt_names,
+                       self.a_cat_name, self.b_cat_name, self.r, self.dr, self.rho, self.drho,
+                       self.j0s, self.pos_corr_dist, self.cross_match_extent, int_fracs,
+                       self.mem_chunk_num, self.include_phot_like)
+        else:
+            print('Loading catalogue islands and overlaps...')
             sys.stdout.flush()
