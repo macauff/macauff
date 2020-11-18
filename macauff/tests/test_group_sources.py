@@ -292,6 +292,11 @@ class TestMakeIslandGroupings():
 
         self.a_coords, self.b_coords = a_coords, b_coords
 
+        # Initialise the catalogue folders now to avoid an error message in
+        # CrossMatch's __init__ call.
+        os.makedirs(self.a_cat_folder_path, exist_ok=True)
+        os.makedirs(self.b_cat_folder_path, exist_ok=True)
+
         # Also set up an instance of CrossMatch at the same time.
         self.cm = CrossMatch(os.path.join(os.path.dirname(__file__), 'data/crossmatch_params.txt'),
                              os.path.join(os.path.dirname(__file__), 'data/cat_a_params.txt'),
