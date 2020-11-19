@@ -21,9 +21,10 @@ class CrossMatch():
     A class to cross-match two photometric catalogues with one another, producing
     a composite catalogue of merged sources.
 
-    The class takes a path, the location of a metadata file containing all of the
-    necessary parameters for the cross-match, and outputs a file containing the
-    appropriate columns of the datasets plus additional derived parameters.
+    The class takes three paths, the locations of the metadata files containing
+    all of the necessary parameters for the cross-match, and outputs a file
+    containing the appropriate columns of the datasets plus additional derived
+    parameters.
 
     Parameters
     ----------
