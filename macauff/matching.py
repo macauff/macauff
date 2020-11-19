@@ -12,6 +12,7 @@ import numpy as np
 from .perturbation_auf import make_perturb_aufs
 from .group_sources import make_island_groupings
 from .misc_functions_fortran import misc_functions_fortran as mff
+from .photometric_likelihood import compute_photometric_likelihoods
 
 __all__ = ['CrossMatch']
 
@@ -64,7 +65,7 @@ class CrossMatch():
                                  "processes are also set to run.")
 
         # Ensure that we can create the folders for outputs.
-        for path in ['group', 'reject']:
+        for path in ['group', 'reject', 'phot_like']:
             try:
                 os.makedirs('{}/{}'.format(self.joint_folder_path, path), exist_ok=True)
             except OSError:
@@ -553,7 +554,7 @@ class CrossMatch():
             print('Loading catalogue islands and overlaps...')
             sys.stdout.flush()
 
-    def calculate_phot_like(self, files_per_phot, phot_like_func=):
+    def calculate_phot_like(self, files_per_phot, phot_like_func=compute_photometric_likelihoods):
         '''
         Create the photometric likelihood information used in the cross-match
         process.
