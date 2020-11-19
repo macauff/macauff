@@ -150,6 +150,10 @@ class CrossMatch():
         # and merge such overlaps into distinct "islands" of sources to match.
         self.group_sources(5)
 
+        # The third step in this process is to, to some level, calculate the
+        # photometry-related information necessary for the cross-match.
+        self.calculate_phot_like()
+
     def _str2bool(self, v):
         '''
         Convenience function to convert strings to boolean values.
@@ -548,3 +552,18 @@ class CrossMatch():
         else:
             print('Loading catalogue islands and overlaps...')
             sys.stdout.flush()
+
+    def calculate_phot_like(self, files_per_phot, phot_like_func=):
+        '''
+        Create the photometric likelihood information used in the cross-match
+        process.
+
+        Parameters
+        ----------
+        files_per_phot : integer
+            The number of files created during the cross-match process for each
+            individual photometric sky position pointing.
+        phot_like_func : callable, optional
+            The function that calls the overall computation of the counterpart
+            and "field" star photometric likelihood-related information.
+        '''
