@@ -5,7 +5,6 @@ used in the cross-matching of the two catalogues.
 '''
 
 import sys
-import os
 import numpy as np
 
 
@@ -42,15 +41,15 @@ def compute_photometric_likelihoods(joint_folder_path, a_cat_folder_path, b_cat_
         shape=(len(bfilts), len(afilts), len(ax2slices)-1, len(ax1slices)-1), fortran_order=True)
     c_array = np.lib.format.open_memmap(
         '{}/phot_like/c_array.npy'.format(joint_folder_path), mode='w+', dtype=float,
-        shape=(longbbinlen, longabinlen, len(bfilts), len(afilts),
+        shape=(longbbinlen-1, longabinlen-1, len(bfilts), len(afilts),
                len(ax2slices)-1, len(ax1slices)-1), fortran_order=True)
     fa_array = np.lib.format.open_memmap(
         '{}/phot_like/fa_array.npy'.format(joint_folder_path), mode='w+', dtype=float,
-        shape=(longabinlen, len(bfilts), len(afilts), len(ax2slices)-1, len(ax1slices)-1),
+        shape=(longabinlen-1, len(bfilts), len(afilts), len(ax2slices)-1, len(ax1slices)-1),
         fortran_order=True)
     fb_array = np.lib.format.open_memmap(
         '{}/phot_like/fb_array.npy'.format(joint_folder_path), mode='w+', dtype=float,
-        shape=(longbbinlen, len(bfilts), len(afilts), len(ax2slices)-1, len(ax1slices)-1),
+        shape=(longbbinlen-1, len(bfilts), len(afilts), len(ax2slices)-1, len(ax1slices)-1),
         fortran_order=True)
 
     a_mm = np.load('{}/con_cat_astro.npy'.format(a_cat_folder_path), mmap_mode='r')
@@ -59,8 +58,10 @@ def compute_photometric_likelihoods(joint_folder_path, a_cat_folder_path, b_cat_
     for m_ in range(0, len(ax1slices)-1, mem_chunk_num):
         ax1_1 = ax1slices[m_]
         ax1_2 = ax1slices[min(len(ax1slices)-1, m_+mem_chunk_num)]
-        a_small = _load_lon_slice(a_mm, joint_folder_path, 'a', ax1_1, ax1_2, a_cat_folder_path)
-        b_small = _load_lon_slice(b_mm, joint_folder_path, 'b', ax1_1, ax1_2, b_cat_folder_path)
+        a_small, a_small_phot = _load_lon_slice(a_mm, joint_folder_path, 'a', ax1_1, ax1_2,
+                                                a_cat_folder_path)
+        b_small, b_small_phot = _load_lon_slice(b_mm, joint_folder_path, 'b', ax1_1, ax1_2,
+                                                b_cat_folder_path)
         for m in range(m_, min(len(ax1slices)-1, m_+mem_chunk_num)):
             ax1_1 = ax1slices[m]
             ax1_2 = ax1slices[m+1]
@@ -70,12 +71,10 @@ def compute_photometric_likelihoods(joint_folder_path, a_cat_folder_path, b_cat_
                 area = (ax2_2 - ax2_1) * (ax1_2 - ax1_1)
                 a_sky_cut = _load_lon_lat_slice(a_small, joint_folder_path, 'a', ax1_1,
                                                 ax1_2, ax2_1, ax2_2, a_cat_folder_path)
-                a_phot_cut = np.load('{}/con_cat_photo.npy'.format(a_cat_folder_path),
-                                     mmap_mode='r')[a_sky_cut]
+                a_phot_cut = a_small_phot[a_sky_cut]
                 b_sky_cut = _load_lon_lat_slice(b_small, joint_folder_path, 'b', ax1_1,
                                                 ax1_2, ax2_1, ax2_2, b_cat_folder_path)
-                b_phot_cut = np.load('{}/con_cat_photo.npy'.format(b_cat_folder_path),
-                                     mmap_mode='r')[b_sky_cut]
+                b_phot_cut = b_small_phot[b_sky_cut]
                 for i in range(0, len(afilts)):
                     if not include_phot_like and not use_phot_priors:
                         a_num_phot_cut = np.sum(~np.isnan(a_phot_cut[:, i]))
@@ -130,7 +129,8 @@ def create_magnitude_bins(ax1slices, ax2slices, filts, mem_chunk_num, joint_fold
         ax1_1 = ax1slices[m_]
         ax1_2 = ax1slices[min(len(ax1slices)-1, m_+mem_chunk_num)]
         a_ = np.load('{}/con_cat_astro.npy'.format(cat_folder_path), mmap_mode='r')
-        a_ = _load_lon_slice(a_, joint_folder_path, cat_type, ax1_1, ax1_2, cat_folder_path)
+        a_, a_phot_ = _load_lon_slice(a_, joint_folder_path, cat_type, ax1_1, ax1_2,
+                                      cat_folder_path)
         for m in range(m_, min(len(ax1slices)-1, m_+mem_chunk_num)):
             ax1_1 = ax1slices[m]
             ax1_2 = ax1slices[m+1]
@@ -140,7 +140,7 @@ def create_magnitude_bins(ax1slices, ax2slices, filts, mem_chunk_num, joint_fold
                 sky_cut = _load_lon_lat_slice(a_, joint_folder_path, cat_type, ax1_1, ax1_2,
                                               ax2_1, ax2_2, cat_folder_path)
                 for i in range(0, len(filts)):
-                    a = a_[sky_cut, i]
+                    a = a_phot_[sky_cut, i]
                     if np.sum(~np.isnan(a)) > 0:
                         f = make_bins(a[~np.isnan(a)])
                     else:
@@ -156,10 +156,9 @@ def create_magnitude_bins(ax1slices, ax2slices, filts, mem_chunk_num, joint_fold
     for m_ in range(0, len(ax1slices)-1, mem_chunk_num):
         ax1_1 = ax1slices[m_]
         ax1_2 = ax1slices[min(len(ax1slices)-1, m_+mem_chunk_num)]
-        a_ = np.load('{}/con_cat_astro.npy'.format(cat_folder_path), mmap_mode='r')[:, 0]
-        cutspacea = (a_ >= ax1_1) & (a_ < ax1_2)
-        a_ = np.load('{}/con_cat_astro.npy'.format(cat_folder_path), mmap_mode='r')[cutspacea]
-        del cutspacea
+        a_ = np.load('{}/con_cat_astro.npy'.format(cat_folder_path), mmap_mode='r')
+        a_, a_phot_ = _load_lon_slice(a_, joint_folder_path, cat_type, ax1_1, ax1_2,
+                                      cat_folder_path)
         for m in range(m_, min(len(ax1slices)-1, m_+mem_chunk_num)):
             ax1_1 = ax1slices[m]
             ax1_2 = ax1slices[m+1]
@@ -169,7 +168,7 @@ def create_magnitude_bins(ax1slices, ax2slices, filts, mem_chunk_num, joint_fold
                 sky_cut = _load_lon_lat_slice(a_, joint_folder_path, cat_type, ax1_1, ax1_2,
                                               ax2_1, ax2_2, cat_folder_path)
                 for i in range(0, len(filts)):
-                    a = a_[sky_cut, i]
+                    a = a_phot_[sky_cut, i]
                     if np.sum(~np.isnan(a)) > 0:
                         f = make_bins(a[~np.isnan(a)])
                     else:
@@ -252,8 +251,9 @@ def _load_lon_slice(a, joint_folder_path, cat_name, lon1, lon2, cat_folder_path)
         sky_cut[i:i+di] = (sky_cut_1[i:i+di] & sky_cut_2[i:i+di])
 
     a_cutout = np.load('{}/con_cat_astro.npy'.format(cat_folder_path), mmap_mode='r')[sky_cut]
+    a_phot_cutout = np.load('{}/con_cat_photo.npy'.format(cat_folder_path), mmap_mode='r')[sky_cut]
 
-    return a_cutout
+    return a_cutout, a_phot_cutout
 
 
 def _load_lon_lat_slice(a, joint_folder_path, cat_name, lon1, lon2, lat1, lat2, cat_folder_path):
@@ -278,7 +278,7 @@ def _load_lon_lat_slice(a, joint_folder_path, cat_name, lon1, lon2, lat1, lat2, 
     for i in range(0, len(a), di):
         sky_cut_3[i:i+di] = (a[i:i+di, 1] >= lat1)
     for i in range(0, len(a), di):
-        sky_cut_4[i:i+di] = (a[i:i+di, 1] <= lat1)
+        sky_cut_4[i:i+di] = (a[i:i+di, 1] <= lat2)
 
     for i in range(0, len(a), di):
         sky_cut[i:i+di] = (sky_cut_1[i:i+di] & sky_cut_2[i:i+di] &
