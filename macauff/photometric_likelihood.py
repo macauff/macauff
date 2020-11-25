@@ -144,7 +144,7 @@ def create_magnitude_bins(ax1slices, ax2slices, filts, mem_chunk_num, joint_fold
                     if np.sum(~np.isnan(a)) > 0:
                         f = make_bins(a[~np.isnan(a)])
                     else:
-                        f = np.array([])
+                        f = np.array([0])
                     del a
                     binlengths[i, n, m] = len(f)
     del a_
@@ -172,7 +172,7 @@ def create_magnitude_bins(ax1slices, ax2slices, filts, mem_chunk_num, joint_fold
                     if np.sum(~np.isnan(a)) > 0:
                         f = make_bins(a[~np.isnan(a)])
                     else:
-                        f = np.array([])
+                        f = np.array([0])
                     del a
                     binsarray[:binlengths[i, n, m], i, n, m] = f
 
@@ -203,8 +203,6 @@ def make_bins(input_mags):
     mina = da*np.floor(minamag/da)
     na = int((maxa - mina)/da + 1)
     output_bins = np.linspace(mina, maxa, na)
-    output_bins[0] = da/10*np.floor(minamag/(da/10))-(da/20)
-    output_bins[-1] = da/10*np.ceil(maxamag/(da/10))+(da/20)
 
     hist, output_bins = np.histogram(input_mags, bins=output_bins)
     smalllist = []
@@ -220,13 +218,13 @@ def make_bins(input_mags):
         for i in smalllist:
             if i not in dellist:
                 flag = 0
-                for j in range(i+1, len(output_bins)):
+                for j in range(i+1, len(output_bins)-1):
                     if np.sum(hist[i:j+1]) > minnum:
                         dellist.extend([k for k in range(i+1, j+1)])
                         flag = 1
                         break
                 if flag == 0:
-                    dellist.extend([k for k in range(i, len(output_bins)-1)])
+                    dellist.extend([k for k in range(i+1, len(output_bins)-1)])
     output_bins = np.delete(output_bins, dellist)
 
     return output_bins
