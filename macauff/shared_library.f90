@@ -6,6 +6,8 @@
 subroutine haversine(lon1, lon2, lat1, lat2, hav_dist)
 ! Function to calculate the haversine formula.
 
+implicit none
+
 integer, parameter :: dp = kind(0.0d0)  ! double precision
 real(dp), parameter :: pi = 4.0_dp*atan(1.0_dp)
 

@@ -1,7 +1,12 @@
 ! Licensed under a 3-clause BSD style license - see LICENSE
 
+! Wrappers for tests in test_shared_library.py, to call the otherwise inaccessible
+! shared_library.f90 functions.
+
 subroutine haversine_wrapper(lon1, lon2, lat1, lat2, hav_dist)
 ! Wrapper for the haversine formula.
+
+implicit none
 
 integer, parameter :: dp = kind(0.0d0)  ! double precision
 
