@@ -23,7 +23,7 @@ real(dp), intent(in) :: source_lon(:), source_lat(:)
 real(dp), intent(in) :: point_lon(:), point_lat(:)
 
 ! 1-D array of indices, for each source position, of the closest position.
-real(dp), intent(out) :: point_ind(size(source_lon))
+integer, intent(out) :: point_ind(size(source_lon))
 
 ! Loop counters
 integer :: i, j
