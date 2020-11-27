@@ -153,7 +153,7 @@ class CrossMatch():
 
         # The third step in this process is to, to some level, calculate the
         # photometry-related information necessary for the cross-match.
-        self.calculate_phot_like()
+        self.calculate_phot_like(6)
 
     def _str2bool(self, v):
         '''
@@ -272,7 +272,7 @@ class CrossMatch():
                                      check_flag, catname))
 
         for run_flag in ['include_perturb_auf', 'include_phot_like', 'run_auf', 'run_group',
-                         'run_cf', 'run_source']:
+                         'run_cf', 'run_source', 'use_phot_priors']:
             setattr(self, run_flag, self._str2bool(joint_config[run_flag]))
 
         for config, catname in zip([cat_a_config, cat_b_config], ['a_', 'b_']):
@@ -568,3 +568,55 @@ class CrossMatch():
             The function that calls the overall computation of the counterpart
             and "field" star photometric likelihood-related information.
         '''
+
+        # Saved files per catalogue: magnitude bins (and lengths), "field"
+        # source priors/likelihoods, the sky slice index of each source,
+        # and the array of "nearest neighbour" areas of each "cf" point.
+        # Additionally, "counterpart" prior/likelihood functions are saved,
+        # for 2 + 2 * 6 files total.
+        file_number = np.sum([len(files) for _, _, files in
+                              os.walk('{}/phot_like'.format(self.joint_folder_path))])
+        expected_file_number = 2 + 2 * files_per_phot
+
+        correct_file_number = expected_file_number == file_number
+
+        if self.run_cf or not correct_file_number:
+            if not correct_file_number and not self.run_cf:
+                warnings.warn('Incorrect number of photometric likelihood files. Deleting all '
+                              'c/f files and re-running calculations.')
+                self.run_source = True
+            os.system('rm -r {}/phot_like/*'.format(self.joint_folder_path))
+            self._calculate_cf_areas()
+            phot_like_func(
+                self.joint_folder_path, self.a_cat_folder_path, self.b_cat_folder_path,
+                self.a_filt_names, self.b_filt_names, self.mem_chunk_num, self.cf_region_points,
+                self.cf_areas, self.include_phot_like, self.use_phot_priors)
+        else:
+            print('Loading photometric priors and likelihoods...')
+            sys.stdout.flush()
+
+    def _calculate_cf_areas(self):
+        dlon, dlat = 0.01, 0.01
+        test_lons = np.arange(self.cross_match_extent[0], self.cross_match_extent[1], dlon)
+        test_lats = np.arange(self.cross_match_extent[2], self.cross_match_extent[3], dlat)
+
+        test_coords = np.array([[a, b] for a in test_lons for b in test_lats])
+
+        inds = mff.find_nearest_point(test_coords[:, 0], test_coords[:, 1],
+                                      self.cf_region_points[:, 0], self.cf_region_points[:, 1])
+
+        cf_areas = np.zeros((len(self.cf_region_points)), float)
+
+        # Unit area of a sphere is cos(theta) dtheta dphi if theta goes from -90
+        # to +90 degrees (sin(theta) for 0 to 180 degrees). Note, however, that
+        # dtheta and dphi have to be in radians, so we have to convert the entire
+        # thing from degrees and re-convert at the end. Hence:
+        for i, ind in enumerate(inds):
+            theta = np.radians(test_coords[i, 1])
+            dtheta, dphi = dlat / 180 * np.pi, dlon / 180 * np.pi
+            # Remember to convert back to square degrees:
+            cf_areas[ind] += (np.cos(theta) * dtheta * dphi) * (180 / np.pi)**2
+
+        self.cf_areas = cf_areas
+
+        return
