@@ -8,15 +8,6 @@ import os
 import numpy as np
 
 from ..matching import CrossMatch
-from ..perturbation_auf_fortran import perturbation_auf_fortran as paf
-
-
-def test_closest_auf_point():
-    auf_points = np.array([[1, 1], [50, 50]])
-    source_points = np.array([[3, 2], [80, 50], [40, 30]])
-    inds = paf.find_nearest_auf_point(source_points[:, 0], source_points[:, 1],
-                                      auf_points[:, 0], auf_points[:, 1])
-    assert np.all(inds == np.array([0, 1, 1]))
 
 
 class TestCreatePerturbAUF:

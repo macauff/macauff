@@ -651,3 +651,22 @@ class TestInputs:
                                 os.path.join(os.path.dirname(__file__), 'data/cat_a_params.txt'),
                                 os.path.join(os.path.dirname(__file__), 'data/cat_b_params.txt'))
             self.setup_class()
+
+    def test_calculate_cf_areas(self):
+        cm = CrossMatch(os.path.join(os.path.dirname(__file__), 'data/crossmatch_params.txt'),
+                        os.path.join(os.path.dirname(__file__), 'data/cat_a_params.txt'),
+                        os.path.join(os.path.dirname(__file__), 'data/cat_b_params.txt'))
+        cm.cross_match_extent = np.array([131, 134, -1, 1])
+        cm.cf_region_points = np.array([[a, b] for a in [131.5, 132.5, 133.5]
+                                        for b in [-0.5, 0.5]])
+        cm._calculate_cf_areas()
+        assert_allclose(cm.cf_areas, np.ones((6), float), rtol=0.02)
+
+        cm.cross_match_extent = np.array([50, 55, 85, 90])
+        cm.cf_region_points = np.array([[a, b] for a in 0.5+np.arange(50, 55, 1)
+                                        for b in 0.5+np.arange(85, 90, 1)])
+        cm._calculate_cf_areas()
+        calculated_areas = np.array(
+            [(c[0]+0.5 - (c[0]-0.5))*180/np.pi * (np.sin(np.radians(c[1]+0.5)) -
+             np.sin(np.radians(c[1]-0.5))) for c in cm.cf_region_points])
+        assert_allclose(cm.cf_areas, calculated_areas, rtol=0.025)

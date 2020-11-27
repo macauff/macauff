@@ -8,7 +8,7 @@ import os
 import sys
 import numpy as np
 
-from .perturbation_auf_fortran import perturbation_auf_fortran as paf
+from .misc_functions_fortran import misc_functions_fortran as mff
 
 __all__ = ['make_perturb_aufs']
 
@@ -180,5 +180,5 @@ def make_perturb_aufs(auf_folder, cat_folder, filters, auf_points, ax_lims, r, d
         # Which sky position to use is more complex; this involves determining
         # the smallest great-circle distance to each auf_point AUF mapping for
         # each source.
-        modelrefinds[2, indexmap] = paf.find_nearest_auf_point(a[:, 0], a[:, 1],
-                                                               auf_points[:, 0], auf_points[:, 1])
+        modelrefinds[2, indexmap] = mff.find_nearest_point(a[:, 0], a[:, 1],
+                                                           auf_points[:, 0], auf_points[:, 1])
