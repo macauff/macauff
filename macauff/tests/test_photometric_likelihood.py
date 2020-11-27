@@ -55,6 +55,28 @@ class TestOneSidedPhotometricLikelihood:
 
             setattr(self, '{}_photo'.format(name), a)
 
+        old_line = 'mem_chunk_num = 10'
+        new_line = 'mem_chunk_num = 2\n'
+        f = open(os.path.join(os.path.dirname(__file__), 'data/crossmatch_params.txt')).readlines()
+        idx = np.where([old_line in line for line in f])[0][0]
+        _replace_line(os.path.join(os.path.dirname(__file__), 'data/crossmatch_params.txt'),
+                      idx, new_line, out_file=os.path.join(os.path.dirname(__file__),
+                      'data/crossmatch_params_.txt'))
+        old_line = 'cf_region_points = 131 134 4 -1 1 3'
+        new_line = 'cf_region_points = 131.5 133.5 3 -0.5 0.5 2\n'
+        f = open(os.path.join(os.path.dirname(__file__),
+                 'data/crossmatch_params_.txt')).readlines()
+        idx = np.where([old_line in line for line in f])[0][0]
+        _replace_line(os.path.join(os.path.dirname(__file__), 'data/crossmatch_params_.txt'),
+                      idx, new_line)
+        old_line = 'cross_match_extent = 131 138 -3 3'
+        new_line = 'cross_match_extent = 131 134 -3 3\n'
+        f = open(os.path.join(os.path.dirname(__file__),
+                 'data/crossmatch_params_.txt')).readlines()
+        idx = np.where([old_line in line for line in f])[0][0]
+        _replace_line(os.path.join(os.path.dirname(__file__), 'data/crossmatch_params_.txt'),
+                      idx, new_line)
+
     def test_compute_photometric_likelihoods(self):
         os.system('rm -r {}/phot_like/*'.format(self.joint_folder_path))
         Na, Nb, area = self.Na, self.Nb, self.area
@@ -208,27 +230,7 @@ class TestOneSidedPhotometricLikelihood:
             np.save('{}/con_cat_photo.npy'.format(folder), getattr(self, '{}_photo'.format(name)))
             np.save('{}/magref.npy'.format(folder),
                     np.zeros((len(getattr(self, '{}_astro'.format(name))))))
-        old_line = 'mem_chunk_num = 10'
-        new_line = 'mem_chunk_num = 2\n'
-        f = open(os.path.join(os.path.dirname(__file__), 'data/crossmatch_params.txt')).readlines()
-        idx = np.where([old_line in line for line in f])[0][0]
-        _replace_line(os.path.join(os.path.dirname(__file__), 'data/crossmatch_params.txt'),
-                      idx, new_line, out_file=os.path.join(os.path.dirname(__file__),
-                      'data/crossmatch_params_.txt'))
-        old_line = 'cf_region_points = 131 134 4 -1 1 3'
-        new_line = 'cf_region_points = 131.5 133.5 3 -0.5 0.5 2\n'
-        f = open(os.path.join(os.path.dirname(__file__),
-                 'data/crossmatch_params_.txt')).readlines()
-        idx = np.where([old_line in line for line in f])[0][0]
-        _replace_line(os.path.join(os.path.dirname(__file__), 'data/crossmatch_params_.txt'),
-                      idx, new_line)
-        old_line = 'cross_match_extent = 131 138 -3 3'
-        new_line = 'cross_match_extent = 131 134 -3 3\n'
-        f = open(os.path.join(os.path.dirname(__file__),
-                 'data/crossmatch_params_.txt')).readlines()
-        idx = np.where([old_line in line for line in f])[0][0]
-        _replace_line(os.path.join(os.path.dirname(__file__), 'data/crossmatch_params_.txt'),
-                      idx, new_line)
+
         self.cm = CrossMatch(os.path.join(os.path.dirname(__file__),
                                           'data/crossmatch_params_.txt'),
                              os.path.join(os.path.dirname(__file__), 'data/cat_a_params.txt'),
@@ -262,3 +264,66 @@ class TestOneSidedPhotometricLikelihood:
                     hist, bins = np.histogram(b[q & ~np.isnan(b[:, k]), k],
                                               bins=_bins[:, k, i])
                     assert np.all(hist >= 250)
+
+    def test_calculate_phot_like_incorrect_files(self):
+        os.system('rm -r {}/phot_like/*'.format(self.joint_folder_path))
+        self.cm = CrossMatch(os.path.join(os.path.dirname(__file__),
+                                          'data/crossmatch_params_.txt'),
+                             os.path.join(os.path.dirname(__file__), 'data/cat_a_params.txt'),
+                             os.path.join(os.path.dirname(__file__), 'data/cat_b_params.txt'))
+        self.cm.run_cf = False
+        files_per_phot = 6
+
+        # Dummy set up the incorrect number of files in phot_like:
+        for i in range(4):
+            np.save('{}/phot_like/array_{}.npy'.format(self.joint_folder_path, i),
+                    np.array([0]))
+
+        with pytest.warns(UserWarning, match='Incorrect number of photometric likelihood files.'):
+            self.cm.calculate_phot_like(files_per_phot)
+
+        abinlen = np.load('{}/phot_like/abinlengths.npy'.format(self.joint_folder_path))
+        bbinlen = np.load('{}/phot_like/bbinlengths.npy'.format(self.joint_folder_path))
+
+        assert np.all(abinlen == 51*np.ones((3, 6), int))
+        assert np.all(bbinlen == 26*np.ones((4, 6), int))
+
+        for file, shape in zip(
+            ['c_array', 'fa_array', 'fb_array'], [(25, 50, 4, 3, 6), (50, 4, 3, 6),
+                                                  (25, 4, 3, 6)]):
+            a = np.load('{}/phot_like/{}.npy'.format(self.joint_folder_path, file))
+            assert np.all(a.shape == shape)
+            assert np.all(a == np.ones(shape, float))
+
+        abins = np.load('{}/phot_like/abinsarray.npy'.format(self.joint_folder_path))
+        bbins = np.load('{}/phot_like/bbinsarray.npy'.format(self.joint_folder_path))
+        for folder, filts, _bins in zip([self.a_cat_folder_path, self.b_cat_folder_path],
+                                        [self.afilts, self.bfilts], [abins, bbins]):
+            a = np.load('{}/con_cat_astro.npy'.format(folder))
+            b = np.load('{}/con_cat_photo.npy'.format(folder))
+            for i, (ax1, ax2) in enumerate(self.cf_points):
+                q = ((a[:, 0] >= ax1-0.5) & (a[:, 0] <= ax1+0.5) &
+                     (a[:, 1] >= ax2-0.5) & (a[:, 1] <= ax2+0.5))
+                for k in range(len(filts)):
+                    hist, bins = np.histogram(b[q & ~np.isnan(b[:, k]), k],
+                                              bins=_bins[:, k, i])
+                    assert np.all(hist >= 250)
+
+    def test_calculate_phot_like_load_files(self, capsys):
+        os.system('rm -r {}/phot_like/*'.format(self.joint_folder_path))
+        self.cm = CrossMatch(os.path.join(os.path.dirname(__file__),
+                                          'data/crossmatch_params_.txt'),
+                             os.path.join(os.path.dirname(__file__), 'data/cat_a_params.txt'),
+                             os.path.join(os.path.dirname(__file__), 'data/cat_b_params.txt'))
+        self.cm.run_cf = False
+        files_per_phot = 6
+
+        # Dummy set up the correct number of files in phot_like:
+        for i in range(2 + 2 * files_per_phot):
+            np.save('{}/phot_like/array_{}.npy'.format(self.joint_folder_path, i),
+                    np.array([0]))
+
+        capsys.readouterr()
+        self.cm.calculate_phot_like(files_per_phot)
+        output = capsys.readouterr().out
+        assert 'Loading photometric priors and likelihoods' in output
