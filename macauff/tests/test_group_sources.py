@@ -301,14 +301,14 @@ class TestMakeIslandGroupings():
         idx = np.where([old_line in line for line in f])[0][0]
         _replace_line(os.path.join(os.path.dirname(__file__), 'data/cat_a_params.txt'),
                       idx, new_line, out_file=os.path.join(os.path.dirname(__file__),
-                      'data/cat_a_params.txt'))
+                      'data/cat_a_params_.txt'))
         old_line = 'cat_folder_path = wise_folder'
         new_line = 'cat_folder_path = {}\n'.format(self.b_cat_folder_path)
         f = open(os.path.join(os.path.dirname(__file__), 'data/cat_b_params.txt')).readlines()
         idx = np.where([old_line in line for line in f])[0][0]
         _replace_line(os.path.join(os.path.dirname(__file__), 'data/cat_b_params.txt'),
                       idx, new_line, out_file=os.path.join(os.path.dirname(__file__),
-                      'data/cat_b_params.txt'))
+                      'data/cat_b_params_.txt'))
 
         # Save dummy files into each catalogue folder as well.
         for folder, N in zip([self.a_cat_folder_path, self.b_cat_folder_path], [3, 4]):
@@ -318,8 +318,8 @@ class TestMakeIslandGroupings():
 
         # Also set up an instance of CrossMatch at the same time.
         self.cm = CrossMatch(os.path.join(os.path.dirname(__file__), 'data/crossmatch_params.txt'),
-                             os.path.join(os.path.dirname(__file__), 'data/cat_a_params.txt'),
-                             os.path.join(os.path.dirname(__file__), 'data/cat_b_params.txt'))
+                             os.path.join(os.path.dirname(__file__), 'data/cat_a_params_.txt'),
+                             os.path.join(os.path.dirname(__file__), 'data/cat_b_params_.txt'))
         self.files_per_island_sim = 5
         self.cm.pos_corr_dist = self.max_sep
         self.cm.cross_match_extent = self.ax_lims

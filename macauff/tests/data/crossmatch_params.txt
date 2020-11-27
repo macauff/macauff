@@ -1,6 +1,7 @@
 # High level match type
 include_perturb_auf = no
 include_phot_like = no
+use_phot_priors = no
 
 # File paths
 # Top-level folder for all temporary cross-match files to be created in. Should be absolute path, or relative to folder script called in
