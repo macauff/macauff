@@ -7,10 +7,11 @@ framework.
 import numpy as np
 
 
-def create_fourier_offsets_grid(auf_folder_path, auf_pointings, filt_names, rho):
+def create_auf_params_grid(auf_folder_path, auf_pointings, filt_names, array_name,
+                           len_first_axis=None):
     '''
-    Minor function to offload the creation of a 4-D array from a series of 2-D
-    arrays.
+    Minor function to offload the creation of a 3-D or 4-D array from a series
+    of 2-D arrays.
 
     Parameters
     ----------
@@ -21,24 +22,36 @@ def create_fourier_offsets_grid(auf_folder_path, auf_pointings, filt_names, rho)
         in the perturbation AUF component creation.
     filt_names : list or numpy.ndarray
         List of ordered filters for the given catalogue.
-    rho : numpy.ndarray
-        Array of values used to create the fourier-space description of the
-        perturbation AUFs in question that are to be loaded.
+    array_name : string
+        The name of the individually-saved arrays, one per sub-folder, to turn
+        into a 3-D or 4-D array.
+    len_first_axis : integer, optional
+        Length of the initial axis of the 4-D array. If not provided or is
+        ``None``, final array is assumed to be 3-D instead.
     '''
     arraylengths = np.load('{}/arraylengths.npy'.format(auf_folder_path))
     longestNm = np.amax(arraylengths)
-    fouriergrid = np.lib.format.open_memmap('{}/fourier_grid.npy'.format(
-        auf_folder_path), mode='w+', dtype=float, shape=(len(rho)-1, longestNm, len(filt_names),
-                                                         len(auf_pointings)), fortran_order=True)
-    fouriergrid[:, :, :, :] = -1
+    if len_first_axis is None:
+        grid = np.lib.format.open_memmap('{}/{}_grid.npy'.format(
+            auf_folder_path, array_name), mode='w+', dtype=float, shape=(
+            longestNm, len(filt_names), len(auf_pointings)), fortran_order=True)
+        grid[:, :, :] = -1
+    else:
+        grid = np.lib.format.open_memmap('{}/{}_grid.npy'.format(
+            auf_folder_path, array_name), mode='w+', dtype=float, shape=(
+            len_first_axis, longestNm, len(filt_names), len(auf_pointings)), fortran_order=True)
+        grid[:, :, :, :] = -1
     for j in range(0, len(auf_pointings)):
         ax1, ax2 = auf_pointings[j]
         for i in range(0, len(filt_names)):
             filt = filt_names[i]
-            fourier = np.load('{}/{}/{}/{}/fourier.npy'.format(auf_folder_path,
-                              ax1, ax2, filt))
-            fouriergrid[:, :arraylengths[i, j], i, j] = fourier
-    del arraylengths, longestNm, fouriergrid
+            single_array = np.load('{}/{}/{}/{}/{}.npy'.format(auf_folder_path,
+                                   ax1, ax2, filt, array_name))
+            if len_first_axis is None:
+                grid[:arraylengths[i, j], i, j] = single_array
+            else:
+                grid[:, :arraylengths[i, j], i, j] = single_array
+    del arraylengths, longestNm, grid
 
 
 def load_small_ref_ind_fourier_grid(modrefind, auf_folder_path):

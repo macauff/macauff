@@ -10,7 +10,7 @@ import os
 import operator
 import numpy as np
 
-from .misc_functions import (create_fourier_offsets_grid, load_small_ref_ind_fourier_grid,
+from .misc_functions import (create_auf_params_grid, load_small_ref_ind_fourier_grid,
                              hav_dist_constant_lat)
 from .group_sources_fortran import group_sources_fortran as gsf
 from .make_set_list import set_list
@@ -99,8 +99,8 @@ def make_island_groupings(joint_folder_path, a_cat_folder_path, b_cat_folder_pat
 
     # Create the 4-D grids that house the perturbation AUF fourier-space
     # representation.
-    create_fourier_offsets_grid(a_auf_folder_path, a_auf_pointings, a_filt_names, rho)
-    create_fourier_offsets_grid(b_auf_folder_path, b_auf_pointings, b_filt_names, rho)
+    create_auf_params_grid(a_auf_folder_path, a_auf_pointings, a_filt_names, 'fourier', len(rho)-1)
+    create_auf_params_grid(b_auf_folder_path, b_auf_pointings, b_filt_names, 'fourier', len(rho)-1)
 
     # The initial step to create island groupings is to find the largest number
     # of overlaps for a single source, to minimise the size of the array of

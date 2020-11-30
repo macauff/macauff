@@ -8,7 +8,7 @@ import numpy as np
 from numpy.testing import assert_allclose
 import scipy.special
 
-from ..misc_functions import (create_fourier_offsets_grid, load_small_ref_ind_fourier_grid,
+from ..misc_functions import (create_auf_params_grid, load_small_ref_ind_fourier_grid,
                               hav_dist_constant_lat)
 from ..misc_functions_fortran import misc_functions_fortran as mff
 from .test_shared_library_fortran import haversine_wrapper
@@ -44,7 +44,7 @@ def test_create_fourier_offsets_grid():
             np.save('{}/{}/{}/fourier.npy'.format(ax1, ax2, filt),
                     (i + len(filt_names)*j)*np.ones((len(r[:-1]), a_len[i, j]), float))
 
-    create_fourier_offsets_grid('.', auf_pointings, filt_names, r)
+    create_auf_params_grid('.', auf_pointings, filt_names, 'fourier', len(r)-1)
     a = np.lib.format.open_memmap('{}/fourier_grid.npy'.format(
         '.'), mode='r', dtype=float, shape=(9, 15, 2, 3), fortran_order=True)
     assert np.all(a.shape == (9, 15, 2, 3))
