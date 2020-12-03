@@ -54,9 +54,9 @@ def create_auf_params_grid(auf_folder_path, auf_pointings, filt_names, array_nam
     del arraylengths, longestNm, grid
 
 
-def load_small_ref_ind_fourier_grid(modrefind, auf_folder_path):
+def load_small_ref_auf_grid(modrefind, auf_folder_path, file_name_prefixes):
     '''
-    Function to create reference index arrays out of a larger array, based on
+    Function to create reference index arrays out of larger arrays, based on
     the mappings from the original reference index array into a larger grid,
     such that the corresponding cutout reference index now maps onto the smaller
     cutout 4-D array.
@@ -68,12 +68,15 @@ def load_small_ref_ind_fourier_grid(modrefind, auf_folder_path):
         for each source in the given catalogue.
     auf_folder_path : string
         Location of the folder in which ``fourier_grid`` is stored.
+    file_name_prefixes : list
+        Prefixes of the files stored in ``auf_folder_path`` -- the parts before
+        "_grid" -- to be loaded as sub-arrays and returned.
 
     Returns
     -------
-    fouriergrid : numpy.ndarray
-        The small cutout of ``fourier_grid``, containing only the appropriate
-        indices for AUF pointing, filter, etc.
+    small_grids : list of numpy.ndarray
+        Small cutouts of ``*_grid`` files defined by ``file_name_prefixes``,
+        containing only the appropriate indices for AUF pointing, filter, etc.
     modrefindsmall : numpy.ndarray
         The corresponding mappings for each source onto ``fouriergrid``, such
         that each source still points to the correct entry that it did in
@@ -82,17 +85,18 @@ def load_small_ref_ind_fourier_grid(modrefind, auf_folder_path):
     nmuniqueind, nmnewind = np.unique(modrefind[0, :], return_inverse=True)
     filtuniqueind, filtnewind = np.unique(modrefind[1, :], return_inverse=True)
     axuniqueind, axnewind = np.unique(modrefind[2, :], return_inverse=True)
-    fouriergrid = np.asfortranarray(np.load('{}/fourier_grid.npy'.format(
-                                    auf_folder_path), mmap_mode='r')[:, :, :,
-                                    axuniqueind][:, :, filtuniqueind, :][:,
-                                    nmuniqueind, :, :])
+    small_grids = []
+    for name in file_name_prefixes:
+        small_grids.append(np.asfortranarray(np.load('{}/{}_grid.npy'.format(
+            auf_folder_path, name), mmap_mode='r')[:, :, :, axuniqueind][
+            :, :, filtuniqueind, :][:, nmuniqueind, :, :]))
     modrefindsmall = np.empty((3, modrefind.shape[1]), int, order='F')
     del modrefind
     modrefindsmall[0, :] = nmnewind
     modrefindsmall[1, :] = filtnewind
     modrefindsmall[2, :] = axnewind
 
-    return fouriergrid, modrefindsmall
+    return small_grids, modrefindsmall
 
 
 def hav_dist_constant_lat(x_lon, x_lat, lon):

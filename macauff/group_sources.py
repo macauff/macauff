@@ -10,7 +10,7 @@ import os
 import operator
 import numpy as np
 
-from .misc_functions import (create_auf_params_grid, load_small_ref_ind_fourier_grid,
+from .misc_functions import (create_auf_params_grid, load_small_ref_auf_grid,
                              hav_dist_constant_lat)
 from .group_sources_fortran import group_sources_fortran as gsf
 from .make_set_list import set_list
@@ -461,7 +461,8 @@ def _load_fourier_grid_cutouts(a, sky_rect_coords, joint_folder_path, cat_folder
 
     modrefind = np.load('{}/modelrefinds.npy'.format(auf_folder_path), mmap_mode='r')[:, sky_cut]
 
-    fouriergrid, modrefindsmall = load_small_ref_ind_fourier_grid(modrefind, auf_folder_path)
+    [fouriergrid], modrefindsmall = load_small_ref_auf_grid(modrefind, auf_folder_path,
+                                                            ['fourier'])
 
     return a_cutout, fouriergrid, modrefindsmall, sky_cut
 

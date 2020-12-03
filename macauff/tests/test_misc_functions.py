@@ -8,7 +8,7 @@ import numpy as np
 from numpy.testing import assert_allclose
 import scipy.special
 
-from ..misc_functions import (create_auf_params_grid, load_small_ref_ind_fourier_grid,
+from ..misc_functions import (create_auf_params_grid, load_small_ref_auf_grid,
                               hav_dist_constant_lat)
 from ..misc_functions_fortran import misc_functions_fortran as mff
 from .test_shared_library_fortran import haversine_wrapper
@@ -69,7 +69,7 @@ def test_load_small_ref_ind_fourier_grid():
     # Unique indices: 0, 1, 2, 5; 0, 3; 0, 1, 2
     # These map to 0, 1, 2, 3; 0, 1; 0, 1, 2
     modrefind = np.array([[0, 2, 0, 2, 1, 5], [0, 3, 3, 3, 3, 0], [0, 1, 2, 1, 2, 1]])
-    a, b = load_small_ref_ind_fourier_grid(modrefind, '.')
+    [a], b = load_small_ref_auf_grid(modrefind, '.', ['fourier'])
 
     new_small_modrefind = np.array([[0, 2, 0, 2, 1, 3], [0, 1, 1, 1, 1, 0], [0, 1, 2, 1, 2, 1]])
     new_small_fouriergrid = np.empty((9, 4, 2, 3), float, order='F')
