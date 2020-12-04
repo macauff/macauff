@@ -11,7 +11,7 @@ import scipy.special
 from ..misc_functions import (create_auf_params_grid, load_small_ref_auf_grid,
                               hav_dist_constant_lat)
 from ..misc_functions_fortran import misc_functions_fortran as mff
-from .test_shared_library_fortran import haversine_wrapper
+# from .test_shared_library_fortran import haversine_wrapper
 
 
 def test_closest_auf_point():
@@ -91,6 +91,6 @@ def test_hav_dist_constant_lat():
 
     for lat in [-86.4, -40.3, -10.1, 0, 15.5, 45.1, 73.14, 88.54]:
         for lon1, lon2 in zip(lon1s, lon2s):
-            a = haversine_wrapper(lon1, lon2, lat, lat)
+            a = mff.haversine_wrapper(lon1, lon2, lat, lat)
             b = hav_dist_constant_lat(lon1, lat, lon2)
             assert_allclose(a, b)
