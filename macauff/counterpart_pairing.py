@@ -4,6 +4,7 @@ This module provides the functionality for the final cross-match process, the
 act of actually pairing sources across the two catalogues as counterparts.
 '''
 
+import os
 import sys
 import numpy as np
 import multiprocessing
@@ -144,6 +145,9 @@ def source_pairing(joint_folder_path, a_cat_folder_path, b_cat_folder_path, a_au
         # *list maps the subarray indices, but *list_ keeps the full catalogue indices
         alist = np.asfortranarray(maparray[alist_.flatten()].reshape(alist_.shape))
 
+        a_sky_inds = np.load('{}/phot_like/a_sky_inds.npy'.format(joint_folder_path),
+                             mmap_mode='r')[lowind:highind]
+
         blist_ = np.load('{}/group/blist.npy'.format(joint_folder_path),
                          mmap_mode='r')[:, lowind:highind]
         bgrplen = np.load('{}/group/bgrplen.npy'.format(joint_folder_path),
@@ -156,6 +160,9 @@ def source_pairing(joint_folder_path, a_cat_folder_path, b_cat_folder_path, a_au
         maparray = -1*np.ones(len_b+1).astype(int)
         maparray[blistunique_flat] = np.arange(0, len(b_astro), dtype=int)
         blist = np.asfortranarray(maparray[blist_.flatten()].reshape(blist_.shape))
+
+        b_sky_inds = np.load('{}/phot_like/b_sky_inds.npy'.format(joint_folder_path),
+                             mmap_mode='r')[lowind:highind]
 
         amodrefind = np.load('{}/modelrefinds.npy'.format(a_auf_folder_path),
                              mmap_mode='r')[:, alistunique_flat]
@@ -173,7 +180,7 @@ def source_pairing(joint_folder_path, a_cat_folder_path, b_cat_folder_path, a_au
         expand_constants = [itertools.repeat(item) for item in [
             a_astro, a_photo, b_astro, b_photo, alist, alist_, blist, blist_, agrplen, bgrplen,
             c_array, fa_array, fb_array, c_priors, fa_priors, fb_priors, amagref, bmagref,
-            amodelrefinds, bmodelrefinds, abinsarray, abinlengths, bbinsarray, bbinlengths,
+            amodrefind, bmodrefind, abinsarray, abinlengths, bbinsarray, bbinlengths,
             afrac_grids, aflux_grids, bfrac_grids, bflux_grids, afourier_grids, bfourier_grids,
             a_sky_inds, b_sky_inds, rho, drho, n_fracs]]
         iter_group = zip(counter, *expand_constants)
@@ -210,6 +217,85 @@ def source_pairing(joint_folder_path, a_cat_folder_path, b_cat_folder_path, a_au
                 probfbarray[bfieldticker:bfieldticker+len(bfield)] = prob/integral
                 bfieldticker += len(bfield)
         pool.close()
+
+    countfilter = np.lib.format.open_memmap('{}/pairing/countfilt.npy'.format(joint_folder_path),
+                                            mode='w+', dtype=np.bool, shape=(small_len,))
+    afieldfilter = np.lib.format.open_memmap('{}/pairing/afieldfilt.npy'.format(joint_folder_path),
+                                             mode='w+', dtype=np.bool, shape=(len_a,))
+    bfieldfilter = np.lib.format.open_memmap('{}/pairing/bfieldfilt.npy'.format(joint_folder_path),
+                                             mode='w+', dtype=np.bool, shape=(len_b,))
+    for cnum in range(0, mem_chunk_num):
+        lowind = np.floor(small_len*cnum/mem_chunk_num).astype(int)
+        highind = np.floor(small_len*(cnum+1)/mem_chunk_num).astype(int)
+        # *contamprob is (smalllen, nfracs) in shape and our check for correctness needs to check
+        # all nfrac values, requiring an all check.
+        countfilter[lowind:highind] = (
+            (acountinds[lowind:highind] < large_len+1) &
+            (bcountinds[lowind:highind] < large_len+1) &
+            np.all(acontamprob[lowind:highind] >= 0, axis=1) &
+            np.all(bcontamprob[lowind:highind] >= 0, axis=1) & (acontamflux[lowind:highind] >= 0) &
+            (bcontamflux[lowind:highind] >= 0) & (probcarray[lowind:highind] >= 0) &
+            (etaarray[lowind:highind] >= -10) & (xiarray[lowind:highind] >= -10))
+
+        lowind = np.floor(len_a*cnum/mem_chunk_num).astype(int)
+        highind = np.floor(len_a*(cnum+1)/mem_chunk_num).astype(int)
+        afieldfilter[lowind:highind] = ((afieldinds[lowind:highind] < large_len+1) &
+                                        (probfaarray[lowind:highind] >= 0))
+
+        lowind = np.floor(len_b*cnum/mem_chunk_num).astype(int)
+        highind = np.floor(len_b*(cnum+1)/mem_chunk_num).astype(int)
+        bfieldfilter[lowind:highind] = ((bfieldinds[lowind:highind] < large_len+1) &
+                                        (probfbarray[lowind:highind] >= 0))
+    lenrejecta = len(np.load('{}/reject/areject.npy'.format(joint_folder_path), mmap_mode='r'))
+    lenrejectb = len(np.load('{}/reject/breject.npy'.format(joint_folder_path), mmap_mode='r'))
+
+    countsum = int(np.sum(countfilter))
+    afieldsum = int(np.sum(afieldfilter))
+    bfieldsum = int(np.sum(bfieldfilter))
+
+    # Reduce size of output files, removing anything that doesn't meet the
+    # criteria above from all saved numpy arrays.
+    for file_name, variable, shape, typing, filter_variable in zip(
+        ['ac', 'bc', 'pacontam', 'pbcontam', 'acontamflux', 'bcontamflux', 'af', 'bf', 'pc', 'eta',
+         'xi', 'pfa', 'pfb'],
+        [acountinds, bcountinds, acontamprob, bcontamprob, acontamflux, bcontamflux, afieldinds,
+         bfieldinds, probcarray, etaarray, xiarray, probfaarray, probfbarray],
+        [(countsum,), (countsum,), (countsum, n_fracs), (countsum, n_fracs), (countsum,),
+         (countsum,), (afieldsum,), (bfieldsum,), (countsum,), (countsum,), (countsum,),
+         (afieldsum,), (bfieldsum,)],
+        [int, int, float, float, float, float, int, int, float, float, float, float, float],
+        [countfilter, countfilter, countfilter, countfilter, countfilter, countfilter,
+         afieldfilter, bfieldfilter, countfilter, countfilter, countfilter, afieldfilter,
+         bfieldfilter]):
+        temp_variable = np.lib.format.open_memmap('{}/pairing/{}2.npy'.format(
+            joint_folder_path, file_name), mode='w+', dtype=typing, shape=shape)
+        for cnum in range(0, mem_chunk_num):
+            lowind = np.floor(shape[0]*cnum/mem_chunk_num).astype(int)
+            highind = np.floor(shape[0]*(cnum+1)/mem_chunk_num).astype(int)
+            temp_variable[lowind:highind] = variable[filter_variable]
+        os.system('mv {}/pairing/{}2.npy {}/pairing/{}.npy'.format(joint_folder_path, file_name,
+                  joint_folder_path, file_name))
+
+    del acountinds, bcountinds, acontamprob, bcontamprob, acontamflux, bcontamflux, afieldinds
+    del bfieldinds, probcarray, etaarray, xiarray, probfaarray, probfbarray
+    tot = countsum + afieldsum + lenrejecta
+    if tot < len_a:
+        print("WARNING: {} catalogue a star{} not in either counterpart or field star lists.".format(len_a - tot, 's' if tot > 1 else ''))
+    if tot > len_a:
+        print("WARNING: {} additional catalogue a {} recorded, check results for duplications carefully".format(tot - len_a, 'indices' if tot - len_a > 1 else 'index'))
+    tot = countsum + bfieldsum + lenrejectb
+    if tot < len_b:
+        print("WARNING: {} catalogue b star{} not in either counterpart or field star lists.".format(len_b - tot, 's' if tot > 1 else ''))
+    if tot > len_b:
+        print("WARNING: {} additional catalogue b {} recorded, check results for duplications carefully".format(tot - len_b, 'indices' if tot - len_b > 1 else 'index'))
+    sys.stdout.flush()
+
+    del countfilter, afieldfilter, bfieldfilter
+    os.remove('{}/pairing/countfilt.npy'.format(joint_folder_path))
+    os.remove('{}/pairing/afieldfilt.npy'.format(joint_folder_path))
+    os.remove('{}/pairing/bfieldfilt.npy'.format(joint_folder_path))
+
+    return
 
 
 def _individual_island_probability(iterable_wrapper):
