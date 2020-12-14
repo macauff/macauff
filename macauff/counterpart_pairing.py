@@ -269,10 +269,11 @@ def source_pairing(joint_folder_path, a_cat_folder_path, b_cat_folder_path, a_au
          bfieldfilter]):
         temp_variable = np.lib.format.open_memmap('{}/pairing/{}2.npy'.format(
             joint_folder_path, file_name), mode='w+', dtype=typing, shape=shape)
-        for cnum in range(0, mem_chunk_num):
-            lowind = np.floor(shape[0]*cnum/mem_chunk_num).astype(int)
-            highind = np.floor(shape[0]*(cnum+1)/mem_chunk_num).astype(int)
-            temp_variable[lowind:highind] = variable[filter_variable]
+        di = max(1, shape[0] // 20)
+        temp_counter = 0
+        for i in range(0, shape[0], di):
+            n_extra = int(np.sum(filter_variable[i:i+di]))
+            temp_variable[temp_counter:temp_counter+n_extra] = variable[filter_variable[i:i+di]]
         os.system('mv {}/pairing/{}2.npy {}/pairing/{}.npy'.format(joint_folder_path, file_name,
                   joint_folder_path, file_name))
 
