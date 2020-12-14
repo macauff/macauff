@@ -11,12 +11,12 @@ real(dp), parameter :: pi = 4.0_dp*atan(1.0_dp)
 
 contains
 
-subroutine contamination_match_probabilities(Fcc, Fcn, Fnc, Fnn, rho, drho, sep, Gcc, Gcn, Gnc, Gnn)
+subroutine contam_match_prob(Fcc, Fcn, Fnc, Fnn, rho, drho, sep, Gcc, Gcn, Gnc, Gnn)
     implicit none
     double precision, intent(in) :: Fcc(:), Fcn(:), Fnc(:), Fnn(:), rho(:), drho(:), sep
     double precision, intent(out) :: Gcc, Gcn, Gnc, Gnn
     integer :: j
-    double precision :: j0, pi, z
+    double precision :: j0, z
     Gcc = 0.0_dp
     Gcn = 0.0_dp
     Gnc = 0.0_dp
@@ -36,6 +36,6 @@ subroutine contamination_match_probabilities(Fcc, Fcn, Fnc, Fnn, rho, drho, sep,
     Gnc = Gnc * 2.0_dp * pi
     Gnn = Gnn * 2.0_dp * pi
 
-end subroutine contamination_match_probabilities
+end subroutine contam_match_prob
 
 end module counterpart_pairing_fortran
