@@ -9,6 +9,7 @@ import sys
 import numpy as np
 import multiprocessing
 import itertools
+import warnings
 
 from .misc_functions import (create_auf_params_grid, load_small_ref_auf_grid)
 from .misc_functions_fortran import misc_functions_fortran as mff
@@ -17,19 +18,18 @@ from .counterpart_pairing_fortran import counterpart_pairing_fortran as cpf
 
 def source_pairing(joint_folder_path, a_cat_folder_path, b_cat_folder_path, a_auf_folder_path,
                    b_auf_folder_path, a_filt_names, b_filt_names, a_auf_pointings, b_auf_pointings,
-                   rho, drho, delta_mag_cuts, mem_chunk_num, n_pool):
+                   rho, drho, n_fracs, mem_chunk_num, n_pool):
     print("Creating catalogue matches...")
     sys.stdout.flush()
 
     # Create the estimated levels of flux contamination and fraction of
     # contaminated source grids.
-    n_fracs = len(delta_mag_cuts)
     create_auf_params_grid(a_auf_folder_path, a_auf_pointings, a_filt_names, 'frac', n_fracs)
     create_auf_params_grid(a_auf_folder_path, a_auf_pointings, a_filt_names, 'flux')
     create_auf_params_grid(b_auf_folder_path, b_auf_pointings, b_filt_names, 'frac', n_fracs)
     create_auf_params_grid(b_auf_folder_path, b_auf_pointings, b_filt_names, 'flux')
 
-    print("Pairing stars...")
+    print("Pairing sources...")
     sys.stdout.flush()
     len_a = len(np.load('{}/con_cat_astro.npy'.format(a_cat_folder_path), mmap_mode='r'))
     len_b = len(np.load('{}/con_cat_astro.npy'.format(b_cat_folder_path), mmap_mode='r'))
@@ -115,10 +115,12 @@ def source_pairing(joint_folder_path, a_cat_folder_path, b_cat_folder_path, a_au
     for i in range(blist.shape[1]):
         for ind in blist[blist[:, i] > -1, i]:
             b_remain_inds[ind] = 0
-    breject = np.load('{}/reject/breject.npy'.format(joint_folder_path), mmap_mode='r')
-    for ind in breject:
-        b_remain_inds[ind] = 0
-    del blist, breject
+    if os.path.isfile('{}/reject/reject_b.npy'.format(joint_folder_path)):
+        breject = np.load('{}/reject/reject_b.npy'.format(joint_folder_path), mmap_mode='r')
+        for ind in breject:
+            b_remain_inds[ind] = 0
+        del breject
+    del blist
     for i in range(0, len_b):
         if b_remain_inds[i]:
             bfieldinds[bfieldticker] = i
@@ -139,14 +141,15 @@ def source_pairing(joint_folder_path, a_cat_folder_path, b_cat_folder_path, a_au
                           mmap_mode='r')[alistunique_flat]
         a_photo = np.load('{}/con_cat_photo.npy'.format(a_cat_folder_path),
                           mmap_mode='r')[alistunique_flat]
-        amagref = np.load('{}/amagref.npy'.format(joint_folder_path), mmap_mode='r')[alistunique_flat]
+        amagref = np.load('{}/magref.npy'.format(a_cat_folder_path),
+                          mmap_mode='r')[alistunique_flat]
         maparray = -1*np.ones(len_a+1).astype(int)
         maparray[alistunique_flat] = np.arange(0, len(a_astro), dtype=int)
         # *list maps the subarray indices, but *list_ keeps the full catalogue indices
         alist = np.asfortranarray(maparray[alist_.flatten()].reshape(alist_.shape))
 
         a_sky_inds = np.load('{}/phot_like/a_sky_inds.npy'.format(joint_folder_path),
-                             mmap_mode='r')[lowind:highind]
+                             mmap_mode='r')[alistunique_flat]
 
         blist_ = np.load('{}/group/blist.npy'.format(joint_folder_path),
                          mmap_mode='r')[:, lowind:highind]
@@ -154,15 +157,18 @@ def source_pairing(joint_folder_path, a_cat_folder_path, b_cat_folder_path, a_au
                           mmap_mode='r')[lowind:highind]
         blist_ = np.asfortranarray(blist_[:np.amax(bgrplen), :])
         blistunique_flat = np.unique(blist_[blist_ > -1])
-        b_astro = np.load('{}/con_cat_astro.npy'.format(b_cat_folder_path), mmap_mode='r')[blistunique_flat]
-        b_photo = np.load('{}/con_cat_photo.npy'.format(b_cat_folder_path), mmap_mode='r')[blistunique_flat]
-        bmagref = np.load('{}/magref.npy'.format(b_cat_folder_path), mmap_mode='r')[blistunique_flat]
+        b_astro = np.load('{}/con_cat_astro.npy'.format(b_cat_folder_path),
+                          mmap_mode='r')[blistunique_flat]
+        b_photo = np.load('{}/con_cat_photo.npy'.format(b_cat_folder_path),
+                          mmap_mode='r')[blistunique_flat]
+        bmagref = np.load('{}/magref.npy'.format(b_cat_folder_path),
+                          mmap_mode='r')[blistunique_flat]
         maparray = -1*np.ones(len_b+1).astype(int)
         maparray[blistunique_flat] = np.arange(0, len(b_astro), dtype=int)
         blist = np.asfortranarray(maparray[blist_.flatten()].reshape(blist_.shape))
 
         b_sky_inds = np.load('{}/phot_like/b_sky_inds.npy'.format(joint_folder_path),
-                             mmap_mode='r')[lowind:highind]
+                             mmap_mode='r')[blistunique_flat]
 
         amodrefind = np.load('{}/modelrefinds.npy'.format(a_auf_folder_path),
                              mmap_mode='r')[:, alistunique_flat]
@@ -190,7 +196,7 @@ def source_pairing(joint_folder_path, a_cat_folder_path, b_cat_folder_path, a_au
             # as a short-hand for zero-length "b" island -- i.e., "a" sources
             # only -- and update the probabilities of the afield sources
             # accordingly:
-            if None in return_items:
+            if np.any([q is None for q in return_items]):
                 _, aperm, aperm_ = return_items
                 afieldinds[afieldticker:afieldticker+len(aperm)] = aperm_
                 probfaarray[afieldticker:afieldticker+len(aperm)] = 1
@@ -246,8 +252,16 @@ def source_pairing(joint_folder_path, a_cat_folder_path, b_cat_folder_path, a_au
         highind = np.floor(len_b*(cnum+1)/mem_chunk_num).astype(int)
         bfieldfilter[lowind:highind] = ((bfieldinds[lowind:highind] < large_len+1) &
                                         (probfbarray[lowind:highind] >= 0))
-    lenrejecta = len(np.load('{}/reject/areject.npy'.format(joint_folder_path), mmap_mode='r'))
-    lenrejectb = len(np.load('{}/reject/breject.npy'.format(joint_folder_path), mmap_mode='r'))
+    if os.path.isfile('{}/reject/reject_a.npy'.format(joint_folder_path)):
+        lenrejecta = len(np.load('{}/reject/reject_a.npy'.format(joint_folder_path),
+                                 mmap_mode='r'))
+    else:
+        lenrejecta = 0
+    if os.path.isfile('{}/reject/reject_b.npy'.format(joint_folder_path)):
+        lenrejectb = len(np.load('{}/reject/reject_b.npy'.format(joint_folder_path),
+                                 mmap_mode='r'))
+    else:
+        lenrejectb = 0
 
     countsum = int(np.sum(countfilter))
     afieldsum = int(np.sum(afieldfilter))
@@ -270,25 +284,29 @@ def source_pairing(joint_folder_path, a_cat_folder_path, b_cat_folder_path, a_au
         temp_variable = np.lib.format.open_memmap('{}/pairing/{}2.npy'.format(
             joint_folder_path, file_name), mode='w+', dtype=typing, shape=shape)
         di = max(1, shape[0] // 20)
-        temp_counter = 0
+        temp_c = 0
         for i in range(0, shape[0], di):
             n_extra = int(np.sum(filter_variable[i:i+di]))
-            temp_variable[temp_counter:temp_counter+n_extra] = variable[filter_variable[i:i+di]]
+            temp_variable[temp_c:temp_c+n_extra] = variable[i:i+di][filter_variable[i:i+di]]
+            temp_c += n_extra
         os.system('mv {}/pairing/{}2.npy {}/pairing/{}.npy'.format(joint_folder_path, file_name,
                   joint_folder_path, file_name))
-
     del acountinds, bcountinds, acontamprob, bcontamprob, acontamflux, bcontamflux, afieldinds
     del bfieldinds, probcarray, etaarray, xiarray, probfaarray, probfbarray
     tot = countsum + afieldsum + lenrejecta
     if tot < len_a:
-        print("WARNING: {} catalogue a star{} not in either counterpart or field star lists.".format(len_a - tot, 's' if tot > 1 else ''))
+        warnings.warn("{} catalogue a source{} not in either counterpart, field, or rejected "
+                      "source lists.".format(len_a - tot, 's' if tot > 1 else ''))
     if tot > len_a:
-        print("WARNING: {} additional catalogue a {} recorded, check results for duplications carefully".format(tot - len_a, 'indices' if tot - len_a > 1 else 'index'))
+        warnings.warn("{} additional catalogue a {} recorded, check results for duplications "
+                      "carefully".format(tot - len_a, 'indices' if tot - len_a > 1 else 'index'))
     tot = countsum + bfieldsum + lenrejectb
     if tot < len_b:
-        print("WARNING: {} catalogue b star{} not in either counterpart or field star lists.".format(len_b - tot, 's' if tot > 1 else ''))
+        warnings.warn("{} catalogue b source{} not in either counterpart, field, or rejected "
+                      "source lists.".format(len_b - tot, 's' if tot > 1 else ''))
     if tot > len_b:
-        print("WARNING: {} additional catalogue b {} recorded, check results for duplications carefully".format(tot - len_b, 'indices' if tot - len_b > 1 else 'index'))
+        warnings.warn("{} additional catalogue b {} recorded, check results for duplications "
+                      "carefully".format(tot - len_b, 'indices' if tot - len_b > 1 else 'index'))
     sys.stdout.flush()
 
     del countfilter, afieldfilter, bfieldfilter
@@ -305,6 +323,7 @@ def _individual_island_probability(iterable_wrapper):
      bmodelrefinds, abinsarray, abinlengths, bbinsarray, bbinlengths, afrac_grids, aflux_grids,
      bfrac_grids, bflux_grids, afourier_grids, bfourier_grids, a_sky_inds, b_sky_inds, rho, drho,
      n_fracs] = iterable_wrapper
+
     if bgrplen[i] == 0:
         return [None, alist[:agrplen[i], i], alist_[:agrplen[i], i]]
     else:
@@ -352,7 +371,7 @@ def _individual_island_probability(iterable_wrapper):
         for j in range(0, len(aperm)):
             bina[j] = np.where(a_photo[aperm[j], amagref[aperm[j]]] - abinsarray[
                 :abinlengths[aused[j], qa[j]], aused[j], qa[j]] >= 0)[0][-1]
-            # For the field stars we don't know which other filter to use, so we
+            # For the field sources we don't know which other filter to use, so we
             # just default to using the first filter in the opposing catalogue,
             # but it shouldn't matter since it ought to be independent.
             Nfa[j] = fa_priors[0, aused[j], qa[j]]
@@ -456,8 +475,8 @@ def _individual_island_probability(iterable_wrapper):
             biter = np.array(list(itertools.permutations(bperm, r=N)))
             for x in aiter:
                 for y in biter:
-                    # For paired stars, order matters, so we have to find the
-                    # index of the array holding the star's overall catalogue
+                    # For paired sources, order matters, so we have to find the
+                    # index of the array holding the source's overall catalogue
                     # index that matches that index in the permutation list.
                     ya = np.array([np.argmin(np.abs(j - aperm)) for j in x], int)
                     yb = np.array([np.argmin(np.abs(j - bperm)) for j in y], int)
