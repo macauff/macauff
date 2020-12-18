@@ -87,9 +87,14 @@ def load_small_ref_auf_grid(modrefind, auf_folder_path, file_name_prefixes):
     axuniqueind, axnewind = np.unique(modrefind[2, :], return_inverse=True)
     small_grids = []
     for name in file_name_prefixes:
-        small_grids.append(np.asfortranarray(np.load('{}/{}_grid.npy'.format(
-            auf_folder_path, name), mmap_mode='r')[:, :, :, axuniqueind][
-            :, :, filtuniqueind, :][:, nmuniqueind, :, :]))
+        if len(np.load('{}/{}_grid.npy'.format(auf_folder_path, name), mmap_mode='r').shape) == 4:
+            small_grids.append(np.asfortranarray(np.load('{}/{}_grid.npy'.format(
+                auf_folder_path, name), mmap_mode='r')[:, :, :, axuniqueind][
+                :, :, filtuniqueind, :][:, nmuniqueind, :, :]))
+        else:
+            small_grids.append(np.asfortranarray(np.load('{}/{}_grid.npy'.format(
+                auf_folder_path, name), mmap_mode='r')[:, :, axuniqueind][
+                :, filtuniqueind, :][nmuniqueind, :, :]))
     modrefindsmall = np.empty((3, modrefind.shape[1]), int, order='F')
     del modrefind
     modrefindsmall[0, :] = nmnewind
