@@ -380,8 +380,10 @@ def _individual_island_probability(iterable_wrapper):
             asig = a_astro[aperm[j], 2]
             afourgauss = np.exp(-2 * np.pi**2 * (rho[:-1]+drho/2)**2 * asig**2)
             for k in range(0, len(bperm)):
-                sep = mff.haversine_wrapper(a_astro[aperm[j], 0], a_astro[aperm[j], 1],
-                                            b_astro[bperm[k], 0], b_astro[bperm[k], 1])
+                # sep comes out of haversine in degrees, but contam_match_prob
+                # assumes everything is in arcseconds, so convert sep here.
+                sep = mff.haversine_wrapper(a_astro[aperm[j], 0], b_astro[bperm[k], 0],
+                                            a_astro[aperm[j], 1], b_astro[bperm[k], 1]) * 3600
                 bF = bfrac_grids[:, brefinds[0, k], brefinds[1, k], brefinds[2, k]]
                 boffs = bfourier_grids[:, brefinds[0, k], brefinds[1, k], brefinds[2, k]]
 
@@ -391,7 +393,7 @@ def _individual_island_probability(iterable_wrapper):
                 G0cc = aoffs*boffs*G0nn
                 G0cn = aoffs*G0nn
                 G0nc = boffs*G0nn
-                Gcc, Gcn, Gnc, Gnn = cpf.contamination_match_probabilities(
+                Gcc, Gcn, Gnc, Gnn = cpf.contam_match_prob(
                     G0cc, G0cn, G0nc, G0nn, rho[:-1]+drho/2, drho, sep)
                 # G would be in units of per square arcseconds, but we need it
                 # in units of per square degree to compare to Nf.
