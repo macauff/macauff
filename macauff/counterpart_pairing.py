@@ -102,31 +102,6 @@ def source_pairing(joint_folder_path, a_cat_folder_path, b_cat_folder_path, a_au
     fb_priors = np.load('{}/phot_like/fb_priors.npy'.format(joint_folder_path), mmap_mode='r')
     fb_array = np.load('{}/phot_like/fb_array.npy'.format(joint_folder_path), mmap_mode='r')
 
-    # The first thing we do is assign all non-grouped catalogue "b" sources
-    # as being non-counterpart objects, as they have nothing to pair with in
-    # catalogue "a", as per our definition in make_set_list.set_list.
-    b_remain_inds = np.lib.format.open_memmap('{}/pairing/temp_b_remain.npy'.format(
-        joint_folder_path), mode='w+', dtype=np.bool, shape=(len_b,))
-    for cnum in range(0, mem_chunk_num):
-        lowind = np.floor(len_b*cnum/mem_chunk_num).astype(int)
-        highind = np.floor(len_b*(cnum+1)/mem_chunk_num).astype(int)
-        b_remain_inds[lowind:highind] = 1
-    blist = np.load('{}/group/blist.npy'.format(joint_folder_path), mmap_mode='r')
-    for i in range(blist.shape[1]):
-        for ind in blist[blist[:, i] > -1, i]:
-            b_remain_inds[ind] = 0
-    if os.path.isfile('{}/reject/reject_b.npy'.format(joint_folder_path)):
-        breject = np.load('{}/reject/reject_b.npy'.format(joint_folder_path), mmap_mode='r')
-        for ind in breject:
-            b_remain_inds[ind] = 0
-        del breject
-    del blist
-    for i in range(0, len_b):
-        if b_remain_inds[i]:
-            bfieldinds[bfieldticker] = i
-            probfbarray[bfieldticker] = 1
-            bfieldticker += 1
-
     for cnum in range(0, mem_chunk_num):
         lowind = np.floor(isle_len*cnum/mem_chunk_num).astype(int)
         highind = np.floor(isle_len*(cnum+1)/mem_chunk_num).astype(int)
@@ -193,14 +168,23 @@ def source_pairing(joint_folder_path, a_cat_folder_path, b_cat_folder_path, a_au
         for return_items in pool.imap_unordered(_individual_island_probability, iter_group,
                                                 chunksize=max(1, len(counter) // n_pool)):
             # Use the quick-return check in _individual_island_probability
-            # as a short-hand for zero-length "b" island -- i.e., "a" sources
-            # only -- and update the probabilities of the afield sources
-            # accordingly:
+            # as a short-hand for zero-length island -- i.e., sources in one
+            # catalogue only -- and update the probabilities of the field
+            # sources accordingly:
             if np.any([q is None for q in return_items]):
-                _, aperm, aperm_ = return_items
-                afieldinds[afieldticker:afieldticker+len(aperm)] = aperm_
-                probfaarray[afieldticker:afieldticker+len(aperm)] = 1
-                afieldticker += len(aperm)
+                # If 'a' in the returned array, assume no "b" sources (all "a"
+                # objects), and update afield; otherwise 'b' indicates an empty
+                # "a" island, and lonely "b" sources.
+                if np.any([isinstance(q, str) and q == 'a' for q in return_items]):
+                    _, _, aperm, aperm_ = return_items
+                    afieldinds[afieldticker:afieldticker+len(aperm)] = aperm_
+                    probfaarray[afieldticker:afieldticker+len(aperm)] = 1
+                    afieldticker += len(aperm)
+                else:
+                    _, _, bperm, bperm_ = return_items
+                    bfieldinds[bfieldticker:bfieldticker+len(bperm)] = bperm_
+                    probfbarray[bfieldticker:bfieldticker+len(bperm)] = 1
+                    bfieldticker += len(bperm)
             else:
                 [acrpts, bcrpts, acrptscontp, bcrptscontp, etacrpts, xicrpts, acrptflux, bcrptflux,
                  afield, bfield, prob, integral] = return_items
@@ -296,14 +280,14 @@ def source_pairing(joint_folder_path, a_cat_folder_path, b_cat_folder_path, a_au
     tot = countsum + afieldsum + lenrejecta
     if tot < len_a:
         warnings.warn("{} catalogue a source{} not in either counterpart, field, or rejected "
-                      "source lists.".format(len_a - tot, 's' if tot > 1 else ''))
+                      "source lists.".format(len_a - tot, 's' if len_a - tot > 1 else ''))
     if tot > len_a:
         warnings.warn("{} additional catalogue a {} recorded, check results for duplications "
                       "carefully".format(tot - len_a, 'indices' if tot - len_a > 1 else 'index'))
     tot = countsum + bfieldsum + lenrejectb
     if tot < len_b:
         warnings.warn("{} catalogue b source{} not in either counterpart, field, or rejected "
-                      "source lists.".format(len_b - tot, 's' if tot > 1 else ''))
+                      "source lists.".format(len_b - tot, 's' if len_b - tot > 1 else ''))
     if tot > len_b:
         warnings.warn("{} additional catalogue b {} recorded, check results for duplications "
                       "carefully".format(tot - len_b, 'indices' if tot - len_b > 1 else 'index'))
@@ -325,7 +309,9 @@ def _individual_island_probability(iterable_wrapper):
      n_fracs] = iterable_wrapper
 
     if bgrplen[i] == 0:
-        return [None, alist[:agrplen[i], i], alist_[:agrplen[i], i]]
+        return ['a', None, alist[:agrplen[i], i], alist_[:agrplen[i], i]]
+    elif agrplen[i] == 0:
+        return ['b', None, blist[:bgrplen[i], i], blist_[:bgrplen[i], i]]
     else:
         aperm = alist[:agrplen[i], i]
         bperm = blist[:bgrplen[i], i]

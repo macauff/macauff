@@ -64,13 +64,12 @@ class TestCounterpartPairing:
         self.a_photo = np.ones((7, 3), float)
         self.b_photo = np.ones((4, 4), float)
 
-        self.alist = np.array([[0, 3], [1, 4], [2, 5], [6, -1]]).T
+        self.alist = np.array([[0, 3], [1, 4], [2, 5], [6, -1], [-1, -1]]).T
         self.alist_ = self.alist
-        # This blist doesn't have index 2, so it's unmatched by default.
-        self.blist = np.array([[1], [0], [3], [-1]]).T
+        self.blist = np.array([[1], [0], [3], [-1], [2]]).T
         self.blist_ = self.blist
-        self.agrplen = np.array([2, 2, 2, 1])
-        self.bgrplen = np.array([1, 1, 1, 0])
+        self.agrplen = np.array([2, 2, 2, 1, 0])
+        self.bgrplen = np.array([1, 1, 1, 0, 1])
 
         self.rho = np.linspace(0, 100, 10000)
         self.drho = np.diff(self.rho)
@@ -272,10 +271,10 @@ class TestCounterpartPairing:
 
     def test_including_b_reject(self):
         # Remove the third group, pretending it's rejected in the group stage.
-        alist = self.alist[:, [0, 1, 3]]
-        blist = self.blist[:, [0, 1, 3]]
-        agrplen = self.agrplen[[0, 1, 3]]
-        bgrplen = self.bgrplen[[0, 1, 3]]
+        alist = self.alist[:, [0, 1, 3, 4]]
+        blist = self.blist[:, [0, 1, 3, 4]]
+        agrplen = self.agrplen[[0, 1, 3, 4]]
+        bgrplen = self.bgrplen[[0, 1, 3, 4]]
 
         a_reject = np.array([2, 5])
         b_reject = np.array([3])
@@ -341,10 +340,10 @@ class TestCounterpartPairing:
         # counterpart, field, or rejected -- is lower than the total length.
         # To achieve this we fake reject length arrays smaller than their
         # supposed lengths.
-        alist = self.alist[:, [0, 1]]
-        blist = self.blist[:, [0, 1]]
-        agrplen = self.agrplen[[0, 1]]
-        bgrplen = self.bgrplen[[0, 1]]
+        alist = self.alist[:, [0, 1, 4]]
+        blist = self.blist[:, [0, 1, 4]]
+        agrplen = self.agrplen[[0, 1, 4]]
+        bgrplen = self.bgrplen[[0, 1, 4]]
 
         # Force catalogue a to have the wrong length by simply leaving a group
         # out of alist.
@@ -388,18 +387,18 @@ class TestCounterpartPairing:
         assert np.all([q not in b_matches for q in [2, 3]])
 
         b_field = np.load('{}/pairing/bf.npy'.format(self.joint_folder_path))
-        assert np.all([q in b_field for q in [2, 3]])
-        assert np.all([q not in b_field for q in [0, 1]])
+        assert np.all([q in b_field for q in [2]])
+        assert np.all([q not in b_field for q in [0, 1, 3]])
 
     def test_large_length_warnings(self):
         # Here want to test that the number of recorded matches -- either
         # counterpart, field, or rejected -- is higher than the total length.
         # To achieve this we fake reject length arrays larger than their
         # supposed lengths.
-        alist = self.alist[:, [0, 1]]
-        blist = self.blist[:, [0, 1]]
-        agrplen = self.agrplen[[0, 1]]
-        bgrplen = self.bgrplen[[0, 1]]
+        alist = self.alist[:, [0, 1, 4]]
+        blist = self.blist[:, [0, 1, 4]]
+        agrplen = self.agrplen[[0, 1, 4]]
+        bgrplen = self.bgrplen[[0, 1, 4]]
 
         a_reject = np.array([2, 3, 4, 5, 6])
         b_reject = np.array([1, 3])

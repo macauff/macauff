@@ -258,7 +258,9 @@ def make_island_groupings(joint_folder_path, a_cat_folder_path, b_cat_folder_pat
         for i in range(0, alist_small.shape[1]):
             subset = alist_1[:agrplen_small[i], i]
             a = a_[subset]
-            meets_min_distance = np.zeros(len(a), np.bool)
+            subset = blist_1[:bgrplen_small[i], i]
+            b = b_[subset]
+            meets_min_distance = np.zeros(len(a)+len(b), np.bool)
             # Do not check for longitudinal "extent" small separations for cases
             # where all 0-360 degrees are included, as this will result in no loss
             # of sources from consideration, with the 0->360 wraparound of
@@ -270,32 +272,31 @@ def make_island_groupings(joint_folder_path, a_cat_folder_path, b_cat_folder_pat
                         hav_dist_constant_lat(a[:, 0], a[:, 1], lon) <= max_sep)
                     # Progressively update the boolean for each source in the group
                     # for each distance check for the four extents.
-                    meets_min_distance = meets_min_distance | is_within_dist_of_lon
+                    meets_min_distance[:len(a)] = (meets_min_distance[:len(a)] |
+                                                   is_within_dist_of_lon)
             # Similarly, if either "latitude" is set to 90 degrees, we cannot have
             # lack of up-down missing sources, so we must check (individually this
             # time) for whether we should skip this check.
             for lat in ax_lims[2:]:
                 if np.abs(lat) < 90:
                     is_within_dist_of_lat = (np.abs(a[:, 1] - lat) <= max_sep)
-                    meets_min_distance = meets_min_distance | is_within_dist_of_lat
+                    meets_min_distance[:len(a)] = (meets_min_distance[:len(a)] |
+                                                   is_within_dist_of_lat)
 
             # Because all sources in BOTH catalogues must pass, we continue
             # to update meets_min_distance for catalogue "b" as well.
-            subset = blist_1[:bgrplen_small[i], i]
-            b = b_[subset]
             if ax_lims[0] > 0 or ax_lims[1] < 360:
                 for lon in ax_lims[:2]:
                     is_within_dist_of_lon = (
                         hav_dist_constant_lat(b[:, 0], b[:, 1], lon) <= max_sep)
-                    meets_min_distance = meets_min_distance | is_within_dist_of_lon
+                    meets_min_distance[len(a):] = (meets_min_distance[len(a):] |
+                                                   is_within_dist_of_lon)
             for lat in ax_lims[2:]:
                 if np.abs(lat) < 90:
                     is_within_dist_of_lat = (np.abs(b[:, 1] - lat) <= max_sep)
-                    meets_min_distance = meets_min_distance | is_within_dist_of_lat
-
+                    meets_min_distance[len(a):] = (meets_min_distance[len(a):] |
+                                                   is_within_dist_of_lat)
             if np.all(meets_min_distance == 0):
-                # check documents groups which do NOT have any source too close
-                # to the edge, while check_invest documents those that DO.
                 passed_check[indexmap[i]] = 1
                 failed_check[indexmap[i]] = 0
                 num_good_checks += 1

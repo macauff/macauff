@@ -61,16 +61,17 @@ def test_set_list_maximum_exceeded():
             # Should be empty if no warnings were raised.
             assert not record
         if i != 2:
-            assert np.all(agrplen == np.array([1, 1]))
-            assert np.all(bgrplen == np.array([1, 0]))
-            assert np.all(alist == np.array([[N_a, N_a+1]]))
-            assert np.all(blist == np.array([[N_b, -1]]))
+            assert np.all(agrplen == np.array([1, 1, 0]))
+            assert np.all(bgrplen == np.array([1, 0, 1]))
+            assert np.all(alist == np.array([[N_a, N_a+1, -1]]))
+            assert np.all(blist == np.array([[N_b, -1, N_b+1]]))
         else:
-            assert np.all(agrplen == np.array([1, 1, 7]))
-            assert np.all(bgrplen == np.array([1, 0, 6]))
+            assert np.all(agrplen == np.array([1, 1, 0, 7]))
+            assert np.all(bgrplen == np.array([1, 0, 1, 6]))
             # Here we can assume a hard-coded N_a=7, N_b=6.
             assert np.all(alist == np.array(
-                [[N_a, N_a+1, 0], [-1, -1, 1], [-1, -1, 2], [-1, -1, 3], [-1, -1, 4],
-                 [-1, -1, 5], [-1, -1, 6]]))
+                [[N_a, N_a+1, -1, 0], [-1, -1, -1, 1], [-1, -1, -1, 2], [-1, -1, -1, 3],
+                 [-1, -1, -1, 4], [-1, -1, -1, 5], [-1, -1, -1, 6]]))
             assert np.all(blist == np.array(
-                [[N_b, -1, 0], [-1, -1, 1], [-1, -1, 2], [-1, -1, 3], [-1, -1, 4], [-1, -1, 5]]))
+                [[N_b, -1, N_b+1, 0], [-1, -1, -1, 1], [-1, -1, -1, 2], [-1, -1, -1, 3],
+                 [-1, -1, -1, 4], [-1, -1, -1, 5]]))
