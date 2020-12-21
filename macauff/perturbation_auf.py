@@ -15,7 +15,7 @@ __all__ = ['make_perturb_aufs']
 
 def make_perturb_aufs(auf_folder, cat_folder, filters, auf_points, ax_lims, r, dr, rho,
                       drho, which_cat, include_perturb_auf, n_sources, mem_chunk_num,
-                      psf_fwhms=None, tri_download_flag=False):
+                      delta_mag_cuts, psf_fwhms=None, tri_download_flag=False):
     """
     Function to perform the creation of the blended object perturbation component
     of the AUF.
@@ -56,6 +56,9 @@ def make_perturb_aufs(auf_folder, cat_folder, filters, auf_points, ax_lims, r, d
     mem_chunk_num : int
         Number of individual sub-sections to break catalogue into for memory
         saving purposes.
+    delta_mag_cuts : numpy.ndarray
+        Array of magnitude offsets corresponding to relative fluxes of perturbing
+        sources, for consideration of relative contamination chances.
     psf_fwhms : numpy.ndarray, optional
         Array of full width at half-maximums for each filter in ``filters``. Only
         required if ``include_perturb_auf`` is True; defaults to ``None``.
@@ -67,14 +70,9 @@ def make_perturb_aufs(auf_folder, cat_folder, filters, auf_points, ax_lims, r, d
     print('Creating empirical crowding AUFs for catalogue "{}"...'.format(which_cat))
     sys.stdout.flush()
 
-    # TODO: assign these variables as input args.
+    # TODO: assign as input arg.
     # The number of simulated PSFs to create for statistical purposes
     N_trials = 1000000
-    # Magnitude offsets corresponding to relative fluxes of perturbing sources; here
-    # dm of 2.5 is 10% relative flux and dm = 5 corresponds to 1% relative flux. Used
-    # to inform the fraction of simulations with a contaminant above these relative
-    # fluxes.
-    delta_mag_cuts = np.array([2.5, 5])
 
     # Store the length of the density-magnitude combinations in each sky/filter
     # combination for future loading purposes.
