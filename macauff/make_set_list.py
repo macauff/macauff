@@ -114,7 +114,9 @@ def set_list(aindices, bindices, aoverlap, boverlap, joint_folder_path):
     # group in the two catalogues (e.g., group 1 has 2 "a" and 3 "b" sources).
     goodlength = np.lib.format.open_memmap('{}/group/goodlen.npy'.format(
         joint_folder_path), mode='w+', dtype=np.bool, shape=(len(agrouplengths),))
-    goodlength[:] = np.logical_not(grouplengthexceeded)
+    di = max(1, len(agrouplengths) // 20)
+    for i in range(0, len(agrouplengths), di):
+        goodlength[i:i+di] = np.logical_not(grouplengthexceeded[i:i+di])
     acounters = np.lib.format.open_memmap('{}/group/acount.npy'.format(joint_folder_path),
                                           mode='w+', dtype=int, shape=(groupmax,))
     acounters[:] = 0
@@ -124,7 +126,6 @@ def set_list(aindices, bindices, aoverlap, boverlap, joint_folder_path):
     # open_memmap requires tuples of ints and np.amax doesn't play nicely with
     # memmapped arrays, making (memmap(result)) variables, so we force the
     # number to a simple int here.
-    di = max(1, len(agrouplengths) // 20)
     amaxlen, bmaxlen = 0, 0
     for i in range(0, len(agrouplengths), di):
         if np.sum(goodlength[i:i+di]) > 0:
@@ -150,16 +151,11 @@ def set_list(aindices, bindices, aoverlap, boverlap, joint_folder_path):
             bcounters[bgroup[i]-1] += 1
 
     # Now, slightly convolutedly, we simply want to remove any sources from the
-    # list with islands too large to run -- or that have no sources in catalogue
-    # "a" in their grouping (i.e., singular catalogue "b" sources). We deal with
-    # this lack of catalogue "b" sources when matching later.
-    q = np.lib.format.open_memmap('{}/group/q.npy'.format(
-        joint_folder_path), mode='w+', dtype=np.bool, shape=(len(agrouplengths),))
+    # list with islands too large to run.
     newsecondlen = 0
     for i in range(0, len(agrouplengths), di):
-        q[i:i+di] = (agrouplengths[i:i+di] > 0) & goodlength[i:i+di]
         # Require the manual conversion to integer due to memmap issues again.
-        newsecondlen += int(np.sum(q[i:i+di]))
+        newsecondlen += int(np.sum(goodlength[i:i+di]))
 
     di = max(1, newsecondlen // 20)
     # Essentially do a = a[q], or a = a[:, q], but via memmap.
@@ -173,9 +169,11 @@ def set_list(aindices, bindices, aoverlap, boverlap, joint_folder_path):
             shape=(newsecondlen,))
         tick = 0
         for i in range(0, len(len_array), di):
-            new_list_array[:, tick:tick+np.sum(q[i:i+di])] = list_array[:, i:i+di][:, q[i:i+di]]
-            new_grouplengths[tick:tick+np.sum(q[i:i+di])] = len_array[i:i+di][q[i:i+di]]
-            tick += np.sum(q[i:i+di])
+            new_list_array[:, tick:tick+np.sum(goodlength[i:i+di])] = list_array[:, i:i+di][
+                :, goodlength[i:i+di]]
+            new_grouplengths[tick:tick+np.sum(goodlength[i:i+di])] = len_array[i:i+di][
+                goodlength[i:i+di]]
+            tick += np.sum(goodlength[i:i+di])
 
         os.system('mv {}/group/{}list2.npy {}/group/{}list.npy'.format(
             joint_folder_path, cat_kind, joint_folder_path, cat_kind))
@@ -183,7 +181,7 @@ def set_list(aindices, bindices, aoverlap, boverlap, joint_folder_path):
             joint_folder_path, cat_kind, joint_folder_path, cat_kind))
 
     # Tidy up temporary memmap arrays.
-    for name in ['agroup', 'bgroup', 'grplenexceed', 'goodlen', 'acount', 'bcount', 'q']:
+    for name in ['agroup', 'bgroup', 'grplenexceed', 'goodlen', 'acount', 'bcount']:
         os.remove('{}/group/{}.npy'.format(joint_folder_path, name))
 
     alist = np.load('{}/group/alist.npy'.format(joint_folder_path), mmap_mode='r+')

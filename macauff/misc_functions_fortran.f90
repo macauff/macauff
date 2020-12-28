@@ -9,6 +9,20 @@ real(dp), parameter :: pi = 4.0_dp*atan(1.0_dp)
 
 contains
 
+subroutine haversine_wrapper(lon1, lon2, lat1, lat2, hav_dist)
+! Wrapper for the haversine formula in shared_library.f90.
+
+implicit none
+
+integer, parameter :: dp = kind(0.0d0)  ! double precision
+
+real(dp), intent(in) :: lon1, lon2, lat1, lat2
+real(dp), intent(out) :: hav_dist
+
+call haversine(lon1, lon2, lat1, lat2, hav_dist)
+
+end subroutine haversine_wrapper
+
 subroutine find_nearest_point(source_lon, source_lat, point_lon, point_lat, point_ind)
 ! Find the nearest on-sky distance between a series of coordinates and another list of positions.
 

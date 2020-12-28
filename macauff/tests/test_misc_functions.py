@@ -8,10 +8,10 @@ import numpy as np
 from numpy.testing import assert_allclose
 import scipy.special
 
-from ..misc_functions import (create_fourier_offsets_grid, load_small_ref_ind_fourier_grid,
+from ..misc_functions import (create_auf_params_grid, load_small_ref_auf_grid,
                               hav_dist_constant_lat)
 from ..misc_functions_fortran import misc_functions_fortran as mff
-from .test_shared_library_fortran import haversine_wrapper
+# from .test_shared_library_fortran import haversine_wrapper
 
 
 def test_closest_auf_point():
@@ -44,7 +44,7 @@ def test_create_fourier_offsets_grid():
             np.save('{}/{}/{}/fourier.npy'.format(ax1, ax2, filt),
                     (i + len(filt_names)*j)*np.ones((len(r[:-1]), a_len[i, j]), float))
 
-    create_fourier_offsets_grid('.', auf_pointings, filt_names, r)
+    create_auf_params_grid('.', auf_pointings, filt_names, 'fourier', len(r)-1)
     a = np.lib.format.open_memmap('{}/fourier_grid.npy'.format(
         '.'), mode='r', dtype=float, shape=(9, 15, 2, 3), fortran_order=True)
     assert np.all(a.shape == (9, 15, 2, 3))
@@ -69,7 +69,7 @@ def test_load_small_ref_ind_fourier_grid():
     # Unique indices: 0, 1, 2, 5; 0, 3; 0, 1, 2
     # These map to 0, 1, 2, 3; 0, 1; 0, 1, 2
     modrefind = np.array([[0, 2, 0, 2, 1, 5], [0, 3, 3, 3, 3, 0], [0, 1, 2, 1, 2, 1]])
-    a, b = load_small_ref_ind_fourier_grid(modrefind, '.')
+    [a], b = load_small_ref_auf_grid(modrefind, '.', ['fourier'])
 
     new_small_modrefind = np.array([[0, 2, 0, 2, 1, 3], [0, 1, 1, 1, 1, 0], [0, 1, 2, 1, 2, 1]])
     new_small_fouriergrid = np.empty((9, 4, 2, 3), float, order='F')
@@ -91,6 +91,6 @@ def test_hav_dist_constant_lat():
 
     for lat in [-86.4, -40.3, -10.1, 0, 15.5, 45.1, 73.14, 88.54]:
         for lon1, lon2 in zip(lon1s, lon2s):
-            a = haversine_wrapper(lon1, lon2, lat, lat)
+            a = mff.haversine_wrapper(lon1, lon2, lat, lat)
             b = hav_dist_constant_lat(lon1, lat, lon2)
             assert_allclose(a, b)

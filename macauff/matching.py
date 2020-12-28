@@ -13,6 +13,7 @@ from .perturbation_auf import make_perturb_aufs
 from .group_sources import make_island_groupings
 from .misc_functions_fortran import misc_functions_fortran as mff
 from .photometric_likelihood import compute_photometric_likelihoods
+from .counterpart_pairing import source_pairing
 
 __all__ = ['CrossMatch']
 
@@ -65,7 +66,7 @@ class CrossMatch():
                                  "processes are also set to run.")
 
         # Ensure that we can create the folders for outputs.
-        for path in ['group', 'reject', 'phot_like']:
+        for path in ['group', 'reject', 'phot_like', 'pairing']:
             try:
                 os.makedirs('{}/{}'.format(self.joint_folder_path, path), exist_ok=True)
             except OSError:
@@ -154,6 +155,10 @@ class CrossMatch():
         # The third step in this process is to, to some level, calculate the
         # photometry-related information necessary for the cross-match.
         self.calculate_phot_like(6)
+
+        # The final stage of the cross-match process is that of putting together
+        # the previous stages, and calculating the cross-match probabilities.
+        self.pair_sources(13)
 
     def _str2bool(self, v):
         '''
@@ -445,6 +450,13 @@ class CrossMatch():
 
         a_n_sources = len(np.load('{}/magref.npy'.format(self.a_cat_folder_path), mmap_mode='r'))
 
+        # Magnitude offsets corresponding to relative fluxes of perturbing sources; here
+        # dm of 2.5 is 10% relative flux and dm = 5 corresponds to 1% relative flux. Used
+        # to inform the fraction of simulations with a contaminant above these relative
+        # fluxes.
+        # TODO: allow as user input.
+        self.delta_mag_cuts = np.array([2.5, 5])
+
         if self.run_auf or not a_correct_file_number:
             # Only warn if we did NOT choose to run AUF, but DID hit wrong file
             # number.
@@ -462,7 +474,7 @@ class CrossMatch():
             perturb_auf_func(self.a_auf_folder_path, self.a_cat_folder_path, self.a_filt_names,
                              self.a_auf_region_points, self.cross_match_extent, self.r, self.dr,
                              self.rho, self.drho, 'a', self.include_perturb_auf, a_n_sources,
-                             self.mem_chunk_num, **_kwargs)
+                             self.mem_chunk_num, self.delta_mag_cuts, **_kwargs)
         else:
             print('Loading empirical crowding AUFs for catalogue "a"...')
             sys.stdout.flush()
@@ -489,7 +501,7 @@ class CrossMatch():
             perturb_auf_func(self.b_auf_folder_path, self.b_cat_folder_path, self.b_filt_names,
                              self.b_auf_region_points, self.cross_match_extent, self.r, self.dr,
                              self.rho, self.drho, 'b', self.include_perturb_auf, b_n_sources,
-                             self.mem_chunk_num, **_kwargs)
+                             self.mem_chunk_num, self.delta_mag_cuts, **_kwargs)
         else:
             print('Loading empirical crowding AUFs for catalogue "b"...')
             sys.stdout.flush()
@@ -620,3 +632,41 @@ class CrossMatch():
         self.cf_areas = cf_areas
 
         return
+
+    def pair_sources(self, files_per_pairing, count_pair_func=source_pairing):
+        '''
+        Assign sources in the two catalogues as either counterparts to one another
+        or singly detected "field" sources.
+
+        Parameters
+        ----------
+        files_per_pairing : integer
+            The number of saved files expected in the pairing folder.
+        count_pair_func : callable, optional
+            The function that calls the counterpart determination routine.
+        '''
+
+        file_number = np.sum([len(files) for _, _, files in
+                              os.walk('{}/pairing'.format(self.joint_folder_path))])
+        # No complicated maths here, since all files are common and in a single
+        # folder common to the pairing process.
+        expected_file_number = files_per_pairing
+
+        correct_file_number = expected_file_number == file_number
+
+        # TODO: generalise as user input
+        n_pool = 4
+
+        if self.run_source or not correct_file_number:
+            if not correct_file_number and not self.run_source:
+                warnings.warn('Incorrect number of counterpart pairing files. Deleting all '
+                              'files and re-running calculations.')
+            os.system('rm -r {}/pairing/*'.format(self.joint_folder_path))
+            count_pair_func(
+                self.joint_folder_path, self.a_cat_folder_path, self.b_cat_folder_path,
+                self.a_auf_folder_path, self.b_auf_folder_path, self.a_filt_names,
+                self.b_filt_names, self.a_auf_region_points, self.b_auf_region_points,
+                self.rho, self.drho, len(self.delta_mag_cuts), self.mem_chunk_num, n_pool)
+        else:
+            print('Loading pre-assigned counterparts...')
+            sys.stdout.flush()

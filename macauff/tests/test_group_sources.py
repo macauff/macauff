@@ -247,6 +247,7 @@ class TestMakeIslandGroupings():
         self.b_auf_pointings = np.array([[11, -21], [14, -22], [14, -24]])
 
         self.N_a, self.N_b = 30, 45
+        self.N_com = 25
 
         self.ax_lims = np.array([8, 16, -26, -19])
 
@@ -281,14 +282,16 @@ class TestMakeIslandGroupings():
         # Move one source to have a forced overlap of objects
         a_coords[-1, :2] = a_coords[0, :2] + [0.01*self.sigma/3600, 0.02*self.sigma/3600]
         b_coords = np.empty((self.N_b, 3), float)
-        # Make sure that the N_b-20=25 matches all return based on Gaussian integrals.
-        b_coords[:self.N_b-20, 0] = a_coords[:self.N_b-20, 0] + self.rng.uniform(
-            -2, 2, self.N_b-20)*self.sigma/3600
-        b_coords[:self.N_b-20, 1] = a_coords[:self.N_b-20, 1] + self.rng.uniform(
-            -2, 2, self.N_b-20)*self.sigma/3600
+        # Make sure that the N_com=25 matches all return based on Gaussian integrals.
+        b_coords[:self.N_com, 0] = a_coords[:self.N_com, 0] + self.rng.uniform(
+            -2, 2, self.N_com)*self.sigma/3600
+        b_coords[:self.N_com, 1] = a_coords[:self.N_com, 1] + self.rng.uniform(
+            -2, 2, self.N_com)*self.sigma/3600
         # This should leave us with 4 "a" and 20 "b" singular matches.
-        b_coords[self.N_b-20:, 0] = self.rng.uniform(self.ax_lims[0]+0.5, self.ax_lims[1]-0.5, 20)
-        b_coords[self.N_b-20:, 1] = self.rng.uniform(self.ax_lims[2]+0.5, self.ax_lims[3]-0.5, 20)
+        b_coords[self.N_com:, 0] = self.rng.uniform(self.ax_lims[0]+0.5,
+                                                    self.ax_lims[1]-0.5, self.N_b-self.N_com)
+        b_coords[self.N_com:, 1] = self.rng.uniform(self.ax_lims[2]+0.5,
+                                                    self.ax_lims[3]-0.5, self.N_b-self.N_com)
         b_coords[:, 2] = self.sigma
 
         self.a_coords, self.b_coords = a_coords, b_coords
@@ -338,10 +341,36 @@ class TestMakeIslandGroupings():
         self.cm.mem_chunk_num = self.mem_chunk_num
         self.cm.include_phot_like = self.include_phot_like
 
+    def _comparisons_in_islands(self, alist, blist, agrplen, bgrplen, N_a, N_b, N_c):
+        # Given, say, 25 common sources from 30 'a' and 45 'b' objects, we'd
+        # expect 5 + 20 + 25 = 50 islands, with zero overlap. Here we expect
+        # a single extra 'a' island overlap, however.
+        assert np.all(alist.shape == (2, N_a - 1 + N_b - N_c))
+        assert np.all(blist.shape == (1, N_a - 1 + N_b - N_c))
+        assert np.all(agrplen.shape == (N_a - 1 + N_b - N_c,))
+        assert np.all(bgrplen.shape == (N_a - 1 + N_b - N_c,))
+        a_list_fix = -1*np.ones((2, N_a - 1 + N_b - N_c), int)
+        # N_c - 1 common, 4 singular "a" matches; N_c-1+4 in arange goes to N_c+4.
+        a_list_fix[0, :N_c - 1 + 4] = np.arange(1, N_c + 4)
+        # The final entry is the double "a" overlap, otherwise no "a" sources.
+        a_list_fix[0, -1] = 0
+        a_list_fix[1, -1] = N_a - 1
+        assert np.all(agrplen == np.append(np.ones((N_c - 1 + 4), int),
+                      [*np.zeros((N_b-N_c), int), 2]))
+        assert np.all(bgrplen == np.append(np.ones((N_c - 1), int),
+                      [0, 0, 0, 0, *np.ones((N_b-N_c), int), 1]))
+        assert np.all(alist == a_list_fix)
+        # Here we mapped one-to-one for "b" sources that are matched to "a" objects,
+        # and by default the empty groups have the null "-1" index. Also remember that
+        # the arrays should be f-ordered, and here are (1, N) shape.
+        assert np.all(blist == np.append(np.arange(1, N_c),
+                                         np.array([-1, -1, -1, -1,
+                                                   *np.arange(N_c, N_b), 0]))).reshape(1, -1)
+
     def test_make_island_groupings(self):
         os.system('rm -rf {}/group/*'.format(self.joint_folder_path))
         os.system('rm -rf {}/reject/*'.format(self.joint_folder_path))
-        N_a, N_b = self.N_a, self.N_b
+        N_a, N_b, N_c = self.N_a, self.N_b, self.N_com
         np.save('{}/con_cat_astro.npy'.format(self.a_cat_folder_path), self.a_coords)
         np.save('{}/con_cat_astro.npy'.format(self.b_cat_folder_path), self.b_coords)
         # For the first, full runthrough call the CrossMatch function instead of
@@ -351,24 +380,7 @@ class TestMakeIslandGroupings():
 
         alist, blist = np.load('joint/group/alist.npy'), np.load('joint/group/blist.npy')
         agrplen, bgrplen = np.load('joint/group/agrplen.npy'), np.load('joint/group/bgrplen.npy')
-        assert np.all(alist.shape == (2, N_a - 1))
-        assert np.all(blist.shape == (1, N_a - 1))
-        assert np.all(agrplen.shape == (N_a - 1,))
-        assert np.all(bgrplen.shape == (N_a - 1,))
-        a_list_fix = -1*np.ones((2, N_a - 1), int)
-        a_list_fix[0, :] = np.append(np.arange(1, N_a - 1), [0])
-        a_list_fix[1, -1] = N_a - 1
-        assert np.all(agrplen == np.append(np.ones((N_a - 2), int), [2]))
-        # Because we only keep groups with "a" sources in them, we have the full 25
-        # (plus one!) joint matches, then N_a-25(-1!)=4 "lonely" "a" objects. Remember
-        # that the three-source group goes last, beyond the empty "b" groups.
-        assert np.all(bgrplen == np.append(np.ones((N_b-21), int), [0, 0, 0, 0, 1]))
-        assert np.all(alist == a_list_fix)
-        # Here we mapped one-to-one for "b" sources that are matched to "a" objects,
-        # and by default the empty groups have the null "-1" index. Also remember that
-        # the arrays should be f-ordered, and here are (1, N) shape.
-        assert np.all(blist == np.append(np.arange(1, N_b-20),
-                                         np.array([-1, -1, -1, -1, 0]))).reshape(1, -1)
+        self._comparisons_in_islands(alist, blist, agrplen, bgrplen, N_a, N_b, N_c)
         # Should correctly save 4 files per catalogue in 'group', not saving any
         # rejection arrays.
         assert len(os.listdir('{}/group'.format(self.joint_folder_path))) == 8
@@ -377,7 +389,7 @@ class TestMakeIslandGroupings():
     def test_mig_extra_reject(self):
         os.system('rm -rf {}/group/*'.format(self.joint_folder_path))
         os.system('rm -rf {}/reject/*'.format(self.joint_folder_path))
-        N_a, N_b = self.N_a, self.N_b
+        N_a, N_b, N_c = self.N_a, self.N_b, self.N_com
         ax_lims = self.ax_lims
         # Pretend like there's already removed objects due to group length being
         # exceeded during make_set_list even though there won't be.
@@ -402,19 +414,24 @@ class TestMakeIslandGroupings():
         alist, blist = np.load('joint/group/alist.npy'), np.load('joint/group/blist.npy')
         agrplen, bgrplen = np.load('joint/group/agrplen.npy'), np.load('joint/group/bgrplen.npy')
         # We removed 3 extra sources this time around, which should all be 1:1 islands.
-        assert np.all(alist.shape == (2, N_a - 4))
-        assert np.all(blist.shape == (1, N_a - 4))
-        assert np.all(agrplen.shape == (N_a - 4,))
-        assert np.all(bgrplen.shape == (N_a - 4,))
-        a_list_fix = -1*np.ones((2, N_a - 4), int)
+        assert np.all(alist.shape == (2, N_a - 4 + N_b - N_c))
+        assert np.all(blist.shape == (1, N_a - 4 + N_b - N_c))
+        assert np.all(agrplen.shape == (N_a - 4 + N_b - N_c,))
+        assert np.all(bgrplen.shape == (N_a - 4 + N_b - N_c,))
+        a_list_fix = -1*np.ones((2, N_a - 4 + N_b - N_c), int)
         a_list_fix[0, :2] = [1, 2]
-        a_list_fix[0, 2:] = np.append(np.arange(6, N_a - 1), [0])
+        # Remove 3 items from between the "2nd" and "6th" entries in alist.
+        a_list_fix[0, 2:N_c - 1 + 4 - 3] = np.arange(6, N_c + 4)
+        a_list_fix[0, -1] = 0
         a_list_fix[1, -1] = N_a - 1
-        assert np.all(agrplen == np.append(np.ones((N_a - 5), int), [2]))
-        assert np.all(bgrplen == np.append(np.ones((N_b-21-3), int), [0, 0, 0, 0, 1]))
+        assert np.all(agrplen == np.append(np.ones((N_c - 1 + 4 - 3), int),
+                      [*np.zeros((N_b-N_c), int), 2]))
+        assert np.all(bgrplen == np.append(np.ones((N_c - 1 - 3), int),
+                      [0, 0, 0, 0, *np.ones((N_b-N_c), int), 1]))
         assert np.all(alist == a_list_fix)
-        assert np.all(blist == np.append(np.append([1, 2], np.arange(6, N_b-20)),
-                                         np.array([-1, -1, -1, -1, 0]))).reshape(1, -1)
+        assert np.all(blist == np.append(np.append([1, 2], np.arange(6, N_c)),
+                                         np.array([-1, -1, -1, -1,
+                                                   *np.arange(N_c, N_b), 0]))).reshape(1, -1)
 
         areject = np.load('joint/reject/reject_a.npy')
         breject = np.load('joint/reject/reject_b.npy')
@@ -429,7 +446,7 @@ class TestMakeIslandGroupings():
     def test_mig_no_reject_ax_lims(self):
         os.system('rm -rf {}/group/*'.format(self.joint_folder_path))
         os.system('rm -rf {}/reject/*'.format(self.joint_folder_path))
-        N_a, N_b = self.N_a, self.N_b
+        N_a, N_b, N_c = self.N_a, self.N_b, self.N_com
         ax_lims = np.array([0, 360, -90, -19])
         # Check if axlims are changed to include wrap-around 0/360, or +-90 latitude,
         # then we don't reject any sources.
@@ -453,19 +470,8 @@ class TestMakeIslandGroupings():
 
         alist, blist = np.load('joint/group/alist.npy'), np.load('joint/group/blist.npy')
         agrplen, bgrplen = np.load('joint/group/agrplen.npy'), np.load('joint/group/bgrplen.npy')
-
-        assert np.all(alist.shape == (2, N_a - 1))
-        assert np.all(blist.shape == (1, N_a - 1))
-        assert np.all(agrplen.shape == (N_a - 1,))
-        assert np.all(bgrplen.shape == (N_a - 1,))
-        a_list_fix = -1*np.ones((2, N_a - 1), int)
-        a_list_fix[0, :] = np.append(np.arange(1, N_a - 1), [0])
-        a_list_fix[1, -1] = N_a - 1
-        assert np.all(agrplen == np.append(np.ones((N_a - 2), int), [2]))
-        assert np.all(bgrplen == np.append(np.ones((N_b-21), int), [0, 0, 0, 0, 1]))
-        assert np.all(alist == a_list_fix)
-        assert np.all(blist == np.append(np.arange(1, N_b-20),
-                                         np.array([-1, -1, -1, -1, 0]))).reshape(1, -1)
+        # The same tests that were ran in make_island_groupings should pass here.
+        self._comparisons_in_islands(alist, blist, agrplen, bgrplen, N_a, N_b, N_c)
         areject = np.load('joint/reject/reject_a.npy')
         breject = np.load('joint/reject/reject_b.npy')
         assert np.all(areject.shape == (5,))
