@@ -408,17 +408,10 @@ def _individual_island_probability(iterable_wrapper):
                           (1-aF[ff])*bF[ff]*Gnc + (1-aF[ff])*(1-bF[ff])*Gnn)
                     # Marginalise over the opposite source contamination probability
                     # to calculate specific source's contamination chance.
-                    if pr > 0:
-                        acontamprobgrid[j, k, ff] = min(1, max(0, (aF[ff]*bF[ff]*Gcc +
-                                                                   aF[ff]*(1-bF[ff])*Gcn)/pr))
-                        bcontamprobgrid[j, k, ff] = min(1, max(0, (aF[ff]*bF[ff]*Gcc +
-                                                                   (1-aF[ff])*bF[ff]*Gnc)/pr))
-                    elif pr == 0:
-                        # If source is so far out that G has truncated to zero,
-                        # then we just set the chance to 50%, as it is very
-                        # unlikely to affect the outcome.
-                        acontamprobgrid[j, k, ff] = 0.5
-                        bcontamprobgrid[j, k, ff] = 0.5
+                    acontamprobgrid[j, k, ff] = min(1, max(0, (aF[ff]*bF[ff]*Gcc +
+                                                               aF[ff]*(1-bF[ff])*Gcn)/pr))
+                    bcontamprobgrid[j, k, ff] = min(1, max(0, (aF[ff]*bF[ff]*Gcc +
+                                                               (1-aF[ff])*bF[ff]*Gnc)/pr))
 
                 Nc = c_priors[bused[k], aused[j], qb[k]]
                 cdmdm = c_array[binb[k], bina[j], bused[k], aused[j], qb[k]]
@@ -483,20 +476,6 @@ def _individual_island_probability(iterable_wrapper):
                         bcrptflux = np.array(bcontamfluxgrid[yb])
                         afield = np.array(aperm_[ta])
                         bfield = np.array(bperm_[tb])
-
-        if integral <= 0:
-            acrpts = np.array([])
-            bcrpts = np.array([])
-            acrptscontp = np.array([]).reshape(0, n_fracs)
-            bcrptscontp = np.array([]).reshape(0, n_fracs)
-            etacrpts = np.array([])
-            xicrpts = np.array([])
-            acrptflux = np.array([])
-            bcrptflux = np.array([])
-            afield = aperm_
-            bfield = bperm_
-            prob = 0
-            integral = 1
 
         return [acrpts, bcrpts, acrptscontp, bcrptscontp, etacrpts, xicrpts, acrptflux, bcrptflux,
                 afield, bfield, prob, integral]
