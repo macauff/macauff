@@ -9,6 +9,9 @@ General
 New Features
 ^^^^^^^^^^^^
 
+- Implemented computation of match probabilities for islands of sources,
+  and secondary parameters such as flux contamination likelihood. [#19]
+
 - Added naive Bayes priors based on the relative local densities of the two
   catalogues. [#18]
 
