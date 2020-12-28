@@ -110,12 +110,12 @@ def make_island_groupings(joint_folder_path, a_cat_folder_path, b_cat_folder_pat
 
     ax1_loops = np.linspace(ax_lims[0], ax_lims[1], 11)
     # Force the sub-division of the sky area in question to be 100 chunks, or
-    # one square degree chunks, whichever is larger in area.
+    # roughly one square degree chunks, whichever is larger in area.
     if ax1_loops[1] - ax1_loops[0] < 1:
-        ax1_loops = np.arange(ax_lims[0], ax_lims[1]+1e-10, 1)
+        ax1_loops = np.linspace(ax_lims[0], ax_lims[1], int(np.ceil(ax_lims[1] - ax_lims[0]) + 1))
     ax2_loops = np.linspace(ax_lims[2], ax_lims[3], 11)
     if ax2_loops[1] - ax2_loops[0] < 1:
-        ax2_loops = np.arange(ax_lims[2], ax_lims[3]+1e-10, 1)
+        ax2_loops = np.linspace(ax_lims[2], ax_lims[3], int(np.ceil(ax_lims[3] - ax_lims[2]) + 1))
 
     # Load the astrometry of each catalogue for slicing.
     a_full = np.load('{}/con_cat_astro.npy'.format(a_cat_folder_path), mmap_mode='r')
