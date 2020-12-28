@@ -13,10 +13,23 @@ contains
 
 subroutine contam_match_prob(Fcc, Fcn, Fnc, Fnn, rho, drho, sep, Gcc, Gcn, Gnc, Gnn)
     implicit none
-    double precision, intent(in) :: Fcc(:), Fcn(:), Fnc(:), Fnn(:), rho(:), drho(:), sep
-    double precision, intent(out) :: Gcc, Gcn, Gnc, Gnn
+
+    integer, parameter :: dp = kind(0.0d0)  ! double precision
+    ! Combinations of fourier-space representations of convolutions of AUFs. "c" and "n" represent
+    ! "contaminated" and "non-contaminated", for catalogue "a" then "b" for F[a][b]. Thus the four
+    ! arrays are the four combinations of AUFs that suffer perturbation or not for the two sources.
+    real(dp), intent(in) :: Fcc(:), Fcn(:), Fnc(:), Fnn(:)
+    ! Fourier-space representation of the F** arrays.
+    real(dp), intent(in) :: rho(:), drho(:)
+    ! Sky separation, in arcseconds, between the two objects in question.
+    real(dp), intent(in) :: sep
+    ! Output probability densities -- again, per combination of (non-)contamination -- that the
+    ! two objects are a single source detected twice given their on-sky separation.
+    real(dp), intent(out) :: Gcc, Gcn, Gnc, Gnn
+    ! Loop counter.
     integer :: j
-    double precision :: j0, z
+    ! Hankel transform parameters.
+    real(dp) :: j0, z
     Gcc = 0.0_dp
     Gcn = 0.0_dp
     Gnc = 0.0_dp

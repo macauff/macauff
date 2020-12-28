@@ -19,6 +19,49 @@ from .counterpart_pairing_fortran import counterpart_pairing_fortran as cpf
 def source_pairing(joint_folder_path, a_cat_folder_path, b_cat_folder_path, a_auf_folder_path,
                    b_auf_folder_path, a_filt_names, b_filt_names, a_auf_pointings, b_auf_pointings,
                    rho, drho, n_fracs, mem_chunk_num, n_pool):
+    '''
+    Function to iterate over all grouped islands of sources, calculating the
+    probabilities of all permutations of matches and deriving the most likely
+    counterparts for sources in the two catalogues.
+
+    Parameters
+    ----------
+    joint_folder_path : string
+        Folder in which all common match files are stored for this crossmatch.
+    a_cat_folder_path : string
+        Folder in which the "a" catalogue input catalogues are stored.
+    b_cat_folder_path : string
+        Folder where catalogue "b" files are located.
+    a_auf_folder_path : string
+        Folder where catalogue "a" perturbation AUF component files were saved
+        previously.
+    b_auf_folder_path : string
+        Folder containing catalogue "b" perturbation AUF component files.
+    a_filt_names : numpy.ndarray or list of strings
+        Array or list containing names of the filters used in catalogue "a".
+    b_filt_names : numpy.ndarray or list of strings
+        Array or list of catalogue "b" filter names.
+    a_auf_pointings : numpy.ndarray
+        Array of celestial coordinates indicating the locations used in the
+        simulations of perturbation AUFs for catalogue "a".
+    b_auf_pointings : numpy.ndarray
+        Sky coordinates of locations of catalogue "b" perturbation AUF
+        component simulations.
+    rho : numpy.ndarray
+        Array of fourier-space values, used in the convolution of PDFs.
+    drho : numpy.ndarray
+        The spacings between the `rho` array elements.
+    n_fracs : integer
+        The number of relative contamination fluxes previously considered
+        when calculating the probability of a source being contaminated by
+        a perturbing source brighter than a given flux.
+    mem_chunk_num : integer
+        Number of sub-arrays to break loading of main catalogue into, to
+        reduce the amount of memory used.
+    n_pool : integer
+        The number of `multiprocessing` parallel processes to break island
+        matches down into.
+    '''
     print("Creating catalogue matches...")
     sys.stdout.flush()
 
@@ -302,6 +345,16 @@ def source_pairing(joint_folder_path, a_cat_folder_path, b_cat_folder_path, a_au
 
 
 def _individual_island_probability(iterable_wrapper):
+    '''
+    Individual island probability derivations.
+
+    Parameters
+    ----------
+    iterable_wrapper : list
+        List of parameters used within `_individual_island_probability` to
+        calculate the probability of (non-)match and assorted secondary
+        match parameters.
+    '''
     [i, a_astro, a_photo, b_astro, b_photo, alist, alist_, blist, blist_, agrplen, bgrplen,
      c_array, fa_array, fb_array, c_priors, fa_priors, fb_priors, amagref, bmagref, amodelrefinds,
      bmodelrefinds, abinsarray, abinlengths, bbinsarray, bbinlengths, afrac_grids, aflux_grids,
