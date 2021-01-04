@@ -35,6 +35,9 @@ Bug Fixes
 API Changes
 ^^^^^^^^^^^
 
+- Moved ``delta_mag_cut`` from ``make_perturb_aufs`` to an input variable, defined
+  in ``create_perturb_auf``. [#19]
+
 - Moved ``find_nearest_auf_point`` from being specific to ``perturbation_auf``,
   now located in ``misc_functions_fortran`` as ``find_nearest_point``. [#18]
 
