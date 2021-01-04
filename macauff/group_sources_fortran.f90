@@ -16,9 +16,7 @@ subroutine get_max_overlap(a_ax_1, a_ax_2, b_ax_1, b_ax_2, max_sep, a_axerr, b_a
     ! Loop through all pairs of sources, recording all of those within maximum separation,
     ! keeping a running total of how many overlaps there are for each source in the two
     ! catalogues.
-
     integer, parameter :: dp = kind(0.0d0)  ! double precision
-
     ! 4-D index maps from each source into the fourier-space perturbation AUF component grids.
     integer, intent(in) :: amodrefind(:, :), bmodrefind(:, :)
     ! Orthogonal sky coordinate arrays and circular coordinate uncertainties for catalogue a and b.
@@ -123,9 +121,7 @@ subroutine get_overlap_indices(a_ax_1, a_ax_2, b_ax_1, b_ax_2, max_sep, amax, bm
     ! Once total potential overlap is found in getmaxn, we can keep track of each individual
     ! source overlap between the two catalogues, storing their respective indices to keep
     ! links of potential counterparts between the two catalogues.
-
     integer, parameter :: dp = kind(0.0d0)  ! double precision
-
     ! 4-D index maps from each source into the fourier-space perturbation AUF component grids.
     integer, intent(in) :: amodrefind(:, :), bmodrefind(:, :)
     ! Largest size of overlaps of each catalogue, from getmaxn.

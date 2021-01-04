@@ -10,53 +10,45 @@ real(dp), parameter :: pi = 4.0_dp*atan(1.0_dp)
 contains
 
 subroutine haversine_wrapper(lon1, lon2, lat1, lat2, hav_dist)
-! Wrapper for the haversine formula in shared_library.f90.
+    ! Wrapper for the haversine formula in shared_library.f90.
+    integer, parameter :: dp = kind(0.0d0)  ! double precision
+    ! On sky longitudes and latitudes of the two sources for which we wish to find a separation.
+    real(dp), intent(in) :: lon1, lon2, lat1, lat2
+    ! On-sky, Haversine separation of the two sources in question.
+    real(dp), intent(out) :: hav_dist
 
-implicit none
-
-integer, parameter :: dp = kind(0.0d0)  ! double precision
-
-real(dp), intent(in) :: lon1, lon2, lat1, lat2
-real(dp), intent(out) :: hav_dist
-
-call haversine(lon1, lon2, lat1, lat2, hav_dist)
+    call haversine(lon1, lon2, lat1, lat2, hav_dist)
 
 end subroutine haversine_wrapper
 
 subroutine find_nearest_point(source_lon, source_lat, point_lon, point_lat, point_ind)
-! Find the nearest on-sky distance between a series of coordinates and another list of positions.
+    ! Find the nearest on-sky distance between a series of coordinates and another list of positions.
+    integer, parameter :: dp = kind(0.0d0)  ! double precision
+    ! 1-D arrays of longitudes and latitudes (or equivalent) to search the nearest point of.
+    real(dp), intent(in) :: source_lon(:), source_lat(:)
+    ! 1-D arrays of lon & lat (consistent with source_lon & source_lat) points that positons are
+    ! sampled from.
+    real(dp), intent(in) :: point_lon(:), point_lat(:)
+    ! 1-D array of indices, for each source position, of the closest position.
+    integer, intent(out) :: point_ind(size(source_lon))
+    ! Loop counters
+    integer :: i, j
+    ! Great-circle distance
+    real(dp) :: hav_dist, min_hav_dist
 
-implicit none
-
-integer, parameter :: dp = kind(0.0d0)  ! double precision
-
-! 1-D arrays of longitudes and latitudes (or equivalent) to search the nearest point of.
-real(dp), intent(in) :: source_lon(:), source_lat(:)
-! 1-D arrays of lon & lat (consistent with source_lon & source_lat) points that positons are
-! sampled from.
-real(dp), intent(in) :: point_lon(:), point_lat(:)
-
-! 1-D array of indices, for each source position, of the closest position.
-integer, intent(out) :: point_ind(size(source_lon))
-
-! Loop counters
-integer :: i, j
-! Great-circle distance
-real(dp) :: hav_dist, min_hav_dist
-
-!$OMP PARALLEL DO DEFAULT(NONE) PRIVATE(i, min_hav_dist, hav_dist) SHARED(source_lon, source_lat, point_lon, &
-!$OMP& point_lat, point_ind)
-do i = 1, size(source_lon)
-    min_hav_dist = 9999.9_dp
-    do j = 1, size(point_lon)
-        call haversine(source_lon(i), point_lon(j), source_lat(i), point_lat(j), hav_dist)
-        if (hav_dist < min_hav_dist) then
-            point_ind(i) = j - 1  ! pre-convert one-index fortran to zero-index python indices
-            min_hav_dist = hav_dist
-        end if
+    !$OMP PARALLEL DO DEFAULT(NONE) PRIVATE(i, min_hav_dist, hav_dist) SHARED(source_lon, source_lat, point_lon, &
+    !$OMP& point_lat, point_ind)
+    do i = 1, size(source_lon)
+        min_hav_dist = 9999.9_dp
+        do j = 1, size(point_lon)
+            call haversine(source_lon(i), point_lon(j), source_lat(i), point_lat(j), hav_dist)
+            if (hav_dist < min_hav_dist) then
+                point_ind(i) = j - 1  ! pre-convert one-index fortran to zero-index python indices
+                min_hav_dist = hav_dist
+            end if
+        end do
     end do
-end do
-!$OMP END PARALLEL DO
+    !$OMP END PARALLEL DO
 
 end subroutine find_nearest_point
 

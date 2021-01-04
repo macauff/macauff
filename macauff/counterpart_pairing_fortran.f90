@@ -12,8 +12,10 @@ real(dp), parameter :: pi = 4.0_dp*atan(1.0_dp)
 contains
 
 subroutine contam_match_prob(Fcc, Fcn, Fnc, Fnn, rho, drho, sep, Gcc, Gcn, Gnc, Gnn)
-    implicit none
-
+    ! Calculate the probability density of two sources being two detections of a single sky object
+    ! given the separation between them, including the combinations of hypotheses that the sources
+    ! independently suffer, or do not suffer, from a statistical description of blended source
+    ! perturbation.
     integer, parameter :: dp = kind(0.0d0)  ! double precision
     ! Combinations of fourier-space representations of convolutions of AUFs. "c" and "n" represent
     ! "contaminated" and "non-contaminated", for catalogue "a" then "b" for F[a][b]. Thus the four
