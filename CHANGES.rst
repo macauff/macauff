@@ -9,6 +9,9 @@ General
 New Features
 ^^^^^^^^^^^^
 
+- Created ``generate_random_data``, to create simulated catalogues for testing
+  full end-to-end matches. [#20]
+
 - Implemented computation of match probabilities for islands of sources,
   and secondary parameters such as flux contamination likelihood. [#19]
 

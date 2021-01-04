@@ -202,7 +202,7 @@ def make_bins(input_mags):
     da = 0.1
     maxa = da*np.ceil(maxamag/da)
     mina = da*np.floor(minamag/da)
-    na = int((maxa - mina)/da + 1)
+    na = int(np.ceil((maxa - mina)/da) + 1)
     output_bins = np.linspace(mina, maxa, na)
 
     hist, output_bins = np.histogram(input_mags, bins=output_bins)
