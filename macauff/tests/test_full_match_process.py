@@ -12,6 +12,39 @@ from .test_matching import _replace_line
 
 def generate_random_data(N_a, N_b, N_c, extent, n_a_filts, n_b_filts, a_astro_sig, b_astro_sig,
                          a_cat, b_cat, seed=None):
+    '''
+    Convenience function to allow for the generation of two test datasets.
+
+    Parameters
+    ----------
+    N_a : integer
+        The number of sources to be generated in catalogue "a".
+    N_b : integer
+        The number of catalogue "b" fake sources.
+    N_c : integer
+        The number of common, overlapping sources, in both catalogues.
+    extent : list of integers
+        The on-sky coordinates that mark out the rectangular limits over which
+        sources should be generated. Should be of the form
+        ``[lower_lon, upper_lon, lower_lat, upper_lat]``, in degrees.
+    n_a_filts : integer
+        The number of photometric filters catalogue "a" should have.
+    n_b_filts : integer
+        The number of catalogue "b" photometric filters.
+    a_astro_sig : float
+        The astrometric uncertainty of catalogue "a", in arcseconds.
+    b_astro_sig : float
+        Catalogue "b"'s astrometric uncertainty, in arcseconds.
+    a_cat : string
+        The folder path into which to save the binary files containing
+        catalogue "a"'s astrometric and photometric data.
+    b_cat : string
+        Folder describing the save location of catalogue "b"'s data.
+    seed : integer, optional
+        Random number generator seed. If ``None``, will be passed to
+        ``np.random.default_rng`` as such, and a seed will be generated
+        as per ``default_rng``'s documentation.
+    '''
     if N_a > N_b:
         raise ValueError("N_a must be smaller or equal to N_b.")
     if N_c > N_a:
