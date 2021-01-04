@@ -16,7 +16,39 @@ def compute_photometric_likelihoods(joint_folder_path, a_cat_folder_path, b_cat_
                                     afilts, bfilts, mem_chunk_num, cf_points, cf_areas,
                                     include_phot_like, use_phot_priors):
     '''
+    Derives the photometric likelihoods and priors for use in the catalogue
+    cross-match process.
 
+    Parameters
+    ----------
+    joint_folder_path : string
+        The folder where all folders and files created during the cross-match
+        process are stored.
+    a_cat_folder_path : string
+        The folder where the input data for catalogue "a" are located.
+    b_cat_folder_path : string
+        The location of catalogue "b"'s input data.
+    afilts : list of string
+        A list of the filters in catalogue "a"'s photometric data file.
+    bfilts : list of string
+        List of catalogue "b"'s filters.
+    mem_chunk_num : integer
+        Fraction of input datasets to load at once, in the case of data larger
+        than the memory of the system.
+    cf_points : numpy.ndarray
+        The on-sky coordinates that define the locations of each small
+        set of sources to be used to derive the relative match and non-match
+        photometric likelihoods.
+    cf_areas : numpy.ndarray
+        The areas of closest on-sky separation surrounding each point in
+        ``cf_points``, used to normalise numbers of sources to sky densities.
+    include_phot_like : boolean
+        Flag to indicate whether to derive astrophysical likelihoods ``c`` and
+        ``f``, based on the common coevality of sources of given magnitudes.
+    use_phot_priors : boolean
+        Indicator as to whether to use astrophysical priors, based on the common
+        number of likely matches and non-matches in each ``cf_points`` area, or
+        use naive, asymmetric priors solely based on number density of sources.
     '''
 
     print("Creating c(m, m) and f(m)...")
@@ -124,6 +156,33 @@ def compute_photometric_likelihoods(joint_folder_path, a_cat_folder_path, b_cat_
 
 
 def distribute_sky_indices(joint_folder_path, cat_folder, name, mem_chunk_num, cf_points):
+    '''
+    Function to calculate the nearest on-sky photometric likelihood point for
+    each catalogue source.
+
+    Parameters
+    ----------
+    joint_folder_path : string
+        Top-level folder path for the common files created during the cross-match
+        process.
+    cat_folder : string
+        The location of a given catalogue's input data files.
+    name : string
+        Representation of whether we are calculating sky indices for catalogue
+        "a", or catalogue "b".
+    mem_chunk_num : integer
+        Number of sub-sets to break larger data files down to, to preserve memory.
+    cf_points : numpy.ndarray
+        The two-point sky coordinates for each point to be used as a central
+        point of a small sky area, for calculating "counterpart" and "field"
+        photometric likelihoods.
+
+    Returns
+    -------
+    sky_inds : numpy.ndarray
+        The indices, matching ``cf_points``, of the closest sky position for each
+        source in this catalogue.
+    '''
     n_sources = len(np.load('{}/con_cat_astro.npy'.format(cat_folder), mmap_mode='r'))
     sky_inds = np.lib.format.open_memmap('{}/phot_like/{}_sky_inds.npy'.format(
                                          joint_folder_path, name), mode='w+', dtype=int,
@@ -140,6 +199,44 @@ def distribute_sky_indices(joint_folder_path, cat_folder, name, mem_chunk_num, c
 
 def create_magnitude_bins(cf_points, filts, mem_chunk_num, joint_folder_path,
                           cat_folder_path, cat_type, sky_inds):
+    '''
+    Creates the N-dimensional arrays of single-band photometric bins, and
+    corresponding array lengths.
+
+    Parameters
+    ----------
+    cf_points : numpy.ndarray
+        List of the two-dimensional on-sky coordinates defining the centers
+        of each cutout for which the photometric likelihoods should be
+        calculated.
+    filts : list of strings
+        List of the filters to create magnitude bins for in this catalogue.
+    mem_chunk_num : integer
+        Number of sub-sets to break larger catalogues down into, for memory
+        saving purposes.
+    joint_folder_path : string
+        Location of top-level folder into which all intermediate files are
+        saved for the cross-match process.
+    cat_folder_path : string
+        Location of the input data for this catalogue.
+    cat_type : string
+        String to indicate which catalogue we are creating bins for, either
+        "a", or "b".
+    sky_inds : numpy.ndarray
+        Array of indices, showing which on-sky photometric point, from
+        ``cf_points``, each source in the catalogue is closest to.
+
+    Returns
+    -------
+    binlengths : numpy.ndarray
+        Two-dimensional array, indicating the length of the magnitude bins for
+        each filter-sky coordinate combination.
+    binsarray : numpy.ndarray
+        Three-dimensional array, containing the values of the magnitude bins for
+        the filter-sky combinations.
+    longbinlen : integer
+        Value of the largest of all filter-sky combinations of ``binlengths``.
+    '''
     binlengths = np.empty((len(filts), len(cf_points)), int)
 
     for m_ in range(0, len(cf_points), mem_chunk_num):
@@ -232,6 +329,39 @@ def make_bins(input_mags):
 
 
 def _load_multiple_sky_slice(joint_folder_path, cat_name, ind1, ind2, cat_folder_path, sky_inds):
+    '''
+    Function to, in a memmap-friendly way, return a sub-set of the photometry
+    of a given catalogue.
+
+    Parameters
+    ----------
+    joint_folder_path : string
+        Folder in which common cross-match intermediate data files are stored.
+    cat_name : string
+        String defining whether this function was called on catalogue "a" or "b".
+    ind1 : float
+        The lower of the two sky indices, as defined in ``distribute_sky_indices``,
+        to return a sub-set of the larger catalogue between. This value represents
+        the index of a given on-sky position, used to construct the "counterpart"
+        and "field" likelihoods.
+    ind2 : float
+        The upper of the sky indices, defining the sub-set of the photometric
+        array to return.
+    cat_folder_path : string
+        The folder defining where this particular catalogue is stored.
+    sky_inds : numpy.ndarray
+        The given catalogue's ``distribute_sky_indices`` values, to compare
+        with ``ind1`` and ``ind2``.
+
+    Returns
+    -------
+    photo_cutout : numpy.ndarray
+        A sub-set of the photometry of the given catalogue, those points which are
+        astrometrically closest to the sky indices between ``ind1`` and ``ind2``.
+    sky_ind_cutout : numpy.ndarray
+        The reduced ``sky_inds`` array, containing only those between ``ind1`` and
+        ``ind2``.
+    '''
     sky_cut = np.lib.format.open_memmap('{}/{}_temporary_sky_slice_combined.npy'.format(
         joint_folder_path, cat_name), mode='w+', dtype=np.bool, shape=(len(sky_inds),))
 
@@ -248,6 +378,33 @@ def _load_multiple_sky_slice(joint_folder_path, cat_name, ind1, ind2, cat_folder
 
 
 def _load_single_sky_slice(joint_folder_path, cat_name, ind, cat_folder_path, sky_inds):
+    '''
+    Function to, in a memmap-friendly way, return a sub-set of the nearest sky
+    indices of a given catalogue.
+
+    Parameters
+    ----------
+    joint_folder_path : string
+        Folder in which common cross-match intermediate data files are stored.
+    cat_name : string
+        String defining whether this function was called on catalogue "a" or "b".
+    ind : float
+        The value of the sky indices, as defined in ``distribute_sky_indices``,
+        to return a sub-set of the larger catalogue. This value represents
+        the index of a given on-sky position, used to construct the "counterpart"
+        and "field" likelihoods.
+    cat_folder_path : string
+        The folder defining where this particular catalogue is stored.
+    sky_inds : numpy.ndarray
+        The given catalogue's ``distribute_sky_indices`` values, to compare
+        with ``ind``.
+
+    Returns
+    -------
+    sky_cut : numpy.ndarray
+        A boolean array, indicating whether each element in ``sky_inds`` matches
+        ``ind`` or not.
+    '''
     sky_cut = np.lib.format.open_memmap('{}/{}_small_sky_slice.npy'.format(
         joint_folder_path, cat_name), mode='w+', dtype=np.bool, shape=(len(sky_inds),))
 
