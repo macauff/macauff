@@ -30,10 +30,9 @@ subroutine haversine(lon1, lon2, lat1, lat2, hav_dist)
 end subroutine haversine
 
 subroutine jy01a (x, bj0)
-
-    !*************************************************************************80
+    ! JY01A computes Bessel functions J0(x).
     !
-    !! JY01A computes Bessel functions J0(x).
+    !
     !
     !  Licensing:
     !

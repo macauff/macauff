@@ -15,6 +15,8 @@ from .misc_functions import (create_auf_params_grid, load_small_ref_auf_grid)
 from .misc_functions_fortran import misc_functions_fortran as mff
 from .counterpart_pairing_fortran import counterpart_pairing_fortran as cpf
 
+__all__ = ['source_pairing']
+
 
 def source_pairing(joint_folder_path, a_cat_folder_path, b_cat_folder_path, a_auf_folder_path,
                    b_auf_folder_path, a_filt_names, b_filt_names, a_auf_pointings, b_auf_pointings,
