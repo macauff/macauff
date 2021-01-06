@@ -3,10 +3,48 @@
    You can adapt this file completely to your liking, but it should at least
    contain the root `toctree` directive.
 
+#######
 macauff
-=======
-**The python package for Matching Across Catalogues using the Astrometric Uncertainty Function and Flux**
+#######
+**The Python package for Matching Across Catalogues using the Astrometric Uncertainty Function and Flux**
+
+``macauff`` is a package for cross-matching photometric catalogues. Using the positions, uncertainties, and flux measurements of sources, as well as modelling of the level to which objects are affected by hidden, blended contaminants, ``macauff`` provides posterior probabilities of "many-to-many" matches and non-matches between the two catalogues being merged. It also provides numerous secondary parameters, such as the level to which sources are flux contaminated, and the probability of their suffering blended by a source of a given flux ratio.
+
+.. _getting-started:
+
+************
+Installation
+************
+
+The instructions for installing ``macauff`` can be found :doc:`here<installation>`.
+
+.. _quick-start:
+
+***********
+Quick Start
+***********
+
+A quick-start guide is available :doc:`here<quickstart>`.
+
+******************
+User Documentation
+******************
 
 .. toctree::
    :maxdepth: 1
-   :titlesonly:
+
+   macauff
+
+*****
+Index
+*****
+
+* :ref:`genindex`
+* :ref:`search`
+
+.. toctree::
+   :hidden:
+
+   installation
+   quickstart
+   inputs

@@ -6,6 +6,8 @@ framework.
 
 import numpy as np
 
+__all__ = []
+
 
 def create_auf_params_grid(auf_folder_path, auf_pointings, filt_names, array_name,
                            len_first_axis=None):

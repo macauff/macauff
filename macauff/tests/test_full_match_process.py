@@ -9,6 +9,8 @@ import numpy as np
 from ..matching import CrossMatch
 from .test_matching import _replace_line
 
+__all__ = ['generate_random_data']
+
 
 def generate_random_data(N_a, N_b, N_c, extent, n_a_filts, n_b_filts, a_astro_sig, b_astro_sig,
                          a_cat, b_cat, seed=None):

@@ -387,9 +387,9 @@ class TestInputs:
 
         # List of simple one line config file replacements for error message checking
         for old_line, new_line, match_text, in_file in zip(
-                ['filt_names = G G_BP G_RP', 'filt_names = G G_BP G_RP', 'norm_scale_laws = 2 2 2',
+                ['filt_names = G_BP G G_RP', 'filt_names = G_BP G G_RP', 'norm_scale_laws = 2 2 2',
                  'psf_fwhms = 6.08 6.84 7.36 11.99', 'psf_fwhms = 6.08 6.84 7.36 11.99'],
-                ['', 'filt_names = G G_BP\n', 'norm_scale_laws = 2 2 a\n',
+                ['', 'filt_names = G_BP G\n', 'norm_scale_laws = 2 2 a\n',
                  'psf_fwhms = 6.08 6.84 7.36\n', 'psf_fwhms = 6.08 6.84 7.36 word\n'],
                 ['Missing key filt_names from catalogue "a"',
                  'a_tri_filt_names and a_filt_names should contain the same',

@@ -4,7 +4,7 @@
 *.pyc
 
 docs/_build
-docs/_api
+docs/api
 .tox
 .tmp
 *.egg-info
