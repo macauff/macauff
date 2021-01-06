@@ -4,6 +4,8 @@
 General
 ^^^^^^^
 
+- Preliminary creation of user documentation. [#22]
+
 - Established changelog [#8]
 
 New Features
