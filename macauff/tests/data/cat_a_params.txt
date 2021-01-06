@@ -5,7 +5,7 @@ cat_folder_path = gaia_folder
 auf_folder_path = gaia_auf_folder
 
 # Filter names are also used in any output file created
-filt_names = G G_BP G_RP
+filt_names = G_BP G G_RP
 
 # Catalogue PSF parameters
 # Full-width at half maximums for each filter, in order, in arcseconds
@@ -16,7 +16,7 @@ norm_scale_laws = 2 2 2
 # TRILEGAL Perturbation AUF parameters
 # Names of TRILEGAL filter sets for the catalogue
 tri_set_name = gaiadr2
-tri_filt_names = G G_BP G_RP
+tri_filt_names = G_BP G G_RP
 # Filter number to define limiting magnitude of TRILEGAL simulation in, based on output data file column (one-indexed) number
 tri_filt_num = 1
 # Flag to determine whether to re-download TRILEGAL simulations if they exist - must be "yes"/"no", "true"/"false", "t"/"f", or "1"/"0"
