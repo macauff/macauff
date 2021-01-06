@@ -19,7 +19,7 @@
 # -- Project information -----------------------------------------------------
 
 project = 'macauff'
-copyright = '2020, Tom J Wilson'
+copyright = '2021, Tom J Wilson'
 author = 'Tom J Wilson'
 
 # Parts of this conf.py use settings from sphinx-astropy's v1.py,
@@ -46,7 +46,11 @@ extensions = [
     'sphinx_astropy.ext.doctest',
     'sphinx_astropy.ext.changelog_links',
     'sphinx_astropy.ext.missing_static',
-    'sphinx.ext.mathjax']
+    'sphinx.ext.mathjax',
+    'sphinxfortran.fortran_domain',
+    'sphinxfortran.fortran_autodoc']
+
+fortran_src = ['../macauff/*.f90']
 
 # The suffix of source filenames.
 source_suffix = '.rst'
