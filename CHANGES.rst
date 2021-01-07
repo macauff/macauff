@@ -29,6 +29,9 @@ New Features
 Bug Fixes
 ^^^^^^^^^
 
+- Corrected an error in ``tests.generate_random_data``, where only one catalogue
+  had its source uncertainties simulated. [#23]
+
 - Correct typing of ``point_ind`` in ``misc_function_fortran``'s
   ``find_nearest_point``. [#18]
 
