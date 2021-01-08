@@ -79,10 +79,14 @@ def generate_random_data(N_a, N_b, N_c, extent, n_a_filts, n_b_filts, a_astro_si
         # with magnitude
         raise ValueError("b_sig currently has to be an integer for all generated data.")
 
-    a_astro[:, 0] = a_astro[:, 0] + rng.normal(loc=0, scale=a_astro_sig, size=N_c) / 3600
-    a_astro[:, 1] = a_astro[:, 1] + rng.normal(loc=0, scale=a_astro_sig, size=N_c) / 3600
-    b_astro[:, 0] = b_astro[:, 0] + rng.normal(loc=0, scale=b_astro_sig, size=N_c) / 3600
-    b_astro[:, 1] = b_astro[:, 1] + rng.normal(loc=0, scale=b_astro_sig, size=N_c) / 3600
+    a_circ_dist = rng.normal(loc=0, scale=a_astro[:, 2], size=N_a) / 3600
+    a_circ_angle = rng.uniform(0, 2*np.pi, size=N_a)
+    a_astro[:, 0] = a_astro[:, 0] + a_circ_dist * np.cos(a_circ_angle)
+    a_astro[:, 1] = a_astro[:, 1] + a_circ_dist * np.sin(a_circ_angle)
+    b_circ_dist = rng.normal(loc=0, scale=b_astro[:, 2], size=N_b) / 3600
+    b_circ_angle = rng.uniform(0, 2*np.pi, size=N_b)
+    b_astro[:, 0] = b_astro[:, 0] + b_circ_dist * np.cos(b_circ_angle)
+    b_astro[:, 1] = b_astro[:, 1] + b_circ_dist * np.sin(b_circ_angle)
 
     # Currently all we do, given the only option available is a naive Bayes match,
     # is ignore the photometry -- but we still require its file to be present.
@@ -109,7 +113,7 @@ def generate_random_data(N_a, N_b, N_c, extent, n_a_filts, n_b_filts, a_astro_si
 def test_naive_bayes_match():
     # Generate a small number of sources randomly, then run through the
     # cross-match process.
-    N_a, N_b, N_c = 20, 30, 15
+    N_a, N_b, N_c = 40, 50, 35
     n_a_filts, n_b_filts = 3, 4
     a_astro_sig, b_astro_sig = 0.3, 0.5
     r = 5 * np.sqrt(a_astro_sig**2 + b_astro_sig**2)
