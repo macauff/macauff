@@ -254,11 +254,11 @@ def source_pairing(joint_folder_path, a_cat_folder_path, b_cat_folder_path, a_au
         pool.close()
 
     countfilter = np.lib.format.open_memmap('{}/pairing/countfilt.npy'.format(joint_folder_path),
-                                            mode='w+', dtype=np.bool, shape=(small_len,))
+                                            mode='w+', dtype=bool, shape=(small_len,))
     afieldfilter = np.lib.format.open_memmap('{}/pairing/afieldfilt.npy'.format(joint_folder_path),
-                                             mode='w+', dtype=np.bool, shape=(len_a,))
+                                             mode='w+', dtype=bool, shape=(len_a,))
     bfieldfilter = np.lib.format.open_memmap('{}/pairing/bfieldfilt.npy'.format(joint_folder_path),
-                                             mode='w+', dtype=np.bool, shape=(len_b,))
+                                             mode='w+', dtype=bool, shape=(len_b,))
     for cnum in range(0, mem_chunk_num):
         lowind = np.floor(small_len*cnum/mem_chunk_num).astype(int)
         highind = np.floor(small_len*(cnum+1)/mem_chunk_num).astype(int)

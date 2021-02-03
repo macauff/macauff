@@ -77,7 +77,7 @@ def set_list(aindices, bindices, aoverlap, boverlap, joint_folder_path):
     # computational simplicity.
     maxiters = 50000
     grouplengthexceeded = np.lib.format.open_memmap('{}/group/grplenexceed.npy'.format(
-        joint_folder_path), mode='w+', dtype=np.bool, shape=(len(agrouplengths),))
+        joint_folder_path), mode='w+', dtype=bool, shape=(len(agrouplengths),))
     grouplengthexceeded[:] = 0
     for i in range(0, len(agrouplengths)):
         n_a = agrouplengths[i]
@@ -113,7 +113,7 @@ def set_list(aindices, bindices, aoverlap, boverlap, joint_folder_path):
     # Keep track of which sources have "good" group sizes, and the size of each
     # group in the two catalogues (e.g., group 1 has 2 "a" and 3 "b" sources).
     goodlength = np.lib.format.open_memmap('{}/group/goodlen.npy'.format(
-        joint_folder_path), mode='w+', dtype=np.bool, shape=(len(agrouplengths),))
+        joint_folder_path), mode='w+', dtype=bool, shape=(len(agrouplengths),))
     di = max(1, len(agrouplengths) // 20)
     for i in range(0, len(agrouplengths), di):
         goodlength[i:i+di] = np.logical_not(grouplengthexceeded[i:i+di])
