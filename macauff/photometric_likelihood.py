@@ -363,7 +363,7 @@ def _load_multiple_sky_slice(joint_folder_path, cat_name, ind1, ind2, cat_folder
         ``ind2``.
     '''
     sky_cut = np.lib.format.open_memmap('{}/{}_temporary_sky_slice_combined.npy'.format(
-        joint_folder_path, cat_name), mode='w+', dtype=np.bool, shape=(len(sky_inds),))
+        joint_folder_path, cat_name), mode='w+', dtype=bool, shape=(len(sky_inds),))
 
     di = max(1, len(sky_inds) // 20)
 
@@ -406,7 +406,7 @@ def _load_single_sky_slice(joint_folder_path, cat_name, ind, cat_folder_path, sk
         ``ind`` or not.
     '''
     sky_cut = np.lib.format.open_memmap('{}/{}_small_sky_slice.npy'.format(
-        joint_folder_path, cat_name), mode='w+', dtype=np.bool, shape=(len(sky_inds),))
+        joint_folder_path, cat_name), mode='w+', dtype=bool, shape=(len(sky_inds),))
 
     di = max(1, len(sky_inds) // 20)
 

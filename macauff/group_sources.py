@@ -219,10 +219,10 @@ def make_island_groupings(joint_folder_path, a_cat_folder_path, b_cat_folder_pat
     # in the main catalogue; here we default to, and only allow, their removal.
 
     passed_check = np.lib.format.open_memmap('{}/group/passed_check.npy'.format(joint_folder_path),
-                                             mode='w+', dtype=np.bool, shape=(alist.shape[1],))
+                                             mode='w+', dtype=bool, shape=(alist.shape[1],))
     passed_check[:] = 0
     failed_check = np.lib.format.open_memmap('{}/group/failed_check.npy'.format(joint_folder_path),
-                                             mode='w+', dtype=np.bool, shape=(alist.shape[1],))
+                                             mode='w+', dtype=bool, shape=(alist.shape[1],))
     failed_check[:] = 1
     islelen = alist.shape[1]
     num_good_checks = 0
@@ -260,7 +260,7 @@ def make_island_groupings(joint_folder_path, a_cat_folder_path, b_cat_folder_pat
             a = a_[subset]
             subset = blist_1[:bgrplen_small[i], i]
             b = b_[subset]
-            meets_min_distance = np.zeros(len(a)+len(b), np.bool)
+            meets_min_distance = np.zeros(len(a)+len(b), bool)
             # Do not check for longitudinal "extent" small separations for cases
             # where all 0-360 degrees are included, as this will result in no loss
             # of sources from consideration, with the 0->360 wraparound of
@@ -431,15 +431,15 @@ def _load_fourier_grid_cutouts(a, sky_rect_coords, joint_folder_path, cat_folder
     # Slice the memmapped catalogue, with a memmapped slicing array to
     # preserve memory.
     sky_cut_1 = np.lib.format.open_memmap('{}/{}_temporary_sky_slice_1.npy'.format(
-        joint_folder_path, cat_name), mode='w+', dtype=np.bool, shape=(len(a),))
+        joint_folder_path, cat_name), mode='w+', dtype=bool, shape=(len(a),))
     sky_cut_2 = np.lib.format.open_memmap('{}/{}_temporary_sky_slice_2.npy'.format(
-        joint_folder_path, cat_name), mode='w+', dtype=np.bool, shape=(len(a),))
+        joint_folder_path, cat_name), mode='w+', dtype=bool, shape=(len(a),))
     sky_cut_3 = np.lib.format.open_memmap('{}/{}_temporary_sky_slice_3.npy'.format(
-        joint_folder_path, cat_name), mode='w+', dtype=np.bool, shape=(len(a),))
+        joint_folder_path, cat_name), mode='w+', dtype=bool, shape=(len(a),))
     sky_cut_4 = np.lib.format.open_memmap('{}/{}_temporary_sky_slice_4.npy'.format(
-        joint_folder_path, cat_name), mode='w+', dtype=np.bool, shape=(len(a),))
+        joint_folder_path, cat_name), mode='w+', dtype=bool, shape=(len(a),))
     sky_cut = np.lib.format.open_memmap('{}/{}_temporary_sky_slice_combined.npy'.format(
-        joint_folder_path, cat_name), mode='w+', dtype=np.bool, shape=(len(a),))
+        joint_folder_path, cat_name), mode='w+', dtype=bool, shape=(len(a),))
 
     di = max(1, len(a) // 20)
     # Iterate over each small slice of the larger array, checking for upper
