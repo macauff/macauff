@@ -89,18 +89,65 @@ def test_load_fourier_grid_cutouts():
     assert np.all(_c == c_guess)
 
 
-def test_cumulative_fourier_transform():
-    r = np.linspace(0, 5, 10000)
-    dr = np.diff(r)
-    rho = np.linspace(0, 100, 10000)
-    drho = np.diff(rho)
-    sigma = 0.3
-    f = np.exp(-2 * np.pi**2 * (rho[:-1]+drho/2)**2 * sigma**2)
+class TestFortranCode():
+    def setup_class(self):
+        self.r = np.linspace(0, 5, 10000)
+        self.dr = np.diff(self.r)
+        self.rho = np.linspace(0, 100, 10000)
+        self.drho = np.diff(self.rho)
+        self.j0s = mff.calc_j0(self.rho[:-1]+self.drho/2, self.r[:-1]+self.dr/2)
 
-    j0s = mff.calc_j0(rho[:-1]+drho/2, r[:-1]+dr/2)
-    for dist in [0, 0.1, 0.5, 1, 3]:
-        p = gsf.cumulative_fourier_transform(f, r[:-1], dr, rho[:-1], drho, dist, j0s)
-        assert_allclose(p, 1 - np.exp(-0.5 * dist**2 / sigma**2), rtol=1e-3, atol=1e-4)
+    def test_cumulative_fourier_transform_probability(self):
+        sigma = 0.3
+        f = np.exp(-2 * np.pi**2 * (self.rho[:-1]+self.drho/2)**2 * sigma**2)
+
+        for dist in [0, 0.1, 0.5, 1, 3]:
+            p = gsf.cumulative_fourier_probability(f, self.r[:-1], self.dr, self.rho[:-1],
+                                                   self.drho, dist, self.j0s)
+            assert_allclose(p, 1 - np.exp(-0.5 * dist**2 / sigma**2), rtol=1e-3, atol=1e-4)
+
+    def test_cumulative_fourier_transform_distance(self):
+        sigma = 0.3
+        f = np.exp(-2 * np.pi**2 * (self.rho[:-1]+self.drho/2)**2 * sigma**2)
+
+        probs = [0, 0.1, 0.5, 0.95]
+        d = gsf.cumulative_fourier_distance(f, self.r[:-1], self.dr, self.rho[:-1], self.drho,
+                                            probs, self.j0s)
+        assert np.all(d.shape == (len(probs),))
+        for i, prob in enumerate(probs):
+            # We're forced to accept an absolute precision of half a bin width
+            assert_allclose(d[i]*3600, np.sqrt(-2 * sigma**2 * np.log(1 - prob)),
+                            rtol=1e-3, atol=self.dr[0]/2)
+
+    def test_get_integral_length(self):
+        rng = np.random.default_rng(112233)
+        a_err = rng.uniform(0.2, 0.4, 5)
+        b_err = rng.uniform(0.1, 0.3, 4)
+        a_four_sig = 0.2
+        a_fouriergrid = np.asfortranarray(np.exp(-2 * np.pi**2 * (self.rho[:-1]+self.drho/2)**2 *
+                                                 a_four_sig**2).reshape(-1, 1, 1, 1))
+        b_four_sig = 0.1
+        b_fouriergrid = np.asfortranarray(np.exp(-2 * np.pi**2 * (self.rho[:-1]+self.drho/2)**2 *
+                                                 b_four_sig**2).reshape(-1, 1, 1, 1))
+        amodrefind = np.zeros((3, len(a_err)), int, order='F')
+        bmodrefind = np.zeros((3, len(b_err)), int, order='F')
+        asize = rng.choice(np.arange(1, len(b_err)+1), size=5) + 1
+        ainds = np.zeros((len(b_err), len(a_err)), int, order='F')
+        for i in range(len(asize)):
+            ainds[:asize[i], i] = rng.choice(len(b_err), size=asize[i], replace=False)
+        frac_array = np.array([0.63, 0.9])
+
+        int_dists = gsf.get_integral_length(a_err, b_err, self.r[:-1], self.dr, self.rho[:-1],
+                                            self.drho, self.j0s, a_fouriergrid, b_fouriergrid,
+                                            amodrefind, bmodrefind, ainds, asize, frac_array)
+
+        assert np.all(int_dists.shape == (len(a_err), len(frac_array)))
+        for i in range(len(frac_array)):
+            for j in range(len(a_err)):
+                _berr = np.amax(b_err[ainds[:, j]])
+                assert_allclose(int_dists[j, i]*3600, np.sqrt(-2 * (a_err[j]**2 + _berr**2 +
+                                a_four_sig**2 + b_four_sig**2) * np.log(1 - frac_array[i])),
+                                rtol=1e-3, atol=self.dr[0]/2)
 
 
 class TestOverlap():
@@ -224,7 +271,7 @@ def test_clean_overlaps():
 
 class TestMakeIslandGroupings():
     def setup_class(self):
-        self.mem_chunk_num, self.include_phot_like = 2, False
+        self.mem_chunk_num, self.include_phot_like, self.use_phot_prior = 2, False, False
         self.max_sep, self.int_fracs = 11, [0.63, 0.9, 0.99]  # max_sep in arcseconds
         self.a_filt_names, self.b_filt_names = ['G', 'RP'], ['W1', 'W2', 'W3']
         self.a_title, self.b_title = 'gaia', 'wise'
@@ -340,6 +387,7 @@ class TestMakeIslandGroupings():
         self.cm.joint_folder_path = self.joint_folder_path
         self.cm.mem_chunk_num = self.mem_chunk_num
         self.cm.include_phot_like = self.include_phot_like
+        self.cm.use_phot_prior = self.use_phot_prior
 
     def _comparisons_in_islands(self, alist, blist, agrplen, bgrplen, N_a, N_b, N_c):
         # Given, say, 25 common sources from 30 'a' and 45 'b' objects, we'd
@@ -409,7 +457,7 @@ class TestMakeIslandGroupings():
             self.a_auf_folder_path, self.b_auf_folder_path, self.a_auf_pointings,
             self.b_auf_pointings, self.a_filt_names, self.b_filt_names, self.a_title, self.b_title,
             self.r, self.dr, self.rho, self.drho, self.j0s, self.max_sep, ax_lims,
-            self.int_fracs, self.mem_chunk_num, self.include_phot_like)
+            self.int_fracs, self.mem_chunk_num, self.include_phot_like, self.use_phot_prior)
 
         alist, blist = np.load('joint/group/alist.npy'), np.load('joint/group/blist.npy')
         agrplen, bgrplen = np.load('joint/group/agrplen.npy'), np.load('joint/group/bgrplen.npy')
@@ -466,7 +514,7 @@ class TestMakeIslandGroupings():
             self.a_auf_folder_path, self.b_auf_folder_path, self.a_auf_pointings,
             self.b_auf_pointings, self.a_filt_names, self.b_filt_names, self.a_title, self.b_title,
             self.r, self.dr, self.rho, self.drho, self.j0s, self.max_sep, ax_lims,
-            self.int_fracs, self.mem_chunk_num, self.include_phot_like)
+            self.int_fracs, self.mem_chunk_num, self.include_phot_like, self.use_phot_prior)
 
         alist, blist = np.load('joint/group/alist.npy'), np.load('joint/group/blist.npy')
         agrplen, bgrplen = np.load('joint/group/agrplen.npy'), np.load('joint/group/bgrplen.npy')
@@ -480,22 +528,6 @@ class TestMakeIslandGroupings():
         assert np.all(breject == np.array([N_b, N_b+1, N_b+2, N_b+3]))
         assert len(os.listdir('{}/group'.format(self.joint_folder_path))) == 8
         assert len(os.listdir('{}/reject'.format(self.joint_folder_path))) == 2
-
-    def test_island_no_phot_like(self):
-        os.system('rm -rf {}/group/*'.format(self.joint_folder_path))
-        os.system('rm -rf {}/reject/*'.format(self.joint_folder_path))
-        ax_lims = self.ax_lims
-        # Finally, check that we correctly raise an error if trying to calculate
-        # photometric-likelihood related values.
-        include_phot_like = True
-        with pytest.raises(NotImplementedError,
-                           match='not currently implemented. Please set include_phot_like'):
-            make_island_groupings(
-                self.joint_folder_path, self.a_cat_folder_path, self.b_cat_folder_path,
-                self.a_auf_folder_path, self.b_auf_folder_path, self.a_auf_pointings,
-                self.b_auf_pointings, self.a_filt_names, self.b_filt_names, self.a_title,
-                self.b_title, self.r, self.dr, self.rho, self.drho, self.j0s, self.max_sep,
-                ax_lims, self.int_fracs, self.mem_chunk_num, include_phot_like)
 
     def test_correct_file_number(self):
         os.system('rm -rf {}/group/*'.format(self.joint_folder_path))
@@ -530,3 +562,76 @@ class TestMakeIslandGroupings():
         assert 'Loading catalogue islands and' in output
         assert len(os.listdir('{}/group'.format(self.joint_folder_path))) == 8
         assert len(os.listdir('{}/reject'.format(self.joint_folder_path))) == 2
+
+    def test_make_island_groupings_include_phot_like(self):
+        os.system('rm -rf {}/group/*'.format(self.joint_folder_path))
+        os.system('rm -rf {}/reject/*'.format(self.joint_folder_path))
+        np.save('{}/con_cat_astro.npy'.format(self.a_cat_folder_path), self.a_coords)
+        np.save('{}/con_cat_astro.npy'.format(self.b_cat_folder_path), self.b_coords)
+        include_phot_like = True
+        make_island_groupings(
+            self.joint_folder_path, self.a_cat_folder_path, self.b_cat_folder_path,
+            self.a_auf_folder_path, self.b_auf_folder_path, self.a_auf_pointings,
+            self.b_auf_pointings, self.a_filt_names, self.b_filt_names, self.a_title, self.b_title,
+            self.r, self.dr, self.rho, self.drho, self.j0s, self.max_sep, self.ax_lims,
+            self.int_fracs, self.mem_chunk_num, include_phot_like, self.use_phot_prior)
+
+        # Verify that make_island_groupings doesn't change when the extra arrays
+        # are calculated, as an initial test.
+        alist, blist = np.load('joint/group/alist.npy'), np.load('joint/group/blist.npy')
+        agrplen, bgrplen = np.load('joint/group/agrplen.npy'), np.load('joint/group/bgrplen.npy')
+        self._comparisons_in_islands(alist, blist, agrplen, bgrplen, self.N_a, self.N_b,
+                                     self.N_com)
+        # This time we have an extra four files, the [ab][bf]len arrays, so it's
+        # not quite the same comparison as we made in make_island_grouping.
+        assert len(os.listdir('{}/group'.format(self.joint_folder_path))) == 12
+        assert len(os.listdir('{}/reject'.format(self.joint_folder_path))) == 0
+
+        aerr = np.load('{}/con_cat_astro.npy'.format(self.a_cat_folder_path))[:, 2]
+        berr = np.load('{}/con_cat_astro.npy'.format(self.b_cat_folder_path))[:, 2]
+
+        ablen = np.load('{}/group/ablen.npy'.format(self.joint_folder_path))
+        aflen = np.load('{}/group/aflen.npy'.format(self.joint_folder_path))
+        bblen = np.load('{}/group/bblen.npy'.format(self.joint_folder_path))
+        bflen = np.load('{}/group/bflen.npy'.format(self.joint_folder_path))
+
+        asize = np.load('{}/group/asize.npy'.format(self.joint_folder_path))
+        ainds = np.load('{}/group/ainds.npy'.format(self.joint_folder_path))
+        bsize = np.load('{}/group/bsize.npy'.format(self.joint_folder_path))
+        binds = np.load('{}/group/binds.npy'.format(self.joint_folder_path))
+
+        for i in range(len(ablen)):
+            d = ablen[i]*3600
+            if asize[i] > 0:
+                _berr = np.amax(berr[ainds[:asize[i], i]])
+                real_d = np.sqrt(-2 * (aerr[i]**2 + _berr**2) * np.log(1 - self.int_fracs[0]))
+                assert_allclose(d, real_d, rtol=1e-3, atol=self.dr[0]/2)
+            else:
+                # If there is no overlap in opposing catalogue objects, we should
+                # get a zero distance error circle.
+                assert d == 0
+        for i in range(len(aflen)):
+            d = aflen[i]*3600
+            if asize[i] > 0:
+                _berr = np.amax(berr[ainds[:asize[i], i]])
+                real_d = np.sqrt(-2 * (aerr[i]**2 + _berr**2) * np.log(1 - self.int_fracs[1]))
+                assert_allclose(d, real_d, rtol=1e-3, atol=self.dr[0]/2)
+            else:
+                assert d == 0
+
+        for i in range(len(bblen)):
+            d = bblen[i]*3600
+            if bsize[i] > 0:
+                _aerr = np.amax(aerr[binds[:bsize[i], i]])
+                real_d = np.sqrt(-2 * (berr[i]**2 + _aerr**2) * np.log(1 - self.int_fracs[0]))
+                assert_allclose(d, real_d, rtol=1e-3, atol=self.dr[0]/2)
+            else:
+                assert d == 0
+        for i in range(len(bflen)):
+            d = bflen[i]*3600
+            if bsize[i] > 0:
+                _aerr = np.amax(aerr[binds[:bsize[i], i]])
+                real_d = np.sqrt(-2 * (berr[i]**2 + _aerr**2) * np.log(1 - self.int_fracs[1]))
+                assert_allclose(d, real_d, rtol=1e-3, atol=self.dr[0]/2)
+            else:
+                assert d == 0
