@@ -9,7 +9,8 @@ import numpy as np
 import pytest
 
 from ..matching import CrossMatch
-from ..photometric_likelihood import compute_photometric_likelihoods
+from ..photometric_likelihood import compute_photometric_likelihoods, make_bins
+from ..photometric_likelihood_fortran import photometric_likelihood_fortran as plf
 from .test_matching import _replace_line
 
 
@@ -123,34 +124,6 @@ class TestOneSidedPhotometricLikelihood:
                     hist, bins = np.histogram(b[q & ~np.isnan(b[:, k]), k],
                                               bins=_bins[:, k, i])
                     assert np.all(hist >= 250)
-
-    def test_raise_error_message(self):
-        os.system('rm -r {}/phot_like/*'.format(self.joint_folder_path))
-        include_phot_like, use_phot_priors = False, True
-        for folder, name in zip([self.a_cat_folder_path, self.b_cat_folder_path], ['a', 'b']):
-            np.save('{}/con_cat_astro.npy'.format(folder), getattr(self, '{}_astro'.format(name)))
-            np.save('{}/con_cat_photo.npy'.format(folder), getattr(self, '{}_photo'.format(name)))
-        with pytest.raises(NotImplementedError, match='Only one-sided, asymmetric'):
-            compute_photometric_likelihoods(
-                self.joint_folder_path, self.a_cat_folder_path, self.b_cat_folder_path,
-                self.afilts, self.bfilts, self.mem_chunk_num, self.cf_points, self.cf_areas,
-                include_phot_like, use_phot_priors)
-
-        os.system('rm -r {}/phot_like/*'.format(self.joint_folder_path))
-        include_phot_like, use_phot_priors = True, False
-        with pytest.raises(NotImplementedError, match='Photometric likelihoods not currently'):
-            compute_photometric_likelihoods(
-                self.joint_folder_path, self.a_cat_folder_path, self.b_cat_folder_path,
-                self.afilts, self.bfilts, self.mem_chunk_num, self.cf_points, self.cf_areas,
-                include_phot_like, use_phot_priors)
-
-        os.system('rm -r {}/phot_like/*'.format(self.joint_folder_path))
-        include_phot_like, use_phot_priors = True, True
-        with pytest.raises(NotImplementedError, match='Photometric likelihoods not currently'):
-            compute_photometric_likelihoods(
-                self.joint_folder_path, self.a_cat_folder_path, self.b_cat_folder_path,
-                self.afilts, self.bfilts, self.mem_chunk_num, self.cf_points, self.cf_areas,
-                include_phot_like, use_phot_priors)
 
     def test_empty_filter(self):
         os.system('rm -r {}/phot_like/*'.format(self.joint_folder_path))
@@ -327,3 +300,268 @@ class TestOneSidedPhotometricLikelihood:
         self.cm.calculate_phot_like(files_per_phot)
         output = capsys.readouterr().out
         assert 'Loading photometric priors and likelihoods' in output
+
+
+def test_get_field_dists_fortran():
+    rng = np.random.default_rng(11119999)
+    a = np.empty((10, 2), float)
+    a[:, 0] = rng.uniform(0, 1, 10)
+    a[:, 1] = rng.uniform(0, 1, 10)
+
+    b = np.empty((15, 2), float)
+    b[:, 0] = rng.uniform(0, 1, 15)
+    b[:, 1] = rng.uniform(0, 1, 15)
+    d = rng.rayleigh(scale=0.1/3600, size=10)
+    t = rng.uniform(0, 2*np.pi, 10)
+    b[:10, 0] = a[:, 0] + d * np.cos(t)
+    b[:10, 1] = a[:, 1] + d * np.sin(t)
+    ainds = np.arange(0, 10).reshape(1, 10, order='F')
+    asize = np.array([1] * 10)
+    berr = np.array([0.05/3600] * 15)
+    aflags = np.ones(10, bool)
+    bflags = np.ones(15, bool)
+    bmag = np.array([10] * 15)
+    lowmag, uppmag = -999, 999
+
+    mask, area = plf.get_field_dists(a[:, 0], a[:, 1], b[:, 0], b[:, 1], ainds, asize, berr,
+                                     aflags, bflags, bmag, lowmag, uppmag)
+    test_mask = np.ones(10, bool)
+    test_mask[d <= berr[:10]] = 0
+    assert np.all(mask == test_mask)
+    assert np.sum(mask) > 0
+    assert area == np.sum(np.pi * berr[:10][d <= berr[:10]]**2)
+
+
+def test_brightest_mag_fortran():
+    rng = np.random.default_rng(11119998)
+    a = np.empty((10, 2), float)
+    a[:, 0] = rng.uniform(0, 1, 10)
+    a[:, 1] = rng.uniform(0, 1, 10)
+
+    b = np.empty((15, 2), float)
+    b[:, 0] = rng.uniform(0, 1, 15)
+    b[:, 1] = rng.uniform(0, 1, 15)
+    d = rng.rayleigh(scale=0.1/3600, size=10)
+    t = rng.uniform(0, 2*np.pi, 10)
+    b[:10, 0] = a[:, 0] + d * np.cos(t)
+    b[:10, 1] = a[:, 1] + d * np.sin(t)
+    ainds = np.arange(0, 10).reshape(1, 10, order='F')
+    asize = np.array([1] * 10)
+    aerr = np.array([0.05/3600] * 10)
+    aflags = np.ones(10, bool)
+    bflags = np.ones(15, bool)
+    amag = np.array([10] * 10)
+    bmag = np.array([12] * 15)
+    abin = np.array([9, 11])
+
+    mask, area = plf.brightest_mag(a[:, 0], a[:, 1], b[:, 0], b[:, 1], amag, bmag, ainds, asize,
+                                   aerr, aflags, bflags, abin)
+    test_mask = np.zeros((15, 1), bool)
+    test_mask[:10][d <= aerr, 0] = 1
+    assert np.all(mask == test_mask)
+    assert np.sum(mask) > 0
+    assert_allclose(area, np.sum(np.pi * aerr[d <= aerr]**2) / np.sum(d <= aerr))
+
+
+class TestFullPhotometricLikelihood:
+    def setup_class(self):
+        self.cf_points = np.array([[131.5, -0.5]])
+        self.cf_areas = 0.25 * np.ones((1), float)
+        self.joint_folder_path = 'test_path'
+        self.a_cat_folder_path = 'gaia_folder'
+        self.b_cat_folder_path = 'wise_folder'
+
+        self.area = 0.25
+
+        self.afilts, self.bfilts = np.array(['G']), np.array(['G'])
+
+        self.mem_chunk_num = 2
+        self.include_phot_like, self.use_phot_priors = True, True
+
+        os.makedirs('{}/phot_like'.format(self.joint_folder_path), exist_ok=True)
+        os.makedirs(self.a_cat_folder_path, exist_ok=True)
+        os.makedirs(self.b_cat_folder_path, exist_ok=True)
+
+        # Create a random selection of sources, and then NaN out 25% of each of
+        # the filters, at random.
+        seed = 98763
+        rng = np.random.default_rng(seed)
+
+        asig, bsig = 0.1, 0.15
+        self.Ntot = 30000
+
+        aa = np.empty((self.Ntot, 3), float)
+        aa[:, 0] = rng.uniform(131.25, 131.75, self.Ntot)
+        aa[:, 1] = rng.uniform(-0.75, -0.25, self.Ntot)
+        aa[:, 2] = asig
+
+        ba = np.empty((self.Ntot, 3), float)
+        d = rng.rayleigh(scale=np.sqrt(asig**2 + bsig**2)/3600, size=self.Ntot)
+        t = rng.uniform(0, 2*np.pi, size=self.Ntot)
+        ba[:, 0] = aa[:, 0] + d * np.cos(t)
+        ba[:, 1] = aa[:, 1] + d * np.sin(t)
+        ba[:, 2] = bsig
+
+        a_phot_sig, b_phot_sig = 0.05, 0.1
+
+        ap = rng.uniform(10, 15, (self.Ntot, len(self.afilts)))
+        bp = ap + rng.normal(loc=0, scale=b_phot_sig, size=(self.Ntot, len(self.bfilts)))
+        ap = ap + rng.normal(loc=0, scale=a_phot_sig, size=(self.Ntot, len(self.afilts)))
+
+        a_cut, b_cut = ap[:, 0] > 11, bp[:, 0] < 14.5
+        self.Nc = np.sum(a_cut & b_cut)
+
+        aa[~a_cut, 0] = rng.uniform(131.25, 131.75, np.sum(~a_cut))
+        aa[~a_cut, 1] = rng.uniform(-0.75, -0.25, np.sum(~a_cut))
+        ba[~b_cut, 0] = rng.uniform(131.25, 131.75, np.sum(~b_cut))
+        ba[~b_cut, 1] = rng.uniform(-0.75, -0.25, np.sum(~b_cut))
+
+        self.a_astro = aa
+        self.b_astro = ba
+        self.a_photo = ap
+        self.b_photo = bp
+
+        os.system('rm -r {}/group/*'.format(self.joint_folder_path))
+        # Have to pre-create the various overlap arrays, and integral lengths:
+        asize = np.ones(self.Ntot, int)
+        asize[~a_cut] = 0
+        ainds = -1*np.ones((1, self.Ntot), int, order='F')
+        ainds[0, :] = np.arange(0, self.Ntot)
+        ainds[0, ~a_cut] = -1
+        bsize = np.ones(self.Ntot, int)
+        bsize[~b_cut] = 0
+        binds = -1*np.ones((1, self.Ntot), int, order='F')
+        binds[0, :] = np.arange(0, self.Ntot)
+        binds[0, ~b_cut] = -1
+        np.save('{}/group/ainds.npy'.format(self.joint_folder_path), ainds)
+        np.save('{}/group/asize.npy'.format(self.joint_folder_path), asize)
+        np.save('{}/group/binds.npy'.format(self.joint_folder_path), binds)
+        np.save('{}/group/bsize.npy'.format(self.joint_folder_path), bsize)
+
+        # Integrate 2-D Gaussian to N*sigma radius gives probability Y of
+        # 1 - exp(-0.5 N^2 sigma^2 / sigma^2) = 1 - exp(-0.5 N^2).
+        # Rearranging for N gives N = sqrt(-2 ln(1 - Y))
+        self.Y_f, self.Y_b = 0.99, 0.63
+        N_b = np.sqrt(-2 * np.log(1 - self.Y_b))
+        N_f = np.sqrt(-2 * np.log(1 - self.Y_f))
+        ablen = N_b * np.sqrt(asig**2 + bsig**2) * np.ones(self.Ntot, float) / 3600
+        ablen[~a_cut] = 0
+        aflen = N_f * np.sqrt(asig**2 + bsig**2) * np.ones(self.Ntot, float) / 3600
+        aflen[~a_cut] = 0
+        bblen = N_b * np.sqrt(asig**2 + bsig**2) * np.ones(self.Ntot, float) / 3600
+        bblen[~b_cut] = 0
+        bflen = N_f * np.sqrt(asig**2 + bsig**2) * np.ones(self.Ntot, float) / 3600
+        bflen[~b_cut] = 0
+        np.save('{}/group/ablen.npy'.format(self.joint_folder_path), ablen)
+        np.save('{}/group/aflen.npy'.format(self.joint_folder_path), aflen)
+        np.save('{}/group/bblen.npy'.format(self.joint_folder_path), bblen)
+        np.save('{}/group/bflen.npy'.format(self.joint_folder_path), bflen)
+
+    def test_phot_like_prior_frac_inclusion(self):
+        os.system('rm -r {}/phot_like/*'.format(self.joint_folder_path))
+        for ipl, upp in zip([False, True, True], [True, False, True]):
+            for bf, ff in zip([None, 0.5, None], [0.5, None, None]):
+                msg = 'bright_frac' if bf is None else 'field_frac'
+                with pytest.raises(ValueError, match='{} must be supplied if '.format(msg)):
+                    compute_photometric_likelihoods(
+                        self.joint_folder_path, self.a_cat_folder_path, self.b_cat_folder_path,
+                        self.afilts, self.bfilts, self.mem_chunk_num, self.cf_points,
+                        self.cf_areas, ipl, upp, bright_frac=bf, field_frac=ff)
+
+    def test_compute_phot_like(self):
+        os.system('rm -r {}/phot_like/*'.format(self.joint_folder_path))
+        for folder, name in zip([self.a_cat_folder_path, self.b_cat_folder_path], ['a', 'b']):
+            np.save('{}/con_cat_astro.npy'.format(folder), getattr(self, '{}_astro'.format(name)))
+            np.save('{}/con_cat_photo.npy'.format(folder), getattr(self, '{}_photo'.format(name)))
+        compute_photometric_likelihoods(
+            self.joint_folder_path, self.a_cat_folder_path, self.b_cat_folder_path,
+            self.afilts, self.bfilts, self.mem_chunk_num, self.cf_points,
+            self.cf_areas, self.include_phot_like, self.use_phot_priors, bright_frac=self.Y_b,
+            field_frac=self.Y_f)
+
+        c_p = np.load('{}/phot_like/c_priors.npy'.format(self.joint_folder_path))
+        c_l = np.load('{}/phot_like/c_array.npy'.format(self.joint_folder_path))
+        fa_p = np.load('{}/phot_like/fa_priors.npy'.format(self.joint_folder_path))
+        fa_l = np.load('{}/phot_like/fa_array.npy'.format(self.joint_folder_path))
+        fb_p = np.load('{}/phot_like/fb_priors.npy'.format(self.joint_folder_path))
+        fb_l = np.load('{}/phot_like/fb_array.npy'.format(self.joint_folder_path))
+
+        fake_c_p = self.Nc / self.area
+        fake_fa_p = (self.Ntot - self.Nc) / self.area
+        fake_fb_p = (self.Ntot - self.Nc) / self.area
+        assert_allclose(c_p, fake_c_p, rtol=0.05)
+        assert_allclose(fa_p, fake_fa_p, rtol=0.01)
+        assert_allclose(fb_p, fake_fb_p, rtol=0.01)
+
+        abins = make_bins(self.a_photo[~np.isnan(self.a_photo[:, 0]), 0])
+        bbins = make_bins(self.b_photo[~np.isnan(self.b_photo[:, 0]), 0])
+        a = self.a_photo[~np.isnan(self.a_photo[:, 0]), 0]
+        b = self.b_photo[~np.isnan(self.b_photo[:, 0]), 0]
+        q = (a <= 11) | (b >= 14.5)
+
+        fake_fa_l = np.zeros((len(abins) - 1, 1, 1, 1), float)
+        h, _ = np.histogram(a[q], bins=abins, density=True)
+        fake_fa_l[:, 0, 0, 0] = h
+        fake_abins = np.load('{}/phot_like/abinsarray.npy'.format(self.joint_folder_path))[:, 0, 0]
+        assert np.all(abins == fake_abins)
+        assert np.all(fake_fa_l.shape == fa_l.shape)
+        assert_allclose(fa_l, fake_fa_l, atol=0.02)
+
+        fake_fb_l = np.zeros((len(bbins) - 1, 1, 1, 1), float)
+        h, _ = np.histogram(b[q], bins=bbins, density=True)
+        fake_fb_l[:, 0, 0, 0] = h
+        fake_bbins = np.load('{}/phot_like/bbinsarray.npy'.format(self.joint_folder_path))[:, 0, 0]
+        assert np.all(bbins == fake_bbins)
+        assert np.all(fake_fb_l.shape == fb_l.shape)
+        assert_allclose(fb_l, fake_fb_l, atol=0.02)
+
+        h, _, _ = np.histogram2d(a[~q], b[~q], bins=[abins, bbins], density=True)
+        fake_c_l = np.zeros((len(bbins)-1, len(abins) - 1, 1, 1, 1), float, order='F')
+        fake_c_l[:, :, 0, 0, 0] = h.T
+        assert np.all(fake_c_l.shape == c_l.shape)
+        assert_allclose(c_l, fake_c_l, rtol=0.1, atol=0.05)
+
+    def test_compute_phot_like_use_priors_only(self):
+        os.system('rm -r {}/phot_like/*'.format(self.joint_folder_path))
+        for folder, name in zip([self.a_cat_folder_path, self.b_cat_folder_path], ['a', 'b']):
+            np.save('{}/con_cat_astro.npy'.format(folder), getattr(self, '{}_astro'.format(name)))
+            np.save('{}/con_cat_photo.npy'.format(folder), getattr(self, '{}_photo'.format(name)))
+        include_phot_like = False
+        compute_photometric_likelihoods(
+            self.joint_folder_path, self.a_cat_folder_path, self.b_cat_folder_path,
+            self.afilts, self.bfilts, self.mem_chunk_num, self.cf_points,
+            self.cf_areas, include_phot_like, self.use_phot_priors, bright_frac=self.Y_b,
+            field_frac=self.Y_f)
+
+        c_p = np.load('{}/phot_like/c_priors.npy'.format(self.joint_folder_path))
+        c_l = np.load('{}/phot_like/c_array.npy'.format(self.joint_folder_path))
+        fa_p = np.load('{}/phot_like/fa_priors.npy'.format(self.joint_folder_path))
+        fa_l = np.load('{}/phot_like/fa_array.npy'.format(self.joint_folder_path))
+        fb_p = np.load('{}/phot_like/fb_priors.npy'.format(self.joint_folder_path))
+        fb_l = np.load('{}/phot_like/fb_array.npy'.format(self.joint_folder_path))
+
+        fake_c_p = self.Nc / self.area
+        fake_fa_p = (self.Ntot - self.Nc) / self.area
+        fake_fb_p = (self.Ntot - self.Nc) / self.area
+        assert_allclose(c_p, fake_c_p, rtol=0.05)
+        assert_allclose(fa_p, fake_fa_p, rtol=0.01)
+        assert_allclose(fb_p, fake_fb_p, rtol=0.01)
+
+        abins = make_bins(self.a_photo[~np.isnan(self.a_photo[:, 0]), 0])
+        bbins = make_bins(self.b_photo[~np.isnan(self.b_photo[:, 0]), 0])
+
+        fake_fa_l = np.ones((len(abins) - 1, 1, 1, 1), float)
+        fake_abins = np.load('{}/phot_like/abinsarray.npy'.format(self.joint_folder_path))[:, 0, 0]
+        assert np.all(abins == fake_abins)
+        assert np.all(fake_fa_l.shape == fa_l.shape)
+        assert_allclose(fa_l, fake_fa_l)
+
+        fake_fb_l = np.ones((len(bbins) - 1, 1, 1, 1), float)
+        fake_bbins = np.load('{}/phot_like/bbinsarray.npy'.format(self.joint_folder_path))[:, 0, 0]
+        assert np.all(bbins == fake_bbins)
+        assert np.all(fake_fb_l.shape == fb_l.shape)
+        assert_allclose(fb_l, fake_fb_l)
+
+        fake_c_l = np.ones((len(bbins)-1, len(abins) - 1, 1, 1, 1), float, order='F')
+        assert np.all(fake_c_l.shape == c_l.shape)
+        assert_allclose(c_l, fake_c_l)
