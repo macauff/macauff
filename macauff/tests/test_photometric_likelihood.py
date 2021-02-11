@@ -363,6 +363,44 @@ def test_brightest_mag_fortran():
     assert_allclose(area, np.sum(np.pi * aerr[d <= aerr]**2) / np.sum(d <= aerr))
 
 
+def test_make_bins():
+    # Test a few combinations of input magnitude arrays to ensure make_bins
+    # returns expected bins.
+
+    dm = 0.1/251
+    m = np.arange(10+1e-10, 15, dm)
+    bins = make_bins(m)
+    assert_allclose(bins, np.arange(10, 15+1e-10, 0.1))
+    h, _ = np.histogram(m, bins=bins)
+    assert np.all(h == 251)
+
+    dm = 0.1/2500
+    m = np.arange(10+1e-10, 15, dm)
+    bins = make_bins(m)
+    assert_allclose(bins, np.arange(10, 15+1e-10, 0.1))
+    h, _ = np.histogram(m, bins=bins)
+    assert np.all(h == 2500)
+
+    dm = 0.1/249
+    m = np.arange(10+1e-10, 15, dm)
+    bins = make_bins(m)
+    assert_allclose(bins, np.arange(10, 15+1e-10, 0.2))
+    h, _ = np.histogram(m, bins=bins)
+    assert np.all(h == 2*249)
+
+    dm = 0.1/124
+    m = np.arange(10+1e-10, 15, dm)
+    bins = make_bins(m)
+    fake_bins = np.arange(10, 15.11, 0.3)
+    fake_bins[-1] = 15
+    assert_allclose(bins, fake_bins)
+    h, _ = np.histogram(m, bins=bins)
+    # With this bin size not quite being exactly able to fit into
+    # 10 -> 15 exactly, the final bin is only 0.2 wide, and hence
+    # not a "triple" sized bin like the others.
+    assert np.all(h[:-1] == 3*124) & (h[-1] == 2*124)
+
+
 class TestFullPhotometricLikelihood:
     def setup_class(self):
         self.cf_points = np.array([[131.5, -0.5]])
