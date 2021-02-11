@@ -4,6 +4,7 @@ This module provides miscellaneous scripts, called in other parts of the cross-m
 framework.
 '''
 
+import os
 import numpy as np
 
 __all__ = []
@@ -131,3 +132,15 @@ def hav_dist_constant_lat(x_lon, x_lat, lon):
                                            np.sin(np.radians((x_lon - lon)/2)))))
 
     return dist
+
+
+def map_large_index_to_small_index(inds, length, folder):
+    inds_unique_flat = np.unique(inds[inds > -1])
+    map_array = np.lib.format.open_memmap('{}/map_array.npy'.format(folder), mode='w+', dtype=int,
+                                          shape=(length,))
+    map_array[:] = -1
+    map_array[inds_unique_flat] = np.arange(0, len(inds_unique_flat), dtype=int)
+    inds_map = np.asfortranarray(map_array[inds.flatten()].reshape(inds.shape))
+    os.system('rm {}/map_array.npy'.format(folder))
+
+    return inds_map, inds_unique_flat
