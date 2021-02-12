@@ -1,4 +1,34 @@
-0.1.1 (unreleased)
+0.1.2 (unreleased)
+----------------
+
+General
+^^^^^^^
+
+New Features
+^^^^^^^^^^^^
+
+- Added options to photometric routines to create full photometry-based
+  likelihood and prior, or just use the photometric prior and use the naive
+  equal-probability likelihood. [#25]
+
+Bug Fixes
+^^^^^^^^^
+
+- Corrected an error in ``tests.generate_random_data``, where only one catalogue
+  had its source uncertainties simulated. [#23]
+
+API Changes
+^^^^^^^^^^^
+
+- Added ``int_fracs`` as an input to the joint configuration file for a
+  cross-match. [#25]
+
+Other Changes
+^^^^^^^^^^^^^
+
+
+
+0.1.1 (2021-01-06)
 ----------------
 
 General
@@ -10,10 +40,6 @@ General
 
 New Features
 ^^^^^^^^^^^^
-
-- Added options to photometric routines to create full photometry-based
-  likelihood and prior, or just use the photometric prior and use the naive
-  equal-probability likelihood. [#25]
 
 - Created ``generate_random_data``, to create simulated catalogues for testing
   full end-to-end matches. [#20]
@@ -33,9 +59,6 @@ New Features
 Bug Fixes
 ^^^^^^^^^
 
-- Corrected an error in ``tests.generate_random_data``, where only one catalogue
-  had its source uncertainties simulated. [#23]
-
 - Correct typing of ``point_ind`` in ``misc_function_fortran``'s
   ``find_nearest_point``. [#18]
 
@@ -43,9 +66,6 @@ Bug Fixes
 
 API Changes
 ^^^^^^^^^^^
-
-- Added ``int_fracs`` as an input to the joint configuration file for a
-  cross-match. [#25]
 
 - Moved ``delta_mag_cut`` from ``make_perturb_aufs`` to an input variable, defined
   in ``create_perturb_auf``. [#19]
