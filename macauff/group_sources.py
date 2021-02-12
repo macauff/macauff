@@ -11,7 +11,7 @@ import operator
 import numpy as np
 
 from .misc_functions import (create_auf_params_grid, load_small_ref_auf_grid,
-                             hav_dist_constant_lat)
+                             hav_dist_constant_lat, map_large_index_to_small_index)
 from .group_sources_fortran import group_sources_fortran as gsf
 from .make_set_list import set_list
 
@@ -21,7 +21,8 @@ __all__ = ['make_island_groupings']
 def make_island_groupings(joint_folder_path, a_cat_folder_path, b_cat_folder_path,
                           a_auf_folder_path, b_auf_folder_path, a_auf_pointings, b_auf_pointings,
                           a_filt_names, b_filt_names, a_title, b_title, r, dr, rho, drho, j0s,
-                          max_sep, ax_lims, int_fracs, mem_chunk_num, include_phot_like):
+                          max_sep, ax_lims, int_fracs, mem_chunk_num, include_phot_like,
+                          use_phot_priors):
     '''
     Function to handle the creation of "islands" of astrometrically coeval
     sources, and identify which overlap to some probability based on their
@@ -87,6 +88,9 @@ def make_island_groupings(joint_folder_path, a_cat_folder_path, b_cat_folder_pat
     include_phot_like : boolean
         Flag indicating whether to perform additional computations required for
         the future calculation of photometric likelihoods.
+    use_phot_priors : boolean
+        Flag indicating whether to calcualte additional parameters needed to
+        calculate photometric-information dependent priors for cross-matching.
     '''
 
     # Convert from arcseconds to degrees internally.
@@ -201,9 +205,75 @@ def make_island_groupings(joint_folder_path, a_cat_folder_path, b_cat_folder_pat
     ainds, asize = _clean_overlaps(ainds, asize, joint_folder_path, 'ainds')
     binds, bsize = _clean_overlaps(binds, bsize, joint_folder_path, 'binds')
 
-    if include_phot_like:
-        raise NotImplementedError("Photometric likelihood not currently implemented. "
-                                  "Please set include_phot_like to False.")
+    if include_phot_like or use_phot_priors:
+        ablen = np.lib.format.open_memmap('{}/group/ablen.npy'.format(joint_folder_path),
+                                          mode='w+', dtype=float, shape=(len(a_full),))
+        aflen = np.lib.format.open_memmap('{}/group/aflen.npy'.format(joint_folder_path),
+                                          mode='w+', dtype=float, shape=(len(a_full),))
+        bblen = np.lib.format.open_memmap('{}/group/bblen.npy'.format(joint_folder_path),
+                                          mode='w+', dtype=float, shape=(len(b_full),))
+        bflen = np.lib.format.open_memmap('{}/group/bflen.npy'.format(joint_folder_path),
+                                          mode='w+', dtype=float, shape=(len(b_full),))
+
+        for cnum in range(0, mem_chunk_num):
+            lowind = np.floor(len(a_full)*cnum/mem_chunk_num).astype(int)
+            highind = np.floor(len(a_full)*(cnum+1)/mem_chunk_num).astype(int)
+            a = a_full[lowind:highind, 2]
+
+            a_inds_small = ainds[:, lowind:highind]
+            a_size_small = asize[lowind:highind]
+            a_inds_small = np.asfortranarray(a_inds_small[:np.amax(a_size_small), :])
+
+            a_inds_map, a_inds_unique = map_large_index_to_small_index(
+                a_inds_small, len(a_full), '{}/group'.format(joint_folder_path))
+
+            b = b_full[a_inds_unique, 2]
+
+            modrefind = np.load('{}/modelrefinds.npy'.format(a_auf_folder_path),
+                                mmap_mode='r')[:, lowind:highind]
+            [a_fouriergrid], a_modrefindsmall = load_small_ref_auf_grid(
+                modrefind, a_auf_folder_path, ['fourier'])
+            modrefind = np.load('{}/modelrefinds.npy'.format(b_auf_folder_path),
+                                mmap_mode='r')[:, a_inds_unique]
+            [b_fouriergrid], b_modrefindsmall = load_small_ref_auf_grid(
+                modrefind, b_auf_folder_path, ['fourier'])
+            del modrefind
+
+            a_int_lens = gsf.get_integral_length(
+                a, b, r[:-1], dr, rho[:-1], drho, j0s, a_fouriergrid, b_fouriergrid,
+                a_modrefindsmall, b_modrefindsmall, a_inds_map, a_size_small, int_fracs[0:2])
+            ablen[lowind:highind] = a_int_lens[:, 0]
+            aflen[lowind:highind] = a_int_lens[:, 1]
+
+        for cnum in range(0, mem_chunk_num):
+            lowind = np.floor(len(b_full)*cnum/mem_chunk_num).astype(int)
+            highind = np.floor(len(b_full)*(cnum+1)/mem_chunk_num).astype(int)
+            b = b_full[lowind:highind, 2]
+
+            b_inds_small = binds[:, lowind:highind]
+            b_size_small = bsize[lowind:highind]
+            b_inds_small = np.asfortranarray(b_inds_small[:np.amax(b_size_small), :])
+
+            b_inds_map, b_inds_unique = map_large_index_to_small_index(
+                b_inds_small, len(b_full), '{}/group'.format(joint_folder_path))
+
+            a = a_full[b_inds_unique, 2]
+
+            modrefind = np.load('{}/modelrefinds.npy'.format(b_auf_folder_path),
+                                mmap_mode='r')[:, lowind:highind]
+            [b_fouriergrid], b_modrefindsmall = load_small_ref_auf_grid(
+                modrefind, b_auf_folder_path, ['fourier'])
+            modrefind = np.load('{}/modelrefinds.npy'.format(a_auf_folder_path),
+                                mmap_mode='r')[:, b_inds_unique]
+            [a_fouriergrid], a_modrefindsmall = load_small_ref_auf_grid(
+                modrefind, a_auf_folder_path, ['fourier'])
+            del modrefind
+
+            b_int_lens = gsf.get_integral_length(
+                b, a, r[:-1], dr, rho[:-1], drho, j0s, b_fouriergrid, a_fouriergrid,
+                b_modrefindsmall, a_modrefindsmall, b_inds_map, b_size_small, int_fracs[0:2])
+            bblen[lowind:highind] = b_int_lens[:, 0]
+            bflen[lowind:highind] = b_int_lens[:, 1]
 
     print("Maximum overlaps are:", amaxsize, bmaxsize)
     sys.stdout.flush()

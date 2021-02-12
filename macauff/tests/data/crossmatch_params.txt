@@ -37,3 +37,6 @@ cross_match_extent = 131 138 -3 3
 
 # Number of chunks to break each catalogue into when splitting larger catalogues up for memory reasons
 mem_chunk_num = 10
+
+# Integral fractions for various error circle cutouts used during the cross-match process. Should be space-separated floats, in the order of <bright error circle fraction>, <field error circle fraction>, <potential counterpart integral limit>
+int_fracs = 0.63 0.9 0.99

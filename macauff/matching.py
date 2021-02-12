@@ -264,7 +264,7 @@ class CrossMatch():
                            'run_cf', 'run_source', 'cf_region_type', 'cf_region_frame',
                            'cf_region_points', 'joint_folder_path', 'pos_corr_dist',
                            'real_hankel_points', 'four_hankel_points', 'four_max_rho',
-                           'cross_match_extent', 'mem_chunk_num']:
+                           'cross_match_extent', 'mem_chunk_num', 'int_fracs']:
             if check_flag not in joint_config:
                 raise ValueError("Missing key {} from joint metadata file.".format(check_flag))
 
@@ -413,6 +413,15 @@ class CrossMatch():
         except ValueError:
             raise ValueError("mem_chunk_num should be a single integer number.")
 
+        a = joint_config['int_fracs'].split()
+        try:
+            b = np.array([float(f) for f in a])
+        except ValueError:
+            raise ValueError("All elements of int_fracs should be floats.")
+        if len(b) != 3:
+            raise ValueError("int_fracs should contain three elements.")
+        self.int_fracs = b
+
     def make_shared_data(self):
         """
         Function to initialise the shared variables used in the cross-match process.
@@ -540,9 +549,6 @@ class CrossMatch():
             [len(files) for _, _, files in os.walk('{}/reject'.format(self.joint_folder_path))])
         correct_file_number = expected_files == file_number
 
-        # Currently hard-code the integral fractions used in group_sources:
-        int_fracs = np.array([0.63, 0.9, 0.99])
-
         # First check whether we actually need to dip into the group sources
         # routine or not.
         if self.run_group or not correct_file_number:
@@ -560,8 +566,8 @@ class CrossMatch():
                        self.a_auf_folder_path, self.b_auf_folder_path, self.a_auf_region_points,
                        self.b_auf_region_points, self.a_filt_names, self.b_filt_names,
                        self.a_cat_name, self.b_cat_name, self.r, self.dr, self.rho, self.drho,
-                       self.j0s, self.pos_corr_dist, self.cross_match_extent, int_fracs,
-                       self.mem_chunk_num, self.include_phot_like)
+                       self.j0s, self.pos_corr_dist, self.cross_match_extent, self.int_fracs,
+                       self.mem_chunk_num, self.include_phot_like, self.use_phot_priors)
         else:
             print('Loading catalogue islands and overlaps...')
             sys.stdout.flush()
@@ -599,10 +605,17 @@ class CrossMatch():
                 self.run_source = True
             os.system('rm -r {}/phot_like/*'.format(self.joint_folder_path))
             self._calculate_cf_areas()
+            if self.use_phot_priors or self.include_phot_like:
+                bright_frac = self.int_fracs[0]
+                field_frac = self.int_fracs[1]
+            else:
+                bright_frac = None
+                field_frac = None
             phot_like_func(
                 self.joint_folder_path, self.a_cat_folder_path, self.b_cat_folder_path,
                 self.a_filt_names, self.b_filt_names, self.mem_chunk_num, self.cf_region_points,
-                self.cf_areas, self.include_phot_like, self.use_phot_priors)
+                self.cf_areas, self.include_phot_like, self.use_phot_priors, bright_frac,
+                field_frac)
         else:
             print('Loading photometric priors and likelihoods...')
             sys.stdout.flush()
