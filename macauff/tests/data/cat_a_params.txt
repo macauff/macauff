@@ -15,7 +15,7 @@ norm_scale_laws = 2 2 2
 
 # TRILEGAL Perturbation AUF parameters
 # Names of TRILEGAL filter sets for the catalogue
-tri_set_name = gaiadr2
+tri_set_name = gaiaDR2
 tri_filt_names = G_BP G G_RP
 # Filter number to define limiting magnitude of TRILEGAL simulation in, based on output data file column (one-indexed) number
 tri_filt_num = 1
