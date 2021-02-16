@@ -333,14 +333,14 @@ class TestInputs:
         cm = CrossMatch(os.path.join(os.path.dirname(__file__), 'data/crossmatch_params_.txt'),
                         os.path.join(os.path.dirname(__file__), 'data/cat_a_params.txt'),
                         os.path.join(os.path.dirname(__file__), 'data/cat_b_params.txt'))
-        assert cm.a_tri_set_name == 'gaiadr2'
+        assert cm.a_tri_set_name == 'gaiaDR2'
         assert np.all(cm.b_tri_filt_names == np.array(['W1', 'W2', 'W3', 'W4']))
         assert cm.a_tri_filt_num == 1
         assert not cm.b_download_tri
 
         # List of simple one line config file replacements for error message checking
         for old_line, new_line, match_text, in_file in zip(
-                ['tri_set_name = gaiadr2', 'tri_filt_num = 11', 'tri_filt_num = 11',
+                ['tri_set_name = gaiaDR2', 'tri_filt_num = 11', 'tri_filt_num = 11',
                  'download_tri = no', 'download_tri = no'],
                 ['', 'tri_filt_num = a\n', 'tri_filt_num = 3.4\n', 'download_tri = aye\n',
                  'download_tri = yes\n'],
