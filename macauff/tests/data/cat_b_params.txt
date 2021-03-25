@@ -10,8 +10,6 @@ filt_names = W1 W2 W3 W4
 # Catalogue PSF parameters
 # Full-width at half maximums for each filter, in order, in arcseconds
 psf_fwhms = 6.08 6.84 7.36 11.99
-# The source count vs magnitude scaling relations z for bright sources, following the geometric series z^mag
-norm_scale_laws = 2 2 2 2
 
 # TRILEGAL Perturbation AUF parameters
 # Names of TRILEGAL filter sets for the catalogue
@@ -32,3 +30,5 @@ auf_region_points = 131 134 4 -1 1 4
 
 # Local density calculation radius, in arcseconds
 dens_dist = 900
+# Magnitudes, in each bandpass, down to which to count nearby local sources when calculating local density
+dens_mags = 20 20 20 20
