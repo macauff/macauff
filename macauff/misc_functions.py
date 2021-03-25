@@ -248,7 +248,7 @@ def _lon_cut(i, a, di, lon, padding, sky_cut, cat_folder_path, inequality):
         sky position criterion.
     cat_folder_path : string
         Folder on disk where main catalogue being cross-matched is stored.
-    inequaility : ``operator.le`` or ``operator.ge``
+    inequality : ``operator.le`` or ``operator.ge``
         Function to determine whether a source is either above or below the
         given ``lon`` value.
     '''
