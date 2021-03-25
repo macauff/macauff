@@ -218,6 +218,9 @@ def _load_rectangular_slice(folder_path, cat_name, cat_folder_path, a, lon1, lon
         sky_cut[i:i+di] = (sky_cut_1[i:i+di] & sky_cut_2[i:i+di] &
                            sky_cut_3[i:i+di] & sky_cut_4[i:i+di])
 
+    for i in range(4):
+        os.system('rm {}/{}_temporary_sky_slice_{}.npy'.format(folder_path, cat_name, i+1))
+
     return sky_cut
 
 
