@@ -521,13 +521,14 @@ class CrossMatch():
                 if self.compute_local_density:
                     _kwargs = dict(_kwargs, **{'density_radius': self.a_dens_dist})
             else:
+                os.system("rm -rf {}/*".format(self.a_auf_folder_path))
                 _kwargs = {}
             perturb_auf_func(self.a_auf_folder_path, self.a_cat_folder_path, self.a_filt_names,
                              self.a_auf_region_points, self.r, self.dr,
                              self.rho, self.drho, 'a', self.include_perturb_auf,
                              self.mem_chunk_num, **_kwargs)
         else:
-            print('Loading empirical crowding AUFs for catalogue "a"...')
+            print('Loading empirical perturbation AUFs for catalogue "a"...')
             sys.stdout.flush()
 
         b_expected_files = 3 + len(self.b_auf_region_points) + (
@@ -566,7 +567,6 @@ class CrossMatch():
                                   ax_folder, ax_folder))
                 if self.compute_local_density:
                     _kwargs = dict(_kwargs, **{'density_radius': self.b_dens_dist})
-
             else:
                 os.system("rm -rf {}/*".format(self.b_auf_folder_path))
                 _kwargs = {}
@@ -575,7 +575,7 @@ class CrossMatch():
                              self.rho, self.drho, 'b', self.include_perturb_auf,
                              self.mem_chunk_num, **_kwargs)
         else:
-            print('Loading empirical crowding AUFs for catalogue "b"...')
+            print('Loading empirical perturbation AUFs for catalogue "b"...')
             sys.stdout.flush()
 
     def group_sources(self, files_per_grouping, group_func=make_island_groupings):
