@@ -2,7 +2,7 @@ from setuptools import find_packages
 from numpy.distutils.core import Extension, setup
 
 names = ['group_sources_fortran', 'misc_functions_fortran', 'counterpart_pairing_fortran',
-         'photometric_likelihood_fortran']
+         'photometric_likelihood_fortran', 'perturbation_auf_fortran']
 f90_args = ["-Wall", "-Wextra", "-Werror", "-pedantic", "-fbacktrace", "-O0", "-g", "-fcheck=all",
             "-fopenmp"]
 

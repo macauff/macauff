@@ -20,7 +20,11 @@ jobs:
           pip install numpy
           pip install tox
       - name: Run tests
+        if: github.event_name != 'push' || github.ref != 'refs/heads/master'
         run: tox -e test
+      - name: Run tests with remote
+        if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+        run: tox -e test -- --remote-data
       - name: Run documentation
         run: tox -e build_docs
 
