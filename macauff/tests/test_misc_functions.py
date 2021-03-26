@@ -110,15 +110,17 @@ def test_load_rectangular_slice():
     padding = 0.05
     sky_cut = _load_rectangular_slice('.', '', a, lon1, lon2, lat1, lat2, padding)
     for i in range(len(a)):
-        within_range = (((hav_dist_constant_lat(a[i, 0], a[i, 1], lon1) <= padding) |
-                         (a[i, 0] > lon1)) &
-                        ((hav_dist_constant_lat(a[i, 0], a[i, 1], lon2) <= padding) |
-                         (a[i, 0] < lon2)) &
-                        (a[i, 1] >= lat1-padding) & (a[i, 1] <= lat2+padding))
+        within_range = np.empty(4, bool)
+        within_range[0] = ((hav_dist_constant_lat(a[i, 0], a[i, 1], lon1) <= padding) |
+                           (a[i, 0] > lon1))
+        within_range[1] = ((hav_dist_constant_lat(a[i, 0], a[i, 1], lon2) <= padding) |
+                           (a[i, 0] < lon2))
+        within_range[2] = (a[i, 1] >= lat1-padding)
+        within_range[3] = (a[i, 1] <= lat2+padding)
         if sky_cut[i]:
-            assert within_range
+            assert np.all(within_range)
         else:
-            assert not within_range
+            assert not np.all(within_range)
 
 
 def test_load_single_sky_slice():
