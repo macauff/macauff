@@ -19,11 +19,11 @@ jobs:
           sudo ln -sf /usr/bin/gfortran-9 /usr/bin/gfortran
           pip install numpy
           pip install tox
-      - name: Run tests
-        if: github.event_name != 'push' || github.ref != 'refs/heads/master'
+      - if: github.event_name != 'push' || github.ref != 'refs/heads/master'
+        name: Run tests
         run: tox -e test
-      - name: Run tests with remote
-        if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+      - if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+        name: Run tests with remote
         run: tox -e test -- --remote-data
       - name: Run documentation
         run: tox -e build_docs
