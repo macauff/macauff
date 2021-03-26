@@ -7,11 +7,11 @@ various photometric integral purposes.
 
 import sys
 import os
-import operator
 import numpy as np
 
 from .misc_functions import (create_auf_params_grid, load_small_ref_auf_grid,
-                             hav_dist_constant_lat, map_large_index_to_small_index)
+                             hav_dist_constant_lat, map_large_index_to_small_index,
+                             _load_rectangular_slice)
 from .group_sources_fortran import group_sources_fortran as gsf
 from .make_set_list import set_list
 
@@ -498,35 +498,9 @@ def _load_fourier_grid_cutouts(a, sky_rect_coords, joint_folder_path, cat_folder
     '''
 
     lon1, lon2, lat1, lat2 = sky_rect_coords
-    # Slice the memmapped catalogue, with a memmapped slicing array to
-    # preserve memory.
-    sky_cut_1 = np.lib.format.open_memmap('{}/{}_temporary_sky_slice_1.npy'.format(
-        joint_folder_path, cat_name), mode='w+', dtype=bool, shape=(len(a),))
-    sky_cut_2 = np.lib.format.open_memmap('{}/{}_temporary_sky_slice_2.npy'.format(
-        joint_folder_path, cat_name), mode='w+', dtype=bool, shape=(len(a),))
-    sky_cut_3 = np.lib.format.open_memmap('{}/{}_temporary_sky_slice_3.npy'.format(
-        joint_folder_path, cat_name), mode='w+', dtype=bool, shape=(len(a),))
-    sky_cut_4 = np.lib.format.open_memmap('{}/{}_temporary_sky_slice_4.npy'.format(
-        joint_folder_path, cat_name), mode='w+', dtype=bool, shape=(len(a),))
-    sky_cut = np.lib.format.open_memmap('{}/{}_temporary_sky_slice_combined.npy'.format(
-        joint_folder_path, cat_name), mode='w+', dtype=bool, shape=(len(a),))
 
-    di = max(1, len(a) // 20)
-    # Iterate over each small slice of the larger array, checking for upper
-    # and lower longitude, then latitude, criterion matching.
-    for i in range(0, len(a), di):
-        _lon_cut(i, a.shape[0], di, lon1, padding, sky_cut_1, cat_folder_path, operator.ge)
-    for i in range(0, len(a), di):
-        _lon_cut(i, a.shape[0], di, lon2, padding, sky_cut_2, cat_folder_path, operator.le)
-
-    for i in range(0, len(a), di):
-        _lat_cut(i, a.shape[0], di, lat1, padding, sky_cut_3, cat_folder_path, operator.ge)
-    for i in range(0, len(a), di):
-        _lat_cut(i, a.shape[0], di, lat2, padding, sky_cut_4, cat_folder_path, operator.le)
-
-    for i in range(0, len(a), di):
-        sky_cut[i:i+di] = (sky_cut_1[i:i+di] & sky_cut_2[i:i+di] &
-                           sky_cut_3[i:i+di] & sky_cut_4[i:i+di])
+    sky_cut = _load_rectangular_slice(joint_folder_path, cat_name, a, lon1, lon2,
+                                      lat1, lat2, padding)
 
     a_cutout = np.load('{}/con_cat_astro.npy'.format(cat_folder_path), mmap_mode='r')[sky_cut]
 
@@ -536,94 +510,6 @@ def _load_fourier_grid_cutouts(a, sky_rect_coords, joint_folder_path, cat_folder
                                                             ['fourier'])
 
     return a_cutout, fouriergrid, modrefindsmall, sky_cut
-
-
-def _lon_cut(i, lena, di, lon, padding, sky_cut, cat_folder_path, inequality):
-    '''
-    Function to calculate the longitude inequality criterion for astrometric
-    sources relative to a rectangle defining boundary limits.
-
-    Parameters
-    ----------
-    i : integer
-        Index into ``sky_cut`` for slicing.
-    lena : integer
-        Number of rows in main catalogue.
-    di : integer
-        Index stride value, for slicing.
-    lon : float
-        Longitude at which to cut sources, either above or below, in degrees.
-    padding : float
-        Maximum allowed sky separation the "wrong" side of ``lon``, to allow
-        for an increase in sky box size to ensure all overlaps are caught in
-        ``get_max_overlap`` or ``get_max_indices``.
-    sky_cut : numpy.ndarray
-        Array into which to store boolean flags for whether source meets the
-        sky position criterion.
-    cat_folder_path : string
-        Folder on disk where main catalogue being cross-matched is stored.
-    inequaility : ``operator.le`` or ``operator.ge``
-        Function to determine whether a source is either above or below the
-        given ``lon`` value.
-    '''
-    a = np.lib.format.open_memmap('{}/con_cat_astro.npy'.format(cat_folder_path), mode='r',
-                                  dtype=float, shape=(lena, 3))
-    # To check whether a source should be included in this slice or not if the
-    # "padding" factor is non-zero, add an extra caveat to check whether
-    # Haversine great-circle distance is less than the padding factor. For
-    # constant latitude this reduces to
-    # r = 2 arcsin(|cos(lat) * sin(delta-lon/2)|).
-    # However, in both zero and non-zero padding factor cases, we always require
-    # the source to be above or below the longitude for sky_cut_1 and sky_cut_2
-    # in load_fourier_grid_cutouts, respectively.
-    if padding > 0:
-        sky_cut[i:i+di] = (hav_dist_constant_lat(a[i:i+di, 0], a[i:i+di, 1], lon) <=
-                           padding) | inequality(a[i:i+di, 0], lon)
-    else:
-        sky_cut[i:i+di] = inequality(a[i:i+di, 0], lon)
-
-
-def _lat_cut(i, lena, di, lat, padding, sky_cut, cat_folder_path, inequality):
-    '''
-    Function to calculate the latitude inequality criterion for astrometric
-    sources relative to a rectangle defining boundary limits.
-
-    Parameters
-    ----------
-    i : integer
-        Index into ``sky_cut`` for slicing.
-    lena : integer
-        Number of rows in main catalogue.
-    di : integer
-        Index stride value, for slicing.
-    lat : float
-        Latitude at which to cut sources, either above or below, in degrees.
-    padding : float
-        Maximum allowed sky separation the "wrong" side of ``lat``, to allow
-        for an increase in sky box size to ensure all overlaps are caught in
-        ``get_max_overlap`` or ``get_max_indices``.
-    sky_cut : numpy.ndarray
-        Array into which to store boolean flags for whether source meets the
-        sky position criterion.
-    cat_folder_path : string
-        Folder on disk where main catalogue being cross-matched is stored.
-    inequaility : ``operator.le`` or ``operator.ge``
-        Function to determine whether a source is either above or below the
-        given ``lat`` value.
-    '''
-    a = np.lib.format.open_memmap('{}/con_cat_astro.npy'.format(cat_folder_path), mode='r',
-                                  dtype=float, shape=(lena, 3))
-    # The "padding" factor is easier to handle for constant longitude in the
-    # Haversine formula, being a straight comparison of delta-lat, and thus we
-    # can simply move the required latitude padding factor to within the
-    # latitude comparison.
-    if padding > 0:
-        if inequality is operator.le:
-            sky_cut[i:i+di] = inequality(a[i:i+di, 1] - padding, lat)
-        else:
-            sky_cut[i:i+di] = inequality(a[i:i+di, 1] + padding, lat)
-    else:
-        sky_cut[i:i+di] = inequality(a[i:i+di, 1], lat)
 
 
 def _clean_overlaps(inds, size, joint_folder_path, filename):

@@ -9,9 +9,9 @@ from numpy.testing import assert_allclose
 import scipy.special
 
 from ..misc_functions import (create_auf_params_grid, load_small_ref_auf_grid,
-                              hav_dist_constant_lat, map_large_index_to_small_index)
+                              hav_dist_constant_lat, map_large_index_to_small_index,
+                              _load_rectangular_slice, _load_single_sky_slice)
 from ..misc_functions_fortran import misc_functions_fortran as mff
-# from .test_shared_library_fortran import haversine_wrapper
 
 
 def test_closest_auf_point():
@@ -101,3 +101,34 @@ def test_large_small_index():
     a, b = map_large_index_to_small_index(inds, 40, '.')
     assert np.all(a == np.array([0, 1, 2, 1, 3]))
     assert np.all(b == np.array([0, 10, 15, 35]))
+
+
+def test_load_rectangular_slice():
+    rng = np.random.default_rng(4324324432)
+    a = rng.uniform(2, 3, size=(5000, 2))
+    lon1, lon2, lat1, lat2 = 2.2, 2.4, 2.1, 2.3
+    padding = 0.05
+    sky_cut = _load_rectangular_slice('.', '', a, lon1, lon2, lat1, lat2, padding)
+    for i in range(len(a)):
+        within_range = np.empty(4, bool)
+        within_range[0] = ((hav_dist_constant_lat(a[i, 0], a[i, 1], lon1) <= padding) |
+                           (a[i, 0] > lon1))
+        within_range[1] = ((hav_dist_constant_lat(a[i, 0], a[i, 1], lon2) <= padding) |
+                           (a[i, 0] < lon2))
+        within_range[2] = (a[i, 1] >= lat1-padding)
+        within_range[3] = (a[i, 1] <= lat2+padding)
+        if sky_cut[i]:
+            assert np.all(within_range)
+        else:
+            assert not np.all(within_range)
+
+
+def test_load_single_sky_slice():
+    folder_path = '.'
+    cat_name = ''
+    ind = 3
+
+    rng = np.random.default_rng(6123123)
+    sky_inds = rng.choice(5, size=5000)
+    sky_cut = _load_single_sky_slice(folder_path, cat_name, ind, sky_inds)
+    assert np.all(sky_cut == (sky_inds == ind))

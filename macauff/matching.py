@@ -313,10 +313,13 @@ class CrossMatch():
         if self.include_perturb_auf:
             for config, catname in zip([cat_a_config, cat_b_config], ['"a"', '"b"']):
                 for check_flag in ['tri_set_name', 'tri_filt_names', 'psf_fwhms',
-                                   'norm_scale_laws', 'download_tri']:
+                                   'download_tri', 'dens_mags']:
                     if check_flag not in config:
                         raise ValueError("Missing key {} from catalogue {} metadata file.".format(
                                          check_flag, catname))
+            for check_flag in ['num_trials', 'dm_max', 'd_mag', 'compute_local_density']:
+                if check_flag not in joint_config:
+                    raise ValueError("Missing key {} from joint metadata file.".format(check_flag))
             self.a_download_tri = self._str2bool(cat_a_config['download_tri'])
             self.b_download_tri = self._str2bool(cat_b_config['download_tri'])
             self.a_tri_set_name = cat_a_config['tri_set_name']
@@ -346,16 +349,41 @@ class CrossMatch():
             # Perturbation AUF component.
             for config, catname, flag in zip([cat_a_config, cat_b_config], ['"a"', '"b"'],
                                              ['a_', 'b_']):
-                a = config['norm_scale_laws'].split()
+                a = config['dens_mags'].split()
                 try:
                     b = np.array([float(f) for f in a])
                 except ValueError:
-                    raise ValueError('norm_scale_laws should be a list of floats in '
+                    raise ValueError('dens_mags should be a list of floats in '
                                      'catalogue {} metadata file.'.format(catname))
                 if len(b) != len(getattr(self, '{}filt_names'.format(flag))):
-                    raise ValueError('{}norm_scale_laws and {}filt_names should contain the '
+                    raise ValueError('{}dens_mags and {}filt_names should contain the '
                                      'same number of entries.'.format(flag, flag))
-                setattr(self, '{}norm_scale_laws'.format(flag), b)
+                setattr(self, '{}dens_mags'.format(flag), b)
+
+            a = joint_config['num_trials']
+            try:
+                a = float(a)
+            except ValueError:
+                raise ValueError("num_trials should be an integer.")
+            if not a.is_integer():
+                raise ValueError("num_trials should be an integer.")
+            self.num_trials = int(a)
+
+            for flag in ['dm_max', 'd_mag']:
+                try:
+                    setattr(self, flag, float(joint_config[flag]))
+                except ValueError:
+                    raise ValueError("{} must be a float.".format(flag))
+
+            self.compute_local_density = self._str2bool(joint_config['compute_local_density'])
+
+            if self.compute_local_density:
+                for config, catname, flag in zip([cat_a_config, cat_b_config], ['"a"', '"b"'],
+                                                 ['a_', 'b_']):
+                    try:
+                        setattr(self, '{}dens_dist'.format(flag), float(config['dens_dist']))
+                    except ValueError:
+                        raise ValueError("dens_dist in catalogue {} must be a float.".format(catname))
 
         for config, catname, flag in zip([cat_a_config, cat_b_config], ['"a"', '"b"'],
                                          ['a_', 'b_']):
@@ -377,13 +405,6 @@ class CrossMatch():
             self.pos_corr_dist = float(joint_config['pos_corr_dist'])
         except ValueError:
             raise ValueError("pos_corr_dist must be a float.")
-
-        for config, catname, flag in zip([cat_a_config, cat_b_config], ['"a"', '"b"'],
-                                         ['a_', 'b_']):
-            try:
-                setattr(self, '{}dens_dist'.format(flag), float(config['dens_dist']))
-            except ValueError:
-                raise ValueError("dens_dist in catalogue {} must be a float.".format(catname))
 
         for flag in ['real_hankel_points', 'four_hankel_points', 'four_max_rho']:
             a = joint_config[flag]
@@ -457,8 +478,6 @@ class CrossMatch():
                                 os.walk(self.a_auf_folder_path)])
         a_correct_file_number = a_expected_files == a_file_number
 
-        a_n_sources = len(np.load('{}/magref.npy'.format(self.a_cat_folder_path), mmap_mode='r'))
-
         # Magnitude offsets corresponding to relative fluxes of perturbing sources; here
         # dm of 2.5 is 10% relative flux and dm = 5 corresponds to 1% relative flux. Used
         # to inform the fraction of simulations with a contaminant above these relative
@@ -467,25 +486,49 @@ class CrossMatch():
         self.delta_mag_cuts = np.array([2.5, 5])
 
         if self.run_auf or not a_correct_file_number:
+            if self.j0s is None:
+                self.j0s = mff.calc_j0(self.rho[:-1]+self.drho/2, self.r[:-1]+self.dr/2)
             # Only warn if we did NOT choose to run AUF, but DID hit wrong file
             # number.
             if not a_correct_file_number and not self.run_auf:
                 warnings.warn('Incorrect number of files in catalogue "a" perturbation'
                               'AUF simulation folder. Deleting all files and re-running '
                               'cross-match process.')
-                # Once run AUf flag is updated, all other flags need to be set to run
+                # Once run AUF flag is updated, all other flags need to be set to run
                 self.run_group, self.run_cf, self.run_source = True, True, True
-            os.system("rm -rf {}/*".format(self.a_auf_folder_path))
             if self.include_perturb_auf:
-                _kwargs = {'psf_fwhms': self.a_psf_fwhms, 'tri_download_flag': self.a_download_tri}
+                _kwargs = {'psf_fwhms': self.a_psf_fwhms, 'tri_download_flag': self.a_download_tri,
+                           'delta_mag_cuts': self.delta_mag_cuts, 'num_trials': self.num_trials,
+                           'j0s': self.j0s, 'density_mags': self.a_dens_mags,
+                           'dm_max': self.dm_max, 'd_mag': self.d_mag,
+                           'tri_filt_names': self.a_tri_filt_names,
+                           'compute_local_density': self.compute_local_density}
+                if self.b_download_tri:
+                    _kwargs = dict(_kwargs,
+                                   **{'tri_set_name': self.a_tri_set_name,
+                                      'fri_filt_num': self.a_tri_filt_num,
+                                      'auf_region_frame': self.a_auf_region_frame})
+                    os.system("rm -rf {}/*".format(self.a_auf_folder_path))
+                else:
+                    for i in range(len(self.a_auf_region_points)):
+                        ax1, ax2 = self.a_auf_region_points[i]
+                        ax_folder = '{}/{}/{}'.format(self.a_auf_folder_path, ax1, ax2)
+                        os.system('mv {}/trilegal_auf_simulation.dat {}/..'.format(
+                                  ax_folder, ax_folder))
+                        os.system("rm -rf {}/*".format(ax_folder))
+                        os.system('mv {}/../trilegal_auf_simulation.dat {}'.format(
+                                  ax_folder, ax_folder))
+                if self.compute_local_density:
+                    _kwargs = dict(_kwargs, **{'density_radius': self.a_dens_dist})
             else:
+                os.system("rm -rf {}/*".format(self.a_auf_folder_path))
                 _kwargs = {}
             perturb_auf_func(self.a_auf_folder_path, self.a_cat_folder_path, self.a_filt_names,
-                             self.a_auf_region_points, self.cross_match_extent, self.r, self.dr,
-                             self.rho, self.drho, 'a', self.include_perturb_auf, a_n_sources,
-                             self.mem_chunk_num, self.delta_mag_cuts, **_kwargs)
+                             self.a_auf_region_points, self.r, self.dr,
+                             self.rho, self.drho, 'a', self.include_perturb_auf,
+                             self.mem_chunk_num, **_kwargs)
         else:
-            print('Loading empirical crowding AUFs for catalogue "a"...')
+            print('Loading empirical perturbation AUFs for catalogue "a"...')
             sys.stdout.flush()
 
         b_expected_files = 3 + len(self.b_auf_region_points) + (
@@ -494,25 +537,45 @@ class CrossMatch():
                                 os.walk(self.b_auf_folder_path)])
         b_correct_file_number = b_expected_files == b_file_number
 
-        b_n_sources = len(np.load('{}/magref.npy'.format(self.b_cat_folder_path), mmap_mode='r'))
-
         if self.run_auf or not b_correct_file_number:
             if not b_correct_file_number and not self.run_auf:
                 warnings.warn('Incorrect number of files in catalogue "b" perturbation'
                               'AUF simulation folder. Deleting all files and re-running '
                               'cross-match process.')
                 self.run_group, self.run_cf, self.run_source = True, True, True
-            os.system("rm -rf {}/*".format(self.b_auf_folder_path))
             if self.include_perturb_auf:
-                _kwargs = {'psf_fwhms': self.b_psf_fwhms, 'tri_download_flag': self.b_download_tri}
+                _kwargs = {'psf_fwhms': self.b_psf_fwhms, 'tri_download_flag': self.b_download_tri,
+                           'delta_mag_cuts': self.delta_mag_cuts, 'num_trials': self.num_trials,
+                           'j0s': self.j0s, 'density_mags': self.b_dens_mags,
+                           'dm_max': self.dm_max, 'd_mag': self.d_mag,
+                           'tri_filt_names': self.b_tri_filt_names,
+                           'compute_local_density': self.compute_local_density}
+                if self.b_download_tri:
+                    _kwargs = dict(_kwargs,
+                                   **{'tri_set_name': self.b_tri_set_name,
+                                      'fri_filt_num': self.b_tri_filt_num,
+                                      'auf_region_frame': self.b_auf_region_frame})
+                    os.system("rm -rf {}/*".format(self.b_auf_folder_path))
+                else:
+                    for i in range(len(self.b_auf_region_points)):
+                        ax1, ax2 = self.b_auf_region_points[i]
+                        ax_folder = '{}/{}/{}'.format(self.b_auf_folder_path, ax1, ax2)
+                        os.system('mv {}/trilegal_auf_simulation.dat {}/..'.format(
+                                  ax_folder, ax_folder))
+                        os.system("rm -rf {}/*".format(ax_folder))
+                        os.system('mv {}/../trilegal_auf_simulation.dat {}'.format(
+                                  ax_folder, ax_folder))
+                if self.compute_local_density:
+                    _kwargs = dict(_kwargs, **{'density_radius': self.b_dens_dist})
             else:
+                os.system("rm -rf {}/*".format(self.b_auf_folder_path))
                 _kwargs = {}
             perturb_auf_func(self.b_auf_folder_path, self.b_cat_folder_path, self.b_filt_names,
-                             self.b_auf_region_points, self.cross_match_extent, self.r, self.dr,
-                             self.rho, self.drho, 'b', self.include_perturb_auf, b_n_sources,
-                             self.mem_chunk_num, self.delta_mag_cuts, **_kwargs)
+                             self.b_auf_region_points, self.r, self.dr,
+                             self.rho, self.drho, 'b', self.include_perturb_auf,
+                             self.mem_chunk_num, **_kwargs)
         else:
-            print('Loading empirical crowding AUFs for catalogue "b"...')
+            print('Loading empirical perturbation AUFs for catalogue "b"...')
             sys.stdout.flush()
 
     def group_sources(self, files_per_grouping, group_func=make_island_groupings):

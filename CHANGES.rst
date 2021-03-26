@@ -7,6 +7,9 @@ General
 New Features
 ^^^^^^^^^^^^
 
+- Added option to include the full perturbation AUF component, based on
+  simulated Galactic source modelling. [#27]
+
 - Added options to photometric routines to create full photometry-based
   likelihood and prior, or just use the photometric prior and use the naive
   equal-probability likelihood. [#25]
@@ -20,11 +23,26 @@ Bug Fixes
 API Changes
 ^^^^^^^^^^^
 
+- Moved several functions (``_load_single_sky_slice``, ``_load_rectangular_slice``,
+  ``_lon_cut``, ``_lat_cut``) out of individual Python scripts into
+  ``misc_functions`` to generalise their use in the codebase. [#27]
+
+- Removed ``norm_scale_laws`` as an input to catalogue configuration files. [#27]
+
+- Added ``dens_mags``, ``num_trials``, ``dm_max``, ``d_mag``, and
+  ``compute_local_density`` as inputs to the joint and catalogue-specific
+  configuration files [#27]
+
 - Added ``int_fracs`` as an input to the joint configuration file for a
   cross-match. [#25]
 
 Other Changes
 ^^^^^^^^^^^^^
+
+- GitHub Actions will only run remote data dependent tests (those marked with
+  ``pytest.mark.remote_data``) on a pull request merge. [#27]
+
+- Added ``astropy`` as a dependency. [#27]
 
 
 

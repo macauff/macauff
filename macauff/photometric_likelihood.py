@@ -7,7 +7,7 @@ used in the cross-matching of the two catalogues.
 import sys
 import numpy as np
 
-from .misc_functions import map_large_index_to_small_index
+from .misc_functions import map_large_index_to_small_index, _load_single_sky_slice
 from .misc_functions_fortran import misc_functions_fortran as mff
 from .photometric_likelihood_fortran import photometric_likelihood_fortran as plf
 
@@ -146,7 +146,7 @@ def compute_photometric_likelihoods(joint_folder_path, a_cat_folder_path, b_cat_
         for m in range(m_, min(len(cf_points), m_+mem_chunk_num)):
             area = cf_areas[m]
             a_sky_cut = _load_single_sky_slice(
-                joint_folder_path, 'a', m, a_cat_folder_path, a_sky_ind_small)
+                joint_folder_path, 'a', m, a_sky_ind_small)
             a_photo_cut = a_small_photo[a_sky_cut]
             if include_phot_like or use_phot_priors:
                 a_astro_cut, a_blen_cut, a_inds_cut, a_size_cut = (
@@ -154,7 +154,7 @@ def compute_photometric_likelihoods(joint_folder_path, a_cat_folder_path, b_cat_
                     a_size_small[a_sky_cut])
 
             b_sky_cut = _load_single_sky_slice(
-                joint_folder_path, 'b', m, b_cat_folder_path, b_sky_ind_small)
+                joint_folder_path, 'b', m, b_sky_ind_small)
             b_photo_cut = b_small_photo[b_sky_cut]
             if include_phot_like or use_phot_priors:
                 b_astro_cut, b_inds_cut, b_size_cut = (
@@ -345,7 +345,7 @@ def create_magnitude_bins(cf_points, filts, mem_chunk_num, joint_folder_path,
         del a_multi_return
         for m in range(m_, min(len(cf_points), m_+mem_chunk_num)):
             sky_cut = _load_single_sky_slice(
-                joint_folder_path, cat_type, m, cat_folder_path, sky_inds_)
+                joint_folder_path, cat_type, m, sky_inds_)
             for i in range(0, len(filts)):
                 a = a_phot_[sky_cut, i]
                 if np.sum(~np.isnan(a)) > 0:
@@ -370,7 +370,7 @@ def create_magnitude_bins(cf_points, filts, mem_chunk_num, joint_folder_path,
             a_phot_, sky_inds_ = a_multi_return
         for m in range(m_, min(len(cf_points), m_+mem_chunk_num)):
             sky_cut = _load_single_sky_slice(
-                joint_folder_path, cat_type, m, cat_folder_path, sky_inds_)
+                joint_folder_path, cat_type, m, sky_inds_)
             for i in range(0, len(filts)):
                 a = a_phot_[sky_cut, i]
                 if np.sum(~np.isnan(a)) > 0:
@@ -507,45 +507,6 @@ def _load_multiple_sky_slice(joint_folder_path, cat_name, ind1, ind2, cat_folder
         list_of_arrays = (photo_cutout, sky_ind_cutout)
 
     return list_of_arrays
-
-
-def _load_single_sky_slice(joint_folder_path, cat_name, ind, cat_folder_path, sky_inds):
-    '''
-    Function to, in a memmap-friendly way, return a sub-set of the nearest sky
-    indices of a given catalogue.
-
-    Parameters
-    ----------
-    joint_folder_path : string
-        Folder in which common cross-match intermediate data files are stored.
-    cat_name : string
-        String defining whether this function was called on catalogue "a" or "b".
-    ind : float
-        The value of the sky indices, as defined in ``distribute_sky_indices``,
-        to return a sub-set of the larger catalogue. This value represents
-        the index of a given on-sky position, used to construct the "counterpart"
-        and "field" likelihoods.
-    cat_folder_path : string
-        The folder defining where this particular catalogue is stored.
-    sky_inds : numpy.ndarray
-        The given catalogue's ``distribute_sky_indices`` values, to compare
-        with ``ind``.
-
-    Returns
-    -------
-    sky_cut : numpy.ndarray
-        A boolean array, indicating whether each element in ``sky_inds`` matches
-        ``ind`` or not.
-    '''
-    sky_cut = np.lib.format.open_memmap('{}/{}_small_sky_slice.npy'.format(
-        joint_folder_path, cat_name), mode='w+', dtype=bool, shape=(len(sky_inds),))
-
-    di = max(1, len(sky_inds) // 20)
-
-    for i in range(0, len(sky_inds), di):
-        sky_cut[i:i+di] = sky_inds[i:i+di] == ind
-
-    return sky_cut
 
 
 def create_c_and_f(a_astro, b_astro, a_mag, b_mag, a_inds, a_size, b_inds, b_size, a_blen,

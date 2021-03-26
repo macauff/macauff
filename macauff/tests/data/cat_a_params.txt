@@ -10,12 +10,10 @@ filt_names = G_BP G G_RP
 # Catalogue PSF parameters
 # Full-width at half maximums for each filter, in order, in arcseconds
 psf_fwhms = 0.12 0.12 0.12
-# The source count vs magnitude scaling relations z for bright sources, following the geometric series z^mag
-norm_scale_laws = 2 2 2
 
 # TRILEGAL Perturbation AUF parameters
 # Names of TRILEGAL filter sets for the catalogue
-tri_set_name = gaiadr2
+tri_set_name = gaiaDR2
 tri_filt_names = G_BP G G_RP
 # Filter number to define limiting magnitude of TRILEGAL simulation in, based on output data file column (one-indexed) number
 tri_filt_num = 1
@@ -30,5 +28,7 @@ auf_region_frame = equatorial
 # For "rectangle" this should be 6 numbers: start coordinate, end coordinate, integer number of data points from start to end (inclusive of both start and end), first for ra/l, then for dec/b (depending on auf_region_type), all separated by spaces
 auf_region_points = 131 134 4 -1 1 3
 
-# Local density calculation radius, in arcseconds
-dens_dist = 900
+# Local density calculation radius, in degrees
+dens_dist = 0.25
+# Magnitudes, in each bandpass, down to which to count nearby local sources when calculating local density
+dens_mags = 20 20 20
