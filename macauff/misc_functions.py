@@ -184,8 +184,42 @@ def _load_single_sky_slice(folder_path, cat_name, ind, sky_inds):
     return sky_cut
 
 
-def _load_rectangular_slice(folder_path, cat_name, cat_folder_path, a, lon1, lon2, lat1, lat2,
-                            padding):
+def _load_rectangular_slice(folder_path, cat_name, a, lon1, lon2, lat1, lat2, padding):
+    '''
+    Loads all sources in a catalogue within a given separation of a rectangle
+    in sky coordinates, allowing for the search for all sources within a given
+    radius of sources inside the rectangle.
+
+    Parameters
+    ----------
+    folder_path : string
+        Location of where to store the memmap files used in the slicing of the
+        catalogue.
+    cat_name : string
+        Indication of whether we are loading catalogue "a" or catalogue "b",
+        for separation within a given folder.
+    a : numpy.ndarray
+        Full astrometric catalogue from which the subset of sources within
+        ``padding`` distance of the sky rectangle are to be drawn.
+    lon1 : float
+        Lower limit on on-sky rectangle, in given sky coordinates, in degrees.
+    lon2 : float
+        Upper limit on sky region to slice sources from ``a``.
+    lat1 : float
+        Lower limit on second orthogonal sky coordinate defining rectangle.
+    lat2 : float
+        Upper sky rectangle coordinate of the second axis.
+    padding : float
+        The sky separation, in degrees, to find all sources within a distance
+        of in ``a``.
+
+    Returns
+    -------
+    sky_cut : numpy.ndarray
+        Boolean array, indicating whether each source in ``a`` is within ``padding``
+        of the rectangle defined by ``lon1``, ``lon2``, ``lat1``, and ``lat2``.
+    '''
+
     # Slice the memmapped catalogue, with a memmapped slicing array to
     # preserve memory.
     sky_cut_1 = np.lib.format.open_memmap('{}/{}_temporary_sky_slice_1.npy'.format(
@@ -199,20 +233,18 @@ def _load_rectangular_slice(folder_path, cat_name, cat_folder_path, a, lon1, lon
     sky_cut = np.lib.format.open_memmap('{}/{}_temporary_sky_slice_combined.npy'.format(
         folder_path, cat_name), mode='w+', dtype=bool, shape=(len(a),))
 
-    a = np.load('{}/con_cat_astro.npy'.format(cat_folder_path), mmap_mode='r')
-
     di = max(1, len(a) // 20)
     # Iterate over each small slice of the larger array, checking for upper
     # and lower longitude, then latitude, criterion matching.
     for i in range(0, len(a), di):
-        _lon_cut(i, a, di, lon1, padding, sky_cut_1, cat_folder_path, operator.ge)
+        _lon_cut(i, a, di, lon1, padding, sky_cut_1, operator.ge)
     for i in range(0, len(a), di):
-        _lon_cut(i, a, di, lon2, padding, sky_cut_2, cat_folder_path, operator.le)
+        _lon_cut(i, a, di, lon2, padding, sky_cut_2, operator.le)
 
     for i in range(0, len(a), di):
-        _lat_cut(i, a, di, lat1, padding, sky_cut_3, cat_folder_path, operator.ge)
+        _lat_cut(i, a, di, lat1, padding, sky_cut_3, operator.ge)
     for i in range(0, len(a), di):
-        _lat_cut(i, a, di, lat2, padding, sky_cut_4, cat_folder_path, operator.le)
+        _lat_cut(i, a, di, lat2, padding, sky_cut_4, operator.le)
 
     for i in range(0, len(a), di):
         sky_cut[i:i+di] = (sky_cut_1[i:i+di] & sky_cut_2[i:i+di] &
@@ -224,7 +256,7 @@ def _load_rectangular_slice(folder_path, cat_name, cat_folder_path, a, lon1, lon
     return sky_cut
 
 
-def _lon_cut(i, a, di, lon, padding, sky_cut, cat_folder_path, inequality):
+def _lon_cut(i, a, di, lon, padding, sky_cut, inequality):
     '''
     Function to calculate the longitude inequality criterion for astrometric
     sources relative to a rectangle defining boundary limits.
@@ -246,8 +278,6 @@ def _lon_cut(i, a, di, lon, padding, sky_cut, cat_folder_path, inequality):
     sky_cut : numpy.ndarray
         Array into which to store boolean flags for whether source meets the
         sky position criterion.
-    cat_folder_path : string
-        Folder on disk where main catalogue being cross-matched is stored.
     inequality : ``operator.le`` or ``operator.ge``
         Function to determine whether a source is either above or below the
         given ``lon`` value.
@@ -267,7 +297,7 @@ def _lon_cut(i, a, di, lon, padding, sky_cut, cat_folder_path, inequality):
         sky_cut[i:i+di] = inequality(a[i:i+di, 0], lon)
 
 
-def _lat_cut(i, a, di, lat, padding, sky_cut, cat_folder_path, inequality):
+def _lat_cut(i, a, di, lat, padding, sky_cut, inequality):
     '''
     Function to calculate the latitude inequality criterion for astrometric
     sources relative to a rectangle defining boundary limits.
@@ -289,8 +319,6 @@ def _lat_cut(i, a, di, lat, padding, sky_cut, cat_folder_path, inequality):
     sky_cut : numpy.ndarray
         Array into which to store boolean flags for whether source meets the
         sky position criterion.
-    cat_folder_path : string
-        Folder on disk where main catalogue being cross-matched is stored.
     inequality : ``operator.le`` or ``operator.ge``
         Function to determine whether a source is either above or below the
         given ``lat`` value.
