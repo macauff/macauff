@@ -499,7 +499,7 @@ def _load_fourier_grid_cutouts(a, sky_rect_coords, joint_folder_path, cat_folder
 
     lon1, lon2, lat1, lat2 = sky_rect_coords
 
-    sky_cut = _load_rectangular_slice(joint_folder_path, cat_name, cat_folder_path, a, lon1, lon2,
+    sky_cut = _load_rectangular_slice(joint_folder_path, cat_name, a, lon1, lon2,
                                       lat1, lat2, padding)
 
     a_cutout = np.load('{}/con_cat_astro.npy'.format(cat_folder_path), mmap_mode='r')[sky_cut]

@@ -435,7 +435,7 @@ def calculate_local_density(a_astro, a_tot_astro, a_tot_photo, auf_folder, cat_f
     min_lon, max_lon = np.amin(a_astro[:, 0]), np.amax(a_astro[:, 0])
     min_lat, max_lat = np.amin(a_astro[:, 1]), np.amax(a_astro[:, 1])
 
-    overlap_sky_cut = _load_rectangular_slice(auf_folder, '', cat_folder, a_tot_astro, min_lon,
+    overlap_sky_cut = _load_rectangular_slice(auf_folder, '', a_tot_astro, min_lon,
                                               max_lon, min_lat, max_lat, density_radius)
     cut = np.lib.format.open_memmap('{}/_temporary_slice.npy'.format(
         auf_folder), mode='w+', dtype=bool, shape=(len(a_tot_astro),))
