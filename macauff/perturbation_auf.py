@@ -116,7 +116,7 @@ def make_perturb_aufs(auf_folder, cat_folder, filters, auf_points, r, dr, rho,
         The astrometric distance, in degrees, within which to consider numbers
         of internal catalogue sources, from which to calculate local density.
         Must be given if both ``include_perturb_auf`` and
-        ``compute_local_density`` are both ``True.
+        ``compute_local_density`` are both ``True``.
     """
     if include_perturb_auf and tri_download_flag and tri_set_name is None:
         raise ValueError("tri_set_name must be given if include_perturb_auf and tri_download_flag "
