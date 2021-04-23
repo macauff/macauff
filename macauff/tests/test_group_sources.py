@@ -107,6 +107,10 @@ class TestFortranCode():
         self.rho = np.linspace(0, 100, 9999)
         self.drho = np.diff(self.rho)
 
+        self.j1s = np.empty((len(self.drho), len(self.dr)), float)
+        for i in range(len(self.dr)):
+            self.j1s[:, i] = gsf.calc_j1s(self.rho[:-1], self.drho, self.r[i]+self.dr[i]/2)
+
     def test_cumulative_fourier_transform_probability(self):
         sigma = 0.3
         f = np.exp(-2 * np.pi**2 * (self.rho[:-1]+self.drho/2)**2 * sigma**2)
@@ -117,14 +121,11 @@ class TestFortranCode():
             assert_allclose(p, 1 - np.exp(-0.5 * dist**2 / sigma**2), rtol=1e-3, atol=1e-4)
 
     def test_cumulative_fourier_transform_distance(self):
-        j1s = np.empty((len(self.drho), len(self.dr)), float)
-        for i in range(len(self.dr)):
-            j1s[:, i] = gsf.calc_j1s(self.rho[:-1], self.drho, self.r[i]+self.dr[i]/2)
         sigma = 0.3
         f = np.exp(-2 * np.pi**2 * (self.rho[:-1]+self.drho/2)**2 * sigma**2)
 
         probs = [0, 0.1, 0.5, 0.95]
-        d = gsf.cumulative_fourier_distance(f, self.r[:-1], self.dr, self.drho, probs, j1s)
+        d = gsf.cumulative_fourier_distance(f, self.r[:-1]+self.dr/2, self.drho, probs, self.j1s)
         assert np.all(d.shape == (len(probs),))
         for i, prob in enumerate(probs):
             # We're forced to accept an absolute precision of half a bin width
@@ -149,11 +150,8 @@ class TestFortranCode():
             ainds[:asize[i], i] = rng.choice(len(b_err), size=asize[i], replace=False)
         frac_array = np.array([0.63, 0.9])
 
-        j1s = np.empty((len(self.drho), len(self.dr)), float)
-        for i in range(len(self.dr)):
-            j1s[:, i] = gsf.calc_j1s(self.rho[:-1], self.drho, self.r[i]+self.dr[i]/2)
-        int_dists = gsf.get_integral_length(a_err, b_err, self.r[:-1], self.dr, self.rho[:-1],
-                                            self.drho, j1s, a_fouriergrid, b_fouriergrid,
+        int_dists = gsf.get_integral_length(a_err, b_err, self.r[:-1]+self.dr/2, self.rho[:-1],
+                                            self.drho, self.j1s, a_fouriergrid, b_fouriergrid,
                                             amodrefind, bmodrefind, ainds, asize, frac_array)
 
         assert np.all(int_dists.shape == (len(a_err), len(frac_array)))
@@ -301,7 +299,9 @@ class TestMakeIslandGroupings():
         self.rho = np.linspace(0, 100, 9900)
         self.drho = np.diff(self.rho)
 
-        self.j0s = mff.calc_j0(self.rho[:-1]+self.drho/2, self.r[:-1]+self.dr/2)
+        self.j1s = np.empty((len(self.drho), len(self.dr)), float)
+        for i in range(len(self.dr)):
+            self.j1s[:, i] = gsf.calc_j1s(self.rho[:-1], self.drho, self.r[i]+self.dr[i]/2)
 
         self.a_auf_pointings = np.array([[10, -20], [12, -22], [15, -25]])
         self.b_auf_pointings = np.array([[11, -21], [14, -22], [14, -24]])
@@ -469,7 +469,7 @@ class TestMakeIslandGroupings():
             self.joint_folder_path, self.a_cat_folder_path, self.b_cat_folder_path,
             self.a_auf_folder_path, self.b_auf_folder_path, self.a_auf_pointings,
             self.b_auf_pointings, self.a_filt_names, self.b_filt_names, self.a_title, self.b_title,
-            self.r, self.dr, self.rho, self.drho, self.j0s, self.max_sep, ax_lims,
+            self.r, self.dr, self.rho, self.drho, self.j1s, self.max_sep, ax_lims,
             self.int_fracs, self.mem_chunk_num, self.include_phot_like, self.use_phot_prior)
 
         alist, blist = np.load('joint/group/alist.npy'), np.load('joint/group/blist.npy')
@@ -526,7 +526,7 @@ class TestMakeIslandGroupings():
             self.joint_folder_path, self.a_cat_folder_path, self.b_cat_folder_path,
             self.a_auf_folder_path, self.b_auf_folder_path, self.a_auf_pointings,
             self.b_auf_pointings, self.a_filt_names, self.b_filt_names, self.a_title, self.b_title,
-            self.r, self.dr, self.rho, self.drho, self.j0s, self.max_sep, ax_lims,
+            self.r, self.dr, self.rho, self.drho, self.j1s, self.max_sep, ax_lims,
             self.int_fracs, self.mem_chunk_num, self.include_phot_like, self.use_phot_prior)
 
         alist, blist = np.load('joint/group/alist.npy'), np.load('joint/group/blist.npy')
@@ -548,7 +548,7 @@ class TestMakeIslandGroupings():
         np.save('{}/con_cat_astro.npy'.format(self.a_cat_folder_path), self.a_coords)
         np.save('{}/con_cat_astro.npy'.format(self.b_cat_folder_path), self.b_coords)
         self.cm.run_group = False
-        self.cm.j0s = self.j0s
+        self.cm.j1s = self.j1s
         # Dummy variables to represent the incorrect number of outputs
         for i in range(9):
             np.save('{}/group/{}.npy'.format(self.joint_folder_path, i), np.array([i]))
@@ -563,7 +563,7 @@ class TestMakeIslandGroupings():
         np.save('{}/con_cat_astro.npy'.format(self.a_cat_folder_path), self.a_coords)
         np.save('{}/con_cat_astro.npy'.format(self.b_cat_folder_path), self.b_coords)
         self.cm.run_group = False
-        self.cm.j0s = self.j0s
+        self.cm.j1s = self.j1s
         # Dummy variables to represent the correct number of outputs
         for i in range(8):
             np.save('{}/group/{}.npy'.format(self.joint_folder_path, i), np.array([i]))
@@ -586,7 +586,7 @@ class TestMakeIslandGroupings():
             self.joint_folder_path, self.a_cat_folder_path, self.b_cat_folder_path,
             self.a_auf_folder_path, self.b_auf_folder_path, self.a_auf_pointings,
             self.b_auf_pointings, self.a_filt_names, self.b_filt_names, self.a_title, self.b_title,
-            self.r, self.dr, self.rho, self.drho, self.j0s, self.max_sep, self.ax_lims,
+            self.r, self.dr, self.rho, self.drho, self.j1s, self.max_sep, self.ax_lims,
             self.int_fracs, self.mem_chunk_num, include_phot_like, self.use_phot_prior)
 
         # Verify that make_island_groupings doesn't change when the extra arrays

@@ -246,7 +246,7 @@ subroutine get_overlap_indices(a_ax_1, a_ax_2, b_ax_1, b_ax_2, max_sep, amax, bm
 
 end subroutine get_overlap_indices
 
-subroutine get_integral_length(a_err, b_err, r, dr, rho, drho, j1s, a_fouriergrid, b_fouriergrid, a_modrefind, b_modrefind, &
+subroutine get_integral_length(a_err, b_err, r, rho, drho, j1s, a_fouriergrid, b_fouriergrid, a_modrefind, b_modrefind, &
     a_inds, a_size, frac_array, int_dists)
     ! Calculate the "error circle" lengths for sources, based on various cumulative integral fractions
     ! of the convolution of all overlapping opposing catalogue source AUFs with the given source's AUF.
@@ -259,7 +259,7 @@ subroutine get_integral_length(a_err, b_err, r, dr, rho, drho, j1s, a_fouriergri
     real(dp), intent(in) :: a_err(:), b_err(:)
     ! Real- and fourier-space arrays, and the Bessel Function of First Kind of First Order for those
     ! r-rho combinations.
-    real(dp), intent(in) :: r(:), dr(:), rho(:), drho(:), j1s(:, :)
+    real(dp), intent(in) :: r(:), rho(:), drho(:), j1s(:, :)
     ! Grids of fourier representations of the perturbation component of the AUF for the catalogue sources.
     real(dp), intent(in) :: a_fouriergrid(:, :, :, :), b_fouriergrid(:, :, :, :)
     ! Fractions of integral to consider when integrating convolutions of AUFs; likely to be the "bright"
@@ -278,7 +278,7 @@ subroutine get_integral_length(a_err, b_err, r, dr, rho, drho, j1s, a_fouriergri
     int_dists = 0.0_dp
 
 !$OMP PARALLEL DO DEFAULT(NONE) PRIVATE(i, j, k, l, ao, bo, afourier, bfourier, four, cumulative_dists) SHARED(a_err, &
-!$OMP& a_fouriergrid, a_modrefind, r, dr, rho, drho, j1s, a_size, a_inds, b_err, b_fouriergrid, b_modrefind, frac_array, int_dists)
+!$OMP& a_fouriergrid, a_modrefind, r, rho, drho, j1s, a_size, a_inds, b_err, b_fouriergrid, b_modrefind, frac_array, int_dists)
     do i = 1, size(a_err)
         ao = a_err(i)
         afourier = a_fouriergrid(:, a_modrefind(1, i)+1, a_modrefind(2, i)+1, a_modrefind(3, i)+1)
@@ -287,7 +287,7 @@ subroutine get_integral_length(a_err, b_err, r, dr, rho, drho, j1s, a_fouriergri
             bo = b_err(k)
             bfourier = b_fouriergrid(:, b_modrefind(1, k)+1, b_modrefind(2, k)+1, b_modrefind(3, k)+1)
             four = afourier*bfourier*exp(-2.0_dp * pi**2 * (rho+drho/2.0_dp)**2 * (ao**2 + bo**2))
-            call cumulative_fourier_distance(four, r, dr, drho, frac_array, j1s, cumulative_dists)
+            call cumulative_fourier_distance(four, r, drho, frac_array, j1s, cumulative_dists)
             do l = 1, size(frac_array)
                 int_dists(i, l) = max(int_dists(i, l), cumulative_dists(l))
             end do
@@ -297,7 +297,7 @@ subroutine get_integral_length(a_err, b_err, r, dr, rho, drho, j1s, a_fouriergri
 
 end subroutine get_integral_length
 
-subroutine cumulative_fourier_distance(f, r, dr, drho, probs, j1s, cumulative_dists)
+subroutine cumulative_fourier_distance(f, r, drho, probs, j1s, cumulative_dists)
     ! Calculates the cumulative 2-D spacial integral of the convolved AUFs of two sources,
     ! based on an inverse 2-D Fourier (Hankel) transform of the fourier-space representation
     ! of the individual AUF components, up to a specified set of probabilities, returning the
@@ -306,38 +306,38 @@ subroutine cumulative_fourier_distance(f, r, dr, drho, probs, j1s, cumulative_di
     ! Fourier-space representation of PDF to be fourier transformed.
     real(dp), intent(in) :: f(:)
     ! Real- and fourier-space coordinates for fourier transformation.
-    real(dp), intent(in) :: r(:), dr(:), drho(:)
+    real(dp), intent(in) :: r(:), drho(:)
     ! Integral fractions out to which to perform cumulative convolution integral.
     real(dp), intent(in) :: probs(:)
     ! J0, the Bessel Function of First Kind of First Order, evaluated at all r-rho combinations.
     real(dp), intent(in) :: j1s(:, :)
     ! Loop counters.
-    integer :: j, k
+    integer :: j, k, loop
     ! Flags, one per probability in probs, to indicate we have reached the distance out to this
     ! probability integral and to stop considering it any further.
     integer :: flags(size(probs))
     ! Individual probability, calculated by the integral of the Hankel transformation of f.
     real(dp) :: cumulative_prob
+    ! Temporary distance, to keep for the distance search.
+    real(dp) :: dist_low, dist_high, dist
     ! Distances of integrals of the convolved PDFs, evaluated via fourier transformation.
     real(dp), intent(out) :: cumulative_dists(size(probs))
 
-    flags = 0
-    do j = 1, size(r)
-        call cumulative_fourier_probability(f, drho, r(j) + dr(j)/2.0_dp, j1s(:, j), cumulative_prob)
-        do k = 1, size(flags)
-            if (cumulative_prob >= probs(k) .and. flags(k) == 0) then
-                flags(k) = 1
-                cumulative_dists(k) = (r(j) + dr(j)/2.0_dp)/3600.0_dp
+    do k = 1, size(flags)
+        flags(k) = 0
+        dist_low = 0
+        dist_high = r(size(r))
+        do loop = 1, 15
+            dist = 0.5_dp * (dist_high + dist_low)
+            j = minloc(r, mask=(r >= dist), dim=1)
+            call cumulative_fourier_probability(f, drho, dist, j1s(:, j), cumulative_prob)
+            if (cumulative_prob >= probs(k)) then
+                dist_high = dist
+            else
+                dist_low = dist
             end if
         end do
-        if (all(flags == 1)) then
-            exit
-        end if
-    end do
-    do k = 1, size(flags)
-        if (flags(k) == 0) then
-            cumulative_dists(k) = (r(size(r)) + dr(size(r))/2.0_dp)/3600.0_dp
-        end if
+        cumulative_dists(k) = dist/3600.0_dp
     end do
 
 end subroutine cumulative_fourier_distance

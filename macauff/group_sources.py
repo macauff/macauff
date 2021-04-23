@@ -240,7 +240,7 @@ def make_island_groupings(joint_folder_path, a_cat_folder_path, b_cat_folder_pat
             del modrefind
 
             a_int_lens = gsf.get_integral_length(
-                a, b, r[:-1], dr, rho[:-1], drho, j1s, a_fouriergrid, b_fouriergrid,
+                a, b, r[:-1]+dr/2, rho[:-1], drho, j1s, a_fouriergrid, b_fouriergrid,
                 a_modrefindsmall, b_modrefindsmall, a_inds_map, a_size_small, int_fracs[0:2])
             ablen[lowind:highind] = a_int_lens[:, 0]
             aflen[lowind:highind] = a_int_lens[:, 1]
@@ -270,7 +270,7 @@ def make_island_groupings(joint_folder_path, a_cat_folder_path, b_cat_folder_pat
             del modrefind
 
             b_int_lens = gsf.get_integral_length(
-                b, a, r[:-1], dr, rho[:-1], drho, j1s, b_fouriergrid, a_fouriergrid,
+                b, a, r[:-1]+dr/2, rho[:-1], drho, j1s, b_fouriergrid, a_fouriergrid,
                 b_modrefindsmall, a_modrefindsmall, b_inds_map, b_size_small, int_fracs[0:2])
             bblen[lowind:highind] = b_int_lens[:, 0]
             bflen[lowind:highind] = b_int_lens[:, 1]
