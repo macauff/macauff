@@ -7,6 +7,7 @@ import pytest
 import os
 from numpy.testing import assert_allclose
 import numpy as np
+from scipy.special import j1
 
 from ..matching import CrossMatch
 from ..group_sources import make_island_groupings, _load_fourier_grid_cutouts, _clean_overlaps
@@ -89,30 +90,41 @@ def test_load_fourier_grid_cutouts():
     assert np.all(_c == c_guess)
 
 
+def test_j1s():
+    rho = np.linspace(0, 100, 10000)
+    drho = np.diff(rho)
+    rng = np.random.default_rng(seed=1231231)
+    values = rng.uniform(0, 3, size=50)
+    for val in values:
+        j1s = gsf.calc_j1s(rho[:-1], drho, val)
+        assert_allclose(j1s, j1(2*np.pi*(rho[:-1]+drho/2)*val), rtol=1e-5)
+
+
 class TestFortranCode():
     def setup_class(self):
         self.r = np.linspace(0, 5, 10000)
         self.dr = np.diff(self.r)
-        self.rho = np.linspace(0, 100, 10000)
+        self.rho = np.linspace(0, 100, 9999)
         self.drho = np.diff(self.rho)
-        self.j0s = mff.calc_j0(self.rho[:-1]+self.drho/2, self.r[:-1]+self.dr/2)
 
     def test_cumulative_fourier_transform_probability(self):
         sigma = 0.3
         f = np.exp(-2 * np.pi**2 * (self.rho[:-1]+self.drho/2)**2 * sigma**2)
 
         for dist in [0, 0.1, 0.5, 1, 3]:
-            p = gsf.cumulative_fourier_probability(f, self.r[:-1], self.dr, self.rho[:-1],
-                                                   self.drho, dist, self.j0s)
+            j1s = gsf.calc_j1s(self.rho[:-1], self.drho, dist)
+            p = gsf.cumulative_fourier_probability(f, self.drho, dist, j1s)
             assert_allclose(p, 1 - np.exp(-0.5 * dist**2 / sigma**2), rtol=1e-3, atol=1e-4)
 
     def test_cumulative_fourier_transform_distance(self):
+        j1s = np.empty((len(self.drho), len(self.dr)), float)
+        for i in range(len(self.dr)):
+            j1s[:, i] = gsf.calc_j1s(self.rho[:-1], self.drho, self.r[i]+self.dr[i]/2)
         sigma = 0.3
         f = np.exp(-2 * np.pi**2 * (self.rho[:-1]+self.drho/2)**2 * sigma**2)
 
         probs = [0, 0.1, 0.5, 0.95]
-        d = gsf.cumulative_fourier_distance(f, self.r[:-1], self.dr, self.rho[:-1], self.drho,
-                                            probs, self.j0s)
+        d = gsf.cumulative_fourier_distance(f, self.r[:-1], self.dr, self.drho, probs, j1s)
         assert np.all(d.shape == (len(probs),))
         for i, prob in enumerate(probs):
             # We're forced to accept an absolute precision of half a bin width
@@ -137,8 +149,11 @@ class TestFortranCode():
             ainds[:asize[i], i] = rng.choice(len(b_err), size=asize[i], replace=False)
         frac_array = np.array([0.63, 0.9])
 
+        j1s = np.empty((len(self.drho), len(self.dr)), float)
+        for i in range(len(self.dr)):
+            j1s[:, i] = gsf.calc_j1s(self.rho[:-1], self.drho, self.r[i]+self.dr[i]/2)
         int_dists = gsf.get_integral_length(a_err, b_err, self.r[:-1], self.dr, self.rho[:-1],
-                                            self.drho, self.j0s, a_fouriergrid, b_fouriergrid,
+                                            self.drho, j1s, a_fouriergrid, b_fouriergrid,
                                             amodrefind, bmodrefind, ainds, asize, frac_array)
 
         assert np.all(int_dists.shape == (len(a_err), len(frac_array)))
@@ -187,8 +202,6 @@ class TestOverlap():
         self.rho = np.linspace(0, 100, 10000)
         self.drho = np.diff(self.rho)
 
-        self.j0s = mff.calc_j0(self.rho[:-1] + self.drho/2, self.r[:-1] + self.dr/2)
-
         self.amodrefind = np.zeros((3, len(self.a_ax_1)), int)
         self.bmodrefind = np.zeros((3, len(self.b_ax_1)), int)
         self.afouriergrid = np.ones((len(self.rho) - 1, 1, 1, 1), float)
@@ -197,8 +210,8 @@ class TestOverlap():
     def test_get_max_overlap_fortran(self):
         a_num, b_num = gsf.get_max_overlap(
             self.a_ax_1, self.a_ax_2, self.b_ax_1, self.b_ax_2, self.max_sep/3600, self.a_axerr,
-            self.b_axerr, self.r[:-1], self.dr, self.rho[:-1], self.drho, self.j0s,
-            self.afouriergrid, self.bfouriergrid, self.amodrefind, self.bmodrefind, self.max_frac)
+            self.b_axerr, self.rho[:-1], self.drho, self.afouriergrid, self.bfouriergrid,
+            self.amodrefind, self.bmodrefind, self.max_frac)
 
         assert np.all(a_num.shape == (20,))
         assert np.all(b_num.shape == (19,))
@@ -211,8 +224,8 @@ class TestOverlap():
         a_max, b_max = 2, 2
         a_inds, b_inds, a_num, b_num = gsf.get_overlap_indices(
             self.a_ax_1, self.a_ax_2, self.b_ax_1, self.b_ax_2, self.max_sep/3600, a_max, b_max,
-            self.a_axerr, self.b_axerr, self.r[:-1], self.dr, self.rho[:-1], self.drho, self.j0s,
-            self.afouriergrid, self.bfouriergrid, self.amodrefind, self.bmodrefind, self.max_frac)
+            self.a_axerr, self.b_axerr, self.rho[:-1], self.drho, self.afouriergrid,
+            self.bfouriergrid, self.amodrefind, self.bmodrefind, self.max_frac)
 
         assert np.all(a_num.shape == (20,))
         assert np.all(b_num.shape == (19,))
