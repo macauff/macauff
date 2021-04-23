@@ -48,3 +48,9 @@ Index
    installation
    quickstart
    inputs
+   f90_docs/perturb_auf_docs
+   f90_docs/group_sources_docs
+   f90_docs/phot_like_docs
+   f90_docs/pairing_docs
+   f90_docs/misc_func_docs
+   f90_docs/shared_library_docs

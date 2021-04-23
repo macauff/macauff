@@ -11,10 +11,14 @@ The current package requirements are:
 
 * ``numpy``
 * ``scipy``
+* ``astropy``
 
 and for running the test suite
 
-* ``tox``.
+* ``tox``
+* ``sphinx-fortran``
+* ``sphinx-astropy``
+* ``pytest-astropy``.
 
 Additionally, you will need the following to install ``macauff``:
 
@@ -28,7 +32,7 @@ As of now, the only way to install this package is by downloading it from the `G
 
 Once you have installed your choice of conda, then you can create an initial conda environment::
 
-	conda create -n your_environment_name python=3.7 numpy scipy
+	conda create -n your_environment_name python=3.7 numpy scipy astropy
 
 although you can drop the ``=3.7``, or chose another (later) Python version, if you desire to do so. Then activate this as our Python environment::
 
@@ -36,11 +40,12 @@ although you can drop the ``=3.7``, or chose another (later) Python version, if 
 
 If you require the additional test packages listed above, for running tests, you can install them separately with::
 
-	conda install -c conda-forge tox
+	conda install -c conda-forge tox sphinx-astropy pytest-astropy
+	conda install -c vacumm -c conda-forge sphinx-fortran
 
 You will also need to install ``gfortran`` in order to compile the fortran code in this package. Instructions for how to install this for Windows, MacOS, or Linux can be found `here <https://gcc.gnu.org/wiki/GFortranBinaries>`_. Finally, install ``git`` if you do not have it on your computer; `instructions <https://git-scm.com/book/en/v2/Getting-Started-Installing-Git>`_ for installing it on your operating system are available.
 
-Once you have the required packages installed, you can clone the repository::
+Once you have the required packages installed -- whether in a new ``conda`` environment or otherwise -- you can clone the repository::
 
 	git clone git://github.com/onoddil/macauff.git
 

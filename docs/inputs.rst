@@ -5,9 +5,6 @@ Input Parameters
 This page details the various inputs expected by `~macauff.CrossMatch`.
 
 
-.. note::
-	Currently only a naive, pure Bayes match is implemented. Thus ``include_perturb_auf``, ``include_phot_like``, and ``use_phot_priors`` must all be set to ``False``, and any parameters only used when either of these parameters is ``True`` can be ignored.
-
 Catalogue-specific Parameters
 =============================
 
@@ -35,10 +32,6 @@ The filter names of the photometric bandpasses used in this catalogue, in the or
 ``psf_fwhms``
 
 The Full-Width-At-Half-Maximum of each filter's Point Spread Function (PSF), in the same order as in ``filt_names``. These are used to simulate the PSF if ``include_perturb_auf`` is set to ``True``, and are unnecessary otherwise. Should be a space-separated list of floats.
-
-``norm_scale_laws``
-
-The scaling relations, number density of sources as a function of magnitude, for the bright end of the catalogue. Should be of the form :math:`N = N_0 z^m`, where :math:`z` is the scaling law parameter. Should be a space-separated list of floats. Optional if ``include_perturb_aufs`` is ``False``.
 
 ``tri_set_name``
 The name of the filter set used to simulate the catalogue's sources in TRILEGAL [#]_. Used to interact with the TRILEGAL API; optional if ``include_perturb_aufs`` is ``False``.
@@ -71,6 +64,10 @@ The list of pointings for which to run simulations of perturbations due to blend
 
 The radius, in arcseconds, within which to count internal catalogue sources for each object, to calculate the local source density. Used to scale TRILEGAL simulated source counts to match smaller scale density fluctuations.
 
+``dens_mags``
+
+The magnitude, in each bandpass -- the same order as ``filt_names`` -- down to which to count the number of nearby sources when deriving the local normalising density of each object. Should be space-separated floats, of the same number as those given in ``filt_names``.
+
 
 Joint Parameters
 ================
@@ -87,11 +84,11 @@ Flag for whether to include the simulated effects of blended sources on the meas
 
 ``include_phot_like``
 
-Flag for the inclusion of the likelihood of match or non-match based on the photometric information in the two catalogues. Must be ``False``.
+Flag for the inclusion of the likelihood of match or non-match based on the photometric information in the two catalogues.
 
 ``use_phot_priors``
 
-Flag to determine whether to calculate the priors on match or non-match using the photometry (if set to ``True``) or calculate them based on a naive asymmetric density argument (``False``). Currently should be ``False``.
+Flag to determine whether to calculate the priors on match or non-match using the photometry (if set to ``True``) or calculate them based on a naive asymmetric density argument (``False``).
 
 ``joint_folder_path``
 
@@ -152,7 +149,25 @@ The maximum extent of the matching process. When not matching all-sky catalogues
 
 The number of smaller subsets into which to break various loops throughout the cross-match process. Used to reduce the memory usage of the process at any given time, in case of catalogues too large to fit into memory at once.
 
+``int_fracs``
 
+The integral fractions of the various so-called "error circles" used in the cross-match process. Should be space-separated floats, in the order of: bright error circle fraction, "field" error circle fraction, and potential counterpart cutoff limit.
+
+``num_trials``
+
+The number of PSF realisations to draw when simulating the perturbation component of the AUF. Should be an integer.
+
+``dm_max``
+
+The magnitude offset (or relative flux in magnitude space) down to which to draw blended sources to potentially perturb a given PSF realisation of the perturbation AUF component. Should be a single float.
+
+``d_mag``
+
+Bin sizes for magnitudes used to represent the source number density used in the random drawing of perturbation AUF component PSFs. Should be a single float.
+
+``compute_local_density``
+
+Boolean flag, ``yes`` or ``no``, to indicate whether to on-the-fly compute the local densities of sources in each catalogue for use in its perturbation AUF component, or to use pre-computed values. ``yes`` indicates values will be computed during the cross-match process.
 
 .. rubric:: Footnotes
 
