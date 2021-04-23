@@ -29,8 +29,8 @@ subroutine haversine(lon1, lon2, lat1, lat2, hav_dist)
 
 end subroutine haversine
 
-subroutine jy01a (x, bj0)
-    ! JY01A computes Bessel functions J0(x).
+subroutine jy01a_j0 (x, bj0)
+    ! JY01A_J0 computes Bessel function J0(x).
     !
     !
     !
@@ -135,6 +135,119 @@ subroutine jy01a (x, bj0)
       end do
       cu = sqrt ( rp2 / x )
       bj0 = cu * ( p0 * cos ( t1 ) - q0 * sin ( t1 ) )
+
+    end if
+    return
+end
+
+subroutine jy01a_j1 (x, bj1)
+    ! JY01A_J1 computes Bessel function J1(x).
+    !
+    !
+    !
+    !  Licensing:
+    !
+    !    This routine is copyrighted by Shanjie Zhang and Jianming Jin. However,
+    !    they give permission to incorporate this routine into a user program 
+    !    provided that the copyright is acknowledged.
+    !
+    !  Modified:
+    !
+    !    01 August 2012
+    !
+    !  Author:
+    !
+    !    Shanjie Zhang, Jianming Jin
+    !
+    !  Reference:
+    !
+    !    Shanjie Zhang, Jianming Jin,
+    !    Computation of Special Functions,
+    !    Wiley, 1996,
+    !    ISBN: 0-471-11963-6,
+    !    LC: QA351.C45.
+    !
+    !  Parameters:
+    !
+    !    Input, real ( kind = 8 ) X, the argument.
+    !
+    !    Output, real ( kind = 8 ) BJ1,
+    !    the value of J1(x).
+    !
+    !  Modified slightly by TJW, 2021.
+    !
+    implicit none
+
+    real ( kind = 8 ), save, dimension(12) :: a1 = (/ &
+      0.1171875000000000D+00, -0.1441955566406250D+00, &
+      0.6765925884246826D+00, -0.6883914268109947D+01, &
+      0.1215978918765359D+03, -0.3302272294480852D+04, &
+      0.1276412726461746D+06, -0.6656367718817688D+07, &
+      0.4502786003050393D+09, -0.3833857520742790D+11, &
+      0.4011838599133198D+13, -0.5060568503314727D+15 /)
+    real ( kind = 8 ), save, dimension(12) :: b1 = (/ &
+      -0.1025390625000000D+00, 0.2775764465332031D+00, &
+      -0.1993531733751297D+01, 0.2724882731126854D+02, &
+      -0.6038440767050702D+03, 0.1971837591223663D+05, &
+      -0.8902978767070678D+06, 0.5310411010968522D+08, &
+      -0.4043620325107754D+10, 0.3827011346598605D+12, &
+      -0.4406481417852278D+14, 0.6065091351222699D+16 /)
+    real ( kind = 8 ) bj1
+    real ( kind = 8 ) cu
+
+    integer ( kind = 4 ) k
+    integer ( kind = 4 ) k0
+    real ( kind = 8 ) p1
+    real ( kind = 8 ) pi
+    real ( kind = 8 ) q1
+    real ( kind = 8 ) r
+    real ( kind = 8 ) rp2
+    real ( kind = 8 ) t2
+    real ( kind = 8 ) x
+    real ( kind = 8 ) x2
+
+    pi = 3.141592653589793D+00
+    rp2 = 0.63661977236758D+00
+    x2 = x * x
+
+    if ( abs( x ) <= 1.0D-05 ) then
+      bj1 = 0.0D+00
+      return
+    end if
+
+    if ( x <= 12.0D+00 ) then
+
+      bj1 = 1.0D+00
+      r = 1.0D+00
+      do k = 1, 30
+        r = -0.25D+00 * r * x2 / ( k * ( k + 1.0D+00 ) )
+        bj1 = bj1 + r
+        if ( abs ( r ) < abs ( bj1 ) * 1.0D-15 ) then
+          exit
+        end if
+      end do
+
+      bj1 = 0.5D+00 * x * bj1
+
+    else
+
+      if ( x < 35.0D+00 ) then
+        k0 = 12
+      else if ( x < 50.0D+00 ) then
+        k0 = 10
+      else
+        k0 = 8
+      end if
+
+      t2 = x - 0.75D+00 * pi
+      p1 = 1.0D+00
+      q1 = 0.375D+00 / x
+      do k = 1, k0
+        p1 = p1 + a1(k) * x ** ( - 2 * k )
+        q1 = q1 + b1(k) * x ** ( - 2 * k - 1 )
+      end do
+      cu = sqrt ( rp2 / x )
+      bj1 = cu * ( p1 * cos ( t2 ) - q1 * sin ( t2 ) )
 
     end if
     return
