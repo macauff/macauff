@@ -20,7 +20,7 @@ __all__ = ['make_island_groupings']
 
 def make_island_groupings(joint_folder_path, a_cat_folder_path, b_cat_folder_path,
                           a_auf_folder_path, b_auf_folder_path, a_auf_pointings, b_auf_pointings,
-                          a_filt_names, b_filt_names, a_title, b_title, r, dr, rho, drho, j0s,
+                          a_filt_names, b_filt_names, a_title, b_title, r, dr, rho, drho, j1s,
                           max_sep, ax_lims, int_fracs, mem_chunk_num, include_phot_like,
                           use_phot_priors):
     '''
@@ -69,9 +69,9 @@ def make_island_groupings(joint_folder_path, a_cat_folder_path, b_cat_folder_pat
     drho : numpy.ndarray
         Array representing the bin widths of ``rho``. As with ``dr``, is one
         shorter than ``rho`` due to its additional bin edge.
-    j0s : 2-D numpy.ndarray
+    j1s : 2-D numpy.ndarray
         Array holding the evaluations of the Bessel Function of First kind of
-        Zeroth Order, evaluated at all ``r`` and ``rho`` bin-middle combination.
+        First Order, evaluated at all ``r`` and ``rho`` bin-middle combination.
     max_sep : float
         The maximum allowed sky separation between two sources in opposing
         catalogues for consideration as potential counterparts.
@@ -143,8 +143,8 @@ def make_island_groupings(joint_folder_path, a_cat_folder_path, b_cat_folder_pat
 
             if len(a) > 0 and len(b) > 0:
                 overlapa, overlapb = gsf.get_max_overlap(
-                    a[:, 0], a[:, 1], b[:, 0], b[:, 1], max_sep, a[:, 2], b[:, 2], r[:-1], dr,
-                    rho[:-1], drho, j0s, afouriergrid, bfouriergrid, amodrefindsmall,
+                    a[:, 0], a[:, 1], b[:, 0], b[:, 1], max_sep, a[:, 2], b[:, 2],
+                    rho[:-1], drho, afouriergrid, bfouriergrid, amodrefindsmall,
                     bmodrefindsmall, int_fracs[2])
                 asize[a_cut] = asize[a_cut] + overlapa
                 bsize[b_cut] = bsize[b_cut] + overlapb
@@ -178,7 +178,7 @@ def make_island_groupings(joint_folder_path, a_cat_folder_path, b_cat_folder_pat
             if len(a) > 0 and len(b) > 0:
                 indicesa, indicesb, overlapa, overlapb = gsf.get_overlap_indices(
                     a[:, 0], a[:, 1], b[:, 0], b[:, 1], max_sep, amaxsize, bmaxsize, a[:, 2],
-                    b[:, 2], r[:-1], dr, rho[:-1], drho, j0s, afouriergrid, bfouriergrid,
+                    b[:, 2], rho[:-1], drho, afouriergrid, bfouriergrid,
                     amodrefindsmall, bmodrefindsmall, int_fracs[2])
 
                 a_cut2 = np.arange(0, len(a_full))[a_cut]
@@ -240,7 +240,7 @@ def make_island_groupings(joint_folder_path, a_cat_folder_path, b_cat_folder_pat
             del modrefind
 
             a_int_lens = gsf.get_integral_length(
-                a, b, r[:-1], dr, rho[:-1], drho, j0s, a_fouriergrid, b_fouriergrid,
+                a, b, r[:-1], dr, rho[:-1], drho, j1s, a_fouriergrid, b_fouriergrid,
                 a_modrefindsmall, b_modrefindsmall, a_inds_map, a_size_small, int_fracs[0:2])
             ablen[lowind:highind] = a_int_lens[:, 0]
             aflen[lowind:highind] = a_int_lens[:, 1]
@@ -270,7 +270,7 @@ def make_island_groupings(joint_folder_path, a_cat_folder_path, b_cat_folder_pat
             del modrefind
 
             b_int_lens = gsf.get_integral_length(
-                b, a, r[:-1], dr, rho[:-1], drho, j0s, b_fouriergrid, a_fouriergrid,
+                b, a, r[:-1], dr, rho[:-1], drho, j1s, b_fouriergrid, a_fouriergrid,
                 b_modrefindsmall, a_modrefindsmall, b_inds_map, b_size_small, int_fracs[0:2])
             bblen[lowind:highind] = b_int_lens[:, 0]
             bflen[lowind:highind] = b_int_lens[:, 1]
