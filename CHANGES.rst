@@ -39,6 +39,10 @@ API Changes
 Other Changes
 ^^^^^^^^^^^^^
 
+- Updates to documentation to reflect the relaxing of photometric likelihood and
+  perturbation AUF component options. Other minor changes to documentation
+  layout. [#30]
+
 - GitHub Actions will only run remote data dependent tests (those marked with
   ``pytest.mark.remote_data``) on a pull request merge. [#27]
 
