@@ -15,18 +15,20 @@ Python
 Fortran
 =======
 
-Group Sources
-^^^^^^^^^^^^^
-.. f:automodule:: group_sources_fortran
+:doc:`Perturbation AUF<f90_docs/perturb_auf_docs>`
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Counterpart Pairing
-^^^^^^^^^^^^^^^^^^^
-.. f:automodule:: counterpart_pairing_fortran
+:doc:`Group Sources<f90_docs/group_sources_docs>`
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Miscellaneous Functions
-^^^^^^^^^^^^^^^^^^^^^^^
-.. f:automodule:: misc_functions_fortran
+:doc:`Photometric Likelihood<f90_docs/phot_like_docs>`
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Shared Library
-^^^^^^^^^^^^^^
-.. f:autosrcfile:: ../macauff/shared_library.f90
+:doc:`Counterpart Pairing<f90_docs/pairing_docs>`
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+:doc:`Miscellaneous Functions<f90_docs/misc_func_docs>`
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+:doc:`Shared Library<f90_docs/shared_library_docs>`
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

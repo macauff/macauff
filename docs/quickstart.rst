@@ -44,7 +44,8 @@ These files are the only inputs to `~macauff.CrossMatch`, the main class for per
 
 By default, the parameters in the files above are set up such that a cross-match will be performed in the equatorial coordinate frame region :math:`131 \leq \alpha \leq 138,\ -3 \leq \delta \leq 3`. Thus, depending on the coordinates you used when calling `~macauff.tests.generate_random_data`, you may wish to edit ``cross_match_extent`` and ``cf_region_points`` within ``crossmatch_params.txt``, to match your chosen sky coordinates.
 
-Discussion of the input parameters available in the catalogue-specific and joint match-specific input files is provided in more detail :doc:`here<inputs>`.
+.. note::
+	Discussion of the input parameters available in the catalogue-specific and joint match-specific input files is provided in more detail :doc:`here<inputs>`.
 
 Running the Matches
 ===================
