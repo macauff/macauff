@@ -11,7 +11,7 @@ real(dp), parameter :: pi = 4.0_dp*atan(1.0_dp)
 
 contains
 
-subroutine get_max_overlap(a_ax_1, a_ax_2, b_ax_1, b_ax_2, max_sep, a_axerr, b_axerr, r, dr, rho, drho, j0s, afouriergrid, &
+subroutine get_max_overlap(a_ax_1, a_ax_2, b_ax_1, b_ax_2, max_sep, a_axerr, b_axerr, r, rho, drho, j1s, afouriergrid, &
     bfouriergrid, amodrefind, bmodrefind, max_frac, anumoverlap, bnumoverlap)
     ! Loop through all pairs of sources, recording all of those within maximum separation,
     ! keeping a running total of how many overlaps there are for each source in the two
@@ -24,10 +24,12 @@ subroutine get_max_overlap(a_ax_1, a_ax_2, b_ax_1, b_ax_2, max_sep, a_axerr, b_a
     ! Largest allowed separation between objects across catalogue a and b to be considered
     ! potential counterparts to one another.
     real(dp), intent(in) :: max_sep
-    ! Physical sky coordinates and fourier space values for empirical AUF convolutions and integrals.
-    real(dp), intent(in) :: r(:), dr(:), rho(:), drho(:)
-    ! J0, the Bessel Function of First Kind of Zeroth Order, evaluated at all r-rho combinations.
-    real(dp), intent(in) :: j0s(:, :)
+    ! Real- and fourier-space values for empirical AUF convolutions and integrals. Note that r
+    ! evalutaes at a bin middle (i.e., r'+dr'/2) while rho is left-hand bin edges and drho
+    ! bin widths.
+    real(dp), intent(in) :: r(:), rho(:), drho(:)
+    ! J1, the Bessel Function of First Kind of First Order, evaluated at all r-rho bin middle combinations.
+    real(dp), intent(in) :: j1s(:, :)
     ! Grid of fourier-space representations of the perturbation components of each AUF.
     real(dp), intent(in) :: afouriergrid(:, :, :, :), bfouriergrid(:, :, :, :)
     ! Largest considered AUF integral to be considered as potential counterparts.
@@ -35,7 +37,7 @@ subroutine get_max_overlap(a_ax_1, a_ax_2, b_ax_1, b_ax_2, max_sep, a_axerr, b_a
     ! Number of sources overlapping each source in a given catalogue from the opposing catalogue.
     integer, intent(out) :: anumoverlap(size(a_ax_1)), bnumoverlap(size(b_ax_1))
     ! Loop counters.
-    integer :: i, j
+    integer :: i, j, k
     ! Sky offsets and uncertainties
     real(dp) :: dax2, oa, ob
     ! Respective fourier-space variables.
@@ -49,9 +51,9 @@ subroutine get_max_overlap(a_ax_1, a_ax_2, b_ax_1, b_ax_2, max_sep, a_axerr, b_a
     max_sep2 = max_sep**2
 
     anumoverlap = 0
-!$OMP PARALLEL DO DEFAULT(NONE) PRIVATE(i, j, dax2, afourier, bfourier, cumulative, oa, ob, dist, four) &
+!$OMP PARALLEL DO DEFAULT(NONE) PRIVATE(i, j, k, dax2, afourier, bfourier, cumulative, oa, ob, dist, four) &
 !$OMP& SHARED(a_ax_1, a_ax_2, b_ax_1, b_ax_2, max_sep, max_sep2, anumoverlap, afouriergrid, bfouriergrid, amodrefind, &
-!$OMP& bmodrefind, a_axerr, b_axerr, max_frac, r, dr, rho, drho, j0s) REDUCTION(+:bnumoverlap)
+!$OMP& bmodrefind, a_axerr, b_axerr, max_frac, r, rho, drho, j1s) REDUCTION(+:bnumoverlap)
     do j = 1, size(a_ax_1)
         oa = a_axerr(j)
         do i = 1, size(b_ax_1)
@@ -66,7 +68,8 @@ subroutine get_max_overlap(a_ax_1, a_ax_2, b_ax_1, b_ax_2, max_sep, a_axerr, b_a
                     afourier = afouriergrid(:, amodrefind(1, j)+1, amodrefind(2, j)+1, amodrefind(3, j)+1)
                     bfourier = bfouriergrid(:, bmodrefind(1, i)+1, bmodrefind(2, i)+1, bmodrefind(3, i)+1)
                     four = afourier*bfourier*exp(-2.0_dp * pi**2 * (rho+drho/2.0_dp)**2 * (oa**2 + ob**2))
-                    call cumulative_fourier_probability(four, r, dr, rho, drho, dist*3600.0_dp, j0s, cumulative)
+                    k = minloc(abs(r - dist*3600.0_dp), dim=1)
+                    call cumulative_fourier_probability(four, drho, dist*3600.0_dp, j1s(:, k), cumulative)
                     if (cumulative < max_frac) then
                         anumoverlap(j) = anumoverlap(j) + 1
                         bnumoverlap(i) = bnumoverlap(i) + 1
@@ -79,45 +82,53 @@ subroutine get_max_overlap(a_ax_1, a_ax_2, b_ax_1, b_ax_2, max_sep, a_axerr, b_a
 
 end subroutine get_max_overlap
 
-subroutine cumulative_fourier_probability(f, r, dr, rho, drho, dist, j0s, cumulative_prob)
+subroutine calc_j1s(rho, r, j1s)
+    ! Calculate the Bessel Function of First Kind of First Order for a set of fourier-space coordinates.
+    integer, parameter :: dp = kind(0.0d0)  ! double precision
+    ! Fourier- and real-space coordinates at which to evaluate J1.
+    real(dp), intent(in) :: rho(:), r(:)
+    ! Bessel Function of First kind of First order
+    real(dp), intent(out) :: j1s(size(rho), size(r))
+    integer :: j, k
+
+!$OMP PARALLEL DO DEFAULT(NONE) PRIVATE(j, k) SHARED(rho, r, j1s)
+    do k = 1, size(rho)
+        do j = 1, size(r)
+            call jy01a_j1(2.0_dp*pi*rho(k)*r(j), j1s(k, j))
+        end do
+    end do
+!$OMP END PARALLEL DO
+
+end subroutine calc_j1s
+
+subroutine cumulative_fourier_probability(pr, drho, dist, j1s, cumulative_prob)
     ! Calculates the cumulative 2-D spacial integral of the convolved AUFs of two sources,
     ! based on an inverse 2-D Fourier (Hankel) transform of the fourier-space representation
     ! of the individual AUF components, returning the probability under a specific radial distance.
     integer, parameter :: dp = kind(0.0d0)  ! double precision
     ! Fourier-space representation of PDF to be fourier transformed.
-    real(dp), intent(in) :: f(:)
-    ! Real- and fourier-space coordinates for fourier transformation.
-    real(dp), intent(in) :: r(:), dr(:), rho(:), drho(:)
+    real(dp), intent(in) :: pr(:)
+    ! Real--space coordinate widths for fourier transformation.
+    real(dp), intent(in) :: drho(:)
     ! Real-space distance out to which to perform cumulative convolution integral.
     real(dp), intent(in) :: dist
-    ! J0, the Bessel Function of First Kind of Zeroth Order, evaluated at all r-rho combinations.
-    real(dp), intent(in) :: j0s(:, :)
-    ! Loop counters.
-    integer :: i, j
-    ! Individual probability density, calculated by a Hankel transformation of f.
-    real(dp) :: pr
+    ! J1, the Bessel Function of First Kind of First Order, evaluated at all dist-rho combinations.
+    real(dp), intent(in) :: j1s(:)
+    ! Loop counter.
+    integer :: j
     ! Total integral of the convolved PDFs, evaluated via fourier transformation.
     real(dp), intent(out) :: cumulative_prob
 
     cumulative_prob = 0.0_dp
-    do j = 1, size(r)
-        if (r(j) >= dist) then
-            exit
-        end if
-        pr = 0.0_dp
-        do i = 1, size(rho)
-            pr = pr + (rho(i)+drho(i)/2.0_dp) * f(i) * j0s(i, j) * drho(i)
-        end do
-        ! pr, the fourier transform of f, ends up being in probability density of per
-        ! unit area, so we have to account for that when integrating. The final term
-        ! is, essentially, 2 pi r dr
-        cumulative_prob = cumulative_prob + 2.0_dp * pi * pr * (pi * ((r(j)+dr(j))**2 - r(j)**2))
+    do j = 1, size(drho)
+        cumulative_prob = cumulative_prob + pr(j) * j1s(j) * drho(j)
     end do
+    cumulative_prob = dist * cumulative_prob * 2.0_dp * pi
 
 end subroutine cumulative_fourier_probability
 
-subroutine get_overlap_indices(a_ax_1, a_ax_2, b_ax_1, b_ax_2, max_sep, amax, bmax, a_axerr, b_axerr, r, dr, rho, drho, j0s, &
-    afouriergrid, bfouriergrid, amodrefind, bmodrefind, max_frac, aindices, bindices, anumoverlap, bnumoverlap)
+subroutine get_overlap_indices(a_ax_1, a_ax_2, b_ax_1, b_ax_2, max_sep, amax, bmax, a_axerr, b_axerr, r, rho, drho, &
+    j1s, afouriergrid, bfouriergrid, amodrefind, bmodrefind, max_frac, aindices, bindices, anumoverlap, bnumoverlap)
     ! Once total potential overlap is found in getmaxn, we can keep track of each individual
     ! source overlap between the two catalogues, storing their respective indices to keep
     ! links of potential counterparts between the two catalogues.
@@ -131,10 +142,12 @@ subroutine get_overlap_indices(a_ax_1, a_ax_2, b_ax_1, b_ax_2, max_sep, amax, bm
     ! Largest allowed separation between objects across catalogue a and b to be considered
     ! potential counterparts to one another.
     real(dp), intent(in) :: max_sep
-    ! Physical sky coordinates and fourier space values for empirical AUF convolutions and integrals.
-    real(dp), intent(in) :: r(:), dr(:), rho(:), drho(:)
-    ! J0, the Bessel Function of First Kind of Zeroth Order, evaluated at all r-rho combinations.
-    real(dp), intent(in) :: j0s(:, :)
+    ! Real- and fourier-space values for empirical AUF convolutions and integrals. Note that r
+    ! evalutaes at a bin middle (i.e., r'+dr'/2) while rho is left-hand bin edges and drho
+    ! bin widths.
+    real(dp), intent(in) :: r(:), rho(:), drho(:)
+    ! J1, the Bessel Function of First Kind of First Order, evaluated at all r-rho bin middle combinations.
+    real(dp), intent(in) :: j1s(:, :)
     ! Grid of fourier-space representations of the perturbation components of each AUF.
     real(dp), intent(in) :: afouriergrid(:, :, :, :), bfouriergrid(:, :, :, :)
     ! Largest considered AUF integral to be considered as potential counterparts.
@@ -144,7 +157,7 @@ subroutine get_overlap_indices(a_ax_1, a_ax_2, b_ax_1, b_ax_2, max_sep, amax, bm
     ! Number of overlaps of each source into the opposing catalogue.
     integer, intent(out) :: anumoverlap(size(a_ax_1)), bnumoverlap(size(b_ax_1))
     ! Loop counters.
-    integer :: i, j
+    integer :: i, j, k
     ! Sky offsets and uncertainties
     real(dp) :: dax2, oa, ob
     ! Respective fourier-space variables.
@@ -167,9 +180,9 @@ subroutine get_overlap_indices(a_ax_1, a_ax_2, b_ax_1, b_ax_2, max_sep, amax, bm
     bnumoverlap = 0
 
     allocate(tempind(amax))
-!$OMP PARALLEL DO DEFAULT(NONE) PRIVATE(i, j, dax2, dist, afourier, bfourier, four, cumulative, tempind, tempcounter, &
+!$OMP PARALLEL DO DEFAULT(NONE) PRIVATE(i, j, k, dax2, dist, afourier, bfourier, four, cumulative, tempind, tempcounter, &
 !$OMP& changeflag, oa, ob) SHARED(a_ax_1, a_ax_2, b_ax_1, b_ax_2, max_sep, max_sep2, aindices, anumoverlap, afouriergrid, &
-!$OMP& bfouriergrid, amodrefind, bmodrefind, r, dr, rho, drho, j0s, max_frac, a_axerr, b_axerr)
+!$OMP& bfouriergrid, amodrefind, bmodrefind, r, rho, drho, max_frac, a_axerr, b_axerr, j1s)
     do j = 1, size(a_ax_1)
         tempind = -1
         tempcounter = 1
@@ -184,7 +197,8 @@ subroutine get_overlap_indices(a_ax_1, a_ax_2, b_ax_1, b_ax_2, max_sep, amax, bm
                     afourier = afouriergrid(:, amodrefind(1, j)+1, amodrefind(2, j)+1, amodrefind(3, j)+1)
                     bfourier = bfouriergrid(:, bmodrefind(1, i)+1, bmodrefind(2, i)+1, bmodrefind(3, i)+1)
                     four = afourier*bfourier*exp(-2.0_dp * pi**2 * (rho+drho/2.0_dp)**2 * (oa**2 + ob**2))
-                    call cumulative_fourier_probability(four, r, dr, rho, drho, dist*3600.0_dp, j0s, cumulative)
+                    k = minloc(abs(r - dist*3600.0_dp), dim=1)
+                    call cumulative_fourier_probability(four, drho, dist*3600.0_dp, j1s(:, k), cumulative)
                     if (cumulative < max_frac) then
                         tempind(tempcounter) = i
                         tempcounter = tempcounter + 1
@@ -203,9 +217,9 @@ subroutine get_overlap_indices(a_ax_1, a_ax_2, b_ax_1, b_ax_2, max_sep, amax, bm
     deallocate(tempind)
     allocate(tempind(bmax))
 
-!$OMP PARALLEL DO DEFAULT(NONE) PRIVATE(i, j, dax2, dist, afourier, bfourier, four, cumulative, tempind, tempcounter, &
+!$OMP PARALLEL DO DEFAULT(NONE) PRIVATE(i, j, k, dax2, dist, afourier, bfourier, four, cumulative, tempind, tempcounter, &
 !$OMP& changeflag, oa, ob) SHARED(a_ax_1, a_ax_2, b_ax_1, b_ax_2, max_sep, max_sep2, bindices, bnumoverlap, afouriergrid, &
-!$OMP& bfouriergrid, amodrefind, bmodrefind, r, dr, rho, drho, j0s, max_frac, a_axerr, b_axerr)
+!$OMP& bfouriergrid, amodrefind, bmodrefind, r, rho, drho, max_frac, a_axerr, b_axerr, j1s)
     do i = 1, size(b_ax_1)
         tempind = -1
         tempcounter = 1
@@ -220,7 +234,8 @@ subroutine get_overlap_indices(a_ax_1, a_ax_2, b_ax_1, b_ax_2, max_sep, amax, bm
                     afourier = afouriergrid(:, amodrefind(1, j)+1, amodrefind(2, j)+1, amodrefind(3, j)+1)
                     bfourier = bfouriergrid(:, bmodrefind(1, i)+1, bmodrefind(2, i)+1, bmodrefind(3, i)+1)
                     four = afourier*bfourier*exp(-2.0_dp * pi**2 * (rho+drho/2.0_dp)**2 * (oa**2 + ob**2))
-                    call cumulative_fourier_probability(four, r, dr, rho, drho, dist*3600.0_dp, j0s, cumulative)
+                    k = minloc(abs(r - dist*3600.0_dp), dim=1)
+                    call cumulative_fourier_probability(four, drho, dist*3600.0_dp, j1s(:, k), cumulative)
                     if (cumulative < max_frac) then
                         tempind(tempcounter) = j
                         tempcounter = tempcounter + 1
@@ -238,7 +253,7 @@ subroutine get_overlap_indices(a_ax_1, a_ax_2, b_ax_1, b_ax_2, max_sep, amax, bm
 
 end subroutine get_overlap_indices
 
-subroutine get_integral_length(a_err, b_err, r, dr, rho, drho, j0s, a_fouriergrid, b_fouriergrid, a_modrefind, b_modrefind, &
+subroutine get_integral_length(a_err, b_err, r, rho, drho, j1s, a_fouriergrid, b_fouriergrid, a_modrefind, b_modrefind, &
     a_inds, a_size, frac_array, int_dists)
     ! Calculate the "error circle" lengths for sources, based on various cumulative integral fractions
     ! of the convolution of all overlapping opposing catalogue source AUFs with the given source's AUF.
@@ -249,9 +264,9 @@ subroutine get_integral_length(a_err, b_err, r, dr, rho, drho, j0s, a_fouriergri
     integer, intent(in) :: a_size(:), a_inds(:, :)
     ! Astrometric uncertainties for the sources in the two catalogues.
     real(dp), intent(in) :: a_err(:), b_err(:)
-    ! Real- and fourier-space arrays, and the Bessel Function of First Kind of Zeroth Order for those
+    ! Real- and fourier-space arrays, and the Bessel Function of First Kind of First Order for those
     ! r-rho combinations.
-    real(dp), intent(in) :: r(:), dr(:), rho(:), drho(:), j0s(:, :)
+    real(dp), intent(in) :: r(:), rho(:), drho(:), j1s(:, :)
     ! Grids of fourier representations of the perturbation component of the AUF for the catalogue sources.
     real(dp), intent(in) :: a_fouriergrid(:, :, :, :), b_fouriergrid(:, :, :, :)
     ! Fractions of integral to consider when integrating convolutions of AUFs; likely to be the "bright"
@@ -270,7 +285,7 @@ subroutine get_integral_length(a_err, b_err, r, dr, rho, drho, j0s, a_fouriergri
     int_dists = 0.0_dp
 
 !$OMP PARALLEL DO DEFAULT(NONE) PRIVATE(i, j, k, l, ao, bo, afourier, bfourier, four, cumulative_dists) SHARED(a_err, &
-!$OMP& a_fouriergrid, a_modrefind, r, dr, rho, drho, j0s, a_size, a_inds, b_err, b_fouriergrid, b_modrefind, frac_array, int_dists)
+!$OMP& a_fouriergrid, a_modrefind, r, rho, drho, j1s, a_size, a_inds, b_err, b_fouriergrid, b_modrefind, frac_array, int_dists)
     do i = 1, size(a_err)
         ao = a_err(i)
         afourier = a_fouriergrid(:, a_modrefind(1, i)+1, a_modrefind(2, i)+1, a_modrefind(3, i)+1)
@@ -279,7 +294,7 @@ subroutine get_integral_length(a_err, b_err, r, dr, rho, drho, j0s, a_fouriergri
             bo = b_err(k)
             bfourier = b_fouriergrid(:, b_modrefind(1, k)+1, b_modrefind(2, k)+1, b_modrefind(3, k)+1)
             four = afourier*bfourier*exp(-2.0_dp * pi**2 * (rho+drho/2.0_dp)**2 * (ao**2 + bo**2))
-            call cumulative_fourier_distance(four, r, dr, rho, drho, frac_array, j0s, cumulative_dists)
+            call cumulative_fourier_distance(four, r, drho, frac_array, j1s, cumulative_dists)
             do l = 1, size(frac_array)
                 int_dists(i, l) = max(int_dists(i, l), cumulative_dists(l))
             end do
@@ -289,7 +304,7 @@ subroutine get_integral_length(a_err, b_err, r, dr, rho, drho, j0s, a_fouriergri
 
 end subroutine get_integral_length
 
-subroutine cumulative_fourier_distance(f, r, dr, rho, drho, probs, j0s, cumulative_dists)
+subroutine cumulative_fourier_distance(f, r, drho, probs, j1s, cumulative_dists)
     ! Calculates the cumulative 2-D spacial integral of the convolved AUFs of two sources,
     ! based on an inverse 2-D Fourier (Hankel) transform of the fourier-space representation
     ! of the individual AUF components, up to a specified set of probabilities, returning the
@@ -298,46 +313,38 @@ subroutine cumulative_fourier_distance(f, r, dr, rho, drho, probs, j0s, cumulati
     ! Fourier-space representation of PDF to be fourier transformed.
     real(dp), intent(in) :: f(:)
     ! Real- and fourier-space coordinates for fourier transformation.
-    real(dp), intent(in) :: r(:), dr(:), rho(:), drho(:)
+    real(dp), intent(in) :: r(:), drho(:)
     ! Integral fractions out to which to perform cumulative convolution integral.
     real(dp), intent(in) :: probs(:)
-    ! J0, the Bessel Function of First Kind of Zeroth Order, evaluated at all r-rho combinations.
-    real(dp), intent(in) :: j0s(:, :)
+    ! J0, the Bessel Function of First Kind of First Order, evaluated at all r-rho combinations.
+    real(dp), intent(in) :: j1s(:, :)
     ! Loop counters.
-    integer :: i, j, k
+    integer :: j, k, loop
     ! Flags, one per probability in probs, to indicate we have reached the distance out to this
     ! probability integral and to stop considering it any further.
     integer :: flags(size(probs))
-    ! Individual probabilities, calculated by a Hankel transformation of f.
-    real(dp) :: pr, cumulative_prob
+    ! Individual probability, calculated by the integral of the Hankel transformation of f.
+    real(dp) :: cumulative_prob
+    ! Temporary distance, to keep for the distance search.
+    real(dp) :: dist_low, dist_high, dist
     ! Distances of integrals of the convolved PDFs, evaluated via fourier transformation.
     real(dp), intent(out) :: cumulative_dists(size(probs))
 
-    flags = 0
-    cumulative_prob = 0.0_dp
-    do j = 1, size(r)
-        pr = 0.0_dp
-        do i = 1, size(rho)
-            pr = pr + (rho(i)+drho(i)/2.0_dp) * f(i) * j0s(i, j) * drho(i)
-        end do
-        ! pr, the fourier transform of f, ends up being in probability density of per
-        ! unit area, so we have to account for that when integrating. The final term
-        ! is, essentially, 2 pi r dr
-        cumulative_prob = cumulative_prob + 2.0_dp * pi * pr * (pi * ((r(j)+dr(j))**2 - r(j)**2))
-        do k = 1, size(flags)
-            if (cumulative_prob >= probs(k) .and. flags(k) == 0) then
-                flags(k) = 1
-                cumulative_dists(k) = (r(j) + dr(j)/2.0_dp)/3600.0_dp
+    do k = 1, size(flags)
+        flags(k) = 0
+        dist_low = 0
+        dist_high = r(size(r))
+        do loop = 1, 15
+            dist = 0.5_dp * (dist_high + dist_low)
+            j = minloc(r, mask=(r >= dist), dim=1)
+            call cumulative_fourier_probability(f, drho, dist, j1s(:, j), cumulative_prob)
+            if (cumulative_prob >= probs(k)) then
+                dist_high = dist
+            else
+                dist_low = dist
             end if
         end do
-        if (all(flags == 1)) then
-            exit
-        end if
-    end do
-    do k = 1, size(flags)
-        if (flags(k) == 0) then
-            cumulative_dists(k) = (r(size(r)) + dr(size(r))/2.0_dp)/3600.0_dp
-        end if
+        cumulative_dists(k) = dist/3600.0_dp
     end do
 
 end subroutine cumulative_fourier_distance

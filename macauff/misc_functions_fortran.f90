@@ -53,7 +53,7 @@ subroutine find_nearest_point(source_lon, source_lat, point_lon, point_lat, poin
 end subroutine find_nearest_point
 
 subroutine calc_j0(r, r0, j0s)
-    ! Wrapper for jy01a, to calculate the Bessel Function of First Kind of
+    ! Wrapper for jy01a_j0, to calculate the Bessel Function of First Kind of
     ! Zeroth Order for arrays of rs and rhos.
     integer, parameter :: dp = kind(0.0d0)  ! double precision
     ! Input r/rho arrays.
@@ -69,7 +69,7 @@ subroutine calc_j0(r, r0, j0s)
     do i = 1, size(r0)
         do j = 1, size(r)
             z = r(j)*r0(i)*2.0_dp*pi
-            call jy01a(z, j0s(j, i))
+            call jy01a_j0(z, j0s(j, i))
         end do
     end do
 !$OMP END PARALLEL DO

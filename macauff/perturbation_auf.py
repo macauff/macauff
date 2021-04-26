@@ -8,7 +8,8 @@ import os
 import sys
 import numpy as np
 
-from .misc_functions import _load_single_sky_slice, _load_rectangular_slice
+from .misc_functions import (_load_single_sky_slice, _load_rectangular_slice,
+                             _create_rectangular_slice_arrays)
 from .misc_functions_fortran import misc_functions_fortran as mff
 from .get_trilegal_wrapper import get_trilegal
 from .perturbation_auf_fortran import perturbation_auf_fortran as paf
@@ -186,6 +187,14 @@ def make_perturb_aufs(auf_folder, cat_folder, filters, auf_points, r, dr, rho,
         a_tot_photo = np.load('{}/con_cat_photo.npy'.format(cat_folder), mmap_mode='r')
         if compute_local_density:
             a_tot_astro = np.load('{}/con_cat_astro.npy'.format(cat_folder), mmap_mode='r')
+            # Set up the temporary sky slice memmap arrays quickly, as they will
+            # be needed in calculate_local_density later.
+            _create_rectangular_slice_arrays(auf_folder, '', len(a_tot_astro))
+            memmap_slice_arrays = []
+            for n in ['1', '2', '3', '4', 'combined']:
+                memmap_slice_arrays.append(np.lib.format.open_memmap(
+                    '{}/{}_temporary_sky_slice_{}.npy'.format(auf_folder, '', n), mode='r+',
+                    dtype=bool, shape=(len(a_tot_astro),)))
 
     for i in range(len(auf_points)):
         ax1, ax2 = auf_points[i]
@@ -219,7 +228,8 @@ def make_perturb_aufs(auf_folder, cat_folder, filters, auf_points, r, dr, rho,
                 if compute_local_density:
                     localN = calculate_local_density(
                         a_astro_cut[good_mag_slice], a_tot_astro, a_tot_photo[:, j],
-                        auf_folder, cat_folder, density_radius, density_mags[j])
+                        auf_folder, cat_folder, density_radius, density_mags[j],
+                        memmap_slice_arrays)
                 else:
                     localN = np.load('{}/local_N.npy'.format(auf_folder),
                                      mmap_mode='r')[sky_cut][good_mag_slice, j]
@@ -398,7 +408,7 @@ def download_trilegal_simulation(tri_folder, tri_filter_set, ax1, ax2, mag_num, 
 
 
 def calculate_local_density(a_astro, a_tot_astro, a_tot_photo, auf_folder, cat_folder,
-                            density_radius, density_mag):
+                            density_radius, density_mag, memmap_slice_arrays):
     '''
     Calculates the number of sources above a given brightness within a specified
     radius of each source in a catalogue, to provide a local density for
@@ -425,6 +435,9 @@ def calculate_local_density(a_astro, a_tot_astro, a_tot_photo, auf_folder, cat_f
     density_mag : float
         The brightness, in magnitudes, above which to count sources for density
         purposes.
+    memmap_slice_arrays : list of numpy.ndarray
+        List of the memmap sky slice arrays, to be used in the loading of the
+        rectangular sky patch.
 
     Returns
     -------
@@ -436,7 +449,8 @@ def calculate_local_density(a_astro, a_tot_astro, a_tot_photo, auf_folder, cat_f
     min_lat, max_lat = np.amin(a_astro[:, 1]), np.amax(a_astro[:, 1])
 
     overlap_sky_cut = _load_rectangular_slice(auf_folder, '', a_tot_astro, min_lon,
-                                              max_lon, min_lat, max_lat, density_radius)
+                                              max_lon, min_lat, max_lat, density_radius,
+                                              memmap_slice_arrays)
     cut = np.lib.format.open_memmap('{}/_temporary_slice.npy'.format(
         auf_folder), mode='w+', dtype=bool, shape=(len(a_tot_astro),))
     di = max(1, len(cut) // 20)

@@ -184,7 +184,37 @@ def _load_single_sky_slice(folder_path, cat_name, ind, sky_inds):
     return sky_cut
 
 
-def _load_rectangular_slice(folder_path, cat_name, a, lon1, lon2, lat1, lat2, padding):
+def _create_rectangular_slice_arrays(folder_path, cat_name, len_a):
+    '''
+    Create temporary sky slice memmap arrays for parts of the cross-match
+    process to use.
+
+    Parameters
+    ----------
+    folder_path : string
+        Location of where to store memmap arrays.
+    cat_name : string
+        Unique indicator of which catalogue these arrays are for.
+    len_a : integer
+        The length of the catalogue in question, allowing for a one-to-one
+        mapping of sky slice per source.
+    '''
+    np.lib.format.open_memmap('{}/{}_temporary_sky_slice_1.npy'.format(
+        folder_path, cat_name), mode='w+', dtype=bool, shape=(len_a,))
+    np.lib.format.open_memmap('{}/{}_temporary_sky_slice_2.npy'.format(
+        folder_path, cat_name), mode='w+', dtype=bool, shape=(len_a,))
+    np.lib.format.open_memmap('{}/{}_temporary_sky_slice_3.npy'.format(
+        folder_path, cat_name), mode='w+', dtype=bool, shape=(len_a,))
+    np.lib.format.open_memmap('{}/{}_temporary_sky_slice_4.npy'.format(
+        folder_path, cat_name), mode='w+', dtype=bool, shape=(len_a,))
+    np.lib.format.open_memmap('{}/{}_temporary_sky_slice_combined.npy'.format(
+        folder_path, cat_name), mode='w+', dtype=bool, shape=(len_a,))
+
+    return
+
+
+def _load_rectangular_slice(folder_path, cat_name, a, lon1, lon2, lat1, lat2, padding,
+                            memmap_arrays):
     '''
     Loads all sources in a catalogue within a given separation of a rectangle
     in sky coordinates, allowing for the search for all sources within a given
@@ -193,8 +223,8 @@ def _load_rectangular_slice(folder_path, cat_name, a, lon1, lon2, lat1, lat2, pa
     Parameters
     ----------
     folder_path : string
-        Location of where to store the memmap files used in the slicing of the
-        catalogue.
+        Location of where the memmap files used in the slicing of the
+        catalogue are stored.
     cat_name : string
         Indication of whether we are loading catalogue "a" or catalogue "b",
         for separation within a given folder.
@@ -212,6 +242,9 @@ def _load_rectangular_slice(folder_path, cat_name, a, lon1, lon2, lat1, lat2, pa
     padding : float
         The sky separation, in degrees, to find all sources within a distance
         of in ``a``.
+    memmap_arrays : list of numpy.ndarray
+        The list of temporary arrays to use for memory-friendly sky coordinate
+        slicing.
 
     Returns
     -------
@@ -222,16 +255,7 @@ def _load_rectangular_slice(folder_path, cat_name, a, lon1, lon2, lat1, lat2, pa
 
     # Slice the memmapped catalogue, with a memmapped slicing array to
     # preserve memory.
-    sky_cut_1 = np.lib.format.open_memmap('{}/{}_temporary_sky_slice_1.npy'.format(
-        folder_path, cat_name), mode='w+', dtype=bool, shape=(len(a),))
-    sky_cut_2 = np.lib.format.open_memmap('{}/{}_temporary_sky_slice_2.npy'.format(
-        folder_path, cat_name), mode='w+', dtype=bool, shape=(len(a),))
-    sky_cut_3 = np.lib.format.open_memmap('{}/{}_temporary_sky_slice_3.npy'.format(
-        folder_path, cat_name), mode='w+', dtype=bool, shape=(len(a),))
-    sky_cut_4 = np.lib.format.open_memmap('{}/{}_temporary_sky_slice_4.npy'.format(
-        folder_path, cat_name), mode='w+', dtype=bool, shape=(len(a),))
-    sky_cut = np.lib.format.open_memmap('{}/{}_temporary_sky_slice_combined.npy'.format(
-        folder_path, cat_name), mode='w+', dtype=bool, shape=(len(a),))
+    sky_cut_1, sky_cut_2, sky_cut_3, sky_cut_4, sky_cut = memmap_arrays
 
     di = max(1, len(a) // 20)
     # Iterate over each small slice of the larger array, checking for upper
@@ -249,9 +273,6 @@ def _load_rectangular_slice(folder_path, cat_name, a, lon1, lon2, lat1, lat2, pa
     for i in range(0, len(a), di):
         sky_cut[i:i+di] = (sky_cut_1[i:i+di] & sky_cut_2[i:i+di] &
                            sky_cut_3[i:i+di] & sky_cut_4[i:i+di])
-
-    for i in range(4):
-        os.system('rm {}/{}_temporary_sky_slice_{}.npy'.format(folder_path, cat_name, i+1))
 
     return sky_cut
 

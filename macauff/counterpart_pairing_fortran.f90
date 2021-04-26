@@ -39,7 +39,7 @@ subroutine contam_match_prob(Fcc, Fcn, Fnc, Fnn, rho, drho, sep, Gcc, Gcn, Gnc, 
 
     do j = 1, size(rho)
         z = rho(j)*sep*2.0_dp*pi
-        call jy01a(z, j0)
+        call jy01a_j0(z, j0)
         Gcc = Gcc + rho(j) * Fcc(j) * j0 * drho(j)
         Gcn = Gcn + rho(j) * Fcn(j) * j0 * drho(j)
         Gnc = Gnc + rho(j) * Fnc(j) * j0 * drho(j)

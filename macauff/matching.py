@@ -11,6 +11,7 @@ import numpy as np
 
 from .perturbation_auf import make_perturb_aufs
 from .group_sources import make_island_groupings
+from .group_sources_fortran import group_sources_fortran as gsf
 from .misc_functions_fortran import misc_functions_fortran as mff
 from .photometric_likelihood import compute_photometric_likelihoods
 from .counterpart_pairing import source_pairing
@@ -452,8 +453,9 @@ class CrossMatch():
         self.dr = np.diff(self.r)
         self.rho = np.linspace(0, self.four_max_rho, self.four_hankel_points)
         self.drho = np.diff(self.rho)
-        # Only need to calculate this the first time we need it, so buffer for now.
+        # Only need to calculate these the first time we need them, so buffer for now.
         self.j0s = None
+        self.j1s = None
 
     def create_perturb_auf(self, files_per_auf_sim, perturb_auf_func=make_perturb_aufs):
         '''
@@ -615,8 +617,8 @@ class CrossMatch():
         # First check whether we actually need to dip into the group sources
         # routine or not.
         if self.run_group or not correct_file_number:
-            if self.j0s is None:
-                self.j0s = mff.calc_j0(self.rho[:-1]+self.drho/2, self.r[:-1]+self.dr/2)
+            if self.j1s is None:
+                self.j1s = gsf.calc_j1s(self.rho[:-1]+self.drho/2, self.r[:-1]+self.dr/2)
             # Only worry about the warning if we didn't choose to run the grouping
             # but hit incorrect file numbers.
             if not correct_file_number and not self.run_group:
@@ -629,7 +631,7 @@ class CrossMatch():
                        self.a_auf_folder_path, self.b_auf_folder_path, self.a_auf_region_points,
                        self.b_auf_region_points, self.a_filt_names, self.b_filt_names,
                        self.a_cat_name, self.b_cat_name, self.r, self.dr, self.rho, self.drho,
-                       self.j0s, self.pos_corr_dist, self.cross_match_extent, self.int_fracs,
+                       self.j1s, self.pos_corr_dist, self.cross_match_extent, self.int_fracs,
                        self.mem_chunk_num, self.include_phot_like, self.use_phot_priors)
         else:
             print('Loading catalogue islands and overlaps...')
