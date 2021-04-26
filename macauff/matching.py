@@ -618,10 +618,7 @@ class CrossMatch():
         # routine or not.
         if self.run_group or not correct_file_number:
             if self.j1s is None:
-                self.j1s = np.empty((len(self.drho), len(self.dr)), float)
-                for i in range(len(self.dr)):
-                    self.j1s[:, i] = gsf.calc_j1s(self.rho[:-1], self.drho,
-                                                  self.r[i]+self.dr[i]/2)
+                self.j1s = gsf.calc_j1s(self.rho[:-1]+self.drho/2, self.r[:-1]+self.dr/2)
             # Only worry about the warning if we didn't choose to run the grouping
             # but hit incorrect file numbers.
             if not correct_file_number and not self.run_group:

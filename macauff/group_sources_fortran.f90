@@ -11,7 +11,7 @@ real(dp), parameter :: pi = 4.0_dp*atan(1.0_dp)
 
 contains
 
-subroutine get_max_overlap(a_ax_1, a_ax_2, b_ax_1, b_ax_2, max_sep, a_axerr, b_axerr, rho, drho, afouriergrid, &
+subroutine get_max_overlap(a_ax_1, a_ax_2, b_ax_1, b_ax_2, max_sep, a_axerr, b_axerr, r, rho, drho, j1s, afouriergrid, &
     bfouriergrid, amodrefind, bmodrefind, max_frac, anumoverlap, bnumoverlap)
     ! Loop through all pairs of sources, recording all of those within maximum separation,
     ! keeping a running total of how many overlaps there are for each source in the two
@@ -24,8 +24,12 @@ subroutine get_max_overlap(a_ax_1, a_ax_2, b_ax_1, b_ax_2, max_sep, a_axerr, b_a
     ! Largest allowed separation between objects across catalogue a and b to be considered
     ! potential counterparts to one another.
     real(dp), intent(in) :: max_sep
-    ! Fourier space values for empirical AUF convolutions and integrals.
-    real(dp), intent(in) :: rho(:), drho(:)
+    ! Real- and fourier-space values for empirical AUF convolutions and integrals. Note that r
+    ! evalutaes at a bin middle (i.e., r'+dr'/2) while rho is left-hand bin edges and drho
+    ! bin widths.
+    real(dp), intent(in) :: r(:), rho(:), drho(:)
+    ! J1, the Bessel Function of First Kind of First Order, evaluated at all r-rho bin middle combinations.
+    real(dp), intent(in) :: j1s(:, :)
     ! Grid of fourier-space representations of the perturbation components of each AUF.
     real(dp), intent(in) :: afouriergrid(:, :, :, :), bfouriergrid(:, :, :, :)
     ! Largest considered AUF integral to be considered as potential counterparts.
@@ -33,9 +37,7 @@ subroutine get_max_overlap(a_ax_1, a_ax_2, b_ax_1, b_ax_2, max_sep, a_axerr, b_a
     ! Number of sources overlapping each source in a given catalogue from the opposing catalogue.
     integer, intent(out) :: anumoverlap(size(a_ax_1)), bnumoverlap(size(b_ax_1))
     ! Loop counters.
-    integer :: i, j
-    ! J1, the Bessel Function of First Kind of First Order, evaluated at all dist-rho combinations.
-    real(dp) :: j1s(size(rho))
+    integer :: i, j, k
     ! Sky offsets and uncertainties
     real(dp) :: dax2, oa, ob
     ! Respective fourier-space variables.
@@ -49,9 +51,9 @@ subroutine get_max_overlap(a_ax_1, a_ax_2, b_ax_1, b_ax_2, max_sep, a_axerr, b_a
     max_sep2 = max_sep**2
 
     anumoverlap = 0
-!$OMP PARALLEL DO DEFAULT(NONE) PRIVATE(i, j, dax2, afourier, bfourier, cumulative, oa, ob, dist, four, j1s) &
+!$OMP PARALLEL DO DEFAULT(NONE) PRIVATE(i, j, k, dax2, afourier, bfourier, cumulative, oa, ob, dist, four) &
 !$OMP& SHARED(a_ax_1, a_ax_2, b_ax_1, b_ax_2, max_sep, max_sep2, anumoverlap, afouriergrid, bfouriergrid, amodrefind, &
-!$OMP& bmodrefind, a_axerr, b_axerr, max_frac, rho, drho) REDUCTION(+:bnumoverlap)
+!$OMP& bmodrefind, a_axerr, b_axerr, max_frac, r, rho, drho, j1s) REDUCTION(+:bnumoverlap)
     do j = 1, size(a_ax_1)
         oa = a_axerr(j)
         do i = 1, size(b_ax_1)
@@ -66,8 +68,8 @@ subroutine get_max_overlap(a_ax_1, a_ax_2, b_ax_1, b_ax_2, max_sep, a_axerr, b_a
                     afourier = afouriergrid(:, amodrefind(1, j)+1, amodrefind(2, j)+1, amodrefind(3, j)+1)
                     bfourier = bfouriergrid(:, bmodrefind(1, i)+1, bmodrefind(2, i)+1, bmodrefind(3, i)+1)
                     four = afourier*bfourier*exp(-2.0_dp * pi**2 * (rho+drho/2.0_dp)**2 * (oa**2 + ob**2))
-                    call calc_j1s(rho, drho, dist*3600.0_dp, j1s)
-                    call cumulative_fourier_probability(four, drho, dist*3600.0_dp, j1s, cumulative)
+                    k = minloc(abs(r - dist*3600.0_dp), dim=1)
+                    call cumulative_fourier_probability(four, drho, dist*3600.0_dp, j1s(:, k), cumulative)
                     if (cumulative < max_frac) then
                         anumoverlap(j) = anumoverlap(j) + 1
                         bnumoverlap(i) = bnumoverlap(i) + 1
@@ -80,20 +82,23 @@ subroutine get_max_overlap(a_ax_1, a_ax_2, b_ax_1, b_ax_2, max_sep, a_axerr, b_a
 
 end subroutine get_max_overlap
 
-subroutine calc_j1s(rho, drho, dist, j1s)
+subroutine calc_j1s(rho, r, j1s)
     ! Calculate the Bessel Function of First Kind of First Order for a set of fourier-space coordinates.
     integer, parameter :: dp = kind(0.0d0)  ! double precision
-    ! Fourier space coordinates.
-    real(dp), intent(in) :: rho(:), drho(:)
-    ! Real-space distance at which to evaluate integral.
-    real(dp), intent(in) :: dist
+    ! Fourier- and real-space coordinates at which to evaluate J1.
+    real(dp), intent(in) :: rho(:), r(:)
     ! Bessel Function of First kind of First order
-    real(dp), intent(out) :: j1s(size(rho))
-    integer :: k
+    real(dp), intent(out) :: j1s(size(rho), size(r))
+    integer :: j, k
 
+!$OMP PARALLEL DO DEFAULT(NONE) PRIVATE(j, k) SHARED(rho, r, j1s)
     do k = 1, size(rho)
-        call jy01a_j1(2.0_dp*pi*(rho(k)+drho(k)/2.0_dp)*dist, j1s(k))
+        do j = 1, size(r)
+            call jy01a_j1(2.0_dp*pi*rho(k)*r(j), j1s(k, j))
+        end do
     end do
+!$OMP END PARALLEL DO
+
 end subroutine calc_j1s
 
 subroutine cumulative_fourier_probability(pr, drho, dist, j1s, cumulative_prob)
@@ -122,8 +127,8 @@ subroutine cumulative_fourier_probability(pr, drho, dist, j1s, cumulative_prob)
 
 end subroutine cumulative_fourier_probability
 
-subroutine get_overlap_indices(a_ax_1, a_ax_2, b_ax_1, b_ax_2, max_sep, amax, bmax, a_axerr, b_axerr, rho, drho, &
-    afouriergrid, bfouriergrid, amodrefind, bmodrefind, max_frac, aindices, bindices, anumoverlap, bnumoverlap)
+subroutine get_overlap_indices(a_ax_1, a_ax_2, b_ax_1, b_ax_2, max_sep, amax, bmax, a_axerr, b_axerr, r, rho, drho, &
+    j1s, afouriergrid, bfouriergrid, amodrefind, bmodrefind, max_frac, aindices, bindices, anumoverlap, bnumoverlap)
     ! Once total potential overlap is found in getmaxn, we can keep track of each individual
     ! source overlap between the two catalogues, storing their respective indices to keep
     ! links of potential counterparts between the two catalogues.
@@ -137,8 +142,12 @@ subroutine get_overlap_indices(a_ax_1, a_ax_2, b_ax_1, b_ax_2, max_sep, amax, bm
     ! Largest allowed separation between objects across catalogue a and b to be considered
     ! potential counterparts to one another.
     real(dp), intent(in) :: max_sep
-    ! Physical sky coordinates and fourier space values for empirical AUF convolutions and integrals.
-    real(dp), intent(in) :: rho(:), drho(:)
+    ! Real- and fourier-space values for empirical AUF convolutions and integrals. Note that r
+    ! evalutaes at a bin middle (i.e., r'+dr'/2) while rho is left-hand bin edges and drho
+    ! bin widths.
+    real(dp), intent(in) :: r(:), rho(:), drho(:)
+    ! J1, the Bessel Function of First Kind of First Order, evaluated at all r-rho bin middle combinations.
+    real(dp), intent(in) :: j1s(:, :)
     ! Grid of fourier-space representations of the perturbation components of each AUF.
     real(dp), intent(in) :: afouriergrid(:, :, :, :), bfouriergrid(:, :, :, :)
     ! Largest considered AUF integral to be considered as potential counterparts.
@@ -148,9 +157,7 @@ subroutine get_overlap_indices(a_ax_1, a_ax_2, b_ax_1, b_ax_2, max_sep, amax, bm
     ! Number of overlaps of each source into the opposing catalogue.
     integer, intent(out) :: anumoverlap(size(a_ax_1)), bnumoverlap(size(b_ax_1))
     ! Loop counters.
-    integer :: i, j
-    ! J1, the Bessel Function of First Kind of First Order, evaluated at all dist-rho combinations.
-    real(dp) :: j1s(size(rho))
+    integer :: i, j, k
     ! Sky offsets and uncertainties
     real(dp) :: dax2, oa, ob
     ! Respective fourier-space variables.
@@ -173,9 +180,9 @@ subroutine get_overlap_indices(a_ax_1, a_ax_2, b_ax_1, b_ax_2, max_sep, amax, bm
     bnumoverlap = 0
 
     allocate(tempind(amax))
-!$OMP PARALLEL DO DEFAULT(NONE) PRIVATE(i, j, dax2, dist, afourier, bfourier, four, cumulative, tempind, tempcounter, &
-!$OMP& changeflag, oa, ob, j1s) SHARED(a_ax_1, a_ax_2, b_ax_1, b_ax_2, max_sep, max_sep2, aindices, anumoverlap, afouriergrid, &
-!$OMP& bfouriergrid, amodrefind, bmodrefind, rho, drho, max_frac, a_axerr, b_axerr)
+!$OMP PARALLEL DO DEFAULT(NONE) PRIVATE(i, j, k, dax2, dist, afourier, bfourier, four, cumulative, tempind, tempcounter, &
+!$OMP& changeflag, oa, ob) SHARED(a_ax_1, a_ax_2, b_ax_1, b_ax_2, max_sep, max_sep2, aindices, anumoverlap, afouriergrid, &
+!$OMP& bfouriergrid, amodrefind, bmodrefind, r, rho, drho, max_frac, a_axerr, b_axerr, j1s)
     do j = 1, size(a_ax_1)
         tempind = -1
         tempcounter = 1
@@ -190,8 +197,8 @@ subroutine get_overlap_indices(a_ax_1, a_ax_2, b_ax_1, b_ax_2, max_sep, amax, bm
                     afourier = afouriergrid(:, amodrefind(1, j)+1, amodrefind(2, j)+1, amodrefind(3, j)+1)
                     bfourier = bfouriergrid(:, bmodrefind(1, i)+1, bmodrefind(2, i)+1, bmodrefind(3, i)+1)
                     four = afourier*bfourier*exp(-2.0_dp * pi**2 * (rho+drho/2.0_dp)**2 * (oa**2 + ob**2))
-                    call calc_j1s(rho, drho, dist*3600.0_dp, j1s)
-                    call cumulative_fourier_probability(four, drho, dist*3600.0_dp, j1s, cumulative)
+                    k = minloc(abs(r - dist*3600.0_dp), dim=1)
+                    call cumulative_fourier_probability(four, drho, dist*3600.0_dp, j1s(:, k), cumulative)
                     if (cumulative < max_frac) then
                         tempind(tempcounter) = i
                         tempcounter = tempcounter + 1
@@ -210,9 +217,9 @@ subroutine get_overlap_indices(a_ax_1, a_ax_2, b_ax_1, b_ax_2, max_sep, amax, bm
     deallocate(tempind)
     allocate(tempind(bmax))
 
-!$OMP PARALLEL DO DEFAULT(NONE) PRIVATE(i, j, dax2, dist, afourier, bfourier, four, cumulative, tempind, tempcounter, &
-!$OMP& changeflag, oa, ob, j1s) SHARED(a_ax_1, a_ax_2, b_ax_1, b_ax_2, max_sep, max_sep2, bindices, bnumoverlap, afouriergrid, &
-!$OMP& bfouriergrid, amodrefind, bmodrefind, rho, drho, max_frac, a_axerr, b_axerr)
+!$OMP PARALLEL DO DEFAULT(NONE) PRIVATE(i, j, k, dax2, dist, afourier, bfourier, four, cumulative, tempind, tempcounter, &
+!$OMP& changeflag, oa, ob) SHARED(a_ax_1, a_ax_2, b_ax_1, b_ax_2, max_sep, max_sep2, bindices, bnumoverlap, afouriergrid, &
+!$OMP& bfouriergrid, amodrefind, bmodrefind, r, rho, drho, max_frac, a_axerr, b_axerr, j1s)
     do i = 1, size(b_ax_1)
         tempind = -1
         tempcounter = 1
@@ -227,8 +234,8 @@ subroutine get_overlap_indices(a_ax_1, a_ax_2, b_ax_1, b_ax_2, max_sep, amax, bm
                     afourier = afouriergrid(:, amodrefind(1, j)+1, amodrefind(2, j)+1, amodrefind(3, j)+1)
                     bfourier = bfouriergrid(:, bmodrefind(1, i)+1, bmodrefind(2, i)+1, bmodrefind(3, i)+1)
                     four = afourier*bfourier*exp(-2.0_dp * pi**2 * (rho+drho/2.0_dp)**2 * (oa**2 + ob**2))
-                    call calc_j1s(rho, drho, dist*3600.0_dp, j1s)
-                    call cumulative_fourier_probability(four, drho, dist*3600.0_dp, j1s, cumulative)
+                    k = minloc(abs(r - dist*3600.0_dp), dim=1)
+                    call cumulative_fourier_probability(four, drho, dist*3600.0_dp, j1s(:, k), cumulative)
                     if (cumulative < max_frac) then
                         tempind(tempcounter) = j
                         tempcounter = tempcounter + 1

@@ -11,7 +11,7 @@ import numpy as np
 
 from .misc_functions import (create_auf_params_grid, load_small_ref_auf_grid,
                              hav_dist_constant_lat, map_large_index_to_small_index,
-                             _load_rectangular_slice)
+                             _load_rectangular_slice, _create_rectangular_slice_arrays)
 from .group_sources_fortran import group_sources_fortran as gsf
 from .make_set_list import set_list
 
@@ -125,6 +125,20 @@ def make_island_groupings(joint_folder_path, a_cat_folder_path, b_cat_folder_pat
     a_full = np.load('{}/con_cat_astro.npy'.format(a_cat_folder_path), mmap_mode='r')
     b_full = np.load('{}/con_cat_astro.npy'.format(b_cat_folder_path), mmap_mode='r')
 
+    # Generate the necessary memmap sky slice arrays now.
+    _create_rectangular_slice_arrays(joint_folder_path, 'a', len(a_full))
+    memmap_slice_arrays_a = []
+    for n in ['1', '2', '3', '4', 'combined']:
+        memmap_slice_arrays_a.append(np.lib.format.open_memmap(
+            '{}/{}_temporary_sky_slice_{}.npy'.format(joint_folder_path, 'a', n), mode='r+',
+            dtype=bool, shape=(len(a_full),)))
+    _create_rectangular_slice_arrays(joint_folder_path, 'b', len(b_full))
+    memmap_slice_arrays_b = []
+    for n in ['1', '2', '3', '4', 'combined']:
+        memmap_slice_arrays_b.append(np.lib.format.open_memmap(
+            '{}/{}_temporary_sky_slice_{}.npy'.format(joint_folder_path, 'b', n), mode='r+',
+            dtype=bool, shape=(len(b_full),)))
+
     asize = np.lib.format.open_memmap('{}/group/asize.npy'.format(joint_folder_path), mode='w+',
                                       dtype=int, shape=(len(a_full),))
     asize[:] = 0
@@ -136,15 +150,16 @@ def make_island_groupings(joint_folder_path, a_cat_folder_path, b_cat_folder_pat
         for ax2_start, ax2_end in zip(ax2_loops[:-1], ax2_loops[1:]):
             ax_cutout = [ax1_start, ax1_end, ax2_start, ax2_end]
             a, afouriergrid, amodrefindsmall, a_cut = _load_fourier_grid_cutouts(
-                a_full, ax_cutout, joint_folder_path, a_cat_folder_path, a_auf_folder_path, 0, 'a')
+                a_full, ax_cutout, joint_folder_path, a_cat_folder_path, a_auf_folder_path, 0, 'a',
+                memmap_slice_arrays_a)
             b, bfouriergrid, bmodrefindsmall, b_cut = _load_fourier_grid_cutouts(
                 b_full, ax_cutout, joint_folder_path, b_cat_folder_path, b_auf_folder_path,
-                max_sep, 'b')
+                max_sep, 'b', memmap_slice_arrays_b)
 
             if len(a) > 0 and len(b) > 0:
                 overlapa, overlapb = gsf.get_max_overlap(
                     a[:, 0], a[:, 1], b[:, 0], b[:, 1], max_sep, a[:, 2], b[:, 2],
-                    rho[:-1], drho, afouriergrid, bfouriergrid, amodrefindsmall,
+                    r[:-1]+dr/2, rho[:-1], drho, j1s, afouriergrid, bfouriergrid, amodrefindsmall,
                     bmodrefindsmall, int_fracs[2])
                 asize[a_cut] = asize[a_cut] + overlapa
                 bsize[b_cut] = bsize[b_cut] + overlapb
@@ -170,15 +185,16 @@ def make_island_groupings(joint_folder_path, a_cat_folder_path, b_cat_folder_pat
         for ax2_start, ax2_end in zip(ax2_loops[:-1], ax2_loops[1:]):
             ax_cutout = [ax1_start, ax1_end, ax2_start, ax2_end]
             a, afouriergrid, amodrefindsmall, a_cut = _load_fourier_grid_cutouts(
-                a_full, ax_cutout, joint_folder_path, a_cat_folder_path, a_auf_folder_path, 0, 'a')
+                a_full, ax_cutout, joint_folder_path, a_cat_folder_path, a_auf_folder_path, 0, 'a',
+                memmap_slice_arrays_a)
             b, bfouriergrid, bmodrefindsmall, b_cut = _load_fourier_grid_cutouts(
                 b_full, ax_cutout, joint_folder_path, b_cat_folder_path, b_auf_folder_path,
-                max_sep, 'b')
+                max_sep, 'b', memmap_slice_arrays_b)
 
             if len(a) > 0 and len(b) > 0:
                 indicesa, indicesb, overlapa, overlapb = gsf.get_overlap_indices(
                     a[:, 0], a[:, 1], b[:, 0], b[:, 1], max_sep, amaxsize, bmaxsize, a[:, 2],
-                    b[:, 2], rho[:-1], drho, afouriergrid, bfouriergrid,
+                    b[:, 2], r[:-1]+dr/2, rho[:-1], drho, j1s, afouriergrid, bfouriergrid,
                     amodrefindsmall, bmodrefindsmall, int_fracs[2])
 
                 a_cut2 = np.arange(0, len(a_full))[a_cut]
@@ -465,7 +481,7 @@ def make_island_groupings(joint_folder_path, a_cat_folder_path, b_cat_folder_pat
 
 
 def _load_fourier_grid_cutouts(a, sky_rect_coords, joint_folder_path, cat_folder_path,
-                               auf_folder_path, padding, cat_name):
+                               auf_folder_path, padding, cat_name, memmap_slice_arrays):
     '''
     Function to load a sub-set of a given catalogue's astrometry, slicing it
     in a given sky coordinate rectangle, and load the appropriate sub-array
@@ -495,12 +511,15 @@ def _load_fourier_grid_cutouts(a, sky_rect_coords, joint_folder_path, cat_folder
     cat_name : string
         String indicating whether we are loading cutouts from catalogue "a" or
         "b".
+    memmap_slice_arrays : list of numpy.ndarray
+        List of the memmap sky slice arrays, to be used in the loading of the
+        rectangular sky patch.
     '''
 
     lon1, lon2, lat1, lat2 = sky_rect_coords
 
     sky_cut = _load_rectangular_slice(joint_folder_path, cat_name, a, lon1, lon2,
-                                      lat1, lat2, padding)
+                                      lat1, lat2, padding, memmap_slice_arrays)
 
     a_cutout = np.load('{}/con_cat_astro.npy'.format(cat_folder_path), mmap_mode='r')[sky_cut]
 
