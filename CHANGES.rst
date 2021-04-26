@@ -17,6 +17,9 @@ New Features
 Bug Fixes
 ^^^^^^^^^
 
+- Fixed inefficiencies in both group sources and perturbation AUF creation runtime,
+  significantly improving the speed of those parts of a cross-match. [#31]
+
 - Corrected an error in ``tests.generate_random_data``, where only one catalogue
   had its source uncertainties simulated. [#23]
 
