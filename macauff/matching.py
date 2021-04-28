@@ -505,10 +505,10 @@ class CrossMatch():
                            'dm_max': self.dm_max, 'd_mag': self.d_mag,
                            'tri_filt_names': self.a_tri_filt_names,
                            'compute_local_density': self.compute_local_density}
-                if self.b_download_tri:
+                if self.a_download_tri:
                     _kwargs = dict(_kwargs,
                                    **{'tri_set_name': self.a_tri_set_name,
-                                      'fri_filt_num': self.a_tri_filt_num,
+                                      'tri_filt_num': self.a_tri_filt_num,
                                       'auf_region_frame': self.a_auf_region_frame})
                     os.system("rm -rf {}/*".format(self.a_auf_folder_path))
                 else:
@@ -555,7 +555,7 @@ class CrossMatch():
                 if self.b_download_tri:
                     _kwargs = dict(_kwargs,
                                    **{'tri_set_name': self.b_tri_set_name,
-                                      'fri_filt_num': self.b_tri_filt_num,
+                                      'tri_filt_num': self.b_tri_filt_num,
                                       'auf_region_frame': self.b_auf_region_frame})
                     os.system("rm -rf {}/*".format(self.b_auf_folder_path))
                 else:
