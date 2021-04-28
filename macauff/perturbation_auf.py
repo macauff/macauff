@@ -206,7 +206,9 @@ def make_perturb_aufs(auf_folder, cat_folder, filters, auf_points, r, dr, rho,
         if not os.path.exists(ax_folder):
             os.makedirs(ax_folder, exist_ok=True)
 
-        if include_perturb_auf and tri_download_flag:
+        if include_perturb_auf and (tri_download_flag or not
+                                    os.path.isfile('{}/trilegal_auf_simulation.dat'
+                                                   .format(ax_folder))):
             download_trilegal_simulation(ax_folder, tri_set_name, ax1, ax2, tri_filt_num,
                                          auf_region_frame)
 
