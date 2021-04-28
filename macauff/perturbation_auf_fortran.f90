@@ -136,6 +136,7 @@ subroutine perturb_aufs(Narray, magarray, r, dr, rbins, j0s, mag_D, dmag_D, Ds, 
         Fluxav(j) = sum(fluxcontam) / real(lentrials, dp)
 
         deallocate(dms)
+        deallocate(ddms)
         deallocate(dNs)
     end do
 !$OMP END PARALLEL DO
