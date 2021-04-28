@@ -249,8 +249,9 @@ def make_perturb_aufs(auf_folder, cat_folder, filters, auf_points, r, dr, rho,
                     localN = np.load('{}/local_N.npy'.format(auf_folder),
                                      mmap_mode='r')[sky_cut][good_mag_slice, j]
                 Narray = create_single_perturb_auf(
-                    ax_folder, filters, r, dr, rho, drho, j0s, num_trials, psf_fwhms,
-                    tri_filt_names, density_mags, a_photo, localN, dm_max, d_mag, delta_mag_cuts)
+                    ax_folder, filters[j], r, dr, rho, drho, j0s, num_trials, psf_fwhms[j],
+                    tri_filt_names[j], density_mags[j], a_photo, localN, dm_max, d_mag,
+                    delta_mag_cuts)
             else:
                 # Without the simulations to force local normalising density N or
                 # individual source brightness magnitudes, we can simply combine
@@ -573,8 +574,8 @@ def chord_integral_eval(x, r, h):
     return integral
 
 
-def create_single_perturb_auf(tri_folder, filters, r, dr, rho, drho, j0s, num_trials, psf_fwhms,
-                              headers, density_mags, a_photo, localN, dm_max, d_mag, mag_cut):
+def create_single_perturb_auf(tri_folder, filt, r, dr, rho, drho, j0s, num_trials, psf_fwhm,
+                              header, density_mag, a_photo, localN, dm_max, d_mag, mag_cut):
     '''
     Creates the associated parameters for describing a single perturbation AUF
     component, for a single sky position.
@@ -584,8 +585,8 @@ def create_single_perturb_auf(tri_folder, filters, r, dr, rho, drho, j0s, num_tr
     tri_folder : string
         Folder where the TRILEGAL datafile is stored, and where the individual
         filter-specific perturbation AUF simulations should be saved.
-    filters : list of floats or numpy.ndarray
-        List of the filters for which to simulate the AUF component.
+    filt : float
+        Filter for which to simulate the AUF component.
     r : numpy.ndarray
         Array of real-space positions.
     dr : numpy.ndarray
@@ -601,13 +602,13 @@ def create_single_perturb_auf(tri_folder, filters, r, dr, rho, drho, j0s, num_tr
     num_trials : integer
         The number of realisations of blended contaminant sources to draw
         when simulating perturbations of source positions.
-    psf_fwhms : list of floats or numpy.ndarray
-        The full-width at half maxima of each ``filters`` filter.
-    headers : list of floats or numpy.ndarray
-        The filter names as given by the TRILEGAL datafiles, in ``filters`` order.
-    density_mags : list of floats or numpy.ndarray
+    psf_fwhm : float
+        The full-width at half maxima of the ``filt`` filter.
+    header : float
+        The filter name, as given by the TRILEGAL datafile, for this simulation.
+    density_mag : float
         The limiting magnitude above which to consider local normalising densities,
-        corresponding to each ``filters`` bandpass.
+        corresponding to the ``filt`` bandpass.
     a_photo : numpy.ndarray
         The photometry of each source for which simulated perturbations should be
         made.
@@ -640,74 +641,60 @@ def create_single_perturb_auf(tri_folder, filters, r, dr, rho, drho, j0s, num_tr
                         names=True, comments='#', skip_header=1)
 
     # TODO: extend to allow a Galactic source model that doesn't depend on TRILEGAL
-    tri_counts = np.empty(len(filters), int)
-    model_mags_list = []
-    model_mags_interval_list = []
-    log10y_tris = []
-    log10y_gals = []
-    for k in range(len(filters)):
-        tri_mags = tri[:][headers[k]]
-        tri_counts[k] = np.sum(tri_mags <= density_mags[k]) / tri_area
+    tri_mags = tri[:][header]
+    tri_count = np.sum(tri_mags <= density_mag) / tri_area
 
-        minmag = d_mag * np.floor(np.amin(tri_mags)/d_mag)
-        maxmag = d_mag * np.ceil(np.amax(tri_mags)/d_mag)
-        hist, model_mags = np.histogram(tri_mags, bins=np.arange(minmag, maxmag+1e-10, d_mag))
-        hc = np.where(hist > 3)[0]
+    minmag = d_mag * np.floor(np.amin(tri_mags)/d_mag)
+    maxmag = d_mag * np.ceil(np.amax(tri_mags)/d_mag)
+    hist, model_mags = np.histogram(tri_mags, bins=np.arange(minmag, maxmag+1e-10, d_mag))
+    hc = np.where(hist > 3)[0]
 
-        hist = hist[hc]
-        model_mags_interval = np.diff(model_mags)[hc]
-        model_mags = model_mags[hc]
+    hist = hist[hc]
+    model_mags_interval = np.diff(model_mags)[hc]
+    model_mags = model_mags[hc]
 
-        hist = hist / model_mags_interval / tri_area
-        log10y = np.log10(hist)
-
-        log10y_tris.append(log10y)
-        model_mags_list.append(model_mags)
-        model_mags_interval_list.append(model_mags_interval)
+    hist = hist / model_mags_interval / tri_area
+    log10y_tri = np.log10(hist)
 
     # TODO: add the step to get density and counts of extra-galactic sources.
-    gal_counts = np.zeros_like(tri_counts)
-    for k in range(len(filters)):
-        log10y_gals.append(-np.inf * np.ones_like(log10y_tris[k]))
+    gal_count = 0
+    log10y_gal = -np.inf * np.ones_like(log10y_tri)
 
-    for k in range(len(filters)):
-        model_count = tri_counts[k] + gal_counts[k]
+    model_count = tri_count + gal_count
 
-        log10y = np.log10(10**log10y_tris[k] + 10**log10y_gals[k])
-        model_mags = model_mags_list[k]
-        model_mags_interval = model_mags_interval_list[k]
+    log10y = np.log10(10**log10y_tri + 10**log10y_gal)
 
-        # Set a magnitude bin width of 0.25 mags, to avoid oversampling.
-        dmag = 0.25
-        mag_min = dmag * np.floor(np.amin(a_photo)/dmag)
-        mag_max = dmag * np.ceil(np.amax(a_photo)/dmag)
-        magbins = np.arange(mag_min, mag_max+1e-10, dmag)
-        # For local densities, we want a percentage offset, given that we're in
-        # logarithmic bins, accepting a log-difference maximum. This is slightly
-        # lop-sided, but for 20% results in +18%/-22% limits, which is fine.
-        dlogN = 0.2
-        logNvals = np.log(localN)
-        logN_min = dlogN * np.floor(np.amin(logNvals)/dlogN)
-        logN_max = dlogN * np.ceil(np.amax(logNvals)/dlogN)
-        logNbins = np.arange(logN_min, logN_max+1e-10, dlogN)
+    # Set a magnitude bin width of 0.25 mags, to avoid oversampling.
+    dmag = 0.25
+    mag_min = dmag * np.floor(np.amin(a_photo)/dmag)
+    mag_max = dmag * np.ceil(np.amax(a_photo)/dmag)
+    magbins = np.arange(mag_min, mag_max+1e-10, dmag)
+    # For local densities, we want a percentage offset, given that we're in
+    # logarithmic bins, accepting a log-difference maximum. This is slightly
+    # lop-sided, but for 20% results in +18%/-22% limits, which is fine.
+    dlogN = 0.2
+    logNvals = np.log(localN)
+    logN_min = dlogN * np.floor(np.amin(logNvals)/dlogN)
+    logN_max = dlogN * np.ceil(np.amax(logNvals)/dlogN)
+    logNbins = np.arange(logN_min, logN_max+1e-10, dlogN)
 
-        counts, logNbins, magbins = np.histogram2d(logNvals, a_photo, bins=[logNbins, magbins])
-        Ni, magi = np.where(counts > 0)
-        mag_array = 0.5*(magbins[1:]+magbins[:-1])[magi]
-        count_array = np.exp(0.5*(logNbins[1:]+logNbins[:-1])[Ni])
+    counts, logNbins, magbins = np.histogram2d(logNvals, a_photo, bins=[logNbins, magbins])
+    Ni, magi = np.where(counts > 0)
+    mag_array = 0.5*(magbins[1:]+magbins[:-1])[magi]
+    count_array = np.exp(0.5*(logNbins[1:]+logNbins[:-1])[Ni])
 
-        R = 1.185 * psf_fwhms[k]
-        seed = np.random.default_rng().choice(100000, size=paf.get_random_seed_size())
-        Frac, Flux, fourieroffset, offset, cumulative = paf.perturb_aufs(
-            count_array, mag_array, r[:-1]+dr/2, dr, r, j0s.T,
-            model_mags+model_mags_interval/2, model_mags_interval, log10y, model_count,
-            int(dm_max/d_mag) * np.ones_like(count_array), mag_cut, R, num_trials, seed)
-        np.save('{}/{}/frac.npy'.format(tri_folder, filters[k]), Frac)
-        np.save('{}/{}/flux.npy'.format(tri_folder, filters[k]), Flux)
-        np.save('{}/{}/offset.npy'.format(tri_folder, filters[k]), offset)
-        np.save('{}/{}/cumulative.npy'.format(tri_folder, filters[k]), cumulative)
-        np.save('{}/{}/fourier.npy'.format(tri_folder, filters[k]), fourieroffset)
-        np.save('{}/{}/N.npy'.format(tri_folder, filters[k]), count_array)
-        np.save('{}/{}/mag.npy'.format(tri_folder, filters[k]), mag_array)
+    R = 1.185 * psf_fwhm
+    seed = np.random.default_rng().choice(100000, size=paf.get_random_seed_size())
+    Frac, Flux, fourieroffset, offset, cumulative = paf.perturb_aufs(
+        count_array, mag_array, r[:-1]+dr/2, dr, r, j0s.T,
+        model_mags+model_mags_interval/2, model_mags_interval, log10y, model_count,
+        int(dm_max/d_mag) * np.ones_like(count_array), mag_cut, R, num_trials, seed)
+    np.save('{}/{}/frac.npy'.format(tri_folder, filt), Frac)
+    np.save('{}/{}/flux.npy'.format(tri_folder, filt), Flux)
+    np.save('{}/{}/offset.npy'.format(tri_folder, filt), offset)
+    np.save('{}/{}/cumulative.npy'.format(tri_folder, filt), cumulative)
+    np.save('{}/{}/fourier.npy'.format(tri_folder, filt), fourieroffset)
+    np.save('{}/{}/N.npy'.format(tri_folder, filt), count_array)
+    np.save('{}/{}/mag.npy'.format(tri_folder, filt), mag_array)
 
     return count_array
