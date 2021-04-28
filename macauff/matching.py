@@ -505,7 +505,10 @@ class CrossMatch():
                            'dm_max': self.dm_max, 'd_mag': self.d_mag,
                            'tri_filt_names': self.a_tri_filt_names,
                            'compute_local_density': self.compute_local_density}
-                if self.a_download_tri:
+                missing_tri_check = np.any(
+                    [not os.path.isfile('{}/{}/{}/trilegal_auf_simulation.dat'.format(
+                     self.a_auf_folder_path, a, b)) for (a, b) in self.a_auf_region_points])
+                if self.a_download_tri or missing_tri_check:
                     _kwargs = dict(_kwargs,
                                    **{'tri_set_name': self.a_tri_set_name,
                                       'tri_filt_num': self.a_tri_filt_num,
@@ -552,7 +555,10 @@ class CrossMatch():
                            'dm_max': self.dm_max, 'd_mag': self.d_mag,
                            'tri_filt_names': self.b_tri_filt_names,
                            'compute_local_density': self.compute_local_density}
-                if self.b_download_tri:
+                missing_tri_check = np.any(
+                    [not os.path.isfile('{}/{}/{}/trilegal_auf_simulation.dat'.format(
+                     self.b_auf_folder_path, a, b)) for (a, b) in self.b_auf_region_points])
+                if self.b_download_tri or missing_tri_check:
                     _kwargs = dict(_kwargs,
                                    **{'tri_set_name': self.b_tri_set_name,
                                       'tri_filt_num': self.b_tri_filt_num,

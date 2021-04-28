@@ -19,8 +19,8 @@ Bug Fixes
 
 - Fixes to various minor typos in variables in the cross-match workflow. [#32]
 
-- Allow for the non-existence of a TRILEGAL simulation in a folder, and download
-  a new file even if ``tri_download_flag`` was set to ``False``. [#32]
+- Allow for the non-existence of a TRILEGAL simulation in any folder, and download
+  new files even if ``tri_download_flag`` was set to ``False``. [#32]
 
 - Save local normalising densities to file if ``compute_local_density`` was set
   to ``True``, to allow for its non-calculation in the future. [#32]
