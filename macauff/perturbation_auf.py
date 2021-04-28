@@ -311,7 +311,7 @@ def make_perturb_aufs(auf_folder, cat_folder, filters, auf_points, r, dr, rho,
         lowind = np.floor(n_sources*cnum/mem_chunk_num).astype(int)
         highind = np.floor(n_sources*(cnum+1)/mem_chunk_num).astype(int)
         if include_perturb_auf:
-            a = np.load('{}/con_cat_astro.npy'.format(cat_folder), mmap_mode='r')[lowind:highind]
+            a = np.load('{}/con_cat_photo.npy'.format(cat_folder), mmap_mode='r')[lowind:highind]
         magref = np.load('{}/magref.npy'.format(cat_folder), mmap_mode='r')[lowind:highind]
         # As we chunk in even steps through the files this is simple for now,
         # but could be replaced with a more complex mapping in the future.
