@@ -331,9 +331,9 @@ def make_perturb_aufs(auf_folder, cat_folder, filters, auf_points, r, dr, rho,
             for i in range(0, len(a)):
                 axind = modelrefinds[2, indexmap[i]]
                 filterind = magref[i]
-                Nmind = np.argmin((local_N[indexmap[i]] - Narrays[:arraylengths[filterind, axind],
-                                                                  filterind, axind])**2 +
-                                  (a[i, magref[i]] - magarrays[:arraylengths[filterind, axind],
+                Nmind = np.argmin((local_N[i] - Narrays[:arraylengths[filterind, axind],
+                                                        filterind, axind])**2 +
+                                  (a[i, filterind] - magarrays[:arraylengths[filterind, axind],
                                                                filterind, axind])**2)
                 modelrefinds[0, indexmap[i]] = Nmind
         else:
