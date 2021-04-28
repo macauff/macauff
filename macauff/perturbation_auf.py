@@ -196,6 +196,10 @@ def make_perturb_aufs(auf_folder, cat_folder, filters, auf_points, r, dr, rho,
                     '{}/{}_temporary_sky_slice_{}.npy'.format(auf_folder, '', n), mode='r+',
                     dtype=bool, shape=(len(a_tot_astro),)))
 
+    # Overload compute_local_density if it is False but local_N does not exist.
+    if not compute_local_density and not os.path.isfile('{}/local_N.npy'.format(auf_folder)):
+        compute_local_density = True
+
     if compute_local_density:
         local_N = np.lib.format.open_memmap('{}/local_N.npy'.format(auf_folder), mode='w+',
                                             dtype=float, shape=(len(a_tot_astro),))
