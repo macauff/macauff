@@ -513,6 +513,7 @@ class CrossMatch():
                                    **{'tri_set_name': self.a_tri_set_name,
                                       'tri_filt_num': self.a_tri_filt_num,
                                       'auf_region_frame': self.a_auf_region_frame})
+                if self.a_download_tri:
                     os.system("rm -rf {}/*".format(self.a_auf_folder_path))
                 else:
                     for i in range(len(self.a_auf_region_points)):
@@ -563,6 +564,7 @@ class CrossMatch():
                                    **{'tri_set_name': self.b_tri_set_name,
                                       'tri_filt_num': self.b_tri_filt_num,
                                       'auf_region_frame': self.b_auf_region_frame})
+                if self.b_download_tri:
                     os.system("rm -rf {}/*".format(self.b_auf_folder_path))
                 else:
                     for i in range(len(self.b_auf_region_points)):
