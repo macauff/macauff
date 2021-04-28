@@ -196,6 +196,10 @@ def make_perturb_aufs(auf_folder, cat_folder, filters, auf_points, r, dr, rho,
                     '{}/{}_temporary_sky_slice_{}.npy'.format(auf_folder, '', n), mode='r+',
                     dtype=bool, shape=(len(a_tot_astro),)))
 
+    if compute_local_density:
+        local_N = np.lib.format.open_memmap('{}/local_N.npy'.format(auf_folder), mode='w+',
+                                            dtype=float, shape=(len(a_tot_astro),))
+
     for i in range(len(auf_points)):
         ax1, ax2 = auf_points[i]
         ax_folder = '{}/{}/{}'.format(auf_folder, ax1, ax2)
@@ -230,6 +234,11 @@ def make_perturb_aufs(auf_folder, cat_folder, filters, auf_points, r, dr, rho,
                         a_astro_cut[good_mag_slice], a_tot_astro, a_tot_photo[:, j],
                         auf_folder, cat_folder, density_radius, density_mags[j],
                         memmap_slice_arrays)
+                    # Because we always calculate the density from the full
+                    # catalogue, using just the astrometry, we should be able
+                    # to just over-write this N times if there happen to be N
+                    # good detections of a source.
+                    local_N[sky_cut][good_mag_slice] = localN
                 else:
                     localN = np.load('{}/local_N.npy'.format(auf_folder),
                                      mmap_mode='r')[sky_cut][good_mag_slice, j]
@@ -312,6 +321,7 @@ def make_perturb_aufs(auf_folder, cat_folder, filters, auf_points, r, dr, rho,
         highind = np.floor(n_sources*(cnum+1)/mem_chunk_num).astype(int)
         if include_perturb_auf:
             a = np.load('{}/con_cat_photo.npy'.format(cat_folder), mmap_mode='r')[lowind:highind]
+            local_N = np.load('{}/local_N.npy'.format(auf_folder), mmap_mode='r')[lowind:highind]
         magref = np.load('{}/magref.npy'.format(cat_folder), mmap_mode='r')[lowind:highind]
         # As we chunk in even steps through the files this is simple for now,
         # but could be replaced with a more complex mapping in the future.
@@ -321,8 +331,8 @@ def make_perturb_aufs(auf_folder, cat_folder, filters, auf_points, r, dr, rho,
             for i in range(0, len(a)):
                 axind = modelrefinds[2, indexmap[i]]
                 filterind = magref[i]
-                Nmind = np.argmin((localN[indexmap[i]] - Narrays[:arraylengths[filterind, axind],
-                                                                 filterind, axind])**2 +
+                Nmind = np.argmin((local_N[indexmap[i]] - Narrays[:arraylengths[filterind, axind],
+                                                                  filterind, axind])**2 +
                                   (a[i, magref[i]] - magarrays[:arraylengths[filterind, axind],
                                                                filterind, axind])**2)
                 modelrefinds[0, indexmap[i]] = Nmind
