@@ -183,6 +183,10 @@ def make_perturb_aufs(auf_folder, cat_folder, filters, auf_points, r, dr, rho,
                                              dtype=int, shape=(len(filters), len(auf_points)),
                                              fortran_order=True)
 
+    # Overload compute_local_density if it is False but local_N does not exist.
+    if not compute_local_density and not os.path.isfile('{}/local_N.npy'.format(auf_folder)):
+        compute_local_density = True
+
     if include_perturb_auf:
         a_tot_photo = np.load('{}/con_cat_photo.npy'.format(cat_folder), mmap_mode='r')
         if compute_local_density:
@@ -195,10 +199,6 @@ def make_perturb_aufs(auf_folder, cat_folder, filters, auf_points, r, dr, rho,
                 memmap_slice_arrays.append(np.lib.format.open_memmap(
                     '{}/{}_temporary_sky_slice_{}.npy'.format(auf_folder, '', n), mode='r+',
                     dtype=bool, shape=(len(a_tot_astro),)))
-
-    # Overload compute_local_density if it is False but local_N does not exist.
-    if not compute_local_density and not os.path.isfile('{}/local_N.npy'.format(auf_folder)):
-        compute_local_density = True
 
     if compute_local_density:
         local_N = np.lib.format.open_memmap('{}/local_N.npy'.format(auf_folder), mode='w+',
