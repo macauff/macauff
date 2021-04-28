@@ -200,7 +200,7 @@ def make_perturb_aufs(auf_folder, cat_folder, filters, auf_points, r, dr, rho,
                     '{}/{}_temporary_sky_slice_{}.npy'.format(auf_folder, '', n), mode='r+',
                     dtype=bool, shape=(len(a_tot_astro),)))
 
-    if compute_local_density:
+    if compute_local_density and include_perturb_auf:
         local_N = np.lib.format.open_memmap('{}/local_N.npy'.format(auf_folder), mode='w+',
                                             dtype=float, shape=(len(a_tot_astro),))
 
