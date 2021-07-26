@@ -4,6 +4,7 @@ This module provides the framework for the creation of the photometric likelihoo
 used in the cross-matching of the two catalogues.
 '''
 
+import os
 import sys
 import numpy as np
 
@@ -238,6 +239,9 @@ def compute_photometric_likelihoods(joint_folder_path, a_cat_folder_path, b_cat_
                             :abinlengths[i, m]-1, j, i, m] = c_like
                     fa_array[:abinlengths[i, m]-1, j, i, m] = fa_like
                     fb_array[:bbinlengths[j, m]-1, j, i, m] = fb_like
+
+    os.system('rm {}/a_small_sky_slice.npy'.format(joint_folder_path))
+    os.system('rm {}/b_small_sky_slice.npy'.format(joint_folder_path))
 
     # *binsarray is passed back from create_magnitude_bins as a memmapped array,
     # but *binlengths is just a numpy array, so quickly save these before returning.
@@ -511,6 +515,8 @@ def _load_multiple_sky_slice(joint_folder_path, cat_name, ind1, ind2, cat_folder
                           a_size_cutout)
     else:
         list_of_arrays = (photo_cutout, sky_ind_cutout)
+
+    os.system('rm {}/{}_temporary_sky_slice_combined.npy'.format(joint_folder_path, cat_name))
 
     return list_of_arrays
 
