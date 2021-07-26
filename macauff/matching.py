@@ -151,11 +151,11 @@ class CrossMatch():
         # Once AUF components are assembled, we now group sources based on
         # convolved AUF integration lengths, to get "common overlap" sources
         # and merge such overlaps into distinct "islands" of sources to match.
-        self.group_sources(5)
+        self.group_sources(7)
 
         # The third step in this process is to, to some level, calculate the
         # photometry-related information necessary for the cross-match.
-        self.calculate_phot_like(6)
+        self.calculate_phot_like(5)
 
         # The final stage of the cross-match process is that of putting together
         # the previous stages, and calculating the cross-match probabilities.
