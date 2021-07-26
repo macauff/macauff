@@ -358,6 +358,10 @@ def make_perturb_aufs(auf_folder, cat_folder, filters, auf_points, r, dr, rho,
         os.remove('{}/narrays.npy'.format(auf_folder))
         os.remove('{}/magarrays.npy'.format(auf_folder))
 
+        # Delete sky slices used to make fourier cutouts.
+        os.system('rm {}/*temporary_sky_slice*.npy'.format(auf_folder))
+        os.system('rm {}/_small_sky_slice.npy'.format(auf_folder))
+
 
 def download_trilegal_simulation(tri_folder, tri_filter_set, ax1, ax2, mag_num, region_frame,
                                  total_objs=1.5e6):
