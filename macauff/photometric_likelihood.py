@@ -667,7 +667,7 @@ def create_c_and_f(a_astro, b_astro, a_mag, b_mag, a_inds, a_size, b_inds, b_siz
         bmask, barea = plf.get_field_dists(
             b_astro[:, 0], b_astro[:, 1], a_astro[:, 0], a_astro[:, 1], b_inds, b_size, a_flen_ind,
             b_flags, a_flags_ind, a_mag, a_bins[i], a_bins[i+1])
-        b_mask = b_mask.astype(bool)
+        bmask = bmask.astype(bool)
         b_left = b_mag[bmask]
         hist, b_bins = np.histogram(b_left, bins=b_bins)
         _Num_fb = np.sum(b_mask)
