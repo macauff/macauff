@@ -604,12 +604,12 @@ class CrossMatch():
             potentially counterparts to one another.
         '''
 
-        # Each catalogue should expect 5 files in "group/" or "reject/": island
+        # Each catalogue should expect 7 files in "group/" or "reject/": island
         # lengths, indices into the opposite catalogue for each source, the
         # indices of sources in this catalogue in each island, the number of
-        # opposing catalogue overlaps for each source, and the list of any
-        # "rejected" source indices. However, there may be no "reject" arrays,
-        # so we might expect two fewer files.
+        # opposing catalogue overlaps for each source, "field" and "bright" error
+        # circle lengths, and the list of any "rejected" source indices. However,
+        # there may be no "reject" arrays, so we might expect two fewer files.
         if (np.all(['reject_a' not in f for f in
                     os.listdir('{}/reject'.format(self.joint_folder_path))]) and
             np.all(['reject_b' not in f for f in
@@ -660,11 +660,10 @@ class CrossMatch():
             and "field" star photometric likelihood-related information.
         '''
 
-        # Saved files per catalogue: magnitude bins (and lengths), "field"
-        # source priors/likelihoods, the sky slice index of each source,
-        # and the array of "nearest neighbour" areas of each "cf" point.
-        # Additionally, "counterpart" prior/likelihood functions are saved,
-        # for 2 + 2 * 6 files total.
+        # Saved files per catalogue: magnitude bins and bin array lengths, "field"
+        # source priors/likelihoods, and the sky slice index of each source.
+        # Additionally, "counterpart" prior/likelihood functions are saved, for
+        # 2 + 2 * 5 files total.
         file_number = np.sum([len(files) for _, _, files in
                               os.walk('{}/phot_like'.format(self.joint_folder_path))])
         expected_file_number = 2 + 2 * files_per_phot
