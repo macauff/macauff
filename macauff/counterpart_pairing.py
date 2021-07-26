@@ -233,24 +233,27 @@ def source_pairing(joint_folder_path, a_cat_folder_path, b_cat_folder_path, a_au
             else:
                 [acrpts, bcrpts, acrptscontp, bcrptscontp, etacrpts, xicrpts, acrptflux, bcrptflux,
                  afield, bfield, prob, integral] = return_items
-                acountinds[counterpartticker:counterpartticker+len(acrpts)] = acrpts
-                bcountinds[counterpartticker:counterpartticker+len(bcrpts)] = bcrpts
-                acontamprob[counterpartticker:counterpartticker+len(acrptscontp)] = acrptscontp
-                bcontamprob[counterpartticker:counterpartticker+len(bcrptscontp)] = bcrptscontp
-                etaarray[counterpartticker:counterpartticker+len(bcrptscontp)] = etacrpts
-                xiarray[counterpartticker:counterpartticker+len(bcrptscontp)] = xicrpts
-                acontamflux[counterpartticker:counterpartticker+len(acrptflux)] = acrptflux
-                bcontamflux[counterpartticker:counterpartticker+len(bcrptflux)] = bcrptflux
-                probcarray[counterpartticker:counterpartticker+len(acrpts)] = prob/integral
-                counterpartticker += len(acrpts)
+                if len(acrpts) > 0:
+                    acountinds[counterpartticker:counterpartticker+len(acrpts)] = acrpts
+                    bcountinds[counterpartticker:counterpartticker+len(bcrpts)] = bcrpts
+                    acontamprob[counterpartticker:counterpartticker+len(acrptscontp)] = acrptscontp
+                    bcontamprob[counterpartticker:counterpartticker+len(bcrptscontp)] = bcrptscontp
+                    etaarray[counterpartticker:counterpartticker+len(bcrptscontp)] = etacrpts
+                    xiarray[counterpartticker:counterpartticker+len(bcrptscontp)] = xicrpts
+                    acontamflux[counterpartticker:counterpartticker+len(acrptflux)] = acrptflux
+                    bcontamflux[counterpartticker:counterpartticker+len(bcrptflux)] = bcrptflux
+                    probcarray[counterpartticker:counterpartticker+len(acrpts)] = prob/integral
+                    counterpartticker += len(acrpts)
 
-                afieldinds[afieldticker:afieldticker+len(afield)] = afield
-                probfaarray[afieldticker:afieldticker+len(afield)] = prob/integral
-                afieldticker += len(afield)
+                if len(afield) > 0:
+                    afieldinds[afieldticker:afieldticker+len(afield)] = afield
+                    probfaarray[afieldticker:afieldticker+len(afield)] = prob/integral
+                    afieldticker += len(afield)
 
-                bfieldinds[bfieldticker:bfieldticker+len(bfield)] = bfield
-                probfbarray[bfieldticker:bfieldticker+len(bfield)] = prob/integral
-                bfieldticker += len(bfield)
+                if len(bfield) > 0:
+                    bfieldinds[bfieldticker:bfieldticker+len(bfield)] = bfield
+                    probfbarray[bfieldticker:bfieldticker+len(bfield)] = prob/integral
+                    bfieldticker += len(bfield)
         pool.close()
 
     countfilter = np.lib.format.open_memmap('{}/pairing/countfilt.npy'.format(joint_folder_path),
