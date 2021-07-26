@@ -234,6 +234,25 @@ def make_perturb_aufs(auf_folder, cat_folder, filters, auf_points, r, dr, rho,
                 a_photo = a_photo_cut[good_mag_slice, j]
                 if len(a_photo) == 0:
                     arraylengths[j, i] = 0
+                    # If no sources in this AUF-filter combination, we need to
+                    # fake some dummy variables for use in the 3/4-D grids below.
+                    # See below, in include_perturb_auf is False, for meanings.
+                    num_N_mag = 1
+                    Frac = np.zeros((1, num_N_mag), float, order='F')
+                    np.save('{}/frac.npy'.format(filt_folder), Frac)
+                    Flux = np.zeros(num_N_mag, float, order='F')
+                    np.save('{}/flux.npy'.format(filt_folder), Flux)
+                    offset = np.zeros((len(r)-1, num_N_mag), float, order='F')
+                    offset[0, :] = 1 / (2 * np.pi * (r[0] + dr[0]/2) * dr[0])
+                    np.save('{}/offset.npy'.format(filt_folder), offset)
+                    cumulative = np.ones((len(r)-1, num_N_mag), float, order='F')
+                    np.save('{}/cumulative.npy'.format(filt_folder), cumulative)
+                    fourieroffset = np.ones((len(rho)-1, num_N_mag), float, order='F')
+                    np.save('{}/fourier.npy'.format(filt_folder), fourieroffset)
+                    Narray = np.array([[1]], float)
+                    np.save('{}/N.npy'.format(filt_folder), Narray)
+                    magarray = np.array([[1]], float)
+                    np.save('{}/mag.npy'.format(filt_folder), magarray)
                     continue
                 if compute_local_density:
                     localN = calculate_local_density(

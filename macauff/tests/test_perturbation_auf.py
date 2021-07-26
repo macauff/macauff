@@ -91,9 +91,9 @@ class TestCreatePerturbAUF:
             self.cm.create_perturb_auf(self.files_per_auf_sim)
 
         # Now create fake files to simulate catalogue "a" having the right files.
-        # For 2 AUF pointings this comes to 5 + 2*N_filt*files_per_auf_sim files.
+        # For 2 AUF pointings this comes to 8 + 2*N_filt*files_per_auf_sim files.
         os.system("rm -rf {}/*".format(self.cm.a_auf_folder_path))
-        for i in range(5 + 2 * 3 * self.files_per_auf_sim):
+        for i in range(6 + 2 + 2 * 3 * self.files_per_auf_sim):
             np.save('{}/random_file_{}.npy'.format(self.cm.a_auf_folder_path, i), np.zeros(1))
 
         # This should still return the same warning, just for catalogue "b" now.
@@ -109,7 +109,7 @@ class TestCreatePerturbAUF:
         os.system("rm -rf {}/*".format(self.cm.b_auf_folder_path))
 
         # Generate new dummy data for catalogue "b"'s AUF folder.
-        for i in range(5 + 2 * 4 * self.files_per_auf_sim):
+        for i in range(6 + 2 + 2 * 4 * self.files_per_auf_sim):
             np.save('{}/random_file_{}.npy'.format(self.cm.b_auf_folder_path, i), np.zeros(1))
         capsys.readouterr()
         # This test will create catalogue "a" files because of the wrong
@@ -123,7 +123,7 @@ class TestCreatePerturbAUF:
         os.system("rm -rf {}/*".format(self.cm.b_auf_folder_path))
         # Generate new dummy data for each catalogue's AUF folder.
         for path, fn in zip([self.cm.a_auf_folder_path, self.cm.b_auf_folder_path], [3, 4]):
-            for i in range(5 + 2 * fn * self.files_per_auf_sim):
+            for i in range(6 + 2 + 2 * fn * self.files_per_auf_sim):
                 np.save('{}/random_file_{}.npy'.format(path, i), np.zeros(1))
         capsys.readouterr()
         self.cm.create_perturb_auf(self.files_per_auf_sim)
