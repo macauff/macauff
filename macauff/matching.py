@@ -493,7 +493,7 @@ class CrossMatch():
             # Only warn if we did NOT choose to run AUF, but DID hit wrong file
             # number.
             if not a_correct_file_number and not self.run_auf:
-                warnings.warn('Incorrect number of files in catalogue "a" perturbation'
+                warnings.warn('Incorrect number of files in catalogue "a" perturbation '
                               'AUF simulation folder. Deleting all files and re-running '
                               'cross-match process.')
                 # Once run AUF flag is updated, all other flags need to be set to run
@@ -545,7 +545,7 @@ class CrossMatch():
 
         if self.run_auf or not b_correct_file_number:
             if not b_correct_file_number and not self.run_auf:
-                warnings.warn('Incorrect number of files in catalogue "b" perturbation'
+                warnings.warn('Incorrect number of files in catalogue "b" perturbation '
                               'AUF simulation folder. Deleting all files and re-running '
                               'cross-match process.')
                 self.run_group, self.run_cf, self.run_source = True, True, True
