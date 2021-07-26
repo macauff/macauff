@@ -376,17 +376,6 @@ def _individual_island_probability(iterable_wrapper):
         aperm_ = alist_[:agrplen[i], i]
         bperm_ = blist_[:bgrplen[i], i]
 
-        acrpts = []
-        bcrpts = []
-        acrptscontp = []
-        bcrptscontp = []
-        etacrpts = []
-        xicrpts = []
-        acrptflux = []
-        bcrptflux = []
-        afield = []
-        bfield = []
-
         aused = amagref[aperm]
         qa = a_sky_inds[aperm]
 
@@ -489,24 +478,24 @@ def _individual_island_probability(iterable_wrapper):
                     xigrid[j, k] = np.log10(Nc*G/(Nfa[j]*Nfb[k]))
 
         prob = 0
-        integral = 0
-        # Start with the case of no matches between any island objects.
+        integral = 1e-10
+        # Start with the case of no matches between any island objects. Assume
+        # by default that no sources match in the island.
         tempprob = np.prod(afieldarray) * np.prod(bfieldarray)
         integral = integral + tempprob
-        if tempprob > prob:
-            prob = tempprob
-            acrpts = np.array([])
-            bcrpts = np.array([])
-            # With unknown blank array have to reshape the two two-dimensional
-            # arrays to (0, n_fracs).
-            acrptscontp = np.array([]).reshape(0, n_fracs)
-            bcrptscontp = np.array([]).reshape(0, n_fracs)
-            etacrpts = np.array([])
-            xicrpts = np.array([])
-            acrptflux = np.array([])
-            bcrptflux = np.array([])
-            afield = aperm_
-            bfield = bperm_
+        prob = tempprob
+        acrpts = np.array([])
+        bcrpts = np.array([])
+        # With unknown blank array have to reshape the two two-dimensional
+        # arrays to (0, n_fracs).
+        acrptscontp = np.array([]).reshape(0, n_fracs)
+        bcrptscontp = np.array([]).reshape(0, n_fracs)
+        etacrpts = np.array([])
+        xicrpts = np.array([])
+        acrptflux = np.array([])
+        bcrptflux = np.array([])
+        afield = aperm_
+        bfield = bperm_
         for N in range(1, min(len(aperm), len(bperm))+1):
             aiter = np.array(list(itertools.combinations(aperm, r=N)))
             biter = np.array(list(itertools.permutations(bperm, r=N)))
