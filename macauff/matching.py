@@ -698,6 +698,7 @@ class CrossMatch():
         ``cross_match_extent`` sky coordinate where it is defined as having the
         smallest on-sky separation.
         '''
+        print("Calculating photometric region areas...")
         dlon, dlat = 0.01, 0.01
         test_lons = np.arange(self.cross_match_extent[0], self.cross_match_extent[1], dlon)
         test_lats = np.arange(self.cross_match_extent[2], self.cross_match_extent[3], dlat)
