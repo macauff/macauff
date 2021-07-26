@@ -11,7 +11,7 @@ import multiprocessing
 import itertools
 import warnings
 
-from .misc_functions import (create_auf_params_grid, load_small_ref_auf_grid)
+from .misc_functions import load_small_ref_auf_grid
 from .misc_functions_fortran import misc_functions_fortran as mff
 from .counterpart_pairing_fortran import counterpart_pairing_fortran as cpf
 
@@ -66,13 +66,6 @@ def source_pairing(joint_folder_path, a_cat_folder_path, b_cat_folder_path, a_au
     '''
     print("Creating catalogue matches...")
     sys.stdout.flush()
-
-    # Create the estimated levels of flux contamination and fraction of
-    # contaminated source grids.
-    create_auf_params_grid(a_auf_folder_path, a_auf_pointings, a_filt_names, 'frac', n_fracs)
-    create_auf_params_grid(a_auf_folder_path, a_auf_pointings, a_filt_names, 'flux')
-    create_auf_params_grid(b_auf_folder_path, b_auf_pointings, b_filt_names, 'frac', n_fracs)
-    create_auf_params_grid(b_auf_folder_path, b_auf_pointings, b_filt_names, 'flux')
 
     print("Pairing sources...")
     sys.stdout.flush()

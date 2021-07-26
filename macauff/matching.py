@@ -473,8 +473,11 @@ class CrossMatch():
         # normalising density, plus -- per AUF "pointing" -- a simulation file
         # and N simulation files per filter. Additionally, it will contain a
         # single file with each source's index reference into the cube of AUFs,
-        # and a convenience cube for each N-m combination array's length.
-        a_expected_files = 3 + len(self.a_auf_region_points) + (
+        # and a convenience cube for each N-m combination array's length; it will
+        # also contain 3- and 4-D cubes of the fourier-space perturbation AUF
+        # component, and simulated flux contamination and fraction of contaminated
+        # sources, for all simulations.
+        a_expected_files = 6 + len(self.a_auf_region_points) + (
             files_per_auf_sim * len(self.a_filt_names) * len(self.a_auf_region_points))
         a_file_number = np.sum([len(files) for _, _, files in
                                 os.walk(self.a_auf_folder_path)])
@@ -537,7 +540,7 @@ class CrossMatch():
             print('Loading empirical perturbation AUFs for catalogue "a"...')
             sys.stdout.flush()
 
-        b_expected_files = 3 + len(self.b_auf_region_points) + (
+        b_expected_files = 6 + len(self.b_auf_region_points) + (
             files_per_auf_sim * len(self.b_filt_names) * len(self.b_auf_region_points))
         b_file_number = np.sum([len(files) for _, _, files in
                                 os.walk(self.b_auf_folder_path)])

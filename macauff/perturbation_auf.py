@@ -8,8 +8,8 @@ import os
 import sys
 import numpy as np
 
-from .misc_functions import (_load_single_sky_slice, _load_rectangular_slice,
-                             _create_rectangular_slice_arrays)
+from .misc_functions import (create_auf_params_grid, _load_single_sky_slice,
+                             _load_rectangular_slice, _create_rectangular_slice_arrays)
 from .misc_functions_fortran import misc_functions_fortran as mff
 from .get_trilegal_wrapper import get_trilegal
 from .perturbation_auf_fortran import perturbation_auf_fortran as paf
@@ -352,6 +352,18 @@ def make_perturb_aufs(auf_folder, cat_folder, filters, auf_points, r, dr, rho,
         # The mapping of which filter to use is straightforward: simply pick
         # the filter index of the "best" filter for each source, from magref.
         modelrefinds[1, indexmap] = magref
+
+    if delta_mag_cuts is None:
+        n_fracs = 2  # TODO: generalise once delta_mag_cuts is user-inputtable.
+    else:
+        n_fracs = len(delta_mag_cuts)
+    # Create the 4-D grids that house the perturbation AUF fourier-space
+    # representation.
+    create_auf_params_grid(auf_folder, auf_points, filters, 'fourier', len(rho)-1)
+    # Create the estimated levels of flux contamination and fraction of
+    # contaminated source grids.
+    create_auf_params_grid(auf_folder, auf_points, filters, 'frac', n_fracs)
+    create_auf_params_grid(auf_folder, auf_points, filters, 'flux')
 
     if include_perturb_auf:
         del Narrays, magarrays
