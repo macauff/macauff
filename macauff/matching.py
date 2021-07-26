@@ -544,6 +544,8 @@ class CrossMatch():
         b_correct_file_number = b_expected_files == b_file_number
 
         if self.run_auf or not b_correct_file_number:
+            if self.j0s is None:
+                self.j0s = mff.calc_j0(self.rho[:-1]+self.drho/2, self.r[:-1]+self.dr/2)
             if not b_correct_file_number and not self.run_auf:
                 warnings.warn('Incorrect number of files in catalogue "b" perturbation '
                               'AUF simulation folder. Deleting all files and re-running '
