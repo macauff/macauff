@@ -161,21 +161,7 @@ class TestCounterpartPairing:
         self.a_auf_pointings = np.array([[0.0, 0.0]])
         self.b_auf_pointings = np.array([[0.0, 0.0]])
         self.a_filt_names = np.array(['G_BP', 'G', 'G_RP'])
-        # for i in range(0, len(self.a_filt_names)):
-        #     os.makedirs('{}/0.0/0.0/{}'.format(self.a_auf_folder_path, self.a_filt_names[i]),
-        #                 exist_ok=True)
-        #     np.save('{}/0.0/0.0/{}/frac.npy'.format(self.a_auf_folder_path, self.a_filt_names[i]),
-        #             np.zeros((self.n_fracs, 1), float))
-        #     np.save('{}/0.0/0.0/{}/flux.npy'.format(self.a_auf_folder_path, self.a_filt_names[i]),
-        #             np.zeros((1), float))
         self.b_filt_names = np.array(['W1', 'W2', 'W3', 'W4'])
-        # for i in range(0, len(self.b_filt_names)):
-        #     os.makedirs('{}/0.0/0.0/{}'.format(self.b_auf_folder_path, self.b_filt_names[i]),
-        #                 exist_ok=True)
-        #     np.save('{}/0.0/0.0/{}/frac.npy'.format(self.b_auf_folder_path, self.b_filt_names[i]),
-        #             np.zeros((self.n_fracs, 1), float))
-        #     np.save('{}/0.0/0.0/{}/flux.npy'.format(self.b_auf_folder_path, self.b_filt_names[i]),
-        #             np.zeros((1), float))
 
     def _calculate_prob_integral(self):
         self.o = np.sqrt(self.a_sig**2 + self.b_sig**2) / 3600
