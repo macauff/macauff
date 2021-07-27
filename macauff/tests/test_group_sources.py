@@ -12,7 +12,7 @@ from scipy.special import j1
 from ..matching import CrossMatch
 from ..group_sources import make_island_groupings, _load_fourier_grid_cutouts, _clean_overlaps
 from ..group_sources_fortran import group_sources_fortran as gsf
-from ..misc_functions import _create_rectangular_slice_arrays
+from ..misc_functions import _create_rectangular_slice_arrays, create_auf_params_grid
 from .test_matching import _replace_line
 
 
@@ -334,6 +334,7 @@ class TestMakeIslandGroupings():
                     os.makedirs(filt_folder, exist_ok=True)
                     fourieroffset = np.ones((len(self.rho) - 1, 1), float, order='F')
                     np.save('{}/fourier.npy'.format(filt_folder), fourieroffset)
+            create_auf_params_grid(auf_folder, auf_points, filters, 'fourier', len(self.rho)-1)
         # 99% is slightly more than 3-sigma of a 2-D Gaussian integral, for
         # int_frac[2] = 0.99
         self.sigma = 0.1

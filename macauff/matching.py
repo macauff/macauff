@@ -151,11 +151,11 @@ class CrossMatch():
         # Once AUF components are assembled, we now group sources based on
         # convolved AUF integration lengths, to get "common overlap" sources
         # and merge such overlaps into distinct "islands" of sources to match.
-        self.group_sources(5)
+        self.group_sources(7)
 
         # The third step in this process is to, to some level, calculate the
         # photometry-related information necessary for the cross-match.
-        self.calculate_phot_like(6)
+        self.calculate_phot_like(5)
 
         # The final stage of the cross-match process is that of putting together
         # the previous stages, and calculating the cross-match probabilities.
@@ -473,8 +473,11 @@ class CrossMatch():
         # normalising density, plus -- per AUF "pointing" -- a simulation file
         # and N simulation files per filter. Additionally, it will contain a
         # single file with each source's index reference into the cube of AUFs,
-        # and a convenience cube for each N-m combination array's length.
-        a_expected_files = 3 + len(self.a_auf_region_points) + (
+        # and a convenience cube for each N-m combination array's length; it will
+        # also contain 3- and 4-D cubes of the fourier-space perturbation AUF
+        # component, and simulated flux contamination and fraction of contaminated
+        # sources, for all simulations.
+        a_expected_files = 6 + len(self.a_auf_region_points) + (
             files_per_auf_sim * len(self.a_filt_names) * len(self.a_auf_region_points))
         a_file_number = np.sum([len(files) for _, _, files in
                                 os.walk(self.a_auf_folder_path)])
@@ -493,7 +496,7 @@ class CrossMatch():
             # Only warn if we did NOT choose to run AUF, but DID hit wrong file
             # number.
             if not a_correct_file_number and not self.run_auf:
-                warnings.warn('Incorrect number of files in catalogue "a" perturbation'
+                warnings.warn('Incorrect number of files in catalogue "a" perturbation '
                               'AUF simulation folder. Deleting all files and re-running '
                               'cross-match process.')
                 # Once run AUF flag is updated, all other flags need to be set to run
@@ -537,15 +540,17 @@ class CrossMatch():
             print('Loading empirical perturbation AUFs for catalogue "a"...')
             sys.stdout.flush()
 
-        b_expected_files = 3 + len(self.b_auf_region_points) + (
+        b_expected_files = 6 + len(self.b_auf_region_points) + (
             files_per_auf_sim * len(self.b_filt_names) * len(self.b_auf_region_points))
         b_file_number = np.sum([len(files) for _, _, files in
                                 os.walk(self.b_auf_folder_path)])
         b_correct_file_number = b_expected_files == b_file_number
 
         if self.run_auf or not b_correct_file_number:
+            if self.j0s is None:
+                self.j0s = mff.calc_j0(self.rho[:-1]+self.drho/2, self.r[:-1]+self.dr/2)
             if not b_correct_file_number and not self.run_auf:
-                warnings.warn('Incorrect number of files in catalogue "b" perturbation'
+                warnings.warn('Incorrect number of files in catalogue "b" perturbation '
                               'AUF simulation folder. Deleting all files and re-running '
                               'cross-match process.')
                 self.run_group, self.run_cf, self.run_source = True, True, True
@@ -604,12 +609,12 @@ class CrossMatch():
             potentially counterparts to one another.
         '''
 
-        # Each catalogue should expect 5 files in "group/" or "reject/": island
+        # Each catalogue should expect 7 files in "group/" or "reject/": island
         # lengths, indices into the opposite catalogue for each source, the
         # indices of sources in this catalogue in each island, the number of
-        # opposing catalogue overlaps for each source, and the list of any
-        # "rejected" source indices. However, there may be no "reject" arrays,
-        # so we might expect two fewer files.
+        # opposing catalogue overlaps for each source, "field" and "bright" error
+        # circle lengths, and the list of any "rejected" source indices. However,
+        # there may be no "reject" arrays, so we might expect two fewer files.
         if (np.all(['reject_a' not in f for f in
                     os.listdir('{}/reject'.format(self.joint_folder_path))]) and
             np.all(['reject_b' not in f for f in
@@ -660,11 +665,10 @@ class CrossMatch():
             and "field" star photometric likelihood-related information.
         '''
 
-        # Saved files per catalogue: magnitude bins (and lengths), "field"
-        # source priors/likelihoods, the sky slice index of each source,
-        # and the array of "nearest neighbour" areas of each "cf" point.
-        # Additionally, "counterpart" prior/likelihood functions are saved,
-        # for 2 + 2 * 6 files total.
+        # Saved files per catalogue: magnitude bins and bin array lengths, "field"
+        # source priors/likelihoods, and the sky slice index of each source.
+        # Additionally, "counterpart" prior/likelihood functions are saved, for
+        # 2 + 2 * 5 files total.
         file_number = np.sum([len(files) for _, _, files in
                               os.walk('{}/phot_like'.format(self.joint_folder_path))])
         expected_file_number = 2 + 2 * files_per_phot
@@ -699,6 +703,7 @@ class CrossMatch():
         ``cross_match_extent`` sky coordinate where it is defined as having the
         smallest on-sky separation.
         '''
+        print("Calculating photometric region areas...")
         dlon, dlat = 0.01, 0.01
         test_lons = np.arange(self.cross_match_extent[0], self.cross_match_extent[1], dlon)
         test_lats = np.arange(self.cross_match_extent[2], self.cross_match_extent[3], dlat)

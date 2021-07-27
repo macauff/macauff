@@ -11,7 +11,7 @@ import multiprocessing
 import itertools
 import warnings
 
-from .misc_functions import (create_auf_params_grid, load_small_ref_auf_grid)
+from .misc_functions import load_small_ref_auf_grid
 from .misc_functions_fortran import misc_functions_fortran as mff
 from .counterpart_pairing_fortran import counterpart_pairing_fortran as cpf
 
@@ -66,13 +66,6 @@ def source_pairing(joint_folder_path, a_cat_folder_path, b_cat_folder_path, a_au
     '''
     print("Creating catalogue matches...")
     sys.stdout.flush()
-
-    # Create the estimated levels of flux contamination and fraction of
-    # contaminated source grids.
-    create_auf_params_grid(a_auf_folder_path, a_auf_pointings, a_filt_names, 'frac', n_fracs)
-    create_auf_params_grid(a_auf_folder_path, a_auf_pointings, a_filt_names, 'flux')
-    create_auf_params_grid(b_auf_folder_path, b_auf_pointings, b_filt_names, 'frac', n_fracs)
-    create_auf_params_grid(b_auf_folder_path, b_auf_pointings, b_filt_names, 'flux')
 
     print("Pairing sources...")
     sys.stdout.flush()
@@ -233,24 +226,27 @@ def source_pairing(joint_folder_path, a_cat_folder_path, b_cat_folder_path, a_au
             else:
                 [acrpts, bcrpts, acrptscontp, bcrptscontp, etacrpts, xicrpts, acrptflux, bcrptflux,
                  afield, bfield, prob, integral] = return_items
-                acountinds[counterpartticker:counterpartticker+len(acrpts)] = acrpts
-                bcountinds[counterpartticker:counterpartticker+len(bcrpts)] = bcrpts
-                acontamprob[counterpartticker:counterpartticker+len(acrptscontp)] = acrptscontp
-                bcontamprob[counterpartticker:counterpartticker+len(bcrptscontp)] = bcrptscontp
-                etaarray[counterpartticker:counterpartticker+len(bcrptscontp)] = etacrpts
-                xiarray[counterpartticker:counterpartticker+len(bcrptscontp)] = xicrpts
-                acontamflux[counterpartticker:counterpartticker+len(acrptflux)] = acrptflux
-                bcontamflux[counterpartticker:counterpartticker+len(bcrptflux)] = bcrptflux
-                probcarray[counterpartticker:counterpartticker+len(acrpts)] = prob/integral
-                counterpartticker += len(acrpts)
+                if len(acrpts) > 0:
+                    acountinds[counterpartticker:counterpartticker+len(acrpts)] = acrpts
+                    bcountinds[counterpartticker:counterpartticker+len(bcrpts)] = bcrpts
+                    acontamprob[counterpartticker:counterpartticker+len(acrptscontp)] = acrptscontp
+                    bcontamprob[counterpartticker:counterpartticker+len(bcrptscontp)] = bcrptscontp
+                    etaarray[counterpartticker:counterpartticker+len(bcrptscontp)] = etacrpts
+                    xiarray[counterpartticker:counterpartticker+len(bcrptscontp)] = xicrpts
+                    acontamflux[counterpartticker:counterpartticker+len(acrptflux)] = acrptflux
+                    bcontamflux[counterpartticker:counterpartticker+len(bcrptflux)] = bcrptflux
+                    probcarray[counterpartticker:counterpartticker+len(acrpts)] = prob/integral
+                    counterpartticker += len(acrpts)
 
-                afieldinds[afieldticker:afieldticker+len(afield)] = afield
-                probfaarray[afieldticker:afieldticker+len(afield)] = prob/integral
-                afieldticker += len(afield)
+                if len(afield) > 0:
+                    afieldinds[afieldticker:afieldticker+len(afield)] = afield
+                    probfaarray[afieldticker:afieldticker+len(afield)] = prob/integral
+                    afieldticker += len(afield)
 
-                bfieldinds[bfieldticker:bfieldticker+len(bfield)] = bfield
-                probfbarray[bfieldticker:bfieldticker+len(bfield)] = prob/integral
-                bfieldticker += len(bfield)
+                if len(bfield) > 0:
+                    bfieldinds[bfieldticker:bfieldticker+len(bfield)] = bfield
+                    probfbarray[bfieldticker:bfieldticker+len(bfield)] = prob/integral
+                    bfieldticker += len(bfield)
         pool.close()
 
     countfilter = np.lib.format.open_memmap('{}/pairing/countfilt.npy'.format(joint_folder_path),
@@ -373,17 +369,6 @@ def _individual_island_probability(iterable_wrapper):
         aperm_ = alist_[:agrplen[i], i]
         bperm_ = blist_[:bgrplen[i], i]
 
-        acrpts = []
-        bcrpts = []
-        acrptscontp = []
-        bcrptscontp = []
-        etacrpts = []
-        xicrpts = []
-        acrptflux = []
-        bcrptflux = []
-        afield = []
-        bfield = []
-
         aused = amagref[aperm]
         qa = a_sky_inds[aperm]
 
@@ -486,24 +471,24 @@ def _individual_island_probability(iterable_wrapper):
                     xigrid[j, k] = np.log10(Nc*G/(Nfa[j]*Nfb[k]))
 
         prob = 0
-        integral = 0
-        # Start with the case of no matches between any island objects.
+        integral = 1e-10
+        # Start with the case of no matches between any island objects. Assume
+        # by default that no sources match in the island.
         tempprob = np.prod(afieldarray) * np.prod(bfieldarray)
         integral = integral + tempprob
-        if tempprob > prob:
-            prob = tempprob
-            acrpts = np.array([])
-            bcrpts = np.array([])
-            # With unknown blank array have to reshape the two two-dimensional
-            # arrays to (0, n_fracs).
-            acrptscontp = np.array([]).reshape(0, n_fracs)
-            bcrptscontp = np.array([]).reshape(0, n_fracs)
-            etacrpts = np.array([])
-            xicrpts = np.array([])
-            acrptflux = np.array([])
-            bcrptflux = np.array([])
-            afield = aperm_
-            bfield = bperm_
+        prob = tempprob
+        acrpts = np.array([])
+        bcrpts = np.array([])
+        # With unknown blank array have to reshape the two two-dimensional
+        # arrays to (0, n_fracs).
+        acrptscontp = np.array([]).reshape(0, n_fracs)
+        bcrptscontp = np.array([]).reshape(0, n_fracs)
+        etacrpts = np.array([])
+        xicrpts = np.array([])
+        acrptflux = np.array([])
+        bcrptflux = np.array([])
+        afield = aperm_
+        bfield = bperm_
         for N in range(1, min(len(aperm), len(bperm))+1):
             aiter = np.array(list(itertools.combinations(aperm, r=N)))
             biter = np.array(list(itertools.permutations(bperm, r=N)))

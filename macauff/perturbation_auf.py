@@ -8,8 +8,8 @@ import os
 import sys
 import numpy as np
 
-from .misc_functions import (_load_single_sky_slice, _load_rectangular_slice,
-                             _create_rectangular_slice_arrays)
+from .misc_functions import (create_auf_params_grid, _load_single_sky_slice,
+                             _load_rectangular_slice, _create_rectangular_slice_arrays)
 from .misc_functions_fortran import misc_functions_fortran as mff
 from .get_trilegal_wrapper import get_trilegal
 from .perturbation_auf_fortran import perturbation_auf_fortran as paf
@@ -234,6 +234,25 @@ def make_perturb_aufs(auf_folder, cat_folder, filters, auf_points, r, dr, rho,
                 a_photo = a_photo_cut[good_mag_slice, j]
                 if len(a_photo) == 0:
                     arraylengths[j, i] = 0
+                    # If no sources in this AUF-filter combination, we need to
+                    # fake some dummy variables for use in the 3/4-D grids below.
+                    # See below, in include_perturb_auf is False, for meanings.
+                    num_N_mag = 1
+                    Frac = np.zeros((1, num_N_mag), float, order='F')
+                    np.save('{}/frac.npy'.format(filt_folder), Frac)
+                    Flux = np.zeros(num_N_mag, float, order='F')
+                    np.save('{}/flux.npy'.format(filt_folder), Flux)
+                    offset = np.zeros((len(r)-1, num_N_mag), float, order='F')
+                    offset[0, :] = 1 / (2 * np.pi * (r[0] + dr[0]/2) * dr[0])
+                    np.save('{}/offset.npy'.format(filt_folder), offset)
+                    cumulative = np.ones((len(r)-1, num_N_mag), float, order='F')
+                    np.save('{}/cumulative.npy'.format(filt_folder), cumulative)
+                    fourieroffset = np.ones((len(rho)-1, num_N_mag), float, order='F')
+                    np.save('{}/fourier.npy'.format(filt_folder), fourieroffset)
+                    Narray = np.array([[1]], float)
+                    np.save('{}/N.npy'.format(filt_folder), Narray)
+                    magarray = np.array([[1]], float)
+                    np.save('{}/mag.npy'.format(filt_folder), magarray)
                     continue
                 if compute_local_density:
                     localN = calculate_local_density(
@@ -353,10 +372,26 @@ def make_perturb_aufs(auf_folder, cat_folder, filters, auf_points, r, dr, rho,
         # the filter index of the "best" filter for each source, from magref.
         modelrefinds[1, indexmap] = magref
 
+    if delta_mag_cuts is None:
+        n_fracs = 2  # TODO: generalise once delta_mag_cuts is user-inputtable.
+    else:
+        n_fracs = len(delta_mag_cuts)
+    # Create the 4-D grids that house the perturbation AUF fourier-space
+    # representation.
+    create_auf_params_grid(auf_folder, auf_points, filters, 'fourier', len(rho)-1)
+    # Create the estimated levels of flux contamination and fraction of
+    # contaminated source grids.
+    create_auf_params_grid(auf_folder, auf_points, filters, 'frac', n_fracs)
+    create_auf_params_grid(auf_folder, auf_points, filters, 'flux')
+
     if include_perturb_auf:
         del Narrays, magarrays
         os.remove('{}/narrays.npy'.format(auf_folder))
         os.remove('{}/magarrays.npy'.format(auf_folder))
+
+        # Delete sky slices used to make fourier cutouts.
+        os.system('rm {}/*temporary_sky_slice*.npy'.format(auf_folder))
+        os.system('rm {}/_small_sky_slice.npy'.format(auf_folder))
 
 
 def download_trilegal_simulation(tri_folder, tri_filter_set, ax1, ax2, mag_num, region_frame,

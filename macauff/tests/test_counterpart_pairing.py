@@ -149,30 +149,19 @@ class TestCounterpartPairing:
         np.save('{}/arraylengths.npy'.format(self.a_auf_folder_path), np.ones((3, 1), int))
         np.save('{}/arraylengths.npy'.format(self.b_auf_folder_path), np.ones((4, 1), int))
 
-        # We should have already made fourier_grid for each catalogue.
+        # We should have already made fourier_grid, frac_grid, and flux_grid
+        # for each catalogue.
         np.save('{}/fourier_grid.npy'.format(self.a_auf_folder_path), self.afourier_grids)
         np.save('{}/fourier_grid.npy'.format(self.b_auf_folder_path), self.bfourier_grids)
+        np.save('{}/frac_grid.npy'.format(self.a_auf_folder_path), self.afrac_grids)
+        np.save('{}/frac_grid.npy'.format(self.b_auf_folder_path), self.bfrac_grids)
+        np.save('{}/flux_grid.npy'.format(self.a_auf_folder_path), self.aflux_grids)
+        np.save('{}/flux_grid.npy'.format(self.b_auf_folder_path), self.bflux_grids)
 
         self.a_auf_pointings = np.array([[0.0, 0.0]])
         self.b_auf_pointings = np.array([[0.0, 0.0]])
-        # However, source_pairing will create the flux and frac grids, this being
-        # the first time we should have encountered them.
         self.a_filt_names = np.array(['G_BP', 'G', 'G_RP'])
-        for i in range(0, len(self.a_filt_names)):
-            os.makedirs('{}/0.0/0.0/{}'.format(self.a_auf_folder_path, self.a_filt_names[i]),
-                        exist_ok=True)
-            np.save('{}/0.0/0.0/{}/frac.npy'.format(self.a_auf_folder_path, self.a_filt_names[i]),
-                    np.zeros((self.n_fracs, 1), float))
-            np.save('{}/0.0/0.0/{}/flux.npy'.format(self.a_auf_folder_path, self.a_filt_names[i]),
-                    np.zeros((1), float))
         self.b_filt_names = np.array(['W1', 'W2', 'W3', 'W4'])
-        for i in range(0, len(self.b_filt_names)):
-            os.makedirs('{}/0.0/0.0/{}'.format(self.b_auf_folder_path, self.b_filt_names[i]),
-                        exist_ok=True)
-            np.save('{}/0.0/0.0/{}/frac.npy'.format(self.b_auf_folder_path, self.b_filt_names[i]),
-                    np.zeros((self.n_fracs, 1), float))
-            np.save('{}/0.0/0.0/{}/flux.npy'.format(self.b_auf_folder_path, self.b_filt_names[i]),
-                    np.zeros((1), float))
 
     def _calculate_prob_integral(self):
         self.o = np.sqrt(self.a_sig**2 + self.b_sig**2) / 3600

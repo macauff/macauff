@@ -4,6 +4,7 @@ This module provides the framework for the creation of the photometric likelihoo
 used in the cross-matching of the two catalogues.
 '''
 
+import os
 import sys
 import numpy as np
 
@@ -239,6 +240,9 @@ def compute_photometric_likelihoods(joint_folder_path, a_cat_folder_path, b_cat_
                     fa_array[:abinlengths[i, m]-1, j, i, m] = fa_like
                     fb_array[:bbinlengths[j, m]-1, j, i, m] = fb_like
 
+    os.system('rm {}/a_small_sky_slice.npy'.format(joint_folder_path))
+    os.system('rm {}/b_small_sky_slice.npy'.format(joint_folder_path))
+
     # *binsarray is passed back from create_magnitude_bins as a memmapped array,
     # but *binlengths is just a numpy array, so quickly save these before returning.
     np.save('{}/phot_like/abinlengths.npy'.format(joint_folder_path), abinlengths)
@@ -407,6 +411,12 @@ def make_bins(input_mags):
     mina = da*np.floor(minamag/da)
     na = int(np.ceil((maxa - mina)/da) + 1)
     output_bins = np.linspace(mina, maxa, na)
+    # If min/max magnitudes that define magnitude bins happen to lie exactly
+    # on a bin edge (i.e., maxamag % da == 0), then just pad bin edge slightly.
+    if np.abs(mina - minamag) < 1e-5:
+        output_bins[0] -= 1e-4
+    if np.abs(maxa - maxamag) < 1e-5:
+        output_bins[-1] += 1e-4
 
     hist, output_bins = np.histogram(input_mags, bins=output_bins)
     smalllist = []
@@ -505,6 +515,8 @@ def _load_multiple_sky_slice(joint_folder_path, cat_name, ind1, ind2, cat_folder
                           a_size_cutout)
     else:
         list_of_arrays = (photo_cutout, sky_ind_cutout)
+
+    os.system('rm {}/{}_temporary_sky_slice_combined.npy'.format(joint_folder_path, cat_name))
 
     return list_of_arrays
 
@@ -661,7 +673,7 @@ def create_c_and_f(a_astro, b_astro, a_mag, b_mag, a_inds, a_size, b_inds, b_siz
         bmask, barea = plf.get_field_dists(
             b_astro[:, 0], b_astro[:, 1], a_astro[:, 0], a_astro[:, 1], b_inds, b_size, a_flen_ind,
             b_flags, a_flags_ind, a_mag, a_bins[i], a_bins[i+1])
-        b_mask = b_mask.astype(bool)
+        bmask = bmask.astype(bool)
         b_left = b_mag[bmask]
         hist, b_bins = np.histogram(b_left, bins=b_bins)
         _Num_fb = np.sum(b_mask)

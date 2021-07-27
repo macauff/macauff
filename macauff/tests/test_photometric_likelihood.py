@@ -38,7 +38,7 @@ class TestOneSidedPhotometricLikelihood:
         seed = 98765
         rng = np.random.default_rng(seed)
 
-        self.Na, self.Nb = 200000, 80000
+        self.Na, self.Nb = 200000, 78000
         for N, folder, filts, name in zip([self.Na, self.Nb],
                                           [self.a_cat_folder_path, self.b_cat_folder_path],
                                           [self.afilts, self.bfilts], ['a', 'b']):
@@ -49,7 +49,7 @@ class TestOneSidedPhotometricLikelihood:
 
             setattr(self, '{}_astro'.format(name), a)
 
-            a = rng.uniform(10, 15, (N, len(filts)))
+            a = rng.uniform(10.01, 14.99, (N, len(filts)))
             for i in range(len(filts)):
                 q = rng.choice(N, size=N // 4, replace=False)
                 a[q, i] = np.nan
@@ -369,6 +369,9 @@ def test_make_bins():
 
     dm = 0.1/251
     m = np.arange(10+1e-10, 15, dm)
+    # Fudge edge magnitudes away from 'too close to bin edge' checks.
+    m[m < 10.01] = 10.01
+    m[m > 14.99] = 14.99
     bins = make_bins(m)
     assert_allclose(bins, np.arange(10, 15+1e-10, 0.1))
     h, _ = np.histogram(m, bins=bins)
@@ -376,6 +379,8 @@ def test_make_bins():
 
     dm = 0.1/2500
     m = np.arange(10+1e-10, 15, dm)
+    m[m < 10.01] = 10.01
+    m[m > 14.99] = 14.99
     bins = make_bins(m)
     assert_allclose(bins, np.arange(10, 15+1e-10, 0.1))
     h, _ = np.histogram(m, bins=bins)
@@ -383,6 +388,8 @@ def test_make_bins():
 
     dm = 0.1/249
     m = np.arange(10+1e-10, 15, dm)
+    m[m < 10.01] = 10.01
+    m[m > 14.99] = 14.99
     bins = make_bins(m)
     assert_allclose(bins, np.arange(10, 15+1e-10, 0.2))
     h, _ = np.histogram(m, bins=bins)
@@ -390,9 +397,12 @@ def test_make_bins():
 
     dm = 0.1/124
     m = np.arange(10+1e-10, 15, dm)
+    m[-1] = 15-1e-9
+    # Don't fudge data away from bin edge this time.
     bins = make_bins(m)
     fake_bins = np.arange(10, 15.11, 0.3)
-    fake_bins[-1] = 15
+    fake_bins[0] = 10-1e-4
+    fake_bins[-1] = 15+1e-4
     assert_allclose(bins, fake_bins)
     h, _ = np.histogram(m, bins=bins)
     # With this bin size not quite being exactly able to fit into
@@ -426,7 +436,7 @@ class TestFullPhotometricLikelihood:
         rng = np.random.default_rng(seed)
 
         asig, bsig = 0.1, 0.15
-        self.Ntot = 30000
+        self.Ntot = 45000
 
         aa = np.empty((self.Ntot, 3), float)
         aa[:, 0] = rng.uniform(131.25, 131.75, self.Ntot)
