@@ -43,7 +43,7 @@ extensions = [
     'numpydoc',
     'sphinx_automodapi.automodapi',
     'sphinx_automodapi.smart_resolver',
-    'sphinx_astropy.ext.doctest',
+    'pytest_doctestplus.sphinx.doctestplus',
     'sphinx_astropy.ext.changelog_links',
     'sphinx_astropy.ext.missing_static',
     'sphinx.ext.mathjax',
