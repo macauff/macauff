@@ -440,7 +440,6 @@ def make_bins(input_mags):
                 if flag == 0:
                     dellist.extend([k for k in range(i+1, len(output_bins)-1)])
     output_bins = np.delete(output_bins, dellist)
-    print(len(output_bins))
 
     return output_bins
 

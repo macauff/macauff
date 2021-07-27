@@ -436,7 +436,7 @@ class TestFullPhotometricLikelihood:
         rng = np.random.default_rng(seed)
 
         asig, bsig = 0.1, 0.15
-        self.Ntot = 30000
+        self.Ntot = 45000
 
         aa = np.empty((self.Ntot, 3), float)
         aa[:, 0] = rng.uniform(131.25, 131.75, self.Ntot)
