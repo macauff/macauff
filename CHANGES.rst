@@ -7,6 +7,10 @@ General
 New Features
 ^^^^^^^^^^^^
 
+- Added functionality to convert .csv files to internal files used in the
+  matching process, and create output .csv files from the resulting merged
+  datasets created as a result of the matching. [#34]
+
 - Added option to include the full perturbation AUF component, based on
   simulated Galactic source modelling. [#27]
 
