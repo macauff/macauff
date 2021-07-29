@@ -290,7 +290,7 @@ class TestCounterpartPairing:
             self.Nfa*self.Nfa*self.Nfb
         _prob = self.Nc*self.G*self.Nfa
         norm_prob = _prob/_integral
-        q = np.where([a_matches == 0])[0][0]
+        q = np.where(a_matches == 0)[0][0]
         assert_allclose(prob_counterpart[q], norm_prob, rtol=1e-5)
         xicrpts = np.load('{}/pairing/xi.npy'.format(self.joint_folder_path))
         assert_allclose(xicrpts[q], np.array([np.log10(self.G / self.fa_priors[0, 0, 0])]),
@@ -359,7 +359,7 @@ class TestCounterpartPairing:
             self.Nfa*self.Nfa*self.Nfb
         _prob = self.Nc*self.G*self.Nfa
         norm_prob = _prob/_integral
-        q = np.where([a_matches == 0])[0][0]
+        q = np.where(a_matches == 0)[0][0]
         assert_allclose(prob_counterpart[q], norm_prob, rtol=1e-5)
         xicrpts = np.load('{}/pairing/xi.npy'.format(self.joint_folder_path))
         assert_allclose(xicrpts[q], np.array([np.log10(self.G / self.fa_priors[0, 0, 0])]),
@@ -552,7 +552,7 @@ class TestCounterpartPairing:
             self.Nfa*self.Nfa*self.Nfb
         _prob = self.Nc*self.G*self.Nfa
         norm_prob = _prob/_integral
-        q = np.where([a_matches == 0])[0][0]
+        q = np.where(a_matches == 0)[0][0]
         assert_allclose(prob_counterpart[q], norm_prob, rtol=1e-5)
         xicrpts = np.load('{}/pairing/xi.npy'.format(self.joint_folder_path))
         assert_allclose(xicrpts[q], np.array([np.log10(self.G / self.fa_priors[0, 0, 0])]),
