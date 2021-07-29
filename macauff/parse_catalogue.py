@@ -123,7 +123,8 @@ def npy_to_csv(input_csv_folders, input_match_folder, output_folder, csv_filenam
     # TODO: un-hardcode number of relative contaminant fractions
     # TODO: remove photometric likelihood when not used.
     cols = np.append(np.append(column_name_lists[0], column_name_lists[1]),
-                     ['MATCH_P', 'ETA', 'XI', '{}_AVG_CONT'.format(extra_col_cat_names[0]),
+                     ['MATCH_P', 'SEPARATION', 'ETA', 'XI',
+                      '{}_AVG_CONT'.format(extra_col_cat_names[0]),
                       '{}_AVG_CONT'.format(extra_col_cat_names[1]),
                       '{}_CONT_F1'.format(extra_col_cat_names[0]),
                       '{}_CONT_F10'.format(extra_col_cat_names[0]),
@@ -138,6 +139,7 @@ def npy_to_csv(input_csv_folders, input_match_folder, output_folder, csv_filenam
     b_avg_cont = np.load('{}/pairing/bcontamflux.npy'.format(input_match_folder), mmap_mode='r')
     acontprob = np.load('{}/pairing/pacontam.npy'.format(input_match_folder), mmap_mode='r')
     bcontprob = np.load('{}/pairing/pbcontam.npy'.format(input_match_folder), mmap_mode='r')
+    seps = np.load('{}/pairing/crptseps.npy'.format(input_match_folder), mmap_mode='r')
     # TODO: generalise so that other columns than designation+position+magnitudes
     # can be kept.
     n_amags, n_bmags = len(column_name_lists[0]) - 3, len(column_name_lists[1]) - 3
@@ -158,14 +160,15 @@ def npy_to_csv(input_csv_folders, input_match_folder, output_folder, csv_filenam
         for i in column_name_lists[1]:
             match_df[i].iloc[lowind:highind] = cat_b[i].iloc[bc[lowind:highind]].values
         match_df.iloc[lowind:highind, 6+n_amags+n_bmags] = p[lowind:highind]
-        match_df.iloc[lowind:highind, 6+n_amags+n_bmags+1] = eta[lowind:highind]
-        match_df.iloc[lowind:highind, 6+n_amags+n_bmags+2] = xi[lowind:highind]
-        match_df.iloc[lowind:highind, 6+n_amags+n_bmags+3] = a_avg_cont[lowind:highind]
-        match_df.iloc[lowind:highind, 6+n_amags+n_bmags+4] = b_avg_cont[lowind:highind]
+        match_df.iloc[lowind:highind, 6+n_amags+n_bmags+1] = seps[lowind:highind]
+        match_df.iloc[lowind:highind, 6+n_amags+n_bmags+2] = eta[lowind:highind]
+        match_df.iloc[lowind:highind, 6+n_amags+n_bmags+3] = xi[lowind:highind]
+        match_df.iloc[lowind:highind, 6+n_amags+n_bmags+4] = a_avg_cont[lowind:highind]
+        match_df.iloc[lowind:highind, 6+n_amags+n_bmags+5] = b_avg_cont[lowind:highind]
         for i in range(acontprob.shape[1]):
-            match_df.iloc[lowind:highind, 6+n_amags+n_bmags+5+i] = acontprob[lowind:highind, i]
+            match_df.iloc[lowind:highind, 6+n_amags+n_bmags+6+i] = acontprob[lowind:highind, i]
         for i in range(bcontprob.shape[1]):
-            match_df.iloc[lowind:highind, 6+n_amags+n_bmags+5+acontprob.shape[1]+i] = bcontprob[
+            match_df.iloc[lowind:highind, 6+n_amags+n_bmags+6+acontprob.shape[1]+i] = bcontprob[
                 lowind:highind, i]
 
     match_df.to_csv('{}/{}.csv'.format(output_folder, output_filenames[0]), encoding='utf-8',
@@ -176,8 +179,12 @@ def npy_to_csv(input_csv_folders, input_match_folder, output_folder, csv_filenam
     af = np.load('{}/pairing/af.npy'.format(input_match_folder), mmap_mode='r')
     a_avg_cont = np.load('{}/pairing/afieldflux.npy'.format(input_match_folder), mmap_mode='r')
     p = np.load('{}/pairing/pfa.npy'.format(input_match_folder), mmap_mode='r')
+    seps = np.load('{}/pairing/afieldseps.npy'.format(input_match_folder), mmap_mode='r')
+    afeta = np.load('{}/pairing/afieldeta.npy'.format(input_match_folder), mmap_mode='r')
+    afxi = np.load('{}/pairing/afieldxi.npy'.format(input_match_folder), mmap_mode='r')
     cols = np.append(column_name_lists[0],
-                     ['MATCH_P', '{}_AVG_CONT'.format(extra_col_cat_names[0])])
+                     ['MATCH_P', 'NNM_SEPARATION', 'NNM_ETA', 'NNM_XI',
+                      '{}_AVG_CONT'.format(extra_col_cat_names[0])])
     n_anonmatches = len(af)
     a_nonmatch_df = pd.DataFrame(columns=cols, index=np.arange(0, n_anonmatches))
     for cnum in range(0, mem_chunk_num):
@@ -186,7 +193,10 @@ def npy_to_csv(input_csv_folders, input_match_folder, output_folder, csv_filenam
         for i in column_name_lists[0]:
             a_nonmatch_df[i].iloc[lowind:highind] = cat_a[i].iloc[af[lowind:highind]].values
         a_nonmatch_df.iloc[lowind:highind, 3+n_amags] = p[lowind:highind]
-        a_nonmatch_df.iloc[lowind:highind, 3+n_amags+1] = a_avg_cont[lowind:highind]
+        a_nonmatch_df.iloc[lowind:highind, 3+n_amags+1] = seps[lowind:highind]
+        a_nonmatch_df.iloc[lowind:highind, 3+n_amags+2] = afeta[lowind:highind]
+        a_nonmatch_df.iloc[lowind:highind, 3+n_amags+3] = afxi[lowind:highind]
+        a_nonmatch_df.iloc[lowind:highind, 3+n_amags+4] = a_avg_cont[lowind:highind]
 
     a_nonmatch_df.to_csv('{}/{}.csv'.format(output_folder, output_filenames[1]), encoding='utf-8',
                          index=False, header=False)
@@ -194,8 +204,12 @@ def npy_to_csv(input_csv_folders, input_match_folder, output_folder, csv_filenam
     bf = np.load('{}/pairing/bf.npy'.format(input_match_folder), mmap_mode='r')
     b_avg_cont = np.load('{}/pairing/bfieldflux.npy'.format(input_match_folder), mmap_mode='r')
     p = np.load('{}/pairing/pfb.npy'.format(input_match_folder), mmap_mode='r')
+    seps = np.load('{}/pairing/bfieldseps.npy'.format(input_match_folder), mmap_mode='r')
+    bfeta = np.load('{}/pairing/bfieldeta.npy'.format(input_match_folder), mmap_mode='r')
+    bfxi = np.load('{}/pairing/bfieldxi.npy'.format(input_match_folder), mmap_mode='r')
     cols = np.append(column_name_lists[1],
-                     ['MATCH_P', '{}_AVG_CONT'.format(extra_col_cat_names[1])])
+                     ['MATCH_P', 'NNM_SEPARATION', 'NNM_ETA', 'NNM_XI',
+                      '{}_AVG_CONT'.format(extra_col_cat_names[1])])
     n_bnonmatches = len(bf)
     b_nonmatch_df = pd.DataFrame(columns=cols, index=np.arange(0, n_bnonmatches))
     for cnum in range(0, mem_chunk_num):
@@ -204,7 +218,10 @@ def npy_to_csv(input_csv_folders, input_match_folder, output_folder, csv_filenam
         for i in column_name_lists[1]:
             b_nonmatch_df[i].iloc[lowind:highind] = cat_b[i].iloc[bf[lowind:highind]].values
         b_nonmatch_df.iloc[lowind:highind, 3+n_bmags] = p[lowind:highind]
-        b_nonmatch_df.iloc[lowind:highind, 3+1+n_bmags] = b_avg_cont[lowind:highind]
+        b_nonmatch_df.iloc[lowind:highind, 3+n_bmags+1] = seps[lowind:highind]
+        b_nonmatch_df.iloc[lowind:highind, 3+n_bmags+2] = bfeta[lowind:highind]
+        b_nonmatch_df.iloc[lowind:highind, 3+n_bmags+3] = bfxi[lowind:highind]
+        b_nonmatch_df.iloc[lowind:highind, 3+n_bmags+4] = b_avg_cont[lowind:highind]
 
     b_nonmatch_df.to_csv('{}/{}.csv'.format(output_folder, output_filenames[2]), encoding='utf-8',
                          index=False, header=False)
