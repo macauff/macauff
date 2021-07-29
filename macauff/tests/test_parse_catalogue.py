@@ -104,14 +104,14 @@ class TestParseCatalogue:
         bcf = rng.uniform(0, 3, size=N_match)
         np.save('test_folder/pairing/bcontamflux.npy', bcf)
 
-        a_cols = ['A_Designation', 'A_RA', 'A_Dec', 'G_BP', 'G', 'G_RP']
-        b_cols = ['B_Designation', 'B_RA', 'B_Dec', 'W1', 'W2', 'W3', 'W4']
+        a_cols = ['A_Designation', 'A_RA', 'A_Dec', 'G', 'G_RP']
+        b_cols = ['B_Designation', 'B_RA', 'B_Dec', 'W1', 'W2', 'W3']
         extra_cols = ['MATCH_P', 'ETA', 'XI', 'A_AVG_CONT', 'B_AVG_CONT', 'A_CONT_F1',
                       'A_CONT_F10', 'B_CONT_F1', 'B_CONT_F10']
 
         npy_to_csv(['.', '.'], 'test_folder', '.', ['test_a_data', 'test_b_data'],
                    ['match_csv', 'a_nonmatch_csv', 'b_nonmatch_csv'], [a_cols, b_cols],
-                   [[0, 1, 2, 3, 4, 5], [0, 1, 2, 3, 4, 5, 6]], ['A', 'B'], 20,
+                   [[0, 1, 2, 4, 5], [0, 1, 2, 4, 5, 6]], ['A', 'B'], 20,
                    headers=[False, False])
 
         assert os.path.isfile('match_csv.csv')
@@ -120,12 +120,12 @@ class TestParseCatalogue:
         names = np.append(np.append(a_cols, b_cols), extra_cols)
 
         df = pd.read_csv('match_csv.csv', header=None, names=names)
-        for i, col in zip([1, 2, 3, 4, 5], a_cols[1:]):
+        for i, col in zip([1, 2, 4, 5], a_cols[1:]):
             assert_allclose(df[col], self.data[ac, i])
         # data1 and data2 are the string representations of catalogues a/b.
         assert np.all([df[a_cols[0]].iloc[i] == data1[ac[i], 0] for i in range(len(ac))])
         # self.data kept as catalogue "a", and regular variable data cat "b".
-        for i, col in zip([1, 2, 3, 4, 5, 6], b_cols[1:]):
+        for i, col in zip([1, 2, 4, 5, 6], b_cols[1:]):
             assert_allclose(df[col], data[bc, i])
         assert np.all([df[b_cols[0]].iloc[i] == data2[bc[i], 0] for i in range(len(bc))])
 
@@ -135,13 +135,13 @@ class TestParseCatalogue:
 
         names = np.append(a_cols, ['MATCH_P'])
         df = pd.read_csv('a_nonmatch_csv.csv', header=None, names=names)
-        for i, col in zip([1, 2, 3, 4, 5], a_cols[1:]):
+        for i, col in zip([1, 2, 4, 5], a_cols[1:]):
             assert_allclose(df[col], self.data[af, i])
         assert np.all([df[a_cols[0]].iloc[i] == data1[af[i], 0] for i in range(len(af))])
         assert_allclose(df['MATCH_P'], pfa)
         names = np.append(b_cols, ['MATCH_P'])
         df = pd.read_csv('b_nonmatch_csv.csv', header=None, names=names)
-        for i, col in zip([1, 2, 3, 4, 5, 6], b_cols[1:]):
+        for i, col in zip([1, 2, 4, 5, 6], b_cols[1:]):
             assert_allclose(df[col], data[bf, i])
         assert np.all([df[b_cols[0]].iloc[i] == data2[bf[i], 0] for i in range(len(bf))])
         assert_allclose(df['MATCH_P'], pfb)
