@@ -268,6 +268,11 @@ class TestCounterpartPairing:
         bflux = np.load('{}/pairing/bcontamflux.npy'.format(self.joint_folder_path))
         assert np.all(bflux == np.zeros((3), float))
 
+        aflux = np.load('{}/pairing/afieldflux.npy'.format(self.joint_folder_path))
+        assert np.all(aflux == np.zeros((4), float))
+        bflux = np.load('{}/pairing/bfieldflux.npy'.format(self.joint_folder_path))
+        assert np.all(bflux == np.zeros((1), float))
+
         a_matches = np.load('{}/pairing/ac.npy'.format(self.joint_folder_path))
         assert np.all([q in a_matches for q in [0, 1, 2]])
         assert np.all([q not in a_matches for q in [3, 4, 5, 6]])
