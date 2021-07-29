@@ -11,6 +11,8 @@ import pandas as pd
 
 from .misc_functions import _load_rectangular_slice, _create_rectangular_slice_arrays
 
+__all__ = ['csv_to_npy', 'rect_slice_npy', 'npy_to_csv', 'rect_slice_csv']
+
 
 def csv_to_npy(input_folder, input_filename, output_folder, astro_cols, photo_cols, bestindex_col,
                header=False):
