@@ -8,7 +8,7 @@ import pandas as pd
 import numpy as np
 from numpy.testing import assert_allclose
 
-from ..parse_catalogue import csv_to_npy, npy_to_csv
+from ..parse_catalogue import csv_to_npy, npy_to_csv, rect_slice_npy, rect_slice_csv
 
 
 class TestParseCatalogue:
@@ -145,3 +145,64 @@ class TestParseCatalogue:
             assert_allclose(df[col], data[bf, i])
         assert np.all([df[b_cols[0]].iloc[i] == data2[bf[i], 0] for i in range(len(bf))])
         assert_allclose(df['MATCH_P'], pfb)
+
+    def test_rect_slice_npy(self):
+        np.save('con_cat_astro.npy', self.data[:, [1, 2, 3]])
+        np.save('con_cat_photo.npy', self.data[:, [4, 5]])
+        np.save('magref.npy', self.data[:, 6])
+
+        os.makedirs('dummy_folder', exist_ok=True)
+
+        rc = [-0.3, 0.3, -0.1, 0.2]
+        for pad in [0.03, 0]:
+            if os.path.isfile('_temporary_sky_slice_1.npy'):
+                for n in ['1', '2', '3', '4', 'combined']:
+                    os.system('rm _temporary_sky_slice_{}.npy'.format(n))
+                for f in ['con_cat_astro', 'con_cat_photo', 'magref']:
+                    os.system('rm dummy_folder/{}.npy'.format(f))
+
+            rect_slice_npy('.', 'dummy_folder', rc, pad, 10)
+
+            astro = np.load('dummy_folder/con_cat_astro.npy')
+            photo = np.load('dummy_folder/con_cat_photo.npy')
+            best_index = np.load('dummy_folder/magref.npy')
+
+            cosd = np.cos(np.radians(self.data[:, 2]))
+            qa = (self.data[:, 1] >= rc[0]-pad/cosd) & (self.data[:, 1] <= rc[1]+pad/cosd)
+            qd = (self.data[:, 2] >= rc[2]-pad) & (self.data[:, 2] <= rc[3]+pad)
+            q = qa & qd
+
+            assert np.sum(q) == astro.shape[0]
+            assert np.sum(q) == photo.shape[0]
+            assert np.sum(q) == len(best_index)
+
+            assert_allclose(self.data[q][:, [1, 2, 3]], astro)
+            assert_allclose(self.data[q][:, [4, 5]], photo)
+            assert_allclose(self.data[q][:, 6], best_index)
+
+    def test_rect_slice_csv(self):
+        # Convert data to string to get expected Pandas-esque .csv formatting where
+        # NaN values are empty strings.
+        data1 = self.data.astype(str)
+        data1[data1 == 'nan'] = ''
+        data1[:, 0] = ['Gaia {}'.format(i) for i in data1[:, 0]]
+        rc = [-0.3, 0.3, -0.1, 0.2]
+        col_names = ['A_Designation', 'A_RA', 'A_Dec', 'A_Err', 'G', 'G_RP', 'Best_Index']
+        for header_text, header in zip(['', '# a, b, c, d, e, f, g'], [False, True]):
+            np.savetxt('test_data.csv', data1, delimiter=',', fmt='%s', header=header_text)
+
+            for pad in [0.03, 0]:
+                rect_slice_csv('.', '.', 'test_data', 'test_data_small', rc, pad, [1, 2], 20,
+                               header=header)
+                df = pd.read_csv('test_data_small.csv', header=None, names=col_names)
+                cosd = np.cos(np.radians(self.data[:, 2]))
+                qa = (self.data[:, 1] >= rc[0]-pad/cosd) & (self.data[:, 1] <= rc[1]+pad/cosd)
+                qd = (self.data[:, 2] >= rc[2]-pad) & (self.data[:, 2] <= rc[3]+pad)
+                q = qa & qd
+
+                assert np.sum(q) == len(df)
+
+                for i, col in zip([1, 2, 3, 4, 5, 6], col_names[1:]):
+                    assert_allclose(df[col], self.data[q, i])
+                assert np.all([df[col_names[0]].iloc[i] == data1[q, 0][i] for i in
+                               range(np.sum(q))])
