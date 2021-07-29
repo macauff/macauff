@@ -171,11 +171,13 @@ def npy_to_csv(input_csv_folders, input_match_folder, output_folder, csv_filenam
     match_df.to_csv('{}/{}.csv'.format(output_folder, output_filenames[0]), encoding='utf-8',
                     index=False, header=False)
 
-    # For non-match, ID/coordinates/mags, then island probability.
-    # TODO: add average contaminant flux recording to non-match outputs.
+    # For non-match, ID/coordinates/mags, then island probability + average
+    # contamination.
     af = np.load('{}/pairing/af.npy'.format(input_match_folder), mmap_mode='r')
+    a_avg_cont = np.load('{}/pairing/afieldflux.npy'.format(input_match_folder), mmap_mode='r')
     p = np.load('{}/pairing/pfa.npy'.format(input_match_folder), mmap_mode='r')
-    cols = np.append(column_name_lists[0], ['MATCH_P'])
+    cols = np.append(column_name_lists[0],
+                     ['MATCH_P', '{}_AVG_CONT'.format(extra_col_cat_names[0])])
     n_anonmatches = len(af)
     a_nonmatch_df = pd.DataFrame(columns=cols, index=np.arange(0, n_anonmatches))
     for cnum in range(0, mem_chunk_num):
@@ -184,13 +186,16 @@ def npy_to_csv(input_csv_folders, input_match_folder, output_folder, csv_filenam
         for i in column_name_lists[0]:
             a_nonmatch_df[i].iloc[lowind:highind] = cat_a[i].iloc[af[lowind:highind]].values
         a_nonmatch_df.iloc[lowind:highind, 3+n_amags] = p[lowind:highind]
+        a_nonmatch_df.iloc[lowind:highind, 3+n_amags+1] = a_avg_cont[lowind:highind]
 
     a_nonmatch_df.to_csv('{}/{}.csv'.format(output_folder, output_filenames[1]), encoding='utf-8',
                          index=False, header=False)
 
     bf = np.load('{}/pairing/bf.npy'.format(input_match_folder), mmap_mode='r')
+    b_avg_cont = np.load('{}/pairing/bfieldflux.npy'.format(input_match_folder), mmap_mode='r')
     p = np.load('{}/pairing/pfb.npy'.format(input_match_folder), mmap_mode='r')
-    cols = np.append(column_name_lists[1], ['MATCH_P'])
+    cols = np.append(column_name_lists[1],
+                     ['MATCH_P', '{}_AVG_CONT'.format(extra_col_cat_names[1])])
     n_bnonmatches = len(bf)
     b_nonmatch_df = pd.DataFrame(columns=cols, index=np.arange(0, n_bnonmatches))
     for cnum in range(0, mem_chunk_num):
@@ -199,6 +204,7 @@ def npy_to_csv(input_csv_folders, input_match_folder, output_folder, csv_filenam
         for i in column_name_lists[1]:
             b_nonmatch_df[i].iloc[lowind:highind] = cat_b[i].iloc[bf[lowind:highind]].values
         b_nonmatch_df.iloc[lowind:highind, 3+n_bmags] = p[lowind:highind]
+        b_nonmatch_df.iloc[lowind:highind, 3+1+n_bmags] = b_avg_cont[lowind:highind]
 
     b_nonmatch_df.to_csv('{}/{}.csv'.format(output_folder, output_filenames[2]), encoding='utf-8',
                          index=False, header=False)
