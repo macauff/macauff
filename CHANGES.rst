@@ -21,6 +21,9 @@ New Features
 Bug Fixes
 ^^^^^^^^^
 
+- Fix to issue with np.where test in ``test_counterpart_pairing`` causing incorrect
+  failure to match probabilities. [#36]
+
 - Fixes to various minor typos in variables in the cross-match workflow. [#32]
 
 - Allow for the non-existence of a TRILEGAL simulation in any folder, and download
