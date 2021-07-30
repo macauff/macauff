@@ -109,10 +109,27 @@ class TestParseCatalogue:
         bff = rng.uniform(0, 3, size=len(bf))
         np.save('test_folder/pairing/bfieldflux.npy', bff)
 
+        csep = rng.uniform(0, 0.5, size=N_match)
+        np.save('test_folder/pairing/crptseps.npy', csep)
+
+        afs = rng.uniform(0, 0.5, size=len(af))
+        np.save('test_folder/pairing/afieldseps.npy', afs)
+        afeta = rng.uniform(-3, 0, size=len(af))
+        np.save('test_folder/pairing/afieldeta.npy', afeta)
+        afxi = rng.uniform(-3, 0, size=len(af))
+        np.save('test_folder/pairing/afieldxi.npy', afxi)
+
+        bfs = rng.uniform(0, 0.5, size=len(bf))
+        np.save('test_folder/pairing/bfieldseps.npy', bfs)
+        bfeta = rng.uniform(0, 0.5, size=len(bf))
+        np.save('test_folder/pairing/bfieldeta.npy', bfeta)
+        bfxi = rng.uniform(0, 0.5, size=len(bf))
+        np.save('test_folder/pairing/bfieldxi.npy', bfxi)
+
         a_cols = ['A_Designation', 'A_RA', 'A_Dec', 'G', 'G_RP']
         b_cols = ['B_Designation', 'B_RA', 'B_Dec', 'W1', 'W2', 'W3']
-        extra_cols = ['MATCH_P', 'ETA', 'XI', 'A_AVG_CONT', 'B_AVG_CONT', 'A_CONT_F1',
-                      'A_CONT_F10', 'B_CONT_F1', 'B_CONT_F10']
+        extra_cols = ['MATCH_P', 'SEPARATION', 'ETA', 'XI', 'A_AVG_CONT', 'B_AVG_CONT',
+                      'A_CONT_F1', 'A_CONT_F10', 'B_CONT_F1', 'B_CONT_F10']
 
         npy_to_csv(['.', '.'], 'test_folder', '.', ['test_a_data', 'test_b_data'],
                    ['match_csv', 'a_nonmatch_csv', 'b_nonmatch_csv'], [a_cols, b_cols],
@@ -134,24 +151,30 @@ class TestParseCatalogue:
             assert_allclose(df[col], data[bc, i])
         assert np.all([df[b_cols[0]].iloc[i] == data2[bc[i], 0] for i in range(len(bc))])
 
-        for f, col in zip([pc, eta, xi, acf, bcf, pac[:, 0], pac[:, 1], pbc[:, 0], pbc[:, 1]],
-                          extra_cols):
+        for f, col in zip([pc, csep, eta, xi, acf, bcf, pac[:, 0], pac[:, 1], pbc[:, 0],
+                           pbc[:, 1]], extra_cols):
             assert_allclose(df[col], f)
 
-        names = np.append(a_cols, ['MATCH_P', 'A_AVG_CONT'])
+        names = np.append(a_cols, ['MATCH_P', 'NNM_SEPARATION', 'NNM_ETA', 'NNM_XI', 'A_AVG_CONT'])
         df = pd.read_csv('a_nonmatch_csv.csv', header=None, names=names)
         for i, col in zip([1, 2, 4, 5], a_cols[1:]):
             assert_allclose(df[col], self.data[af, i])
         assert np.all([df[a_cols[0]].iloc[i] == data1[af[i], 0] for i in range(len(af))])
         assert_allclose(df['MATCH_P'], pfa)
         assert_allclose(df['A_AVG_CONT'], aff)
-        names = np.append(b_cols, ['MATCH_P', 'B_AVG_CONT'])
+        assert_allclose(df['NNM_SEPARATION'], afs)
+        assert_allclose(df['NNM_ETA'], afeta)
+        assert_allclose(df['NNM_XI'], afxi)
+        names = np.append(b_cols, ['MATCH_P', 'NNM_SEPARATION', 'NNM_ETA', 'NNM_XI', 'B_AVG_CONT'])
         df = pd.read_csv('b_nonmatch_csv.csv', header=None, names=names)
         for i, col in zip([1, 2, 4, 5, 6], b_cols[1:]):
             assert_allclose(df[col], data[bf, i])
         assert np.all([df[b_cols[0]].iloc[i] == data2[bf[i], 0] for i in range(len(bf))])
         assert_allclose(df['MATCH_P'], pfb)
         assert_allclose(df['B_AVG_CONT'], bff)
+        assert_allclose(df['NNM_SEPARATION'], bfs)
+        assert_allclose(df['NNM_ETA'], bfeta)
+        assert_allclose(df['NNM_XI'], bfxi)
 
     def test_rect_slice_npy(self):
         np.save('con_cat_astro.npy', self.data[:, [1, 2, 3]])
