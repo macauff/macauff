@@ -6,6 +6,7 @@ Tests for the "parse_catalogue" module.
 import os
 import pandas as pd
 import numpy as np
+import pytest
 from numpy.testing import assert_allclose
 
 from ..parse_catalogue import csv_to_npy, npy_to_csv, rect_slice_npy, rect_slice_csv
@@ -110,6 +111,7 @@ class TestParseCatalogue:
 
 class TestParseCatalogueNpyToCsv:
     def setup_class(self):
+        os.system('rm *.csv')
         rng = np.random.default_rng(seed=45555)
 
         self.N = 100000
@@ -248,6 +250,226 @@ class TestParseCatalogueNpyToCsv:
         df = pd.read_csv('b_nonmatch_csv.csv', header=None, names=names)
         for i, col in zip([1, 2, 4, 5, 6], b_cols[1:]):
             assert_allclose(df[col], self.datab[self.bf, i])
+        assert np.all([df[b_cols[0]].iloc[i] == self.data2[self.bf[i], 0] for i in
+                       range(len(self.bf))])
+        assert_allclose(df['MATCH_P'], self.pfb)
+        assert_allclose(df['B_AVG_CONT'], self.bff)
+        assert_allclose(df['NNM_SEPARATION'], self.bfs)
+        assert_allclose(df['NNM_ETA'], self.bfeta)
+        assert_allclose(df['NNM_XI'], self.bfxi)
+
+    def test_npy_to_csv_cols_out_of_order(self):
+        a_cols = ['A_RA', 'A_Dec', 'A_Designation', 'G', 'G_RP']
+        b_cols = ['W1', 'W2', 'W3', 'B_Designation', 'B_RA', 'B_Dec']
+        extra_cols = ['MATCH_P', 'SEPARATION', 'ETA', 'XI', 'A_AVG_CONT', 'B_AVG_CONT',
+                      'A_CONT_F1', 'A_CONT_F10', 'B_CONT_F1', 'B_CONT_F10']
+
+        npy_to_csv(['.', '.'], 'test_folder', '.', ['test_a_data', 'test_b_data'],
+                   ['match_csv', 'a_nonmatch_csv', 'b_nonmatch_csv'], [a_cols, b_cols],
+                   [[1, 2, 0, 4, 5], [4, 5, 6, 0, 1, 2]], ['A', 'B'], 20,
+                   headers=[False, False])
+
+        assert os.path.isfile('match_csv.csv')
+        assert os.path.isfile('a_nonmatch_csv.csv')
+
+        names = np.append(np.append(a_cols, b_cols), extra_cols)
+
+        df = pd.read_csv('match_csv.csv', header=None, names=names)
+        for i, col in zip([1, 2, 4, 5], np.array(a_cols)[[0, 1, 3, 4]]):
+            assert_allclose(df[col], self.data[self.ac, i])
+        # data1 and data2 are the string representations of catalogues a/b.
+        assert np.all([df[a_cols[2]].iloc[i] == self.data1[self.ac[i], 0] for i in
+                       range(len(self.ac))])
+        # self.data kept as catalogue "a", and datab for cat "b".
+        for i, col in zip([4, 5, 6, 1, 2], np.array(b_cols)[[0, 1, 2, 4, 5]]):
+            assert_allclose(df[col], self.datab[self.bc, i])
+        assert np.all([df[b_cols[3]].iloc[i] == self.data2[self.bc[i], 0] for i in
+                       range(len(self.bc))])
+
+        for f, col in zip([self.pc, self.csep, self.eta, self.xi, self.acf, self.bcf,
+                           self.pac[:, 0], self.pac[:, 1], self.pbc[:, 0], self.pbc[:, 1]],
+                          extra_cols):
+            assert_allclose(df[col], f)
+
+        names = np.append(a_cols, ['MATCH_P', 'NNM_SEPARATION', 'NNM_ETA', 'NNM_XI', 'A_AVG_CONT'])
+        df = pd.read_csv('a_nonmatch_csv.csv', header=None, names=names)
+        for i, col in zip([1, 2, 4, 5], np.array(a_cols)[[0, 1, 3, 4]]):
+            assert_allclose(df[col], self.data[self.af, i])
+        assert np.all([df[a_cols[2]].iloc[i] == self.data1[self.af[i], 0] for i in
+                       range(len(self.af))])
+        assert_allclose(df['MATCH_P'], self.pfa)
+        assert_allclose(df['A_AVG_CONT'], self.aff)
+        assert_allclose(df['NNM_SEPARATION'], self.afs)
+        assert_allclose(df['NNM_ETA'], self.afeta)
+        assert_allclose(df['NNM_XI'], self.afxi)
+        names = np.append(b_cols, ['MATCH_P', 'NNM_SEPARATION', 'NNM_ETA', 'NNM_XI', 'B_AVG_CONT'])
+        df = pd.read_csv('b_nonmatch_csv.csv', header=None, names=names)
+        for i, col in zip([4, 5, 6, 1, 2], np.array(b_cols)[[0, 1, 2, 4, 5]]):
+            assert_allclose(df[col], self.datab[self.bf, i])
+        assert np.all([df[b_cols[3]].iloc[i] == self.data2[self.bf[i], 0] for i in
+                       range(len(self.bf))])
+        assert_allclose(df['MATCH_P'], self.pfb)
+        assert_allclose(df['B_AVG_CONT'], self.bff)
+        assert_allclose(df['NNM_SEPARATION'], self.bfs)
+        assert_allclose(df['NNM_ETA'], self.bfeta)
+        assert_allclose(df['NNM_XI'], self.bfxi)
+
+    def test_npy_to_csv_incorrect_extra_cols(self):
+        a_cols = ['A_Designation', 'A_RA', 'A_Dec', 'G', 'G_RP']
+        b_cols = ['B_Designation', 'B_RA', 'B_Dec', 'W1', 'W2', 'W3']
+
+        with pytest.raises(UserWarning, match="either both need to be None, or both"):
+            npy_to_csv(['.', '.'], 'test_folder', '.', ['test_a_data', 'test_b_data'],
+                       ['match_csv', 'a_nonmatch_csv', 'b_nonmatch_csv'], [a_cols, b_cols],
+                       [[0, 1, 2, 4, 5], [0, 1, 2, 4, 5, 6]], ['A', 'B'], 20,
+                       headers=[False, False], extra_col_name_lists=[[1], [2]])
+
+    def test_npy_to_csv_both_cat_extra_col(self):
+        a_cols = ['A_Designation', 'A_RA', 'A_Dec', 'G', 'G_RP']
+        b_cols = ['B_Designation', 'B_RA', 'B_Dec', 'W1', 'W2', 'W3']
+        extra_cols = ['MATCH_P', 'SEPARATION', 'ETA', 'XI', 'A_AVG_CONT', 'B_AVG_CONT',
+                      'A_CONT_F1', 'A_CONT_F10', 'B_CONT_F1', 'B_CONT_F10']
+
+        add_a_cols = ['A_Err']
+        add_b_cols = ['B_Err']
+        add_a_nums = [3]
+        add_b_nums = [3]
+
+        npy_to_csv(['.', '.'], 'test_folder', '.', ['test_a_data', 'test_b_data'],
+                               ['match_csv', 'a_nonmatch_csv', 'b_nonmatch_csv'], [a_cols, b_cols],
+                               [[0, 1, 2, 4, 5], [0, 1, 2, 4, 5, 6]], ['A', 'B'], 20,
+                               headers=[False, False],
+                               extra_col_name_lists=[add_a_cols, add_b_cols],
+                               extra_col_num_lists=[add_a_nums, add_b_nums])
+
+        assert os.path.isfile('match_csv.csv')
+        assert os.path.isfile('a_nonmatch_csv.csv')
+
+        add_cols = np.append(add_a_cols, add_b_cols)
+        names = np.append(np.append(np.append(a_cols, b_cols), extra_cols), add_cols)
+
+        df = pd.read_csv('match_csv.csv', header=None, names=names)
+        for i, col in zip([1, 2, 4, 5], a_cols[1:]):
+            assert_allclose(df[col], self.data[self.ac, i])
+        for i, col in zip(add_a_nums, add_a_cols):
+            assert_allclose(df[col], self.data[self.ac, i])
+        # data1 and data2 are the string representations of catalogues a/b.
+        assert np.all([df[a_cols[0]].iloc[i] == self.data1[self.ac[i], 0] for i in
+                       range(len(self.ac))])
+        # self.data kept as catalogue "a", and datab for cat "b".
+        for i, col in zip([1, 2, 4, 5, 6], b_cols[1:]):
+            assert_allclose(df[col], self.datab[self.bc, i])
+        for i, col in zip(add_b_nums, add_b_cols):
+            assert_allclose(df[col], self.datab[self.bc, i])
+        assert np.all([df[b_cols[0]].iloc[i] == self.data2[self.bc[i], 0] for i in
+                       range(len(self.bc))])
+
+        for f, col in zip([self.pc, self.csep, self.eta, self.xi, self.acf, self.bcf,
+                           self.pac[:, 0], self.pac[:, 1], self.pbc[:, 0], self.pbc[:, 1]],
+                          extra_cols):
+            assert_allclose(df[col], f)
+
+        names = np.append(np.append(a_cols, ['MATCH_P', 'NNM_SEPARATION', 'NNM_ETA', 'NNM_XI',
+                                             'A_AVG_CONT']), add_a_cols)
+        df = pd.read_csv('a_nonmatch_csv.csv', header=None, names=names)
+        for i, col in zip([1, 2, 4, 5], a_cols[1:]):
+            assert_allclose(df[col], self.data[self.af, i])
+        for i, col in zip(add_a_nums, add_a_cols):
+            assert_allclose(df[col], self.data[self.af, i])
+        assert np.all([df[a_cols[0]].iloc[i] == self.data1[self.af[i], 0] for i in
+                       range(len(self.af))])
+        assert_allclose(df['MATCH_P'], self.pfa)
+        assert_allclose(df['A_AVG_CONT'], self.aff)
+        assert_allclose(df['NNM_SEPARATION'], self.afs)
+        assert_allclose(df['NNM_ETA'], self.afeta)
+        assert_allclose(df['NNM_XI'], self.afxi)
+        names = np.append(np.append(b_cols, ['MATCH_P', 'NNM_SEPARATION', 'NNM_ETA', 'NNM_XI',
+                                             'B_AVG_CONT']), add_b_cols)
+        df = pd.read_csv('b_nonmatch_csv.csv', header=None, names=names)
+        for i, col in zip([1, 2, 4, 5, 6], b_cols[1:]):
+            assert_allclose(df[col], self.datab[self.bf, i])
+        for i, col in zip(add_b_nums, add_b_cols):
+            assert_allclose(df[col], self.datab[self.bf, i])
+        assert np.all([df[b_cols[0]].iloc[i] == self.data2[self.bf[i], 0] for i in
+                       range(len(self.bf))])
+        assert_allclose(df['MATCH_P'], self.pfb)
+        assert_allclose(df['B_AVG_CONT'], self.bff)
+        assert_allclose(df['NNM_SEPARATION'], self.bfs)
+        assert_allclose(df['NNM_ETA'], self.bfeta)
+        assert_allclose(df['NNM_XI'], self.bfxi)
+
+    def test_npy_to_csv_one_cat_extra_col(self):
+        a_cols = ['A_Designation', 'A_RA', 'A_Dec', 'G', 'G_RP']
+        b_cols = ['B_Designation', 'B_RA', 'B_Dec', 'W1', 'W2', 'W3']
+        extra_cols = ['MATCH_P', 'SEPARATION', 'ETA', 'XI', 'A_AVG_CONT', 'B_AVG_CONT',
+                      'A_CONT_F1', 'A_CONT_F10', 'B_CONT_F1', 'B_CONT_F10']
+
+        add_a_cols = ['A_Err']
+        add_b_cols = []
+        add_a_nums = [3]
+        add_b_nums = []
+
+        npy_to_csv(['.', '.'], 'test_folder', '.', ['test_a_data', 'test_b_data'],
+                               ['match_csv', 'a_nonmatch_csv', 'b_nonmatch_csv'], [a_cols, b_cols],
+                               [[0, 1, 2, 4, 5], [0, 1, 2, 4, 5, 6]], ['A', 'B'], 20,
+                               headers=[False, False],
+                               extra_col_name_lists=[add_a_cols, add_b_cols],
+                               extra_col_num_lists=[add_a_nums, add_b_nums])
+
+        assert os.path.isfile('match_csv.csv')
+        assert os.path.isfile('a_nonmatch_csv.csv')
+
+        add_cols = np.append(add_a_cols, add_b_cols)
+        names = np.append(np.append(np.append(a_cols, b_cols), extra_cols), add_cols)
+
+        df = pd.read_csv('match_csv.csv', header=None, names=names)
+        for i, col in zip([1, 2, 4, 5], a_cols[1:]):
+            assert_allclose(df[col], self.data[self.ac, i])
+        for i, col in zip(add_a_nums, add_a_cols):
+            assert_allclose(df[col], self.data[self.ac, i])
+        # data1 and data2 are the string representations of catalogues a/b.
+        assert np.all([df[a_cols[0]].iloc[i] == self.data1[self.ac[i], 0] for i in
+                       range(len(self.ac))])
+        # self.data kept as catalogue "a", and datab for cat "b".
+        for i, col in zip([1, 2, 4, 5, 6], b_cols[1:]):
+            assert_allclose(df[col], self.datab[self.bc, i])
+        # Only extra column in test_b_data.csv is the "B_Err" column from above,
+        # self.data2[:, 3]. Test that these data do not match any output data:
+        for n in names[np.delete(np.arange(len(names)), [0, 5])]:
+            with pytest.raises(AssertionError, match='Not equal to tolerance'):
+                assert_allclose(df[n], self.datab[self.bc, 3])
+        assert np.all([df[b_cols[0]].iloc[i] == self.data2[self.bc[i], 0] for i in
+                       range(len(self.bc))])
+
+        for f, col in zip([self.pc, self.csep, self.eta, self.xi, self.acf, self.bcf,
+                           self.pac[:, 0], self.pac[:, 1], self.pbc[:, 0], self.pbc[:, 1]],
+                          extra_cols):
+            assert_allclose(df[col], f)
+
+        names = np.append(np.append(a_cols, ['MATCH_P', 'NNM_SEPARATION', 'NNM_ETA', 'NNM_XI',
+                                             'A_AVG_CONT']), add_a_cols)
+        df = pd.read_csv('a_nonmatch_csv.csv', header=None, names=names)
+        for i, col in zip([1, 2, 4, 5], a_cols[1:]):
+            assert_allclose(df[col], self.data[self.af, i])
+        for i, col in zip(add_a_nums, add_a_cols):
+            assert_allclose(df[col], self.data[self.af, i])
+        assert np.all([df[a_cols[0]].iloc[i] == self.data1[self.af[i], 0] for i in
+                       range(len(self.af))])
+        assert_allclose(df['MATCH_P'], self.pfa)
+        assert_allclose(df['A_AVG_CONT'], self.aff)
+        assert_allclose(df['NNM_SEPARATION'], self.afs)
+        assert_allclose(df['NNM_ETA'], self.afeta)
+        assert_allclose(df['NNM_XI'], self.afxi)
+        names = np.append(np.append(b_cols, ['MATCH_P', 'NNM_SEPARATION', 'NNM_ETA', 'NNM_XI',
+                                             'B_AVG_CONT']), add_b_cols)
+        df = pd.read_csv('b_nonmatch_csv.csv', header=None, names=names)
+        for i, col in zip([1, 2, 4, 5, 6], b_cols[1:]):
+            assert_allclose(df[col], self.datab[self.bf, i])
+        # Only extra column in test_b_data.csv is the "B_Err" column from above,
+        # self.data2[:, 3]. Test that these data do not match any output data:
+        for n in names[1:]:
+            with pytest.raises(AssertionError, match='Not equal to tolerance'):
+                assert_allclose(df[n], self.datab[self.bf, 3])
         assert np.all([df[b_cols[0]].iloc[i] == self.data2[self.bf[i], 0] for i in
                        range(len(self.bf))])
         assert_allclose(df['MATCH_P'], self.pfb)
