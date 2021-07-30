@@ -46,136 +46,6 @@ class TestParseCatalogue:
             assert_allclose(photo, self.data[:, [4, 5]])
             assert_allclose(best_index, self.data[:, 6])
 
-    def test_npy_to_csv(self):
-        # Convert data to string to get expected Pandas-esque .csv formatting where
-        # NaN values are empty strings.
-        data1 = self.data.astype(str)
-        data1[data1 == 'nan'] = ''
-        data1[:, 0] = ['Gaia {}'.format(i) for i in data1[:, 0]]
-        np.savetxt('test_a_data.csv', data1, delimiter=',', fmt='%s', header='')
-
-        rng = np.random.default_rng(seed=43587232)
-
-        self.Nb = 70000
-        data = rng.standard_normal(size=(self.Nb, 8))
-        data[:, 7] = np.round(data[:, 7]).astype(int)
-        nan_cols = [rng.choice(self.Nb, size=(200,), replace=False),
-                    rng.choice(self.Nb, size=(200,), replace=False)]
-        data[nan_cols[0], 4] = np.nan
-        data[nan_cols[1], 5] = np.nan
-        data2 = data.astype(str)
-        data2[data2 == 'nan'] = ''
-        data2[:, 0] = ['J{}'.format(i) for i in data2[:, 0]]
-        np.savetxt('test_b_data.csv', data2, delimiter=',', fmt='%s', header='')
-
-        # Fake 3x match probability, eta/xi/2x contamination/match+non-match
-        # index arrays.
-        os.system('rm -r test_folder')
-        os.makedirs('test_folder/pairing', exist_ok=True)
-        N_match = int(0.6*self.N)
-        ac = rng.choice(self.N, size=N_match, replace=False)
-        np.save('test_folder/pairing/ac.npy', ac)
-        bc = rng.choice(self.Nb, size=N_match, replace=False)
-        np.save('test_folder/pairing/bc.npy', bc)
-        af = np.delete(np.arange(0, self.N), ac)
-        np.save('test_folder/pairing/af.npy', af)
-        bf = np.delete(np.arange(0, self.Nb), bc)
-        np.save('test_folder/pairing/bf.npy', bf)
-
-        pc = rng.uniform(0.5, 1, size=N_match)
-        np.save('test_folder/pairing/pc.npy', pc)
-        pfa = rng.uniform(0.5, 1, size=len(af))
-        np.save('test_folder/pairing/pfa.npy', pfa)
-        pfb = rng.uniform(0.5, 1, size=len(bf))
-        np.save('test_folder/pairing/pfb.npy', pfb)
-
-        eta = rng.uniform(-10, 10, size=N_match)
-        np.save('test_folder/pairing/eta.npy', eta)
-        xi = rng.uniform(-10, 10, size=N_match)
-        np.save('test_folder/pairing/xi.npy', xi)
-
-        pac = rng.uniform(0, 1, size=(N_match, 2))
-        np.save('test_folder/pairing/pacontam.npy', pac)
-        pbc = rng.uniform(0, 1, size=(N_match, 2))
-        np.save('test_folder/pairing/pbcontam.npy', pbc)
-
-        acf = rng.uniform(0, 0.2, size=N_match)
-        np.save('test_folder/pairing/acontamflux.npy', acf)
-        bcf = rng.uniform(0, 3, size=N_match)
-        np.save('test_folder/pairing/bcontamflux.npy', bcf)
-
-        aff = rng.uniform(0, 0.2, size=len(af))
-        np.save('test_folder/pairing/afieldflux.npy', aff)
-        bff = rng.uniform(0, 3, size=len(bf))
-        np.save('test_folder/pairing/bfieldflux.npy', bff)
-
-        csep = rng.uniform(0, 0.5, size=N_match)
-        np.save('test_folder/pairing/crptseps.npy', csep)
-
-        afs = rng.uniform(0, 0.5, size=len(af))
-        np.save('test_folder/pairing/afieldseps.npy', afs)
-        afeta = rng.uniform(-3, 0, size=len(af))
-        np.save('test_folder/pairing/afieldeta.npy', afeta)
-        afxi = rng.uniform(-3, 0, size=len(af))
-        np.save('test_folder/pairing/afieldxi.npy', afxi)
-
-        bfs = rng.uniform(0, 0.5, size=len(bf))
-        np.save('test_folder/pairing/bfieldseps.npy', bfs)
-        bfeta = rng.uniform(0, 0.5, size=len(bf))
-        np.save('test_folder/pairing/bfieldeta.npy', bfeta)
-        bfxi = rng.uniform(0, 0.5, size=len(bf))
-        np.save('test_folder/pairing/bfieldxi.npy', bfxi)
-
-        a_cols = ['A_Designation', 'A_RA', 'A_Dec', 'G', 'G_RP']
-        b_cols = ['B_Designation', 'B_RA', 'B_Dec', 'W1', 'W2', 'W3']
-        extra_cols = ['MATCH_P', 'SEPARATION', 'ETA', 'XI', 'A_AVG_CONT', 'B_AVG_CONT',
-                      'A_CONT_F1', 'A_CONT_F10', 'B_CONT_F1', 'B_CONT_F10']
-
-        npy_to_csv(['.', '.'], 'test_folder', '.', ['test_a_data', 'test_b_data'],
-                   ['match_csv', 'a_nonmatch_csv', 'b_nonmatch_csv'], [a_cols, b_cols],
-                   [[0, 1, 2, 4, 5], [0, 1, 2, 4, 5, 6]], ['A', 'B'], 20,
-                   headers=[False, False])
-
-        assert os.path.isfile('match_csv.csv')
-        assert os.path.isfile('a_nonmatch_csv.csv')
-
-        names = np.append(np.append(a_cols, b_cols), extra_cols)
-
-        df = pd.read_csv('match_csv.csv', header=None, names=names)
-        for i, col in zip([1, 2, 4, 5], a_cols[1:]):
-            assert_allclose(df[col], self.data[ac, i])
-        # data1 and data2 are the string representations of catalogues a/b.
-        assert np.all([df[a_cols[0]].iloc[i] == data1[ac[i], 0] for i in range(len(ac))])
-        # self.data kept as catalogue "a", and regular variable data cat "b".
-        for i, col in zip([1, 2, 4, 5, 6], b_cols[1:]):
-            assert_allclose(df[col], data[bc, i])
-        assert np.all([df[b_cols[0]].iloc[i] == data2[bc[i], 0] for i in range(len(bc))])
-
-        for f, col in zip([pc, csep, eta, xi, acf, bcf, pac[:, 0], pac[:, 1], pbc[:, 0],
-                           pbc[:, 1]], extra_cols):
-            assert_allclose(df[col], f)
-
-        names = np.append(a_cols, ['MATCH_P', 'NNM_SEPARATION', 'NNM_ETA', 'NNM_XI', 'A_AVG_CONT'])
-        df = pd.read_csv('a_nonmatch_csv.csv', header=None, names=names)
-        for i, col in zip([1, 2, 4, 5], a_cols[1:]):
-            assert_allclose(df[col], self.data[af, i])
-        assert np.all([df[a_cols[0]].iloc[i] == data1[af[i], 0] for i in range(len(af))])
-        assert_allclose(df['MATCH_P'], pfa)
-        assert_allclose(df['A_AVG_CONT'], aff)
-        assert_allclose(df['NNM_SEPARATION'], afs)
-        assert_allclose(df['NNM_ETA'], afeta)
-        assert_allclose(df['NNM_XI'], afxi)
-        names = np.append(b_cols, ['MATCH_P', 'NNM_SEPARATION', 'NNM_ETA', 'NNM_XI', 'B_AVG_CONT'])
-        df = pd.read_csv('b_nonmatch_csv.csv', header=None, names=names)
-        for i, col in zip([1, 2, 4, 5, 6], b_cols[1:]):
-            assert_allclose(df[col], data[bf, i])
-        assert np.all([df[b_cols[0]].iloc[i] == data2[bf[i], 0] for i in range(len(bf))])
-        assert_allclose(df['MATCH_P'], pfb)
-        assert_allclose(df['B_AVG_CONT'], bff)
-        assert_allclose(df['NNM_SEPARATION'], bfs)
-        assert_allclose(df['NNM_ETA'], bfeta)
-        assert_allclose(df['NNM_XI'], bfxi)
-
     def test_rect_slice_npy(self):
         np.save('con_cat_astro.npy', self.data[:, [1, 2, 3]])
         np.save('con_cat_photo.npy', self.data[:, [4, 5]])
@@ -236,3 +106,152 @@ class TestParseCatalogue:
                     assert_allclose(df[col], self.data[q, i])
                 assert np.all([df[col_names[0]].iloc[i] == data1[q, 0][i] for i in
                                range(np.sum(q))])
+
+
+class TestParseCatalogueNpyToCsv:
+    def setup_class(self):
+        rng = np.random.default_rng(seed=45555)
+
+        self.N = 100000
+        data = rng.standard_normal(size=(self.N, 7))
+        data[:, 6] = np.round(data[:, 6]).astype(int)
+        nan_cols = [rng.choice(self.N, size=(100,), replace=False),
+                    rng.choice(self.N, size=(100,), replace=False)]
+        data[nan_cols[0], 4] = np.nan
+        data[nan_cols[1], 5] = np.nan
+        self.data = data
+
+        # Convert data to string to get expected Pandas-esque .csv formatting where
+        # NaN values are empty strings.
+        self.data1 = self.data.astype(str)
+        self.data1[self.data1 == 'nan'] = ''
+        self.data1[:, 0] = ['Gaia {}'.format(i) for i in self.data1[:, 0]]
+        np.savetxt('test_a_data.csv', self.data1, delimiter=',', fmt='%s', header='')
+
+        rng = np.random.default_rng(seed=43587232)
+
+        self.Nb = 70000
+        self.datab = rng.standard_normal(size=(self.Nb, 8))
+        self.datab[:, 7] = np.round(self.datab[:, 7]).astype(int)
+        nan_cols = [rng.choice(self.Nb, size=(200,), replace=False),
+                    rng.choice(self.Nb, size=(200,), replace=False)]
+        self.datab[nan_cols[0], 4] = np.nan
+        self.datab[nan_cols[1], 5] = np.nan
+        self.data2 = self.datab.astype(str)
+        self.data2[self.data2 == 'nan'] = ''
+        self.data2[:, 0] = ['J{}'.format(i) for i in self.data2[:, 0]]
+        np.savetxt('test_b_data.csv', self.data2, delimiter=',', fmt='%s', header='')
+
+        # Fake 3x match probability, eta/xi/2x contamination/match+non-match
+        # index arrays.
+        os.system('rm -r test_folder')
+        os.makedirs('test_folder/pairing', exist_ok=True)
+        self.N_match = int(0.6*self.N)
+        self.ac = rng.choice(self.N, size=self.N_match, replace=False)
+        np.save('test_folder/pairing/ac.npy', self.ac)
+        self.bc = rng.choice(self.Nb, size=self.N_match, replace=False)
+        np.save('test_folder/pairing/bc.npy', self.bc)
+        self.af = np.delete(np.arange(0, self.N), self.ac)
+        np.save('test_folder/pairing/af.npy', self.af)
+        self.bf = np.delete(np.arange(0, self.Nb), self.bc)
+        np.save('test_folder/pairing/bf.npy', self.bf)
+
+        self.pc = rng.uniform(0.5, 1, size=self.N_match)
+        np.save('test_folder/pairing/pc.npy', self.pc)
+        self.pfa = rng.uniform(0.5, 1, size=len(self.af))
+        np.save('test_folder/pairing/pfa.npy', self.pfa)
+        self.pfb = rng.uniform(0.5, 1, size=len(self.bf))
+        np.save('test_folder/pairing/pfb.npy', self.pfb)
+
+        self.eta = rng.uniform(-10, 10, size=self.N_match)
+        np.save('test_folder/pairing/eta.npy', self.eta)
+        self.xi = rng.uniform(-10, 10, size=self.N_match)
+        np.save('test_folder/pairing/xi.npy', self.xi)
+
+        self.pac = rng.uniform(0, 1, size=(self.N_match, 2))
+        np.save('test_folder/pairing/pacontam.npy', self.pac)
+        self.pbc = rng.uniform(0, 1, size=(self.N_match, 2))
+        np.save('test_folder/pairing/pbcontam.npy', self.pbc)
+
+        self.acf = rng.uniform(0, 0.2, size=self.N_match)
+        np.save('test_folder/pairing/acontamflux.npy', self.acf)
+        self.bcf = rng.uniform(0, 3, size=self.N_match)
+        np.save('test_folder/pairing/bcontamflux.npy', self.bcf)
+
+        self.aff = rng.uniform(0, 0.2, size=len(self.af))
+        np.save('test_folder/pairing/afieldflux.npy', self.aff)
+        self.bff = rng.uniform(0, 3, size=len(self.bf))
+        np.save('test_folder/pairing/bfieldflux.npy', self.bff)
+
+        self.csep = rng.uniform(0, 0.5, size=self.N_match)
+        np.save('test_folder/pairing/crptseps.npy', self.csep)
+
+        self.afs = rng.uniform(0, 0.5, size=len(self.af))
+        np.save('test_folder/pairing/afieldseps.npy', self.afs)
+        self.afeta = rng.uniform(-3, 0, size=len(self.af))
+        np.save('test_folder/pairing/afieldeta.npy', self.afeta)
+        self.afxi = rng.uniform(-3, 0, size=len(self.af))
+        np.save('test_folder/pairing/afieldxi.npy', self.afxi)
+
+        self.bfs = rng.uniform(0, 0.5, size=len(self.bf))
+        np.save('test_folder/pairing/bfieldseps.npy', self.bfs)
+        self.bfeta = rng.uniform(0, 0.5, size=len(self.bf))
+        np.save('test_folder/pairing/bfieldeta.npy', self.bfeta)
+        self.bfxi = rng.uniform(0, 0.5, size=len(self.bf))
+        np.save('test_folder/pairing/bfieldxi.npy', self.bfxi)
+
+    def test_npy_to_csv(self):
+        a_cols = ['A_Designation', 'A_RA', 'A_Dec', 'G', 'G_RP']
+        b_cols = ['B_Designation', 'B_RA', 'B_Dec', 'W1', 'W2', 'W3']
+        extra_cols = ['MATCH_P', 'SEPARATION', 'ETA', 'XI', 'A_AVG_CONT', 'B_AVG_CONT',
+                      'A_CONT_F1', 'A_CONT_F10', 'B_CONT_F1', 'B_CONT_F10']
+
+        npy_to_csv(['.', '.'], 'test_folder', '.', ['test_a_data', 'test_b_data'],
+                   ['match_csv', 'a_nonmatch_csv', 'b_nonmatch_csv'], [a_cols, b_cols],
+                   [[0, 1, 2, 4, 5], [0, 1, 2, 4, 5, 6]], ['A', 'B'], 20,
+                   headers=[False, False])
+
+        assert os.path.isfile('match_csv.csv')
+        assert os.path.isfile('a_nonmatch_csv.csv')
+
+        names = np.append(np.append(a_cols, b_cols), extra_cols)
+
+        df = pd.read_csv('match_csv.csv', header=None, names=names)
+        for i, col in zip([1, 2, 4, 5], a_cols[1:]):
+            assert_allclose(df[col], self.data[self.ac, i])
+        # data1 and data2 are the string representations of catalogues a/b.
+        assert np.all([df[a_cols[0]].iloc[i] == self.data1[self.ac[i], 0] for i in
+                       range(len(self.ac))])
+        # self.data kept as catalogue "a", and datab for cat "b".
+        for i, col in zip([1, 2, 4, 5, 6], b_cols[1:]):
+            assert_allclose(df[col], self.datab[self.bc, i])
+        assert np.all([df[b_cols[0]].iloc[i] == self.data2[self.bc[i], 0] for i in
+                       range(len(self.bc))])
+
+        for f, col in zip([self.pc, self.csep, self.eta, self.xi, self.acf, self.bcf,
+                           self.pac[:, 0], self.pac[:, 1], self.pbc[:, 0], self.pbc[:, 1]],
+                          extra_cols):
+            assert_allclose(df[col], f)
+
+        names = np.append(a_cols, ['MATCH_P', 'NNM_SEPARATION', 'NNM_ETA', 'NNM_XI', 'A_AVG_CONT'])
+        df = pd.read_csv('a_nonmatch_csv.csv', header=None, names=names)
+        for i, col in zip([1, 2, 4, 5], a_cols[1:]):
+            assert_allclose(df[col], self.data[self.af, i])
+        assert np.all([df[a_cols[0]].iloc[i] == self.data1[self.af[i], 0] for i in
+                       range(len(self.af))])
+        assert_allclose(df['MATCH_P'], self.pfa)
+        assert_allclose(df['A_AVG_CONT'], self.aff)
+        assert_allclose(df['NNM_SEPARATION'], self.afs)
+        assert_allclose(df['NNM_ETA'], self.afeta)
+        assert_allclose(df['NNM_XI'], self.afxi)
+        names = np.append(b_cols, ['MATCH_P', 'NNM_SEPARATION', 'NNM_ETA', 'NNM_XI', 'B_AVG_CONT'])
+        df = pd.read_csv('b_nonmatch_csv.csv', header=None, names=names)
+        for i, col in zip([1, 2, 4, 5, 6], b_cols[1:]):
+            assert_allclose(df[col], self.datab[self.bf, i])
+        assert np.all([df[b_cols[0]].iloc[i] == self.data2[self.bf[i], 0] for i in
+                       range(len(self.bf))])
+        assert_allclose(df['MATCH_P'], self.pfb)
+        assert_allclose(df['B_AVG_CONT'], self.bff)
+        assert_allclose(df['NNM_SEPARATION'], self.bfs)
+        assert_allclose(df['NNM_ETA'], self.bfeta)
+        assert_allclose(df['NNM_XI'], self.bfxi)
