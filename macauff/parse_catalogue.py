@@ -74,7 +74,7 @@ def csv_to_npy(input_folder, input_filename, output_folder, astro_cols, photo_co
 
 
 def npy_to_csv(input_csv_folders, input_match_folder, output_folder, csv_filenames,
-               output_filenames, column_name_lists, csv_col_name_or_num_lists,
+               output_filenames, column_name_lists, column_num_lists,
                extra_col_cat_names, mem_chunk_num, headers=[False, False]):
     '''
     Function to convert output .npy files, as created during the cross-match
@@ -101,7 +101,7 @@ def npy_to_csv(input_csv_folders, input_match_folder, output_folder, csv_filenam
         be included in the merged dataset -- its ID or designation, two
         orthogonal sky positions, and N magnitudes, as were originally used
         in the matching process, and likely used in ``csv_to_npy``.
-    csv_col_name_or_num_lists : list of list or array of integers
+    column_num_lists : list of list or array of integers
         List containing two lists or arrays of integers, one per catalogue,
         with the zero-index column integers corresponding to those columns listed
         in ``column_name_lists``.
@@ -145,10 +145,10 @@ def npy_to_csv(input_csv_folders, input_match_folder, output_folder, csv_filenam
     n_amags, n_bmags = len(column_name_lists[0]) - 3, len(column_name_lists[1]) - 3
     cat_a = pd.read_csv('{}/{}.csv'.format(input_csv_folders[0], csv_filenames[0]),
                         memory_map=True, header=None if not headers[0] else 0,
-                        usecols=csv_col_name_or_num_lists[0], names=column_name_lists[0])
+                        usecols=column_num_lists[0], names=column_name_lists[0])
     cat_b = pd.read_csv('{}/{}.csv'.format(input_csv_folders[1], csv_filenames[1]),
                         memory_map=True, header=None if not headers[1] else 0,
-                        usecols=csv_col_name_or_num_lists[1], names=column_name_lists[1])
+                        usecols=column_num_lists[1], names=column_name_lists[1])
     n_matches = len(ac)
     match_df = pd.DataFrame(columns=cols, index=np.arange(0, n_matches))
 
