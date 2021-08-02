@@ -7,6 +7,10 @@ General
 New Features
 ^^^^^^^^^^^^
 
+- Added additional data outputs to ``counterpart_pairing``: match separations, as
+  well as the nearest neighbour non-match for each source within a given island,
+  and its eta/xi and average contamination derived values. [#37]
+
 - Added functionality to convert .csv files to internal files used in the
   matching process, and create output .csv files from the resulting merged
   datasets created as a result of the matching. [#34]
@@ -51,6 +55,13 @@ Bug Fixes
 
 API Changes
 ^^^^^^^^^^^
+
+- Added extra columns derived in ``counterpart_pairing`` to output datafiles in
+  ``npy_to_csv``. [#37]
+
+- ``npy_to_csv`` now has ``extra_col_name_lists``, allowing for the inclusion of
+  extra columns from the original catalogue .csv file to be passed through to the
+  output merged datafiles. [#37]
 
 - Moved several functions (``_load_single_sky_slice``, ``_load_rectangular_slice``,
   ``_lon_cut``, ``_lat_cut``) out of individual Python scripts into
