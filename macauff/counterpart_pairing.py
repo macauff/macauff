@@ -369,6 +369,7 @@ def source_pairing(joint_folder_path, a_cat_folder_path, b_cat_folder_path, a_au
     del acountinds, bcountinds, acontamprob, bcontamprob, acontamflux, bcontamflux, afieldinds
     del bfieldinds, probcarray, etaarray, xiarray, probfaarray, probfbarray
     del afieldflux, bfieldflux
+    del crptseps, afieldseps, afieldeta, afieldxi, bfieldseps, bfieldeta, bfieldxi
     tot = countsum + afieldsum + lenrejecta
     if tot < len_a:
         warnings.warn("{} catalogue a source{} not in either counterpart, field, or rejected "
