@@ -74,8 +74,9 @@ def csv_to_npy(input_folder, input_filename, output_folder, astro_cols, photo_co
 
 
 def npy_to_csv(input_csv_folders, input_match_folder, output_folder, csv_filenames,
-               output_filenames, column_name_lists, csv_col_name_or_num_lists,
-               extra_col_cat_names, mem_chunk_num, headers=[False, False]):
+               output_filenames, column_name_lists, column_num_lists,
+               extra_col_cat_names, mem_chunk_num, headers=[False, False],
+               extra_col_name_lists=None, extra_col_num_lists=None):
     '''
     Function to convert output .npy files, as created during the cross-match
     process, and create a .csv file of matches and non-matches, combining columns
@@ -101,7 +102,7 @@ def npy_to_csv(input_csv_folders, input_match_folder, output_folder, csv_filenam
         be included in the merged dataset -- its ID or designation, two
         orthogonal sky positions, and N magnitudes, as were originally used
         in the matching process, and likely used in ``csv_to_npy``.
-    csv_col_name_or_num_lists : list of list or array of integers
+    column_num_lists : list of list or array of integers
         List containing two lists or arrays of integers, one per catalogue,
         with the zero-index column integers corresponding to those columns listed
         in ``column_name_lists``.
@@ -117,18 +118,35 @@ def npy_to_csv(input_csv_folders, input_match_folder, output_folder, csv_filenam
         original input .csv file for this catalogue had a header which provides
         names for each column on its first line, or whether its first line is the
         first line of the data.
+    extra_col_name_lists : list of list or array of strings, optional
+        If not ``None``, should be a list of two lists of strings, one per
+        catalogue. As with ``column_name_lists``, these should be names of
+        columns from their respective catalogue in ``csv_filenames``, to be
+        included in the output merged datasets.
+    extra_col_num_lists : list of list or array of integer, optional
+        If not ``None``, should be a list of two lists of strings, analagous
+        to ``column_num_lists``, providing the column indices for additional
+        catalogue columns in the original .csv files to be included in the
+        output datafiles.
     '''
     # Need IDs/coordinates x2, mags (xN), then our columns: match probability, average
     # contaminant flux, eta/xi, and then M contaminant fractions for M relative fluxes.
     # TODO: un-hardcode number of relative contaminant fractions
     # TODO: remove photometric likelihood when not used.
     cols = np.append(np.append(column_name_lists[0], column_name_lists[1]),
-                     ['MATCH_P', 'ETA', 'XI', '{}_AVG_CONT'.format(extra_col_cat_names[0]),
+                     ['MATCH_P', 'SEPARATION', 'ETA', 'XI',
+                      '{}_AVG_CONT'.format(extra_col_cat_names[0]),
                       '{}_AVG_CONT'.format(extra_col_cat_names[1]),
                       '{}_CONT_F1'.format(extra_col_cat_names[0]),
                       '{}_CONT_F10'.format(extra_col_cat_names[0]),
                       '{}_CONT_F1'.format(extra_col_cat_names[1]),
                       '{}_CONT_F10'.format(extra_col_cat_names[1])])
+    if ((extra_col_name_lists is None and extra_col_num_lists is not None) or
+            (extra_col_name_lists is not None and extra_col_num_lists is None)):
+        raise UserWarning("extra_col_name_lists and extra_col_num_lists either both "
+                          "need to be None, or both need to not be None.")
+    if extra_col_num_lists is not None:
+        cols = np.append(np.append(cols, extra_col_name_lists[0]), extra_col_name_lists[1])
     ac = np.load('{}/pairing/ac.npy'.format(input_match_folder), mmap_mode='r')
     bc = np.load('{}/pairing/bc.npy'.format(input_match_folder), mmap_mode='r')
     p = np.load('{}/pairing/pc.npy'.format(input_match_folder), mmap_mode='r')
@@ -138,15 +156,27 @@ def npy_to_csv(input_csv_folders, input_match_folder, output_folder, csv_filenam
     b_avg_cont = np.load('{}/pairing/bcontamflux.npy'.format(input_match_folder), mmap_mode='r')
     acontprob = np.load('{}/pairing/pacontam.npy'.format(input_match_folder), mmap_mode='r')
     bcontprob = np.load('{}/pairing/pbcontam.npy'.format(input_match_folder), mmap_mode='r')
-    # TODO: generalise so that other columns than designation+position+magnitudes
-    # can be kept.
+    seps = np.load('{}/pairing/crptseps.npy'.format(input_match_folder), mmap_mode='r')
+
     n_amags, n_bmags = len(column_name_lists[0]) - 3, len(column_name_lists[1]) - 3
+    if extra_col_num_lists is None:
+        a_cols = column_num_lists[0]
+        b_cols = column_num_lists[1]
+        a_names = column_name_lists[0]
+        b_names = column_name_lists[1]
+    else:
+        a_cols = np.append(column_num_lists[0], extra_col_num_lists[0]).astype(int)
+        b_cols = np.append(column_num_lists[1], extra_col_num_lists[1]).astype(int)
+        a_names = np.append(column_name_lists[0], extra_col_name_lists[0])
+        b_names = np.append(column_name_lists[1], extra_col_name_lists[1])
+    a_names, b_names = np.array(a_names)[np.argsort(a_cols)], np.array(b_names)[np.argsort(b_cols)]
+
     cat_a = pd.read_csv('{}/{}.csv'.format(input_csv_folders[0], csv_filenames[0]),
                         memory_map=True, header=None if not headers[0] else 0,
-                        usecols=csv_col_name_or_num_lists[0], names=column_name_lists[0])
+                        usecols=a_cols, names=a_names)
     cat_b = pd.read_csv('{}/{}.csv'.format(input_csv_folders[1], csv_filenames[1]),
                         memory_map=True, header=None if not headers[1] else 0,
-                        usecols=csv_col_name_or_num_lists[1], names=column_name_lists[1])
+                        usecols=b_cols, names=b_names)
     n_matches = len(ac)
     match_df = pd.DataFrame(columns=cols, index=np.arange(0, n_matches))
 
@@ -158,24 +188,38 @@ def npy_to_csv(input_csv_folders, input_match_folder, output_folder, csv_filenam
         for i in column_name_lists[1]:
             match_df[i].iloc[lowind:highind] = cat_b[i].iloc[bc[lowind:highind]].values
         match_df.iloc[lowind:highind, 6+n_amags+n_bmags] = p[lowind:highind]
-        match_df.iloc[lowind:highind, 6+n_amags+n_bmags+1] = eta[lowind:highind]
-        match_df.iloc[lowind:highind, 6+n_amags+n_bmags+2] = xi[lowind:highind]
-        match_df.iloc[lowind:highind, 6+n_amags+n_bmags+3] = a_avg_cont[lowind:highind]
-        match_df.iloc[lowind:highind, 6+n_amags+n_bmags+4] = b_avg_cont[lowind:highind]
+        match_df.iloc[lowind:highind, 6+n_amags+n_bmags+1] = seps[lowind:highind]
+        match_df.iloc[lowind:highind, 6+n_amags+n_bmags+2] = eta[lowind:highind]
+        match_df.iloc[lowind:highind, 6+n_amags+n_bmags+3] = xi[lowind:highind]
+        match_df.iloc[lowind:highind, 6+n_amags+n_bmags+4] = a_avg_cont[lowind:highind]
+        match_df.iloc[lowind:highind, 6+n_amags+n_bmags+5] = b_avg_cont[lowind:highind]
         for i in range(acontprob.shape[1]):
-            match_df.iloc[lowind:highind, 6+n_amags+n_bmags+5+i] = acontprob[lowind:highind, i]
+            match_df.iloc[lowind:highind, 6+n_amags+n_bmags+6+i] = acontprob[lowind:highind, i]
         for i in range(bcontprob.shape[1]):
-            match_df.iloc[lowind:highind, 6+n_amags+n_bmags+5+acontprob.shape[1]+i] = bcontprob[
+            match_df.iloc[lowind:highind, 6+n_amags+n_bmags+6+acontprob.shape[1]+i] = bcontprob[
                 lowind:highind, i]
+        if extra_col_name_lists is not None:
+            for i in extra_col_name_lists[0]:
+                match_df[i].iloc[lowind:highind] = cat_a[i].iloc[ac[lowind:highind]].values
+            for i in extra_col_name_lists[1]:
+                match_df[i].iloc[lowind:highind] = cat_b[i].iloc[bc[lowind:highind]].values
 
     match_df.to_csv('{}/{}.csv'.format(output_folder, output_filenames[0]), encoding='utf-8',
                     index=False, header=False)
 
-    # For non-match, ID/coordinates/mags, then island probability.
-    # TODO: add average contaminant flux recording to non-match outputs.
+    # For non-match, ID/coordinates/mags, then island probability + average
+    # contamination.
     af = np.load('{}/pairing/af.npy'.format(input_match_folder), mmap_mode='r')
+    a_avg_cont = np.load('{}/pairing/afieldflux.npy'.format(input_match_folder), mmap_mode='r')
     p = np.load('{}/pairing/pfa.npy'.format(input_match_folder), mmap_mode='r')
-    cols = np.append(column_name_lists[0], ['MATCH_P'])
+    seps = np.load('{}/pairing/afieldseps.npy'.format(input_match_folder), mmap_mode='r')
+    afeta = np.load('{}/pairing/afieldeta.npy'.format(input_match_folder), mmap_mode='r')
+    afxi = np.load('{}/pairing/afieldxi.npy'.format(input_match_folder), mmap_mode='r')
+    cols = np.append(column_name_lists[0],
+                     ['MATCH_P', 'NNM_SEPARATION', 'NNM_ETA', 'NNM_XI',
+                      '{}_AVG_CONT'.format(extra_col_cat_names[0])])
+    if extra_col_num_lists is not None:
+        cols = np.append(cols, extra_col_name_lists[0])
     n_anonmatches = len(af)
     a_nonmatch_df = pd.DataFrame(columns=cols, index=np.arange(0, n_anonmatches))
     for cnum in range(0, mem_chunk_num):
@@ -184,13 +228,28 @@ def npy_to_csv(input_csv_folders, input_match_folder, output_folder, csv_filenam
         for i in column_name_lists[0]:
             a_nonmatch_df[i].iloc[lowind:highind] = cat_a[i].iloc[af[lowind:highind]].values
         a_nonmatch_df.iloc[lowind:highind, 3+n_amags] = p[lowind:highind]
+        a_nonmatch_df.iloc[lowind:highind, 3+n_amags+1] = seps[lowind:highind]
+        a_nonmatch_df.iloc[lowind:highind, 3+n_amags+2] = afeta[lowind:highind]
+        a_nonmatch_df.iloc[lowind:highind, 3+n_amags+3] = afxi[lowind:highind]
+        a_nonmatch_df.iloc[lowind:highind, 3+n_amags+4] = a_avg_cont[lowind:highind]
+        if extra_col_name_lists is not None:
+            for i in extra_col_name_lists[0]:
+                a_nonmatch_df[i].iloc[lowind:highind] = cat_a[i].iloc[af[lowind:highind]].values
 
     a_nonmatch_df.to_csv('{}/{}.csv'.format(output_folder, output_filenames[1]), encoding='utf-8',
                          index=False, header=False)
 
     bf = np.load('{}/pairing/bf.npy'.format(input_match_folder), mmap_mode='r')
+    b_avg_cont = np.load('{}/pairing/bfieldflux.npy'.format(input_match_folder), mmap_mode='r')
     p = np.load('{}/pairing/pfb.npy'.format(input_match_folder), mmap_mode='r')
-    cols = np.append(column_name_lists[1], ['MATCH_P'])
+    seps = np.load('{}/pairing/bfieldseps.npy'.format(input_match_folder), mmap_mode='r')
+    bfeta = np.load('{}/pairing/bfieldeta.npy'.format(input_match_folder), mmap_mode='r')
+    bfxi = np.load('{}/pairing/bfieldxi.npy'.format(input_match_folder), mmap_mode='r')
+    cols = np.append(column_name_lists[1],
+                     ['MATCH_P', 'NNM_SEPARATION', 'NNM_ETA', 'NNM_XI',
+                      '{}_AVG_CONT'.format(extra_col_cat_names[1])])
+    if extra_col_num_lists is not None:
+        cols = np.append(cols, extra_col_name_lists[1])
     n_bnonmatches = len(bf)
     b_nonmatch_df = pd.DataFrame(columns=cols, index=np.arange(0, n_bnonmatches))
     for cnum in range(0, mem_chunk_num):
@@ -199,6 +258,13 @@ def npy_to_csv(input_csv_folders, input_match_folder, output_folder, csv_filenam
         for i in column_name_lists[1]:
             b_nonmatch_df[i].iloc[lowind:highind] = cat_b[i].iloc[bf[lowind:highind]].values
         b_nonmatch_df.iloc[lowind:highind, 3+n_bmags] = p[lowind:highind]
+        b_nonmatch_df.iloc[lowind:highind, 3+n_bmags+1] = seps[lowind:highind]
+        b_nonmatch_df.iloc[lowind:highind, 3+n_bmags+2] = bfeta[lowind:highind]
+        b_nonmatch_df.iloc[lowind:highind, 3+n_bmags+3] = bfxi[lowind:highind]
+        b_nonmatch_df.iloc[lowind:highind, 3+n_bmags+4] = b_avg_cont[lowind:highind]
+        if extra_col_name_lists is not None:
+            for i in extra_col_name_lists[1]:
+                b_nonmatch_df[i].iloc[lowind:highind] = cat_b[i].iloc[bf[lowind:highind]].values
 
     b_nonmatch_df.to_csv('{}/{}.csv'.format(output_folder, output_filenames[2]), encoding='utf-8',
                          index=False, header=False)

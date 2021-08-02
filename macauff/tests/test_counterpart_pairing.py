@@ -36,8 +36,9 @@ class TestCounterpartPairing:
     def setup_class(self):
         seed = 8888
         rng = np.random.default_rng(seed)
-        # Test will have three overlap islands: 2 a sources and 1 b source, and
-        # a single lonely a source. Also two islands each with one "field" object.
+        # Test will have three overlap islands: two with 2 a sources and 1 b
+        # source, with 1 unmatched a source, and one with 2 a + 1 b all unmatched
+        # sources. Also two islands each with just one "field" object.
         self.a_astro = np.empty((7, 3), float)
         self.b_astro = np.empty((4, 3), float)
         self.a_sig, self.b_sig = 0.1, 0.08
@@ -57,6 +58,9 @@ class TestCounterpartPairing:
         # Swap the last two indexes as well
         self.b_astro[-2:, 0] = self.b_astro[[-1, -2], 0]
         self.b_astro[-2:, 1] = self.b_astro[[-1, -2], 1]
+        # Force no match between the third island by adding distance between
+        # a[2] and b[3]. Unphysical but effective.
+        self.b_astro[3, 1] += 7*self.b_sig/3600
 
         self.a_astro[:, 2] = self.a_sig
         self.b_astro[:, 2] = self.b_sig
@@ -84,9 +88,10 @@ class TestCounterpartPairing:
         self.c_array = np.ones((1, 1, 4, 3, 1), float, order='F')
         self.fa_array = np.ones((1, 4, 3, 1), float, order='F')
         self.fb_array = np.ones((1, 4, 3, 1), float, order='F')
-        self.c_priors = np.asfortranarray((3/0.1**2 * 0.5) * np.ones((4, 3, 1), float))
-        self.fa_priors = np.asfortranarray((7/0.1**2 - 3/0.1**2 * 0.5) * np.ones((4, 3, 1), float))
-        self.fb_priors = np.asfortranarray((3/0.1**2 * 0.5) * np.ones((4, 3, 1), float))
+        self.c_priors = np.asfortranarray((3/0.001**2 * 0.5) * np.ones((4, 3, 1), float))
+        self.fa_priors = np.asfortranarray((7/0.001**2 - 3/0.001**2 * 0.5) *
+                                           np.ones((4, 3, 1), float))
+        self.fb_priors = np.asfortranarray((3/0.001**2 * 0.5) * np.ones((4, 3, 1), float))
 
         self.amagref = np.zeros((self.a_astro.shape[0]), int)
         self.bmagref = np.zeros((self.b_astro.shape[0]), int)
@@ -191,7 +196,8 @@ class TestCounterpartPairing:
             self.n_fracs]
         results = _individual_island_probability(wrapper)
         (acrpts, bcrpts, acrptscontp, bcrptscontp, etacrpts, xicrpts, acrptflux, bcrptflux,
-         afield, bfield, prob, integral) = results
+         crptseps, afield, bfield, afieldflux, bfieldflux, afieldseps, afieldeta,
+         afieldxi, bfieldseps, bfieldeta, bfieldxi, prob, integral) = results
 
         assert np.all(acrpts == np.array([0]))
         assert np.all(bcrpts == np.array([1]))
@@ -231,7 +237,8 @@ class TestCounterpartPairing:
             self.n_fracs]
         results = _individual_island_probability(wrapper)
         (acrpts, bcrpts, acrptscontp, bcrptscontp, etacrpts, xicrpts, acrptflux, bcrptflux,
-         afield, bfield, prob, integral) = results
+         crptseps, afield, bfield, afieldflux, bfieldflux, afieldseps, afieldeta,
+         afieldxi, bfieldseps, bfieldeta, bfieldxi, prob, integral) = results
 
         assert np.all(acrpts == np.array([0]))
         assert np.all(bcrpts == np.array([1]))
@@ -249,7 +256,8 @@ class TestCounterpartPairing:
             self.n_fracs]
         results = _individual_island_probability(wrapper)
         (acrpts, bcrpts, acrptscontp, bcrptscontp, etacrpts, xicrpts, acrptflux, bcrptflux,
-         afield, bfield, prob, integral) = results
+         crptseps, afield, bfield, afieldflux, bfieldflux, afieldseps, afieldeta,
+         afieldxi, bfieldseps, bfieldeta, bfieldxi, prob, integral) = results
 
         assert len(acrpts) == 0
         assert len(bcrpts) == 0
@@ -266,23 +274,28 @@ class TestCounterpartPairing:
             mem_chunk_num, n_pool)
 
         bflux = np.load('{}/pairing/bcontamflux.npy'.format(self.joint_folder_path))
-        assert np.all(bflux == np.zeros((3), float))
+        assert np.all(bflux == np.zeros((2), float))
+
+        aflux = np.load('{}/pairing/afieldflux.npy'.format(self.joint_folder_path))
+        assert np.all(aflux == np.zeros((5), float))
+        bflux = np.load('{}/pairing/bfieldflux.npy'.format(self.joint_folder_path))
+        assert np.all(bflux == np.zeros((2), float))
 
         a_matches = np.load('{}/pairing/ac.npy'.format(self.joint_folder_path))
-        assert np.all([q in a_matches for q in [0, 1, 2]])
-        assert np.all([q not in a_matches for q in [3, 4, 5, 6]])
+        assert np.all([q in a_matches for q in [0, 1]])
+        assert np.all([q not in a_matches for q in [2, 3, 4, 5, 6]])
 
         a_field = np.load('{}/pairing/af.npy'.format(self.joint_folder_path))
-        assert np.all([q in a_field for q in [3, 4, 5, 6]])
-        assert np.all([q not in a_field for q in [0, 1, 2]])
+        assert np.all([q in a_field for q in [2, 3, 4, 5, 6]])
+        assert np.all([q not in a_field for q in [0, 1]])
 
         b_matches = np.load('{}/pairing/bc.npy'.format(self.joint_folder_path))
-        assert np.all([q in b_matches for q in [0, 1, 3]])
-        assert np.all([q not in b_matches for q in [2]])
+        assert np.all([q in b_matches for q in [0, 1]])
+        assert np.all([q not in b_matches for q in [2, 3]])
 
         b_field = np.load('{}/pairing/bf.npy'.format(self.joint_folder_path))
-        assert np.all([q in b_field for q in [2]])
-        assert np.all([q not in b_field for q in [0, 1, 3]])
+        assert np.all([q in b_field for q in [2, 3]])
+        assert np.all([q not in b_field for q in [0, 1]])
 
         prob_counterpart = np.load('{}/pairing/pc.npy'.format(self.joint_folder_path))
         self._calculate_prob_integral()
@@ -295,6 +308,9 @@ class TestCounterpartPairing:
         xicrpts = np.load('{}/pairing/xi.npy'.format(self.joint_folder_path))
         assert_allclose(xicrpts[q], np.array([np.log10(self.G / self.fa_priors[0, 0, 0])]),
                         rtol=1e-6)
+        csep = np.load('{}/pairing/crptseps.npy'.format(self.joint_folder_path))
+        assert_allclose(csep[q], self.sep * 3600, rtol=1e-6)
+        assert len(csep) == len(a_matches)
 
         prob_a_field = np.load('{}/pairing/pfa.npy'.format(self.joint_folder_path))
         a_field = np.load('{}/pairing/af.npy'.format(self.joint_folder_path))
@@ -305,6 +321,22 @@ class TestCounterpartPairing:
         b_field = np.load('{}/pairing/bf.npy'.format(self.joint_folder_path))
         q = np.where(b_field == 2)[0][0]
         assert prob_b_field[q] == 1
+
+        afs = np.load('{}/pairing/afieldseps.npy'.format(self.joint_folder_path))
+        afeta = np.load('{}/pairing/afieldeta.npy'.format(self.joint_folder_path))
+        afxi = np.load('{}/pairing/afieldxi.npy'.format(self.joint_folder_path))
+        q = np.where(a_field == 2)[0][0]
+        fake_field_sep = np.sqrt(((self.a_astro[2, 0] -
+                                   self.b_astro[3, 0])*np.cos(np.radians(self.b_astro[3, 1])))**2 +
+                                 (self.a_astro[2, 1] - self.b_astro[3, 1])**2)
+        assert_allclose(afs[q], fake_field_sep * 3600, rtol=1e-6)
+
+        fake_field_G = 1/(2 * np.pi * self.o**2) * np.exp(-0.5 * fake_field_sep**2 / self.o**2)
+        # c_priors and fb_priors are the same, so they cancel in the division.
+        # Being in log space we can be relatively forgiving in our assertion limits.
+        assert_allclose(afxi[q], np.log10(fake_field_G / self.Nfa), rtol=0.01, atol=0.01)
+        # Ignoring photometry here, so this should be equal probability.
+        assert_allclose(afeta[q], np.log10(1.0))
 
     def test_including_b_reject(self):
         os.system('rm -r {}/pairing'.format(self.joint_folder_path))
@@ -528,23 +560,23 @@ class TestCounterpartPairing:
         self.cm.pair_sources(self.files_per_pairing)
 
         bflux = np.load('{}/pairing/bcontamflux.npy'.format(self.joint_folder_path))
-        assert np.all(bflux == np.zeros((3), float))
+        assert np.all(bflux == np.zeros((2), float))
 
         a_matches = np.load('{}/pairing/ac.npy'.format(self.joint_folder_path))
-        assert np.all([q in a_matches for q in [0, 1, 2]])
-        assert np.all([q not in a_matches for q in [3, 4, 5, 6]])
+        assert np.all([q in a_matches for q in [0, 1]])
+        assert np.all([q not in a_matches for q in [2, 3, 4, 5, 6]])
 
         a_field = np.load('{}/pairing/af.npy'.format(self.joint_folder_path))
-        assert np.all([q in a_field for q in [3, 4, 5, 6]])
-        assert np.all([q not in a_field for q in [0, 1, 2]])
+        assert np.all([q in a_field for q in [2, 3, 4, 5, 6]])
+        assert np.all([q not in a_field for q in [0, 1]])
 
         b_matches = np.load('{}/pairing/bc.npy'.format(self.joint_folder_path))
-        assert np.all([q in b_matches for q in [0, 1, 3]])
-        assert np.all([q not in b_matches for q in [2]])
+        assert np.all([q in b_matches for q in [0, 1]])
+        assert np.all([q not in b_matches for q in [2, 3]])
 
         b_field = np.load('{}/pairing/bf.npy'.format(self.joint_folder_path))
-        assert np.all([q in b_field for q in [2]])
-        assert np.all([q not in b_field for q in [0, 1, 3]])
+        assert np.all([q in b_field for q in [2, 3]])
+        assert np.all([q not in b_field for q in [0, 1]])
 
         prob_counterpart = np.load('{}/pairing/pc.npy'.format(self.joint_folder_path))
         self._calculate_prob_integral()
@@ -567,6 +599,22 @@ class TestCounterpartPairing:
         b_field = np.load('{}/pairing/bf.npy'.format(self.joint_folder_path))
         q = np.where(b_field == 2)[0][0]
         assert prob_b_field[q] == 1
+
+        afs = np.load('{}/pairing/afieldseps.npy'.format(self.joint_folder_path))
+        afeta = np.load('{}/pairing/afieldeta.npy'.format(self.joint_folder_path))
+        afxi = np.load('{}/pairing/afieldxi.npy'.format(self.joint_folder_path))
+        q = np.where(a_field == 2)[0][0]
+        fake_field_sep = np.sqrt(((self.a_astro[2, 0] -
+                                   self.b_astro[3, 0])*np.cos(np.radians(self.b_astro[3, 1])))**2 +
+                                 (self.a_astro[2, 1] - self.b_astro[3, 1])**2)
+        assert_allclose(afs[q], fake_field_sep * 3600, rtol=1e-6)
+
+        fake_field_G = 1/(2 * np.pi * self.o**2) * np.exp(-0.5 * fake_field_sep**2 / self.o**2)
+        # c_priors and fb_priors are the same, so they cancel in the division.
+        # Being in log space we can be relatively forgiving in our assertion limits.
+        assert_allclose(afxi[q], np.log10(fake_field_G / self.Nfa), rtol=0.01, atol=0.01)
+        # Ignoring photometry here, so this should be equal probability.
+        assert_allclose(afeta[q], np.log10(1.0))
 
     def test_pair_sources_incorrect_warning(self):
         os.system('rm -r {}/pairing'.format(self.joint_folder_path))

@@ -91,6 +91,8 @@ def source_pairing(joint_folder_path, a_cat_folder_path, b_cat_folder_path, a_au
                                          mode='w+', dtype=float, shape=(small_len,))
     xiarray = np.lib.format.open_memmap('{}/pairing/xi.npy'.format(joint_folder_path),
                                         mode='w+', dtype=float, shape=(small_len,))
+    crptseps = np.lib.format.open_memmap('{}/pairing/crptseps.npy'.format(joint_folder_path),
+                                         mode='w+', dtype=float, shape=(small_len,))
     for cnum in range(0, mem_chunk_num):
         lowind = np.floor(small_len*cnum/mem_chunk_num).astype(int)
         highind = np.floor(small_len*(cnum+1)/mem_chunk_num).astype(int)
@@ -103,23 +105,48 @@ def source_pairing(joint_folder_path, a_cat_folder_path, b_cat_folder_path, a_au
         probcarray[lowind:highind] = -100
         etaarray[lowind:highind] = -100
         xiarray[lowind:highind] = -100
+        crptseps[lowind:highind] = -100
     afieldinds = np.lib.format.open_memmap('{}/pairing/af.npy'.format(joint_folder_path),
                                            mode='w+', dtype=int, shape=(len_a,))
     probfaarray = np.lib.format.open_memmap('{}/pairing/pfa.npy'.format(joint_folder_path),
                                             mode='w+', dtype=float, shape=(len_a,))
+    afieldflux = np.lib.format.open_memmap('{}/pairing/afieldflux.npy'.format(joint_folder_path),
+                                           mode='w+', dtype=float, shape=(len_a,))
+    afieldseps = np.lib.format.open_memmap('{}/pairing/afieldseps.npy'.format(joint_folder_path),
+                                           mode='w+', dtype=float, shape=(len_a,))
+    afieldeta = np.lib.format.open_memmap('{}/pairing/afieldeta.npy'.format(joint_folder_path),
+                                          mode='w+', dtype=float, shape=(len_a,))
+    afieldxi = np.lib.format.open_memmap('{}/pairing/afieldxi.npy'.format(joint_folder_path),
+                                         mode='w+', dtype=float, shape=(len_a,))
     for cnum in range(0, mem_chunk_num):
         lowind = np.floor(len_a*cnum/mem_chunk_num).astype(int)
         highind = np.floor(len_a*(cnum+1)/mem_chunk_num).astype(int)
         afieldinds[lowind:highind] = large_len+1
+        afieldflux[lowind:highind] = -100
+        afieldseps[lowind:highind] = -100
+        afieldeta[lowind:highind] = -100
+        afieldxi[lowind:highind] = -100
         probfaarray[lowind:highind] = -100
     bfieldinds = np.lib.format.open_memmap('{}/pairing/bf.npy'.format(joint_folder_path),
                                            mode='w+', dtype=int, shape=(len_b,))
     probfbarray = np.lib.format.open_memmap('{}/pairing/pfb.npy'.format(joint_folder_path),
                                             mode='w+', dtype=float, shape=(len_b,))
+    bfieldflux = np.lib.format.open_memmap('{}/pairing/bfieldflux.npy'.format(joint_folder_path),
+                                           mode='w+', dtype=float, shape=(len_b,))
+    bfieldseps = np.lib.format.open_memmap('{}/pairing/bfieldseps.npy'.format(joint_folder_path),
+                                           mode='w+', dtype=float, shape=(len_b,))
+    bfieldeta = np.lib.format.open_memmap('{}/pairing/bfieldeta.npy'.format(joint_folder_path),
+                                          mode='w+', dtype=float, shape=(len_b,))
+    bfieldxi = np.lib.format.open_memmap('{}/pairing/bfieldxi.npy'.format(joint_folder_path),
+                                         mode='w+', dtype=float, shape=(len_b,))
     for cnum in range(0, mem_chunk_num):
         lowind = np.floor(len_b*cnum/mem_chunk_num).astype(int)
         highind = np.floor(len_b*(cnum+1)/mem_chunk_num).astype(int)
         bfieldinds[lowind:highind] = large_len+1
+        bfieldflux[lowind:highind] = -100
+        bfieldseps[lowind:highind] = -100
+        bfieldeta[lowind:highind] = -100
+        bfieldxi[lowind:highind] = -100
         probfbarray[lowind:highind] = -100
 
     counterpartticker = 0
@@ -214,18 +241,27 @@ def source_pairing(joint_folder_path, a_cat_folder_path, b_cat_folder_path, a_au
                 # objects), and update afield; otherwise 'b' indicates an empty
                 # "a" island, and lonely "b" sources.
                 if np.any([isinstance(q, str) and q == 'a' for q in return_items]):
-                    _, _, aperm, aperm_ = return_items
+                    _, _, aperm, aperm_, aff, afsep, afeta, afxi = return_items
                     afieldinds[afieldticker:afieldticker+len(aperm)] = aperm_
                     probfaarray[afieldticker:afieldticker+len(aperm)] = 1
+                    afieldflux[afieldticker:afieldticker+len(aperm)] = aff
+                    afieldseps[afieldticker:afieldticker+len(aperm)] = afsep
+                    afieldeta[afieldticker:afieldticker+len(aperm)] = afeta
+                    afieldxi[afieldticker:afieldticker+len(aperm)] = afxi
                     afieldticker += len(aperm)
                 else:
-                    _, _, bperm, bperm_ = return_items
+                    _, _, bperm, bperm_, bff, bfsep, bfeta, bfxi = return_items
                     bfieldinds[bfieldticker:bfieldticker+len(bperm)] = bperm_
                     probfbarray[bfieldticker:bfieldticker+len(bperm)] = 1
+                    bfieldflux[bfieldticker:bfieldticker+len(bperm)] = bff
+                    bfieldseps[bfieldticker:bfieldticker+len(bperm)] = bfsep
+                    bfieldeta[bfieldticker:bfieldticker+len(bperm)] = bfeta
+                    bfieldxi[bfieldticker:bfieldticker+len(bperm)] = bfxi
                     bfieldticker += len(bperm)
             else:
                 [acrpts, bcrpts, acrptscontp, bcrptscontp, etacrpts, xicrpts, acrptflux, bcrptflux,
-                 afield, bfield, prob, integral] = return_items
+                 cseps, afield, bfield, aff, bff, afseps, afeta, afxi, bfseps, bfeta, bfxi, prob,
+                 integral] = return_items
                 if len(acrpts) > 0:
                     acountinds[counterpartticker:counterpartticker+len(acrpts)] = acrpts
                     bcountinds[counterpartticker:counterpartticker+len(bcrpts)] = bcrpts
@@ -236,16 +272,25 @@ def source_pairing(joint_folder_path, a_cat_folder_path, b_cat_folder_path, a_au
                     acontamflux[counterpartticker:counterpartticker+len(acrptflux)] = acrptflux
                     bcontamflux[counterpartticker:counterpartticker+len(bcrptflux)] = bcrptflux
                     probcarray[counterpartticker:counterpartticker+len(acrpts)] = prob/integral
+                    crptseps[counterpartticker:counterpartticker+len(cseps)] = cseps
                     counterpartticker += len(acrpts)
 
                 if len(afield) > 0:
                     afieldinds[afieldticker:afieldticker+len(afield)] = afield
                     probfaarray[afieldticker:afieldticker+len(afield)] = prob/integral
+                    afieldflux[afieldticker:afieldticker+len(afield)] = aff
+                    afieldseps[afieldticker:afieldticker+len(afield)] = afseps
+                    afieldeta[afieldticker:afieldticker+len(afield)] = afeta
+                    afieldxi[afieldticker:afieldticker+len(afield)] = afxi
                     afieldticker += len(afield)
 
                 if len(bfield) > 0:
                     bfieldinds[bfieldticker:bfieldticker+len(bfield)] = bfield
                     probfbarray[bfieldticker:bfieldticker+len(bfield)] = prob/integral
+                    bfieldflux[bfieldticker:bfieldticker+len(bfield)] = bff
+                    bfieldseps[bfieldticker:bfieldticker+len(bfield)] = bfseps
+                    bfieldeta[bfieldticker:bfieldticker+len(bfield)] = bfeta
+                    bfieldxi[bfieldticker:bfieldticker+len(bfield)] = bfxi
                     bfieldticker += len(bfield)
         pool.close()
 
@@ -296,16 +341,21 @@ def source_pairing(joint_folder_path, a_cat_folder_path, b_cat_folder_path, a_au
     # criteria above from all saved numpy arrays.
     for file_name, variable, shape, typing, filter_variable in zip(
         ['ac', 'bc', 'pacontam', 'pbcontam', 'acontamflux', 'bcontamflux', 'af', 'bf', 'pc', 'eta',
-         'xi', 'pfa', 'pfb'],
+         'xi', 'pfa', 'pfb', 'afieldflux', 'bfieldflux', 'crptseps', 'afieldseps', 'afieldeta',
+         'afieldxi', 'bfieldseps', 'bfieldeta', 'bfieldxi'],
         [acountinds, bcountinds, acontamprob, bcontamprob, acontamflux, bcontamflux, afieldinds,
-         bfieldinds, probcarray, etaarray, xiarray, probfaarray, probfbarray],
+         bfieldinds, probcarray, etaarray, xiarray, probfaarray, probfbarray, afieldflux,
+         bfieldflux, crptseps, afieldseps, afieldeta, afieldxi, bfieldseps, bfieldeta, bfieldxi],
         [(countsum,), (countsum,), (countsum, n_fracs), (countsum, n_fracs), (countsum,),
          (countsum,), (afieldsum,), (bfieldsum,), (countsum,), (countsum,), (countsum,),
-         (afieldsum,), (bfieldsum,)],
-        [int, int, float, float, float, float, int, int, float, float, float, float, float],
+         (afieldsum,), (bfieldsum,), (afieldsum,), (bfieldsum,), (countsum,), (afieldsum,),
+         (afieldsum,), (afieldsum,), (bfieldsum,), (bfieldsum,), (bfieldsum,)],
+        [int, int, float, float, float, float, int, int, float, float, float, float, float,
+         float, float, float, float, float, float, float, float, float],
         [countfilter, countfilter, countfilter, countfilter, countfilter, countfilter,
          afieldfilter, bfieldfilter, countfilter, countfilter, countfilter, afieldfilter,
-         bfieldfilter]):
+         bfieldfilter, afieldfilter, bfieldfilter, countfilter, afieldfilter, afieldfilter,
+         afieldfilter, bfieldfilter, bfieldfilter, bfieldfilter]):
         temp_variable = np.lib.format.open_memmap('{}/pairing/{}2.npy'.format(
             joint_folder_path, file_name), mode='w+', dtype=typing, shape=shape)
         di = max(1, shape[0] // 20)
@@ -318,6 +368,8 @@ def source_pairing(joint_folder_path, a_cat_folder_path, b_cat_folder_path, a_au
                   joint_folder_path, file_name))
     del acountinds, bcountinds, acontamprob, bcontamprob, acontamflux, bcontamflux, afieldinds
     del bfieldinds, probcarray, etaarray, xiarray, probfaarray, probfbarray
+    del afieldflux, bfieldflux
+    del crptseps, afieldseps, afieldeta, afieldxi, bfieldseps, bfieldeta, bfieldxi
     tot = countsum + afieldsum + lenrejecta
     if tot < len_a:
         warnings.warn("{} catalogue a source{} not in either counterpart, field, or rejected "
@@ -360,9 +412,23 @@ def _individual_island_probability(iterable_wrapper):
      n_fracs] = iterable_wrapper
 
     if bgrplen[i] == 0:
-        return ['a', None, alist[:agrplen[i], i], alist_[:agrplen[i], i]]
+        aperm = alist[:agrplen[i], i]
+        arefinds = amodelrefinds[:, aperm]
+        acontamfluxgrid = np.empty(len(aperm), float)
+        for j in range(0, len(aperm)):
+            acontamfluxgrid[j] = aflux_grids[arefinds[0, j], arefinds[1, j], arefinds[2, j]]
+        return ['a', None, alist[:agrplen[i], i], alist_[:agrplen[i], i], acontamfluxgrid,
+                np.nan * np.empty(len(aperm), float), np.nan * np.empty(len(aperm), float),
+                np.nan * np.empty(len(aperm), float)]
     elif agrplen[i] == 0:
-        return ['b', None, blist[:bgrplen[i], i], blist_[:bgrplen[i], i]]
+        bperm = blist[:bgrplen[i], i]
+        brefinds = bmodelrefinds[:, bperm]
+        bcontamfluxgrid = np.empty(len(bperm), float)
+        for j in range(0, len(bperm)):
+            bcontamfluxgrid[j] = bflux_grids[brefinds[0, j], brefinds[1, j], brefinds[2, j]]
+        return ['b', None, blist[:bgrplen[i], i], blist_[:bgrplen[i], i], bcontamfluxgrid,
+                np.nan * np.empty(len(bperm), float), np.nan * np.empty(len(bperm), float),
+                np.nan * np.empty(len(bperm), float)]
     else:
         aperm = alist[:agrplen[i], i]
         bperm = blist[:bgrplen[i], i]
@@ -393,6 +459,7 @@ def _individual_island_probability(iterable_wrapper):
         Nfb = np.zeros(len(bperm), float)
         fa = np.empty((len(aperm)), float)
         fb = np.empty((len(bperm)), float)
+        seps = np.empty((len(aperm), len(bperm)), float)
 
         for j in range(0, len(aperm)):
             bina[j] = np.where(a_photo[aperm[j], amagref[aperm[j]]] - abinsarray[
@@ -469,6 +536,7 @@ def _individual_island_probability(iterable_wrapper):
                     xigrid[j, k] = -10
                 else:
                     xigrid[j, k] = np.log10(Nc*G/(Nfa[j]*Nfb[k]))
+                seps[j, k] = sep
 
         prob = 0
         integral = 1e-10
@@ -489,6 +557,32 @@ def _individual_island_probability(iterable_wrapper):
         bcrptflux = np.array([])
         afield = aperm_
         bfield = bperm_
+        afieldflux = acontamfluxgrid
+        bfieldflux = bcontamfluxgrid
+        crptseps = np.array([])
+        afieldseps = np.empty(len(aperm), float) * np.nan
+        afieldeta = np.empty(len(aperm), float) * np.nan
+        afieldxi = np.empty(len(aperm), float) * np.nan
+        for j in range(len(aperm)):
+            tempsep = 1e10
+            for k in range(len(bperm)):
+                if seps[j, k] < tempsep:
+                    afieldseps[j] = seps[j, k]
+                    afieldeta[j] = etagrid[j, k]
+                    afieldxi[j] = xigrid[j, k]
+                    tempsep = seps[j, k]
+
+        bfieldseps = np.empty(len(bperm), float) * np.nan
+        bfieldeta = np.empty(len(bperm), float) * np.nan
+        bfieldxi = np.empty(len(bperm), float) * np.nan
+        for k in range(len(bperm)):
+            tempsep = 1e10
+            for j in range(len(aperm)):
+                if seps[j, k] < tempsep:
+                    bfieldseps[k] = seps[j, k]
+                    bfieldeta[k] = etagrid[j, k]
+                    bfieldxi[k] = xigrid[j, k]
+                    tempsep = seps[j, k]
         for N in range(1, min(len(aperm), len(bperm))+1):
             aiter = np.array(list(itertools.combinations(aperm, r=N)))
             biter = np.array(list(itertools.permutations(bperm, r=N)))
@@ -516,6 +610,35 @@ def _individual_island_probability(iterable_wrapper):
                         bcrptflux = np.array(bcontamfluxgrid[yb])
                         afield = np.array(aperm_[ta])
                         bfield = np.array(bperm_[tb])
+                        afieldflux = np.array(acontamfluxgrid[ta])
+                        bfieldflux = np.array(bcontamfluxgrid[tb])
+                        crptseps = np.array(seps[ya, yb])
 
+                        # TODO: do we want these to be nearest of all sources,
+                        # or nearest non-paired object?
+                        afieldseps = np.empty(len(ta), float) * np.nan
+                        afieldeta = np.empty(len(ta), float) * np.nan
+                        afieldxi = np.empty(len(ta), float) * np.nan
+                        for ta_counter, j in enumerate(ta):
+                            tempsep = 1e10
+                            for k in tb:
+                                if seps[j, k] < tempsep:
+                                    afieldseps[ta_counter] = seps[j, k]
+                                    afieldeta[ta_counter] = etagrid[j, k]
+                                    afieldxi[ta_counter] = xigrid[j, k]
+                                    tempsep = seps[j, k]
+
+                        bfieldseps = np.empty(len(tb), float) * np.nan
+                        bfieldeta = np.empty(len(tb), float) * np.nan
+                        bfieldxi = np.empty(len(tb), float) * np.nan
+                        for tb_counter, k in enumerate(tb):
+                            tempsep = 1e10
+                            for j in ta:
+                                if seps[j, k] < tempsep:
+                                    bfieldseps[tb_counter] = seps[j, k]
+                                    bfieldeta[tb_counter] = etagrid[j, k]
+                                    bfieldxi[tb_counter] = xigrid[j, k]
+                                    tempsep = seps[j, k]
         return [acrpts, bcrpts, acrptscontp, bcrptscontp, etacrpts, xicrpts, acrptflux, bcrptflux,
-                afield, bfield, prob, integral]
+                crptseps, afield, bfield, afieldflux, bfieldflux, afieldseps, afieldeta,
+                afieldxi, bfieldseps, bfieldeta, bfieldxi, prob, integral]
