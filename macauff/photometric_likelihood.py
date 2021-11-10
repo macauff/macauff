@@ -616,17 +616,7 @@ def create_c_and_f(a_astro, b_astro, a_mag, b_mag, a_inds, a_size, b_inds, b_siz
     a_hist, a_bins = np.histogram(a_mag[a_flags], bins=a_bins)
     pa = a_hist/(np.sum(a_hist)*np.diff(a_bins))
 
-    a_cuts = np.zeros((len(a_bins)-1, len(a_astro)), bool)
-    for i in range(0, len(a_astro)):
-        if a_flags[i]:
-            q = np.where(a_mag[i] >= a_bins[:-1])[0][-1]
-            a_cuts[q, i] = 1
-
-    b_cuts = np.zeros((len(b_bins)-1, len(b_astro)), bool)
-    for i in range(0, len(b_astro)):
-        if b_flags[i]:
-            q = np.where(b_mag[i] >= b_bins[:-1])[0][-1]
-            b_cuts[q, i] = 1
+    a_cuts = plf.find_mag_bin_inds(a_mag, a_flags, a_bins)
 
     # get_field_dists allows for magnitude slicing, to get f(m | m) instead of f(m),
     # but when we do want f(m) we just pass two impossible magnitudes as the limits.
