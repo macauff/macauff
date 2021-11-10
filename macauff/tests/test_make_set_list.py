@@ -53,11 +53,11 @@ def test_set_list_maximum_exceeded():
             with pytest.warns(UserWarning, match='1 island, containing {}/{} catalogue a and '
                               '{}/{} catalogue b stars'.format(N_a, N_a+2, N_b, N_b+2)):
                 alist, blist, agrplen, bgrplen = set_list(
-                    a_overlaps, b_overlaps, a_num, b_num, '.')
+                    a_overlaps, b_overlaps, a_num, b_num, '.', 2)
         else:
             with pytest.warns(None) as record:
                 alist, blist, agrplen, bgrplen = set_list(
-                    a_overlaps, b_overlaps, a_num, b_num, '.')
+                    a_overlaps, b_overlaps, a_num, b_num, '.', 2)
             # Should be empty if no warnings were raised.
             assert not record
         if i != 2:
