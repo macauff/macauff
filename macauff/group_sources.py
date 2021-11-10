@@ -392,6 +392,8 @@ def make_island_groupings(joint_folder_path, a_cat_folder_path, b_cat_folder_pat
     num_good_checks = 0
     num_a_failed_checks = 0
     num_b_failed_checks = 0
+    # Initialise the multiprocessing loop setup:
+    pool = multiprocessing.Pool(n_pool)
     for cnum in range(0, mem_chunk_num):
         lowind = np.floor(islelen*cnum/mem_chunk_num).astype(int)
         highind = np.floor(islelen*(cnum+1)/mem_chunk_num).astype(int)
@@ -419,48 +421,14 @@ def make_island_groupings(joint_folder_path, a_cat_folder_path, b_cat_folder_pat
         # Here, since we know no source can be outside of extent, we can simply
         # look at whether any source has a sky separation of less than max_sep
         # from any of the four lines defining extent in orthogonal sky axes.
-        for i in range(0, alist_small.shape[1]):
-            subset = alist_1[:agrplen_small[i], i]
-            a = a_[subset]
-            subset = blist_1[:bgrplen_small[i], i]
-            b = b_[subset]
-            meets_min_distance = np.zeros(len(a)+len(b), bool)
-            # Do not check for longitudinal "extent" small separations for cases
-            # where all 0-360 degrees are included, as this will result in no loss
-            # of sources from consideration, with the 0->360 wraparound of
-            # coordinates. In either case if there is a small slice of sky not
-            # considered, however, we must remove sources near the "empty" strip.
-            if ax_lims[0] > 0 or ax_lims[1] < 360:
-                for lon in ax_lims[:2]:
-                    is_within_dist_of_lon = (
-                        hav_dist_constant_lat(a[:, 0], a[:, 1], lon) <= max_sep)
-                    # Progressively update the boolean for each source in the group
-                    # for each distance check for the four extents.
-                    meets_min_distance[:len(a)] = (meets_min_distance[:len(a)] |
-                                                   is_within_dist_of_lon)
-            # Similarly, if either "latitude" is set to 90 degrees, we cannot have
-            # lack of up-down missing sources, so we must check (individually this
-            # time) for whether we should skip this check.
-            for lat in ax_lims[2:]:
-                if np.abs(lat) < 90:
-                    is_within_dist_of_lat = (np.abs(a[:, 1] - lat) <= max_sep)
-                    meets_min_distance[:len(a)] = (meets_min_distance[:len(a)] |
-                                                   is_within_dist_of_lat)
-
-            # Because all sources in BOTH catalogues must pass, we continue
-            # to update meets_min_distance for catalogue "b" as well.
-            if ax_lims[0] > 0 or ax_lims[1] < 360:
-                for lon in ax_lims[:2]:
-                    is_within_dist_of_lon = (
-                        hav_dist_constant_lat(b[:, 0], b[:, 1], lon) <= max_sep)
-                    meets_min_distance[len(a):] = (meets_min_distance[len(a):] |
-                                                   is_within_dist_of_lon)
-            for lat in ax_lims[2:]:
-                if np.abs(lat) < 90:
-                    is_within_dist_of_lat = (np.abs(b[:, 1] - lat) <= max_sep)
-                    meets_min_distance[len(a):] = (meets_min_distance[len(a):] |
-                                                   is_within_dist_of_lat)
-            if np.all(meets_min_distance == 0):
+        counter = np.arange(0, alist_small.shape[1])
+        expand_constants = [itertools.repeat(item) for item in [
+            a_, b_, alist_1, blist_1, agrplen_small, bgrplen_small, ax_lims, max_sep]]
+        iter_group = zip(counter, *expand_constants)
+        for return_items in pool.imap_unordered(_distance_check, iter_group,
+                                                chunksize=max(1, len(counter) // n_pool)):
+            i, dist_check, a, b = return_items
+            if dist_check:
                 passed_check[indexmap[i]] = 1
                 failed_check[indexmap[i]] = 0
                 num_good_checks += 1
@@ -470,6 +438,8 @@ def make_island_groupings(joint_folder_path, a_cat_folder_path, b_cat_folder_pat
                 # sources in each catalogue for.
                 num_a_failed_checks += len(a)
                 num_b_failed_checks += len(b)
+
+    pool.close()
 
     # If set_list returned any rejected sources, then add any sources too close
     # to match extent to those now. Ensure that we only reject the unique source IDs
@@ -676,3 +646,49 @@ def _clean_overlaps(inds, size, joint_folder_path, filename, n_pool):
 def _calc_unique_inds(iterable):
     i, inds = iterable
     return i, np.unique(inds[inds[:, i] > -1, i])
+
+
+def _distance_check(iterable):
+    i, a_, b_, alist_1, blist_1, agrplen_small, bgrplen_small, ax_lims, max_sep = iterable
+    subset = alist_1[:agrplen_small[i], i]
+    a = a_[subset]
+    subset = blist_1[:bgrplen_small[i], i]
+    b = b_[subset]
+    meets_min_distance = np.zeros(len(a)+len(b), bool)
+    # Do not check for longitudinal "extent" small separations for cases
+    # where all 0-360 degrees are included, as this will result in no loss
+    # of sources from consideration, with the 0->360 wraparound of
+    # coordinates. In either case if there is a small slice of sky not
+    # considered, however, we must remove sources near the "empty" strip.
+    if ax_lims[0] > 0 or ax_lims[1] < 360:
+        for lon in ax_lims[:2]:
+            is_within_dist_of_lon = (
+                hav_dist_constant_lat(a[:, 0], a[:, 1], lon) <= max_sep)
+            # Progressively update the boolean for each source in the group
+            # for each distance check for the four extents.
+            meets_min_distance[:len(a)] = (meets_min_distance[:len(a)] |
+                                           is_within_dist_of_lon)
+    # Similarly, if either "latitude" is set to 90 degrees, we cannot have
+    # lack of up-down missing sources, so we must check (individually this
+    # time) for whether we should skip this check.
+    for lat in ax_lims[2:]:
+        if np.abs(lat) < 90:
+            is_within_dist_of_lat = (np.abs(a[:, 1] - lat) <= max_sep)
+            meets_min_distance[:len(a)] = (meets_min_distance[:len(a)] |
+                                           is_within_dist_of_lat)
+
+    # Because all sources in BOTH catalogues must pass, we continue
+    # to update meets_min_distance for catalogue "b" as well.
+    if ax_lims[0] > 0 or ax_lims[1] < 360:
+        for lon in ax_lims[:2]:
+            is_within_dist_of_lon = (
+                hav_dist_constant_lat(b[:, 0], b[:, 1], lon) <= max_sep)
+            meets_min_distance[len(a):] = (meets_min_distance[len(a):] |
+                                           is_within_dist_of_lon)
+    for lat in ax_lims[2:]:
+        if np.abs(lat) < 90:
+            is_within_dist_of_lat = (np.abs(b[:, 1] - lat) <= max_sep)
+            meets_min_distance[len(a):] = (meets_min_distance[len(a):] |
+                                           is_within_dist_of_lat)
+
+    return [i, np.all(meets_min_distance == 0), a, b]
