@@ -529,7 +529,8 @@ def make_island_groupings(joint_folder_path, a_cat_folder_path, b_cat_folder_pat
 
 
 def _load_fourier_grid_cutouts(a, sky_rect_coords, joint_folder_path, cat_folder_path,
-                               auf_folder_path, padding, cat_name, memmap_slice_arrays):
+                               auf_folder_path, padding, cat_name, memmap_slice_arrays,
+                               large_sky_slice):
     '''
     Function to load a sub-set of a given catalogue's astrometry, slicing it
     in a given sky coordinate rectangle, and load the appropriate sub-array
@@ -562,6 +563,9 @@ def _load_fourier_grid_cutouts(a, sky_rect_coords, joint_folder_path, cat_folder
     memmap_slice_arrays : list of numpy.ndarray
         List of the memmap sky slice arrays, to be used in the loading of the
         rectangular sky patch.
+    large_sky_slice : boolean
+        Slice array containing the ``True`` and ``False`` elements of which
+        elements of the full catalogue, in ``con_cat_astro.npy``, are in ``a``.
     '''
 
     lon1, lon2, lat1, lat2 = sky_rect_coords
@@ -569,9 +573,11 @@ def _load_fourier_grid_cutouts(a, sky_rect_coords, joint_folder_path, cat_folder
     sky_cut = _load_rectangular_slice(joint_folder_path, cat_name, a, lon1, lon2,
                                       lat1, lat2, padding, memmap_slice_arrays)
 
-    a_cutout = np.load('{}/con_cat_astro.npy'.format(cat_folder_path), mmap_mode='r')[sky_cut]
+    a_cutout = np.load('{}/con_cat_astro.npy'.format(cat_folder_path),
+                       mmap_mode='r')[large_sky_slice][sky_cut]
 
-    modrefind = np.load('{}/modelrefinds.npy'.format(auf_folder_path), mmap_mode='r')[:, sky_cut]
+    modrefind = np.load('{}/modelrefinds.npy'.format(auf_folder_path),
+                        mmap_mode='r')[:, large_sky_slice][:, sky_cut]
 
     [fouriergrid], modrefindsmall = load_small_ref_auf_grid(modrefind, auf_folder_path,
                                                             ['fourier'])
