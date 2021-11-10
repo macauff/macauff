@@ -163,14 +163,14 @@ subroutine perturb_aufs(Narray, magarray, r, dr, rbins, j0s, mag_D, dmag_D, Ds, 
     ! perturbations, and Fourier-space representation of perturbation distribution.
     real(dp) :: hist(size(r)), cumulathist(size(r)), fourierhist(size(j0s, 2))
     ! Central source magnitude and local normalising density at which to simulate PSF contaminations.
-    real(dp) :: mag, N_b
+    real(dp) :: mag, N_b, midr(size(r))
     ! Define the number of sources per PSF circle in each magnitude bin range (from central source
     ! brightness to num_int bins fainter), the magnitude offsets (relative fluxes) of those bins,
     ! and the widths of those magnitude offset bins.
     real(dp), allocatable :: dNs(:), dms(:), ddms(:)
 
 !$OMP PARALLEL DO DEFAULT(NONE) PRIVATE(j, k, N_b, mag, mag_Dindex, lendm, dms, dNs, ddms, offsets, fraccontam, maxk, &
-!$OMP& fluxcontam, hist, cumulathist, fourierhist) &
+!$OMP& fluxcontam, hist, cumulathist, fourierhist, midr) &
 !$OMP& SHARED(Narray, magarray, mag_D, psfr, dmcut, lentrials, num_int, Ds, dmag_D, N_norm, rbins, r, dr, j0s, rgrid, &
 !$OMP& seed, fouriergrid, intrgrid, Fracgrid, Fluxav) SCHEDULE(guided)
     do j = 1, size(Narray)
@@ -188,7 +188,7 @@ subroutine perturb_aufs(Narray, magarray, r, dr, rbins, j0s, mag_D, dmag_D, Ds, 
         end do
         maxk = max(5, int(10*maxval(dNs)))
         call scatter_perturbers(dNs, dms, psfr, maxk, dmcut, offsets, fraccontam, fluxcontam, ddms, lentrials, seed(:, j))
-        call histogram(offsets, rbins, hist, size(r)+1, lentrials)
+        call histogram1d_dp(offsets, rbins(1), rbins(size(rbins)), size(r), midr, hist)
 
         ! r is middle of bins, which are represented by rbins; there's a shift of dr/2 between the two (minus rbins(lenr+1))
         hist = hist / (pi * ((r + dr/2.0_dp)**2 - (r - dr/2.0_dp)**2) * sum(hist))
@@ -328,36 +328,156 @@ subroutine scatter_perturbers(dNs, dms, psfr, maxk, dmcut, offsets, fraccontam, 
 
 end subroutine scatter_perturbers
 
-subroutine histogram(x, range, c, M, N)
-    ! Generates a histogram of values, counting the number within each of a given set of bin ranges.
+! ------------------------------------------------------------------------------
+! Copyright (c) 2009-13, Thomas P. Robitaille
+!
+! All rights reserved.
+!
+! Redistribution and use in source and binary forms, with or without
+! modification, are permitted provided that the following conditions are met:
+!
+!  * Redistributions of source code must retain the above copyright notice, this
+!    list of conditions and the following disclaimer.
+!
+!  * Redistributions in binary form must reproduce the above copyright notice,
+!    this list of conditions and the following disclaimer in the documentation
+!    and/or other materials provided with the distribution.
+!
+! THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+! AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+! IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+! DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+! FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+! DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+! SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+! CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+! OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+! OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+! ------------------------------------------------------------------------------
+! (Applies to xval_dp, ipos_dp, and histogram1d_dp)
+
+real(dp) function xval_dp(xmin,xmax,i,nbin)
+  ! Find central value of a bin for a regular histogram
+
+  integer, parameter :: dp = kind(0.0d0)  ! double precision
+
+  real(dp),intent(in) :: xmin,xmax
+  ! range of values
+
+  integer,intent(in) :: i
+  ! the bin number
+
+  integer,intent(in) :: nbin
+  ! number of bins
+
+  real(dp) :: frac
+
+  frac=(real(i-1)+0.5)/real(nbin)
+
+  xval_dp=frac*(xmax-xmin)+xmin
+
+end function xval_dp
+
+integer function ipos_dp(xmin,xmax,x,nbin)
+! Find bin a value falls in for a regular histogram
+
     integer, parameter :: dp = kind(0.0d0)  ! double precision
-    ! Sizes of the data to be binned, and the number of bins, respectively.
-    integer, intent(in) :: N, M
-    ! The input data to be binned, and values of bin edges, respectively.
-    real(dp), intent(in) :: x(N), range(M)
-    ! The histogram counts. Note that range is left hand bins plus one right hand bin, and hence
-    ! c has length M-1.
-    real(dp), intent(out) :: c(M-1)
-    integer :: i, j  
 
-    c(:) = 0
+    real(dp),intent(in) :: xmin,xmax
+    ! range of values
 
-    do i = 1, N                       ! for each input score
-        do j = 1, M-1                    ! determine the bucket
-            if (x(i) < range(1) .or. x(i) > range(M)) then
-                exit
-            end if
-            if (x(i) < range(j+1) .and. x(i) >= range(j)) then
-                c(j) = c(j) + 1
-                exit
-            end if               
-        end do    
-        if (x(i) >= range(M)) then
-            c(M-1) = c(M-1) + 1
-        end if                    
-    end do
+    real(dp),intent(in) :: x
+    ! the value to bin
 
-end subroutine histogram
+    integer,intent(in) :: nbin
+    ! number of bins
+
+    real(dp) :: frac
+
+    if(xmax > xmin) then
+
+       if(x < xmin) then
+          ipos_dp = 0
+       else if(x > xmax) then
+          ipos_dp = nbin+1
+       else if(x < xmax) then
+          frac=(x-xmin)/(xmax-xmin)
+          ipos_dp=int(frac*real(nbin, dp))+1
+       else  ! x == xmax
+          ipos_dp = nbin
+       end if
+
+    else
+
+       if(x < xmax) then
+          ipos_dp = 0
+       else if(x > xmin) then
+          ipos_dp = nbin+1
+       else if(x < xmin) then
+          frac=(x-xmin)/(xmax-xmin)
+          ipos_dp=int(frac*real(nbin, dp))+1
+       else  ! x == xmin
+          ipos_dp = nbin
+       end if
+
+    end if
+
+end function ipos_dp
+
+subroutine histogram1d_dp(array,xmin,xmax,nbin,hist_x,hist_y,mask,weights)
+  ! Bin 1D array of values into 1D regular histogram
+
+  integer, parameter :: dp = kind(0.0d0)  ! double precision
+
+  real(dp),dimension(:),intent(in) :: array
+  real(dp),dimension(:),intent(in),optional :: weights
+  ! the array of values to bin
+
+  real(dp),intent(in) :: xmin,xmax
+  ! the range of the histogram
+
+  integer,intent(in) :: nbin
+  ! number of bins
+
+  real(dp),dimension(nbin),intent(out) :: hist_x,hist_y
+  ! the histogram
+
+  integer :: i,ibin
+  ! binning variables
+
+  logical,optional,intent(in) :: mask(:)
+  logical,allocatable:: keep(:)
+
+  allocate(keep(size(array)))
+
+  if(present(mask)) then
+     keep = mask
+  else
+     keep = .true.
+  end if
+
+  hist_x=0._dp ; hist_y=0._dp
+
+  do i=1,size(array)
+     if(keep(i)) then
+        ibin=ipos_dp(xmin,xmax,array(i),nbin)
+        if(ibin.ge.1.and.ibin.le.nbin) then
+           if(present(weights)) then
+              hist_y(ibin)=hist_y(ibin)+weights(i)
+           else
+              hist_y(ibin)=hist_y(ibin)+1._dp
+           end if
+        end if
+     end if
+  end do
+
+  do ibin=1,nbin
+     hist_x(ibin)=xval_dp(xmin,xmax,ibin,nbin)
+  end do
+
+  deallocate(keep)
+
+end subroutine histogram1d_dp
 
 subroutine fourier_transform(pr, r, dr, j0s, G)
     ! Calculates the Fourier-Bessel transform, or Hankel transform of zeroth order, of a function.
