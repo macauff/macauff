@@ -7,6 +7,8 @@ various photometric integral purposes.
 
 import sys
 import os
+import multiprocessing
+import itertools
 import numpy as np
 
 from .misc_functions import (load_small_ref_auf_grid, hav_dist_constant_lat,
@@ -22,7 +24,7 @@ def make_island_groupings(joint_folder_path, a_cat_folder_path, b_cat_folder_pat
                           a_auf_folder_path, b_auf_folder_path, a_auf_pointings, b_auf_pointings,
                           a_filt_names, b_filt_names, a_title, b_title, r, dr, rho, drho, j1s,
                           max_sep, ax_lims, int_fracs, mem_chunk_num, include_phot_like,
-                          use_phot_priors):
+                          use_phot_priors, n_pool):
     '''
     Function to handle the creation of "islands" of astrometrically coeval
     sources, and identify which overlap to some probability based on their
@@ -91,6 +93,8 @@ def make_island_groupings(joint_folder_path, a_cat_folder_path, b_cat_folder_pat
     use_phot_priors : boolean
         Flag indicating whether to calcualte additional parameters needed to
         calculate photometric-information dependent priors for cross-matching.
+    n_pool : integer
+        Number of multiprocessing pools to use when parallelising.
     '''
 
     # Convert from arcseconds to degrees internally.
@@ -289,8 +293,11 @@ def make_island_groupings(joint_folder_path, a_cat_folder_path, b_cat_folder_pat
     print("Cleaning overlaps...")
     sys.stdout.flush()
 
-    ainds, asize = _clean_overlaps(ainds, asize, joint_folder_path, 'ainds')
-    binds, bsize = _clean_overlaps(binds, bsize, joint_folder_path, 'binds')
+    ainds, asize = _clean_overlaps(ainds, asize, joint_folder_path, 'ainds', n_pool)
+    binds, bsize = _clean_overlaps(binds, bsize, joint_folder_path, 'binds', n_pool)
+
+    print("Calculating integral lengths...")
+    sys.stdout.flush()
 
     if include_phot_like or use_phot_priors:
         ablen = np.lib.format.open_memmap('{}/group/ablen.npy'.format(joint_folder_path),
@@ -602,7 +609,7 @@ def _load_fourier_grid_cutouts(a, sky_rect_coords, joint_folder_path, cat_folder
     return a_cutout, fouriergrid, modrefindsmall, sky_cut
 
 
-def _clean_overlaps(inds, size, joint_folder_path, filename):
+def _clean_overlaps(inds, size, joint_folder_path, filename, n_pool):
     '''
     Convenience function to parse either catalogue's indices array for
     duplicate references to the opposing array on a per-source basis,
@@ -621,6 +628,8 @@ def _clean_overlaps(inds, size, joint_folder_path, filename):
         index arrays are saved.
     filename : string
         The name of the ``inds`` array saved to disk.
+    n_pool : integer
+        Number of multiprocessing threads to use.
 
     Returns
     -------
@@ -633,18 +642,23 @@ def _clean_overlaps(inds, size, joint_folder_path, filename):
     '''
     maxsize = 0
     size[:] = 0
-    for i in range(0, inds.shape[1]):
-        q = np.unique(inds[inds[:, i] > -1, i])
-        y = len(q)
-        inds[:y, i] = q
+    pool = multiprocessing.Pool(n_pool)
+    counter = np.arange(0, inds.shape[1])
+    iter_group = zip(counter, itertools.repeat(inds))
+    for return_items in pool.imap_unordered(_calc_unique_inds, iter_group,
+                                            chunksize=max(1, len(counter) // n_pool)):
+        i, unique_inds = return_items
+        y = len(unique_inds)
+        inds[:y, i] = unique_inds
         inds[y:, i] = -1
         if y > maxsize:
             maxsize = y
         size[i] = y
 
+    pool.close()
+
     # We ideally want to basically do np.asfortranarray(inds[:maxsize, :]), but
-    # this would involve a copy instead of a read so we have to loop as per
-    # _load_fourier_grid_cutouts.
+    # this would involve a copy instead of a read so we have to loop.
     inds2 = np.lib.format.open_memmap('{}/group/{}2.npy'.format(joint_folder_path, filename),
                                       mode='w+', dtype=int, shape=(maxsize, len(size)),
                                       fortran_order=True)
@@ -657,3 +671,8 @@ def _clean_overlaps(inds, size, joint_folder_path, filename):
     inds = np.load('{}/group/{}.npy'.format(joint_folder_path, filename), mmap_mode='r+')
 
     return inds, size
+
+
+def _calc_unique_inds(iterable):
+    i, inds = iterable
+    return i, np.unique(inds[inds[:, i] > -1, i])
