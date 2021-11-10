@@ -167,6 +167,8 @@ def source_pairing(joint_folder_path, a_cat_folder_path, b_cat_folder_path, a_au
     fb_priors = np.load('{}/phot_like/fb_priors.npy'.format(joint_folder_path), mmap_mode='r')
     fb_array = np.load('{}/phot_like/fb_array.npy'.format(joint_folder_path), mmap_mode='r')
 
+    # Initialise the multiprocessing loop setup:
+    pool = multiprocessing.Pool(n_pool)
     for cnum in range(0, mem_chunk_num):
         lowind = np.floor(isle_len*cnum/mem_chunk_num).astype(int)
         highind = np.floor(isle_len*(cnum+1)/mem_chunk_num).astype(int)
@@ -220,8 +222,6 @@ def source_pairing(joint_folder_path, a_cat_folder_path, b_cat_folder_path, a_au
         [bfourier_grids, bfrac_grids, bflux_grids], bmodrefind = load_small_ref_auf_grid(
             bmodrefind, b_auf_folder_path, ['fourier', 'frac', 'flux'])
 
-        # Initialise the multiprocessing loop setup:
-        pool = multiprocessing.Pool(n_pool)
         counter = np.arange(0, alist.shape[1])
         expand_constants = [itertools.repeat(item) for item in [
             a_astro, a_photo, b_astro, b_photo, alist, alist_, blist, blist_, agrplen, bgrplen,
@@ -236,63 +236,68 @@ def source_pairing(joint_folder_path, a_cat_folder_path, b_cat_folder_path, a_au
             # as a short-hand for zero-length island -- i.e., sources in one
             # catalogue only -- and update the probabilities of the field
             # sources accordingly:
-            if np.any([q is None for q in return_items]):
+            if return_items[1] is None:
                 # If 'a' in the returned array, assume no "b" sources (all "a"
                 # objects), and update afield; otherwise 'b' indicates an empty
                 # "a" island, and lonely "b" sources.
-                if np.any([isinstance(q, str) and q == 'a' for q in return_items]):
+                if isinstance(return_items[0], str) and return_items[0] == 'a':
                     _, _, aperm, aperm_, aff, afsep, afeta, afxi = return_items
-                    afieldinds[afieldticker:afieldticker+len(aperm)] = aperm_
-                    probfaarray[afieldticker:afieldticker+len(aperm)] = 1
-                    afieldflux[afieldticker:afieldticker+len(aperm)] = aff
-                    afieldseps[afieldticker:afieldticker+len(aperm)] = afsep
-                    afieldeta[afieldticker:afieldticker+len(aperm)] = afeta
-                    afieldxi[afieldticker:afieldticker+len(aperm)] = afxi
-                    afieldticker += len(aperm)
+                    aft_new = afieldticker+len(aperm)
+                    afieldinds[afieldticker:aft_new] = aperm_
+                    probfaarray[afieldticker:aft_new] = 1
+                    afieldflux[afieldticker:aft_new] = aff
+                    afieldseps[afieldticker:aft_new] = afsep
+                    afieldeta[afieldticker:aft_new] = afeta
+                    afieldxi[afieldticker:aft_new] = afxi
+                    afieldticker = aft_new
                 else:
                     _, _, bperm, bperm_, bff, bfsep, bfeta, bfxi = return_items
-                    bfieldinds[bfieldticker:bfieldticker+len(bperm)] = bperm_
-                    probfbarray[bfieldticker:bfieldticker+len(bperm)] = 1
-                    bfieldflux[bfieldticker:bfieldticker+len(bperm)] = bff
-                    bfieldseps[bfieldticker:bfieldticker+len(bperm)] = bfsep
-                    bfieldeta[bfieldticker:bfieldticker+len(bperm)] = bfeta
-                    bfieldxi[bfieldticker:bfieldticker+len(bperm)] = bfxi
-                    bfieldticker += len(bperm)
+                    btf_new = bfieldticker+len(bperm)
+                    bfieldinds[bfieldticker:btf_new] = bperm_
+                    probfbarray[bfieldticker:btf_new] = 1
+                    bfieldflux[bfieldticker:btf_new] = bff
+                    bfieldseps[bfieldticker:btf_new] = bfsep
+                    bfieldeta[bfieldticker:btf_new] = bfeta
+                    bfieldxi[bfieldticker:btf_new] = bfxi
+                    bfieldticker = btf_new
             else:
                 [acrpts, bcrpts, acrptscontp, bcrptscontp, etacrpts, xicrpts, acrptflux, bcrptflux,
                  cseps, afield, bfield, aff, bff, afseps, afeta, afxi, bfseps, bfeta, bfxi, prob,
                  integral] = return_items
                 if len(acrpts) > 0:
-                    acountinds[counterpartticker:counterpartticker+len(acrpts)] = acrpts
-                    bcountinds[counterpartticker:counterpartticker+len(bcrpts)] = bcrpts
-                    acontamprob[counterpartticker:counterpartticker+len(acrptscontp)] = acrptscontp
-                    bcontamprob[counterpartticker:counterpartticker+len(bcrptscontp)] = bcrptscontp
-                    etaarray[counterpartticker:counterpartticker+len(bcrptscontp)] = etacrpts
-                    xiarray[counterpartticker:counterpartticker+len(bcrptscontp)] = xicrpts
-                    acontamflux[counterpartticker:counterpartticker+len(acrptflux)] = acrptflux
-                    bcontamflux[counterpartticker:counterpartticker+len(bcrptflux)] = bcrptflux
-                    probcarray[counterpartticker:counterpartticker+len(acrpts)] = prob/integral
-                    crptseps[counterpartticker:counterpartticker+len(cseps)] = cseps
-                    counterpartticker += len(acrpts)
+                    cpt_new = counterpartticker+len(acrpts)
+                    acountinds[counterpartticker:cpt_new] = acrpts
+                    bcountinds[counterpartticker:cpt_new] = bcrpts
+                    acontamprob[counterpartticker:cpt_new] = acrptscontp
+                    bcontamprob[counterpartticker:cpt_new] = bcrptscontp
+                    etaarray[counterpartticker:cpt_new] = etacrpts
+                    xiarray[counterpartticker:cpt_new] = xicrpts
+                    acontamflux[counterpartticker:cpt_new] = acrptflux
+                    bcontamflux[counterpartticker:cpt_new] = bcrptflux
+                    probcarray[counterpartticker:cpt_new] = prob/integral
+                    crptseps[counterpartticker:cpt_new] = cseps
+                    counterpartticker = cpt_new
 
                 if len(afield) > 0:
-                    afieldinds[afieldticker:afieldticker+len(afield)] = afield
-                    probfaarray[afieldticker:afieldticker+len(afield)] = prob/integral
-                    afieldflux[afieldticker:afieldticker+len(afield)] = aff
-                    afieldseps[afieldticker:afieldticker+len(afield)] = afseps
-                    afieldeta[afieldticker:afieldticker+len(afield)] = afeta
-                    afieldxi[afieldticker:afieldticker+len(afield)] = afxi
-                    afieldticker += len(afield)
+                    aft_new = afieldticker+len(afield)
+                    afieldinds[afieldticker:aft_new] = afield
+                    probfaarray[afieldticker:aft_new] = prob/integral
+                    afieldflux[afieldticker:aft_new] = aff
+                    afieldseps[afieldticker:aft_new] = afseps
+                    afieldeta[afieldticker:aft_new] = afeta
+                    afieldxi[afieldticker:aft_new] = afxi
+                    afieldticker = aft_new
 
                 if len(bfield) > 0:
-                    bfieldinds[bfieldticker:bfieldticker+len(bfield)] = bfield
-                    probfbarray[bfieldticker:bfieldticker+len(bfield)] = prob/integral
-                    bfieldflux[bfieldticker:bfieldticker+len(bfield)] = bff
-                    bfieldseps[bfieldticker:bfieldticker+len(bfield)] = bfseps
-                    bfieldeta[bfieldticker:bfieldticker+len(bfield)] = bfeta
-                    bfieldxi[bfieldticker:bfieldticker+len(bfield)] = bfxi
-                    bfieldticker += len(bfield)
-        pool.close()
+                    bft_new = bfieldticker+len(bfield)
+                    bfieldinds[bfieldticker:bft_new] = bfield
+                    probfbarray[bfieldticker:bft_new] = prob/integral
+                    bfieldflux[bfieldticker:bft_new] = bff
+                    bfieldseps[bfieldticker:bft_new] = bfseps
+                    bfieldeta[bfieldticker:bft_new] = bfeta
+                    bfieldxi[bfieldticker:bft_new] = bfxi
+                    bfieldticker = bft_new
+    pool.close()
 
     countfilter = np.lib.format.open_memmap('{}/pairing/countfilt.npy'.format(joint_folder_path),
                                             mode='w+', dtype=bool, shape=(small_len,))
