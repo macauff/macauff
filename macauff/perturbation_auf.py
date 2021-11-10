@@ -567,98 +567,15 @@ def calculate_local_density(a_astro, a_tot_astro, a_tot_photo, auf_folder, cat_f
                 full_counts[small_sky_cut] = counts
     min_lon, max_lon = np.amin(a_astro_overlap_cut[:, 0]), np.amax(a_astro_overlap_cut[:, 0])
     min_lat, max_lat = np.amin(a_astro_overlap_cut[:, 1]), np.amax(a_astro_overlap_cut[:, 1])
-    circle_overlap_area = np.empty(len(a_astro), float)
-    for i in range(len(a_astro)):
-        circle_overlap_area[i] = get_circle_overlap_area(
-            density_radius, [min_lon, max_lon], [min_lat, max_lat], a_astro[i, [0, 1]])
-    count_density = counts / circle_overlap_area
+
+    circle_overlap_area = paf.get_circle_area_overlap(a_astro[:, 0], a_astro[:, 1], density_radius,
+                                                      min_lon, max_lon, min_lat, max_lat)
+
+    count_density = full_counts / circle_overlap_area
+
+    os.system('rm {}/_temporary_slice.npy'.format(auf_folder))
 
     return count_density
-
-
-def get_circle_overlap_area(r, x_edges, y_edges, coords):
-    '''
-    Calculates the overlap between a circle of given radius and rectangle
-    defined by four edge coordinates.
-
-    Parameters
-    ----------
-    r : float
-        The radius of the circle.
-    x_edges : list or numpy.ndarray
-        Upper and lower limits of the rectangle.
-    y_edges : list or numpy.ndarray
-        Limits of the rectangle in the second orthogonal axis.
-    coords : numpy.ndarray or list
-        The (x, y) coordinates of the center of each circle to consider
-        overlap area with rectangle for.
-
-    Returns
-    -------
-    area : float
-        The area of circle of radius ``r`` which overlaps the rectangle
-        defined by ``x_edges`` and ``y_edges``.
-    '''
-    area = np.pi * r**2
-    has_overlapped_edge = [0, 0, 0, 0]
-    edges = np.array([x_edges[0], y_edges[0], x_edges[1], y_edges[1]])
-    coords = np.array([coords[0], coords[1], coords[0], coords[1]])
-    for i, (edge, coord) in enumerate(zip(edges, coords)):
-        h = np.abs(coord - edge)
-        if h < r:
-            # The first chord integration is "free", and does not have
-            # truncated limits based on overlaps; the final chord integration,
-            # however, cares about truncation on both sides. The "middle two"
-            # integrations only truncate to the previous side.
-            a = -np.sqrt(r**2 - h**2)
-            b = +np.sqrt(r**2 - h**2)
-
-            if i == 1 and has_overlapped_edge[0]:
-                a = max(a, x_edges[0] - coords[0])
-            if i == 2 and has_overlapped_edge[1]:
-                a = max(a, y_edges[0] - coords[1])
-            if i == 3 and has_overlapped_edge[0]:
-                a = max(a, x_edges[0] - coords[0])
-            if i == 3 and has_overlapped_edge[2]:
-                b = min(b, x_edges[1] - coords[0])
-
-            chord_area_overlap = chord_integral_eval(b, r, h) - chord_integral_eval(a, r, h)
-            has_overlapped_edge[i] = 1
-
-            area -= chord_area_overlap
-
-    return area
-
-
-def chord_integral_eval(x, r, h):
-    '''
-    Calculates the indefinite integral of the distance between a given circle
-    chord and the circumference of the circle, to calculate the chord area.
-
-    Parameters
-    ----------
-    x : float
-        The integrable coordinate, orthogonal to the line between the center
-        of the circle and the chord at height ``h``.
-    r : float
-        The radius of the circle.
-    h : float
-        The height of the chord inside the circle of radius ``r``.
-
-    Returns
-    -------
-    integral : float
-        The result of the indefinite integral of the chord area.
-    '''
-    d = np.sqrt(r**2 - x**2)
-
-    if d == 0:
-        x_div_d = np.sign(x) * np.inf
-    else:
-        x_div_d = x / d
-
-    integral = 0.5 * (x * d + r**2 * np.arctan(x_div_d)) - h * x
-    return integral
 
 
 def create_single_perturb_auf(tri_folder, filt, r, dr, rho, drho, j0s, num_trials, psf_fwhm,
