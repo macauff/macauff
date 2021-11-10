@@ -642,7 +642,7 @@ def create_single_perturb_auf(tri_folder, filt, r, dr, rho, drho, j0s, num_trial
     bits = line.split(' ')
     tri_area = float(bits[2])
     tri = np.genfromtxt('{}/{}.dat'.format(tri_folder, tri_name), delimiter=None,
-                        names=True, comments='#', skip_header=1)
+                        names=True, comments='#', skip_header=1, usecols=[header])
 
     # TODO: extend to allow a Galactic source model that doesn't depend on TRILEGAL
     tri_mags = tri[:][header]
