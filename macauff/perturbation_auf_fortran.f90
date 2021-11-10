@@ -127,7 +127,7 @@ subroutine perturb_aufs(Narray, magarray, r, dr, rbins, j0s, mag_D, dmag_D, Ds, 
     ! Number of bins to draw simulated perturbers from, below the brightness of the central source.
     integer, intent(in) :: num_int(:)
     ! RNG seed.
-    integer, intent(in) :: seed(:)
+    integer, intent(in) :: seed(:, :)
     ! Arrays of local densities and central source brightnesses to generate simulated PSFs for.
     real(dp), intent(in) :: Narray(:), magarray(:)
     ! Real space coordinates: middle of bins, bin widths, and bin edges (hence size(r)+1 == size(rbins)).
@@ -187,7 +187,7 @@ subroutine perturb_aufs(Narray, magarray, r, dr, rbins, j0s, mag_D, dmag_D, Ds, 
             ddms(k) = dmag_D(mag_Dindex+k-1)
         end do
         maxk = max(5, int(10*maxval(dNs)))
-        call scatter_perturbers(dNs, dms, psfr, maxk, dmcut, offsets, fraccontam, fluxcontam, ddms, lentrials, seed)
+        call scatter_perturbers(dNs, dms, psfr, maxk, dmcut, offsets, fraccontam, fluxcontam, ddms, lentrials, seed(:, j))
         call histogram(offsets, rbins, hist, size(r)+1, lentrials)
 
         ! r is middle of bins, which are represented by rbins; there's a shift of dr/2 between the two (minus rbins(lenr+1))

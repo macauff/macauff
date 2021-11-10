@@ -688,7 +688,8 @@ def create_single_perturb_auf(tri_folder, filt, r, dr, rho, drho, j0s, num_trial
     count_array = np.exp(0.5*(logNbins[1:]+logNbins[:-1])[Ni])
 
     R = 1.185 * psf_fwhm
-    seed = np.random.default_rng().choice(100000, size=paf.get_random_seed_size())
+    seed = np.random.default_rng().choice(100000, size=(paf.get_random_seed_size(),
+                                                        len(count_array)))
     Frac, Flux, fourieroffset, offset, cumulative = paf.perturb_aufs(
         count_array, mag_array, r[:-1]+dr/2, dr, r, j0s.T,
         model_mags+model_mags_interval/2, model_mags_interval, log10y, model_count,
