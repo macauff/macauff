@@ -107,14 +107,23 @@ def make_island_groupings(joint_folder_path, a_cat_folder_path, b_cat_folder_pat
     # padding in one catalogue to ensure all pairings can be found, and total
     # the number of overlaps for each object across all sky slices.
 
-    ax1_loops = np.linspace(ax_lims[0], ax_lims[1], 11)
-    # Force the sub-division of the sky area in question to be 100 chunks, or
-    # roughly one square degree chunks, whichever is larger in area.
-    if ax1_loops[1] - ax1_loops[0] < 1:
-        ax1_loops = np.linspace(ax_lims[0], ax_lims[1], int(np.ceil(ax_lims[1] - ax_lims[0]) + 1))
-    ax2_loops = np.linspace(ax_lims[2], ax_lims[3], 11)
-    if ax2_loops[1] - ax2_loops[0] < 1:
-        ax2_loops = np.linspace(ax_lims[2], ax_lims[3], int(np.ceil(ax_lims[3] - ax_lims[2]) + 1))
+    ax1_skip, ax2_skip = 8, 8
+    ax1_loops = np.linspace(ax_lims[0], ax_lims[1], 41)
+    # Force the sub-division of the sky area in question to be 1600 chunks, or
+    # roughly quarter square degree chunks, whichever is larger in area.
+    if ax1_loops[1] - ax1_loops[0] < 0.25:
+        ax1_loops = np.linspace(ax_lims[0], ax_lims[1],
+                                int(np.ceil((ax_lims[1] - ax_lims[0])/0.25) + 1))
+    ax2_loops = np.linspace(ax_lims[2], ax_lims[3], 41)
+    if ax2_loops[1] - ax2_loops[0] < 0.25:
+        ax2_loops = np.linspace(ax_lims[2], ax_lims[3],
+                                int(np.ceil((ax_lims[3] - ax_lims[2])/0.25) + 1))
+    ax1_sparse_loops = ax1_loops[::ax1_skip]
+    if ax1_sparse_loops[-1] != ax1_loops[-1]:
+        ax1_sparse_loops = np.append(ax1_sparse_loops, ax1_loops[-1])
+    ax2_sparse_loops = ax2_loops[::ax2_skip]
+    if ax2_sparse_loops[-1] != ax2_loops[-1]:
+        ax2_sparse_loops = np.append(ax2_sparse_loops, ax2_loops[-1])
 
     # Load the astrometry of each catalogue for slicing.
     a_full = np.load('{}/con_cat_astro.npy'.format(a_cat_folder_path), mmap_mode='r')
@@ -141,23 +150,59 @@ def make_island_groupings(joint_folder_path, a_cat_folder_path, b_cat_folder_pat
                                       dtype=int, shape=(len(b_full),))
     bsize[:] = 0
 
-    for ax1_start, ax1_end in zip(ax1_loops[:-1], ax1_loops[1:]):
-        for ax2_start, ax2_end in zip(ax2_loops[:-1], ax2_loops[1:]):
-            ax_cutout = [ax1_start, ax1_end, ax2_start, ax2_end]
-            a, afouriergrid, amodrefindsmall, a_cut = _load_fourier_grid_cutouts(
-                a_full, ax_cutout, joint_folder_path, a_cat_folder_path, a_auf_folder_path, 0, 'a',
-                memmap_slice_arrays_a)
-            b, bfouriergrid, bmodrefindsmall, b_cut = _load_fourier_grid_cutouts(
-                b_full, ax_cutout, joint_folder_path, b_cat_folder_path, b_auf_folder_path,
-                max_sep, 'b', memmap_slice_arrays_b)
+    for i, (ax1_sparse_start, ax1_sparse_end) in enumerate(zip(ax1_sparse_loops[:-1],
+                                                               ax1_sparse_loops[1:])):
+        for j, (ax2_sparse_start, ax2_sparse_end) in enumerate(zip(ax2_sparse_loops[:-1],
+                                                                   ax2_sparse_loops[1:])):
+            a_big_sky_cut = _load_rectangular_slice(
+                joint_folder_path, '', a_full, ax1_sparse_start, ax1_sparse_end, ax2_sparse_start,
+                ax2_sparse_end, 0, memmap_slice_arrays_a)
+            b_big_sky_cut = _load_rectangular_slice(
+                joint_folder_path, '', b_full, ax1_sparse_start, ax1_sparse_end, ax2_sparse_start,
+                ax2_sparse_end, max_sep, memmap_slice_arrays_b)
+            a_cutout = a_full[a_big_sky_cut]
+            b_cutout = b_full[b_big_sky_cut]
+            _create_rectangular_slice_arrays(joint_folder_path, 'a_cutout', len(a_cutout))
+            small_memmap_slice_arrays_a = []
+            for n in ['1', '2', '3', '4', 'combined']:
+                small_memmap_slice_arrays_a.append(np.lib.format.open_memmap(
+                    '{}/{}_temporary_sky_slice_{}.npy'.format(joint_folder_path, 'a_cutout', n),
+                    mode='r+', dtype=bool, shape=(len(a_cutout),)))
+            _create_rectangular_slice_arrays(joint_folder_path, 'b_cutout', len(b_cutout))
+            small_memmap_slice_arrays_b = []
+            for n in ['1', '2', '3', '4', 'combined']:
+                small_memmap_slice_arrays_b.append(np.lib.format.open_memmap(
+                    '{}/{}_temporary_sky_slice_{}.npy'.format(joint_folder_path, 'b_cutout', n),
+                    mode='r+', dtype=bool, shape=(len(b_cutout),)))
 
-            if len(a) > 0 and len(b) > 0:
-                overlapa, overlapb = gsf.get_max_overlap(
-                    a[:, 0], a[:, 1], b[:, 0], b[:, 1], max_sep, a[:, 2], b[:, 2],
-                    r[:-1]+dr/2, rho[:-1], drho, j1s, afouriergrid, bfouriergrid, amodrefindsmall,
-                    bmodrefindsmall, int_fracs[2])
-                asize[a_cut] = asize[a_cut] + overlapa
-                bsize[b_cut] = bsize[b_cut] + overlapb
+            # TODO: avoid np.arange by first iterating an np.sum(big_sky_cut)
+            # and pre-generating a memmapped sub-array, and looping over
+            # putting the correct indices into place.
+            a_sky_inds = np.arange(0, len(a_full))[a_big_sky_cut]
+            b_sky_inds = np.arange(0, len(b_full))[b_big_sky_cut]
+            for ax1_start, ax1_end in zip(ax1_loops[i*ax1_skip:(i+1)*ax1_skip],
+                                          ax1_loops[i*ax1_skip+1:(i+1)*ax1_skip+1]):
+                for ax2_start, ax2_end in zip(ax2_loops[j*ax2_skip:(j+1)*ax2_skip],
+                                              ax2_loops[j*ax2_skip+1:(j+1)*ax2_skip+1]):
+                    ax_cutout = [ax1_start, ax1_end, ax2_start, ax2_end]
+                    a, afouriergrid, amodrefindsmall, a_cut = _load_fourier_grid_cutouts(
+                        a_cutout, ax_cutout, joint_folder_path, a_cat_folder_path,
+                        a_auf_folder_path, 0, 'a', small_memmap_slice_arrays_a, a_big_sky_cut)
+                    b, bfouriergrid, bmodrefindsmall, b_cut = _load_fourier_grid_cutouts(
+                        b_cutout, ax_cutout, joint_folder_path, b_cat_folder_path,
+                        b_auf_folder_path, max_sep, 'b', small_memmap_slice_arrays_b,
+                        b_big_sky_cut)
+
+                    if len(a) > 0 and len(b) > 0:
+                        overlapa, overlapb = gsf.get_max_overlap(
+                            a[:, 0], a[:, 1], b[:, 0], b[:, 1], max_sep, a[:, 2], b[:, 2],
+                            r[:-1]+dr/2, rho[:-1], drho, j1s, afouriergrid, bfouriergrid,
+                            amodrefindsmall, bmodrefindsmall, int_fracs[2])
+                        a_cut2 = a_sky_inds[a_cut]
+                        b_cut2 = b_sky_inds[b_cut]
+
+                        asize[a_cut2] = asize[a_cut2] + overlapa
+                        bsize[b_cut2] = bsize[b_cut2] + overlapb
 
     amaxsize = int(np.amax(asize))
     bmaxsize = int(np.amax(bsize))
@@ -176,34 +221,65 @@ def make_island_groupings(joint_folder_path, a_cat_folder_path, b_cat_folder_pat
     asize[:] = 0
     bsize[:] = 0
 
-    for ax1_start, ax1_end in zip(ax1_loops[:-1], ax1_loops[1:]):
-        for ax2_start, ax2_end in zip(ax2_loops[:-1], ax2_loops[1:]):
-            ax_cutout = [ax1_start, ax1_end, ax2_start, ax2_end]
-            a, afouriergrid, amodrefindsmall, a_cut = _load_fourier_grid_cutouts(
-                a_full, ax_cutout, joint_folder_path, a_cat_folder_path, a_auf_folder_path, 0, 'a',
-                memmap_slice_arrays_a)
-            b, bfouriergrid, bmodrefindsmall, b_cut = _load_fourier_grid_cutouts(
-                b_full, ax_cutout, joint_folder_path, b_cat_folder_path, b_auf_folder_path,
-                max_sep, 'b', memmap_slice_arrays_b)
+    for i, (ax1_sparse_start, ax1_sparse_end) in enumerate(zip(ax1_sparse_loops[:-1],
+                                                               ax1_sparse_loops[1:])):
+        for j, (ax2_sparse_start, ax2_sparse_end) in enumerate(zip(ax2_sparse_loops[:-1],
+                                                                   ax2_sparse_loops[1:])):
+            a_big_sky_cut = _load_rectangular_slice(
+                joint_folder_path, '', a_full, ax1_sparse_start, ax1_sparse_end, ax2_sparse_start,
+                ax2_sparse_end, 0, memmap_slice_arrays_a)
+            b_big_sky_cut = _load_rectangular_slice(
+                joint_folder_path, '', b_full, ax1_sparse_start, ax1_sparse_end, ax2_sparse_start,
+                ax2_sparse_end, max_sep, memmap_slice_arrays_b)
+            a_cutout = a_full[a_big_sky_cut]
+            b_cutout = b_full[b_big_sky_cut]
+            _create_rectangular_slice_arrays(joint_folder_path, 'a_cutout', len(a_cutout))
+            small_memmap_slice_arrays_a = []
+            for n in ['1', '2', '3', '4', 'combined']:
+                small_memmap_slice_arrays_a.append(np.lib.format.open_memmap(
+                    '{}/{}_temporary_sky_slice_{}.npy'.format(joint_folder_path, 'a_cutout', n),
+                    mode='r+', dtype=bool, shape=(len(a_cutout),)))
+            _create_rectangular_slice_arrays(joint_folder_path, 'b_cutout', len(b_cutout))
+            small_memmap_slice_arrays_b = []
+            for n in ['1', '2', '3', '4', 'combined']:
+                small_memmap_slice_arrays_b.append(np.lib.format.open_memmap(
+                    '{}/{}_temporary_sky_slice_{}.npy'.format(joint_folder_path, 'b_cutout', n),
+                    mode='r+', dtype=bool, shape=(len(b_cutout),)))
 
-            if len(a) > 0 and len(b) > 0:
-                indicesa, indicesb, overlapa, overlapb = gsf.get_overlap_indices(
-                    a[:, 0], a[:, 1], b[:, 0], b[:, 1], max_sep, amaxsize, bmaxsize, a[:, 2],
-                    b[:, 2], r[:-1]+dr/2, rho[:-1], drho, j1s, afouriergrid, bfouriergrid,
-                    amodrefindsmall, bmodrefindsmall, int_fracs[2])
+            a_sky_inds = np.arange(0, len(a_full))[a_big_sky_cut]
+            b_sky_inds = np.arange(0, len(b_full))[b_big_sky_cut]
+            for ax1_start, ax1_end in zip(ax1_loops[i*ax1_skip:(i+1)*ax1_skip],
+                                          ax1_loops[i*ax1_skip+1:(i+1)*ax1_skip+1]):
+                for ax2_start, ax2_end in zip(ax2_loops[j*ax2_skip:(j+1)*ax2_skip],
+                                              ax2_loops[j*ax2_skip+1:(j+1)*ax2_skip+1]):
+                    ax_cutout = [ax1_start, ax1_end, ax2_start, ax2_end]
+                    a, afouriergrid, amodrefindsmall, a_cut = _load_fourier_grid_cutouts(
+                        a_cutout, ax_cutout, joint_folder_path, a_cat_folder_path,
+                        a_auf_folder_path, 0, 'a', small_memmap_slice_arrays_a, a_big_sky_cut)
+                    b, bfouriergrid, bmodrefindsmall, b_cut = _load_fourier_grid_cutouts(
+                        b_cutout, ax_cutout, joint_folder_path, b_cat_folder_path,
+                        b_auf_folder_path, max_sep, 'b', small_memmap_slice_arrays_b,
+                        b_big_sky_cut)
 
-                a_cut2 = np.arange(0, len(a_full))[a_cut]
-                b_cut2 = np.arange(0, len(b_full))[b_cut]
+                    if len(a) > 0 and len(b) > 0:
+                        indicesa, indicesb, overlapa, overlapb = gsf.get_overlap_indices(
+                            a[:, 0], a[:, 1], b[:, 0], b[:, 1], max_sep, amaxsize, bmaxsize,
+                            a[:, 2], b[:, 2], r[:-1]+dr/2, rho[:-1], drho, j1s, afouriergrid,
+                            bfouriergrid, amodrefindsmall, bmodrefindsmall, int_fracs[2])
 
-                for j in range(0, len(a_cut2)):
-                    ainds[asize[a_cut2[j]]:asize[a_cut2[j]]+overlapa[j], a_cut2[j]] = b_cut2[
-                        indicesa[:overlapa[j], j] - 1]
-                for j in range(0, len(b_cut2)):
-                    binds[bsize[b_cut2[j]]:bsize[b_cut2[j]]+overlapb[j], b_cut2[j]] = a_cut2[
-                        indicesb[:overlapb[j], j] - 1]
+                        a_cut2 = a_sky_inds[a_cut]
+                        b_cut2 = b_sky_inds[b_cut]
 
-                asize[a_cut] = asize[a_cut] + overlapa
-                bsize[b_cut] = bsize[b_cut] + overlapb
+                        for k in range(0, len(a_cut2)):
+                            ainds[asize[a_cut2[k]]:asize[a_cut2[k]]+overlapa[k], a_cut2[k]] = \
+                                b_cut2[indicesa[:overlapa[k], k] - 1]
+                        for k in range(0, len(b_cut2)):
+                            binds[bsize[b_cut2[k]]:bsize[b_cut2[k]]+overlapb[k], b_cut2[k]] = \
+                                a_cut2[indicesb[:overlapb[k], k] - 1]
+
+                        asize[a_cut2] = asize[a_cut2] + overlapa
+                        bsize[b_cut2] = bsize[b_cut2] + overlapb
+
     del (a_cut, a_cut2, b_cut, b_cut2, indicesa, indicesb, overlapa, overlapb, a, b,
          amodrefindsmall, bmodrefindsmall, afouriergrid, bfouriergrid)
 
