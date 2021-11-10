@@ -504,8 +504,15 @@ def calculate_local_density(a_astro, a_tot_astro, a_tot_photo, auf_folder, cat_f
         The number of sources per square degree near to each source in
         ``a_astro`` that are above ``density_mag`` in ``a_tot_astro``.
     '''
+
     min_lon, max_lon = np.amin(a_astro[:, 0]), np.amax(a_astro[:, 0])
     min_lat, max_lat = np.amin(a_astro[:, 1]), np.amax(a_astro[:, 1])
+
+    memmap_slice_arrays_2 = []
+    for n in ['1', '2', '3', '4', 'combined']:
+        memmap_slice_arrays_2.append(np.lib.format.open_memmap(
+            '{}/{}_temporary_sky_slice_{}.npy'.format(auf_folder, '2', n), mode='w+',
+            dtype=bool, shape=(len(a_astro),)))
 
     overlap_sky_cut = _load_rectangular_slice(auf_folder, '', a_tot_astro, min_lon,
                                               max_lon, min_lat, max_lat, density_radius,
@@ -516,10 +523,48 @@ def calculate_local_density(a_astro, a_tot_astro, a_tot_photo, auf_folder, cat_f
     for i in range(0, len(a_tot_astro), di):
         cut[i:i+di] = overlap_sky_cut[i:i+di] & (a_tot_photo[i:i+di] <= density_mag)
     a_astro_overlap_cut = a_tot_astro[cut]
-    os.system('rm {}/_temporary_slice.npy'.format(auf_folder))
+    a_photo_overlap_cut = a_tot_photo[cut]
 
-    counts = paf.get_density(a_astro[:, 0], a_astro[:, 1], a_astro_overlap_cut[:, 0],
-                             a_astro_overlap_cut[:, 1], density_radius)
+    memmap_slice_arrays_3 = []
+    for n in ['1', '2', '3', '4', 'combined']:
+        memmap_slice_arrays_3.append(np.lib.format.open_memmap(
+            '{}/{}_temporary_sky_slice_{}.npy'.format(auf_folder, '3', n), mode='w+',
+            dtype=bool, shape=(len(a_astro_overlap_cut),)))
+
+    ax1_loops = np.linspace(min_lon, max_lon, 11)
+    # Force the sub-division of the sky area in question to be 100 chunks, or
+    # roughly square degree chunks, whichever is larger in area.
+    if ax1_loops[1] - ax1_loops[0] < 1:
+        ax1_loops = np.linspace(min_lon, max_lon,
+                                int(np.ceil(max_lon - min_lon) + 1))
+    ax2_loops = np.linspace(min_lat, max_lat, 11)
+    if ax2_loops[1] - ax2_loops[0] < 1:
+        ax2_loops = np.linspace(min_lat, max_lat,
+                                int(np.ceil(max_lat - min_lat) + 1))
+    full_counts = np.empty(len(a_astro), float)
+    for ax1_start, ax1_end in zip(ax1_loops[:-1], ax1_loops[1:]):
+        for ax2_start, ax2_end in zip(ax2_loops[:-1], ax2_loops[1:]):
+            small_sky_cut = _load_rectangular_slice(auf_folder, 'small_', a_astro, ax1_start,
+                                                    ax1_end, ax2_start, ax2_end, 0,
+                                                    memmap_slice_arrays_2)
+            a_astro_small = a_astro[small_sky_cut]
+
+            overlap_sky_cut = _load_rectangular_slice(auf_folder, '', a_astro_overlap_cut,
+                                                      ax1_start, ax1_end, ax2_start, ax2_end,
+                                                      density_radius, memmap_slice_arrays_3)
+            cut = np.lib.format.open_memmap('{}/_temporary_slice.npy'.format(
+                auf_folder), mode='w+', dtype=bool, shape=(len(a_astro_overlap_cut),))
+            di = max(1, len(cut) // 20)
+            for i in range(0, len(a_astro_overlap_cut), di):
+                cut[i:i+di] = (overlap_sky_cut[i:i+di] &
+                               (a_photo_overlap_cut[i:i+di] <= density_mag))
+            a_astro_overlap_cut_small = a_astro_overlap_cut[cut]
+
+            if len(a_astro_small) > 0 and len(a_astro_overlap_cut_small) > 0:
+                counts = paf.get_density(a_astro_small[:, 0], a_astro_small[:, 1],
+                                         a_astro_overlap_cut_small[:, 0],
+                                         a_astro_overlap_cut_small[:, 1], density_radius)
+                full_counts[small_sky_cut] = counts
     min_lon, max_lon = np.amin(a_astro_overlap_cut[:, 0]), np.amax(a_astro_overlap_cut[:, 0])
     min_lat, max_lat = np.amin(a_astro_overlap_cut[:, 1]), np.amax(a_astro_overlap_cut[:, 1])
     circle_overlap_area = np.empty(len(a_astro), float)
