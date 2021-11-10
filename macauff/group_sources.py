@@ -375,7 +375,8 @@ def make_island_groupings(joint_folder_path, a_cat_folder_path, b_cat_folder_pat
     print("Finding unique sets...")
     sys.stdout.flush()
 
-    alist, blist, agrplen, bgrplen = set_list(ainds, binds, asize, bsize, joint_folder_path)
+    alist, blist, agrplen, bgrplen = set_list(ainds, binds, asize, bsize, joint_folder_path,
+                                              n_pool)
 
     # The final act of creating island groups is to clear out any sources too
     # close to the edge of the catalogue -- defined by its rectangular extend.
