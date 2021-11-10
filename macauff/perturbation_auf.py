@@ -202,7 +202,7 @@ def make_perturb_aufs(auf_folder, cat_folder, filters, auf_points, r, dr, rho,
 
     if compute_local_density and include_perturb_auf:
         local_N = np.lib.format.open_memmap('{}/local_N.npy'.format(auf_folder), mode='w+',
-                                            dtype=float, shape=(len(a_tot_astro),))
+                                            dtype=float, shape=(len(a_tot_astro), len(filters)))
 
     for i in range(len(auf_points)):
         ax1, ax2 = auf_points[i]
@@ -218,6 +218,11 @@ def make_perturb_aufs(auf_folder, cat_folder, filters, auf_points, r, dr, rho,
 
         if include_perturb_auf:
             sky_cut = _load_single_sky_slice(auf_folder, '', i, modelrefinds[2, :])
+            if compute_local_density:
+                # TODO: avoid np.arange by first iterating an np.sum(sky_cut)
+                # and pre-generating a memmapped sub-array, and looping over
+                # putting the correct indices into place.
+                med_index_slice = np.arange(0, len(local_N))[sky_cut]
             a_photo_cut = a_tot_photo[sky_cut]
             if compute_local_density:
                 a_astro_cut = a_tot_astro[sky_cut]
@@ -263,7 +268,9 @@ def make_perturb_aufs(auf_folder, cat_folder, filters, auf_points, r, dr, rho,
                     # catalogue, using just the astrometry, we should be able
                     # to just over-write this N times if there happen to be N
                     # good detections of a source.
-                    local_N[sky_cut][good_mag_slice] = localN
+                    index_slice = med_index_slice[good_mag_slice]
+                    for ii in range(len(index_slice)):
+                        local_N[index_slice[ii], j] = localN[ii]
                 else:
                     localN = np.load('{}/local_N.npy'.format(auf_folder),
                                      mmap_mode='r')[sky_cut][good_mag_slice, j]
@@ -357,8 +364,8 @@ def make_perturb_aufs(auf_folder, cat_folder, filters, auf_points, r, dr, rho,
             for i in range(0, len(a)):
                 axind = modelrefinds[2, indexmap[i]]
                 filterind = magref[i]
-                Nmind = np.argmin((local_N[i] - Narrays[:arraylengths[filterind, axind],
-                                                        filterind, axind])**2 +
+                Nmind = np.argmin((local_N[i, filterind] - Narrays[:arraylengths[filterind, axind],
+                                                                   filterind, axind])**2 +
                                   (a[i, filterind] - magarrays[:arraylengths[filterind, axind],
                                                                filterind, axind])**2)
                 modelrefinds[0, indexmap[i]] = Nmind
