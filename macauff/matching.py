@@ -753,9 +753,6 @@ class CrossMatch():
 
         correct_file_number = expected_file_number == file_number
 
-        # TODO: generalise as user input
-        n_pool = 4
-
         if self.run_source or not correct_file_number:
             if not correct_file_number and not self.run_source:
                 warnings.warn('Incorrect number of counterpart pairing files. Deleting all '
@@ -765,7 +762,7 @@ class CrossMatch():
                 self.joint_folder_path, self.a_cat_folder_path, self.b_cat_folder_path,
                 self.a_auf_folder_path, self.b_auf_folder_path, self.a_filt_names,
                 self.b_filt_names, self.a_auf_region_points, self.b_auf_region_points,
-                self.rho, self.drho, len(self.delta_mag_cuts), self.mem_chunk_num, n_pool)
+                self.rho, self.drho, len(self.delta_mag_cuts), self.mem_chunk_num)
         else:
             print('Loading pre-assigned counterparts...')
             sys.stdout.flush()
