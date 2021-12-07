@@ -233,10 +233,11 @@ class TestCounterpartPairing:
     def test_individual_island_zero_probabilities(self):
         os.system('rm -r {}/pairing'.format(self.joint_folder_path))
         os.makedirs('{}/pairing'.format(self.joint_folder_path), exist_ok=True)
-        fa_array = np.zeros_like(self.fa_array)
-        fb_array = np.zeros_like(self.fb_array)
-        fa_priors = np.zeros_like(self.fa_priors)
-        fb_priors = np.zeros_like(self.fb_priors)
+        # Fake the extra fire extinguisher likelihood/prior used in the main code.
+        fa_array = np.zeros_like(self.fa_array) + 1e-10
+        fb_array = np.zeros_like(self.fb_array) + 1e-10
+        fa_priors = np.zeros_like(self.fa_priors) + 1e-10
+        fb_priors = np.zeros_like(self.fb_priors) + 1e-10
         i = 0
         wrapper = [
             self.a_astro, self.a_photo, self.b_astro, self.b_photo, self.c_array, fa_array,
@@ -260,8 +261,8 @@ class TestCounterpartPairing:
         assert np.all(acrpts == np.array([0]))
         assert np.all(bcrpts == np.array([1]))
 
-        c_array = np.zeros_like(self.c_array)
-        c_priors = np.zeros_like(self.c_priors)
+        c_array = np.zeros_like(self.c_array) + 1e-10
+        c_priors = np.zeros_like(self.c_priors) + 1e-10
         wrapper = [
             self.a_astro, self.a_photo, self.b_astro, self.b_photo, c_array, fa_array,
             fb_array, c_priors, fa_priors, fb_priors, self.abinsarray,
@@ -281,8 +282,10 @@ class TestCounterpartPairing:
          crptseps, afield, bfield, afieldflux, bfieldflux, afieldseps, afieldeta,
          afieldxi, bfieldseps, bfieldeta, bfieldxi, prob, integral) = results
 
-        assert len(acrpts) == 0
-        assert len(bcrpts) == 0
+        assert len(acrpts) == 1
+        assert len(bcrpts) == 1
+        assert np.all(acrpts == np.array([self.large_len+1]))
+        assert np.all(bcrpts == np.array([self.large_len+1]))
         assert_allclose(prob/integral, 1)
 
     def test_source_pairing(self):
