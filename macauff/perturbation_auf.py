@@ -548,6 +548,8 @@ def calculate_local_density(a_astro, a_tot_astro, a_tot_photo, auf_folder, cat_f
                                                     ax1_end, ax2_start, ax2_end, 0,
                                                     memmap_slice_arrays_2)
             a_astro_small = a_astro[small_sky_cut]
+            if len(a_astro_small) == 0:
+                continue
 
             overlap_sky_cut = _load_rectangular_slice(auf_folder, '', a_astro_overlap_cut,
                                                       ax1_start, ax1_end, ax2_start, ax2_end,
@@ -560,11 +562,22 @@ def calculate_local_density(a_astro, a_tot_astro, a_tot_photo, auf_folder, cat_f
                                (a_photo_overlap_cut[i:i+di] <= density_mag))
             a_astro_overlap_cut_small = a_astro_overlap_cut[cut]
 
-            if len(a_astro_small) > 0 and len(a_astro_overlap_cut_small) > 0:
+            if len(a_astro_overlap_cut_small) > 0:
                 counts = paf.get_density(a_astro_small[:, 0], a_astro_small[:, 1],
                                          a_astro_overlap_cut_small[:, 0],
                                          a_astro_overlap_cut_small[:, 1], density_radius)
+                # If objects return with zero bright sources in their error circle,
+                # like in the else below we force at least themselves to be in the
+                # circle, slightly over-representing any object below the
+                # brightness cutoff, but 1/area is still a very low density.
+                counts[counts == 0] = 1
                 full_counts[small_sky_cut] = counts
+            else:
+                # If we have sources to check the surrounding density of, but
+                # no bright sources around them, just set them to be alone
+                # in the error circle, slightly over-representing bright objects
+                # but still giving them a very low normalising sky density.
+                full_counts[small_sky_cut] = 1
     min_lon, max_lon = np.amin(a_astro_overlap_cut[:, 0]), np.amax(a_astro_overlap_cut[:, 0])
     min_lat, max_lat = np.amin(a_astro_overlap_cut[:, 1]), np.amax(a_astro_overlap_cut[:, 1])
 
