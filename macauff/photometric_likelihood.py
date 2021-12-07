@@ -214,7 +214,7 @@ def compute_photometric_likelihoods(joint_folder_path, a_cat_folder_path, b_cat_
                         fb_prior = Nb - c_prior
                         # To fake no photometric likelihoods, simply set all
                         # values to one, to cancel in the ratio later.
-                        c_like, fa_like, fb_like = 1, 1, 1
+                        c_like, fa_like, fb_like = 1-1e-10, 1-1e-10, 1-1e-10
                     else:
                         b_bins = bbinsarray[:bbinlengths[j, m], j, m]
                         b_mag = b_photo_cut[:, j]
@@ -230,15 +230,19 @@ def compute_photometric_likelihoods(joint_folder_path, a_cat_folder_path, b_cat_
                     if use_phot_priors and not include_phot_like:
                         # If we only used the create_c_and_f routine to derive
                         # priors, then quickly update likelihoods here.
-                        c_like, fa_like, fb_like = 1, 1, 1
+                        c_like, fa_like, fb_like = 1-1e-10, 1-1e-10, 1-1e-10
 
-                    c_priors[j, i, m] = c_prior
-                    fa_priors[j, i, m] = fa_prior
-                    fb_priors[j, i, m] = fb_prior
+                    # Have to add a very small "fire extinguisher" value to all
+                    # likelihoods and priors, to avoid ever having exactly zero
+                    # value in either, which would mean all island permutations
+                    # were rejected.
+                    c_priors[j, i, m] = c_prior + 1e-10
+                    fa_priors[j, i, m] = fa_prior + 1e-10
+                    fb_priors[j, i, m] = fb_prior + 1e-10
                     c_array[:bbinlengths[j, m]-1,
-                            :abinlengths[i, m]-1, j, i, m] = c_like
-                    fa_array[:abinlengths[i, m]-1, j, i, m] = fa_like
-                    fb_array[:bbinlengths[j, m]-1, j, i, m] = fb_like
+                            :abinlengths[i, m]-1, j, i, m] = c_like + 1e-10
+                    fa_array[:abinlengths[i, m]-1, j, i, m] = fa_like + 1e-10
+                    fb_array[:bbinlengths[j, m]-1, j, i, m] = fb_like + 1e-10
 
     os.system('rm {}/a_small_sky_slice.npy'.format(joint_folder_path))
     os.system('rm {}/b_small_sky_slice.npy'.format(joint_folder_path))
