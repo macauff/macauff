@@ -210,6 +210,7 @@ subroutine find_single_island_prob(a_astro, a_photo, b_astro, b_photo, c_array, 
     ! calculates secondary parameters such as likelihood ratios for astrometry and photometry and
     ! contamination probabilities for matches.
     integer, parameter :: dp = kind(0.0d0)  ! double precision
+    integer, parameter :: int64 = selected_int_kind(15)  ! 64-bit integer
     ! Small- and large-index versions of the indices of the objects in each catalogue in this island.
     integer, intent(in) :: aperm(:), bperm(:), aperm_(:), bperm_(:)
     ! Magnitude and sky filter indices for catalogues 'a' and 'b'.
@@ -283,6 +284,8 @@ subroutine find_single_island_prob(a_astro, a_photo, b_astro, b_photo, c_array, 
     ! Combinations of catalogue a indices, and permutations of catalogue b indices, to provide the overall
     ! set of all a-b matches and non-matches.
     integer, allocatable :: a_combinations(:, :), b_permutations(:, :)
+    ! Temporary storage of 64-bit integer factorial numbers.
+    integer(int64) :: fac1, fac2, fac3
 
     nan = IEEE_VALUE(nan, IEEE_QUIET_NAN)
 
@@ -418,11 +421,18 @@ subroutine find_single_island_prob(a_astro, a_photo, b_astro, b_photo, c_array, 
     end do
 
     do N = 1, min(size(aperm), size(bperm))
-        ! Combinations of m-pick-n are m! / n! / (m - n)! and we use Gamma(x+1) = x!
-        a_n_combs = int(Gamma(real(size(aperm)+1, dp)) / Gamma(real(N+1, dp)) / Gamma(real(size(aperm)-N+1, dp)))
-        b_n_combs = int(Gamma(real(size(bperm)+1, dp)) / Gamma(real(N+1, dp)) / Gamma(real(size(bperm)-N+1, dp)))
+        ! Combinations of m-pick-n are m! / n! / (m - n)!
+        call factorial(int(size(aperm), int64), fac1)
+        call factorial(int(N, int64), fac2)
+        call factorial(int(size(aperm)-N, int64), fac3)
+        a_n_combs = int(fac1 / fac2 / fac3)
+        call factorial(int(size(bperm), int64), fac1)
+        call factorial(int(N, int64), fac2)
+        call factorial(int(size(bperm)-N, int64), fac3)
+        b_n_combs = int(fac1 / fac2 / fac3)
         ! Permutations of an n-sized array (n-pick-n) are n!
-        b_n_perms_per_comb = int(Gamma(real(N+1, dp)))
+        call factorial(int(N, int64), fac1)
+        b_n_perms_per_comb = int(fac1)
         allocate(a_combinations(N, a_n_combs), b_permutations(N, b_n_combs*b_n_perms_per_comb))
         call calc_combs(size(aperm), a_n_combs, N, a_combinations)
         call calc_permcombs(size(bperm), N, b_n_perms_per_comb, b_n_combs, b_permutations)
@@ -548,6 +558,23 @@ subroutine find_single_island_prob(a_astro, a_photo, b_astro, b_photo, c_array, 
     end do
 
 end subroutine find_single_island_prob
+
+subroutine factorial(N, g)
+    ! Calculates N! = N * (N-1) * (N-2) * ... * 1, the factorial of N.
+    integer, parameter :: int64 = selected_int_kind(15)  ! 64-bit integer
+    ! The number to calculate the factorial of.
+    integer(int64), intent(in) :: N
+    ! The returned value g = N!.
+    integer(int64), intent(out) :: g
+    ! Loop counter.
+    integer(int64) :: k
+
+    g = 1
+    do k = 1, N
+        g = g * k
+    end do
+
+end subroutine factorial
 
 subroutine contam_match_prob(Fcc, Fcn, Fnc, Fnn, rho, drho, sep, Gcc, Gcn, Gnc, Gnn)
     ! Calculate the probability density of two sources being two detections of a single sky object

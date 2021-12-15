@@ -716,3 +716,8 @@ def test_f90_perm_comb():
             iter_perms = np.array(list(itertools.permutations(np.arange(1, n+1, 1), r=k)))
             new_iter_perms = iter_perms[np.lexsort([iter_perms[:, i] for i in range(k)])]
             assert np.all(new_perms == new_iter_perms)
+
+
+def test_factorial():
+    for k in range(21):
+        assert np.math.factorial(k) == cpf.factorial(k)
