@@ -8,13 +8,15 @@ their respective uncertainties across two catalogues.
 import sys
 import os
 import warnings
+import multiprocessing
+import itertools
 import numpy as np
 import scipy.special
 
 __all__ = ['set_list']
 
 
-def set_list(aindices, bindices, aoverlap, boverlap, joint_folder_path):
+def set_list(aindices, bindices, aoverlap, boverlap, joint_folder_path, n_pool):
     '''
     Creates the inter-catalogue groupings between catalogues "a" and "b", based
     on previously determined individual source "overlaps" in astrometry.
@@ -35,6 +37,8 @@ def set_list(aindices, bindices, aoverlap, boverlap, joint_folder_path):
     joint_folder_path : string
         Location of top-level folder containing the "group" folder in which
         index and overlap arrays are stored.
+    n_pool : integer
+        Number of multiprocessing pools to use when parallelising.
 
     Returns
     -------
@@ -78,19 +82,15 @@ def set_list(aindices, bindices, aoverlap, boverlap, joint_folder_path):
     maxiters = 50000
     grouplengthexceeded = np.lib.format.open_memmap('{}/group/grplenexceed.npy'.format(
         joint_folder_path), mode='w+', dtype=bool, shape=(len(agrouplengths),))
-    grouplengthexceeded[:] = 0
-    for i in range(0, len(agrouplengths)):
-        n_a = agrouplengths[i]
-        n_b = bgrouplengths[i]
-        counter = 0
-        for k in np.arange(0, min(n_a, n_b)+1e-10, 1):
-            kcomb = (np.prod([qq for qq in np.arange(n_a-k+1, n_a+1e-10, 1)]) /
-                     scipy.special.factorial(k))
-            kperm = np.prod([qq for qq in np.arange(n_b-k+1, n_b+1e-10, 1)])
-            counter += kcomb*kperm
-            if counter > maxiters:
-                grouplengthexceeded[i] = 1
-                break
+    pool = multiprocessing.Pool(n_pool)
+    counter = np.arange(0, len(agrouplengths))
+    iter_group = zip(counter, agrouplengths, bgrouplengths, itertools.repeat(maxiters))
+    for return_items in pool.imap_unordered(_calc_group_length_exceeded, iter_group,
+                                            chunksize=max(1, len(counter) // n_pool)):
+        i, len_exceeded_flag = return_items
+        grouplengthexceeded[i] = len_exceeded_flag
+
+    pool.close()
 
     if np.any(grouplengthexceeded):
         nremoveisland = np.sum(grouplengthexceeded)
@@ -337,3 +337,18 @@ def _b_to_a(ind, grp, N, aindices, bindices, aoverlap, boverlap, agroup, bgroup)
         if agroup[f] != grp:
             _a_to_b(f, grp, aoverlap[f], aindices, bindices, aoverlap, boverlap, agroup, bgroup)
     return
+
+
+def _calc_group_length_exceeded(iterable):
+    i, n_a, n_b, maxiters = iterable
+    counter = 0
+    for k in np.arange(0, min(n_a, n_b)+1e-10, 1):
+        kcomb = (np.prod([qq for qq in np.arange(n_a-k+1, n_a+1e-10, 1)]) /
+                 scipy.special.factorial(k))
+        kperm = np.prod([qq for qq in np.arange(n_b-k+1, n_b+1e-10, 1)])
+        counter += kcomb*kperm
+        if counter > maxiters:
+            exceed_flag = 1
+            return i, exceed_flag
+    exceed_flag = 0
+    return i, exceed_flag

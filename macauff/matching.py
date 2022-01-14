@@ -627,6 +627,9 @@ class CrossMatch():
             [len(files) for _, _, files in os.walk('{}/reject'.format(self.joint_folder_path))])
         correct_file_number = expected_files == file_number
 
+        # TODO: generalise as user input
+        n_pool = 4
+
         # First check whether we actually need to dip into the group sources
         # routine or not.
         if self.run_group or not correct_file_number:
@@ -645,7 +648,7 @@ class CrossMatch():
                        self.b_auf_region_points, self.a_filt_names, self.b_filt_names,
                        self.a_cat_name, self.b_cat_name, self.r, self.dr, self.rho, self.drho,
                        self.j1s, self.pos_corr_dist, self.cross_match_extent, self.int_fracs,
-                       self.mem_chunk_num, self.include_phot_like, self.use_phot_priors)
+                       self.mem_chunk_num, self.include_phot_like, self.use_phot_priors, n_pool)
         else:
             print('Loading catalogue islands and overlaps...')
             sys.stdout.flush()
@@ -750,9 +753,6 @@ class CrossMatch():
 
         correct_file_number = expected_file_number == file_number
 
-        # TODO: generalise as user input
-        n_pool = 4
-
         if self.run_source or not correct_file_number:
             if not correct_file_number and not self.run_source:
                 warnings.warn('Incorrect number of counterpart pairing files. Deleting all '
@@ -762,7 +762,7 @@ class CrossMatch():
                 self.joint_folder_path, self.a_cat_folder_path, self.b_cat_folder_path,
                 self.a_auf_folder_path, self.b_auf_folder_path, self.a_filt_names,
                 self.b_filt_names, self.a_auf_region_points, self.b_auf_region_points,
-                self.rho, self.drho, len(self.delta_mag_cuts), self.mem_chunk_num, n_pool)
+                self.rho, self.drho, len(self.delta_mag_cuts), self.mem_chunk_num)
         else:
             print('Loading pre-assigned counterparts...')
             sys.stdout.flush()

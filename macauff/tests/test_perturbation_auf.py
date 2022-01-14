@@ -11,8 +11,7 @@ from scipy.special import j0, j1
 
 from ..matching import CrossMatch
 from ..misc_functions_fortran import misc_functions_fortran as mff
-from ..perturbation_auf import (make_perturb_aufs, get_circle_overlap_area,
-                                download_trilegal_simulation)
+from ..perturbation_auf import (make_perturb_aufs, download_trilegal_simulation)
 from ..perturbation_auf_fortran import perturbation_auf_fortran as paf
 
 from .test_matching import _replace_line
@@ -171,9 +170,9 @@ def test_perturb_aufs():
     # better counting statistics.
     num = 100
     for _ in range(num):
-        seed = rng.choice(1000000, size=seed_size)
+        seed = rng.choice(1000000, size=(seed_size, 1))
         offsets, fracs, fluxs = paf.scatter_perturbers(np.array([mean]), m, R, 5, mag_cut,
-                                                       model_mags_interval, num_trials, seed)
+                                                       model_mags_interval, num_trials, seed[:, 0])
         hist, _ = np.histogram(offsets, bins=r)
         assert_allclose(fracs[0], 1-prob_0_draw, rtol=0.05)
         assert_allclose(np.mean(fluxs), prob_0_draw*0+prob_1_draw*1+prob_2_draw*2, rtol=0.05)
@@ -239,7 +238,8 @@ def test_histogram():
     x = rng.uniform(0, 1, 10000)
     bins = np.linspace(0, 1, 15)
 
-    counts_f = paf.histogram(x, bins)
+    _, counts_f = paf.histogram1d_dp(x, bins[0], bins[-1], len(bins)-1,
+                                     np.array([True] * (len(x))), np.ones_like(x))
     counts_p, _ = np.histogram(x, bins=bins)
     assert np.all(counts_f == counts_p)
 
@@ -257,19 +257,22 @@ def test_circle_area():
         [x, y] = rng.uniform(0, 1, size=2)
         if (x - R >= x_edges[0] and x + R <= x_edges[1] and
                 y - R >= y_edges[0] and y + R <= y_edges[1]):
-            calc_area = get_circle_overlap_area(R, x_edges, y_edges, [x, y])
+            calc_area = paf.get_circle_area_overlap([x], [y], R, x_edges[0], x_edges[1],
+                                                    y_edges[0], y_edges[1])
             assert_allclose(calc_area, np.pi * R**2)
             done += 1
 
     # Now, if the circle is exactly on the corners of the rectangle
     # we should have a quarter the area:
     for x, y in zip([0, 0, 1, 1], [0, 1, 0, 1]):
-        calc_area = get_circle_overlap_area(R, x_edges, y_edges, [x, y])
+        calc_area = paf.get_circle_area_overlap([x], [y], R, x_edges[0], x_edges[1],
+                                                y_edges[0], y_edges[1])
         assert_allclose(calc_area, np.pi * R**2 / 4)
 
     # In the middle of an edge we should have half the circle area:
     for x, y in zip([0, 0.5, 1, 0.5], [0.5, 0, 0.5, 1]):
-        calc_area = get_circle_overlap_area(R, x_edges, y_edges, [x, y])
+        calc_area = paf.get_circle_area_overlap([x], [y], R, x_edges[0], x_edges[1],
+                                                y_edges[0], y_edges[1])
         assert_allclose(calc_area, np.pi * R**2 / 2)
 
     # Verify a few randomly placed circles too:
@@ -281,7 +284,8 @@ def test_circle_area():
         [x, y] = rng.uniform(0, 1, size=2)
         if np.any([x - R < x_edges[0], x + R > x_edges[1],
                    y - R < y_edges[0], y + R > y_edges[1]]):
-            calc_area = get_circle_overlap_area(R, x_edges, y_edges, [x, y])
+            calc_area = paf.get_circle_area_overlap([x], [y], R, x_edges[0], x_edges[1],
+                                                    y_edges[0], y_edges[1])
             manual_area = 0
             for i in range(len(xp)):
                 for j in range(len(yp)):

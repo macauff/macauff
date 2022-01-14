@@ -11,6 +11,35 @@ real(dp), parameter :: pi = 4.0_dp*atan(1.0_dp)
 
 contains
 
+subroutine find_mag_bin_inds(mags, flags, bins, cuts)
+    ! Find the indices of the bins to place all magnitudes in for a given magnitude bin array.
+    integer, parameter :: dp = kind(0.0d0)  ! double precision
+    ! Magnitudes to place in the appropriate magnitude bins.
+    real(dp), intent(in) :: mags(:), bins(:)
+    ! Flags for whether to use this source for populating magnitude bins.
+    logical, intent(in) :: flags(:)
+    ! Slices for each magnitude bin, indicating which sources fall into that particular bin.
+    integer, intent(out) :: cuts(size(bins)-1, size(mags))
+
+    integer :: i, j
+
+    cuts(:, :) = 0
+
+!$OMP PARALLEL DO DEFAULT(NONE) PRIVATE(i, j) SHARED(mags, flags, bins, cuts)
+    do i = 1, size(mags)
+        if (flags(i)) then
+            do j = 1, size(bins)-1
+                if (mags(i) >= bins(j) .and. mags(i) < bins(j+1)) then
+                    cuts(j, i) = 1
+                    exit
+                end if
+            end do
+        end if
+    end do
+!$OMP END PARALLEL DO
+
+end subroutine find_mag_bin_inds
+
 subroutine get_field_dists(a_ax1, a_ax2, b_ax1, b_ax2, a_indices, a_overlap, b_err_circ, a_flags, b_flags, b_mag, low_mag, &
     upp_mag, a_mask_ind, a_area_cut)
     ! Derive the distribution of "field" sources, those with no counterpart in the opposing

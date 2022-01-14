@@ -60,7 +60,7 @@ def test_load_fourier_grid_cutouts():
         memmap_arrays.append(np.lib.format.open_memmap('{}/{}_temporary_sky_slice_{}.npy'.format(
                              '.', 'check', n), mode='r+', dtype=bool, shape=(len(a),)))
     _a, _b, _c, _ = _load_fourier_grid_cutouts(a, rect, '.', '.', '.', padding, 'check',
-                                               memmap_arrays)
+                                               memmap_arrays, np.array([True]*lena))
     assert np.all(_a.shape == (4, 3))
     assert np.all(_a ==
                   np.array([[50, 50, 0.1], [48, 60.02, 0.5], [39.98, 43, 0.2], [45, 45, 0.2]]))
@@ -83,7 +83,7 @@ def test_load_fourier_grid_cutouts():
     # reference index. Hence we only have one unique grid reference now.
     padding = 0
     _a, _b, _c, _ = _load_fourier_grid_cutouts(a, rect, '.', '.', '.', padding, 'check',
-                                               memmap_arrays)
+                                               memmap_arrays, np.array([True]*lena))
     assert np.all(_a.shape == (2, 3))
     assert np.all(_a == np.array([[50, 50, 0.1], [45, 45, 0.2]]))
     assert np.all(_b.shape == (100, 1, 1, 1))
@@ -270,7 +270,7 @@ def test_clean_overlaps():
         inds[:, 8+10*i] = [2, 2, 2, 2, 2]
         inds[:, 9+10*i] = [1, 1, 2, 3, -1]
 
-    inds2, size2 = _clean_overlaps(inds, size, joint_folder_path, filename)
+    inds2, size2 = _clean_overlaps(inds, size, joint_folder_path, filename, 2)
     compare_inds2 = np.empty((4, 30), int)
     for i in range(0, 3):
         compare_inds2[:, 0+10*i] = [0, 1, -1, -1]
@@ -409,6 +409,8 @@ class TestMakeIslandGroupings():
         self.cm.use_phot_prior = self.use_phot_prior
         self.cm.j1s = self.j1s
 
+        self.n_pool = 5
+
     def _comparisons_in_islands(self, alist, blist, agrplen, bgrplen, N_a, N_b, N_c):
         # Given, say, 25 common sources from 30 'a' and 45 'b' objects, we'd
         # expect 5 + 20 + 25 = 50 islands, with zero overlap. Here we expect
@@ -477,7 +479,8 @@ class TestMakeIslandGroupings():
             self.a_auf_folder_path, self.b_auf_folder_path, self.a_auf_pointings,
             self.b_auf_pointings, self.a_filt_names, self.b_filt_names, self.a_title, self.b_title,
             self.r, self.dr, self.rho, self.drho, self.j1s, self.max_sep, ax_lims,
-            self.int_fracs, self.mem_chunk_num, self.include_phot_like, self.use_phot_prior)
+            self.int_fracs, self.mem_chunk_num, self.include_phot_like, self.use_phot_prior,
+            self.n_pool)
 
         alist, blist = np.load('joint/group/alist.npy'), np.load('joint/group/blist.npy')
         agrplen, bgrplen = np.load('joint/group/agrplen.npy'), np.load('joint/group/bgrplen.npy')
@@ -534,7 +537,8 @@ class TestMakeIslandGroupings():
             self.a_auf_folder_path, self.b_auf_folder_path, self.a_auf_pointings,
             self.b_auf_pointings, self.a_filt_names, self.b_filt_names, self.a_title, self.b_title,
             self.r, self.dr, self.rho, self.drho, self.j1s, self.max_sep, ax_lims,
-            self.int_fracs, self.mem_chunk_num, self.include_phot_like, self.use_phot_prior)
+            self.int_fracs, self.mem_chunk_num, self.include_phot_like, self.use_phot_prior,
+            self.n_pool)
 
         alist, blist = np.load('joint/group/alist.npy'), np.load('joint/group/blist.npy')
         agrplen, bgrplen = np.load('joint/group/agrplen.npy'), np.load('joint/group/bgrplen.npy')
@@ -592,7 +596,8 @@ class TestMakeIslandGroupings():
             self.a_auf_folder_path, self.b_auf_folder_path, self.a_auf_pointings,
             self.b_auf_pointings, self.a_filt_names, self.b_filt_names, self.a_title, self.b_title,
             self.r, self.dr, self.rho, self.drho, self.j1s, self.max_sep, self.ax_lims,
-            self.int_fracs, self.mem_chunk_num, include_phot_like, self.use_phot_prior)
+            self.int_fracs, self.mem_chunk_num, include_phot_like, self.use_phot_prior,
+            self.n_pool)
 
         # Verify that make_island_groupings doesn't change when the extra arrays
         # are calculated, as an initial test.

@@ -4,12 +4,13 @@ Tests for the "counterpart_pairing" module.
 '''
 
 import os
+import itertools
 from numpy.testing import assert_allclose
 import numpy as np
 import pytest
 
 from ..matching import CrossMatch
-from ..counterpart_pairing import source_pairing, _individual_island_probability
+from ..counterpart_pairing import source_pairing
 from ..counterpart_pairing_fortran import counterpart_pairing_fortran as cpf
 from .test_matching import _replace_line
 
@@ -168,6 +169,8 @@ class TestCounterpartPairing:
         self.a_filt_names = np.array(['G_BP', 'G', 'G_RP'])
         self.b_filt_names = np.array(['W1', 'W2', 'W3', 'W4'])
 
+        self.large_len = max(len(self.a_astro), len(self.b_astro))
+
     def _calculate_prob_integral(self):
         self.o = np.sqrt(self.a_sig**2 + self.b_sig**2) / 3600
         self.sep = np.sqrt(((self.a_astro[0, 0] -
@@ -186,15 +189,21 @@ class TestCounterpartPairing:
         os.makedirs('{}/pairing'.format(self.joint_folder_path), exist_ok=True)
         i = 0
         wrapper = [
-            i, self.a_astro, self.a_photo, self.b_astro, self.b_photo, self.alist, self.alist_,
-            self.blist, self.blist_, self.agrplen, self.bgrplen, self.c_array, self.fa_array,
-            self.fb_array, self.c_priors, self.fa_priors, self.fb_priors, self.amagref,
-            self.bmagref, self.amodelrefinds, self.bmodelrefinds, self.abinsarray,
-            self.abinlengths, self.bbinsarray, self.bbinlengths, self.afrac_grids,
-            self.aflux_grids, self.bfrac_grids, self.bflux_grids, self.afourier_grids,
-            self.bfourier_grids, self.a_sky_inds, self.b_sky_inds, self.rho, self.drho,
-            self.n_fracs]
-        results = _individual_island_probability(wrapper)
+            self.a_astro, self.a_photo, self.b_astro, self.b_photo, self.c_array, self.fa_array,
+            self.fb_array, self.c_priors, self.fa_priors, self.fb_priors, self.abinsarray,
+            self.bbinsarray, self.abinlengths, self.bbinlengths, self.afrac_grids,
+            self.aflux_grids, self.afourier_grids, self.bfrac_grids, self.bflux_grids,
+            self.bfourier_grids, self.rho, self.drho, self.n_fracs, self.large_len,
+            self.alist[:self.agrplen[i], i]+1, self.blist[:self.bgrplen[i], i]+1,
+            self.alist_[:self.agrplen[i], i], self.blist_[:self.bgrplen[i], i],
+            self.amagref[self.alist[:self.agrplen[i], i]]+1,
+            self.a_sky_inds[self.alist[:self.agrplen[i], i]]+1,
+            self.bmagref[self.blist[:self.bgrplen[i], i]]+1,
+            self.b_sky_inds[self.blist[:self.bgrplen[i], i]]+1,
+            self.amodelrefinds[:, self.alist[:self.agrplen[i], i]]+1,
+            self.bmodelrefinds[:, self.blist[:self.bgrplen[i], i]]+1]
+        results = cpf.find_single_island_prob(*wrapper)
+
         (acrpts, bcrpts, acrptscontp, bcrptscontp, etacrpts, xicrpts, acrptflux, bcrptflux,
          crptseps, afield, bfield, afieldflux, bfieldflux, afieldseps, afieldeta,
          afieldxi, bfieldseps, bfieldeta, bfieldxi, prob, integral) = results
@@ -209,8 +218,11 @@ class TestCounterpartPairing:
         assert_allclose(xicrpts, np.array([np.log10(self.G / self.fa_priors[0, 0, 0])]), rtol=1e-6)
         assert np.all(acrptflux == np.array([0]))
         assert np.all(bcrptflux == np.array([0]))
-        assert np.all(afield == np.array([3]))
-        assert len(bfield) == 0
+        # 2 a vs 1 b with a match means only one rejected a source, but a
+        # length 2 array; similarly, bfield will be empty but length one.
+        assert np.all(afield == np.array([3, self.large_len+1]))
+        assert len(bfield) == 1
+        assert np.all(bfield == np.array([self.large_len+1]))
 
         _integral = self.Nc*self.G*self.Nfa + self.Nc*self.G_wrong*self.Nfa +\
             self.Nfa*self.Nfa*self.Nfb
@@ -221,21 +233,27 @@ class TestCounterpartPairing:
     def test_individual_island_zero_probabilities(self):
         os.system('rm -r {}/pairing'.format(self.joint_folder_path))
         os.makedirs('{}/pairing'.format(self.joint_folder_path), exist_ok=True)
-        fa_array = np.zeros_like(self.fa_array)
-        fb_array = np.zeros_like(self.fb_array)
-        fa_priors = np.zeros_like(self.fa_priors)
-        fb_priors = np.zeros_like(self.fb_priors)
+        # Fake the extra fire extinguisher likelihood/prior used in the main code.
+        fa_array = np.zeros_like(self.fa_array) + 1e-10
+        fb_array = np.zeros_like(self.fb_array) + 1e-10
+        fa_priors = np.zeros_like(self.fa_priors) + 1e-10
+        fb_priors = np.zeros_like(self.fb_priors) + 1e-10
         i = 0
         wrapper = [
-            i, self.a_astro, self.a_photo, self.b_astro, self.b_photo, self.alist, self.alist_,
-            self.blist, self.blist_, self.agrplen, self.bgrplen, self.c_array, fa_array,
-            fb_array, self.c_priors, fa_priors, fb_priors, self.amagref,
-            self.bmagref, self.amodelrefinds, self.bmodelrefinds, self.abinsarray,
-            self.abinlengths, self.bbinsarray, self.bbinlengths, self.afrac_grids,
-            self.aflux_grids, self.bfrac_grids, self.bflux_grids, self.afourier_grids,
-            self.bfourier_grids, self.a_sky_inds, self.b_sky_inds, self.rho, self.drho,
-            self.n_fracs]
-        results = _individual_island_probability(wrapper)
+            self.a_astro, self.a_photo, self.b_astro, self.b_photo, self.c_array, fa_array,
+            fb_array, self.c_priors, fa_priors, fb_priors, self.abinsarray,
+            self.bbinsarray, self.abinlengths, self.bbinlengths, self.afrac_grids,
+            self.aflux_grids, self.afourier_grids, self.bfrac_grids, self.bflux_grids,
+            self.bfourier_grids, self.rho, self.drho, self.n_fracs, self.large_len,
+            self.alist[:self.agrplen[i], i]+1, self.blist[:self.bgrplen[i], i]+1,
+            self.alist_[:self.agrplen[i], i], self.blist_[:self.bgrplen[i], i],
+            self.amagref[self.alist[:self.agrplen[i], i]]+1,
+            self.a_sky_inds[self.alist[:self.agrplen[i], i]]+1,
+            self.bmagref[self.blist[:self.bgrplen[i], i]]+1,
+            self.b_sky_inds[self.blist[:self.bgrplen[i], i]]+1,
+            self.amodelrefinds[:, self.alist[:self.agrplen[i], i]]+1,
+            self.bmodelrefinds[:, self.blist[:self.bgrplen[i], i]]+1]
+        results = cpf.find_single_island_prob(*wrapper)
         (acrpts, bcrpts, acrptscontp, bcrptscontp, etacrpts, xicrpts, acrptflux, bcrptflux,
          crptseps, afield, bfield, afieldflux, bfieldflux, afieldseps, afieldeta,
          afieldxi, bfieldseps, bfieldeta, bfieldxi, prob, integral) = results
@@ -243,35 +261,42 @@ class TestCounterpartPairing:
         assert np.all(acrpts == np.array([0]))
         assert np.all(bcrpts == np.array([1]))
 
-        c_array = np.zeros_like(self.c_array)
-        c_priors = np.zeros_like(self.c_priors)
+        c_array = np.zeros_like(self.c_array) + 1e-10
+        c_priors = np.zeros_like(self.c_priors) + 1e-10
         wrapper = [
-            i, self.a_astro, self.a_photo, self.b_astro, self.b_photo, self.alist, self.alist_,
-            self.blist, self.blist_, self.agrplen, self.bgrplen, c_array, self.fa_array,
-            self.fb_array, c_priors, self.fa_priors, self.fb_priors, self.amagref,
-            self.bmagref, self.amodelrefinds, self.bmodelrefinds, self.abinsarray,
-            self.abinlengths, self.bbinsarray, self.bbinlengths, self.afrac_grids,
-            self.aflux_grids, self.bfrac_grids, self.bflux_grids, self.afourier_grids,
-            self.bfourier_grids, self.a_sky_inds, self.b_sky_inds, self.rho, self.drho,
-            self.n_fracs]
-        results = _individual_island_probability(wrapper)
+            self.a_astro, self.a_photo, self.b_astro, self.b_photo, c_array, fa_array,
+            fb_array, c_priors, fa_priors, fb_priors, self.abinsarray,
+            self.bbinsarray, self.abinlengths, self.bbinlengths, self.afrac_grids,
+            self.aflux_grids, self.afourier_grids, self.bfrac_grids, self.bflux_grids,
+            self.bfourier_grids, self.rho, self.drho, self.n_fracs, self.large_len,
+            self.alist[:self.agrplen[i], i]+1, self.blist[:self.bgrplen[i], i]+1,
+            self.alist_[:self.agrplen[i], i], self.blist_[:self.bgrplen[i], i],
+            self.amagref[self.alist[:self.agrplen[i], i]]+1,
+            self.a_sky_inds[self.alist[:self.agrplen[i], i]]+1,
+            self.bmagref[self.blist[:self.bgrplen[i], i]]+1,
+            self.b_sky_inds[self.blist[:self.bgrplen[i], i]]+1,
+            self.amodelrefinds[:, self.alist[:self.agrplen[i], i]]+1,
+            self.bmodelrefinds[:, self.blist[:self.bgrplen[i], i]]+1]
+        results = cpf.find_single_island_prob(*wrapper)
         (acrpts, bcrpts, acrptscontp, bcrptscontp, etacrpts, xicrpts, acrptflux, bcrptflux,
          crptseps, afield, bfield, afieldflux, bfieldflux, afieldseps, afieldeta,
          afieldxi, bfieldseps, bfieldeta, bfieldxi, prob, integral) = results
 
-        assert len(acrpts) == 0
-        assert len(bcrpts) == 0
+        assert len(acrpts) == 1
+        assert len(bcrpts) == 1
+        assert np.all(acrpts == np.array([self.large_len+1]))
+        assert np.all(bcrpts == np.array([self.large_len+1]))
         assert_allclose(prob/integral, 1)
 
     def test_source_pairing(self):
         os.system('rm -r {}/pairing'.format(self.joint_folder_path))
         os.makedirs('{}/pairing'.format(self.joint_folder_path), exist_ok=True)
-        mem_chunk_num, n_pool = 2, 2
+        mem_chunk_num = 2
         source_pairing(
             self.joint_folder_path, self.a_cat_folder_path, self.b_cat_folder_path,
             self.a_auf_folder_path, self.b_auf_folder_path, self.a_filt_names, self.b_filt_names,
             self.a_auf_pointings, self.b_auf_pointings, self.rho, self.drho, self.n_fracs,
-            mem_chunk_num, n_pool)
+            mem_chunk_num)
 
         bflux = np.load('{}/pairing/bcontamflux.npy'.format(self.joint_folder_path))
         assert np.all(bflux == np.zeros((2), float))
@@ -359,12 +384,12 @@ class TestCounterpartPairing:
         np.save('{}/group/agrplen.npy'.format(self.joint_folder_path), agrplen)
         np.save('{}/group/bgrplen.npy'.format(self.joint_folder_path), bgrplen)
 
-        mem_chunk_num, n_pool = 2, 2
+        mem_chunk_num = 2
         source_pairing(
             self.joint_folder_path, self.a_cat_folder_path, self.b_cat_folder_path,
             self.a_auf_folder_path, self.b_auf_folder_path, self.a_filt_names,
             self.b_filt_names, self.a_auf_pointings, self.b_auf_pointings, self.rho, self.drho,
-            self.n_fracs, mem_chunk_num, n_pool)
+            self.n_fracs, mem_chunk_num)
 
         bflux = np.load('{}/pairing/bcontamflux.npy'.format(self.joint_folder_path))
         assert np.all(bflux == np.zeros((2), float))
@@ -410,6 +435,7 @@ class TestCounterpartPairing:
     def test_small_length_warnings(self):
         os.system('rm -r {}/pairing'.format(self.joint_folder_path))
         os.makedirs('{}/pairing'.format(self.joint_folder_path), exist_ok=True)
+        os.makedirs('{}/reject'.format(self.joint_folder_path), exist_ok=True)
         # Here want to test that the number of recorded matches -- either
         # counterpart, field, or rejected -- is lower than the total length.
         # To achieve this we fake reject length arrays smaller than their
@@ -430,13 +456,13 @@ class TestCounterpartPairing:
         np.save('{}/group/agrplen.npy'.format(self.joint_folder_path), agrplen)
         np.save('{}/group/bgrplen.npy'.format(self.joint_folder_path), bgrplen)
 
-        mem_chunk_num, n_pool = 2, 2
+        mem_chunk_num = 2
         with pytest.warns(UserWarning) as record:
             source_pairing(
                 self.joint_folder_path, self.a_cat_folder_path, self.b_cat_folder_path,
                 self.a_auf_folder_path, self.b_auf_folder_path, self.a_filt_names,
                 self.b_filt_names, self.a_auf_pointings, self.b_auf_pointings, self.rho, self.drho,
-                self.n_fracs, mem_chunk_num, n_pool)
+                self.n_fracs, mem_chunk_num)
         assert len(record) == 2
         assert '2 catalogue a sources not in either counterpart, f' in record[0].message.args[0]
         assert '1 catalogue b source not in either counterpart, f' in record[1].message.args[0]
@@ -467,6 +493,7 @@ class TestCounterpartPairing:
     def test_large_length_warnings(self):
         os.system('rm -r {}/pairing'.format(self.joint_folder_path))
         os.makedirs('{}/pairing'.format(self.joint_folder_path), exist_ok=True)
+        os.makedirs('{}/reject'.format(self.joint_folder_path), exist_ok=True)
         # Here want to test that the number of recorded matches -- either
         # counterpart, field, or rejected -- is higher than the total length.
         # To achieve this we fake reject length arrays larger than their
@@ -486,13 +513,13 @@ class TestCounterpartPairing:
         np.save('{}/group/agrplen.npy'.format(self.joint_folder_path), agrplen)
         np.save('{}/group/bgrplen.npy'.format(self.joint_folder_path), bgrplen)
 
-        mem_chunk_num, n_pool = 2, 2
+        mem_chunk_num = 2
         with pytest.warns(UserWarning) as record:
             source_pairing(
                 self.joint_folder_path, self.a_cat_folder_path, self.b_cat_folder_path,
                 self.a_auf_folder_path, self.b_auf_folder_path, self.a_filt_names,
                 self.b_filt_names, self.a_auf_pointings, self.b_auf_pointings, self.rho, self.drho,
-                self.n_fracs, mem_chunk_num, n_pool)
+                self.n_fracs, mem_chunk_num)
         assert len(record) == 2
         assert '2 additional catalogue a indices recorded' in record[0].message.args[0]
         assert '1 additional catalogue b index recorded' in record[1].message.args[0]
@@ -662,3 +689,35 @@ class TestCounterpartPairing:
         self.cm.pair_sources(self.files_per_pairing)
         output = capsys.readouterr().out
         assert 'Loading pre-assigned counterparts' in output
+
+
+def test_f90_comb():
+    for n in [2, 3, 4, 5]:
+        for k in range(2, n+1, 1):
+            n_combs = np.math.factorial(n) / np.math.factorial(k) / np.math.factorial(n - k)
+            combs = cpf.calc_combs(n, n_combs, k).T
+            new_combs = combs[np.lexsort([combs[:, i] for i in range(k)])]
+
+            iter_combs = np.array(list(itertools.combinations(np.arange(1, n+1, 1), k)))
+            new_iter_combs = iter_combs[np.lexsort([iter_combs[:, i] for i in range(k)])]
+            assert np.all(new_combs == new_iter_combs)
+
+
+def test_f90_perm_comb():
+    for n in [2, 3, 4, 5]:
+        for k in range(2, n+1, 1):
+            n_combs = np.math.factorial(n) / np.math.factorial(k) / np.math.factorial(n - k)
+            n_perms_per_comb = np.math.factorial(k)
+            perms = cpf.calc_permcombs(n, k, n_perms_per_comb, n_combs).T
+            new_perms = perms[np.lexsort([perms[:, i] for i in range(k)])]
+
+            # Test against itertools, with n-pick-k: combinations then
+            # permutations.
+            iter_perms = np.array(list(itertools.permutations(np.arange(1, n+1, 1), r=k)))
+            new_iter_perms = iter_perms[np.lexsort([iter_perms[:, i] for i in range(k)])]
+            assert np.all(new_perms == new_iter_perms)
+
+
+def test_factorial():
+    for k in range(21):
+        assert np.math.factorial(k) == cpf.factorial(k)

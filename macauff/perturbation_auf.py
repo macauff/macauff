@@ -202,7 +202,7 @@ def make_perturb_aufs(auf_folder, cat_folder, filters, auf_points, r, dr, rho,
 
     if compute_local_density and include_perturb_auf:
         local_N = np.lib.format.open_memmap('{}/local_N.npy'.format(auf_folder), mode='w+',
-                                            dtype=float, shape=(len(a_tot_astro),))
+                                            dtype=float, shape=(len(a_tot_astro), len(filters)))
 
     for i in range(len(auf_points)):
         ax1, ax2 = auf_points[i]
@@ -218,6 +218,11 @@ def make_perturb_aufs(auf_folder, cat_folder, filters, auf_points, r, dr, rho,
 
         if include_perturb_auf:
             sky_cut = _load_single_sky_slice(auf_folder, '', i, modelrefinds[2, :])
+            if compute_local_density:
+                # TODO: avoid np.arange by first iterating an np.sum(sky_cut)
+                # and pre-generating a memmapped sub-array, and looping over
+                # putting the correct indices into place.
+                med_index_slice = np.arange(0, len(local_N))[sky_cut]
             a_photo_cut = a_tot_photo[sky_cut]
             if compute_local_density:
                 a_astro_cut = a_tot_astro[sky_cut]
@@ -263,7 +268,9 @@ def make_perturb_aufs(auf_folder, cat_folder, filters, auf_points, r, dr, rho,
                     # catalogue, using just the astrometry, we should be able
                     # to just over-write this N times if there happen to be N
                     # good detections of a source.
-                    local_N[sky_cut][good_mag_slice] = localN
+                    index_slice = med_index_slice[good_mag_slice]
+                    for ii in range(len(index_slice)):
+                        local_N[index_slice[ii], j] = localN[ii]
                 else:
                     localN = np.load('{}/local_N.npy'.format(auf_folder),
                                      mmap_mode='r')[sky_cut][good_mag_slice, j]
@@ -357,8 +364,8 @@ def make_perturb_aufs(auf_folder, cat_folder, filters, auf_points, r, dr, rho,
             for i in range(0, len(a)):
                 axind = modelrefinds[2, indexmap[i]]
                 filterind = magref[i]
-                Nmind = np.argmin((local_N[i] - Narrays[:arraylengths[filterind, axind],
-                                                        filterind, axind])**2 +
+                Nmind = np.argmin((local_N[i, filterind] - Narrays[:arraylengths[filterind, axind],
+                                                                   filterind, axind])**2 +
                                   (a[i, filterind] - magarrays[:arraylengths[filterind, axind],
                                                                filterind, axind])**2)
                 modelrefinds[0, indexmap[i]] = Nmind
@@ -497,8 +504,15 @@ def calculate_local_density(a_astro, a_tot_astro, a_tot_photo, auf_folder, cat_f
         The number of sources per square degree near to each source in
         ``a_astro`` that are above ``density_mag`` in ``a_tot_astro``.
     '''
+
     min_lon, max_lon = np.amin(a_astro[:, 0]), np.amax(a_astro[:, 0])
     min_lat, max_lat = np.amin(a_astro[:, 1]), np.amax(a_astro[:, 1])
+
+    memmap_slice_arrays_2 = []
+    for n in ['1', '2', '3', '4', 'combined']:
+        memmap_slice_arrays_2.append(np.lib.format.open_memmap(
+            '{}/{}_temporary_sky_slice_{}.npy'.format(auf_folder, '2', n), mode='w+',
+            dtype=bool, shape=(len(a_astro),)))
 
     overlap_sky_cut = _load_rectangular_slice(auf_folder, '', a_tot_astro, min_lon,
                                               max_lon, min_lat, max_lat, density_radius,
@@ -509,104 +523,72 @@ def calculate_local_density(a_astro, a_tot_astro, a_tot_photo, auf_folder, cat_f
     for i in range(0, len(a_tot_astro), di):
         cut[i:i+di] = overlap_sky_cut[i:i+di] & (a_tot_photo[i:i+di] <= density_mag)
     a_astro_overlap_cut = a_tot_astro[cut]
-    os.system('rm {}/_temporary_slice.npy'.format(auf_folder))
+    a_photo_overlap_cut = a_tot_photo[cut]
 
-    counts = paf.get_density(a_astro[:, 0], a_astro[:, 1], a_astro_overlap_cut[:, 0],
-                             a_astro_overlap_cut[:, 1], density_radius)
+    memmap_slice_arrays_3 = []
+    for n in ['1', '2', '3', '4', 'combined']:
+        memmap_slice_arrays_3.append(np.lib.format.open_memmap(
+            '{}/{}_temporary_sky_slice_{}.npy'.format(auf_folder, '3', n), mode='w+',
+            dtype=bool, shape=(len(a_astro_overlap_cut),)))
+
+    ax1_loops = np.linspace(min_lon, max_lon, 11)
+    # Force the sub-division of the sky area in question to be 100 chunks, or
+    # roughly square degree chunks, whichever is larger in area.
+    if ax1_loops[1] - ax1_loops[0] < 1:
+        ax1_loops = np.linspace(min_lon, max_lon,
+                                int(np.ceil(max_lon - min_lon) + 1))
+    ax2_loops = np.linspace(min_lat, max_lat, 11)
+    if ax2_loops[1] - ax2_loops[0] < 1:
+        ax2_loops = np.linspace(min_lat, max_lat,
+                                int(np.ceil(max_lat - min_lat) + 1))
+    full_counts = np.empty(len(a_astro), float)
+    for ax1_start, ax1_end in zip(ax1_loops[:-1], ax1_loops[1:]):
+        for ax2_start, ax2_end in zip(ax2_loops[:-1], ax2_loops[1:]):
+            small_sky_cut = _load_rectangular_slice(auf_folder, 'small_', a_astro, ax1_start,
+                                                    ax1_end, ax2_start, ax2_end, 0,
+                                                    memmap_slice_arrays_2)
+            a_astro_small = a_astro[small_sky_cut]
+            if len(a_astro_small) == 0:
+                continue
+
+            overlap_sky_cut = _load_rectangular_slice(auf_folder, '', a_astro_overlap_cut,
+                                                      ax1_start, ax1_end, ax2_start, ax2_end,
+                                                      density_radius, memmap_slice_arrays_3)
+            cut = np.lib.format.open_memmap('{}/_temporary_slice.npy'.format(
+                auf_folder), mode='w+', dtype=bool, shape=(len(a_astro_overlap_cut),))
+            di = max(1, len(cut) // 20)
+            for i in range(0, len(a_astro_overlap_cut), di):
+                cut[i:i+di] = (overlap_sky_cut[i:i+di] &
+                               (a_photo_overlap_cut[i:i+di] <= density_mag))
+            a_astro_overlap_cut_small = a_astro_overlap_cut[cut]
+
+            if len(a_astro_overlap_cut_small) > 0:
+                counts = paf.get_density(a_astro_small[:, 0], a_astro_small[:, 1],
+                                         a_astro_overlap_cut_small[:, 0],
+                                         a_astro_overlap_cut_small[:, 1], density_radius)
+                # If objects return with zero bright sources in their error circle,
+                # like in the else below we force at least themselves to be in the
+                # circle, slightly over-representing any object below the
+                # brightness cutoff, but 1/area is still a very low density.
+                counts[counts == 0] = 1
+                full_counts[small_sky_cut] = counts
+            else:
+                # If we have sources to check the surrounding density of, but
+                # no bright sources around them, just set them to be alone
+                # in the error circle, slightly over-representing bright objects
+                # but still giving them a very low normalising sky density.
+                full_counts[small_sky_cut] = 1
     min_lon, max_lon = np.amin(a_astro_overlap_cut[:, 0]), np.amax(a_astro_overlap_cut[:, 0])
     min_lat, max_lat = np.amin(a_astro_overlap_cut[:, 1]), np.amax(a_astro_overlap_cut[:, 1])
-    circle_overlap_area = np.empty(len(a_astro), float)
-    for i in range(len(a_astro)):
-        circle_overlap_area[i] = get_circle_overlap_area(
-            density_radius, [min_lon, max_lon], [min_lat, max_lat], a_astro[i, [0, 1]])
-    count_density = counts / circle_overlap_area
+
+    circle_overlap_area = paf.get_circle_area_overlap(a_astro[:, 0], a_astro[:, 1], density_radius,
+                                                      min_lon, max_lon, min_lat, max_lat)
+
+    count_density = full_counts / circle_overlap_area
+
+    os.system('rm {}/_temporary_slice.npy'.format(auf_folder))
 
     return count_density
-
-
-def get_circle_overlap_area(r, x_edges, y_edges, coords):
-    '''
-    Calculates the overlap between a circle of given radius and rectangle
-    defined by four edge coordinates.
-
-    Parameters
-    ----------
-    r : float
-        The radius of the circle.
-    x_edges : list or numpy.ndarray
-        Upper and lower limits of the rectangle.
-    y_edges : list or numpy.ndarray
-        Limits of the rectangle in the second orthogonal axis.
-    coords : numpy.ndarray or list
-        The (x, y) coordinates of the center of each circle to consider
-        overlap area with rectangle for.
-
-    Returns
-    -------
-    area : float
-        The area of circle of radius ``r`` which overlaps the rectangle
-        defined by ``x_edges`` and ``y_edges``.
-    '''
-    area = np.pi * r**2
-    has_overlapped_edge = [0, 0, 0, 0]
-    edges = np.array([x_edges[0], y_edges[0], x_edges[1], y_edges[1]])
-    coords = np.array([coords[0], coords[1], coords[0], coords[1]])
-    for i, (edge, coord) in enumerate(zip(edges, coords)):
-        h = np.abs(coord - edge)
-        if h < r:
-            # The first chord integration is "free", and does not have
-            # truncated limits based on overlaps; the final chord integration,
-            # however, cares about truncation on both sides. The "middle two"
-            # integrations only truncate to the previous side.
-            a = -np.sqrt(r**2 - h**2)
-            b = +np.sqrt(r**2 - h**2)
-
-            if i == 1 and has_overlapped_edge[0]:
-                a = max(a, x_edges[0] - coords[0])
-            if i == 2 and has_overlapped_edge[1]:
-                a = max(a, y_edges[0] - coords[1])
-            if i == 3 and has_overlapped_edge[0]:
-                a = max(a, x_edges[0] - coords[0])
-            if i == 3 and has_overlapped_edge[2]:
-                b = min(b, x_edges[1] - coords[0])
-
-            chord_area_overlap = chord_integral_eval(b, r, h) - chord_integral_eval(a, r, h)
-            has_overlapped_edge[i] = 1
-
-            area -= chord_area_overlap
-
-    return area
-
-
-def chord_integral_eval(x, r, h):
-    '''
-    Calculates the indefinite integral of the distance between a given circle
-    chord and the circumference of the circle, to calculate the chord area.
-
-    Parameters
-    ----------
-    x : float
-        The integrable coordinate, orthogonal to the line between the center
-        of the circle and the chord at height ``h``.
-    r : float
-        The radius of the circle.
-    h : float
-        The height of the chord inside the circle of radius ``r``.
-
-    Returns
-    -------
-    integral : float
-        The result of the indefinite integral of the chord area.
-    '''
-    d = np.sqrt(r**2 - x**2)
-
-    if d == 0:
-        x_div_d = np.sign(x) * np.inf
-    else:
-        x_div_d = x / d
-
-    integral = 0.5 * (x * d + r**2 * np.arctan(x_div_d)) - h * x
-    return integral
 
 
 def create_single_perturb_auf(tri_folder, filt, r, dr, rho, drho, j0s, num_trials, psf_fwhm,
@@ -673,7 +655,7 @@ def create_single_perturb_auf(tri_folder, filt, r, dr, rho, drho, j0s, num_trial
     bits = line.split(' ')
     tri_area = float(bits[2])
     tri = np.genfromtxt('{}/{}.dat'.format(tri_folder, tri_name), delimiter=None,
-                        names=True, comments='#', skip_header=1)
+                        names=True, comments='#', skip_header=1, usecols=[header])
 
     # TODO: extend to allow a Galactic source model that doesn't depend on TRILEGAL
     tri_mags = tri[:][header]
@@ -719,7 +701,8 @@ def create_single_perturb_auf(tri_folder, filt, r, dr, rho, drho, j0s, num_trial
     count_array = np.exp(0.5*(logNbins[1:]+logNbins[:-1])[Ni])
 
     R = 1.185 * psf_fwhm
-    seed = np.random.default_rng().choice(100000, size=paf.get_random_seed_size())
+    seed = np.random.default_rng().choice(100000, size=(paf.get_random_seed_size(),
+                                                        len(count_array)))
     Frac, Flux, fourieroffset, offset, cumulative = paf.perturb_aufs(
         count_array, mag_array, r[:-1]+dr/2, dr, r, j0s.T,
         model_mags+model_mags_interval/2, model_mags_interval, log10y, model_count,

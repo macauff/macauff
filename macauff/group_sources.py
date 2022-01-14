@@ -7,6 +7,8 @@ various photometric integral purposes.
 
 import sys
 import os
+import multiprocessing
+import itertools
 import numpy as np
 
 from .misc_functions import (load_small_ref_auf_grid, hav_dist_constant_lat,
@@ -22,7 +24,7 @@ def make_island_groupings(joint_folder_path, a_cat_folder_path, b_cat_folder_pat
                           a_auf_folder_path, b_auf_folder_path, a_auf_pointings, b_auf_pointings,
                           a_filt_names, b_filt_names, a_title, b_title, r, dr, rho, drho, j1s,
                           max_sep, ax_lims, int_fracs, mem_chunk_num, include_phot_like,
-                          use_phot_priors):
+                          use_phot_priors, n_pool):
     '''
     Function to handle the creation of "islands" of astrometrically coeval
     sources, and identify which overlap to some probability based on their
@@ -91,6 +93,8 @@ def make_island_groupings(joint_folder_path, a_cat_folder_path, b_cat_folder_pat
     use_phot_priors : boolean
         Flag indicating whether to calcualte additional parameters needed to
         calculate photometric-information dependent priors for cross-matching.
+    n_pool : integer
+        Number of multiprocessing pools to use when parallelising.
     '''
 
     # Convert from arcseconds to degrees internally.
@@ -107,14 +111,23 @@ def make_island_groupings(joint_folder_path, a_cat_folder_path, b_cat_folder_pat
     # padding in one catalogue to ensure all pairings can be found, and total
     # the number of overlaps for each object across all sky slices.
 
-    ax1_loops = np.linspace(ax_lims[0], ax_lims[1], 11)
-    # Force the sub-division of the sky area in question to be 100 chunks, or
-    # roughly one square degree chunks, whichever is larger in area.
-    if ax1_loops[1] - ax1_loops[0] < 1:
-        ax1_loops = np.linspace(ax_lims[0], ax_lims[1], int(np.ceil(ax_lims[1] - ax_lims[0]) + 1))
-    ax2_loops = np.linspace(ax_lims[2], ax_lims[3], 11)
-    if ax2_loops[1] - ax2_loops[0] < 1:
-        ax2_loops = np.linspace(ax_lims[2], ax_lims[3], int(np.ceil(ax_lims[3] - ax_lims[2]) + 1))
+    ax1_skip, ax2_skip = 8, 8
+    ax1_loops = np.linspace(ax_lims[0], ax_lims[1], 41)
+    # Force the sub-division of the sky area in question to be 1600 chunks, or
+    # roughly quarter square degree chunks, whichever is larger in area.
+    if ax1_loops[1] - ax1_loops[0] < 0.25:
+        ax1_loops = np.linspace(ax_lims[0], ax_lims[1],
+                                int(np.ceil((ax_lims[1] - ax_lims[0])/0.25) + 1))
+    ax2_loops = np.linspace(ax_lims[2], ax_lims[3], 41)
+    if ax2_loops[1] - ax2_loops[0] < 0.25:
+        ax2_loops = np.linspace(ax_lims[2], ax_lims[3],
+                                int(np.ceil((ax_lims[3] - ax_lims[2])/0.25) + 1))
+    ax1_sparse_loops = ax1_loops[::ax1_skip]
+    if ax1_sparse_loops[-1] != ax1_loops[-1]:
+        ax1_sparse_loops = np.append(ax1_sparse_loops, ax1_loops[-1])
+    ax2_sparse_loops = ax2_loops[::ax2_skip]
+    if ax2_sparse_loops[-1] != ax2_loops[-1]:
+        ax2_sparse_loops = np.append(ax2_sparse_loops, ax2_loops[-1])
 
     # Load the astrometry of each catalogue for slicing.
     a_full = np.load('{}/con_cat_astro.npy'.format(a_cat_folder_path), mmap_mode='r')
@@ -141,23 +154,59 @@ def make_island_groupings(joint_folder_path, a_cat_folder_path, b_cat_folder_pat
                                       dtype=int, shape=(len(b_full),))
     bsize[:] = 0
 
-    for ax1_start, ax1_end in zip(ax1_loops[:-1], ax1_loops[1:]):
-        for ax2_start, ax2_end in zip(ax2_loops[:-1], ax2_loops[1:]):
-            ax_cutout = [ax1_start, ax1_end, ax2_start, ax2_end]
-            a, afouriergrid, amodrefindsmall, a_cut = _load_fourier_grid_cutouts(
-                a_full, ax_cutout, joint_folder_path, a_cat_folder_path, a_auf_folder_path, 0, 'a',
-                memmap_slice_arrays_a)
-            b, bfouriergrid, bmodrefindsmall, b_cut = _load_fourier_grid_cutouts(
-                b_full, ax_cutout, joint_folder_path, b_cat_folder_path, b_auf_folder_path,
-                max_sep, 'b', memmap_slice_arrays_b)
+    for i, (ax1_sparse_start, ax1_sparse_end) in enumerate(zip(ax1_sparse_loops[:-1],
+                                                               ax1_sparse_loops[1:])):
+        for j, (ax2_sparse_start, ax2_sparse_end) in enumerate(zip(ax2_sparse_loops[:-1],
+                                                                   ax2_sparse_loops[1:])):
+            a_big_sky_cut = _load_rectangular_slice(
+                joint_folder_path, '', a_full, ax1_sparse_start, ax1_sparse_end, ax2_sparse_start,
+                ax2_sparse_end, 0, memmap_slice_arrays_a)
+            b_big_sky_cut = _load_rectangular_slice(
+                joint_folder_path, '', b_full, ax1_sparse_start, ax1_sparse_end, ax2_sparse_start,
+                ax2_sparse_end, max_sep, memmap_slice_arrays_b)
+            a_cutout = a_full[a_big_sky_cut]
+            b_cutout = b_full[b_big_sky_cut]
+            _create_rectangular_slice_arrays(joint_folder_path, 'a_cutout', len(a_cutout))
+            small_memmap_slice_arrays_a = []
+            for n in ['1', '2', '3', '4', 'combined']:
+                small_memmap_slice_arrays_a.append(np.lib.format.open_memmap(
+                    '{}/{}_temporary_sky_slice_{}.npy'.format(joint_folder_path, 'a_cutout', n),
+                    mode='r+', dtype=bool, shape=(len(a_cutout),)))
+            _create_rectangular_slice_arrays(joint_folder_path, 'b_cutout', len(b_cutout))
+            small_memmap_slice_arrays_b = []
+            for n in ['1', '2', '3', '4', 'combined']:
+                small_memmap_slice_arrays_b.append(np.lib.format.open_memmap(
+                    '{}/{}_temporary_sky_slice_{}.npy'.format(joint_folder_path, 'b_cutout', n),
+                    mode='r+', dtype=bool, shape=(len(b_cutout),)))
 
-            if len(a) > 0 and len(b) > 0:
-                overlapa, overlapb = gsf.get_max_overlap(
-                    a[:, 0], a[:, 1], b[:, 0], b[:, 1], max_sep, a[:, 2], b[:, 2],
-                    r[:-1]+dr/2, rho[:-1], drho, j1s, afouriergrid, bfouriergrid, amodrefindsmall,
-                    bmodrefindsmall, int_fracs[2])
-                asize[a_cut] = asize[a_cut] + overlapa
-                bsize[b_cut] = bsize[b_cut] + overlapb
+            # TODO: avoid np.arange by first iterating an np.sum(big_sky_cut)
+            # and pre-generating a memmapped sub-array, and looping over
+            # putting the correct indices into place.
+            a_sky_inds = np.arange(0, len(a_full))[a_big_sky_cut]
+            b_sky_inds = np.arange(0, len(b_full))[b_big_sky_cut]
+            for ax1_start, ax1_end in zip(ax1_loops[i*ax1_skip:(i+1)*ax1_skip],
+                                          ax1_loops[i*ax1_skip+1:(i+1)*ax1_skip+1]):
+                for ax2_start, ax2_end in zip(ax2_loops[j*ax2_skip:(j+1)*ax2_skip],
+                                              ax2_loops[j*ax2_skip+1:(j+1)*ax2_skip+1]):
+                    ax_cutout = [ax1_start, ax1_end, ax2_start, ax2_end]
+                    a, afouriergrid, amodrefindsmall, a_cut = _load_fourier_grid_cutouts(
+                        a_cutout, ax_cutout, joint_folder_path, a_cat_folder_path,
+                        a_auf_folder_path, 0, 'a', small_memmap_slice_arrays_a, a_big_sky_cut)
+                    b, bfouriergrid, bmodrefindsmall, b_cut = _load_fourier_grid_cutouts(
+                        b_cutout, ax_cutout, joint_folder_path, b_cat_folder_path,
+                        b_auf_folder_path, max_sep, 'b', small_memmap_slice_arrays_b,
+                        b_big_sky_cut)
+
+                    if len(a) > 0 and len(b) > 0:
+                        overlapa, overlapb = gsf.get_max_overlap(
+                            a[:, 0], a[:, 1], b[:, 0], b[:, 1], max_sep, a[:, 2], b[:, 2],
+                            r[:-1]+dr/2, rho[:-1], drho, j1s, afouriergrid, bfouriergrid,
+                            amodrefindsmall, bmodrefindsmall, int_fracs[2])
+                        a_cut2 = a_sky_inds[a_cut]
+                        b_cut2 = b_sky_inds[b_cut]
+
+                        asize[a_cut2] = asize[a_cut2] + overlapa
+                        bsize[b_cut2] = bsize[b_cut2] + overlapb
 
     amaxsize = int(np.amax(asize))
     bmaxsize = int(np.amax(bsize))
@@ -176,34 +225,65 @@ def make_island_groupings(joint_folder_path, a_cat_folder_path, b_cat_folder_pat
     asize[:] = 0
     bsize[:] = 0
 
-    for ax1_start, ax1_end in zip(ax1_loops[:-1], ax1_loops[1:]):
-        for ax2_start, ax2_end in zip(ax2_loops[:-1], ax2_loops[1:]):
-            ax_cutout = [ax1_start, ax1_end, ax2_start, ax2_end]
-            a, afouriergrid, amodrefindsmall, a_cut = _load_fourier_grid_cutouts(
-                a_full, ax_cutout, joint_folder_path, a_cat_folder_path, a_auf_folder_path, 0, 'a',
-                memmap_slice_arrays_a)
-            b, bfouriergrid, bmodrefindsmall, b_cut = _load_fourier_grid_cutouts(
-                b_full, ax_cutout, joint_folder_path, b_cat_folder_path, b_auf_folder_path,
-                max_sep, 'b', memmap_slice_arrays_b)
+    for i, (ax1_sparse_start, ax1_sparse_end) in enumerate(zip(ax1_sparse_loops[:-1],
+                                                               ax1_sparse_loops[1:])):
+        for j, (ax2_sparse_start, ax2_sparse_end) in enumerate(zip(ax2_sparse_loops[:-1],
+                                                                   ax2_sparse_loops[1:])):
+            a_big_sky_cut = _load_rectangular_slice(
+                joint_folder_path, '', a_full, ax1_sparse_start, ax1_sparse_end, ax2_sparse_start,
+                ax2_sparse_end, 0, memmap_slice_arrays_a)
+            b_big_sky_cut = _load_rectangular_slice(
+                joint_folder_path, '', b_full, ax1_sparse_start, ax1_sparse_end, ax2_sparse_start,
+                ax2_sparse_end, max_sep, memmap_slice_arrays_b)
+            a_cutout = a_full[a_big_sky_cut]
+            b_cutout = b_full[b_big_sky_cut]
+            _create_rectangular_slice_arrays(joint_folder_path, 'a_cutout', len(a_cutout))
+            small_memmap_slice_arrays_a = []
+            for n in ['1', '2', '3', '4', 'combined']:
+                small_memmap_slice_arrays_a.append(np.lib.format.open_memmap(
+                    '{}/{}_temporary_sky_slice_{}.npy'.format(joint_folder_path, 'a_cutout', n),
+                    mode='r+', dtype=bool, shape=(len(a_cutout),)))
+            _create_rectangular_slice_arrays(joint_folder_path, 'b_cutout', len(b_cutout))
+            small_memmap_slice_arrays_b = []
+            for n in ['1', '2', '3', '4', 'combined']:
+                small_memmap_slice_arrays_b.append(np.lib.format.open_memmap(
+                    '{}/{}_temporary_sky_slice_{}.npy'.format(joint_folder_path, 'b_cutout', n),
+                    mode='r+', dtype=bool, shape=(len(b_cutout),)))
 
-            if len(a) > 0 and len(b) > 0:
-                indicesa, indicesb, overlapa, overlapb = gsf.get_overlap_indices(
-                    a[:, 0], a[:, 1], b[:, 0], b[:, 1], max_sep, amaxsize, bmaxsize, a[:, 2],
-                    b[:, 2], r[:-1]+dr/2, rho[:-1], drho, j1s, afouriergrid, bfouriergrid,
-                    amodrefindsmall, bmodrefindsmall, int_fracs[2])
+            a_sky_inds = np.arange(0, len(a_full))[a_big_sky_cut]
+            b_sky_inds = np.arange(0, len(b_full))[b_big_sky_cut]
+            for ax1_start, ax1_end in zip(ax1_loops[i*ax1_skip:(i+1)*ax1_skip],
+                                          ax1_loops[i*ax1_skip+1:(i+1)*ax1_skip+1]):
+                for ax2_start, ax2_end in zip(ax2_loops[j*ax2_skip:(j+1)*ax2_skip],
+                                              ax2_loops[j*ax2_skip+1:(j+1)*ax2_skip+1]):
+                    ax_cutout = [ax1_start, ax1_end, ax2_start, ax2_end]
+                    a, afouriergrid, amodrefindsmall, a_cut = _load_fourier_grid_cutouts(
+                        a_cutout, ax_cutout, joint_folder_path, a_cat_folder_path,
+                        a_auf_folder_path, 0, 'a', small_memmap_slice_arrays_a, a_big_sky_cut)
+                    b, bfouriergrid, bmodrefindsmall, b_cut = _load_fourier_grid_cutouts(
+                        b_cutout, ax_cutout, joint_folder_path, b_cat_folder_path,
+                        b_auf_folder_path, max_sep, 'b', small_memmap_slice_arrays_b,
+                        b_big_sky_cut)
 
-                a_cut2 = np.arange(0, len(a_full))[a_cut]
-                b_cut2 = np.arange(0, len(b_full))[b_cut]
+                    if len(a) > 0 and len(b) > 0:
+                        indicesa, indicesb, overlapa, overlapb = gsf.get_overlap_indices(
+                            a[:, 0], a[:, 1], b[:, 0], b[:, 1], max_sep, amaxsize, bmaxsize,
+                            a[:, 2], b[:, 2], r[:-1]+dr/2, rho[:-1], drho, j1s, afouriergrid,
+                            bfouriergrid, amodrefindsmall, bmodrefindsmall, int_fracs[2])
 
-                for j in range(0, len(a_cut2)):
-                    ainds[asize[a_cut2[j]]:asize[a_cut2[j]]+overlapa[j], a_cut2[j]] = b_cut2[
-                        indicesa[:overlapa[j], j] - 1]
-                for j in range(0, len(b_cut2)):
-                    binds[bsize[b_cut2[j]]:bsize[b_cut2[j]]+overlapb[j], b_cut2[j]] = a_cut2[
-                        indicesb[:overlapb[j], j] - 1]
+                        a_cut2 = a_sky_inds[a_cut]
+                        b_cut2 = b_sky_inds[b_cut]
 
-                asize[a_cut] = asize[a_cut] + overlapa
-                bsize[b_cut] = bsize[b_cut] + overlapb
+                        for k in range(0, len(a_cut2)):
+                            ainds[asize[a_cut2[k]]:asize[a_cut2[k]]+overlapa[k], a_cut2[k]] = \
+                                b_cut2[indicesa[:overlapa[k], k] - 1]
+                        for k in range(0, len(b_cut2)):
+                            binds[bsize[b_cut2[k]]:bsize[b_cut2[k]]+overlapb[k], b_cut2[k]] = \
+                                a_cut2[indicesb[:overlapb[k], k] - 1]
+
+                        asize[a_cut2] = asize[a_cut2] + overlapa
+                        bsize[b_cut2] = bsize[b_cut2] + overlapb
+
     del (a_cut, a_cut2, b_cut, b_cut2, indicesa, indicesb, overlapa, overlapb, a, b,
          amodrefindsmall, bmodrefindsmall, afouriergrid, bfouriergrid)
 
@@ -213,8 +293,11 @@ def make_island_groupings(joint_folder_path, a_cat_folder_path, b_cat_folder_pat
     print("Cleaning overlaps...")
     sys.stdout.flush()
 
-    ainds, asize = _clean_overlaps(ainds, asize, joint_folder_path, 'ainds')
-    binds, bsize = _clean_overlaps(binds, bsize, joint_folder_path, 'binds')
+    ainds, asize = _clean_overlaps(ainds, asize, joint_folder_path, 'ainds', n_pool)
+    binds, bsize = _clean_overlaps(binds, bsize, joint_folder_path, 'binds', n_pool)
+
+    print("Calculating integral lengths...")
+    sys.stdout.flush()
 
     if include_phot_like or use_phot_priors:
         ablen = np.lib.format.open_memmap('{}/group/ablen.npy'.format(joint_folder_path),
@@ -292,7 +375,8 @@ def make_island_groupings(joint_folder_path, a_cat_folder_path, b_cat_folder_pat
     print("Finding unique sets...")
     sys.stdout.flush()
 
-    alist, blist, agrplen, bgrplen = set_list(ainds, binds, asize, bsize, joint_folder_path)
+    alist, blist, agrplen, bgrplen = set_list(ainds, binds, asize, bsize, joint_folder_path,
+                                              n_pool)
 
     # The final act of creating island groups is to clear out any sources too
     # close to the edge of the catalogue -- defined by its rectangular extend.
@@ -309,6 +393,8 @@ def make_island_groupings(joint_folder_path, a_cat_folder_path, b_cat_folder_pat
     num_good_checks = 0
     num_a_failed_checks = 0
     num_b_failed_checks = 0
+    # Initialise the multiprocessing loop setup:
+    pool = multiprocessing.Pool(n_pool)
     for cnum in range(0, mem_chunk_num):
         lowind = np.floor(islelen*cnum/mem_chunk_num).astype(int)
         highind = np.floor(islelen*(cnum+1)/mem_chunk_num).astype(int)
@@ -336,48 +422,14 @@ def make_island_groupings(joint_folder_path, a_cat_folder_path, b_cat_folder_pat
         # Here, since we know no source can be outside of extent, we can simply
         # look at whether any source has a sky separation of less than max_sep
         # from any of the four lines defining extent in orthogonal sky axes.
-        for i in range(0, alist_small.shape[1]):
-            subset = alist_1[:agrplen_small[i], i]
-            a = a_[subset]
-            subset = blist_1[:bgrplen_small[i], i]
-            b = b_[subset]
-            meets_min_distance = np.zeros(len(a)+len(b), bool)
-            # Do not check for longitudinal "extent" small separations for cases
-            # where all 0-360 degrees are included, as this will result in no loss
-            # of sources from consideration, with the 0->360 wraparound of
-            # coordinates. In either case if there is a small slice of sky not
-            # considered, however, we must remove sources near the "empty" strip.
-            if ax_lims[0] > 0 or ax_lims[1] < 360:
-                for lon in ax_lims[:2]:
-                    is_within_dist_of_lon = (
-                        hav_dist_constant_lat(a[:, 0], a[:, 1], lon) <= max_sep)
-                    # Progressively update the boolean for each source in the group
-                    # for each distance check for the four extents.
-                    meets_min_distance[:len(a)] = (meets_min_distance[:len(a)] |
-                                                   is_within_dist_of_lon)
-            # Similarly, if either "latitude" is set to 90 degrees, we cannot have
-            # lack of up-down missing sources, so we must check (individually this
-            # time) for whether we should skip this check.
-            for lat in ax_lims[2:]:
-                if np.abs(lat) < 90:
-                    is_within_dist_of_lat = (np.abs(a[:, 1] - lat) <= max_sep)
-                    meets_min_distance[:len(a)] = (meets_min_distance[:len(a)] |
-                                                   is_within_dist_of_lat)
-
-            # Because all sources in BOTH catalogues must pass, we continue
-            # to update meets_min_distance for catalogue "b" as well.
-            if ax_lims[0] > 0 or ax_lims[1] < 360:
-                for lon in ax_lims[:2]:
-                    is_within_dist_of_lon = (
-                        hav_dist_constant_lat(b[:, 0], b[:, 1], lon) <= max_sep)
-                    meets_min_distance[len(a):] = (meets_min_distance[len(a):] |
-                                                   is_within_dist_of_lon)
-            for lat in ax_lims[2:]:
-                if np.abs(lat) < 90:
-                    is_within_dist_of_lat = (np.abs(b[:, 1] - lat) <= max_sep)
-                    meets_min_distance[len(a):] = (meets_min_distance[len(a):] |
-                                                   is_within_dist_of_lat)
-            if np.all(meets_min_distance == 0):
+        counter = np.arange(0, alist_small.shape[1])
+        expand_constants = [itertools.repeat(item) for item in [
+            a_, b_, alist_1, blist_1, agrplen_small, bgrplen_small, ax_lims, max_sep]]
+        iter_group = zip(counter, *expand_constants)
+        for return_items in pool.imap_unordered(_distance_check, iter_group,
+                                                chunksize=max(1, len(counter) // n_pool)):
+            i, dist_check, a, b = return_items
+            if dist_check:
                 passed_check[indexmap[i]] = 1
                 failed_check[indexmap[i]] = 0
                 num_good_checks += 1
@@ -387,6 +439,8 @@ def make_island_groupings(joint_folder_path, a_cat_folder_path, b_cat_folder_pat
                 # sources in each catalogue for.
                 num_a_failed_checks += len(a)
                 num_b_failed_checks += len(b)
+
+    pool.close()
 
     # If set_list returned any rejected sources, then add any sources too close
     # to match extent to those now. Ensure that we only reject the unique source IDs
@@ -476,7 +530,8 @@ def make_island_groupings(joint_folder_path, a_cat_folder_path, b_cat_folder_pat
 
 
 def _load_fourier_grid_cutouts(a, sky_rect_coords, joint_folder_path, cat_folder_path,
-                               auf_folder_path, padding, cat_name, memmap_slice_arrays):
+                               auf_folder_path, padding, cat_name, memmap_slice_arrays,
+                               large_sky_slice):
     '''
     Function to load a sub-set of a given catalogue's astrometry, slicing it
     in a given sky coordinate rectangle, and load the appropriate sub-array
@@ -509,6 +564,9 @@ def _load_fourier_grid_cutouts(a, sky_rect_coords, joint_folder_path, cat_folder
     memmap_slice_arrays : list of numpy.ndarray
         List of the memmap sky slice arrays, to be used in the loading of the
         rectangular sky patch.
+    large_sky_slice : boolean
+        Slice array containing the ``True`` and ``False`` elements of which
+        elements of the full catalogue, in ``con_cat_astro.npy``, are in ``a``.
     '''
 
     lon1, lon2, lat1, lat2 = sky_rect_coords
@@ -516,9 +574,11 @@ def _load_fourier_grid_cutouts(a, sky_rect_coords, joint_folder_path, cat_folder
     sky_cut = _load_rectangular_slice(joint_folder_path, cat_name, a, lon1, lon2,
                                       lat1, lat2, padding, memmap_slice_arrays)
 
-    a_cutout = np.load('{}/con_cat_astro.npy'.format(cat_folder_path), mmap_mode='r')[sky_cut]
+    a_cutout = np.load('{}/con_cat_astro.npy'.format(cat_folder_path),
+                       mmap_mode='r')[large_sky_slice][sky_cut]
 
-    modrefind = np.load('{}/modelrefinds.npy'.format(auf_folder_path), mmap_mode='r')[:, sky_cut]
+    modrefind = np.load('{}/modelrefinds.npy'.format(auf_folder_path),
+                        mmap_mode='r')[:, large_sky_slice][:, sky_cut]
 
     [fouriergrid], modrefindsmall = load_small_ref_auf_grid(modrefind, auf_folder_path,
                                                             ['fourier'])
@@ -526,7 +586,7 @@ def _load_fourier_grid_cutouts(a, sky_rect_coords, joint_folder_path, cat_folder
     return a_cutout, fouriergrid, modrefindsmall, sky_cut
 
 
-def _clean_overlaps(inds, size, joint_folder_path, filename):
+def _clean_overlaps(inds, size, joint_folder_path, filename, n_pool):
     '''
     Convenience function to parse either catalogue's indices array for
     duplicate references to the opposing array on a per-source basis,
@@ -545,6 +605,8 @@ def _clean_overlaps(inds, size, joint_folder_path, filename):
         index arrays are saved.
     filename : string
         The name of the ``inds`` array saved to disk.
+    n_pool : integer
+        Number of multiprocessing threads to use.
 
     Returns
     -------
@@ -557,18 +619,23 @@ def _clean_overlaps(inds, size, joint_folder_path, filename):
     '''
     maxsize = 0
     size[:] = 0
-    for i in range(0, inds.shape[1]):
-        q = np.unique(inds[inds[:, i] > -1, i])
-        y = len(q)
-        inds[:y, i] = q
+    pool = multiprocessing.Pool(n_pool)
+    counter = np.arange(0, inds.shape[1])
+    iter_group = zip(counter, itertools.repeat(inds))
+    for return_items in pool.imap_unordered(_calc_unique_inds, iter_group,
+                                            chunksize=max(1, len(counter) // n_pool)):
+        i, unique_inds = return_items
+        y = len(unique_inds)
+        inds[:y, i] = unique_inds
         inds[y:, i] = -1
         if y > maxsize:
             maxsize = y
         size[i] = y
 
+    pool.close()
+
     # We ideally want to basically do np.asfortranarray(inds[:maxsize, :]), but
-    # this would involve a copy instead of a read so we have to loop as per
-    # _load_fourier_grid_cutouts.
+    # this would involve a copy instead of a read so we have to loop.
     inds2 = np.lib.format.open_memmap('{}/group/{}2.npy'.format(joint_folder_path, filename),
                                       mode='w+', dtype=int, shape=(maxsize, len(size)),
                                       fortran_order=True)
@@ -581,3 +648,54 @@ def _clean_overlaps(inds, size, joint_folder_path, filename):
     inds = np.load('{}/group/{}.npy'.format(joint_folder_path, filename), mmap_mode='r+')
 
     return inds, size
+
+
+def _calc_unique_inds(iterable):
+    i, inds = iterable
+    return i, np.unique(inds[inds[:, i] > -1, i])
+
+
+def _distance_check(iterable):
+    i, a_, b_, alist_1, blist_1, agrplen_small, bgrplen_small, ax_lims, max_sep = iterable
+    subset = alist_1[:agrplen_small[i], i]
+    a = a_[subset]
+    subset = blist_1[:bgrplen_small[i], i]
+    b = b_[subset]
+    meets_min_distance = np.zeros(len(a)+len(b), bool)
+    # Do not check for longitudinal "extent" small separations for cases
+    # where all 0-360 degrees are included, as this will result in no loss
+    # of sources from consideration, with the 0->360 wraparound of
+    # coordinates. In either case if there is a small slice of sky not
+    # considered, however, we must remove sources near the "empty" strip.
+    if ax_lims[0] > 0 or ax_lims[1] < 360:
+        for lon in ax_lims[:2]:
+            is_within_dist_of_lon = (
+                hav_dist_constant_lat(a[:, 0], a[:, 1], lon) <= max_sep)
+            # Progressively update the boolean for each source in the group
+            # for each distance check for the four extents.
+            meets_min_distance[:len(a)] = (meets_min_distance[:len(a)] |
+                                           is_within_dist_of_lon)
+    # Similarly, if either "latitude" is set to 90 degrees, we cannot have
+    # lack of up-down missing sources, so we must check (individually this
+    # time) for whether we should skip this check.
+    for lat in ax_lims[2:]:
+        if np.abs(lat) < 90:
+            is_within_dist_of_lat = (np.abs(a[:, 1] - lat) <= max_sep)
+            meets_min_distance[:len(a)] = (meets_min_distance[:len(a)] |
+                                           is_within_dist_of_lat)
+
+    # Because all sources in BOTH catalogues must pass, we continue
+    # to update meets_min_distance for catalogue "b" as well.
+    if ax_lims[0] > 0 or ax_lims[1] < 360:
+        for lon in ax_lims[:2]:
+            is_within_dist_of_lon = (
+                hav_dist_constant_lat(b[:, 0], b[:, 1], lon) <= max_sep)
+            meets_min_distance[len(a):] = (meets_min_distance[len(a):] |
+                                           is_within_dist_of_lon)
+    for lat in ax_lims[2:]:
+        if np.abs(lat) < 90:
+            is_within_dist_of_lat = (np.abs(b[:, 1] - lat) <= max_sep)
+            meets_min_distance[len(a):] = (meets_min_distance[len(a):] |
+                                           is_within_dist_of_lat)
+
+    return [i, np.all(meets_min_distance == 0), a, b]
