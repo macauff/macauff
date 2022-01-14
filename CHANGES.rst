@@ -25,6 +25,29 @@ New Features
 Bug Fixes
 ^^^^^^^^^
 
+- Corrected issue where ``local_N`` wasn't having entries saved to memmapped
+  array in ``make_perturb_auf``. [#38]
+
+- Updated ``local_N`` to keep the local densities of catalogue in each filter,
+  instead of overwriting each time. [#38]
+
+- Set minimum density of local sources to one source in the region in question,
+  instead of allowing for a floor of zero density, to avoid issues with AUF
+  simulations. [#38]
+
+- Avoided re-using the same random seed in each density-magnitude combination
+  during AUF simulations. [#38]
+
+- Changed limits on photometric likelihoods and priors to avoid cases where
+  both field and counterpart posteriors are zero, and hence no matches can be
+  made in a given island. [#38]
+
+- Fixed issue in ``source_pairing`` where incorrect island lengths could be used
+  for field and counterpart arrays. [#38]
+
+- Fixed ordering issue with ``acontamprob`` and ``bcontamprob`` in
+  ``source_pairing``. [#38]
+
 - Fix to issue with np.where test in ``test_counterpart_pairing`` causing incorrect
   failure to match probabilities. [#36]
 
@@ -55,6 +78,10 @@ Bug Fixes
 
 API Changes
 ^^^^^^^^^^^
+
+- Added ``npool`` as input parameter to ``make_island_groupings``. [#38]
+
+- Removed ``npool`` as input parameter to ``source_pairing``. [#38]
 
 - Added extra columns derived in ``counterpart_pairing`` to output datafiles in
   ``npy_to_csv``. [#37]
