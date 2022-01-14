@@ -49,12 +49,23 @@ subroutine get_density(a_ax1, a_ax2, b_ax1, b_ax2, maxdist, counts)
 end subroutine get_density
 
 subroutine get_circle_area_overlap(cat_ax1, cat_ax2, density_radius, min_lon, max_lon, min_lat, max_lat, circ_overlap_area)
+    ! Calculates the amount of circle overlap with a rectangle of particular coordinates. Adapted from
+    ! code provided by B. Retter, from Retter, Hatchell & Naylor (2019, MNRAS, 487, 887).
     integer, parameter :: dp = kind(0.0d0)  ! double precision
-    real(dp), intent(in) :: cat_ax1(:), cat_ax2(:), density_radius, min_lon, max_lon, min_lat, max_lat
+    ! Coordinates in orthogonal sky axies, and radius of, circles to calculate the overlap with sky position of.
+    real(dp), intent(in) :: cat_ax1(:), cat_ax2(:), density_radius
+    ! Defining limits of rectangle inside which to calculate overlap amount of each circle.
+    real(dp), intent(in) :: min_lon, max_lon, min_lat, max_lat
+    ! Relative amount of circle inside rectangle for each unique point.
     real(dp), intent(out) :: circ_overlap_area(size(cat_ax1))
 
+    ! Loop counters, and array to keep track of whether the circle overlaps any rectangle edges or not.
     integer :: i, j, has_overlapped_edge(4)
-    real(dp) :: area, edges(4), coords(4), h, a, b, chord_area_overlap, a_eval, b_eval
+    ! Area of circle inside rectangle; rectangle edges; circle coordinates repeated to match each rectangle edge.
+    real(dp) :: area, edges(4), coords(4)
+    ! Distance between circle and a particular rectangle edge; furthest edges of intersection between circle and
+    ! rectangle; amount of circle outside a particular rectangle edge; and integral evaluations of chord of circle.
+    real(dp) :: h, a, b, chord_area_overlap, a_eval, b_eval
 
     edges = (/ min_lon, min_lat, max_lon, max_lat /)
 !$OMP PARALLEL DO DEFAULT(NONE) PRIVATE(i, j, area, has_overlapped_edge, coords, h, a, b, a_eval, b_eval, chord_area_overlap) &
@@ -101,9 +112,14 @@ subroutine get_circle_area_overlap(cat_ax1, cat_ax2, density_radius, min_lon, ma
 end subroutine get_circle_area_overlap
 
 subroutine chord_integral_eval(x, r, h, integral)
+    ! Evaluate the indefinite integral of a chord along its orthogonal axis.
     integer, parameter :: dp = kind(0.0d0)  ! double precision
+    ! x-axis limit to evaluate indefinite integral at; radius of circle; orthogonal distance
+    ! between the center of the circle and the rectangle boundary.
     real(dp), intent(in) :: x, r, h
+    ! Indefinite integral evaluated at a particular x value.
     real(dp), intent(out) :: integral
+    ! Orthogonal distance between center of circle and top of circle.
     real(dp) :: d
 
     d = sqrt(r**2 - x**2)

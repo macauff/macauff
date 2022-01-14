@@ -14,8 +14,11 @@ contains
 subroutine find_mag_bin_inds(mags, flags, bins, cuts)
     ! Find the indices of the bins to place all magnitudes in for a given magnitude bin array.
     integer, parameter :: dp = kind(0.0d0)  ! double precision
+    ! Magnitudes to place in the appropriate magnitude bins.
     real(dp), intent(in) :: mags(:), bins(:)
+    ! Flags for whether to use this source for populating magnitude bins.
     logical, intent(in) :: flags(:)
+    ! Slices for each magnitude bin, indicating which sources fall into that particular bin.
     integer, intent(out) :: cuts(size(bins)-1, size(mags))
 
     integer :: i, j
