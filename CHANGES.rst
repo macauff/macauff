@@ -7,6 +7,9 @@ General
 New Features
 ^^^^^^^^^^^^
 
+- Creation of initial Galactic proper motion model, for inclusion within the
+  cross-match framework in a future release. [#39]
+
 - Added additional data outputs to ``counterpart_pairing``: match separations, as
   well as the nearest neighbour non-match for each source within a given island,
   and its eta/xi and average contamination derived values. [#37]
