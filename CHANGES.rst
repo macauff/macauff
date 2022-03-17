@@ -109,6 +109,8 @@ API Changes
 Other Changes
 ^^^^^^^^^^^^^
 
+- Improved github actions matrix testing coverage. [#40]
+
 - Updates to documentation to reflect the relaxing of photometric likelihood and
   perturbation AUF component options. Other minor changes to documentation
   layout. [#30]
