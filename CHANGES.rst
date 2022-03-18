@@ -1,5 +1,5 @@
 0.1.2 (unreleased)
-----------------
+------------------
 
 General
 ^^^^^^^
@@ -116,6 +116,8 @@ Other Changes
 
 - Improved github actions matrix testing coverage. [#40]
 
+- Added ``pandas`` as a dependency. [#34]
+
 - Updates to documentation to reflect the relaxing of photometric likelihood and
   perturbation AUF component options. Other minor changes to documentation
   layout. [#30]
@@ -128,7 +130,7 @@ Other Changes
 
 
 0.1.1 (2021-01-06)
-----------------
+------------------
 
 General
 ^^^^^^^
@@ -183,3 +185,9 @@ API Changes
 
 Other Changes
 ^^^^^^^^^^^^^
+
+- Added ``sphinx-fortran`` as a dependency. [#22]
+
+- Added ``pytest-astropy`` as a dependency. [#17]
+
+- Added ``scipy`` as a dependency. [#16]
