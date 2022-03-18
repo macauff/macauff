@@ -4,12 +4,28 @@ on: [push, pull_request]
 
 jobs:
   build:
-
+    name: ${{ matrix.name }}
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [ubuntu-latest, macos-10.15]
-        python-version: ['3.7', '3.9']
+        include:
+          - name: Linux, Python 3.7
+            os: ubuntu-latest
+            python-version: 3.7
+            toxenv: py37-test
+          - name: Linux, Python 3.9
+            os: ubuntu-latest
+            python-version: 3.9
+            # Include at least one coverage option for codecov.
+            toxenv: py39-test-cov
+          - name: macOS, Python 3.7
+            os: macOS-10.15
+            python-version: 3.7
+            toxenv: py37-test
+          - name: macOS, Python 3.9
+            os: macOS-10.15
+            python-version: 3.9
+            toxenv: py39-test
 
     steps:
       - uses: actions/checkout@v2
@@ -35,12 +51,17 @@ jobs:
           pip install tox
       - if: github.event_name != 'push' || github.ref != 'refs/heads/main'
         name: Run tests
-        run: tox -e test
+        run: tox -e ${{ matrix.toxenv }}
       - if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         name: Run tests with remote
-        run: tox -e test -- --remote-data
+        run: tox -e ${{ matrix.toxenv }} -- --remote-data
       - name: Run documentation
         run: tox -e build_docs
+      - name: Upload coverage to codecov
+        if: ${{ contains(matrix.toxenv,'-cov') }}
+        uses: codecov/codecov-action@v2
+        with:
+          file: ./.tox/coverage.xml
 
   build_docs_job:
     needs: build
@@ -51,7 +72,7 @@ jobs:
       - name: Setup Python
         uses: actions/setup-python@v2
         with:
-          python-version: 3.7
+          python-version: 3.9
 
       - name: Install Tox and any other packages
         run: |
