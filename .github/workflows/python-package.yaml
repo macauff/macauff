@@ -16,7 +16,8 @@ jobs:
           - name: Linux, Python 3.9
             os: ubuntu-latest
             python-version: 3.9
-            toxenv: py39-test
+            # Include at least one coverage option for codecov.
+            toxenv: py39-test-cov
           - name: macOS, Python 3.7
             os: macOS-10.15
             python-version: 3.7
@@ -56,6 +57,11 @@ jobs:
         run: tox -e ${{ matrix.toxenv }} -- --remote-data
       - name: Run documentation
         run: tox -e build_docs
+      - name: Upload coverage to codecov
+        if: ${{ contains(matrix.toxenv,'-cov') }}
+        uses: codecov/codecov-action@v2
+        with:
+          file: ./.tox/coverage.xml
 
   build_docs_job:
     needs: build
