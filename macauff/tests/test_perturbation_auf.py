@@ -8,11 +8,13 @@ import os
 import numpy as np
 from numpy.testing import assert_allclose
 from scipy.special import j0, j1
+import astropy.units as u
 
 from ..matching import CrossMatch
 from ..misc_functions_fortran import misc_functions_fortran as mff
 from ..perturbation_auf import (make_perturb_aufs, download_trilegal_simulation)
 from ..perturbation_auf_fortran import perturbation_auf_fortran as paf
+from ..galaxy_counts import create_galaxy_counts, generate_speclite_filters
 
 from .test_matching import _replace_line
 
@@ -293,6 +295,106 @@ def test_circle_area():
                         manual_area += dx*dy
             assert_allclose(calc_area, manual_area, rtol=0.05)
         done += 1
+
+
+class TestCreateGalaxyCounts():
+    def setup_class(self):
+        # Update these values if this is changed in CrossMatch
+        self.cmau = np.empty((5, 2, 4), float)
+        self.cmau[0, :, :] = [[-24.286513, 1.141760, 2.655846, np.nan],
+                              [-23.192520, 1.778718, 1.668292, np.nan]]
+        self.cmau[1, :, :] = [[0.001487, 2.918841, 0.000510, np.nan],
+                              [0.000560, 7.691261, 0.003330, -0.065565]]
+        self.cmau[2, :, :] = [[-1.257761, 0.021362, np.nan, np.nan],
+                              [-0.309077, -0.067411, np.nan, np.nan]]
+        self.cmau[3, :, :] = [[-0.302018, 0.034203, np.nan, np.nan],
+                              [-0.713062, 0.233366, np.nan, np.nan]]
+        self.cmau[4, :, :] = [[1.233627, -0.322347, np.nan, np.nan],
+                              [1.068926, -0.385984, np.nan, np.nan]]
+        self.alpha0 = [[2.079, 3.524, 1.917, 1.992, 2.536], [2.461, 2.358, 2.568, 2.268, 2.402]]
+        self.alpha1 = [[2.265, 3.862, 1.921, 1.685, 2.480], [2.410, 2.340, 2.200, 2.540, 2.464]]
+        self.alphaweight = [[3.47e+09, 3.31e+06, 2.13e+09, 1.64e+10, 1.01e+09],
+                            [3.84e+09, 1.57e+06, 3.91e+08, 4.66e+10, 3.03e+07]]
+
+        self.mag_bins = np.arange(10, 15, 0.1)
+        self.z_array = np.array([0, 0.01])
+
+        self.ab_offset = 0
+
+        # Avoid using astropy's functions to independently check working.
+        # For LambdaCDM, H0 = 67.7 km/s/Mpc, Ol = 0.69, Om = 0.31, Ok = 0:
+        # From e.g. https://ned.ipac.caltech.edu/level5/Hogg/Hogg_contents.html:
+        # dV = dh * (1+z)**2 * da**2 / E(z) dO dz
+        # da = dm / (1 + z); dm = dc for Omega_k = 0; dc = dh \int_0^z dz' / E(z')
+        # dV = dh**3 * (\int_0^z dz' / E(z'))**2 / E(z) dOdz
+        # E(z) = sqrt(Om (1+z)^3 + Ok (1 + z)^2 + Ol) = sqrt(Om (1+z)^3 + Ol)
+        Om, Ol = 0.31, 0.69
+        hubble_distance = 3000/0.677  # 3000/h Mpc
+        __z = np.linspace(self.z_array[0], self.z_array[1], 1001)
+        E__z = np.sqrt(Om * (1 + __z)**3 + Ol)
+        int_ez = np.sum(1/E__z) * (__z[1] - __z[0])
+        _dV_dOmega_dz_1 = 0  # at exactly z = 0 \int_0^z dz' / E(z') = 0
+        sterad_per_sq_deg = (np.pi/180)**2
+        _dV_dOmega_dz_2 = hubble_distance**3 * int_ez**2 / E__z[-1] * sterad_per_sq_deg
+        self.dV_dOmega = 0.5 * (_dV_dOmega_dz_1 + _dV_dOmega_dz_2) * np.diff(self.z_array)
+
+        self.fake_mags = np.linspace(-60, 50, 1101)
+        # m ~= M + 5 log10(dl(z)) + 25; dl = (1 + z) * dm = (1 + z) * dh \int_0^z dz' / E(z')
+        __z = np.linspace(self.z_array[0], 0.5 * np.sum(self.z_array), 1001)
+        E__z = np.sqrt(Om * (1 + __z)**3 + Ol)
+        int_ez = np.sum(1/E__z) * (__z[1] - __z[0])
+        dl = (1 + 0.5 * np.sum(self.z_array)) * hubble_distance * int_ez
+        self.fake_app_mags = self.fake_mags + 5 * np.log10(dl) + 25
+
+    def _calculate_params(self, lwav, i):
+        # Assume we're close enough to zero redshift to not need P and Q.
+        _cmau = self.cmau[:, i, :]
+        fake_m = _cmau[0, 2] * np.exp(-lwav * _cmau[0, 1]) + _cmau[0, 0]
+        if i == 0:
+            fake_phi = _cmau[1, 2] * np.exp(-lwav * _cmau[1, 1]) + _cmau[1, 0]
+        else:
+            fake_phi = _cmau[1, 2] * np.exp(-0.5 * (lwav - _cmau[1, 3])**2 *
+                                            _cmau[1, 1]) + _cmau[1, 0]
+        fake_alpha = _cmau[2, 1] * lwav + _cmau[2, 0]
+
+        return fake_m, fake_phi, fake_alpha
+
+    def test_create_galaxy_counts(self):
+        wav = 3.4  # microns
+        filter_name = 'wise2010-w1'
+        gal_dens = create_galaxy_counts(self.cmau, self.mag_bins, self.z_array, wav, self.alpha0,
+                                        self.alpha1, self.alphaweight, self.ab_offset, filter_name)
+        tot_fake_sch = np.zeros_like(gal_dens)
+        for i in [0, 1]:
+            fake_m, fake_phi, fake_alpha = self._calculate_params(np.log10(wav), i)
+            fake_schechter = (0.4 * np.log(10) * fake_phi *
+                              (10**(-0.4 * (self.fake_mags - fake_m)))**(fake_alpha+1) *
+                              np.exp(-10**(-0.4 * (self.fake_mags - fake_m))))
+            tot_fake_sch += np.interp(self.mag_bins, self.fake_app_mags,
+                                      fake_schechter) * self.dV_dOmega
+
+        assert_allclose(tot_fake_sch, gal_dens, rtol=0.01, atol=1e-4)
+
+    def test_create_filter_and_galaxy_counts(self):
+        wav = 0.16  # microns
+        f, n = 'filter', 'uuu'
+        filter_name = '{}-{}'.format(f, n)
+
+        generate_speclite_filters(f, [n], [np.array([0.159, 0.16, 0.161])], [np.array([0, 1, 0])],
+                                  u.micron)
+
+        gal_dens = create_galaxy_counts(self.cmau, self.mag_bins, self.z_array, wav, self.alpha0,
+                                        self.alpha1, self.alphaweight, self.ab_offset, filter_name)
+        tot_fake_sch = np.zeros_like(gal_dens)
+        for i in [0, 1]:
+            fake_m, fake_phi, fake_alpha = self._calculate_params(np.log10(wav), i)
+            fake_schechter = (0.4 * np.log(10) * fake_phi *
+                              (10**(-0.4 * (self.fake_mags - fake_m)))**(fake_alpha+1) *
+                              np.exp(-10**(-0.4 * (self.fake_mags - fake_m))))
+            tot_fake_sch += np.interp(self.mag_bins, self.fake_app_mags,
+                                      fake_schechter) * self.dV_dOmega
+
+        assert_allclose(tot_fake_sch, gal_dens, rtol=0.01, atol=1e-4)
 
 
 class TestMakePerturbAUFs():
