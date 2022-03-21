@@ -738,10 +738,12 @@ def create_single_perturb_auf(tri_folder, filt, r, dr, rho, drho, j0s, num_trial
     maxmag = d_mag * np.ceil(np.amax(tri_mags)/d_mag)
     hist, model_mags = np.histogram(tri_mags, bins=np.arange(minmag, maxmag+1e-10, d_mag))
     model_mags_interval = np.diff(model_mags)
+    model_mag_mids = model_mags[:-1]+model_mags_interval/2
 
     hist = hist / model_mags_interval / tri_area
     log10y_tri = np.log10(hist)
 
+    # TODO: add extinction reddening!
     if fit_gal_flag:
         z_array = np.linspace(0, z_max, nz)
         gal_dens = create_galaxy_counts(cmau_array, model_mags, z_array, wav, alpha0, alpha1,
@@ -781,7 +783,7 @@ def create_single_perturb_auf(tri_folder, filt, r, dr, rho, drho, j0s, num_trial
                                                         len(count_array)))
     Frac, Flux, fourieroffset, offset, cumulative = paf.perturb_aufs(
         count_array, mag_array, r[:-1]+dr/2, dr, r, j0s.T,
-        model_mags+model_mags_interval/2, model_mags_interval, log10y, model_count,
+        model_mag_mids, model_mags_interval, log10y, model_count,
         int(dm_max/d_mag) * np.ones_like(count_array), mag_cut, R, num_trials, seed)
     np.save('{}/{}/frac.npy'.format(tri_folder, filt), Frac)
     np.save('{}/{}/flux.npy'.format(tri_folder, filt), Flux)
