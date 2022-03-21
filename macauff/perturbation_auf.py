@@ -736,11 +736,11 @@ def create_single_perturb_auf(tri_folder, filt, r, dr, rho, drho, j0s, num_trial
 
     minmag = d_mag * np.floor(np.amin(tri_mags)/d_mag)
     maxmag = d_mag * np.ceil(np.amax(tri_mags)/d_mag)
-    hist, model_mags = np.histogram(tri_mags, bins=np.arange(minmag, maxmag+1e-10, d_mag))
+    h, model_mags = np.histogram(tri_mags, bins=np.arange(minmag, maxmag+1e-10, d_mag))
     model_mags_interval = np.diff(model_mags)
     model_mag_mids = model_mags[:-1]+model_mags_interval/2
 
-    hist = hist / model_mags_interval / tri_area
+    hist = h / model_mags_interval / tri_area
     log10y_tri = np.log10(hist)
 
     # TODO: add extinction reddening!
@@ -755,6 +755,12 @@ def create_single_perturb_auf(tri_folder, filt, r, dr, rho, drho, j0s, num_trial
     else:
         gal_count = 0
         log10y_gal = -np.inf * np.ones_like(log10y_tri)
+
+        # If we're not generating galaxy counts, we have to solely rely on
+        # TRILEGAL counting statistics, so we only want to keep populated bins.
+        hc = np.where(h > 3)[0]
+        model_mag_mids = model_mag_mids[hc]
+        model_mags_interval = model_mags_interval[hc]
 
     model_count = tri_count + gal_count
     log10y = np.log10(10**log10y_tri + 10**log10y_gal)
