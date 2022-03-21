@@ -13,6 +13,7 @@ from .misc_functions import (create_auf_params_grid, _load_single_sky_slice,
 from .misc_functions_fortran import misc_functions_fortran as mff
 from .get_trilegal_wrapper import get_trilegal
 from .perturbation_auf_fortran import perturbation_auf_fortran as paf
+from .galaxy_counts import create_galaxy_counts
 
 __all__ = ['make_perturb_aufs', 'create_single_perturb_auf']
 
@@ -592,7 +593,10 @@ def calculate_local_density(a_astro, a_tot_astro, a_tot_photo, auf_folder, cat_f
 
 
 def create_single_perturb_auf(tri_folder, filt, r, dr, rho, drho, j0s, num_trials, psf_fwhm,
-                              header, density_mag, a_photo, localN, dm_max, d_mag, mag_cut):
+                              header, density_mag, a_photo, localN, dm_max, d_mag, mag_cut,
+                              fit_gal_flag, cmau_array=None, wav=None, z_max=None, nz=None,
+                              alpha0=None, alpha1=None, weight=None, ab_offset=None,
+                              filter_name=None):
     '''
     Creates the associated parameters for describing a single perturbation AUF
     component, for a single sky position.
@@ -641,12 +645,50 @@ def create_single_perturb_auf(tri_folder, filt, r, dr, rho, drho, j0s, num_trial
     mag_cut : numpy.ndarray or list of floats
         The magnitude offsets -- or relative fluxes -- above which to keep track of
         the fraction of objects suffering from a contaminating source.
+    fit_gal_flag : bool
+        Flag to indicate whether to simulate galaxy counts for the purposes of
+        simulating the perturbation component of the AUF.
+    cmau_array : numpy.ndarray, optional
+        Array holding the c/m/a/u values that describe the parameterisation
+        of the Schechter functions with wavelength, following Wilson (2022, RNAAS,
+        ...) [1]_. Shape should be `(5, 2, 4)`, with 5 parameters for both blue
+        and red galaxies.
+    wav : float, optional
+        Wavelength, in microns, of the filter of the current observations.
+    z_max : float, optional
+        Maximum redshift to simulate differential galaxy counts out to.
+    nz : int, optional
+        Number of redshifts to simulate, to dictate resolution of Schechter
+        functions used to generate differential galaxy counts.
+    alpha0 : list of numpy.ndarray or numpy.ndarray, optional
+        Zero-redshift indices used to calculate Dirichlet SED coefficients,
+        used within the differential galaxy count simulations. Should either be
+        a two-element list or shape ``(2, 5)`` array. See [2]_ and [3]_ for
+        more details.
+    alpha1 : list of numpy.ndarray or numpy.ndarray, optional
+        Dirichlet SED coefficients at z=1.
+    weight : list of numpy.ndarray or numpy.ndarray, optional
+        Weights used to derive the ``kcorrect`` coefficients within the
+        galaxy count framework.
+    ab_offset : float, optional
+        The zero point difference between the chosen filter and the AB system,
+        for conversion of simulated galaxy counts from AB magnitudes. Should
+        be of the convention m = m_AB - ab_offset
+    filter_name : string, optional
+        The ``speclite`` style ``group_name-band_name`` name for the filter,
+        for use in the creation of simulated galaxy counts.
 
     Returns
     -------
     count_array : numpy.ndarray
         The simulated local normalising densities that were used to simulate
         potential perturbation distributions.
+
+    References
+    ----------
+    .. [1] Wilson T. J. (2022), RNAAS, ...
+    .. [2] Herbel J., Kacprzak T., Amara A., et al. (2017), JCAP, 8, 35
+    .. [3] Blanton M. R., Roweis S. (2007), AJ, 133, 734
     '''
     tri_name = 'trilegal_auf_simulation'
     f = open('{}/{}.dat'.format(tri_folder, tri_name), "r")
@@ -664,21 +706,24 @@ def create_single_perturb_auf(tri_folder, filt, r, dr, rho, drho, j0s, num_trial
     minmag = d_mag * np.floor(np.amin(tri_mags)/d_mag)
     maxmag = d_mag * np.ceil(np.amax(tri_mags)/d_mag)
     hist, model_mags = np.histogram(tri_mags, bins=np.arange(minmag, maxmag+1e-10, d_mag))
-    hc = np.where(hist > 3)[0]
-
-    hist = hist[hc]
-    model_mags_interval = np.diff(model_mags)[hc]
-    model_mags = model_mags[hc]
+    model_mags_interval = np.diff(model_mags)
 
     hist = hist / model_mags_interval / tri_area
     log10y_tri = np.log10(hist)
 
-    # TODO: add the step to get density and counts of extra-galactic sources.
-    gal_count = 0
-    log10y_gal = -np.inf * np.ones_like(log10y_tri)
+    if fit_gal_flag:
+        z_array = np.linspace(0, z_max, nz)
+        gal_dens = create_galaxy_counts(cmau_array, model_mags, z_array, wav, alpha0, alpha1,
+                                        weight, ab_offset, filter_name)
+        max_mag_bin = np.argwhere(model_mags[1:] > density_mag)[0][0]
+        gal_count = np.sum(gal_dens[:max_mag_bin]*model_mags_interval[:max_mag_bin])
+        log10y_gal = -np.inf * np.ones_like(log10y_tri)
+        log10y_gal[gal_dens > 0] = np.log10(gal_dens[gal_dens > 0])
+    else:
+        gal_count = 0
+        log10y_gal = -np.inf * np.ones_like(log10y_tri)
 
     model_count = tri_count + gal_count
-
     log10y = np.log10(10**log10y_tri + 10**log10y_gal)
 
     # Set a magnitude bin width of 0.25 mags, to avoid oversampling.
