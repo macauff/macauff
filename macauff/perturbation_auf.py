@@ -23,7 +23,10 @@ def make_perturb_aufs(auf_folder, cat_folder, filters, auf_points, r, dr, rho,
                       tri_download_flag=False, delta_mag_cuts=None, psf_fwhms=None,
                       tri_set_name=None, tri_filt_num=None, tri_filt_names=None,
                       auf_region_frame=None, num_trials=None, j0s=None, density_mags=None,
-                      dm_max=None, d_mag=None, compute_local_density=None, density_radius=None):
+                      dm_max=None, d_mag=None, compute_local_density=None, density_radius=None,
+                      fit_gal_flag=None, cmau_array=None, wavs=None, z_maxs=None, nzs=None,
+                      ab_offsets=None, filter_names=None, alpha0=None, alpha1=None,
+                      alpha_weight=None):
     """
     Function to perform the creation of the blended object perturbation component
     of the AUF.
@@ -152,6 +155,27 @@ def make_perturb_aufs(auf_folder, cat_folder, filters, auf_points, r, dr, rho,
         raise ValueError("density_radius must be given if include_perturb_auf and "
                          "compute_local_density are both True.")
 
+    if include_perturb_auf and fit_gal_flag is None:
+        raise ValueError("fit_gal_flag must not be None if include_perturb_auf is True.")
+    if include_perturb_auf and fit_gal_flag and cmau_array is None:
+        raise ValueError("cmau_array must be given if fit_gal_flag is True.")
+    if include_perturb_auf and fit_gal_flag and wavs is None:
+        raise ValueError("wavs must be given if fit_gal_flag is True.")
+    if include_perturb_auf and fit_gal_flag and z_maxs is None:
+        raise ValueError("z_maxs must be given if fit_gal_flag is True.")
+    if include_perturb_auf and fit_gal_flag and nzs is None:
+        raise ValueError("nzs must be given if fit_gal_flag is True.")
+    if include_perturb_auf and fit_gal_flag and ab_offsets is None:
+        raise ValueError("ab_offsets must be given if fit_gal_flag is True.")
+    if include_perturb_auf and fit_gal_flag and filter_names is None:
+        raise ValueError("filter_names must be given if fit_gal_flag is True.")
+    if include_perturb_auf and fit_gal_flag and alpha0 is None:
+        raise ValueError("alpha0 must be given if fit_gal_flag is True.")
+    if include_perturb_auf and fit_gal_flag and alpha1 is None:
+        raise ValueError("alpha1 must be given if fit_gal_flag is True.")
+    if include_perturb_auf and fit_gal_flag and alpha_weight is None:
+        raise ValueError("alpha_weight must be given if fit_gal_flag is True.")
+
     print('Creating perturbation AUFs sky indices for catalogue "{}"...'.format(which_cat))
     sys.stdout.flush()
 
@@ -275,10 +299,17 @@ def make_perturb_aufs(auf_folder, cat_folder, filters, auf_points, r, dr, rho,
                 else:
                     localN = np.load('{}/local_N.npy'.format(auf_folder),
                                      mmap_mode='r')[sky_cut][good_mag_slice, j]
-                Narray = create_single_perturb_auf(
-                    ax_folder, filters[j], r, dr, rho, drho, j0s, num_trials, psf_fwhms[j],
-                    tri_filt_names[j], density_mags[j], a_photo, localN, dm_max, d_mag,
-                    delta_mag_cuts)
+                if fit_gal_flag:
+                    Narray = create_single_perturb_auf(
+                        ax_folder, filters[j], r, dr, rho, drho, j0s, num_trials, psf_fwhms[j],
+                        tri_filt_names[j], density_mags[j], a_photo, localN, dm_max, d_mag,
+                        delta_mag_cuts, fit_gal_flag, cmau_array, wavs[j], z_maxs[j], nzs[j],
+                        alpha0, alpha1, alpha_weight, ab_offsets[j], filter_names[j])
+                else:
+                    Narray = create_single_perturb_auf(
+                        ax_folder, filters[j], r, dr, rho, drho, j0s, num_trials, psf_fwhms[j],
+                        tri_filt_names[j], density_mags[j], a_photo, localN, dm_max, d_mag,
+                        delta_mag_cuts, fit_gal_flag)
             else:
                 # Without the simulations to force local normalising density N or
                 # individual source brightness magnitudes, we can simply combine
@@ -595,7 +626,7 @@ def calculate_local_density(a_astro, a_tot_astro, a_tot_photo, auf_folder, cat_f
 def create_single_perturb_auf(tri_folder, filt, r, dr, rho, drho, j0s, num_trials, psf_fwhm,
                               header, density_mag, a_photo, localN, dm_max, d_mag, mag_cut,
                               fit_gal_flag, cmau_array=None, wav=None, z_max=None, nz=None,
-                              alpha0=None, alpha1=None, weight=None, ab_offset=None,
+                              alpha0=None, alpha1=None, alpha_weight=None, ab_offset=None,
                               filter_name=None):
     '''
     Creates the associated parameters for describing a single perturbation AUF
@@ -667,7 +698,7 @@ def create_single_perturb_auf(tri_folder, filt, r, dr, rho, drho, j0s, num_trial
         more details.
     alpha1 : list of numpy.ndarray or numpy.ndarray, optional
         Dirichlet SED coefficients at z=1.
-    weight : list of numpy.ndarray or numpy.ndarray, optional
+    alpha_weight : list of numpy.ndarray or numpy.ndarray, optional
         Weights used to derive the ``kcorrect`` coefficients within the
         galaxy count framework.
     ab_offset : float, optional
@@ -714,7 +745,7 @@ def create_single_perturb_auf(tri_folder, filt, r, dr, rho, drho, j0s, num_trial
     if fit_gal_flag:
         z_array = np.linspace(0, z_max, nz)
         gal_dens = create_galaxy_counts(cmau_array, model_mags, z_array, wav, alpha0, alpha1,
-                                        weight, ab_offset, filter_name)
+                                        alpha_weight, ab_offset, filter_name)
         max_mag_bin = np.argwhere(model_mags[1:] > density_mag)[0][0]
         gal_count = np.sum(gal_dens[:max_mag_bin]*model_mags_interval[:max_mag_bin])
         log10y_gal = -np.inf * np.ones_like(log10y_tri)
