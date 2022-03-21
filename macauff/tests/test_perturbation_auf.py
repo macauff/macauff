@@ -449,7 +449,7 @@ class TestMakePerturbAUFs():
             make_perturb_aufs(*self.args, psf_fwhms=self.psf_fwhms, num_trials=num_trials, j0s=j0s,
                               density_mags=cutoff_mags, dm_max=dm_max, d_mag=d_mag,
                               delta_mag_cuts=self.delta_mag_cuts, compute_local_density=False,
-                              tri_filt_names=self.tri_filt_names)
+                              tri_filt_names=self.tri_filt_names, fit_gal_flag=False)
 
             if i == 0:
                 for name, size in zip(
@@ -619,6 +619,8 @@ class TestMakePerturbAUFs():
         cm.run_cf = True
         cm.run_source = True
         cm.num_trials = self.num_trials
+        cm.a_fit_gal_flag = False
+        cm.b_fit_gal_flag = False
 
         cm.create_perturb_auf(self.files_per_auf_sim)
 
