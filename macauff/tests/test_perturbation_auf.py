@@ -479,6 +479,55 @@ class TestMakePerturbAUFs():
                               compute_local_density=True, psf_fwhms=1, num_trials=1, j0s=1,
                               density_mags=1, dm_max=1, d_mag=1)
 
+        with pytest.raises(ValueError, match='fit_gal_flag must not be None if include_'):
+            make_perturb_aufs(*self.args, tri_filt_names=1, delta_mag_cuts=1,
+                              compute_local_density=False, psf_fwhms=1, num_trials=1, j0s=1,
+                              density_mags=1, dm_max=1, d_mag=1)
+        with pytest.raises(ValueError, match='cmau_array must be given if fit_gal_flag is True.'):
+            make_perturb_aufs(*self.args, tri_filt_names=1, delta_mag_cuts=1,
+                              compute_local_density=False, psf_fwhms=1, num_trials=1, j0s=1,
+                              density_mags=1, dm_max=1, d_mag=1, fit_gal_flag=True)
+        with pytest.raises(ValueError, match='wavs must be given if fit_gal_flag is True.'):
+            make_perturb_aufs(*self.args, tri_filt_names=1, delta_mag_cuts=1,
+                              compute_local_density=False, psf_fwhms=1, num_trials=1, j0s=1,
+                              density_mags=1, dm_max=1, d_mag=1, fit_gal_flag=True, cmau_array=1)
+        with pytest.raises(ValueError, match='z_maxs must be given if fit_gal_flag is True.'):
+            make_perturb_aufs(*self.args, tri_filt_names=1, delta_mag_cuts=1,
+                              compute_local_density=False, psf_fwhms=1, num_trials=1, j0s=1,
+                              density_mags=1, dm_max=1, d_mag=1, fit_gal_flag=True, cmau_array=1,
+                              wavs=1)
+        with pytest.raises(ValueError, match='nzs must be given if fit_gal_flag is True.'):
+            make_perturb_aufs(*self.args, tri_filt_names=1, delta_mag_cuts=1,
+                              compute_local_density=False, psf_fwhms=1, num_trials=1, j0s=1,
+                              density_mags=1, dm_max=1, d_mag=1, fit_gal_flag=True, cmau_array=1,
+                              wavs=1, z_maxs=1)
+        with pytest.raises(ValueError, match='ab_offsets must be given if fit_gal_flag is True.'):
+            make_perturb_aufs(*self.args, tri_filt_names=1, delta_mag_cuts=1,
+                              compute_local_density=False, psf_fwhms=1, num_trials=1, j0s=1,
+                              density_mags=1, dm_max=1, d_mag=1, fit_gal_flag=True, cmau_array=1,
+                              wavs=1, z_maxs=1, nzs=1)
+        with pytest.raises(ValueError, match='filter_names must be given if fit_gal_flag is True.'):
+            make_perturb_aufs(*self.args, tri_filt_names=1, delta_mag_cuts=1,
+                              compute_local_density=False, psf_fwhms=1, num_trials=1, j0s=1,
+                              density_mags=1, dm_max=1, d_mag=1, fit_gal_flag=True, cmau_array=1,
+                              wavs=1, z_maxs=1, nzs=1, ab_offsets=1)
+        with pytest.raises(ValueError, match='alpha0 must be given if fit_gal_flag is True.'):
+            make_perturb_aufs(*self.args, tri_filt_names=1, delta_mag_cuts=1,
+                              compute_local_density=False, psf_fwhms=1, num_trials=1, j0s=1,
+                              density_mags=1, dm_max=1, d_mag=1, fit_gal_flag=True, cmau_array=1,
+                              wavs=1, z_maxs=1, nzs=1, ab_offsets=1, filter_names=1)
+        with pytest.raises(ValueError, match='alpha1 must be given if fit_gal_flag is True.'):
+            make_perturb_aufs(*self.args, tri_filt_names=1, delta_mag_cuts=1,
+                              compute_local_density=False, psf_fwhms=1, num_trials=1, j0s=1,
+                              density_mags=1, dm_max=1, d_mag=1, fit_gal_flag=True, cmau_array=1,
+                              wavs=1, z_maxs=1, nzs=1, ab_offsets=1, filter_names=1, alpha0=1)
+        with pytest.raises(ValueError, match='alpha_weight must be given if fit_gal_flag is True.'):
+            make_perturb_aufs(*self.args, tri_filt_names=1, delta_mag_cuts=1,
+                              compute_local_density=False, psf_fwhms=1, num_trials=1, j0s=1,
+                              density_mags=1, dm_max=1, d_mag=1, fit_gal_flag=True, cmau_array=1,
+                              wavs=1, z_maxs=1, nzs=1, ab_offsets=1, filter_names=1, alpha0=1,
+                              alpha1=1)
+
     def test_without_compute_local_density(self):
         # Number of sources per PSF circle, on average, solved backwards to ensure
         # that local density ends up exactly in the middle of a count_array bin.
