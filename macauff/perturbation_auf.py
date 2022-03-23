@@ -468,8 +468,8 @@ def download_trilegal_simulation(tri_folder, tri_filter_set, ax1, ax2, mag_num, 
     mag_lim = 32
     galactic_flag = True if region_frame == 'galactic' else False
     while areaflag == 0:
-        get_trilegal(tri_name, ax1, ax2, folder=tri_folder, galactic=galactic_flag,
-                     filterset=tri_filter_set, area=triarea, maglim=mag_lim, magnum=mag_num)
+        _ = get_trilegal(tri_name, ax1, ax2, folder=tri_folder, galactic=galactic_flag,
+                         filterset=tri_filter_set, area=triarea, maglim=mag_lim, magnum=mag_num)
         f = open('{}/{}.dat'.format(tri_folder, tri_name), "r")
         contents = f.readlines()
         f.close()
@@ -486,12 +486,12 @@ def download_trilegal_simulation(tri_folder, tri_filter_set, ax1, ax2, mag_num, 
             triarea = min(10, triarea / nobjs * total_objs)
             areaflag = 1
         os.system('rm {}/{}.dat'.format(tri_folder, tri_name))
-    get_trilegal(tri_name, ax1, ax2, folder=tri_folder, galactic=galactic_flag,
-                 filterset=tri_filter_set, area=triarea, maglim=mag_lim, magnum=mag_num)
+    av_inf = get_trilegal(tri_name, ax1, ax2, folder=tri_folder, galactic=galactic_flag,
+                          filterset=tri_filter_set, area=triarea, maglim=mag_lim, magnum=mag_num)
     f = open('{}/{}.dat'.format(tri_folder, tri_name), "r")
     contents = f.readlines()
     f.close()
-    contents.insert(0, '#area = {} sq deg\n'.format(triarea))
+    contents.insert(0, '#area = {} sq deg\n#Av at infinity = {}\n'.format(triarea, av_inf))
     f = open('{}/{}.dat'.format(tri_folder, tri_name), "w")
     contents = "".join(contents)
     f.write(contents)
@@ -627,8 +627,8 @@ def create_single_perturb_auf(tri_folder, filt, r, dr, rho, drho, j0s, num_trial
                               header, density_mag, a_photo, localN, dm_max, d_mag, mag_cut,
                               fit_gal_flag, cmau_array=None, wav=None, z_max=None, nz=None,
                               alpha0=None, alpha1=None, alpha_weight=None, ab_offset=None,
-                              filter_name=None):
-    '''
+                              filter_name=None, al_av=None):
+    r'''
     Creates the associated parameters for describing a single perturbation AUF
     component, for a single sky position.
 
@@ -708,6 +708,8 @@ def create_single_perturb_auf(tri_folder, filt, r, dr, rho, drho, j0s, num_trial
     filter_name : string, optional
         The ``speclite`` style ``group_name-band_name`` name for the filter,
         for use in the creation of simulated galaxy counts.
+    al_av : float
+        Reddening vector for the filter, :math:`\frac{A_\lambda}{A_V}`.
 
     Returns
     -------
@@ -723,12 +725,15 @@ def create_single_perturb_auf(tri_folder, filt, r, dr, rho, drho, j0s, num_trial
     '''
     tri_name = 'trilegal_auf_simulation'
     f = open('{}/{}.dat'.format(tri_folder, tri_name), "r")
-    line = f.readline()
+    area_line = f.readline()
+    av_line = f.readline()
     f.close()
-    bits = line.split(' ')
+    bits = area_line.split(' ')
     tri_area = float(bits[2])
+    bits = av_line.split(' ')
+    av_inf = float(bits[4])
     tri = np.genfromtxt('{}/{}.dat'.format(tri_folder, tri_name), delimiter=None,
-                        names=True, comments='#', skip_header=1, usecols=[header])
+                        names=True, comments='#', skip_header=2, usecols=[header])
 
     # TODO: extend to allow a Galactic source model that doesn't depend on TRILEGAL
     tri_mags = tri[:][header]
@@ -743,11 +748,11 @@ def create_single_perturb_auf(tri_folder, filt, r, dr, rho, drho, j0s, num_trial
     hist = h / model_mags_interval / tri_area
     log10y_tri = np.log10(hist)
 
-    # TODO: add extinction reddening!
     if fit_gal_flag:
+        al_inf = al_av * av_inf
         z_array = np.linspace(0, z_max, nz)
         gal_dens = create_galaxy_counts(cmau_array, model_mag_mids, z_array, wav, alpha0, alpha1,
-                                        alpha_weight, ab_offset, filter_name)
+                                        alpha_weight, ab_offset, filter_name, al_inf)
         max_mag_bin = np.argwhere(model_mags[1:] <= density_mag)[0][-1] + 1
         gal_count = np.sum(gal_dens[:max_mag_bin]*model_mags_interval[:max_mag_bin])
         log10y_gal = -np.inf * np.ones_like(log10y_tri)

@@ -472,7 +472,8 @@ class TestMakePerturbAUFs():
 
         # Fake up a TRILEGAL simulation data file. Need to paste the same source
         # four times to pass a check for more than three sources in a histogram.
-        text = ('#area = 4.0 sq deg\n#Gc logAge [M/H] m_ini   logL   logTe logg  m-M0   Av    ' +
+        text = ('#area = 4.0 sq deg\n#Av at infinity = 0\n' +
+                'Gc logAge [M/H] m_ini   logL   logTe logg  m-M0   Av    ' +
                 'm2/m1 mbol   J      H      Ks     IRAC_3.6 IRAC_4.5 IRAC_5.8 IRAC_8.0 MIPS_24 ' +
                 'MIPS_70 MIPS_160 W1     W2     W3     W4       Mact\n 1   6.65 -0.39  0.02415 ' +
                 '-2.701 3.397  4.057 14.00  8.354 0.00 25.523 25.839 24.409 23.524 22.583 ' +
@@ -583,7 +584,8 @@ class TestMakePerturbAUFs():
 
         # Fake up a TRILEGAL simulation data file. Need to paste the same source
         # four times to pass a check for more than three sources in a histogram.
-        text = ('#area = 4.0 sq deg\n#Gc logAge [M/H] m_ini   logL   logTe logg  m-M0   Av    ' +
+        text = ('#area = 4.0 sq deg\n#Av at infinity = 0\n' +
+                'Gc logAge [M/H] m_ini   logL   logTe logg  m-M0   Av    ' +
                 'm2/m1 mbol   J      H      Ks     IRAC_3.6 IRAC_4.5 IRAC_5.8 IRAC_8.0 MIPS_24 ' +
                 'MIPS_70 MIPS_160 W1     W2     W3     W4       Mact\n 1   6.65 -0.39  0.02415 ' +
                 '-2.701 3.397  4.057 14.00  8.354 0.00 25.523 25.839 24.409 23.524 22.583 ' +
@@ -734,7 +736,8 @@ class TestMakePerturbAUFs():
 
         # Fake up a TRILEGAL simulation data file. Need to paste the same source
         # four times to pass a check for more than three sources in a histogram.
-        text = ('#area = 4.0 sq deg\n#Gc logAge [M/H] m_ini   logL   logTe logg  m-M0   Av    ' +
+        text = ('#area = 4.0 sq deg\n#Av at infinity = 10\n' +
+                'Gc logAge [M/H] m_ini   logL   logTe logg  m-M0   Av    ' +
                 'm2/m1 mbol   J      H      Ks     IRAC_3.6 IRAC_4.5 IRAC_5.8 IRAC_8.0 MIPS_24 ' +
                 'MIPS_70 MIPS_160 W1     W2     W3     W4       Mact\n 1   6.65 -0.39  0.02415 ' +
                 '-2.701 3.397  4.057 14.00  8.354 0.00 25.523 25.839 24.409 23.524 22.583 ' +
