@@ -314,7 +314,7 @@ class CrossMatch():
         if self.include_perturb_auf:
             for config, catname in zip([cat_a_config, cat_b_config], ['"a"', '"b"']):
                 for check_flag in ['tri_set_name', 'tri_filt_names', 'psf_fwhms',
-                                   'download_tri', 'dens_mags']:
+                                   'download_tri', 'dens_mags', 'fit_gal_flag']:
                     if check_flag not in config:
                         raise ValueError("Missing key {} from catalogue {} metadata file.".format(
                                          check_flag, catname))
@@ -325,6 +325,8 @@ class CrossMatch():
             self.b_download_tri = self._str2bool(cat_b_config['download_tri'])
             self.a_tri_set_name = cat_a_config['tri_set_name']
             self.b_tri_set_name = cat_b_config['tri_set_name']
+            self.a_fit_gal_flag = self._str2bool(cat_a_config['fit_gal_flag'])
+            self.b_fit_gal_flag = self._str2bool(cat_b_config['fit_gal_flag'])
             for config, flag in zip([cat_a_config, cat_b_config], ['a_', 'b_']):
                 a = config['tri_filt_names'].split()
                 if len(a) != len(getattr(self, '{}filt_names'.format(flag))):
@@ -385,6 +387,48 @@ class CrossMatch():
                         setattr(self, '{}dens_dist'.format(flag), float(config['dens_dist']))
                     except ValueError:
                         raise ValueError("dens_dist in catalogue {} must be a float.".format(catname))
+
+            for config, catname, fit_gal_flag, flag in zip(
+                    [cat_a_config, cat_b_config], ['"a"', '"b"'],
+                    [self.a_fit_gal_flag, self.b_fit_gal_flag], ['a_', 'b_']):
+                if fit_gal_flag:
+                    for check_flag in ['gal_wavs', 'gal_zmax', 'gal_nzs',
+                                       'gal_aboffsets', 'gal_filternames']:
+                        if check_flag not in config:
+                            raise ValueError("Missing key {} from catalogue {} metadata file."
+                                             .format(check_flag, catname))
+                    # Set all lists of floats
+                    for var in ['gal_wavs', 'gal_zmax', 'gal_aboffsets']:
+                        a = config[var].split(' ')
+                        try:
+                            b = np.array([float(f) for f in a])
+                        except ValueError:
+                            raise ValueError('{} should be a list of floats in catalogue '
+                                             '{} metadata file'.format(var, catname))
+                        if len(b) != len(getattr(self, '{}filt_names'.format(flag))):
+                            raise ValueError('{}{} and {}filt_names should contain the same '
+                                             'number of entries.'.format(flag, var, flag))
+                        setattr(self, '{}{}'.format(flag, var), b)
+                    # galaxy_nzs should be a list of integers.
+                    a = config['gal_nzs'].split(' ')
+                    try:
+                        b = np.array([float(f) for f in a])
+                    except ValueError:
+                        raise ValueError('gal_nzs should be a list of integers '
+                                         'in catalogue {} metadata file'.format(catname))
+                    if len(b) != len(getattr(self, '{}filt_names'.format(flag))):
+                        raise ValueError('{}gal_nzs and {}filt_names should contain the same '
+                                         'number of entries.'.format(flag, flag))
+                    if not np.all([c.is_integer() for c in b]):
+                        raise ValueError('All elements of {}gal_nzs should be '
+                                         'integers.'.format(flag))
+                    setattr(self, '{}gal_nzs'.format(flag), np.array([int(c) for c in b]))
+                    # Filter names are simple lists of strings
+                    b = config['gal_filternames'].split(' ')
+                    if len(b) != len(getattr(self, '{}filt_names'.format(flag))):
+                        raise ValueError('{}gal_filternames and {}filt_names should contain the '
+                                         'same number of entries.'.format(flag, flag))
+                    setattr(self, '{}gal_filternames'.format(flag), np.array(b))
 
         for config, catname, flag in zip([cat_a_config, cat_b_config], ['"a"', '"b"'],
                                          ['a_', 'b_']):
