@@ -931,8 +931,8 @@ class TestMakePerturbAUFs():
         cm.a_gal_filternames = np.array(['gaiadr2-G'])
 
         cm.b_gal_wavs = np.array([3.4])
-        cm.b_gal_zmax = np.array([0.001])
-        cm.b_gal_nzs = np.array([2])
+        cm.b_gal_zmax = np.array([1])
+        cm.b_gal_nzs = np.array([10])
         cm.b_gal_aboffsets = np.array([2.699])
         cm.b_gal_filternames = ['wise2010-w1']
 
