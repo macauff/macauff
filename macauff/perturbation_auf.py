@@ -746,9 +746,9 @@ def create_single_perturb_auf(tri_folder, filt, r, dr, rho, drho, j0s, num_trial
     # TODO: add extinction reddening!
     if fit_gal_flag:
         z_array = np.linspace(0, z_max, nz)
-        gal_dens = create_galaxy_counts(cmau_array, model_mags, z_array, wav, alpha0, alpha1,
+        gal_dens = create_galaxy_counts(cmau_array, model_mag_mids, z_array, wav, alpha0, alpha1,
                                         alpha_weight, ab_offset, filter_name)
-        max_mag_bin = np.argwhere(model_mags[1:] > density_mag)[0][0]
+        max_mag_bin = np.argwhere(model_mags[1:] <= density_mag)[0][-1]
         gal_count = np.sum(gal_dens[:max_mag_bin]*model_mags_interval[:max_mag_bin])
         log10y_gal = -np.inf * np.ones_like(log10y_tri)
         log10y_gal[gal_dens > 0] = np.log10(gal_dens[gal_dens > 0])

@@ -297,8 +297,8 @@ def test_circle_area():
         done += 1
 
 
-class TestCreateGalaxyCounts():
-    def setup_class(self):
+class GalCountValues():
+    def __init__(self):
         # Update these values if this is changed in CrossMatch
         self.cmau = np.empty((5, 2, 4), float)
         self.cmau[0, :, :] = [[-24.286513, 1.141760, 2.655846, np.nan],
@@ -316,6 +316,12 @@ class TestCreateGalaxyCounts():
         self.alphaweight = [[3.47e+09, 3.31e+06, 2.13e+09, 1.64e+10, 1.01e+09],
                             [3.84e+09, 1.57e+06, 3.91e+08, 4.66e+10, 3.03e+07]]
 
+
+gal_values = GalCountValues()
+
+
+class TestCreateGalaxyCounts():
+    def setup_class(self):
         self.mag_bins = np.arange(10, 15, 0.1)
         self.z_array = np.array([0, 0.01])
 
@@ -348,7 +354,7 @@ class TestCreateGalaxyCounts():
 
     def _calculate_params(self, lwav, i):
         # Assume we're close enough to zero redshift to not need P and Q.
-        _cmau = self.cmau[:, i, :]
+        _cmau = gal_values.cmau[:, i, :]
         fake_m = _cmau[0, 2] * np.exp(-lwav * _cmau[0, 1]) + _cmau[0, 0]
         if i == 0:
             fake_phi = _cmau[1, 2] * np.exp(-lwav * _cmau[1, 1]) + _cmau[1, 0]
@@ -362,8 +368,9 @@ class TestCreateGalaxyCounts():
     def test_create_galaxy_counts(self):
         wav = 3.4  # microns
         filter_name = 'wise2010-w1'
-        gal_dens = create_galaxy_counts(self.cmau, self.mag_bins, self.z_array, wav, self.alpha0,
-                                        self.alpha1, self.alphaweight, self.ab_offset, filter_name)
+        gal_dens = create_galaxy_counts(gal_values.cmau, self.mag_bins, self.z_array, wav,
+                                        gal_values.alpha0, gal_values.alpha1,
+                                        gal_values.alphaweight, self.ab_offset, filter_name)
         tot_fake_sch = np.zeros_like(gal_dens)
         for i in [0, 1]:
             fake_m, fake_phi, fake_alpha = self._calculate_params(np.log10(wav), i)
@@ -383,8 +390,9 @@ class TestCreateGalaxyCounts():
         generate_speclite_filters(f, [n], [np.array([0.159, 0.16, 0.161])], [np.array([0, 1, 0])],
                                   u.micron)
 
-        gal_dens = create_galaxy_counts(self.cmau, self.mag_bins, self.z_array, wav, self.alpha0,
-                                        self.alpha1, self.alphaweight, self.ab_offset, filter_name)
+        gal_dens = create_galaxy_counts(gal_values.cmau, self.mag_bins, self.z_array, wav,
+                                        gal_values.alpha0, gal_values.alpha1,
+                                        gal_values.alphaweight, self.ab_offset, filter_name)
         tot_fake_sch = np.zeros_like(gal_dens)
         for i in [0, 1]:
             fake_m, fake_phi, fake_alpha = self._calculate_params(np.log10(wav), i)
@@ -772,6 +780,161 @@ class TestMakePerturbAUFs():
         cm.num_trials = self.num_trials
         cm.a_fit_gal_flag = False
         cm.b_fit_gal_flag = False
+
+        cm.create_perturb_auf(self.files_per_auf_sim)
+
+        fracs = np.load('{}/{}/{}/{}/frac.npy'.format(
+            self.auf_folder, ax1, ax2, self.filters[0]))
+        fluxs = np.load('{}/{}/{}/{}/flux.npy'.format(
+            self.auf_folder, ax1, ax2, self.filters[0]))
+        fourier = np.load('{}/{}/{}/{}/fourier.npy'.format(
+            self.auf_folder, ax1, ax2, self.filters[0]))
+
+        assert_allclose(fracs[0, 0], 1-prob_0_draw, rtol=0.1)
+        assert_allclose(fluxs[0], (prob_0_draw*0 + prob_1_draw*rel_flux +
+                        prob_2_draw*2*rel_flux), rtol=0.1)
+
+        R = 1.185 * self.psf_fwhms[0]
+        small_R = R * rel_flux / (1 + rel_flux)
+
+        fake_fourier = (1-prob_0_draw) / (np.pi * small_R * (cm.rho[:-1]+cm.drho/2)) * j1(
+            2 * np.pi * small_R * (cm.rho[:-1]+cm.drho/2))
+        fake_fourier += prob_0_draw * j0(2 * np.pi * (cm.r[0]+cm.dr[0]/2) *
+                                         (cm.rho[:-1]+cm.drho/2))
+
+        assert_allclose(fake_fourier, fourier[:, 0], rtol=0.05)
+
+    def test_with_galaxy_counts(self):
+        # Number of sources per PSF circle, on average, solved backwards to ensure
+        # that local density ends up exactly in the middle of a count_array bin.
+        # This should be approximately 0.076 sources per PSF circle.
+        psf_mean = np.exp(8.7) * np.pi * (1.185 * self.psf_fwhms[0] / 3600)**2
+        # Local density is the controllable variable to ensure that we get
+        # the expected sources per PSF circle, with most variables cancelling
+        # mean divided by circle area sets the density needed.
+        local_dens = psf_mean / (np.pi * (1.185 * self.psf_fwhms[0] / 3600)**2)
+        np.save('{}/local_N.npy'.format(self.auf_folder), np.array([[local_dens]]))
+
+        np.save('{}/con_cat_astro.npy'.format(self.cat_folder), np.array([[0.3, 0.3, 0.1]]))
+        np.save('{}/con_cat_photo.npy'.format(self.cat_folder), np.array([[14.99]]))
+        np.save('{}/magref.npy'.format(self.cat_folder), np.array([0]))
+
+        # Fake up a TRILEGAL simulation data file. Need to paste the same source
+        # four times to pass a check for more than three sources in a histogram.
+        text = ('#area = 4.0 sq deg\n#Gc logAge [M/H] m_ini   logL   logTe logg  m-M0   Av    ' +
+                'm2/m1 mbol   J      H      Ks     IRAC_3.6 IRAC_4.5 IRAC_5.8 IRAC_8.0 MIPS_24 ' +
+                'MIPS_70 MIPS_160 W1     W2     W3     W4       Mact\n 1   6.65 -0.39  0.02415 ' +
+                '-2.701 3.397  4.057 14.00  8.354 0.00 25.523 25.839 24.409 23.524 22.583 ' +
+                '22.387 22.292 22.015 21.144 19.380 20.878 15.001 22.391 21.637 21.342  0.024\n ' +
+                '1   6.65 -0.39  0.02415 -2.701 3.397  4.057 14.00  8.354 0.00 25.523 25.839 ' +
+                '24.409 23.524 22.583 22.387 22.292 22.015 21.144 19.380 20.878 15.002 22.391 ' +
+                '21.637 21.342  0.024\n 1   6.65 -0.39  0.02415 -2.701 3.397  4.057 14.00  ' +
+                '8.354 0.00 25.523 25.839 24.409 23.524 22.583 22.387 22.292 22.015 21.144 ' +
+                '19.380 20.878 15.003 22.391 21.637 21.342  0.024\n 1   6.65 -0.39  0.02415 ' +
+                '-2.701 3.397  4.057 14.00  8.354 0.00 25.523 25.839 24.409 23.524 22.583 ' +
+                '22.387 22.292 22.015 21.144 19.380 20.878 15.004 22.391 21.637 21.342  0.024')
+        os.makedirs('{}/{}/{}'.format(
+            self.auf_folder, self.auf_points[0][0], self.auf_points[0][1]), exist_ok=True)
+        with open('{}/{}/{}/trilegal_auf_simulation.dat'.format(
+                  self.auf_folder, self.auf_points[0][0], self.auf_points[0][1]), "w") as f:
+            f.write(text)
+
+        prob_0_draw = psf_mean**0 * np.exp(-psf_mean) / np.math.factorial(0)
+        prob_1_draw = psf_mean**1 * np.exp(-psf_mean) / np.math.factorial(1)
+        prob_2_draw = psf_mean**2 * np.exp(-psf_mean) / np.math.factorial(2)
+
+        ax1, ax2 = self.auf_points[0]
+
+        # Catalogue bins for the source:
+        a_photo = np.load('{}/con_cat_photo.npy'.format(self.cat_folder))
+        dmag = 0.25
+        mag_min = dmag * np.floor(np.amin(a_photo)/dmag)
+        mag_max = dmag * np.ceil(np.amax(a_photo)/dmag)
+        mag_bins = np.arange(mag_min, mag_max+1e-10, dmag)
+        mag_bin = 0.5 * (mag_bins[1:]+mag_bins[:-1])
+        # Model magnitude bins:
+        d_mag = 0.1
+        tri_mags = np.array([15.001, 15.002, 15.003, 15.004])
+        minmag = d_mag * np.floor(np.amin(tri_mags)/d_mag)
+        maxmag = d_mag * np.ceil(np.amax(tri_mags)/d_mag)
+        mod_bins = np.arange(minmag, maxmag+1e-10, d_mag)
+        mod_bin = mod_bins[:-1] + np.diff(mod_bins)/2
+        mag_offset = mod_bin - mag_bin
+        rel_flux = 10**(-1/2.5 * mag_offset)
+
+        ol, nl = 'include_perturb_auf = no', 'include_perturb_auf = yes\n'
+        f = open(os.path.join(os.path.dirname(__file__),
+                              'data/crossmatch_params.txt')).readlines()
+        idx = np.where([ol in line for line in f])[0][0]
+        _replace_line(os.path.join(os.path.dirname(__file__), 'data/crossmatch_params.txt'),
+                      idx, nl, out_file=os.path.join(os.path.dirname(__file__),
+                      'data/crossmatch_params_.txt'))
+
+        ol, nl = 'filt_names = G_BP G G_RP', 'filt_names = G\n'
+        f = open(os.path.join(os.path.dirname(__file__),
+                              'data/cat_a_params.txt')).readlines()
+        idx = np.where([ol in line for line in f])[0][0]
+        _replace_line(os.path.join(os.path.dirname(__file__), 'data/cat_a_params.txt'),
+                      idx, nl, out_file=os.path.join(os.path.dirname(__file__),
+                      'data/cat_a_params_.txt'))
+        for ol, nl in zip(['psf_fwhms = 0.12 0.12 0.12', 'cat_folder_path = gaia_folder',
+                           'auf_folder_path = gaia_auf_folder', 'tri_filt_names = G_BP G G_RP',
+                           'dens_mags = 20 20 20'],
+                          ['psf_fwhms = 0.12\n', 'cat_folder_path = cat_folder\n',
+                           'auf_folder_path = auf_folder\n', 'tri_filt_names = W1\n',
+                           'dens_mags = 20\n']):
+            f = open(os.path.join(os.path.dirname(__file__),
+                                  'data/cat_a_params.txt')).readlines()
+            idx = np.where([ol in line for line in f])[0][0]
+            _replace_line(os.path.join(os.path.dirname(__file__), 'data/cat_a_params_.txt'),
+                          idx, nl)
+
+        ol, nl = 'filt_names = W1 W2 W3 W4', 'filt_names = W1\n'
+        f = open(os.path.join(os.path.dirname(__file__),
+                              'data/cat_b_params.txt')).readlines()
+        idx = np.where([ol in line for line in f])[0][0]
+        _replace_line(os.path.join(os.path.dirname(__file__), 'data/cat_b_params.txt'),
+                      idx, nl, out_file=os.path.join(os.path.dirname(__file__),
+                      'data/cat_b_params_.txt'))
+        for ol, nl in zip(['psf_fwhms = 6.08 6.84 7.36 11.99', 'cat_folder_path = wise_folder',
+                           'auf_folder_path = wise_auf_folder', 'tri_filt_names = W1 W2 W3 W4',
+                           'dens_mags = 20 20 20 20'],
+                          ['psf_fwhms = 6.08\n', 'cat_folder_path = cat_folder\n',
+                           'auf_folder_path = auf_folder\n', 'tri_filt_names = W1\n',
+                           'dens_mags = 20\n']):
+            f = open(os.path.join(os.path.dirname(__file__),
+                                  'data/cat_b_params.txt')).readlines()
+            idx = np.where([ol in line for line in f])[0][0]
+            _replace_line(os.path.join(os.path.dirname(__file__), 'data/cat_b_params_.txt'),
+                          idx, nl)
+
+        cm = CrossMatch(os.path.join(os.path.dirname(__file__),
+                                     'data/crossmatch_params_.txt'),
+                        os.path.join(os.path.dirname(__file__), 'data/cat_a_params_.txt'),
+                        os.path.join(os.path.dirname(__file__), 'data/cat_b_params_.txt'))
+
+        cm.a_auf_region_points = self.auf_points
+        cm.b_auf_region_points = self.auf_points
+        cm.cross_match_extent = self.ax_lims
+        cm.run_auf = True
+        cm.run_group = True
+        cm.run_cf = True
+        cm.run_source = True
+        cm.num_trials = self.num_trials
+        cm.a_fit_gal_flag = True
+        cm.b_fit_gal_flag = True
+
+        cm.a_gal_wavs = np.array([0.641])
+        cm.a_gal_zmax = np.array([0.001])
+        cm.a_gal_nzs = np.array([2])
+        cm.a_gal_aboffsets = np.array([0.105])
+        cm.a_gal_filternames = np.array(['gaiadr2-G'])
+
+        cm.b_gal_wavs = np.array([3.4])
+        cm.b_gal_zmax = np.array([0.001])
+        cm.b_gal_nzs = np.array([2])
+        cm.b_gal_aboffsets = np.array([2.699])
+        cm.b_gal_filternames = ['wise2010-w1']
 
         cm.create_perturb_auf(self.files_per_auf_sim)
 
