@@ -19,6 +19,8 @@ tri_filt_names = W1 W2 W3 W4
 tri_filt_num = 11
 # Flag to determine whether to re-download TRILEGAL simulations if they exist - must be "yes"/"no", "true"/"false", "t"/"f", or "1"/"0"
 download_tri = no
+# Galaxy Perturbation AUF parameters
+fit_gal_flag = no
 
 # AUF region definition - either "rectangle" for NxM evenly spaced grid points, or "points" to define a list of two-point tuple coordinates, separated by a comma
 auf_region_type = rectangle
