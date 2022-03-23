@@ -83,6 +83,8 @@ def get_trilegal(filename, ra, dec, folder='.', galactic=False,
     trilegal_webcall(trilegal_version, l, b, area, binaries, AV, sigma_AV, filterset, magnum,
                      maglim, outfile)
 
+    return AV
+
 
 def trilegal_webcall(trilegal_version, l, b, area, binaries, AV, sigma_AV, filterset, magnum,
                      maglim, outfile):

@@ -14,7 +14,7 @@ __all__ = ['create_galaxy_counts', 'generate_speclite_filters']
 
 
 def create_galaxy_counts(cmau_array, mag_bins, z_array, wav, alpha0, alpha1, weight,
-                         ab_offset, filter_name):
+                         ab_offset, filter_name, al_inf):
     r'''
     Create a simulated distribution of galaxy magnitudes for a particular
     bandpass by consideration of double Schechter functions (for blue and
@@ -56,6 +56,8 @@ def create_galaxy_counts(cmau_array, mag_bins, z_array, wav, alpha0, alpha1, wei
         of the particular observations. If observations are in a filter system
         not provided by ``speclite``, response curve can be generated using
         ``generate_speclite_filters``.
+    al_inf : float
+        The reddening at infinity by which to extinct all galaxy magnitudes.
 
     Returns
     -------
@@ -122,7 +124,7 @@ def create_galaxy_counts(cmau_array, mag_bins, z_array, wav, alpha0, alpha1, wei
             kcorr[j] = -2.5 * np.log10(1/(1+_z) * shift_ab_maggy / non_shift_ab_maggy)
         # e.g. Loveday+2015 for absolute -> apparent magnitude conversion
         gal_dens += np.interp(mag_bins, abs_mag_bins + cosmology.distmod(z).value +
-                              np.percentile(kcorr, 50) - ab_offset, model_density)
+                              np.percentile(kcorr, 50) - ab_offset + al_inf, model_density)
 
     return gal_dens
 

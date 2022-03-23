@@ -62,7 +62,7 @@ class TestCreateGalaxyCounts():
         filter_name = 'wise2010-w1'
         gal_dens = create_galaxy_counts(gal_values.cmau, self.mag_bins, self.z_array, wav,
                                         gal_values.alpha0, gal_values.alpha1,
-                                        gal_values.alphaweight, self.ab_offset, filter_name)
+                                        gal_values.alphaweight, self.ab_offset, filter_name, 0)
         tot_fake_sch = np.zeros_like(gal_dens)
         for i in [0, 1]:
             fake_m, fake_phi, fake_alpha = self._calculate_params(np.log10(wav), i)
@@ -84,14 +84,14 @@ class TestCreateGalaxyCounts():
 
         gal_dens = create_galaxy_counts(gal_values.cmau, self.mag_bins, self.z_array, wav,
                                         gal_values.alpha0, gal_values.alpha1,
-                                        gal_values.alphaweight, self.ab_offset, filter_name)
+                                        gal_values.alphaweight, self.ab_offset, filter_name, 1.5)
         tot_fake_sch = np.zeros_like(gal_dens)
         for i in [0, 1]:
             fake_m, fake_phi, fake_alpha = self._calculate_params(np.log10(wav), i)
             fake_schechter = (0.4 * np.log(10) * fake_phi *
                               (10**(-0.4 * (self.fake_mags - fake_m)))**(fake_alpha+1) *
                               np.exp(-10**(-0.4 * (self.fake_mags - fake_m))))
-            tot_fake_sch += np.interp(self.mag_bins, self.fake_app_mags,
+            tot_fake_sch += np.interp(self.mag_bins, self.fake_app_mags + 1.5,
                                       fake_schechter) * self.dV_dOmega
 
         assert_allclose(tot_fake_sch, gal_dens, rtol=0.01, atol=1e-4)
