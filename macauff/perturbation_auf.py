@@ -746,7 +746,8 @@ def create_single_perturb_auf(tri_folder, filt, r, dr, rho, drho, j0s, num_trial
     model_mag_mids = model_mags[:-1]+model_mags_interval/2
 
     hist = h / model_mags_interval / tri_area
-    log10y_tri = np.log10(hist)
+    log10y_tri = -np.inf * np.ones_like(hist)
+    log10y_tri[hist > 0] = np.log10(hist[hist > 0])
 
     if fit_gal_flag:
         al_inf = al_av * av_inf
@@ -766,6 +767,7 @@ def create_single_perturb_auf(tri_folder, filt, r, dr, rho, drho, j0s, num_trial
         hc = np.where(h > 3)[0]
         model_mag_mids = model_mag_mids[hc]
         model_mags_interval = model_mags_interval[hc]
+        log10y_tri = log10y_tri[hc]
 
     model_count = tri_count + gal_count
     log10y = np.log10(10**log10y_tri + 10**log10y_gal)
