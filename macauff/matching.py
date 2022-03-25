@@ -393,12 +393,12 @@ class CrossMatch():
                     [self.a_fit_gal_flag, self.b_fit_gal_flag], ['a_', 'b_']):
                 if fit_gal_flag:
                     for check_flag in ['gal_wavs', 'gal_zmax', 'gal_nzs',
-                                       'gal_aboffsets', 'gal_filternames']:
+                                       'gal_aboffsets', 'gal_filternames', 'gal_al_avs']:
                         if check_flag not in config:
                             raise ValueError("Missing key {} from catalogue {} metadata file."
                                              .format(check_flag, catname))
                     # Set all lists of floats
-                    for var in ['gal_wavs', 'gal_zmax', 'gal_aboffsets']:
+                    for var in ['gal_wavs', 'gal_zmax', 'gal_aboffsets', 'gal_al_avs']:
                         a = config[var].split(' ')
                         try:
                             b = np.array([float(f) for f in a])
@@ -587,7 +587,8 @@ class CrossMatch():
                                       'z_maxs': self.a_gal_zmax, 'nzs': self.a_gal_nzs,
                                       'ab_offsets': self.a_gal_aboffsets,
                                       'filter_names': self.a_gal_filternames,
-                                      'alpha0': self.gal_alpha0, 'alpha1': self.gal_alpha1,
+                                      'al_avs': self.a_gal_al_avs, 'alpha0': self.gal_alpha0,
+                                      'alpha1': self.gal_alpha1,
                                       'alpha_weight': self.gal_alphaweight})
                 else:
                     _kwargs = dict(_kwargs, **{'fit_gal_flag': self.a_fit_gal_flag})
@@ -651,7 +652,8 @@ class CrossMatch():
                                       'z_maxs': self.b_gal_zmax, 'nzs': self.b_gal_nzs,
                                       'ab_offsets': self.b_gal_aboffsets,
                                       'filter_names': self.b_gal_filternames,
-                                      'alpha0': self.gal_alpha0, 'alpha1': self.gal_alpha1,
+                                      'al_avs': self.b_gal_al_avs, 'alpha0': self.gal_alpha0,
+                                      'alpha1': self.gal_alpha1,
                                       'alpha_weight': self.gal_alphaweight})
                 else:
                     _kwargs = dict(_kwargs, **{'fit_gal_flag': self.a_fit_gal_flag})

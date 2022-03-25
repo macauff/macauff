@@ -432,22 +432,28 @@ class TestMakePerturbAUFs():
                               compute_local_density=False, psf_fwhms=1, num_trials=1, j0s=1,
                               density_mags=1, dm_max=1, d_mag=1, fit_gal_flag=True, cmau_array=1,
                               wavs=1, z_maxs=1, nzs=1, ab_offsets=1)
-        with pytest.raises(ValueError, match='alpha0 must be given if fit_gal_flag is True.'):
+        with pytest.raises(ValueError, match='al_avs must be given if fit_gal_flag is True.'):
             make_perturb_aufs(*self.args, tri_filt_names=1, delta_mag_cuts=1,
                               compute_local_density=False, psf_fwhms=1, num_trials=1, j0s=1,
                               density_mags=1, dm_max=1, d_mag=1, fit_gal_flag=True, cmau_array=1,
                               wavs=1, z_maxs=1, nzs=1, ab_offsets=1, filter_names=1)
+        with pytest.raises(ValueError, match='alpha0 must be given if fit_gal_flag is True.'):
+            make_perturb_aufs(*self.args, tri_filt_names=1, delta_mag_cuts=1,
+                              compute_local_density=False, psf_fwhms=1, num_trials=1, j0s=1,
+                              density_mags=1, dm_max=1, d_mag=1, fit_gal_flag=True, cmau_array=1,
+                              wavs=1, z_maxs=1, nzs=1, ab_offsets=1, filter_names=1, al_avs=1)
         with pytest.raises(ValueError, match='alpha1 must be given if fit_gal_flag is True.'):
             make_perturb_aufs(*self.args, tri_filt_names=1, delta_mag_cuts=1,
                               compute_local_density=False, psf_fwhms=1, num_trials=1, j0s=1,
                               density_mags=1, dm_max=1, d_mag=1, fit_gal_flag=True, cmau_array=1,
-                              wavs=1, z_maxs=1, nzs=1, ab_offsets=1, filter_names=1, alpha0=1)
+                              wavs=1, z_maxs=1, nzs=1, ab_offsets=1, filter_names=1, al_avs=1,
+                              alpha0=1)
         with pytest.raises(ValueError, match='alpha_weight must be given if fit_gal_flag is True.'):
             make_perturb_aufs(*self.args, tri_filt_names=1, delta_mag_cuts=1,
                               compute_local_density=False, psf_fwhms=1, num_trials=1, j0s=1,
                               density_mags=1, dm_max=1, d_mag=1, fit_gal_flag=True, cmau_array=1,
-                              wavs=1, z_maxs=1, nzs=1, ab_offsets=1, filter_names=1, alpha0=1,
-                              alpha1=1)
+                              wavs=1, z_maxs=1, nzs=1, ab_offsets=1, filter_names=1, al_avs=1,
+                              alpha0=1, alpha1=1)
 
     def test_without_compute_local_density(self):
         # Number of sources per PSF circle, on average, solved backwards to ensure
@@ -845,12 +851,14 @@ class TestMakePerturbAUFs():
         cm.a_gal_nzs = np.array([2])
         cm.a_gal_aboffsets = np.array([0.105])
         cm.a_gal_filternames = np.array(['gaiadr2-G'])
+        cm.a_gal_al_avs = np.array([0.789])
 
         cm.b_gal_wavs = np.array([3.4])
         cm.b_gal_zmax = np.array([1])
         cm.b_gal_nzs = np.array([10])
         cm.b_gal_aboffsets = np.array([2.699])
         cm.b_gal_filternames = ['wise2010-w1']
+        cm.b_gal_al_avs = np.array([0.030])
 
         cm.create_perturb_auf(self.files_per_auf_sim)
 
