@@ -25,7 +25,7 @@ def make_perturb_aufs(auf_folder, cat_folder, filters, auf_points, r, dr, rho,
                       auf_region_frame=None, num_trials=None, j0s=None, density_mags=None,
                       dm_max=None, d_mag=None, compute_local_density=None, density_radius=None,
                       fit_gal_flag=None, cmau_array=None, wavs=None, z_maxs=None, nzs=None,
-                      ab_offsets=None, filter_names=None, alpha0=None, alpha1=None,
+                      ab_offsets=None, filter_names=None, al_avs=None, alpha0=None, alpha1=None,
                       alpha_weight=None):
     """
     Function to perform the creation of the blended object perturbation component
@@ -169,6 +169,8 @@ def make_perturb_aufs(auf_folder, cat_folder, filters, auf_points, r, dr, rho,
         raise ValueError("ab_offsets must be given if fit_gal_flag is True.")
     if include_perturb_auf and fit_gal_flag and filter_names is None:
         raise ValueError("filter_names must be given if fit_gal_flag is True.")
+    if include_perturb_auf and fit_gal_flag and al_avs is None:
+        raise ValueError("al_avs must be given if fit_gal_flag is True.")
     if include_perturb_auf and fit_gal_flag and alpha0 is None:
         raise ValueError("alpha0 must be given if fit_gal_flag is True.")
     if include_perturb_auf and fit_gal_flag and alpha1 is None:
@@ -304,7 +306,7 @@ def make_perturb_aufs(auf_folder, cat_folder, filters, auf_points, r, dr, rho,
                         ax_folder, filters[j], r, dr, rho, drho, j0s, num_trials, psf_fwhms[j],
                         tri_filt_names[j], density_mags[j], a_photo, localN, dm_max, d_mag,
                         delta_mag_cuts, fit_gal_flag, cmau_array, wavs[j], z_maxs[j], nzs[j],
-                        alpha0, alpha1, alpha_weight, ab_offsets[j], filter_names[j])
+                        alpha0, alpha1, alpha_weight, ab_offsets[j], filter_names[j], al_avs[j])
                 else:
                     Narray = create_single_perturb_auf(
                         ax_folder, filters[j], r, dr, rho, drho, j0s, num_trials, psf_fwhms[j],
