@@ -27,7 +27,7 @@ def make_perturb_aufs(auf_folder, cat_folder, filters, auf_points, r, dr, rho,
                       fit_gal_flag=None, cmau_array=None, wavs=None, z_maxs=None, nzs=None,
                       ab_offsets=None, filter_names=None, al_avs=None, alpha0=None, alpha1=None,
                       alpha_weight=None):
-    """
+    r"""
     Function to perform the creation of the blended object perturbation component
     of the AUF.
 
@@ -122,6 +122,57 @@ def make_perturb_aufs(auf_folder, cat_folder, filters, auf_points, r, dr, rho,
         of internal catalogue sources, from which to calculate local density.
         Must be given if both ``include_perturb_auf`` and
         ``compute_local_density`` are both ``True``.
+    fit_gal_flag : boolean, optional
+        Flag indicating whether to include galaxy counts in derivations of
+        perturbation component of the AUF. Must be given if
+        ``include_perturb_auf`` is ``True``.
+    cmau_array : numpy.ndarray, optional
+        Array of shape ``(5, 2, 4)`` holding the Wilson (2022, RNAAS, ...) [1]_
+        c, m, a, and u values that describe the Schechter parameterisation with
+        wavelength.
+    wavs : list of floats or numpy.ndarray, optional
+        List of central wavelengths of each filter in ``filters``, used to
+        compute appropriate Schechter function parameters for fitting galaxy
+        counts. Must be given if ``include_perturb_auf`` and ``fit_gal_flag``
+        are ``True``.
+    z_maxs : list of floats or numpy.ndarray, optional
+        List of maximum redshifts to compute galaxy densities out to when
+        deriving Schechter functions. Must be given if ``include_perturb_auf``
+        and ``fit_gal_flag`` are ``True``.
+    nzs : list of integers or numpy.ndarray, optional
+        Resolution of redshift grid, in the sense of ``np.linspace(0, z_max, nz)``,
+        to evaluate Schechter functions on. Must be given if
+        ``include_perturb_auf`` and ``fit_gal_flag`` are ``True``.
+    ab_offsets : list of floats or numpy.ndarray, optional
+        For filters in a non-AB magnitude system, the given offset between
+        the chosen filter system and AB magnitudes, in the sense of m = m_AB -
+        ab_offset. Must be given if ``include_perturb_auf`` and ``fit_gal_flag``
+        are ``True``.
+    filter_names : list of string, optional
+        Names for each filter in ``filters`` in a ``speclite``-appropriate
+        naming scheme (``group_name``-``band_name``), for loading response
+        curves to calculate galaxy k-corrections. Must be given if
+        ``include_perturb_auf`` and ``fit_gal_flag`` are ``True``.
+    al_avs : list of numpy.ndarray or numpy.ndarray, optional
+        Relative extinction curve vectors for each filter in ``filters``,
+        :math:`\frac{A_\lambda}{A_V}`, to convert exinction in the V-band
+        to extinction in the relevant filter. Must be given if
+        ``include_perturb_auf`` and ``fit_gal_flag`` are ``True``.
+    alpha0 : list of numpy.ndarray or numpy.ndarray, optional
+        Indices used to calculate parameters :math:`\alpha_i`, used in deriving
+        Dirichlet-distributed SED coefficients. :math:`\alpha{i, 0}` are the
+        zero-redshift parameters; see [2]_ and [3]_ for more details.
+    alpha1 : list of numpy.ndarray or numpy.ndarray, optional
+        :math:`\alpha_{i, 1}`, indices at redshift z=1 used to derive
+        Dirichlet-distributed SED coefficient values :math:`\alpha_i`.
+    alpha_weight : list of numpy.ndarray or numpy.ndarray, optional
+        Weights for use in calculating :math:`\alpha_i` from ``alpha0`` and
+        ``alpha1``.
+    References
+    ----------
+    .. [1] Wilson T. J. (2022), RNAAS, ...
+    .. [2] Herbel J., Kacprzak T., Amara A., et al. (2017), JCAP, 8, 35
+    .. [3] Blanton M. R., Roweis S. (2007), AJ, 133, 734
     """
     if include_perturb_auf and tri_download_flag and tri_set_name is None:
         raise ValueError("tri_set_name must be given if include_perturb_auf and tri_download_flag "
