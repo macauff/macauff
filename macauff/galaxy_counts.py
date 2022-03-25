@@ -94,37 +94,40 @@ def create_galaxy_counts(cmau_array, mag_bins, z_array, wav, alpha0, alpha1, wei
         dV_dOmega = np.sum(cosmology.differential_comoving_volume(
             mini_z_array).to_value('Mpc3 / deg2'))/2 * np.diff(mini_z_array)
 
-        model_density = (phi_model1 + phi_model2) * dV_dOmega
+        model_densities = [phi_model1 * dV_dOmega, phi_model2 * dV_dOmega]
 
         # Blanton & Roweis (2007) kcorrect templates, via skypy.
         w = skygal.spectrum.kcorrect.wavelength
         t = skygal.spectrum.kcorrect.templates
         # Generate redshifts and coefficients and k-corrections for each
         # realisation, and then take the median k-correction.
-        rng = np.random.default_rng()
-        redshift = rng.uniform(z_array[i], z_array[i+1], 100)
-        spectral_coefficients = skygal.spectrum.dirichlet_coefficients(
-            redshift=redshift, alpha0=alpha0_blue, alpha1=alpha1_blue, weight=weight_blue)
+        for _alpha0, _alpha1, _weight, model_density in zip(
+                [alpha0_blue, alpha0_red], [alpha1_blue, alpha1_red],
+                [weight_blue, weight_red], model_densities):
+            rng = np.random.default_rng()
+            redshift = rng.uniform(z_array[i], z_array[i+1], 100)
+            spectral_coefficients = skygal.spectrum.dirichlet_coefficients(
+                redshift=redshift, alpha0=_alpha0, alpha1=_alpha1, weight=_weight)
 
-        kcorr = np.empty_like(redshift)
-        for j in range(len(redshift)):
-            _z = redshift[j]
-            f = load_filters(filter_name)[0]
-            fs = f.create_shifted(_z)
-            non_shift_ab_maggy, shift_ab_maggy = 0, 0
-            for k in range(len(t)):
-                non_shift_ab_maggy += spectral_coefficients[j, k] * f.get_ab_maggies(t[k], w)
-                try:
-                    shift_ab_maggy += spectral_coefficients[j, k] * fs.get_ab_maggies(t[k], w)
-                except ValueError:
-                    _t, _w = fs.pad_spectrum(t[k], w, method='edge')
-                    shift_ab_maggy += spectral_coefficients[j, k] * fs.get_ab_maggies(_t, _w)
-            # Backwards to Hogg+ astro-ph/0210394, our "shifted" bandpass is the rest-frame
-            # as opposed to the observer frame.
-            kcorr[j] = -2.5 * np.log10(1/(1+_z) * shift_ab_maggy / non_shift_ab_maggy)
-        # e.g. Loveday+2015 for absolute -> apparent magnitude conversion
-        gal_dens += np.interp(mag_bins, abs_mag_bins + cosmology.distmod(z).value +
-                              np.percentile(kcorr, 50) - ab_offset + al_inf, model_density)
+            kcorr = np.empty_like(redshift)
+            for j in range(len(redshift)):
+                _z = redshift[j]
+                f = load_filters(filter_name)[0]
+                fs = f.create_shifted(_z)
+                non_shift_ab_maggy, shift_ab_maggy = 0, 0
+                for k in range(len(t)):
+                    non_shift_ab_maggy += spectral_coefficients[j, k] * f.get_ab_maggies(t[k], w)
+                    try:
+                        shift_ab_maggy += spectral_coefficients[j, k] * fs.get_ab_maggies(t[k], w)
+                    except ValueError:
+                        _t, _w = fs.pad_spectrum(t[k], w, method='edge')
+                        shift_ab_maggy += spectral_coefficients[j, k] * fs.get_ab_maggies(_t, _w)
+                # Backwards to Hogg+ astro-ph/0210394, our "shifted" bandpass is the rest-frame
+                # as opposed to the observer frame.
+                kcorr[j] = -2.5 * np.log10(1/(1+_z) * shift_ab_maggy / non_shift_ab_maggy)
+            # e.g. Loveday+2015 for absolute -> apparent magnitude conversion
+            gal_dens += np.interp(mag_bins, abs_mag_bins + cosmology.distmod(z).value +
+                                  np.percentile(kcorr, 50) - ab_offset + al_inf, model_density)
 
     return gal_dens
 
