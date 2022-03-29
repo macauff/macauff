@@ -536,7 +536,7 @@ class CrossMatch():
 
         # TODO: allow as user input.
         self.gal_cmau_array = np.empty((5, 2, 4), float)
-        # See Wilson (2022, RNAAS, ...) for the meanings of the variables c, m,
+        # See Wilson (2022, RNAAS, 6, 60) for the meanings of the variables c, m,
         # a, and u. For each of M*/phi*/alpha/P/Q, for blue+red galaxies, 2-4
         # variables are derived as a function of wavelength, or Q(P).
         self.gal_cmau_array[0, :, :] = [[-24.286513, 1.141760, 2.655846, np.nan],

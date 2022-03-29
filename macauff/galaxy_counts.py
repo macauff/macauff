@@ -25,8 +25,8 @@ def create_galaxy_counts(cmau_array, mag_bins, z_array, wav, alpha0, alpha1, wei
     cmau_array : numpy.ndarray
         Array holding the c/m/a/u values that describe the parameterisation
         of the Schechter functions with wavelength, following Wilson (2022, RNAAS,
-        ...) [1]_. Shape should be `(5, 2, 4)`, with 5 parameters for both blue and red
-        galaxies.
+        6, 60) [1]_. Shape should be `(5, 2, 4)`, with 5 parameters for both
+        blue and red galaxies.
     mag_bins : numpy.ndarray
         The apparent magnitudes at which to evaluate the on-sky differential
         galaxy density.
@@ -67,7 +67,7 @@ def create_galaxy_counts(cmau_array, mag_bins, z_array, wav, alpha0, alpha1, wei
 
     References
     ----------
-    .. [1] Wilson T. J. (2022), RNAAS, ...
+    .. [1] Wilson T. J. (2022), RNAAS, 6, 60
     .. [2] Herbel J., Kacprzak T., Amara A., et al. (2017), JCAP, 8, 35
     .. [3] Blanton M. R., Roweis S. (2007), AJ, 133, 734
     '''
@@ -207,7 +207,7 @@ def function_evaluation_lookup(cmau, ind1, ind2, x):
 
     References
     ----------
-    .. [1] Wilson T. J. (2022), RNAAS, ...
+    .. [1] Wilson T. J. (2022), RNAAS, 6, 60
     '''
     c, m, a, u = cmau[ind1, ind2]
     if np.isnan(a) and np.isnan(u):
