@@ -13,6 +13,7 @@ from .misc_functions import (create_auf_params_grid, _load_single_sky_slice,
 from .misc_functions_fortran import misc_functions_fortran as mff
 from .get_trilegal_wrapper import get_trilegal
 from .perturbation_auf_fortran import perturbation_auf_fortran as paf
+from .galaxy_counts import create_galaxy_counts
 
 __all__ = ['make_perturb_aufs', 'create_single_perturb_auf']
 
@@ -22,8 +23,11 @@ def make_perturb_aufs(auf_folder, cat_folder, filters, auf_points, r, dr, rho,
                       tri_download_flag=False, delta_mag_cuts=None, psf_fwhms=None,
                       tri_set_name=None, tri_filt_num=None, tri_filt_names=None,
                       auf_region_frame=None, num_trials=None, j0s=None, density_mags=None,
-                      dm_max=None, d_mag=None, compute_local_density=None, density_radius=None):
-    """
+                      dm_max=None, d_mag=None, compute_local_density=None, density_radius=None,
+                      fit_gal_flag=None, cmau_array=None, wavs=None, z_maxs=None, nzs=None,
+                      ab_offsets=None, filter_names=None, al_avs=None, alpha0=None, alpha1=None,
+                      alpha_weight=None):
+    r"""
     Function to perform the creation of the blended object perturbation component
     of the AUF.
 
@@ -118,6 +122,59 @@ def make_perturb_aufs(auf_folder, cat_folder, filters, auf_points, r, dr, rho,
         of internal catalogue sources, from which to calculate local density.
         Must be given if both ``include_perturb_auf`` and
         ``compute_local_density`` are both ``True``.
+    fit_gal_flag : boolean, optional
+        Flag indicating whether to include galaxy counts in derivations of
+        perturbation component of the AUF. Must be given if
+        ``include_perturb_auf`` is ``True``.
+    cmau_array : numpy.ndarray, optional
+        Array of shape ``(5, 2, 4)`` holding the Wilson (2022, RNAAS, 6, 60) [1]_
+        c, m, a, and u values that describe the Schechter parameterisation with
+        wavelength.
+    wavs : list of floats or numpy.ndarray, optional
+        List of central wavelengths of each filter in ``filters``, used to
+        compute appropriate Schechter function parameters for fitting galaxy
+        counts. Must be given if ``include_perturb_auf`` and ``fit_gal_flag``
+        are ``True``.
+    z_maxs : list of floats or numpy.ndarray, optional
+        List of maximum redshifts to compute galaxy densities out to when
+        deriving Schechter functions. Must be given if ``include_perturb_auf``
+        and ``fit_gal_flag`` are ``True``.
+    nzs : list of integers or numpy.ndarray, optional
+        Resolution of redshift grid, in the sense of ``np.linspace(0, z_max, nz)``,
+        to evaluate Schechter functions on. Must be given if
+        ``include_perturb_auf`` and ``fit_gal_flag`` are ``True``.
+    ab_offsets : list of floats or numpy.ndarray, optional
+        For filters in a non-AB magnitude system, the given offset between
+        the chosen filter system and AB magnitudes, in the sense of m = m_AB -
+        ab_offset. Must be given if ``include_perturb_auf`` and ``fit_gal_flag``
+        are ``True``.
+    filter_names : list of string, optional
+        Names for each filter in ``filters`` in a ``speclite``-appropriate
+        naming scheme (``group_name``-``band_name``), for loading response
+        curves to calculate galaxy k-corrections. Must be given if
+        ``include_perturb_auf`` and ``fit_gal_flag`` are ``True``.
+    al_avs : list of numpy.ndarray or numpy.ndarray, optional
+        Relative extinction curve vectors for each filter in ``filters``,
+        :math:`\frac{A_\lambda}{A_V}`, to convert exinction in the V-band
+        to extinction in the relevant filter. Must be given if
+        ``include_perturb_auf`` and ``fit_gal_flag`` are ``True``.
+    alpha0 : list of numpy.ndarray or numpy.ndarray, optional
+        Indices used to calculate parameters :math:`\alpha_i`, used in deriving
+        Dirichlet-distributed SED coefficients. :math:`\alpha{i, 0}` are the
+        zero-redshift parameters; see [2]_ and [3]_ for more details.
+    alpha1 : list of numpy.ndarray or numpy.ndarray, optional
+        :math:`\alpha_{i, 1}`, indices at redshift z=1 used to derive
+        Dirichlet-distributed SED coefficient values :math:`\alpha_i`.
+    alpha_weight : list of numpy.ndarray or numpy.ndarray, optional
+        Weights for use in calculating :math:`\alpha_i` from ``alpha0`` and
+        ``alpha1``.
+
+    References
+    ----------
+    .. [1] Wilson T. J. (2022), RNAAS, 6, 60
+    .. [2] Herbel J., Kacprzak T., Amara A., et al. (2017), JCAP, 8, 35
+    .. [3] Blanton M. R., Roweis S. (2007), AJ, 133, 734
+
     """
     if include_perturb_auf and tri_download_flag and tri_set_name is None:
         raise ValueError("tri_set_name must be given if include_perturb_auf and tri_download_flag "
@@ -150,6 +207,29 @@ def make_perturb_aufs(auf_folder, cat_folder, filters, auf_points, r, dr, rho,
     if include_perturb_auf and compute_local_density and density_radius is None:
         raise ValueError("density_radius must be given if include_perturb_auf and "
                          "compute_local_density are both True.")
+
+    if include_perturb_auf and fit_gal_flag is None:
+        raise ValueError("fit_gal_flag must not be None if include_perturb_auf is True.")
+    if include_perturb_auf and fit_gal_flag and cmau_array is None:
+        raise ValueError("cmau_array must be given if fit_gal_flag is True.")
+    if include_perturb_auf and fit_gal_flag and wavs is None:
+        raise ValueError("wavs must be given if fit_gal_flag is True.")
+    if include_perturb_auf and fit_gal_flag and z_maxs is None:
+        raise ValueError("z_maxs must be given if fit_gal_flag is True.")
+    if include_perturb_auf and fit_gal_flag and nzs is None:
+        raise ValueError("nzs must be given if fit_gal_flag is True.")
+    if include_perturb_auf and fit_gal_flag and ab_offsets is None:
+        raise ValueError("ab_offsets must be given if fit_gal_flag is True.")
+    if include_perturb_auf and fit_gal_flag and filter_names is None:
+        raise ValueError("filter_names must be given if fit_gal_flag is True.")
+    if include_perturb_auf and fit_gal_flag and al_avs is None:
+        raise ValueError("al_avs must be given if fit_gal_flag is True.")
+    if include_perturb_auf and fit_gal_flag and alpha0 is None:
+        raise ValueError("alpha0 must be given if fit_gal_flag is True.")
+    if include_perturb_auf and fit_gal_flag and alpha1 is None:
+        raise ValueError("alpha1 must be given if fit_gal_flag is True.")
+    if include_perturb_auf and fit_gal_flag and alpha_weight is None:
+        raise ValueError("alpha_weight must be given if fit_gal_flag is True.")
 
     print('Creating perturbation AUFs sky indices for catalogue "{}"...'.format(which_cat))
     sys.stdout.flush()
@@ -274,10 +354,17 @@ def make_perturb_aufs(auf_folder, cat_folder, filters, auf_points, r, dr, rho,
                 else:
                     localN = np.load('{}/local_N.npy'.format(auf_folder),
                                      mmap_mode='r')[sky_cut][good_mag_slice, j]
-                Narray = create_single_perturb_auf(
-                    ax_folder, filters[j], r, dr, rho, drho, j0s, num_trials, psf_fwhms[j],
-                    tri_filt_names[j], density_mags[j], a_photo, localN, dm_max, d_mag,
-                    delta_mag_cuts)
+                if fit_gal_flag:
+                    Narray = create_single_perturb_auf(
+                        ax_folder, filters[j], r, dr, rho, drho, j0s, num_trials, psf_fwhms[j],
+                        tri_filt_names[j], density_mags[j], a_photo, localN, dm_max, d_mag,
+                        delta_mag_cuts, fit_gal_flag, cmau_array, wavs[j], z_maxs[j], nzs[j],
+                        alpha0, alpha1, alpha_weight, ab_offsets[j], filter_names[j], al_avs[j])
+                else:
+                    Narray = create_single_perturb_auf(
+                        ax_folder, filters[j], r, dr, rho, drho, j0s, num_trials, psf_fwhms[j],
+                        tri_filt_names[j], density_mags[j], a_photo, localN, dm_max, d_mag,
+                        delta_mag_cuts, fit_gal_flag)
             else:
                 # Without the simulations to force local normalising density N or
                 # individual source brightness magnitudes, we can simply combine
@@ -436,8 +523,8 @@ def download_trilegal_simulation(tri_folder, tri_filter_set, ax1, ax2, mag_num, 
     mag_lim = 32
     galactic_flag = True if region_frame == 'galactic' else False
     while areaflag == 0:
-        get_trilegal(tri_name, ax1, ax2, folder=tri_folder, galactic=galactic_flag,
-                     filterset=tri_filter_set, area=triarea, maglim=mag_lim, magnum=mag_num)
+        _ = get_trilegal(tri_name, ax1, ax2, folder=tri_folder, galactic=galactic_flag,
+                         filterset=tri_filter_set, area=triarea, maglim=mag_lim, magnum=mag_num)
         f = open('{}/{}.dat'.format(tri_folder, tri_name), "r")
         contents = f.readlines()
         f.close()
@@ -454,12 +541,12 @@ def download_trilegal_simulation(tri_folder, tri_filter_set, ax1, ax2, mag_num, 
             triarea = min(10, triarea / nobjs * total_objs)
             areaflag = 1
         os.system('rm {}/{}.dat'.format(tri_folder, tri_name))
-    get_trilegal(tri_name, ax1, ax2, folder=tri_folder, galactic=galactic_flag,
-                 filterset=tri_filter_set, area=triarea, maglim=mag_lim, magnum=mag_num)
+    av_inf = get_trilegal(tri_name, ax1, ax2, folder=tri_folder, galactic=galactic_flag,
+                          filterset=tri_filter_set, area=triarea, maglim=mag_lim, magnum=mag_num)
     f = open('{}/{}.dat'.format(tri_folder, tri_name), "r")
     contents = f.readlines()
     f.close()
-    contents.insert(0, '#area = {} sq deg\n'.format(triarea))
+    contents.insert(0, '#area = {} sq deg\n#Av at infinity = {}\n'.format(triarea, av_inf))
     f = open('{}/{}.dat'.format(tri_folder, tri_name), "w")
     contents = "".join(contents)
     f.write(contents)
@@ -592,8 +679,11 @@ def calculate_local_density(a_astro, a_tot_astro, a_tot_photo, auf_folder, cat_f
 
 
 def create_single_perturb_auf(tri_folder, filt, r, dr, rho, drho, j0s, num_trials, psf_fwhm,
-                              header, density_mag, a_photo, localN, dm_max, d_mag, mag_cut):
-    '''
+                              header, density_mag, a_photo, localN, dm_max, d_mag, mag_cut,
+                              fit_gal_flag, cmau_array=None, wav=None, z_max=None, nz=None,
+                              alpha0=None, alpha1=None, alpha_weight=None, ab_offset=None,
+                              filter_name=None, al_av=None):
+    r'''
     Creates the associated parameters for describing a single perturbation AUF
     component, for a single sky position.
 
@@ -641,21 +731,65 @@ def create_single_perturb_auf(tri_folder, filt, r, dr, rho, drho, j0s, num_trial
     mag_cut : numpy.ndarray or list of floats
         The magnitude offsets -- or relative fluxes -- above which to keep track of
         the fraction of objects suffering from a contaminating source.
+    fit_gal_flag : bool
+        Flag to indicate whether to simulate galaxy counts for the purposes of
+        simulating the perturbation component of the AUF.
+    cmau_array : numpy.ndarray, optional
+        Array holding the c/m/a/u values that describe the parameterisation
+        of the Schechter functions with wavelength, following Wilson (2022, RNAAS,
+        6, 60) [1]_. Shape should be `(5, 2, 4)`, with 5 parameters for both blue
+        and red galaxies.
+    wav : float, optional
+        Wavelength, in microns, of the filter of the current observations.
+    z_max : float, optional
+        Maximum redshift to simulate differential galaxy counts out to.
+    nz : int, optional
+        Number of redshifts to simulate, to dictate resolution of Schechter
+        functions used to generate differential galaxy counts.
+    alpha0 : list of numpy.ndarray or numpy.ndarray, optional
+        Zero-redshift indices used to calculate Dirichlet SED coefficients,
+        used within the differential galaxy count simulations. Should either be
+        a two-element list or shape ``(2, 5)`` array. See [2]_ and [3]_ for
+        more details.
+    alpha1 : list of numpy.ndarray or numpy.ndarray, optional
+        Dirichlet SED coefficients at z=1.
+    alpha_weight : list of numpy.ndarray or numpy.ndarray, optional
+        Weights used to derive the ``kcorrect`` coefficients within the
+        galaxy count framework.
+    ab_offset : float, optional
+        The zero point difference between the chosen filter and the AB system,
+        for conversion of simulated galaxy counts from AB magnitudes. Should
+        be of the convention m = m_AB - ab_offset
+    filter_name : string, optional
+        The ``speclite`` style ``group_name-band_name`` name for the filter,
+        for use in the creation of simulated galaxy counts.
+    al_av : float
+        Reddening vector for the filter, :math:`\frac{A_\lambda}{A_V}`.
 
     Returns
     -------
     count_array : numpy.ndarray
         The simulated local normalising densities that were used to simulate
         potential perturbation distributions.
+
+    References
+    ----------
+    .. [1] Wilson T. J. (2022), RNAAS, 6, 60
+    .. [2] Herbel J., Kacprzak T., Amara A., et al. (2017), JCAP, 8, 35
+    .. [3] Blanton M. R., Roweis S. (2007), AJ, 133, 734
+
     '''
     tri_name = 'trilegal_auf_simulation'
     f = open('{}/{}.dat'.format(tri_folder, tri_name), "r")
-    line = f.readline()
+    area_line = f.readline()
+    av_line = f.readline()
     f.close()
-    bits = line.split(' ')
+    bits = area_line.split(' ')
     tri_area = float(bits[2])
+    bits = av_line.split(' ')
+    av_inf = float(bits[4])
     tri = np.genfromtxt('{}/{}.dat'.format(tri_folder, tri_name), delimiter=None,
-                        names=True, comments='#', skip_header=1, usecols=[header])
+                        names=True, comments='#', skip_header=2, usecols=[header])
 
     # TODO: extend to allow a Galactic source model that doesn't depend on TRILEGAL
     tri_mags = tri[:][header]
@@ -663,22 +797,35 @@ def create_single_perturb_auf(tri_folder, filt, r, dr, rho, drho, j0s, num_trial
 
     minmag = d_mag * np.floor(np.amin(tri_mags)/d_mag)
     maxmag = d_mag * np.ceil(np.amax(tri_mags)/d_mag)
-    hist, model_mags = np.histogram(tri_mags, bins=np.arange(minmag, maxmag+1e-10, d_mag))
-    hc = np.where(hist > 3)[0]
+    h, model_mags = np.histogram(tri_mags, bins=np.arange(minmag, maxmag+1e-10, d_mag))
+    model_mags_interval = np.diff(model_mags)
+    model_mag_mids = model_mags[:-1]+model_mags_interval/2
 
-    hist = hist[hc]
-    model_mags_interval = np.diff(model_mags)[hc]
-    model_mags = model_mags[hc]
+    hist = h / model_mags_interval / tri_area
+    log10y_tri = -np.inf * np.ones_like(hist)
+    log10y_tri[hist > 0] = np.log10(hist[hist > 0])
 
-    hist = hist / model_mags_interval / tri_area
-    log10y_tri = np.log10(hist)
+    if fit_gal_flag:
+        al_inf = al_av * av_inf
+        z_array = np.linspace(0, z_max, nz)
+        gal_dens = create_galaxy_counts(cmau_array, model_mag_mids, z_array, wav, alpha0, alpha1,
+                                        alpha_weight, ab_offset, filter_name, al_inf)
+        max_mag_bin = np.argwhere(model_mags[1:] <= density_mag)[0][-1] + 1
+        gal_count = np.sum(gal_dens[:max_mag_bin]*model_mags_interval[:max_mag_bin])
+        log10y_gal = -np.inf * np.ones_like(log10y_tri)
+        log10y_gal[gal_dens > 0] = np.log10(gal_dens[gal_dens > 0])
+    else:
+        gal_count = 0
+        log10y_gal = -np.inf * np.ones_like(log10y_tri)
 
-    # TODO: add the step to get density and counts of extra-galactic sources.
-    gal_count = 0
-    log10y_gal = -np.inf * np.ones_like(log10y_tri)
+        # If we're not generating galaxy counts, we have to solely rely on
+        # TRILEGAL counting statistics, so we only want to keep populated bins.
+        hc = np.where(h > 3)[0]
+        model_mag_mids = model_mag_mids[hc]
+        model_mags_interval = model_mags_interval[hc]
+        log10y_tri = log10y_tri[hc]
 
     model_count = tri_count + gal_count
-
     log10y = np.log10(10**log10y_tri + 10**log10y_gal)
 
     # Set a magnitude bin width of 0.25 mags, to avoid oversampling.
@@ -705,7 +852,7 @@ def create_single_perturb_auf(tri_folder, filt, r, dr, rho, drho, j0s, num_trial
                                                         len(count_array)))
     Frac, Flux, fourieroffset, offset, cumulative = paf.perturb_aufs(
         count_array, mag_array, r[:-1]+dr/2, dr, r, j0s.T,
-        model_mags+model_mags_interval/2, model_mags_interval, log10y, model_count,
+        model_mag_mids, model_mags_interval, log10y, model_count,
         int(dm_max/d_mag) * np.ones_like(count_array), mag_cut, R, num_trials, seed)
     np.save('{}/{}/frac.npy'.format(tri_folder, filt), Frac)
     np.save('{}/{}/flux.npy'.format(tri_folder, filt), Flux)

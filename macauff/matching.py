@@ -314,7 +314,7 @@ class CrossMatch():
         if self.include_perturb_auf:
             for config, catname in zip([cat_a_config, cat_b_config], ['"a"', '"b"']):
                 for check_flag in ['tri_set_name', 'tri_filt_names', 'psf_fwhms',
-                                   'download_tri', 'dens_mags']:
+                                   'download_tri', 'dens_mags', 'fit_gal_flag']:
                     if check_flag not in config:
                         raise ValueError("Missing key {} from catalogue {} metadata file.".format(
                                          check_flag, catname))
@@ -325,6 +325,8 @@ class CrossMatch():
             self.b_download_tri = self._str2bool(cat_b_config['download_tri'])
             self.a_tri_set_name = cat_a_config['tri_set_name']
             self.b_tri_set_name = cat_b_config['tri_set_name']
+            self.a_fit_gal_flag = self._str2bool(cat_a_config['fit_gal_flag'])
+            self.b_fit_gal_flag = self._str2bool(cat_b_config['fit_gal_flag'])
             for config, flag in zip([cat_a_config, cat_b_config], ['a_', 'b_']):
                 a = config['tri_filt_names'].split()
                 if len(a) != len(getattr(self, '{}filt_names'.format(flag))):
@@ -385,6 +387,48 @@ class CrossMatch():
                         setattr(self, '{}dens_dist'.format(flag), float(config['dens_dist']))
                     except ValueError:
                         raise ValueError("dens_dist in catalogue {} must be a float.".format(catname))
+
+            for config, catname, fit_gal_flag, flag in zip(
+                    [cat_a_config, cat_b_config], ['"a"', '"b"'],
+                    [self.a_fit_gal_flag, self.b_fit_gal_flag], ['a_', 'b_']):
+                if fit_gal_flag:
+                    for check_flag in ['gal_wavs', 'gal_zmax', 'gal_nzs',
+                                       'gal_aboffsets', 'gal_filternames', 'gal_al_avs']:
+                        if check_flag not in config:
+                            raise ValueError("Missing key {} from catalogue {} metadata file."
+                                             .format(check_flag, catname))
+                    # Set all lists of floats
+                    for var in ['gal_wavs', 'gal_zmax', 'gal_aboffsets', 'gal_al_avs']:
+                        a = config[var].split(' ')
+                        try:
+                            b = np.array([float(f) for f in a])
+                        except ValueError:
+                            raise ValueError('{} should be a list of floats in catalogue '
+                                             '{} metadata file'.format(var, catname))
+                        if len(b) != len(getattr(self, '{}filt_names'.format(flag))):
+                            raise ValueError('{}{} and {}filt_names should contain the same '
+                                             'number of entries.'.format(flag, var, flag))
+                        setattr(self, '{}{}'.format(flag, var), b)
+                    # galaxy_nzs should be a list of integers.
+                    a = config['gal_nzs'].split(' ')
+                    try:
+                        b = np.array([float(f) for f in a])
+                    except ValueError:
+                        raise ValueError('gal_nzs should be a list of integers '
+                                         'in catalogue {} metadata file'.format(catname))
+                    if len(b) != len(getattr(self, '{}filt_names'.format(flag))):
+                        raise ValueError('{}gal_nzs and {}filt_names should contain the same '
+                                         'number of entries.'.format(flag, flag))
+                    if not np.all([c.is_integer() for c in b]):
+                        raise ValueError('All elements of {}gal_nzs should be '
+                                         'integers.'.format(flag))
+                    setattr(self, '{}gal_nzs'.format(flag), np.array([int(c) for c in b]))
+                    # Filter names are simple lists of strings
+                    b = config['gal_filternames'].split(' ')
+                    if len(b) != len(getattr(self, '{}filt_names'.format(flag))):
+                        raise ValueError('{}gal_filternames and {}filt_names should contain the '
+                                         'same number of entries.'.format(flag, flag))
+                    setattr(self, '{}gal_filternames'.format(flag), np.array(b))
 
         for config, catname, flag in zip([cat_a_config, cat_b_config], ['"a"', '"b"'],
                                          ['a_', 'b_']):
@@ -490,6 +534,26 @@ class CrossMatch():
         # TODO: allow as user input.
         self.delta_mag_cuts = np.array([2.5, 5])
 
+        # TODO: allow as user input.
+        self.gal_cmau_array = np.empty((5, 2, 4), float)
+        # See Wilson (2022, RNAAS, 6, 60) for the meanings of the variables c, m,
+        # a, and u. For each of M*/phi*/alpha/P/Q, for blue+red galaxies, 2-4
+        # variables are derived as a function of wavelength, or Q(P).
+        self.gal_cmau_array[0, :, :] = [[-24.286513, 1.141760, 2.655846, np.nan],
+                                        [-23.192520, 1.778718, 1.668292, np.nan]]
+        self.gal_cmau_array[1, :, :] = [[0.001487, 2.918841, 0.000510, np.nan],
+                                        [0.000560, 7.691261, 0.003330, -0.065565]]
+        self.gal_cmau_array[2, :, :] = [[-1.257761, 0.021362, np.nan, np.nan],
+                                        [-0.309077, -0.067411, np.nan, np.nan]]
+        self.gal_cmau_array[3, :, :] = [[-0.302018, 0.034203, np.nan, np.nan],
+                                        [-0.713062, 0.233366, np.nan, np.nan]]
+        self.gal_cmau_array[4, :, :] = [[1.233627, -0.322347, np.nan, np.nan],
+                                        [1.068926, -0.385984, np.nan, np.nan]]
+        self.gal_alpha0 = [[2.079, 3.524, 1.917, 1.992, 2.536], [2.461, 2.358, 2.568, 2.268, 2.402]]
+        self.gal_alpha1 = [[2.265, 3.862, 1.921, 1.685, 2.480], [2.410, 2.340, 2.200, 2.540, 2.464]]
+        self.gal_alphaweight = [[3.47e+09, 3.31e+06, 2.13e+09, 1.64e+10, 1.01e+09],
+                                [3.84e+09, 1.57e+06, 3.91e+08, 4.66e+10, 3.03e+07]]
+
         if self.run_auf or not a_correct_file_number:
             if self.j0s is None:
                 self.j0s = mff.calc_j0(self.rho[:-1]+self.drho/2, self.r[:-1]+self.dr/2)
@@ -516,6 +580,18 @@ class CrossMatch():
                                    **{'tri_set_name': self.a_tri_set_name,
                                       'tri_filt_num': self.a_tri_filt_num,
                                       'auf_region_frame': self.a_auf_region_frame})
+                if self.a_fit_gal_flag:
+                    _kwargs = dict(_kwargs,
+                                   **{'fit_gal_flag': self.a_fit_gal_flag,
+                                      'cmau_array': self.gal_cmau_array, 'wavs': self.a_gal_wavs,
+                                      'z_maxs': self.a_gal_zmax, 'nzs': self.a_gal_nzs,
+                                      'ab_offsets': self.a_gal_aboffsets,
+                                      'filter_names': self.a_gal_filternames,
+                                      'al_avs': self.a_gal_al_avs, 'alpha0': self.gal_alpha0,
+                                      'alpha1': self.gal_alpha1,
+                                      'alpha_weight': self.gal_alphaweight})
+                else:
+                    _kwargs = dict(_kwargs, **{'fit_gal_flag': self.a_fit_gal_flag})
                 if self.a_download_tri:
                     os.system("rm -rf {}/*".format(self.a_auf_folder_path))
                 else:
@@ -569,6 +645,18 @@ class CrossMatch():
                                    **{'tri_set_name': self.b_tri_set_name,
                                       'tri_filt_num': self.b_tri_filt_num,
                                       'auf_region_frame': self.b_auf_region_frame})
+                if self.b_fit_gal_flag:
+                    _kwargs = dict(_kwargs,
+                                   **{'fit_gal_flag': self.b_fit_gal_flag,
+                                      'cmau_array': self.gal_cmau_array, 'wavs': self.b_gal_wavs,
+                                      'z_maxs': self.b_gal_zmax, 'nzs': self.b_gal_nzs,
+                                      'ab_offsets': self.b_gal_aboffsets,
+                                      'filter_names': self.b_gal_filternames,
+                                      'al_avs': self.b_gal_al_avs, 'alpha0': self.gal_alpha0,
+                                      'alpha1': self.gal_alpha1,
+                                      'alpha_weight': self.gal_alphaweight})
+                else:
+                    _kwargs = dict(_kwargs, **{'fit_gal_flag': self.a_fit_gal_flag})
                 if self.b_download_tri:
                     os.system("rm -rf {}/*".format(self.b_auf_folder_path))
                 else:

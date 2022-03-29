@@ -542,6 +542,107 @@ class TestInputs:
                                 os.path.join(os.path.dirname(__file__),
                                 'data/cat_b_params.txt'))
 
+        for cat_reg, cat_name in zip(['"a"', '"b"'], ['cat_a_params', 'cat_b_params']):
+            f = open(os.path.join(os.path.dirname(__file__),
+                     'data/{}.txt'.format(cat_name))).readlines()
+            old_line = 'fit_gal_flag = no'
+            new_line = ''
+            idx = np.where([old_line in line for line in f])[0][0]
+            _replace_line(os.path.join(os.path.dirname(__file__),
+                          'data/{}.txt'.format(cat_name)), idx, new_line, out_file=os.path.join(
+                          os.path.dirname(__file__), 'data/{}_.txt'.format(cat_name)))
+            with pytest.raises(ValueError,
+                               match='Missing key fit_gal_flag from catalogue {}'.format(cat_reg)):
+                cm = CrossMatch(os.path.join(os.path.dirname(__file__),
+                                'data/crossmatch_params_.txt'),
+                                os.path.join(os.path.dirname(__file__),
+                                'data/cat_a_params{}.txt'.format('_' if 'a' in cat_reg else '')),
+                                os.path.join(os.path.dirname(__file__),
+                                'data/cat_b_params{}.txt'.format('_' if 'b' in cat_reg else '')))
+
+        f = open(os.path.join(os.path.dirname(__file__), 'data/cat_a_params.txt')).readlines()
+        old_line = 'fit_gal_flag = no'
+        new_line = ('fit_gal_flag = yes\ngal_wavs = 0.513 0.641 0.778\n'
+                    'gal_zmax = 4.5 4.5 5\ngal_nzs = 46 46 51\n'
+                    'gal_aboffsets = 0.5 0.5 0.5\n'
+                    'gal_filternames = gaiadr2-BP gaiadr2-G gaiadr2-RP\n'
+                    'gal_al_avs = 0.589 0.789 1.002\n')
+        idx = np.where([old_line in line for line in f])[0][0]
+        _replace_line(os.path.join(os.path.dirname(__file__), 'data/cat_a_params.txt'), idx,
+                      new_line, out_file=os.path.join(os.path.dirname(__file__),
+                      'data/cat_a_params_.txt'))
+        f = open(os.path.join(os.path.dirname(__file__), 'data/cat_b_params.txt')).readlines()
+        old_line = 'fit_gal_flag = no'
+        new_line = ('fit_gal_flag = yes\ngal_wavs = 3.37 4.62 12.08 22.19\n'
+                    'gal_zmax = 3.2 4.0 1 4\ngal_nzs = 33 41 11 41\n'
+                    'gal_aboffsets = 0.5 0.5 0.5 0.5\n'
+                    'gal_filternames = wise2010-W1 wise2010-W2 wise2010-W3 wise2010-W4\n'
+                    'gal_al_avs = 0.039 0.026 0.015 0.005\n')
+        idx = np.where([old_line in line for line in f])[0][0]
+        _replace_line(os.path.join(os.path.dirname(__file__), 'data/cat_b_params.txt'), idx,
+                      new_line, out_file=os.path.join(os.path.dirname(__file__),
+                      'data/cat_b_params_.txt'))
+
+        cm = CrossMatch(os.path.join(os.path.dirname(__file__),
+                        'data/crossmatch_params_.txt'),
+                        os.path.join(os.path.dirname(__file__),
+                        'data/cat_a_params_.txt'),
+                        os.path.join(os.path.dirname(__file__),
+                        'data/cat_b_params_.txt'))
+        assert_allclose(cm.a_gal_zmax, np.array([4.5, 4.5, 5.0]))
+        assert np.all(cm.b_gal_nzs == np.array([33, 41, 11, 41]))
+        assert np.all(cm.a_gal_filternames == ['gaiadr2-BP', 'gaiadr2-G', 'gaiadr2-RP'])
+
+        f = open(os.path.join(os.path.dirname(__file__), 'data/cat_b_params_.txt')).readlines()
+        for i, key in enumerate(['gal_wavs', 'gal_zmax', 'gal_nzs',
+                                 'gal_aboffsets', 'gal_filternames', 'gal_al_avs']):
+            idx = np.where([key in line for line in f])[0][0]
+            _replace_line(os.path.join(os.path.dirname(__file__), 'data/cat_b_params_.txt'),
+                          idx, '', out_file=os.path.join(os.path.dirname(__file__),
+                          'data/cat_b_params__.txt'))
+            with pytest.raises(ValueError,
+                               match='Missing key {} from catalogue "b"'.format(key)):
+                cm = CrossMatch(os.path.join(os.path.dirname(__file__),
+                                'data/crossmatch_params_.txt'),
+                                os.path.join(os.path.dirname(__file__),
+                                'data/cat_a_params_.txt'),
+                                os.path.join(os.path.dirname(__file__),
+                                'data/cat_b_params__.txt'))
+
+        for old_line, new_line, match_text, file in zip(
+                ['gal_wavs = 0.513 0.641 0.778', 'gal_aboffsets = 0.5 0.5 0.5 0.5',
+                 'gal_nzs = 46 46 51', 'gal_nzs = 33 41 11 41', 'gal_nzs = 33 41 11 41',
+                 'gal_filternames = gaiadr2-BP gaiadr2-G gaiadr2-RP',
+                 'gal_al_avs = 0.589 0.789 1.002', 'gal_al_avs = 0.589 0.789 1.002'],
+                ['gal_wavs = 0.513 0.641\n', 'gal_aboffsets = a 0.5 0.5 0.5\n',
+                 'gal_nzs = 46 a 51\n', 'gal_nzs = 33.1 41 11 41\n', 'gal_nzs = 33 41 11\n',
+                 'gal_filternames = gaiadr2-BP gaiadr2-G gaiadr2-RP wise2010-W1\n',
+                 'gal_al_avs = words\n', 'gal_al_avs = 0.789 1.002\n'],
+                ['a_gal_wavs and a_filt_names should contain the same number',
+                 'gal_aboffsets should be a list of floats in catalogue "b"',
+                 'gal_nzs should be a list of integers in catalogue "a"',
+                 'All elements of b_gal_nzs should be integers.',
+                 'b_gal_nzs and b_filt_names should contain the same number of entries.',
+                 'a_gal_filternames and a_filt_names should contain the same number of entries.',
+                 'gal_al_avs should be a list of floats in catalogue "a"',
+                 'a_gal_al_avs and a_filt_names should contain the same number of entries.'],
+                ['cat_a_params', 'cat_b_params', 'cat_a_params', 'cat_b_params', 'cat_b_params',
+                 'cat_a_params', 'cat_a_params', 'cat_a_params']):
+            f = open(os.path.join(os.path.dirname(__file__),
+                                  'data/{}_.txt'.format(file))).readlines()
+            idx = np.where([old_line in line for line in f])[0][0]
+            _replace_line(os.path.join(os.path.dirname(__file__),
+                          'data/{}_.txt'.format(file)), idx, new_line, out_file=os.path.join(
+                          os.path.dirname(__file__), 'data/{}__.txt'.format(file)))
+
+            with pytest.raises(ValueError, match=match_text):
+                cm = CrossMatch(os.path.join(os.path.dirname(__file__),
+                                'data/crossmatch_params_.txt'),
+                                os.path.join(os.path.dirname(__file__),
+                                'data/cat_a_params{}.txt'.format('_' if '_b_' in file else '__')),
+                                os.path.join(os.path.dirname(__file__),
+                                'data/cat_b_params{}.txt'.format('_' if '_a_' in file else '__')))
+
     def test_crossmatch_fourier_inputs(self):
         cm = CrossMatch(os.path.join(os.path.dirname(__file__), 'data/crossmatch_params.txt'),
                         os.path.join(os.path.dirname(__file__), 'data/cat_a_params.txt'),
