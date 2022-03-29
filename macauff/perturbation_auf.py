@@ -127,7 +127,7 @@ def make_perturb_aufs(auf_folder, cat_folder, filters, auf_points, r, dr, rho,
         perturbation component of the AUF. Must be given if
         ``include_perturb_auf`` is ``True``.
     cmau_array : numpy.ndarray, optional
-        Array of shape ``(5, 2, 4)`` holding the Wilson (2022, RNAAS, ...) [1]_
+        Array of shape ``(5, 2, 4)`` holding the Wilson (2022, RNAAS, 6, 60) [1]_
         c, m, a, and u values that describe the Schechter parameterisation with
         wavelength.
     wavs : list of floats or numpy.ndarray, optional
@@ -170,7 +170,7 @@ def make_perturb_aufs(auf_folder, cat_folder, filters, auf_points, r, dr, rho,
         ``alpha1``.
     References
     ----------
-    .. [1] Wilson T. J. (2022), RNAAS, ...
+    .. [1] Wilson T. J. (2022), RNAAS, 6, 60
     .. [2] Herbel J., Kacprzak T., Amara A., et al. (2017), JCAP, 8, 35
     .. [3] Blanton M. R., Roweis S. (2007), AJ, 133, 734
     """
@@ -735,7 +735,7 @@ def create_single_perturb_auf(tri_folder, filt, r, dr, rho, drho, j0s, num_trial
     cmau_array : numpy.ndarray, optional
         Array holding the c/m/a/u values that describe the parameterisation
         of the Schechter functions with wavelength, following Wilson (2022, RNAAS,
-        ...) [1]_. Shape should be `(5, 2, 4)`, with 5 parameters for both blue
+        6, 60) [1]_. Shape should be `(5, 2, 4)`, with 5 parameters for both blue
         and red galaxies.
     wav : float, optional
         Wavelength, in microns, of the filter of the current observations.
@@ -772,7 +772,7 @@ def create_single_perturb_auf(tri_folder, filt, r, dr, rho, drho, j0s, num_trial
 
     References
     ----------
-    .. [1] Wilson T. J. (2022), RNAAS, ...
+    .. [1] Wilson T. J. (2022), RNAAS, 6, 60
     .. [2] Herbel J., Kacprzak T., Amara A., et al. (2017), JCAP, 8, 35
     .. [3] Blanton M. R., Roweis S. (2007), AJ, 133, 734
     '''
