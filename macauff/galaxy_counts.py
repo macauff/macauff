@@ -70,6 +70,7 @@ def create_galaxy_counts(cmau_array, mag_bins, z_array, wav, alpha0, alpha1, wei
     .. [1] Wilson T. J. (2022), RNAAS, 6, 60
     .. [2] Herbel J., Kacprzak T., Amara A., et al. (2017), JCAP, 8, 35
     .. [3] Blanton M. R., Roweis S. (2007), AJ, 133, 734
+
     '''
     cosmology = default_cosmology.get()
     gal_dens = np.zeros_like(mag_bins)
@@ -162,6 +163,7 @@ def generate_phi(cmau_array, cmau_ind, log_wav, z, abs_mag_bins):
     References
     ----------
     .. [1] Schechter P. (1976), ApJ, 203, 297
+
     '''
     M_star0 = function_evaluation_lookup(cmau_array, 0, cmau_ind, log_wav)
     phi_star0 = function_evaluation_lookup(cmau_array, 1, cmau_ind, log_wav)
@@ -208,6 +210,7 @@ def function_evaluation_lookup(cmau, ind1, ind2, x):
     References
     ----------
     .. [1] Wilson T. J. (2022), RNAAS, 6, 60
+
     '''
     c, m, a, u = cmau[ind1, ind2]
     if np.isnan(a) and np.isnan(u):
