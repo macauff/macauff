@@ -7,8 +7,8 @@ General
 New Features
 ^^^^^^^^^^^^
 
-- Inclusion of galaxy count model, to be used in the generation of perturbation
-  AUF components. [#41]
+- Inclusion of galaxy count model, used in the generation of perturbation
+  AUF components. [#41, #44]
 
 - Creation of initial Galactic proper motion model, for inclusion within the
   cross-match framework in a future release. [#39]
