@@ -895,6 +895,6 @@ def test_trilegal_download():
     bits = line.split(' ')
     tri_area = float(bits[2])
     tri = np.genfromtxt('{}/{}.dat'.format(tri_folder, tri_name), delimiter=None,
-                        names=True, comments='#', skip_header=1)
+                        names=True, comments='#', skip_header=2)
     assert np.all(tri[:]['G'] <= 32)
     assert tri_area <= 10
