@@ -168,11 +168,13 @@ def make_perturb_aufs(auf_folder, cat_folder, filters, auf_points, r, dr, rho,
     alpha_weight : list of numpy.ndarray or numpy.ndarray, optional
         Weights for use in calculating :math:`\alpha_i` from ``alpha0`` and
         ``alpha1``.
+
     References
     ----------
     .. [1] Wilson T. J. (2022), RNAAS, 6, 60
     .. [2] Herbel J., Kacprzak T., Amara A., et al. (2017), JCAP, 8, 35
     .. [3] Blanton M. R., Roweis S. (2007), AJ, 133, 734
+
     """
     if include_perturb_auf and tri_download_flag and tri_set_name is None:
         raise ValueError("tri_set_name must be given if include_perturb_auf and tri_download_flag "
@@ -775,6 +777,7 @@ def create_single_perturb_auf(tri_folder, filt, r, dr, rho, drho, j0s, num_trial
     .. [1] Wilson T. J. (2022), RNAAS, 6, 60
     .. [2] Herbel J., Kacprzak T., Amara A., et al. (2017), JCAP, 8, 35
     .. [3] Blanton M. R., Roweis S. (2007), AJ, 133, 734
+
     '''
     tri_name = 'trilegal_auf_simulation'
     f = open('{}/{}.dat'.format(tri_folder, tri_name), "r")
