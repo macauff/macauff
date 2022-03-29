@@ -59,7 +59,7 @@ class TestCreateGalaxyCounts():
 
     def test_create_galaxy_counts(self):
         wav = 3.4  # microns
-        filter_name = 'wise2010-w1'
+        filter_name = 'wise2010-W1'
         gal_dens = create_galaxy_counts(gal_values.cmau, self.mag_bins, self.z_array, wav,
                                         gal_values.alpha0, gal_values.alpha1,
                                         gal_values.alphaweight, self.ab_offset, filter_name, 0)
