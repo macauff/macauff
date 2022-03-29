@@ -1,9 +1,8 @@
 name: Python package
 
 on:
-  push:
+  workflow_dispatch:
   pull_request:
-    types: [opened, reopened]
 
 jobs:
   build:
@@ -52,9 +51,6 @@ jobs:
         run: |
           pip install numpy
           pip install tox
-      - if: github.event_name != 'push' || github.ref != 'refs/heads/main'
-        name: Run tests
-        run: tox -e ${{ matrix.toxenv }}
       - if: github.event_name == 'pull_request'
         name: Run tests with remote
         run: tox -e ${{ matrix.toxenv }} -- --remote-data
