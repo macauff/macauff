@@ -576,7 +576,7 @@ class TestInputs:
         new_line = ('fit_gal_flag = yes\ngal_wavs = 3.37 4.62 12.08 22.19\n'
                     'gal_zmax = 3.2 4.0 1 4\ngal_nzs = 33 41 11 41\n'
                     'gal_aboffsets = 0.5 0.5 0.5 0.5\n'
-                    'gal_filternames = wise2010-w1 wise2010-w2 wise2010-w3 wise2010-w4\n'
+                    'gal_filternames = wise2010-W1 wise2010-W2 wise2010-W3 wise2010-W4\n'
                     'gal_al_avs = 0.039 0.026 0.015 0.005\n')
         idx = np.where([old_line in line for line in f])[0][0]
         _replace_line(os.path.join(os.path.dirname(__file__), 'data/cat_b_params.txt'), idx,
@@ -616,7 +616,7 @@ class TestInputs:
                  'gal_al_avs = 0.589 0.789 1.002', 'gal_al_avs = 0.589 0.789 1.002'],
                 ['gal_wavs = 0.513 0.641\n', 'gal_aboffsets = a 0.5 0.5 0.5\n',
                  'gal_nzs = 46 a 51\n', 'gal_nzs = 33.1 41 11 41\n', 'gal_nzs = 33 41 11\n',
-                 'gal_filternames = gaiadr2-BP gaiadr2-G gaiadr2-RP wise2010-w1\n',
+                 'gal_filternames = gaiadr2-BP gaiadr2-G gaiadr2-RP wise2010-W1\n',
                  'gal_al_avs = words\n', 'gal_al_avs = 0.789 1.002\n'],
                 ['a_gal_wavs and a_filt_names should contain the same number',
                  'gal_aboffsets should be a list of floats in catalogue "b"',

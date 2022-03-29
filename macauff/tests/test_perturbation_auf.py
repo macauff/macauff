@@ -857,7 +857,7 @@ class TestMakePerturbAUFs():
         cm.b_gal_zmax = np.array([1])
         cm.b_gal_nzs = np.array([10])
         cm.b_gal_aboffsets = np.array([2.699])
-        cm.b_gal_filternames = ['wise2010-w1']
+        cm.b_gal_filternames = ['wise2010-W1']
         cm.b_gal_al_avs = np.array([0.030])
 
         cm.create_perturb_auf(self.files_per_auf_sim)
