@@ -308,13 +308,13 @@ class TestMakeIslandGroupings():
 
         self.j1s = gsf.calc_j1s(self.rho[:-1]+self.drho/2, self.r[:-1]+self.dr/2)
 
-        self.a_auf_pointings = np.array([[10, -20], [12, -22], [15, -25]])
-        self.b_auf_pointings = np.array([[11, -21], [14, -22], [14, -24]])
+        self.a_auf_pointings = np.array([[10, -26], [11, -25], [12, -24]])
+        self.b_auf_pointings = np.array([[10.1, -25.9], [11.3, -25.1], [11.9, -24]])
 
         self.N_a, self.N_b = 30, 45
         self.N_com = 25
 
-        self.ax_lims = np.array([8, 16, -26, -19])
+        self.ax_lims = np.array([10, 12, -26, -24])
 
         # Fake fourier grid, in this case under the assumption that there
         # is no extra AUF component:
@@ -518,10 +518,13 @@ class TestMakeIslandGroupings():
         os.system('rm -rf {}/group/*'.format(self.joint_folder_path))
         os.system('rm -rf {}/reject/*'.format(self.joint_folder_path))
         N_a, N_b, N_c = self.N_a, self.N_b, self.N_com
-        ax_lims = np.array([0, 360, -90, -19])
+        ax_lims = np.array([0, 360, -90, -88])
         # Check if axlims are changed to include wrap-around 0/360, or +-90 latitude,
         # then we don't reject any sources.
         a_coords, b_coords = np.copy(self.a_coords), np.copy(self.b_coords)
+        # Set up -26 to -24, and we now want them -90 to -88:
+        a_coords[:, 1] -= 64
+        b_coords[:, 1] -= 64
         a_c_diff = a_coords[3:6, 0] - (ax_lims[0] + self.max_sep/3600 - 1/3600)
         a_coords[3:6, 0] = ax_lims[0] + self.max_sep/3600 - 1/3600
         b_coords[3:6, 0] -= a_c_diff
