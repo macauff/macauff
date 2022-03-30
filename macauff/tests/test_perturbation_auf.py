@@ -168,7 +168,7 @@ def test_perturb_aufs():
 
     # Limit the size of each simulation, but run many to aggregate
     # better counting statistics.
-    num = 100
+    num = 50
     for _ in range(num):
         seed = rng.choice(1000000, size=(seed_size, 1))
         offsets, fracs, fluxs = paf.scatter_perturbers(np.array([mean]), m, R, 5, mag_cut,
@@ -196,7 +196,7 @@ def test_perturb_aufs():
 
     # Here we assume that the direct and wrapper calls had the same seed for
     # each call, and identical results, and hence should basically agree perfectly.
-    assert_allclose(track_pa_hist, track_sp_hist, atol=1e-6)
+    assert_allclose(track_pa_hist, track_sp_hist, atol=2e-6)
 
     offsets_fake = np.zeros_like(r[:-1])
     offsets_fake[0] += prob_0_draw / (np.pi * (r[1]**2 - r[0]**2))
@@ -335,11 +335,12 @@ class TestMakePerturbAUFs():
         self.psf_fwhms = np.array([6.1])
         self.r = np.linspace(0, 1.185 * self.psf_fwhms[0], 2500)
         self.dr = np.diff(self.r)
-        self.rho = np.linspace(0, 100, 10000)
+        self.rho = np.linspace(0, 100, 5000)
         self.drho = np.diff(self.rho)
         self.which_cat = 'b'
         self.include_perturb_auf = True
-        self.num_trials = 100000
+        self.num_trials = 50000
+        self.j0s = mff.calc_j0(self.rho[:-1]+self.drho/2, self.r[:-1]+self.dr/2)
 
         self.mem_chunk_num = 1
         self.delta_mag_cuts = np.array([2.5, 5])
@@ -470,8 +471,6 @@ class TestMakePerturbAUFs():
         np.save('{}/con_cat_photo.npy'.format(self.cat_folder), np.array([[14.99]]))
         np.save('{}/magref.npy'.format(self.cat_folder), np.array([0]))
 
-        num_trials = 100000
-        j0s = mff.calc_j0(self.rho[:-1]+self.drho/2, self.r[:-1]+self.dr/2)
         cutoff_mags = np.array([20])
         dm_max = np.array([10])
         d_mag = 0.1
@@ -523,10 +522,10 @@ class TestMakePerturbAUFs():
         mag_offset = mod_bin - mag_bin
         rel_flux = 10**(-1/2.5 * mag_offset)
 
-        N = 25
+        N = 15
         for i in range(N):
-            make_perturb_aufs(*self.args, psf_fwhms=self.psf_fwhms, num_trials=num_trials, j0s=j0s,
-                              density_mags=cutoff_mags, dm_max=dm_max, d_mag=d_mag,
+            make_perturb_aufs(*self.args, psf_fwhms=self.psf_fwhms, num_trials=self.num_trials,
+                              j0s=self.j0s, density_mags=cutoff_mags, dm_max=dm_max, d_mag=d_mag,
                               delta_mag_cuts=self.delta_mag_cuts, compute_local_density=False,
                               tri_filt_names=self.tri_filt_names, fit_gal_flag=False)
 
@@ -694,6 +693,11 @@ class TestMakePerturbAUFs():
         cm.a_dens_dist = density_radius
         cm.b_dens_dist = density_radius
         cm.compute_local_density = True
+        cm.r = self.r
+        cm.dr = self.dr
+        cm.rho = self.rho
+        cm.drho = self.drho
+        cm.j0s = self.j0s
         cm.run_auf = True
         cm.run_group = True
         cm.run_cf = True
@@ -837,6 +841,11 @@ class TestMakePerturbAUFs():
 
         cm.a_auf_region_points = self.auf_points
         cm.b_auf_region_points = self.auf_points
+        cm.r = self.r
+        cm.dr = self.dr
+        cm.rho = self.rho
+        cm.drho = self.drho
+        cm.j0s = self.j0s
         cm.cross_match_extent = self.ax_lims
         cm.run_auf = True
         cm.run_group = True
@@ -887,7 +896,7 @@ class TestMakePerturbAUFs():
 @pytest.mark.remote_data
 def test_trilegal_download():
     tri_folder = '.'
-    download_trilegal_simulation(tri_folder, 'gaiaDR2', 180, 20, 1, 'galactic', total_objs=10000)
+    download_trilegal_simulation(tri_folder, 'gaiaDR2', 15, 6, 1, 'galactic', total_objs=10000)
     tri_name = 'trilegal_auf_simulation'
     f = open('{}/{}.dat'.format(tri_folder, tri_name), "r")
     line = f.readline()
