@@ -168,7 +168,7 @@ def test_perturb_aufs():
 
     # Limit the size of each simulation, but run many to aggregate
     # better counting statistics.
-    num = 100
+    num = 50
     for _ in range(num):
         seed = rng.choice(1000000, size=(seed_size, 1))
         offsets, fracs, fluxs = paf.scatter_perturbers(np.array([mean]), m, R, 5, mag_cut,
@@ -196,7 +196,7 @@ def test_perturb_aufs():
 
     # Here we assume that the direct and wrapper calls had the same seed for
     # each call, and identical results, and hence should basically agree perfectly.
-    assert_allclose(track_pa_hist, track_sp_hist, atol=1e-6)
+    assert_allclose(track_pa_hist, track_sp_hist, atol=2e-6)
 
     offsets_fake = np.zeros_like(r[:-1])
     offsets_fake[0] += prob_0_draw / (np.pi * (r[1]**2 - r[0]**2))
