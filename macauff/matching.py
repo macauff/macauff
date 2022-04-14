@@ -24,26 +24,37 @@ class CrossMatch():
     A class to cross-match two photometric catalogues with one another, producing
     a composite catalogue of merged sources.
 
-    The class takes three paths, the locations of the metadata files containing
-    all of the necessary parameters for the cross-match, and outputs a file
-    containing the appropriate columns of the datasets plus additional derived
-    parameters.
-
     Parameters
     ----------
-    joint_file_path : string
-        A path to the location of the file containing the cross-match metadata.
-    cat_a_file_path : string
-        A path to the location of the file containing the catalogue "a" specific
-        metadata.
-    cat_b_file_path : string
-        A path to the location of the file containing the catalogue "b" specific
-        metadata.
+    chunks_folder_path : string
+        A path to the location of the folder containing one subfolder per chunk.
     '''
 
-    def __init__(self, joint_file_path, cat_a_file_path, cat_b_file_path):
+    def __init__(self, chunks_folder_path):
         '''
         Initialisation function for cross-match class.
+        '''
+        self.chunks_folder_path = chunks_folder_path
+
+    def _initialise_chunk(self, joint_file_path, cat_a_file_path, cat_b_file_path):
+        '''
+        Initialisation function for a single chunk of sky.
+
+        The function takes three paths, the locations of the metadata files containing
+        all of the necessary parameters for the cross-match, and outputs a file
+        containing the appropriate columns of the datasets plus additional derived
+        parameters.
+
+        Parameters
+        ----------
+        joint_file_path : string
+            A path to the location of the file containing the cross-match metadata.
+        cat_a_file_path : string
+            A path to the location of the file containing the catalogue "a" specific
+            metadata.
+        cat_b_file_path : string
+            A path to the location of the file containing the catalogue "b" specific
+            metadata.
         '''
         for f in [joint_file_path, cat_a_file_path, cat_b_file_path]:
             if not os.path.isfile(f):
@@ -142,24 +153,92 @@ class CrossMatch():
         Call function for CrossMatch, to run the various stages of cross-matching
         two photometric catalogues.
         '''
-        # The first step is to create the perturbation AUF components, if needed.
-        # If run_auf is set to True or if there are not the appropriate number of
-        # pre-saved outputs from a previous run then run perturbation AUF creation.
-        # TODO: generalise the number of files per AUF simulation as input arg.
-        self.create_perturb_auf(7)
 
-        # Once AUF components are assembled, we now group sources based on
-        # convolved AUF integration lengths, to get "common overlap" sources
-        # and merge such overlaps into distinct "islands" of sources to match.
-        self.group_sources(7)
+        chunk_queue = self._make_chunk_queue()
+        for (chunk_id, joint_file_path, cat_a_file_path, cat_b_file_path) in chunk_queue:
 
-        # The third step in this process is to, to some level, calculate the
-        # photometry-related information necessary for the cross-match.
-        self.calculate_phot_like(5)
+            self._initialise_chunk(joint_file_path, cat_a_file_path, cat_b_file_path)
 
-        # The final stage of the cross-match process is that of putting together
-        # the previous stages, and calculating the cross-match probabilities.
-        self.pair_sources(13)
+            # The first step is to create the perturbation AUF components, if needed.
+            # If run_auf is set to True or if there are not the appropriate number of
+            # pre-saved outputs from a previous run then run perturbation AUF creation.
+            # TODO: generalise the number of files per AUF simulation as input arg.
+            self.create_perturb_auf(7)
+
+            # Once AUF components are assembled, we now group sources based on
+            # convolved AUF integration lengths, to get "common overlap" sources
+            # and merge such overlaps into distinct "islands" of sources to match.
+            self.group_sources(7)
+
+            # The third step in this process is to, to some level, calculate the
+            # photometry-related information necessary for the cross-match.
+            self.calculate_phot_like(5)
+
+            # The final stage of the cross-match process is that of putting together
+            # the previous stages, and calculating the cross-match probabilities.
+            self.pair_sources(13)
+
+    def _make_chunk_queue(self):
+        '''
+        Determines the order with which chunks will be processed
+
+        Returns
+        -------
+        chunk_queue : list of tuples of strings
+            List with one element per chunk. Each element a tuple of chunk ID and
+            paths to metadata files in order (ID, cross-match, catalogue "a", catalogue "b")
+        '''
+        # Each metadata file associated with a chunk assumed to be in a subfolder
+        # e.g. Two chunks, "2017" and "2018", have structure:
+        #   chunks_folder_path/2017/crossmatch_params_2017.txt
+        #   chunks_folder_path/2017/cat_a_params_2017.txt
+        #   chunks_folder_path/2017/cat_b_params_2017.txt
+        #   chunks_folder_path/2018/crossmatch_params_2018.txt
+        #   chunks_folder_path/2018/cat_a_params_2018.txt
+        #   chunks_folder_path/2018/cat_b_params_2018.txt
+
+        # List subfolders in chunks folder
+        # Ordering is determined by os.listdir
+        subfolders = [name for name in os.listdir(self.chunks_folder_path)
+                      if os.path.isdir(os.path.join(self.chunks_folder_path, name))]
+
+        # Loop over subfolders, extracting paths to metadata files contained within
+        chunk_queue = []
+        for folder in subfolders:
+
+            # Identify chunk by subfolder name
+            chunk_id = folder
+            joint_file_path = ""
+            cat_a_file_path = ""
+            cat_b_file_path = ""
+
+            folder_path = os.path.join(self.chunks_folder_path, folder)
+            for filename in os.listdir(folder_path):
+                # Ignore non-txt files
+                if filename.endswith(".txt"):
+                    # TODO Relying on particular naming convention for metadata files
+                    if filename.startswith("crossmatch_params"):
+                        joint_file_path = os.path.join(folder_path, filename)
+                    elif filename.startswith("cat_a_params"):
+                        cat_a_file_path = os.path.join(folder_path, filename)
+                    elif filename.startswith("cat_b_params"):
+                        cat_b_file_path = os.path.join(folder_path, filename)
+
+            # Check results
+            if joint_file_path == "":
+                raise FileNotFoundError('Cross-match metadata file for chunk {} not found in directory {}'
+                                        .format(chunk_id, folder_path))
+            if cat_a_file_path == "":
+                raise FileNotFoundError('Catalogue "a" metadata file for chunk {} not found in directory {}'
+                                        .format(chunk_id, folder_path))
+            if cat_b_file_path == "":
+                raise FileNotFoundError('Catalogue "b" metadata file for chunk {} not found in directory {}'
+                                        .format(chunk_id, folder_path))
+
+            # Append result as tuple of ID and all 3 paths
+            chunk_queue.append((chunk_id, joint_file_path, cat_a_file_path, cat_b_file_path))
+
+        return chunk_queue
 
     def _str2bool(self, v):
         '''
