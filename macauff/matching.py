@@ -8,6 +8,7 @@ import sys
 import warnings
 from configparser import ConfigParser
 import numpy as np
+from mpi4py import MPI
 
 from .perturbation_auf import make_perturb_aufs
 from .group_sources import make_island_groupings
@@ -35,6 +36,16 @@ class CrossMatch():
         Initialisation function for cross-match class.
         '''
         self.chunks_folder_path = chunks_folder_path
+
+        # Initialise MPI
+        self.comm = MPI.COMM_WORLD
+        self.rank = self.comm.Get_rank()
+        self.comm_size = self.comm.Get_size()
+        # Special signals for worker MPI processes
+        self.worker_signals = { "NO_MORE_WORK": 0 }
+        # Only manager process needs to set up the queue
+        if self.rank == 0:
+            self.chunk_queue = self._make_chunk_queue()
 
     def _initialise_chunk(self, joint_file_path, cat_a_file_path, cat_b_file_path):
         '''
@@ -150,33 +161,89 @@ class CrossMatch():
 
     def __call__(self):
         '''
-        Call function for CrossMatch, to run the various stages of cross-matching
-        two photometric catalogues.
+        Call function for CrossMatch, performs cross-matching two photometric catalogues.
         '''
 
-        chunk_queue = self._make_chunk_queue()
-        for (chunk_id, joint_file_path, cat_a_file_path, cat_b_file_path) in chunk_queue:
+        # Special case for single process, i.e. serial version of code.
+        # Do not use manager-worker pattern. Instead, one process loops over all chunks
+        if self.comm_size == 1:
+            for (chunk_id, joint_file_path, cat_a_file_path, cat_b_file_path) in self.chunk_queue:
+                print("Rank {} processing chunk {}".format(self.rank, chunk_id))
+                self._process_chunk(joint_file_path, cat_a_file_path, cat_b_file_path)
+        else:
+            # Manager process:
+            #   - assigns chunks to workers
+            #   - TODO receive cross-match results, resolve duplicates and write output
+            #   - TODO monitor job walltime and take resumable snapshots
+            #   - TODO handle crashed workers
+            #   - TODO handle crashed manager process
+            #   - once queue is empty, workers are sent signal to stop
+            if self.rank == 0:
+                # Maintain count of active workers.
+                # Initially every process other than manager.
+                active_workers = self.comm_size - 1
 
-            self._initialise_chunk(joint_file_path, cat_a_file_path, cat_b_file_path)
+                # Loop until all workers have been instructed there is no more work
+                while active_workers > 0:
+                    # Wait for any worker to request a chunk
+                    worker_id = self.comm.recv()
 
-            # The first step is to create the perturbation AUF components, if needed.
-            # If run_auf is set to True or if there are not the appropriate number of
-            # pre-saved outputs from a previous run then run perturbation AUF creation.
-            # TODO: generalise the number of files per AUF simulation as input arg.
-            self.create_perturb_auf(7)
+                    # Assign chunks until no more work.
+                    # Then count "no more work" signals until no more workers.
+                    try:
+                        chunk = self.chunk_queue.pop(0)
+                        print("Rank {}: sending rank {} chunk {}".format(self.rank, worker_id, chunk[0]))
+                    except IndexError:
+                        chunk = self.worker_signals["NO_MORE_WORK"]
+                        active_workers -= 1
 
-            # Once AUF components are assembled, we now group sources based on
-            # convolved AUF integration lengths, to get "common overlap" sources
-            # and merge such overlaps into distinct "islands" of sources to match.
-            self.group_sources(7)
+                    self.comm.send(chunk, dest=worker_id)
 
-            # The third step in this process is to, to some level, calculate the
-            # photometry-related information necessary for the cross-match.
-            self.calculate_phot_like(5)
+            # Worker processes:
+            #  - request chunk from manager
+            #  - loop until given signal to terminate
+            else:
+                # Infinite loop until given signal to break
+                while True:
+                    # Send own rank ID to manager so it knows which process to assign work
+                    self.comm.send(self.rank, dest=0)
+                    message = self.comm.recv(source=0)
 
-            # The final stage of the cross-match process is that of putting together
-            # the previous stages, and calculating the cross-match probabilities.
-            self.pair_sources(13)
+                    # Handle received signal or chunk
+                    if message == self.worker_signals["NO_MORE_WORK"]:
+                        break
+                    else:
+                        (chunk_id, joint_file_path, cat_a_file_path, cat_b_file_path) = message
+                        print("Rank {}: processing chunk {}".format(self.rank, chunk_id))
+                        self._process_chunk(joint_file_path, cat_a_file_path, cat_b_file_path)
+
+    def _process_chunk(self, joint_file_path, cat_a_file_path, cat_b_file_path):
+        '''
+        Runs the various stages of cross-matching two photometric catalogues
+        '''
+        # Initialise using the current chunk data
+        # TODO Move some initialisation into class constructor?
+        # TODO Have manager perform file loads and broadcast result to reduce I/O
+        self._initialise_chunk(joint_file_path, cat_a_file_path, cat_b_file_path)
+
+        # The first step is to create the perturbation AUF components, if needed.
+        # If run_auf is set to True or if there are not the appropriate number of
+        # pre-saved outputs from a previous run then run perturbation AUF creation.
+        # TODO: generalise the number of files per AUF simulation as input arg.
+        self.create_perturb_auf(7)
+
+        # Once AUF components are assembled, we now group sources based on
+        # convolved AUF integration lengths, to get "common overlap" sources
+        # and merge such overlaps into distinct "islands" of sources to match.
+        self.group_sources(7)
+
+        # The third step in this process is to, to some level, calculate the
+        # photometry-related information necessary for the cross-match.
+        self.calculate_phot_like(5)
+
+        # The final stage of the cross-match process is that of putting together
+        # the previous stages, and calculating the cross-match probabilities.
+        self.pair_sources(13)
 
     def _make_chunk_queue(self):
         '''
