@@ -130,7 +130,7 @@ def test_naive_bayes_match():
     idx = np.where([ol in line for line in f])[0][0]
     _replace_line(os.path.join(os.path.dirname(__file__), 'data/crossmatch_params.txt'),
                   idx, nl, out_file=os.path.join(os.path.dirname(__file__),
-                  'data/crossmatch_params_.txt'))
+                  'data/chunk0/crossmatch_params_.txt'))
 
     new_ext = [extent[0] - r/3600 - 0.1/3600, extent[1] + r/3600 + 0.1/3600,
                extent[2] - r/3600 - 0.1/3600, extent[3] + r/3600 + 0.1/3600]
@@ -144,7 +144,7 @@ def test_naive_bayes_match():
         f = open(os.path.join(os.path.dirname(__file__),
                               'data/crossmatch_params.txt')).readlines()
         idx = np.where([ol in line for line in f])[0][0]
-        _replace_line(os.path.join(os.path.dirname(__file__), 'data/crossmatch_params_.txt'),
+        _replace_line(os.path.join(os.path.dirname(__file__), 'data/chunk0/crossmatch_params_.txt'),
                       idx, nl)
 
     ol, nl = 'auf_region_points = 131 134 4 -1 1 {}', 'auf_region_points = 131 131 1 0 0 1\n'
@@ -155,7 +155,7 @@ def test_naive_bayes_match():
         idx = np.where([_ol in line for line in f])[0][0]
         _replace_line(os.path.join(os.path.dirname(__file__), 'data/{}.txt'.format(file_name)),
                       idx, nl, out_file=os.path.join(os.path.dirname(__file__),
-                      'data/{}_.txt'.format(file_name)))
+                      'data/chunk0/{}_.txt'.format(file_name)))
 
     for cat, ol, nl in zip(['cat_a_params', 'cat_b_params'], ['cat_folder_path = gaia_folder',
                            'cat_folder_path = wise_folder'], ['cat_folder_path = a_cat\n',
@@ -163,14 +163,10 @@ def test_naive_bayes_match():
         f = open(os.path.join(os.path.dirname(__file__),
                               'data/{}.txt'.format(cat))).readlines()
         idx = np.where([ol in line for line in f])[0][0]
-        _replace_line(os.path.join(os.path.dirname(__file__), 'data/{}_.txt'.format(cat)),
+        _replace_line(os.path.join(os.path.dirname(__file__), 'data/chunk0/{}_.txt'.format(cat)),
                       idx, nl)
 
-    cm = CrossMatch(os.path.join(os.path.dirname(__file__),
-                                 'data/crossmatch_params_.txt'),
-                    os.path.join(os.path.dirname(__file__), 'data/cat_a_params_.txt'),
-                    os.path.join(os.path.dirname(__file__), 'data/cat_b_params_.txt'))
-
+    cm = CrossMatch(os.path.join(os.path.dirname(__file__), 'data'))
     cm()
 
     ac = np.load('{}/pairing/ac.npy'.format(cm.joint_folder_path))
