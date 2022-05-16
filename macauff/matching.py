@@ -29,13 +29,18 @@ class CrossMatch():
     ----------
     chunks_folder_path : string
         A path to the location of the folder containing one subfolder per chunk.
+    use_memmap_files : boolean
+        When set to True, memory mapped files are used for several internal
+        arrays. Reduces memory consumption bottlenecks at the cost of increased
+        I/O contention.
     '''
 
-    def __init__(self, chunks_folder_path):
+    def __init__(self, chunks_folder_path, use_memmap_files=False):
         '''
         Initialisation function for cross-match class.
         '''
         self.chunks_folder_path = chunks_folder_path
+        self.use_memmap_files = use_memmap_files
 
         # Initialise MPI
         self.comm = MPI.COMM_WORLD
@@ -754,10 +759,10 @@ class CrossMatch():
             else:
                 os.system("rm -rf {}/*".format(self.a_auf_folder_path))
                 _kwargs = {}
-            perturb_auf_func(self.a_auf_folder_path, self.a_cat_folder_path, self.a_filt_names,
-                             self.a_auf_region_points, self.r, self.dr,
-                             self.rho, self.drho, 'a', self.include_perturb_auf,
-                             self.mem_chunk_num, **_kwargs)
+            self.a_modelrefinds = perturb_auf_func(self.a_auf_folder_path, self.a_cat_folder_path, self.a_filt_names,
+                                                   self.a_auf_region_points, self.r, self.dr,
+                                                   self.rho, self.drho, 'a', self.include_perturb_auf,
+                                                   self.mem_chunk_num, self.use_memmap_files, **_kwargs)
         else:
             print('Loading empirical perturbation AUFs for catalogue "a"...')
             sys.stdout.flush()
@@ -819,10 +824,10 @@ class CrossMatch():
             else:
                 os.system("rm -rf {}/*".format(self.b_auf_folder_path))
                 _kwargs = {}
-            perturb_auf_func(self.b_auf_folder_path, self.b_cat_folder_path, self.b_filt_names,
-                             self.b_auf_region_points, self.r, self.dr,
-                             self.rho, self.drho, 'b', self.include_perturb_auf,
-                             self.mem_chunk_num, **_kwargs)
+            self.b_modelrefinds = perturb_auf_func(self.b_auf_folder_path, self.b_cat_folder_path, self.b_filt_names,
+                                                   self.b_auf_region_points, self.r, self.dr,
+                                                   self.rho, self.drho, 'b', self.include_perturb_auf,
+                                                   self.mem_chunk_num, self.use_memmap_files, **_kwargs)
         else:
             print('Loading empirical perturbation AUFs for catalogue "b"...')
             sys.stdout.flush()
@@ -880,9 +885,11 @@ class CrossMatch():
             group_func(self.joint_folder_path, self.a_cat_folder_path, self.b_cat_folder_path,
                        self.a_auf_folder_path, self.b_auf_folder_path, self.a_auf_region_points,
                        self.b_auf_region_points, self.a_filt_names, self.b_filt_names,
-                       self.a_cat_name, self.b_cat_name, self.r, self.dr, self.rho, self.drho,
+                       self.a_cat_name, self.b_cat_name, self.a_modelrefinds, self.b_modelrefinds,
+                       self.r, self.dr, self.rho, self.drho,
                        self.j1s, self.pos_corr_dist, self.cross_match_extent, self.int_fracs,
-                       self.mem_chunk_num, self.include_phot_like, self.use_phot_priors, n_pool)
+                       self.mem_chunk_num, self.include_phot_like, self.use_phot_priors,
+                       n_pool, self.use_memmap_files)
         else:
             print('Loading catalogue islands and overlaps...')
             sys.stdout.flush()
@@ -996,7 +1003,8 @@ class CrossMatch():
                 self.joint_folder_path, self.a_cat_folder_path, self.b_cat_folder_path,
                 self.a_auf_folder_path, self.b_auf_folder_path, self.a_filt_names,
                 self.b_filt_names, self.a_auf_region_points, self.b_auf_region_points,
-                self.rho, self.drho, len(self.delta_mag_cuts), self.mem_chunk_num)
+                self.a_modelrefinds, self.b_modelrefinds, self.rho, self.drho,
+                len(self.delta_mag_cuts), self.mem_chunk_num, self.use_memmap_files)
         else:
             print('Loading pre-assigned counterparts...')
             sys.stdout.flush()

@@ -22,9 +22,9 @@ __all__ = ['make_island_groupings']
 
 def make_island_groupings(joint_folder_path, a_cat_folder_path, b_cat_folder_path,
                           a_auf_folder_path, b_auf_folder_path, a_auf_pointings, b_auf_pointings,
-                          a_filt_names, b_filt_names, a_title, b_title, r, dr, rho, drho, j1s,
-                          max_sep, ax_lims, int_fracs, mem_chunk_num, include_phot_like,
-                          use_phot_priors, n_pool):
+                          a_filt_names, b_filt_names, a_title, b_title, a_modelrefinds, b_modelrefinds,
+                          r, dr, rho, drho, j1s, max_sep, ax_lims, int_fracs, mem_chunk_num,
+                          include_phot_like, use_phot_priors, n_pool, use_memmap_files=False):
     '''
     Function to handle the creation of "islands" of astrometrically coeval
     sources, and identify which overlap to some probability based on their
@@ -59,6 +59,14 @@ def make_island_groupings(joint_folder_path, a_cat_folder_path, b_cat_folder_pat
         Name used to describe catalogue "a" in the cross-match.
     b_title : string
         Catalogue "b" description, for identifying its given folder.
+    a_modelrefinds : numpy.ndarray
+        Catalogue "a" modelrefinds array output from ``create_perturb_auf``. Used
+        only when use_memmap_files is False.
+        TODO Improve description
+    b_modelrefinds : numpy.ndarray
+        Catalogue "b" modelrefinds array output from ``create_perturb_auf``. Used
+        only when use_memmap_files is False.
+        TODO Improve description
     r : numpy.ndarray
         Array of real-space distances, in arcseconds, used in the evaluation of
         convolved AUF integrals; represent bin edges.
@@ -95,6 +103,10 @@ def make_island_groupings(joint_folder_path, a_cat_folder_path, b_cat_folder_pat
         calculate photometric-information dependent priors for cross-matching.
     n_pool : integer
         Number of multiprocessing pools to use when parallelising.
+    use_memmap_files : boolean, optional
+        When set to True, memory mapped files are used for several internal
+        arrays. Reduces memory consumption at the cost of increased I/O
+        contention.
     '''
 
     # Convert from arcseconds to degrees internally.
@@ -191,11 +203,12 @@ def make_island_groupings(joint_folder_path, a_cat_folder_path, b_cat_folder_pat
                     ax_cutout = [ax1_start, ax1_end, ax2_start, ax2_end]
                     a, afouriergrid, amodrefindsmall, a_cut = _load_fourier_grid_cutouts(
                         a_cutout, ax_cutout, joint_folder_path, a_cat_folder_path,
-                        a_auf_folder_path, 0, 'a', small_memmap_slice_arrays_a, a_big_sky_cut)
+                        a_auf_folder_path, 0, 'a', small_memmap_slice_arrays_a, a_big_sky_cut,
+                        a_modelrefinds, use_memmap_files)
                     b, bfouriergrid, bmodrefindsmall, b_cut = _load_fourier_grid_cutouts(
                         b_cutout, ax_cutout, joint_folder_path, b_cat_folder_path,
                         b_auf_folder_path, max_sep, 'b', small_memmap_slice_arrays_b,
-                        b_big_sky_cut)
+                        b_big_sky_cut, b_modelrefinds, use_memmap_files)
 
                     if len(a) > 0 and len(b) > 0:
                         overlapa, overlapb = gsf.get_max_overlap(
@@ -259,11 +272,12 @@ def make_island_groupings(joint_folder_path, a_cat_folder_path, b_cat_folder_pat
                     ax_cutout = [ax1_start, ax1_end, ax2_start, ax2_end]
                     a, afouriergrid, amodrefindsmall, a_cut = _load_fourier_grid_cutouts(
                         a_cutout, ax_cutout, joint_folder_path, a_cat_folder_path,
-                        a_auf_folder_path, 0, 'a', small_memmap_slice_arrays_a, a_big_sky_cut)
+                        a_auf_folder_path, 0, 'a', small_memmap_slice_arrays_a, a_big_sky_cut,
+                        a_modelrefinds, use_memmap_files)
                     b, bfouriergrid, bmodrefindsmall, b_cut = _load_fourier_grid_cutouts(
                         b_cutout, ax_cutout, joint_folder_path, b_cat_folder_path,
                         b_auf_folder_path, max_sep, 'b', small_memmap_slice_arrays_b,
-                        b_big_sky_cut)
+                        b_big_sky_cut, b_modelrefinds, use_memmap_files)
 
                     if len(a) > 0 and len(b) > 0:
                         indicesa, indicesb, overlapa, overlapb = gsf.get_overlap_indices(
@@ -323,15 +337,24 @@ def make_island_groupings(joint_folder_path, a_cat_folder_path, b_cat_folder_pat
 
             b = b_full[a_inds_unique, 2]
 
-            modrefind = np.load('{}/modelrefinds.npy'.format(a_auf_folder_path),
-                                mmap_mode='r')[:, lowind:highind]
+            if use_memmap_files:
+                modrefind = np.load('{}/modelrefinds.npy'.format(a_auf_folder_path),
+                                    mmap_mode='r')[:, lowind:highind]
+            else:
+                modrefind = a_modelrefinds[:, lowind:highind]
             [a_fouriergrid], a_modrefindsmall = load_small_ref_auf_grid(
                 modrefind, a_auf_folder_path, ['fourier'])
-            modrefind = np.load('{}/modelrefinds.npy'.format(b_auf_folder_path),
-                                mmap_mode='r')[:, a_inds_unique]
+
+            if use_memmap_files:
+                modrefind = np.load('{}/modelrefinds.npy'.format(b_auf_folder_path),
+                                    mmap_mode='r')[:, a_inds_unique]
+            else:
+                modrefind = b_modelrefinds[:, a_inds_unique]
             [b_fouriergrid], b_modrefindsmall = load_small_ref_auf_grid(
                 modrefind, b_auf_folder_path, ['fourier'])
-            del modrefind
+
+            if use_memmap_files:
+                del modrefind
 
             a_int_lens = gsf.get_integral_length(
                 a, b, r[:-1]+dr/2, rho[:-1], drho, j1s, a_fouriergrid, b_fouriergrid,
@@ -353,15 +376,24 @@ def make_island_groupings(joint_folder_path, a_cat_folder_path, b_cat_folder_pat
 
             a = a_full[b_inds_unique, 2]
 
-            modrefind = np.load('{}/modelrefinds.npy'.format(b_auf_folder_path),
-                                mmap_mode='r')[:, lowind:highind]
+            if use_memmap_files:
+                modrefind = np.load('{}/modelrefinds.npy'.format(b_auf_folder_path),
+                                    mmap_mode='r')[:, lowind:highind]
+            else:
+                modrefind = b_modelrefinds[:, lowind:highind]
             [b_fouriergrid], b_modrefindsmall = load_small_ref_auf_grid(
                 modrefind, b_auf_folder_path, ['fourier'])
-            modrefind = np.load('{}/modelrefinds.npy'.format(a_auf_folder_path),
-                                mmap_mode='r')[:, b_inds_unique]
+
+            if use_memmap_files:
+                modrefind = np.load('{}/modelrefinds.npy'.format(a_auf_folder_path),
+                                    mmap_mode='r')[:, b_inds_unique]
+            else:
+                modrefind = a_modelrefinds[:, b_inds_unique]
             [a_fouriergrid], a_modrefindsmall = load_small_ref_auf_grid(
                 modrefind, a_auf_folder_path, ['fourier'])
-            del modrefind
+
+            if use_memmap_files:
+                del modrefind
 
             b_int_lens = gsf.get_integral_length(
                 b, a, r[:-1]+dr/2, rho[:-1], drho, j1s, b_fouriergrid, a_fouriergrid,
@@ -531,7 +563,7 @@ def make_island_groupings(joint_folder_path, a_cat_folder_path, b_cat_folder_pat
 
 def _load_fourier_grid_cutouts(a, sky_rect_coords, joint_folder_path, cat_folder_path,
                                auf_folder_path, padding, cat_name, memmap_slice_arrays,
-                               large_sky_slice):
+                               large_sky_slice, modelrefinds, use_memmap_files=False):
     '''
     Function to load a sub-set of a given catalogue's astrometry, slicing it
     in a given sky coordinate rectangle, and load the appropriate sub-array
@@ -567,6 +599,14 @@ def _load_fourier_grid_cutouts(a, sky_rect_coords, joint_folder_path, cat_folder
     large_sky_slice : boolean
         Slice array containing the ``True`` and ``False`` elements of which
         elements of the full catalogue, in ``con_cat_astro.npy``, are in ``a``.
+    modelrefinds : numpy.ndarray
+        The modelrefinds array output from ``create_perturb_auf``. Used only when
+        use_memmap_files is False.
+        TODO Improve description
+    use_memmap_files : boolean, optional
+        When set to True, memory mapped files are used for several internal
+        arrays. Reduces memory consumption at the cost of increased I/O
+        contention.
     '''
 
     lon1, lon2, lat1, lat2 = sky_rect_coords
@@ -577,8 +617,11 @@ def _load_fourier_grid_cutouts(a, sky_rect_coords, joint_folder_path, cat_folder
     a_cutout = np.load('{}/con_cat_astro.npy'.format(cat_folder_path),
                        mmap_mode='r')[large_sky_slice][sky_cut]
 
-    modrefind = np.load('{}/modelrefinds.npy'.format(auf_folder_path),
-                        mmap_mode='r')[:, large_sky_slice][:, sky_cut]
+    if use_memmap_files:
+        modrefind = np.load('{}/modelrefinds.npy'.format(auf_folder_path),
+                            mmap_mode='r')[:, large_sky_slice][:, sky_cut]
+    else:
+        modrefind = modelrefinds
 
     [fouriergrid], modrefindsmall = load_small_ref_auf_grid(modrefind, auf_folder_path,
                                                             ['fourier'])

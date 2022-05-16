@@ -17,7 +17,8 @@ __all__ = ['source_pairing']
 
 def source_pairing(joint_folder_path, a_cat_folder_path, b_cat_folder_path, a_auf_folder_path,
                    b_auf_folder_path, a_filt_names, b_filt_names, a_auf_pointings, b_auf_pointings,
-                   rho, drho, n_fracs, mem_chunk_num):
+                   a_modelrefinds, b_modelrefinds, rho, drho, n_fracs, mem_chunk_num,
+                   use_memmap_files=False):
     '''
     Function to iterate over all grouped islands of sources, calculating the
     probabilities of all permutations of matches and deriving the most likely
@@ -46,6 +47,14 @@ def source_pairing(joint_folder_path, a_cat_folder_path, b_cat_folder_path, a_au
     b_auf_pointings : numpy.ndarray
         Sky coordinates of locations of catalogue "b" perturbation AUF
         component simulations.
+    a_modelrefinds : numpy.ndarray
+        Catalogue "a" modelrefinds array output from ``create_perturb_auf``. Used
+        only when use_memmap_files is False.
+        TODO Improve description
+    b_modelrefinds : numpy.ndarray
+        Catalogue "b" modelrefinds array output from ``create_perturb_auf``. Used
+        only when use_memmap_files is False.
+        TODO Improve description
     rho : numpy.ndarray
         Array of fourier-space values, used in the convolution of PDFs.
     drho : numpy.ndarray
@@ -57,6 +66,10 @@ def source_pairing(joint_folder_path, a_cat_folder_path, b_cat_folder_path, a_au
     mem_chunk_num : integer
         Number of sub-arrays to break loading of main catalogue into, to
         reduce the amount of memory used.
+    use_memmap_files : boolean, optional
+        When set to True, memory mapped files are used for several internal
+        arrays. Reduces memory consumption at the cost of increased I/O
+        contention.
     '''
     print("Creating catalogue matches...")
     sys.stdout.flush()
@@ -203,13 +216,19 @@ def source_pairing(joint_folder_path, a_cat_folder_path, b_cat_folder_path, a_au
         b_sky_inds = np.load('{}/phot_like/b_sky_inds.npy'.format(joint_folder_path),
                              mmap_mode='r')[blistunique_flat]
 
-        amodrefind = np.load('{}/modelrefinds.npy'.format(a_auf_folder_path),
-                             mmap_mode='r')[:, alistunique_flat]
+        if use_memmap_files:
+            amodrefind = np.load('{}/modelrefinds.npy'.format(a_auf_folder_path),
+                                mmap_mode='r')[:, alistunique_flat]
+        else:
+            amodrefind = a_modelrefinds
         [afourier_grids, afrac_grids, aflux_grids], amodrefind = load_small_ref_auf_grid(
             amodrefind, a_auf_folder_path, ['fourier', 'frac', 'flux'])
 
-        bmodrefind = np.load('{}/modelrefinds.npy'.format(b_auf_folder_path),
-                             mmap_mode='r')[:, blistunique_flat]
+        if use_memmap_files:
+            bmodrefind = np.load('{}/modelrefinds.npy'.format(b_auf_folder_path),
+                                mmap_mode='r')[:, blistunique_flat]
+        else:
+            bmodrefind = b_modelrefinds
         [bfourier_grids, bfrac_grids, bflux_grids], bmodrefind = load_small_ref_auf_grid(
             bmodrefind, b_auf_folder_path, ['fourier', 'frac', 'flux'])
 
