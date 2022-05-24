@@ -29,9 +29,12 @@ class CrossMatch():
     ----------
     chunks_folder_path : string
         A path to the location of the folder containing one subfolder per chunk.
+    resume_file_path : string, optional
+        A path to the location of the file containing resume information for the
+        cross match.
     '''
 
-    def __init__(self, chunks_folder_path):
+    def __init__(self, chunks_folder_path, resume_file_path=None):
         '''
         Initialisation function for cross-match class.
         '''
@@ -41,11 +44,27 @@ class CrossMatch():
         self.comm = MPI.COMM_WORLD
         self.rank = self.comm.Get_rank()
         self.comm_size = self.comm.Get_size()
-        # Special signals for worker MPI processes
-        self.worker_signals = { "NO_MORE_WORK": 0 }
-        # Only manager process needs to set up the queue
+        # Special signals for MPI processes
+        #   'NO_MORE_WORK' - manager process uses to signal workers to shut down
+        #   'INITIAL_WORK_REQUEST' - worker uses to signal manager this is its
+        #                            first request for work, i.e. it has not
+        #                            previously completed a chunk
+        self.worker_signals = { 'NO_MORE_WORK': 0,
+                                'INITIAL_WORK_REQUEST': 1 }
+        # Only manager process needs to set up the resume file and queue
         if self.rank == 0:
-            self.chunk_queue = self._make_chunk_queue()
+            completed_chunks = set()
+            # Open and read existing resume file
+            if resume_file_path != None:
+                self.resume_file = open(resume_file_path, 'r+')
+                for line in self.resume_file:
+                    completed_chunks.add(line.rstrip())
+            else:
+                self.resume_file = None
+            # Chunk queue will not contain chunks recorded as completed in the
+            # resume file
+            self.chunk_queue = self._make_chunk_queue(completed_chunks)
+
 
     def _initialise_chunk(self, joint_file_path, cat_a_file_path, cat_b_file_path):
         '''
@@ -168,8 +187,10 @@ class CrossMatch():
         # Do not use manager-worker pattern. Instead, one process loops over all chunks
         if self.comm_size == 1:
             for (chunk_id, joint_file_path, cat_a_file_path, cat_b_file_path) in self.chunk_queue:
-                print("Rank {} processing chunk {}".format(self.rank, chunk_id))
+                print('Rank {} processing chunk {}'.format(self.rank, chunk_id))
                 self._process_chunk(joint_file_path, cat_a_file_path, cat_b_file_path)
+                if self.resume_file != None:
+                    self.resume_file.write(chunk_id+'\n')
         else:
             # Manager process:
             #   - assigns chunks to workers
@@ -185,16 +206,22 @@ class CrossMatch():
 
                 # Loop until all workers have been instructed there is no more work
                 while active_workers > 0:
-                    # Wait for any worker to request a chunk
-                    worker_id = self.comm.recv()
+                    # Wait for any worker to request a chunk and report
+                    # completion of any previous chunk
+                    (worker_id, chunk_id) = self.comm.recv()
+
+                    # Record completed chunk
+                    if chunk_id != self.worker_signals['INITIAL_WORK_REQUEST'] \
+                    and self.resume_file != None:
+                        self.resume_file.write(chunk_id+'\n')
 
                     # Assign chunks until no more work.
                     # Then count "no more work" signals until no more workers.
                     try:
                         chunk = self.chunk_queue.pop(0)
-                        print("Rank {}: sending rank {} chunk {}".format(self.rank, worker_id, chunk[0]))
+                        print('Rank {}: sending rank {} chunk {}'.format(self.rank, worker_id, chunk[0]))
                     except IndexError:
-                        chunk = self.worker_signals["NO_MORE_WORK"]
+                        chunk = self.worker_signals['NO_MORE_WORK']
                         active_workers -= 1
 
                     self.comm.send(chunk, dest=worker_id)
@@ -203,19 +230,26 @@ class CrossMatch():
             #  - request chunk from manager
             #  - loop until given signal to terminate
             else:
+                completed_chunk_id = self.worker_signals['INITIAL_WORK_REQUEST']
                 # Infinite loop until given signal to break
                 while True:
                     # Send own rank ID to manager so it knows which process to assign work
-                    self.comm.send(self.rank, dest=0)
+                    # Also report completed chunk id
+                    self.comm.send((self.rank, completed_chunk_id), dest=0)
                     message = self.comm.recv(source=0)
 
                     # Handle received signal or chunk
-                    if message == self.worker_signals["NO_MORE_WORK"]:
+                    if message == self.worker_signals['NO_MORE_WORK']:
                         break
                     else:
                         (chunk_id, joint_file_path, cat_a_file_path, cat_b_file_path) = message
-                        print("Rank {}: processing chunk {}".format(self.rank, chunk_id))
+                        print('Rank {}: processing chunk {}'.format(self.rank, chunk_id))
                         self._process_chunk(joint_file_path, cat_a_file_path, cat_b_file_path)
+                        completed_chunk_id = chunk_id
+
+        # Clean up and shut down
+        self._cleanup()
+
 
     def _process_chunk(self, joint_file_path, cat_a_file_path, cat_b_file_path):
         '''
@@ -245,7 +279,7 @@ class CrossMatch():
         # the previous stages, and calculating the cross-match probabilities.
         self.pair_sources(13)
 
-    def _make_chunk_queue(self):
+    def _make_chunk_queue(self, completed_chunks):
         '''
         Determines the order with which chunks will be processed
 
@@ -266,8 +300,10 @@ class CrossMatch():
 
         # List subfolders in chunks folder
         # Ordering is determined by os.listdir
+        # Skip chunks completed in a previous run
         subfolders = [name for name in os.listdir(self.chunks_folder_path)
-                      if os.path.isdir(os.path.join(self.chunks_folder_path, name))]
+                      if os.path.isdir(os.path.join(self.chunks_folder_path, name))
+                      and name not in completed_chunks]
 
         # Loop over subfolders, extracting paths to metadata files contained within
         chunk_queue = []
@@ -306,6 +342,13 @@ class CrossMatch():
             chunk_queue.append((chunk_id, joint_file_path, cat_a_file_path, cat_b_file_path))
 
         return chunk_queue
+
+    def _cleanup(self):
+        '''
+        Final clean up operations before application shut down
+        '''
+        if self.rank == 0 and self.resume_file != None:
+            self.resume_file.close()
 
     def _str2bool(self, v):
         '''
