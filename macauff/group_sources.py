@@ -146,25 +146,33 @@ def make_island_groupings(joint_folder_path, a_cat_folder_path, b_cat_folder_pat
     b_full = np.load('{}/con_cat_astro.npy'.format(b_cat_folder_path), mmap_mode='r')
 
     # Generate the necessary memmap sky slice arrays now.
-    _create_rectangular_slice_arrays(joint_folder_path, 'a', len(a_full))
     memmap_slice_arrays_a = []
-    for n in ['1', '2', '3', '4', 'combined']:
-        memmap_slice_arrays_a.append(np.lib.format.open_memmap(
-            '{}/{}_temporary_sky_slice_{}.npy'.format(joint_folder_path, 'a', n), mode='r+',
-            dtype=bool, shape=(len(a_full),)))
-    _create_rectangular_slice_arrays(joint_folder_path, 'b', len(b_full))
     memmap_slice_arrays_b = []
-    for n in ['1', '2', '3', '4', 'combined']:
-        memmap_slice_arrays_b.append(np.lib.format.open_memmap(
-            '{}/{}_temporary_sky_slice_{}.npy'.format(joint_folder_path, 'b', n), mode='r+',
-            dtype=bool, shape=(len(b_full),)))
+    if use_memmap_files:
+        _create_rectangular_slice_arrays(joint_folder_path, 'a', len(a_full))
+        for n in ['1', '2', '3', '4', 'combined']:
+            memmap_slice_arrays_a.append(np.lib.format.open_memmap(
+                '{}/{}_temporary_sky_slice_{}.npy'.format(joint_folder_path, 'a', n), mode='r+',
+                dtype=bool, shape=(len(a_full),)))
 
-    asize = np.lib.format.open_memmap('{}/group/asize.npy'.format(joint_folder_path), mode='w+',
+        _create_rectangular_slice_arrays(joint_folder_path, 'b', len(b_full))
+        for n in ['1', '2', '3', '4', 'combined']:
+            memmap_slice_arrays_b.append(np.lib.format.open_memmap(
+                '{}/{}_temporary_sky_slice_{}.npy'.format(joint_folder_path, 'b', n), mode='r+',
+                dtype=bool, shape=(len(b_full),)))
+
+        asize = np.lib.format.open_memmap('{}/group/asize.npy'.format(joint_folder_path), mode='w+',
                                       dtype=int, shape=(len(a_full),))
-    asize[:] = 0
-    bsize = np.lib.format.open_memmap('{}/group/bsize.npy'.format(joint_folder_path), mode='w+',
-                                      dtype=int, shape=(len(b_full),))
-    bsize[:] = 0
+        asize[:] = 0
+        bsize = np.lib.format.open_memmap('{}/group/bsize.npy'.format(joint_folder_path), mode='w+',
+                                        dtype=int, shape=(len(b_full),))
+        bsize[:] = 0
+    else:
+        for _ in range(5):
+            memmap_slice_arrays_a.append(np.zeros(dtype=bool, shape=(len(a_full),)))
+            memmap_slice_arrays_b.append(np.zeros(dtype=bool, shape=(len(b_full),)))
+        asize = np.zeros(dtype=int, shape=(len(a_full),))
+        bsize = np.zeros(dtype=int, shape=(len(b_full),))
 
     for i, (ax1_sparse_start, ax1_sparse_end) in enumerate(zip(ax1_sparse_loops[:-1],
                                                                ax1_sparse_loops[1:])):
@@ -178,18 +186,24 @@ def make_island_groupings(joint_folder_path, a_cat_folder_path, b_cat_folder_pat
                 ax2_sparse_end, max_sep, memmap_slice_arrays_b)
             a_cutout = a_full[a_big_sky_cut]
             b_cutout = b_full[b_big_sky_cut]
-            _create_rectangular_slice_arrays(joint_folder_path, 'a_cutout', len(a_cutout))
+
             small_memmap_slice_arrays_a = []
-            for n in ['1', '2', '3', '4', 'combined']:
-                small_memmap_slice_arrays_a.append(np.lib.format.open_memmap(
-                    '{}/{}_temporary_sky_slice_{}.npy'.format(joint_folder_path, 'a_cutout', n),
-                    mode='r+', dtype=bool, shape=(len(a_cutout),)))
-            _create_rectangular_slice_arrays(joint_folder_path, 'b_cutout', len(b_cutout))
             small_memmap_slice_arrays_b = []
-            for n in ['1', '2', '3', '4', 'combined']:
-                small_memmap_slice_arrays_b.append(np.lib.format.open_memmap(
-                    '{}/{}_temporary_sky_slice_{}.npy'.format(joint_folder_path, 'b_cutout', n),
-                    mode='r+', dtype=bool, shape=(len(b_cutout),)))
+            if use_memmap_files:
+                _create_rectangular_slice_arrays(joint_folder_path, 'a_cutout', len(a_cutout))
+                for n in ['1', '2', '3', '4', 'combined']:
+                    small_memmap_slice_arrays_a.append(np.lib.format.open_memmap(
+                        '{}/{}_temporary_sky_slice_{}.npy'.format(joint_folder_path, 'a_cutout', n),
+                        mode='r+', dtype=bool, shape=(len(a_cutout),)))
+                _create_rectangular_slice_arrays(joint_folder_path, 'b_cutout', len(b_cutout))
+                for n in ['1', '2', '3', '4', 'combined']:
+                    small_memmap_slice_arrays_b.append(np.lib.format.open_memmap(
+                        '{}/{}_temporary_sky_slice_{}.npy'.format(joint_folder_path, 'b_cutout', n),
+                        mode='r+', dtype=bool, shape=(len(b_cutout),)))
+            else:
+                for _ in range(5):
+                    small_memmap_slice_arrays_a.append(np.zeros(dtype=bool, shape=(len(a_cutout),)))
+                    small_memmap_slice_arrays_b.append(np.zeros(dtype=bool, shape=(len(b_cutout),)))
 
             # TODO: avoid np.arange by first iterating an np.sum(big_sky_cut)
             # and pre-generating a memmapped sub-array, and looping over
@@ -229,10 +243,15 @@ def make_island_groupings(joint_folder_path, a_cat_folder_path, b_cat_folder_pat
     print("Truncating star overlaps by AUF integral...")
     sys.stdout.flush()
 
-    ainds = np.lib.format.open_memmap('{}/group/ainds.npy'.format(joint_folder_path), mode='w+',
-                                      dtype=int, shape=(amaxsize, len(a_full)), fortran_order=True)
-    binds = np.lib.format.open_memmap('{}/group/binds.npy'.format(joint_folder_path), mode='w+',
-                                      dtype=int, shape=(bmaxsize, len(b_full)), fortran_order=True)
+    if use_memmap_files:
+        ainds = np.lib.format.open_memmap('{}/group/ainds.npy'.format(joint_folder_path), mode='w+',
+                                        dtype=int, shape=(amaxsize, len(a_full)), fortran_order=True)
+        binds = np.lib.format.open_memmap('{}/group/binds.npy'.format(joint_folder_path), mode='w+',
+                                        dtype=int, shape=(bmaxsize, len(b_full)), fortran_order=True)
+    else:
+        ainds = np.zeros(dtype=int, shape=(amaxsize, len(a_full)), order='F')
+        binds = np.zeros(dtype=int, shape=(bmaxsize, len(b_full)), order='F')
+
     ainds[:, :] = -1
     binds[:, :] = -1
     asize[:] = 0
@@ -250,18 +269,24 @@ def make_island_groupings(joint_folder_path, a_cat_folder_path, b_cat_folder_pat
                 ax2_sparse_end, max_sep, memmap_slice_arrays_b)
             a_cutout = a_full[a_big_sky_cut]
             b_cutout = b_full[b_big_sky_cut]
-            _create_rectangular_slice_arrays(joint_folder_path, 'a_cutout', len(a_cutout))
+
             small_memmap_slice_arrays_a = []
-            for n in ['1', '2', '3', '4', 'combined']:
-                small_memmap_slice_arrays_a.append(np.lib.format.open_memmap(
-                    '{}/{}_temporary_sky_slice_{}.npy'.format(joint_folder_path, 'a_cutout', n),
-                    mode='r+', dtype=bool, shape=(len(a_cutout),)))
-            _create_rectangular_slice_arrays(joint_folder_path, 'b_cutout', len(b_cutout))
             small_memmap_slice_arrays_b = []
-            for n in ['1', '2', '3', '4', 'combined']:
-                small_memmap_slice_arrays_b.append(np.lib.format.open_memmap(
-                    '{}/{}_temporary_sky_slice_{}.npy'.format(joint_folder_path, 'b_cutout', n),
-                    mode='r+', dtype=bool, shape=(len(b_cutout),)))
+            if use_memmap_files:
+                _create_rectangular_slice_arrays(joint_folder_path, 'a_cutout', len(a_cutout))
+                for n in ['1', '2', '3', '4', 'combined']:
+                    small_memmap_slice_arrays_a.append(np.lib.format.open_memmap(
+                        '{}/{}_temporary_sky_slice_{}.npy'.format(joint_folder_path, 'a_cutout', n),
+                        mode='r+', dtype=bool, shape=(len(a_cutout),)))
+                _create_rectangular_slice_arrays(joint_folder_path, 'b_cutout', len(b_cutout))
+                for n in ['1', '2', '3', '4', 'combined']:
+                    small_memmap_slice_arrays_b.append(np.lib.format.open_memmap(
+                        '{}/{}_temporary_sky_slice_{}.npy'.format(joint_folder_path, 'b_cutout', n),
+                        mode='r+', dtype=bool, shape=(len(b_cutout),)))
+            else:
+                for _ in range(5):
+                    small_memmap_slice_arrays_a.append(np.zeros(dtype=bool, shape=(len(a_cutout),)))
+                    small_memmap_slice_arrays_b.append(np.zeros(dtype=bool, shape=(len(b_cutout),)))
 
             a_sky_inds = np.arange(0, len(a_full))[a_big_sky_cut]
             b_sky_inds = np.arange(0, len(b_full))[b_big_sky_cut]
@@ -307,8 +332,9 @@ def make_island_groupings(joint_folder_path, a_cat_folder_path, b_cat_folder_pat
     print("Cleaning overlaps...")
     sys.stdout.flush()
 
-    ainds, asize = _clean_overlaps(ainds, asize, joint_folder_path, 'ainds', n_pool)
-    binds, bsize = _clean_overlaps(binds, bsize, joint_folder_path, 'binds', n_pool)
+    # DSM TODO from here
+    ainds, asize = _clean_overlaps(ainds, asize, joint_folder_path, 'ainds', n_pool, use_memmap_files)
+    binds, bsize = _clean_overlaps(binds, bsize, joint_folder_path, 'binds', n_pool, use_memmap_files)
 
     print("Calculating integral lengths...")
     sys.stdout.flush()
@@ -629,7 +655,7 @@ def _load_fourier_grid_cutouts(a, sky_rect_coords, joint_folder_path, cat_folder
     return a_cutout, fouriergrid, modrefindsmall, sky_cut
 
 
-def _clean_overlaps(inds, size, joint_folder_path, filename, n_pool):
+def _clean_overlaps(inds, size, joint_folder_path, filename, n_pool, use_memmap_files=False):
     '''
     Convenience function to parse either catalogue's indices array for
     duplicate references to the opposing array on a per-source basis,
@@ -650,6 +676,10 @@ def _clean_overlaps(inds, size, joint_folder_path, filename, n_pool):
         The name of the ``inds`` array saved to disk.
     n_pool : integer
         Number of multiprocessing threads to use.
+    use_memmap_files : boolean, optional
+        When set to True, memory mapped files are used for several internal
+        arrays. Reduces memory consumption at the cost of increased I/O
+        contention.
 
     Returns
     -------
@@ -679,16 +709,23 @@ def _clean_overlaps(inds, size, joint_folder_path, filename, n_pool):
 
     # We ideally want to basically do np.asfortranarray(inds[:maxsize, :]), but
     # this would involve a copy instead of a read so we have to loop.
-    inds2 = np.lib.format.open_memmap('{}/group/{}2.npy'.format(joint_folder_path, filename),
-                                      mode='w+', dtype=int, shape=(maxsize, len(size)),
-                                      fortran_order=True)
+    if use_memmap_files:
+        inds2 = np.lib.format.open_memmap('{}/group/{}2.npy'.format(joint_folder_path, filename),
+                                        mode='w+', dtype=int, shape=(maxsize, len(size)),
+                                        fortran_order=True)
+    else:
+        inds2 = np.zeros(dtype=int, shape=(maxsize, len(size)), order='F')
+
     di = max(1, len(size) // 20)
     for i in range(0, len(size), di):
         inds2[:, i:i+di] = inds[:maxsize, i:i+di]
 
-    os.system('mv {}/group/{}2.npy {}/group/{}.npy'.format(joint_folder_path, filename,
-                                                           joint_folder_path, filename))
-    inds = np.load('{}/group/{}.npy'.format(joint_folder_path, filename), mmap_mode='r+')
+    if use_memmap_files:
+        os.system('mv {}/group/{}2.npy {}/group/{}.npy'.format(joint_folder_path, filename,
+                                                            joint_folder_path, filename))
+        inds = np.load('{}/group/{}.npy'.format(joint_folder_path, filename), mmap_mode='r+')
+    else:
+        inds = inds2
 
     return inds, size
 
