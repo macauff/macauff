@@ -124,6 +124,9 @@ def test_naive_bayes_match():
     generate_random_data(N_a, N_b, N_c, extent, n_a_filts, n_b_filts, a_astro_sig, b_astro_sig,
                          a_cat, b_cat, seed=9999)
 
+    # Ensure output chunk directory exists
+    os.makedirs(os.path.join(os.path.dirname(__file__), "data/chunk0"), exist_ok=True)
+
     ol, nl = 'run_auf = no', 'run_auf = yes\n'
     f = open(os.path.join(os.path.dirname(__file__),
                           'data/crossmatch_params.txt')).readlines()
