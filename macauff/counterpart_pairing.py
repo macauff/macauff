@@ -17,8 +17,8 @@ __all__ = ['source_pairing']
 
 def source_pairing(joint_folder_path, a_cat_folder_path, b_cat_folder_path, a_auf_folder_path,
                    b_auf_folder_path, a_filt_names, b_filt_names, a_auf_pointings, b_auf_pointings,
-                   a_modelrefinds, b_modelrefinds, rho, drho, n_fracs, mem_chunk_num,
-                   use_memmap_files=False):
+                   a_modelrefinds, b_modelrefinds, alist_in, blist_in, agrplen_in, bgrplen_in, rho,
+                   drho, n_fracs, mem_chunk_num, use_memmap_files=False):
     '''
     Function to iterate over all grouped islands of sources, calculating the
     probabilities of all permutations of matches and deriving the most likely
@@ -55,6 +55,22 @@ def source_pairing(joint_folder_path, a_cat_folder_path, b_cat_folder_path, a_au
         Catalogue "b" modelrefinds array output from ``create_perturb_auf``. Used
         only when use_memmap_files is False.
         TODO Improve description
+    alist_in : numpy.ndarray
+        Catalogue "a" alist output from ``make_island_groupings``. Used only
+        when use_memmap_files is False.
+        TODO Improve description
+    blist_in : numpy.ndarray
+        Catalogue "b" blist output from ``make_island_groupings``. Used only
+        when use_memmap_files is False.
+        TODO Improve description
+    agrplen_in : numpy.ndarray
+        Catalogue "a" agrplen output from ``make_island_groupings``. Used only
+        when use_memmap_files is False.
+        TODO Improve description
+    bgrplen_in : numpy.ndarray
+        Catalogue "b" bgrplen output from ``make_island_groupings``. Used only
+        when use_memmap_files is False.
+        TODO Improve description
     rho : numpy.ndarray
         Array of fourier-space values, used in the convolution of PDFs.
     drho : numpy.ndarray
@@ -77,7 +93,10 @@ def source_pairing(joint_folder_path, a_cat_folder_path, b_cat_folder_path, a_au
     print("Pairing sources...")
     sys.stdout.flush()
 
-    isle_len = np.load('{}/group/alist.npy'.format(joint_folder_path), mmap_mode='r').shape[1]
+    if use_memmap_files:
+        isle_len = np.load('{}/group/alist.npy'.format(joint_folder_path), mmap_mode='r').shape[1]
+    else:
+        isle_len = alist_in.shape[1]
 
     match_chunk_lengths = np.empty(mem_chunk_num, int)
     afield_chunk_lengths = np.empty(mem_chunk_num, int)
@@ -90,10 +109,15 @@ def source_pairing(joint_folder_path, a_cat_folder_path, b_cat_folder_path, a_au
     for cnum in range(0, mem_chunk_num):
         lowind = np.floor(isle_len*cnum/mem_chunk_num).astype(int)
         highind = np.floor(isle_len*(cnum+1)/mem_chunk_num).astype(int)
-        agrplen = np.load('{}/group/agrplen.npy'.format(joint_folder_path),
-                          mmap_mode='r')[lowind:highind]
-        bgrplen = np.load('{}/group/bgrplen.npy'.format(joint_folder_path),
-                          mmap_mode='r')[lowind:highind]
+
+        if use_memmap_files:
+            agrplen = np.load('{}/group/agrplen.npy'.format(joint_folder_path),
+                            mmap_mode='r')[lowind:highind]
+            bgrplen = np.load('{}/group/bgrplen.npy'.format(joint_folder_path),
+                            mmap_mode='r')[lowind:highind]
+        else:
+            agrplen = agrplen_in[lowind:highind]
+            bgrplen = bgrplen_in[lowind:highind]
 
         sum_agrp, sum_bgrp = np.sum(agrplen), np.sum(bgrplen)
         match_lens = np.sum(np.minimum(agrplen, bgrplen))
@@ -177,10 +201,15 @@ def source_pairing(joint_folder_path, a_cat_folder_path, b_cat_folder_path, a_au
         lowind = np.floor(isle_len*cnum/mem_chunk_num).astype(int)
         highind = np.floor(isle_len*(cnum+1)/mem_chunk_num).astype(int)
 
-        alist_ = np.load('{}/group/alist.npy'.format(joint_folder_path),
-                         mmap_mode='r')[:, lowind:highind]
-        agrplen = np.load('{}/group/agrplen.npy'.format(joint_folder_path),
-                          mmap_mode='r')[lowind:highind]
+        if use_memmap_files:
+            alist_ = np.load('{}/group/alist.npy'.format(joint_folder_path),
+                            mmap_mode='r')[:, lowind:highind]
+            agrplen = np.load('{}/group/agrplen.npy'.format(joint_folder_path),
+                            mmap_mode='r')[lowind:highind]
+        else:
+            alist_ = alist_in[:, lowind:highind]
+            agrplen = agrplen_in[lowind:highind]
+
         alist_ = np.asfortranarray(alist_[:np.amax(agrplen), :])
         alistunique_flat = np.unique(alist_[alist_ > -1])
         a_astro = np.load('{}/con_cat_astro.npy'.format(a_cat_folder_path),
@@ -197,10 +226,15 @@ def source_pairing(joint_folder_path, a_cat_folder_path, b_cat_folder_path, a_au
         a_sky_inds = np.load('{}/phot_like/a_sky_inds.npy'.format(joint_folder_path),
                              mmap_mode='r')[alistunique_flat]
 
-        blist_ = np.load('{}/group/blist.npy'.format(joint_folder_path),
-                         mmap_mode='r')[:, lowind:highind]
-        bgrplen = np.load('{}/group/bgrplen.npy'.format(joint_folder_path),
-                          mmap_mode='r')[lowind:highind]
+        if use_memmap_files:
+            blist_ = np.load('{}/group/blist.npy'.format(joint_folder_path),
+                            mmap_mode='r')[:, lowind:highind]
+            bgrplen = np.load('{}/group/bgrplen.npy'.format(joint_folder_path),
+                            mmap_mode='r')[lowind:highind]
+        else:
+            blist_ = blist_in[:, lowind:highind]
+            bgrplen = bgrplen_in[lowind:highind]
+
         blist_ = np.asfortranarray(blist_[:np.amax(bgrplen), :])
         blistunique_flat = np.unique(blist_[blist_ > -1])
         b_astro = np.load('{}/con_cat_astro.npy'.format(b_cat_folder_path),

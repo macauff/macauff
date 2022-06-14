@@ -882,14 +882,15 @@ class CrossMatch():
                 self.run_cf, self.run_source = True, True
             os.system('rm -rf {}/group/*'.format(self.joint_folder_path))
             os.system('rm -rf {}/reject/*'.format(self.joint_folder_path))
-            group_func(self.joint_folder_path, self.a_cat_folder_path, self.b_cat_folder_path,
-                       self.a_auf_folder_path, self.b_auf_folder_path, self.a_auf_region_points,
-                       self.b_auf_region_points, self.a_filt_names, self.b_filt_names,
-                       self.a_cat_name, self.b_cat_name, self.a_modelrefinds, self.b_modelrefinds,
-                       self.r, self.dr, self.rho, self.drho,
-                       self.j1s, self.pos_corr_dist, self.cross_match_extent, self.int_fracs,
-                       self.mem_chunk_num, self.include_phot_like, self.use_phot_priors,
-                       n_pool, self.use_memmap_files)
+            self.alist, self.blist, self.agrplen, self.bgrplen = \
+                group_func(self.joint_folder_path, self.a_cat_folder_path, self.b_cat_folder_path,
+                           self.a_auf_folder_path, self.b_auf_folder_path, self.a_auf_region_points,
+                           self.b_auf_region_points, self.a_filt_names, self.b_filt_names,
+                           self.a_cat_name, self.b_cat_name, self.a_modelrefinds, self.b_modelrefinds,
+                           self.r, self.dr, self.rho, self.drho,
+                           self.j1s, self.pos_corr_dist, self.cross_match_extent, self.int_fracs,
+                           self.mem_chunk_num, self.include_phot_like, self.use_phot_priors,
+                           n_pool, self.use_memmap_files)
         else:
             print('Loading catalogue islands and overlaps...')
             sys.stdout.flush()
@@ -1003,8 +1004,9 @@ class CrossMatch():
                 self.joint_folder_path, self.a_cat_folder_path, self.b_cat_folder_path,
                 self.a_auf_folder_path, self.b_auf_folder_path, self.a_filt_names,
                 self.b_filt_names, self.a_auf_region_points, self.b_auf_region_points,
-                self.a_modelrefinds, self.b_modelrefinds, self.rho, self.drho,
-                len(self.delta_mag_cuts), self.mem_chunk_num, self.use_memmap_files)
+                self.a_modelrefinds, self.b_modelrefinds, self.alist, self.blist,
+                self.agrplen, self.bgrplen, self.rho, self.drho, len(self.delta_mag_cuts),
+                self.mem_chunk_num, self.use_memmap_files)
         else:
             print('Loading pre-assigned counterparts...')
             sys.stdout.flush()

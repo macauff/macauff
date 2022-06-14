@@ -332,7 +332,6 @@ def make_island_groupings(joint_folder_path, a_cat_folder_path, b_cat_folder_pat
     print("Cleaning overlaps...")
     sys.stdout.flush()
 
-    # DSM TODO from here
     ainds, asize = _clean_overlaps(ainds, asize, joint_folder_path, 'ainds', n_pool, use_memmap_files)
     binds, bsize = _clean_overlaps(binds, bsize, joint_folder_path, 'binds', n_pool, use_memmap_files)
 
@@ -340,14 +339,20 @@ def make_island_groupings(joint_folder_path, a_cat_folder_path, b_cat_folder_pat
     sys.stdout.flush()
 
     if include_phot_like or use_phot_priors:
-        ablen = np.lib.format.open_memmap('{}/group/ablen.npy'.format(joint_folder_path),
-                                          mode='w+', dtype=float, shape=(len(a_full),))
-        aflen = np.lib.format.open_memmap('{}/group/aflen.npy'.format(joint_folder_path),
-                                          mode='w+', dtype=float, shape=(len(a_full),))
-        bblen = np.lib.format.open_memmap('{}/group/bblen.npy'.format(joint_folder_path),
-                                          mode='w+', dtype=float, shape=(len(b_full),))
-        bflen = np.lib.format.open_memmap('{}/group/bflen.npy'.format(joint_folder_path),
-                                          mode='w+', dtype=float, shape=(len(b_full),))
+        if use_memmap_files:
+            ablen = np.lib.format.open_memmap('{}/group/ablen.npy'.format(joint_folder_path),
+                                            mode='w+', dtype=float, shape=(len(a_full),))
+            aflen = np.lib.format.open_memmap('{}/group/aflen.npy'.format(joint_folder_path),
+                                            mode='w+', dtype=float, shape=(len(a_full),))
+            bblen = np.lib.format.open_memmap('{}/group/bblen.npy'.format(joint_folder_path),
+                                            mode='w+', dtype=float, shape=(len(b_full),))
+            bflen = np.lib.format.open_memmap('{}/group/bflen.npy'.format(joint_folder_path),
+                                            mode='w+', dtype=float, shape=(len(b_full),))
+        else:
+            ablen = np.zeros(dtype=float, shape=(len(a_full),))
+            aflen = np.zeros(dtype=float, shape=(len(a_full),))
+            bblen = np.zeros(dtype=float, shape=(len(b_full),))
+            bflen = np.zeros(dtype=float, shape=(len(b_full),))
 
         for cnum in range(0, mem_chunk_num):
             lowind = np.floor(len(a_full)*cnum/mem_chunk_num).astype(int)
@@ -359,7 +364,7 @@ def make_island_groupings(joint_folder_path, a_cat_folder_path, b_cat_folder_pat
             a_inds_small = np.asfortranarray(a_inds_small[:np.amax(a_size_small), :])
 
             a_inds_map, a_inds_unique = map_large_index_to_small_index(
-                a_inds_small, len(b_full), '{}/group'.format(joint_folder_path))
+                a_inds_small, len(b_full), '{}/group'.format(joint_folder_path), use_memmap_files)
 
             b = b_full[a_inds_unique, 2]
 
@@ -398,7 +403,7 @@ def make_island_groupings(joint_folder_path, a_cat_folder_path, b_cat_folder_pat
             b_inds_small = np.asfortranarray(b_inds_small[:np.amax(b_size_small), :])
 
             b_inds_map, b_inds_unique = map_large_index_to_small_index(
-                b_inds_small, len(a_full), '{}/group'.format(joint_folder_path))
+                b_inds_small, len(a_full), '{}/group'.format(joint_folder_path), use_memmap_files)
 
             a = a_full[b_inds_unique, 2]
 
@@ -441,12 +446,17 @@ def make_island_groupings(joint_folder_path, a_cat_folder_path, b_cat_folder_pat
     # TODO: add flag for allowing the keeping of potentially incomplete islands
     # in the main catalogue; here we default to, and only allow, their removal.
 
-    passed_check = np.lib.format.open_memmap('{}/group/passed_check.npy'.format(joint_folder_path),
-                                             mode='w+', dtype=bool, shape=(alist.shape[1],))
-    passed_check[:] = 0
-    failed_check = np.lib.format.open_memmap('{}/group/failed_check.npy'.format(joint_folder_path),
-                                             mode='w+', dtype=bool, shape=(alist.shape[1],))
-    failed_check[:] = 1
+    if use_memmap_files:
+        passed_check = np.lib.format.open_memmap('{}/group/passed_check.npy'.format(joint_folder_path),
+                                                mode='w+', dtype=bool, shape=(alist.shape[1],))
+        passed_check[:] = 0
+        failed_check = np.lib.format.open_memmap('{}/group/failed_check.npy'.format(joint_folder_path),
+                                                mode='w+', dtype=bool, shape=(alist.shape[1],))
+        failed_check[:] = 1
+    else:
+        passed_check = np.zeros(dtype=bool, shape=(alist.shape[1],))
+        failed_check = np.ones(dtype=bool, shape=(alist.shape[1],))
+
     islelen = alist.shape[1]
     num_good_checks = 0
     num_a_failed_checks = 0
@@ -509,9 +519,12 @@ def make_island_groupings(joint_folder_path, a_cat_folder_path, b_cat_folder_pat
     else:
         a_first_rejected_len = 0
     if num_a_failed_checks + a_first_rejected_len > 0:
-        reject_a = np.lib.format.open_memmap(
-            '{}/reject/reject_a.npy'.format(joint_folder_path), mode='w+', dtype=int,
-            shape=(num_a_failed_checks+a_first_rejected_len,))
+        if use_memmap_files:
+            reject_a = np.lib.format.open_memmap(
+                '{}/reject/reject_a.npy'.format(joint_folder_path), mode='w+', dtype=int,
+                shape=(num_a_failed_checks+a_first_rejected_len,))
+        else:
+            reject_a = np.zeros(dtype=int, shape=(num_a_failed_checks+a_first_rejected_len,))
     if os.path.isfile('{}/reject/areject.npy'.format(joint_folder_path)):
         reject_a[num_a_failed_checks:] = np.load('{}/reject/areject.npy'.format(joint_folder_path),
                                                  mmap_mode='r')
@@ -522,9 +535,12 @@ def make_island_groupings(joint_folder_path, a_cat_folder_path, b_cat_folder_pat
     else:
         b_first_rejected_len = 0
     if num_b_failed_checks + b_first_rejected_len > 0:
-        reject_b = np.lib.format.open_memmap(
-            '{}/reject/reject_b.npy'.format(joint_folder_path), mode='w+', dtype=int,
-            shape=(num_b_failed_checks+b_first_rejected_len,))
+        if use_memmap_files:
+            reject_b = np.lib.format.open_memmap(
+                '{}/reject/reject_b.npy'.format(joint_folder_path), mode='w+', dtype=int,
+                shape=(num_b_failed_checks+b_first_rejected_len,))
+        else:
+            reject_b = np.zeros(dtype=int, shape=(num_b_failed_checks+b_first_rejected_len,))
     if os.path.isfile('{}/reject/breject.npy'.format(joint_folder_path)):
         reject_b[num_b_failed_checks:] = np.load('{}/reject/breject.npy'.format(joint_folder_path),
                                                  mmap_mode='r')
@@ -536,16 +552,23 @@ def make_island_groupings(joint_folder_path, a_cat_folder_path, b_cat_folder_pat
             amaxlen = max(amaxlen, int(np.amax(agrplen[i:i+di][passed_check[i:i+di]])))
             bmaxlen = max(bmaxlen, int(np.amax(bgrplen[i:i+di][passed_check[i:i+di]])))
 
-    new_alist = np.lib.format.open_memmap(
-        '{}/group/alist2.npy'.format(joint_folder_path), mode='w+', dtype=int,
-        shape=(amaxlen, num_good_checks), fortran_order=True)
-    new_blist = np.lib.format.open_memmap(
-        '{}/group/blist2.npy'.format(joint_folder_path), mode='w+', dtype=int,
-        shape=(bmaxlen, num_good_checks), fortran_order=True)
-    new_agrplen = np.lib.format.open_memmap('{}/group/agrplen2.npy'.format(joint_folder_path),
-                                            mode='w+', dtype=int, shape=(num_good_checks,))
-    new_bgrplen = np.lib.format.open_memmap('{}/group/bgrplen2.npy'.format(joint_folder_path),
-                                            mode='w+', dtype=int, shape=(num_good_checks,))
+    if use_memmap_files:
+        new_alist = np.lib.format.open_memmap(
+            '{}/group/alist2.npy'.format(joint_folder_path), mode='w+', dtype=int,
+            shape=(amaxlen, num_good_checks), fortran_order=True)
+        new_blist = np.lib.format.open_memmap(
+            '{}/group/blist2.npy'.format(joint_folder_path), mode='w+', dtype=int,
+            shape=(bmaxlen, num_good_checks), fortran_order=True)
+        new_agrplen = np.lib.format.open_memmap('{}/group/agrplen2.npy'.format(joint_folder_path),
+                                                mode='w+', dtype=int, shape=(num_good_checks,))
+        new_bgrplen = np.lib.format.open_memmap('{}/group/bgrplen2.npy'.format(joint_folder_path),
+                                                mode='w+', dtype=int, shape=(num_good_checks,))
+    else:
+        new_alist = np.zeros(dtype=int, shape=(amaxlen, num_good_checks), order='F')
+        new_blist = np.zeros(dtype=int, shape=(bmaxlen, num_good_checks), order='F')
+        new_agrplen = np.zeros(dtype=int, shape=(num_good_checks,))
+        new_bgrplen = np.zeros(dtype=int, shape=(num_good_checks,))
+
     a_fail_count, b_fail_count, pass_count = 0, 0, 0
     di = max(1, alist.shape[1] // 20)
     for i in range(0, alist.shape[1], di):
@@ -575,16 +598,17 @@ def make_island_groupings(joint_folder_path, a_cat_folder_path, b_cat_folder_pat
         new_bgrplen[pass_count:pass_count+n_extra] = bgrplen[i:i+di][passed_check[i:i+di]]
         pass_count += n_extra
 
-    for cat_kind in ['a', 'b']:
-        os.system('mv {}/group/{}list2.npy {}/group/{}list.npy'.format(
-            joint_folder_path, cat_kind, joint_folder_path, cat_kind))
-        os.system('mv {}/group/{}grplen2.npy {}/group/{}grplen.npy'.format(
-            joint_folder_path, cat_kind, joint_folder_path, cat_kind))
+    if use_memmap_files:
+        for cat_kind in ['a', 'b']:
+            os.system('mv {}/group/{}list2.npy {}/group/{}list.npy'.format(
+                joint_folder_path, cat_kind, joint_folder_path, cat_kind))
+            os.system('mv {}/group/{}grplen2.npy {}/group/{}grplen.npy'.format(
+                joint_folder_path, cat_kind, joint_folder_path, cat_kind))
 
-    os.remove('{}/group/passed_check.npy'.format(joint_folder_path))
-    os.remove('{}/group/failed_check.npy'.format(joint_folder_path))
+        os.remove('{}/group/passed_check.npy'.format(joint_folder_path))
+        os.remove('{}/group/failed_check.npy'.format(joint_folder_path))
 
-    return
+    return new_alist, new_blist, new_agrplen, new_bgrplen
 
 
 def _load_fourier_grid_cutouts(a, sky_rect_coords, joint_folder_path, cat_folder_path,
