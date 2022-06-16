@@ -17,7 +17,8 @@ __all__ = ['compute_photometric_likelihoods']
 
 def compute_photometric_likelihoods(joint_folder_path, a_cat_folder_path, b_cat_folder_path,
                                     afilts, bfilts, mem_chunk_num, cf_points, cf_areas,
-                                    include_phot_like, use_phot_priors, group_sources_data,                                    bright_frac=None, field_frac=None, use_memmap_files=False):
+                                    include_phot_like, use_phot_priors, group_sources_data,
+                                    use_memmap_files, bright_frac=None, field_frac=None):
     '''
     Derives the photometric likelihoods and priors for use in the catalogue
     cross-match process.
@@ -56,6 +57,10 @@ def compute_photometric_likelihoods(joint_folder_path, a_cat_folder_path, b_cat_
         Object containing all outputs from ``make_island_groupings``
         Used only when use_memmap_files is False.
         TODO Improve description
+    use_memmap_files : boolean
+        When set to True, memory mapped files are used for several internal
+        arrays. Reduces memory consumption at the cost of increased I/O
+        contention.
     bright_frac : float, optional
         Expected fraction of sources inside the "bright" error circles used to
         construct the counterpart distribution, to correct for missing numbers.
@@ -66,10 +71,6 @@ def compute_photometric_likelihoods(joint_folder_path, a_cat_folder_path, b_cat_
         construct the counterpart distribution, to correct for missing numbers.
         If ``include_phot_like`` or ``use_phot_prior`` is True then this must
         be supplied, otherwise it can be omitted.
-    use_memmap_files : boolean, optional
-        When set to True, memory mapped files are used for several internal
-        arrays. Reduces memory consumption at the cost of increased I/O
-        contention.
     '''
 
     if bright_frac is None and (include_phot_like or use_phot_priors):
@@ -97,10 +98,10 @@ def compute_photometric_likelihoods(joint_folder_path, a_cat_folder_path, b_cat_
 
     abinlengths, abinsarray, longabinlen = create_magnitude_bins(
         cf_points, afilts, mem_chunk_num, joint_folder_path, a_cat_folder_path, 'a', a_sky_inds,
-        include_phot_like or use_phot_priors)
+        include_phot_like or use_phot_priors, use_memmap_files)
     bbinlengths, bbinsarray, longbbinlen = create_magnitude_bins(
         cf_points, bfilts, mem_chunk_num, joint_folder_path, b_cat_folder_path, 'b', b_sky_inds,
-        include_phot_like or use_phot_priors)
+        include_phot_like or use_phot_priors, use_memmap_files)
 
     print("Calculating PDFs...")
     sys.stdout.flush()
@@ -290,7 +291,7 @@ def compute_photometric_likelihoods(joint_folder_path, a_cat_folder_path, b_cat_
     return phot_like_data
 
 
-def distribute_sky_indices(joint_folder_path, cat_folder, name, mem_chunk_num, cf_points, use_memmap_files=False):
+def distribute_sky_indices(joint_folder_path, cat_folder, name, mem_chunk_num, cf_points, use_memmap_files):
     '''
     Function to calculate the nearest on-sky photometric likelihood point for
     each catalogue source.
@@ -311,7 +312,7 @@ def distribute_sky_indices(joint_folder_path, cat_folder, name, mem_chunk_num, c
         The two-point sky coordinates for each point to be used as a central
         point of a small sky area, for calculating "counterpart" and "field"
         photometric likelihoods.
-    use_memmap_files : boolean, optional
+    use_memmap_files : boolean
         When set to True, memory mapped files are used for several internal
         arrays. Reduces memory consumption at the cost of increased I/O
         contention.
@@ -341,7 +342,7 @@ def distribute_sky_indices(joint_folder_path, cat_folder, name, mem_chunk_num, c
 
 def create_magnitude_bins(cf_points, filts, mem_chunk_num, joint_folder_path,
                           cat_folder_path, cat_type, sky_inds, load_extra_arrays,
-                          use_memmap_files=False):
+                          use_memmap_files):
     '''
     Creates the N-dimensional arrays of single-band photometric bins, and
     corresponding array lengths.
@@ -371,7 +372,7 @@ def create_magnitude_bins(cf_points, filts, mem_chunk_num, joint_folder_path,
     load_extra_arrays : boolean
         Flag to indicate whether the photometric information is being used in
         the cross-match process, and whether to load additional arrays accordingly.
-    use_memmap_files : boolean, optional
+    use_memmap_files : boolean
         When set to True, memory mapped files are used for several internal
         arrays. Reduces memory consumption at the cost of increased I/O
         contention.
@@ -499,7 +500,7 @@ def make_bins(input_mags):
 
 
 def _load_multiple_sky_slice(joint_folder_path, cat_name, ind1, ind2, cat_folder_path, sky_inds,
-                             load_extra_arrays, use_memmap_files=False):
+                             load_extra_arrays, use_memmap_files):
     '''
     Function to, in a memmap-friendly way, return a sub-set of the photometry
     of a given catalogue.
@@ -526,7 +527,7 @@ def _load_multiple_sky_slice(joint_folder_path, cat_name, ind1, ind2, cat_folder
     load_extra_arrays : boolean
         Flag to indicate whether the photometric information is being used in
         the cross-match process, and whether to load additional arrays accordingly.
-    use_memmap_files : boolean, optional
+    use_memmap_files : boolean
         When set to True, memory mapped files are used for several internal
         arrays. Reduces memory consumption at the cost of increased I/O
         contention.

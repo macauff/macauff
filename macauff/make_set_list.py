@@ -16,7 +16,7 @@ import scipy.special
 __all__ = ['set_list']
 
 
-def set_list(aindices, bindices, aoverlap, boverlap, joint_folder_path, n_pool, use_memmap_files=False):
+def set_list(aindices, bindices, aoverlap, boverlap, joint_folder_path, n_pool, use_memmap_files):
     '''
     Creates the inter-catalogue groupings between catalogues "a" and "b", based
     on previously determined individual source "overlaps" in astrometry.
@@ -39,7 +39,7 @@ def set_list(aindices, bindices, aoverlap, boverlap, joint_folder_path, n_pool, 
         index and overlap arrays are stored.
     n_pool : integer
         Number of multiprocessing pools to use when parallelising.
-    use_memmap_files : boolean, optional
+    use_memmap_files : boolean
         When set to True, memory mapped files are used for several internal
         arrays. Reduces memory consumption at the cost of increased I/O
         contention.
@@ -59,7 +59,7 @@ def set_list(aindices, bindices, aoverlap, boverlap, joint_folder_path, n_pool, 
         The number of catalogue "b" sources in each island grouping.
     '''
     agroup, bgroup = _initial_group_numbering(aindices, bindices, aoverlap, boverlap,
-                                              joint_folder_path)
+                                              joint_folder_path, use_memmap_files)
     groupmax = max(np.amax(agroup), np.amax(bgroup))
 
     if use_memmap_files:
@@ -237,7 +237,7 @@ def set_list(aindices, bindices, aoverlap, boverlap, joint_folder_path, n_pool, 
     return alist, blist, agrouplengths, bgrouplengths
 
 
-def _initial_group_numbering(aindices, bindices, aoverlap, boverlap, joint_folder_path, use_memmap_files=False):
+def _initial_group_numbering(aindices, bindices, aoverlap, boverlap, joint_folder_path, use_memmap_files):
     '''
     Iterates over the indices mapping overlaps between the two catalogues,
     assigning initial group numbers to sources to be placed in "islands".
@@ -262,7 +262,7 @@ def _initial_group_numbering(aindices, bindices, aoverlap, boverlap, joint_folde
     joint_folder_path : string
         Location of top-level folder containing the "group" folder in which
         index and overlap arrays are stored.
-    use_memmap_files : boolean, optional
+    use_memmap_files : boolean
         When set to True, memory mapped files are used for several internal
         arrays. Reduces memory consumption at the cost of increased I/O
         contention.

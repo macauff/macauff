@@ -110,7 +110,7 @@ def generate_random_data(N_a, N_b, N_c, extent, n_a_filts, n_b_filts, a_astro_si
     np.save('{}/test_match_indices.npy'.format(b_cat), b_pair_indices)
 
 
-def test_naive_bayes_match():
+def do_naive_bayes_match(use_memmap_files):
     # Generate a small number of sources randomly, then run through the
     # cross-match process.
     N_a, N_b, N_c = 40, 50, 35
@@ -169,7 +169,7 @@ def test_naive_bayes_match():
         _replace_line(os.path.join(os.path.dirname(__file__), 'data/chunk0/{}_.txt'.format(cat)),
                       idx, nl)
 
-    cm = CrossMatch(os.path.join(os.path.dirname(__file__), 'data'))
+    cm = CrossMatch(os.path.join(os.path.dirname(__file__), 'data'), use_memmap_files)
     cm()
 
     ac = np.load('{}/pairing/ac.npy'.format(cm.joint_folder_path))
@@ -185,3 +185,11 @@ def test_naive_bayes_match():
         assert b_right_inds[i] in bc
         q = np.where(a_right_inds[i] == ac)[0][0]
         assert np.all([a_right_inds[i], b_right_inds[i]] == [ac[q], bc[q]])
+
+def test_naive_bayes_match_no_memmap():
+   # Test using standard numpy arrays for internal arrays.
+   do_naive_bayes_match(False)
+
+def test_naive_bayes_match_memmap():
+    # Test using mapped files for internal arrays.
+    do_naive_bayes_match(True)

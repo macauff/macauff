@@ -19,7 +19,7 @@ class StageData:
 
 
 def create_auf_params_grid(auf_folder_path, auf_pointings, filt_names, array_name,
-                           len_first_axis=None, use_memmap_files=False, arraylengths=None):
+                           use_memmap_files, len_first_axis=None, arraylengths=None):
     '''
     Minor function to offload the creation of a 3-D or 4-D array from a series
     of 2-D arrays.
@@ -36,13 +36,13 @@ def create_auf_params_grid(auf_folder_path, auf_pointings, filt_names, array_nam
     array_name : string
         The name of the individually-saved arrays, one per sub-folder, to turn
         into a 3-D or 4-D array.
-    len_first_axis : integer, optional
-        Length of the initial axis of the 4-D array. If not provided or is
-        ``None``, final array is assumed to be 3-D instead.
-    use_memmap_files : boolean, optional
+    use_memmap_files : boolean
         When set to True, memory mapped files are used for several internal
         arrays. Reduces memory consumption at the cost of increased I/O
         contention.
+    len_first_axis : integer, optional
+        Length of the initial axis of the 4-D array. If not provided or is
+        ``None``, final array is assumed to be 3-D instead.
     arraylengths : numpy.ndarray, optional
         Array containing length of the density-magnitude combinations in each
         sky/filter combination. Used only when use_memmap_files is True.
@@ -154,7 +154,7 @@ def hav_dist_constant_lat(x_lon, x_lat, lon):
     return dist
 
 
-def map_large_index_to_small_index(inds, length, folder, use_memmap_files=False):
+def map_large_index_to_small_index(inds, length, folder, use_memmap_files):
     inds_unique_flat = np.unique(inds[inds > -1])
     if use_memmap_files:
         map_array = np.lib.format.open_memmap('{}/map_array.npy'.format(folder), mode='w+', dtype=int,
@@ -172,7 +172,7 @@ def map_large_index_to_small_index(inds, length, folder, use_memmap_files=False)
     return inds_map, inds_unique_flat
 
 
-def _load_single_sky_slice(folder_path, cat_name, ind, sky_inds, use_memmap_files=False):
+def _load_single_sky_slice(folder_path, cat_name, ind, sky_inds, use_memmap_files):
     '''
     Function to, in a memmap-friendly way, return a sub-set of the nearest sky
     indices of a given catalogue.
@@ -191,7 +191,7 @@ def _load_single_sky_slice(folder_path, cat_name, ind, sky_inds, use_memmap_file
     sky_inds : numpy.ndarray
         The given catalogue's ``distribute_sky_indices`` values, to compare
         with ``ind``.
-    use_memmap_files : boolean, optional
+    use_memmap_files : boolean
         When set to True, memory mapped files are used for several internal
         arrays. Reduces memory consumption at the cost of increased I/O
         contention.

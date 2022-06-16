@@ -63,7 +63,7 @@ def make_perturb_aufs(auf_folder, cat_folder, filters, auf_points, r, dr, rho,
     mem_chunk_num : int
         Number of individual sub-sections to break catalogue into for memory
         saving purposes.
-    use_memmap_files : boolean, optional
+    use_memmap_files : boolean
         When set to True, memory mapped files are used for several internal
         arrays. Reduces memory consumption at the cost of increased I/O
         contention.
@@ -499,14 +499,14 @@ def make_perturb_aufs(auf_folder, cat_folder, filters, auf_points, r, dr, rho,
         n_fracs = len(delta_mag_cuts)
     # Create the 4-D grids that house the perturbation AUF fourier-space
     # representation.
-    create_auf_params_grid(auf_folder, auf_points, filters, 'fourier', len(rho)-1,
-                           use_memmap_files, arraylengths)
+    create_auf_params_grid(auf_folder, auf_points, filters, 'fourier', use_memmap_files,
+                           len(rho)-1, arraylengths)
     # Create the estimated levels of flux contamination and fraction of
     # contaminated source grids.
-    create_auf_params_grid(auf_folder, auf_points, filters, 'frac', n_fracs,
-                           use_memmap_files, arraylengths)
-    create_auf_params_grid(auf_folder, auf_points, filters, 'flux',
-                           use_memmap_files=use_memmap_files, arraylengths=arraylengths)
+    create_auf_params_grid(auf_folder, auf_points, filters, 'frac', use_memmap_files,
+                           n_fracs, arraylengths)
+    create_auf_params_grid(auf_folder, auf_points, filters, 'flux', use_memmap_files,
+                           arraylengths=arraylengths)
 
     if include_perturb_auf:
         del Narrays, magarrays
@@ -587,7 +587,7 @@ def download_trilegal_simulation(tri_folder, tri_filter_set, ax1, ax2, mag_num, 
 
 def calculate_local_density(a_astro, a_tot_astro, a_tot_photo, auf_folder, cat_folder,
                             density_radius, density_mag, memmap_slice_arrays,
-                            use_memmap_files=False):
+                            use_memmap_files):
     '''
     Calculates the number of sources above a given brightness within a specified
     radius of each source in a catalogue, to provide a local density for
@@ -617,7 +617,7 @@ def calculate_local_density(a_astro, a_tot_astro, a_tot_photo, auf_folder, cat_f
     memmap_slice_arrays : list of numpy.ndarray
         List of the memmap sky slice arrays, to be used in the loading of the
         rectangular sky patch.
-    use_memmap_files : boolean, optional
+    use_memmap_files : boolean
         When set to True, memory mapped files are used for several internal
         arrays. Reduces memory consumption at the cost of increased I/O
         contention.

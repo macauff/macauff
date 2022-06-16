@@ -937,7 +937,7 @@ class CrossMatch():
                     self.joint_folder_path, self.a_cat_folder_path, self.b_cat_folder_path,
                     self.a_filt_names, self.b_filt_names, self.mem_chunk_num, self.cf_region_points,
                     self.cf_areas, self.include_phot_like, self.use_phot_priors, self.group_sources_data,
-                    bright_frac, field_frac)
+                    self.use_memmap_files, bright_frac, field_frac)
         else:
             print('Loading photometric priors and likelihoods...')
             sys.stdout.flush()

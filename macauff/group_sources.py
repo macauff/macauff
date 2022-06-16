@@ -24,7 +24,7 @@ def make_island_groupings(joint_folder_path, a_cat_folder_path, b_cat_folder_pat
                           a_auf_folder_path, b_auf_folder_path, a_auf_pointings, b_auf_pointings,
                           a_filt_names, b_filt_names, a_title, b_title, a_modelrefinds, b_modelrefinds,
                           r, dr, rho, drho, j1s, max_sep, ax_lims, int_fracs, mem_chunk_num,
-                          include_phot_like, use_phot_priors, n_pool, use_memmap_files=False):
+                          include_phot_like, use_phot_priors, n_pool, use_memmap_files):
     '''
     Function to handle the creation of "islands" of astrometrically coeval
     sources, and identify which overlap to some probability based on their
@@ -103,7 +103,7 @@ def make_island_groupings(joint_folder_path, a_cat_folder_path, b_cat_folder_pat
         calculate photometric-information dependent priors for cross-matching.
     n_pool : integer
         Number of multiprocessing pools to use when parallelising.
-    use_memmap_files : boolean, optional
+    use_memmap_files : boolean
         When set to True, memory mapped files are used for several internal
         arrays. Reduces memory consumption at the cost of increased I/O
         contention.
@@ -439,7 +439,7 @@ def make_island_groupings(joint_folder_path, a_cat_folder_path, b_cat_folder_pat
     sys.stdout.flush()
 
     alist, blist, agrplen, bgrplen = set_list(ainds, binds, asize, bsize, joint_folder_path,
-                                              n_pool)
+                                              n_pool, use_memmap_files)
 
     # The final act of creating island groups is to clear out any sources too
     # close to the edge of the catalogue -- defined by its rectangular extend.
@@ -624,7 +624,7 @@ def make_island_groupings(joint_folder_path, a_cat_folder_path, b_cat_folder_pat
 
 def _load_fourier_grid_cutouts(a, sky_rect_coords, joint_folder_path, cat_folder_path,
                                auf_folder_path, padding, cat_name, memmap_slice_arrays,
-                               large_sky_slice, modelrefinds, use_memmap_files=False):
+                               large_sky_slice, modelrefinds, use_memmap_files):
     '''
     Function to load a sub-set of a given catalogue's astrometry, slicing it
     in a given sky coordinate rectangle, and load the appropriate sub-array
@@ -664,7 +664,7 @@ def _load_fourier_grid_cutouts(a, sky_rect_coords, joint_folder_path, cat_folder
         The modelrefinds array output from ``create_perturb_auf``. Used only when
         use_memmap_files is False.
         TODO Improve description
-    use_memmap_files : boolean, optional
+    use_memmap_files : boolean
         When set to True, memory mapped files are used for several internal
         arrays. Reduces memory consumption at the cost of increased I/O
         contention.
@@ -690,7 +690,7 @@ def _load_fourier_grid_cutouts(a, sky_rect_coords, joint_folder_path, cat_folder
     return a_cutout, fouriergrid, modrefindsmall, sky_cut
 
 
-def _clean_overlaps(inds, size, joint_folder_path, filename, n_pool, use_memmap_files=False):
+def _clean_overlaps(inds, size, joint_folder_path, filename, n_pool, use_memmap_files):
     '''
     Convenience function to parse either catalogue's indices array for
     duplicate references to the opposing array on a per-source basis,
@@ -711,7 +711,7 @@ def _clean_overlaps(inds, size, joint_folder_path, filename, n_pool, use_memmap_
         The name of the ``inds`` array saved to disk.
     n_pool : integer
         Number of multiprocessing threads to use.
-    use_memmap_files : boolean, optional
+    use_memmap_files : boolean
         When set to True, memory mapped files are used for several internal
         arrays. Reduces memory consumption at the cost of increased I/O
         contention.
