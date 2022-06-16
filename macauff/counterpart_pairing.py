@@ -17,8 +17,8 @@ __all__ = ['source_pairing']
 
 def source_pairing(joint_folder_path, a_cat_folder_path, b_cat_folder_path, a_auf_folder_path,
                    b_auf_folder_path, a_filt_names, b_filt_names, a_auf_pointings, b_auf_pointings,
-                   a_modelrefinds, b_modelrefinds, alist_in, blist_in, agrplen_in, bgrplen_in, rho,
-                   drho, n_fracs, mem_chunk_num, use_memmap_files=False):
+                   a_modelrefinds, b_modelrefinds, rho, drho, n_fracs, mem_chunk_num,
+                   group_sources_data, phot_like_data, use_memmap_files=False):
     '''
     Function to iterate over all grouped islands of sources, calculating the
     probabilities of all permutations of matches and deriving the most likely
@@ -55,22 +55,6 @@ def source_pairing(joint_folder_path, a_cat_folder_path, b_cat_folder_path, a_au
         Catalogue "b" modelrefinds array output from ``create_perturb_auf``. Used
         only when use_memmap_files is False.
         TODO Improve description
-    alist_in : numpy.ndarray
-        Catalogue "a" alist output from ``make_island_groupings``. Used only
-        when use_memmap_files is False.
-        TODO Improve description
-    blist_in : numpy.ndarray
-        Catalogue "b" blist output from ``make_island_groupings``. Used only
-        when use_memmap_files is False.
-        TODO Improve description
-    agrplen_in : numpy.ndarray
-        Catalogue "a" agrplen output from ``make_island_groupings``. Used only
-        when use_memmap_files is False.
-        TODO Improve description
-    bgrplen_in : numpy.ndarray
-        Catalogue "b" bgrplen output from ``make_island_groupings``. Used only
-        when use_memmap_files is False.
-        TODO Improve description
     rho : numpy.ndarray
         Array of fourier-space values, used in the convolution of PDFs.
     drho : numpy.ndarray
@@ -82,6 +66,14 @@ def source_pairing(joint_folder_path, a_cat_folder_path, b_cat_folder_path, a_au
     mem_chunk_num : integer
         Number of sub-arrays to break loading of main catalogue into, to
         reduce the amount of memory used.
+    group_sources_data : class.StageData
+        Object containing all outputs from ``make_island_groupings``
+        Used only when use_memmap_files is False.
+        TODO Improve description
+    phot_like_data : class.StageData
+        Object containing all outputs from ``compute_photometric_likelihoods``
+        Used only when use_memmap_files is False.
+        TODO Improve description
     use_memmap_files : boolean, optional
         When set to True, memory mapped files are used for several internal
         arrays. Reduces memory consumption at the cost of increased I/O
@@ -96,7 +88,7 @@ def source_pairing(joint_folder_path, a_cat_folder_path, b_cat_folder_path, a_au
     if use_memmap_files:
         isle_len = np.load('{}/group/alist.npy'.format(joint_folder_path), mmap_mode='r').shape[1]
     else:
-        isle_len = alist_in.shape[1]
+        isle_len = group_sources_data.alist.shape[1]
 
     match_chunk_lengths = np.empty(mem_chunk_num, int)
     afield_chunk_lengths = np.empty(mem_chunk_num, int)
@@ -116,8 +108,8 @@ def source_pairing(joint_folder_path, a_cat_folder_path, b_cat_folder_path, a_au
             bgrplen = np.load('{}/group/bgrplen.npy'.format(joint_folder_path),
                             mmap_mode='r')[lowind:highind]
         else:
-            agrplen = agrplen_in[lowind:highind]
-            bgrplen = bgrplen_in[lowind:highind]
+            agrplen = group_sources_data.agrplen[lowind:highind]
+            bgrplen = group_sources_data.bgrplen[lowind:highind]
 
         sum_agrp, sum_bgrp = np.sum(agrplen), np.sum(bgrplen)
         match_lens = np.sum(np.minimum(agrplen, bgrplen))
@@ -179,17 +171,30 @@ def source_pairing(joint_folder_path, a_cat_folder_path, b_cat_folder_path, a_au
     bfieldxi = np.lib.format.open_memmap('{}/pairing/bfieldxi.npy'.format(joint_folder_path),
                                          mode='w+', dtype=float, shape=(len_b,))
 
-    abinsarray = np.load('{}/phot_like/abinsarray.npy'.format(joint_folder_path), mmap_mode='r')
-    abinlengths = np.load('{}/phot_like/abinlengths.npy'.format(joint_folder_path), mmap_mode='r')
-    bbinsarray = np.load('{}/phot_like/bbinsarray.npy'.format(joint_folder_path), mmap_mode='r')
-    bbinlengths = np.load('{}/phot_like/bbinlengths.npy'.format(joint_folder_path), mmap_mode='r')
+    if use_memmap_files:
+        abinsarray = np.load('{}/phot_like/abinsarray.npy'.format(joint_folder_path), mmap_mode='r')
+        abinlengths = np.load('{}/phot_like/abinlengths.npy'.format(joint_folder_path), mmap_mode='r')
+        bbinsarray = np.load('{}/phot_like/bbinsarray.npy'.format(joint_folder_path), mmap_mode='r')
+        bbinlengths = np.load('{}/phot_like/bbinlengths.npy'.format(joint_folder_path), mmap_mode='r')
 
-    c_priors = np.load('{}/phot_like/c_priors.npy'.format(joint_folder_path), mmap_mode='r')
-    c_array = np.load('{}/phot_like/c_array.npy'.format(joint_folder_path), mmap_mode='r')
-    fa_priors = np.load('{}/phot_like/fa_priors.npy'.format(joint_folder_path), mmap_mode='r')
-    fa_array = np.load('{}/phot_like/fa_array.npy'.format(joint_folder_path), mmap_mode='r')
-    fb_priors = np.load('{}/phot_like/fb_priors.npy'.format(joint_folder_path), mmap_mode='r')
-    fb_array = np.load('{}/phot_like/fb_array.npy'.format(joint_folder_path), mmap_mode='r')
+        c_priors = np.load('{}/phot_like/c_priors.npy'.format(joint_folder_path), mmap_mode='r')
+        c_array = np.load('{}/phot_like/c_array.npy'.format(joint_folder_path), mmap_mode='r')
+        fa_priors = np.load('{}/phot_like/fa_priors.npy'.format(joint_folder_path), mmap_mode='r')
+        fa_array = np.load('{}/phot_like/fa_array.npy'.format(joint_folder_path), mmap_mode='r')
+        fb_priors = np.load('{}/phot_like/fb_priors.npy'.format(joint_folder_path), mmap_mode='r')
+        fb_array = np.load('{}/phot_like/fb_array.npy'.format(joint_folder_path), mmap_mode='r')
+    else:
+        abinsarray = phot_like_data.abinsarray
+        abinlengths = phot_like_data.abinlengths
+        bbinsarray = phot_like_data.bbinsarray
+        bbinlengths = phot_like_data.bbinlengths
+
+        c_priors = phot_like_data.c_priors
+        c_array = phot_like_data.c_array
+        fa_priors = phot_like_data.fa_priors
+        fa_array = phot_like_data.fa_array
+        fb_priors = phot_like_data.fb_priors
+        fb_array = phot_like_data.fb_array
 
     big_len_a = len(np.load('{}/con_cat_astro.npy'.format(a_cat_folder_path), mmap_mode='r'))
     big_len_b = len(np.load('{}/con_cat_astro.npy'.format(b_cat_folder_path), mmap_mode='r'))
@@ -207,8 +212,8 @@ def source_pairing(joint_folder_path, a_cat_folder_path, b_cat_folder_path, a_au
             agrplen = np.load('{}/group/agrplen.npy'.format(joint_folder_path),
                             mmap_mode='r')[lowind:highind]
         else:
-            alist_ = alist_in[:, lowind:highind]
-            agrplen = agrplen_in[lowind:highind]
+            alist_ = group_sources_data.alist[:, lowind:highind]
+            agrplen = group_sources_data.agrplen[lowind:highind]
 
         alist_ = np.asfortranarray(alist_[:np.amax(agrplen), :])
         alistunique_flat = np.unique(alist_[alist_ > -1])
@@ -223,17 +228,19 @@ def source_pairing(joint_folder_path, a_cat_folder_path, b_cat_folder_path, a_au
         # *list maps the subarray indices, but *list_ keeps the full catalogue indices
         alist = np.asfortranarray(maparray[alist_.flatten()].reshape(alist_.shape))
 
-        a_sky_inds = np.load('{}/phot_like/a_sky_inds.npy'.format(joint_folder_path),
-                             mmap_mode='r')[alistunique_flat]
-
         if use_memmap_files:
+            a_sky_inds = np.load('{}/phot_like/a_sky_inds.npy'.format(joint_folder_path),
+                                mmap_mode='r')[alistunique_flat]
+
             blist_ = np.load('{}/group/blist.npy'.format(joint_folder_path),
                             mmap_mode='r')[:, lowind:highind]
             bgrplen = np.load('{}/group/bgrplen.npy'.format(joint_folder_path),
                             mmap_mode='r')[lowind:highind]
         else:
-            blist_ = blist_in[:, lowind:highind]
-            bgrplen = bgrplen_in[lowind:highind]
+            a_sky_inds = phot_like_data.a_sky_inds
+
+            blist_ = group_sources_data.blist[:, lowind:highind]
+            bgrplen = group_sources_data.bgrplen[lowind:highind]
 
         blist_ = np.asfortranarray(blist_[:np.amax(bgrplen), :])
         blistunique_flat = np.unique(blist_[blist_ > -1])
@@ -247,24 +254,24 @@ def source_pairing(joint_folder_path, a_cat_folder_path, b_cat_folder_path, a_au
         maparray[blistunique_flat] = np.arange(0, len(b_astro), dtype=int)
         blist = np.asfortranarray(maparray[blist_.flatten()].reshape(blist_.shape))
 
-        b_sky_inds = np.load('{}/phot_like/b_sky_inds.npy'.format(joint_folder_path),
-                             mmap_mode='r')[blistunique_flat]
-
         if use_memmap_files:
+            b_sky_inds = np.load('{}/phot_like/b_sky_inds.npy'.format(joint_folder_path),
+                        mmap_mode='r')[blistunique_flat]
+
             amodrefind = np.load('{}/modelrefinds.npy'.format(a_auf_folder_path),
                                 mmap_mode='r')[:, alistunique_flat]
-        else:
-            amodrefind = a_modelrefinds
-        [afourier_grids, afrac_grids, aflux_grids], amodrefind = load_small_ref_auf_grid(
-            amodrefind, a_auf_folder_path, ['fourier', 'frac', 'flux'])
-
-        if use_memmap_files:
             bmodrefind = np.load('{}/modelrefinds.npy'.format(b_auf_folder_path),
                                 mmap_mode='r')[:, blistunique_flat]
         else:
+            b_sky_inds = phot_like_data.b_sky_inds
+
+            amodrefind = a_modelrefinds
+            [afourier_grids, afrac_grids, aflux_grids], amodrefind = load_small_ref_auf_grid(
+                amodrefind, a_auf_folder_path, ['fourier', 'frac', 'flux'])
             bmodrefind = b_modelrefinds
-        [bfourier_grids, bfrac_grids, bflux_grids], bmodrefind = load_small_ref_auf_grid(
-            bmodrefind, b_auf_folder_path, ['fourier', 'frac', 'flux'])
+            [bfourier_grids, bfrac_grids, bflux_grids], bmodrefind = load_small_ref_auf_grid(
+                bmodrefind, b_auf_folder_path, ['fourier', 'frac', 'flux'])
+
 
         # Similar to crpts_max_len, mini_crpts_len is the maximum number of
         # counterparts at 100% match rate for this cutout.

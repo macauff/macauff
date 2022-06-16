@@ -13,7 +13,7 @@ import numpy as np
 
 from .misc_functions import (load_small_ref_auf_grid, hav_dist_constant_lat,
                              map_large_index_to_small_index, _load_rectangular_slice,
-                             _create_rectangular_slice_arrays)
+                             _create_rectangular_slice_arrays, StageData)
 from .group_sources_fortran import group_sources_fortran as gsf
 from .make_set_list import set_list
 
@@ -608,7 +608,18 @@ def make_island_groupings(joint_folder_path, a_cat_folder_path, b_cat_folder_pat
         os.remove('{}/group/passed_check.npy'.format(joint_folder_path))
         os.remove('{}/group/failed_check.npy'.format(joint_folder_path))
 
-    return new_alist, new_blist, new_agrplen, new_bgrplen
+        # Ensure unused arrays are garbage collected if memory mapped files enabled
+        aflen = bflen = None
+        new_alist = new_blist = new_agrplen = new_bgrplen = None
+
+    # Only return aflen and bflen if they were created
+    if not (include_phot_like or use_phot_priors):
+        aflen = bflen = None
+
+    group_sources_data = StageData(aflen=aflen, bflen=bflen,
+                                   alist=new_alist, blist=new_blist,
+                                   agrplen=new_agrplen, bgrplen=new_bgrplen)
+    return group_sources_data
 
 
 def _load_fourier_grid_cutouts(a, sky_rect_coords, joint_folder_path, cat_folder_path,

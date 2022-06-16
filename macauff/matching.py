@@ -882,7 +882,7 @@ class CrossMatch():
                 self.run_cf, self.run_source = True, True
             os.system('rm -rf {}/group/*'.format(self.joint_folder_path))
             os.system('rm -rf {}/reject/*'.format(self.joint_folder_path))
-            self.alist, self.blist, self.agrplen, self.bgrplen = \
+            self.group_sources_data = \
                 group_func(self.joint_folder_path, self.a_cat_folder_path, self.b_cat_folder_path,
                            self.a_auf_folder_path, self.b_auf_folder_path, self.a_auf_region_points,
                            self.b_auf_region_points, self.a_filt_names, self.b_filt_names,
@@ -933,11 +933,11 @@ class CrossMatch():
             else:
                 bright_frac = None
                 field_frac = None
-            phot_like_func(
-                self.joint_folder_path, self.a_cat_folder_path, self.b_cat_folder_path,
-                self.a_filt_names, self.b_filt_names, self.mem_chunk_num, self.cf_region_points,
-                self.cf_areas, self.include_phot_like, self.use_phot_priors, bright_frac,
-                field_frac)
+            self.phot_like_data = phot_like_func(
+                    self.joint_folder_path, self.a_cat_folder_path, self.b_cat_folder_path,
+                    self.a_filt_names, self.b_filt_names, self.mem_chunk_num, self.cf_region_points,
+                    self.cf_areas, self.include_phot_like, self.use_phot_priors, self.group_sources_data,
+                    bright_frac, field_frac)
         else:
             print('Loading photometric priors and likelihoods...')
             sys.stdout.flush()
@@ -1004,9 +1004,8 @@ class CrossMatch():
                 self.joint_folder_path, self.a_cat_folder_path, self.b_cat_folder_path,
                 self.a_auf_folder_path, self.b_auf_folder_path, self.a_filt_names,
                 self.b_filt_names, self.a_auf_region_points, self.b_auf_region_points,
-                self.a_modelrefinds, self.b_modelrefinds, self.alist, self.blist,
-                self.agrplen, self.bgrplen, self.rho, self.drho, len(self.delta_mag_cuts),
-                self.mem_chunk_num, self.use_memmap_files)
+                self.a_modelrefinds, self.b_modelrefinds, self.rho, self.drho, len(self.delta_mag_cuts),
+                self.mem_chunk_num, self.group_sources_data, self.phot_like_data, self.use_memmap_files)
         else:
             print('Loading pre-assigned counterparts...')
             sys.stdout.flush()

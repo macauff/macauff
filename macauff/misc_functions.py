@@ -10,6 +10,13 @@ import numpy as np
 
 __all__ = []
 
+# "Anemic" class for holding outputs to pass into later pipeline stages
+# Takes any number of arguments in constructor, each becoming an attribute
+# TODO: Move to own file?
+class StageData:
+    def __init__(self, **kwargs):
+        self.__dict__.update(kwargs)
+
 
 def create_auf_params_grid(auf_folder_path, auf_pointings, filt_names, array_name,
                            len_first_axis=None, use_memmap_files=False, arraylengths=None):
