@@ -6,7 +6,9 @@ This module provides the high-level framework for performing catalogue-catalogue
 import os
 import sys
 import warnings
+import datetime
 from configparser import ConfigParser
+from time import sleep
 import numpy as np
 from mpi4py import MPI
 
@@ -34,7 +36,8 @@ class CrossMatch():
         cross match.
     '''
 
-    def __init__(self, chunks_folder_path, resume_file_path=None):
+    def __init__(self, chunks_folder_path, resume_file_path=None, walltime=None,
+                 end_within='00:10:00', polling_rate=1):
         '''
         Initialisation function for cross-match class.
         '''
@@ -64,6 +67,24 @@ class CrossMatch():
             # Chunk queue will not contain chunks recorded as completed in the
             # resume file
             self.chunk_queue = self._make_chunk_queue(completed_chunks)
+
+            # In seconds, how often the manager checks for new work requests
+            self.polling_rate = polling_rate
+
+            if walltime != None:
+                # Expect job walltime and "end within" time in Hours:Minutes:Seconds (%H:%M:%S)
+                # format, e.g. 02:44:12 for 2 hours, 44 minutes, 12 seconds
+                # Calculate job end time from start time + walltime
+                t = datetime.datetime.strptime(walltime, '%H:%M:%S')
+                self.end_time = datetime.datetime.now() + \
+                    datetime.timedelta(hours=t.hour, minutes=t.minute, seconds=t.second)
+                # Keep track of "end within" time as a timedelta for easy comparison
+                t = datetime.datetime.strptime(end_within, '%H:%M:%S')
+                self.end_within = \
+                    datetime.timedelta(hours=t.hour, minutes=t.minute, seconds=t.second)
+            else:
+                self.end_time = None
+                self.end_within = None
 
 
     def _initialise_chunk(self, joint_file_path, cat_a_file_path, cat_b_file_path):
@@ -195,7 +216,6 @@ class CrossMatch():
             # Manager process:
             #   - assigns chunks to workers
             #   - TODO receive cross-match results, resolve duplicates and write output
-            #   - TODO monitor job walltime and take resumable snapshots
             #   - TODO handle crashed workers
             #   - TODO handle crashed manager process
             #   - once queue is empty, workers are sent signal to stop
@@ -206,9 +226,31 @@ class CrossMatch():
 
                 # Loop until all workers have been instructed there is no more work
                 while active_workers > 0:
-                    # Wait for any worker to request a chunk and report
-                    # completion of any previous chunk
-                    (worker_id, chunk_id) = self.comm.recv()
+                    # If checkpointing disabled, simply wait for any worker to
+                    # request a chunk and report completion of any previous chunk
+                    if self.end_time == None:
+                        (worker_id, chunk_id) = self.comm.recv()
+                    # Otherwise, use non-blocking recv to allow manager to keep
+                    # track of job time via polling loop
+                    else:
+                        req = self.comm.irecv()
+                        # Use an infinite loop with break rather than "while not req.Get_status()"
+                        # to ensure walltime is checked even if request returns immediately, i.e.
+                        # emulate a "do-while" loop
+                        while True:
+                            # Check if we're reaching the limit of job walltime. If so,
+                            # empty the queue so no further work is issued
+                            if self.end_time - datetime.datetime.now() < self.end_within:
+                                print('Rank {}: reaching job walltime. Cancelling all further work'.format(self.rank))
+                                self.chunk_queue.clear()
+                                # Blank end time so we don't re-enter polling loop
+                                self.end_time = None
+                                break
+                            if req.Get_status():
+                                break
+                            sleep(self.polling_rate)
+                        # Request complete, extract data
+                        (worker_id, chunk_id) = req.wait()
 
                     # Record completed chunk
                     if chunk_id != self.worker_signals['INITIAL_WORK_REQUEST'] \
