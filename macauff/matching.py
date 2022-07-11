@@ -47,22 +47,32 @@ class CrossMatch():
         self.comm = MPI.COMM_WORLD
         self.rank = self.comm.Get_rank()
         self.comm_size = self.comm.Get_size()
+        # Set MPI error handling to return exceptions rather than MPI_Abort the.
+        # application. Allows for recovery of crashed workers.
+        self.comm.Set_errhandler(MPI.ERRORS_RETURN)
         # Special signals for MPI processes
-        #   'NO_MORE_WORK' - manager process uses to signal workers to shut down
-        #   'INITIAL_WORK_REQUEST' - worker uses to signal manager this is its
-        #                            first request for work, i.e. it has not
-        #                            previously completed a chunk
+        #   'NO_MORE_WORK' - manager uses to signal workers to shut down
+        #   'WORK_REQUEST' - manager uses to signal new chunk for processing.
+        #                    worker uses to request initial chunk from manager.
+        #   'WORK_COMPLETE' - worker uses to report successfully processed given chunk
+        #   'WORK_ERROR' - worker uses to report failed processing of given chunk
         self.worker_signals = { 'NO_MORE_WORK': 0,
-                                'INITIAL_WORK_REQUEST': 1 }
+                                'WORK_REQUEST': 1,
+                                'WORK_COMPLETE': 2,
+                                'WORK_ERROR': 3 }
         # Only manager process needs to set up the resume file and queue
         if self.rank == 0:
             completed_chunks = set()
-            # Open and read existing resume file
-            if resume_file_path != None:
+            try:
+                # Open and read existing resume file
                 self.resume_file = open(resume_file_path, 'r+')
                 for line in self.resume_file:
                     completed_chunks.add(line.rstrip())
-            else:
+            except FileNotFoundError:
+                # Resume file specified but does not exist. Create new one.
+                self.resume_file = open(resume_file_path, 'w')
+            except TypeError:
+                # Resume file was not specified. Disable checkpointing
                 self.resume_file = None
             # Chunk queue will not contain chunks recorded as completed in the
             # resume file
@@ -215,6 +225,7 @@ class CrossMatch():
         else:
             # Manager process:
             #   - assigns chunks to workers
+            #   - writes completed chunk IDs to resume file
             #   - TODO receive cross-match results, resolve duplicates and write output
             #   - TODO handle crashed workers
             #   - TODO handle crashed manager process
@@ -229,7 +240,7 @@ class CrossMatch():
                     # If checkpointing disabled, simply wait for any worker to
                     # request a chunk and report completion of any previous chunk
                     if self.end_time == None:
-                        (worker_id, chunk_id) = self.comm.recv()
+                        (signal, worker_id, chunk_id) = self.comm.recv()
                     # Otherwise, use non-blocking recv to allow manager to keep
                     # track of job time via polling loop
                     else:
@@ -250,44 +261,75 @@ class CrossMatch():
                                 break
                             sleep(self.polling_rate)
                         # Request complete, extract data
-                        (worker_id, chunk_id) = req.wait()
+                        (signal, worker_id, chunk_id) = req.wait()
 
                     # Record completed chunk
-                    if chunk_id != self.worker_signals['INITIAL_WORK_REQUEST'] \
+                    if signal == self.worker_signals['WORK_COMPLETE'] \
                     and self.resume_file != None:
+                        print('Rank {}: chunk {} processed by rank {}. Adding to resume file.'
+                              .format(self.rank, chunk_id, worker_id))
                         self.resume_file.write(chunk_id+'\n')
+                        # Do not buffer. Immediately commit to disk for
+                        # resilience against crashes and overrunning walltime
+                        # flush() alone is not enough. See:
+                        # https://docs.python.org/3/library/os.html#os.fsync
+                        self.resume_file.flush()
+                        os.fsync(self.resume_file)
+                    # Handle failed chunk
+                    elif signal == self.worker_signals['WORK_ERROR']:
+                        print('Rank {}: rank {} failed to process chunk {}.'
+                              .format(self.rank, worker_id, chunk_id))
 
                     # Assign chunks until no more work.
                     # Then count "no more work" signals until no more workers.
                     try:
-                        chunk = self.chunk_queue.pop(0)
-                        print('Rank {}: sending rank {} chunk {}'.format(self.rank, worker_id, chunk[0]))
+                        new_chunk = self.chunk_queue.pop(0)
+                        signal = self.worker_signals['WORK_REQUEST']
+                        print('Rank {}: sending rank {} chunk {}'.format(self.rank, worker_id, new_chunk[0]))
                     except IndexError:
-                        chunk = self.worker_signals['NO_MORE_WORK']
+                        new_chunk = None
+                        signal = self.worker_signals['NO_MORE_WORK']
                         active_workers -= 1
 
-                    self.comm.send(chunk, dest=worker_id)
+                    sys.stdout.flush()
+
+                    self.comm.send((signal, new_chunk), dest=worker_id)
 
             # Worker processes:
             #  - request chunk from manager
             #  - loop until given signal to terminate
             else:
-                completed_chunk_id = self.worker_signals['INITIAL_WORK_REQUEST']
+                signal = self.worker_signals['WORK_REQUEST']
+                completed_chunk_id = None
                 # Infinite loop until given signal to break
                 while True:
                     # Send own rank ID to manager so it knows which process to assign work
-                    # Also report completed chunk id
-                    self.comm.send((self.rank, completed_chunk_id), dest=0)
-                    message = self.comm.recv(source=0)
+                    # in addition to signal and completed chunk id
+                    self.comm.send((signal, self.rank, completed_chunk_id), dest=0)
+                    (signal, chunk) = self.comm.recv(source=0)
 
-                    # Handle received signal or chunk
-                    if message == self.worker_signals['NO_MORE_WORK']:
+                    # Handle received signal.
+                    # Terminate when signalled there is no more work...
+                    if signal == self.worker_signals['NO_MORE_WORK']:
                         break
+                    # ...or process the given chunk
                     else:
-                        (chunk_id, joint_file_path, cat_a_file_path, cat_b_file_path) = message
+                        (chunk_id, joint_file_path, cat_a_file_path, cat_b_file_path) = chunk
                         print('Rank {}: processing chunk {}'.format(self.rank, chunk_id))
-                        self._process_chunk(joint_file_path, cat_a_file_path, cat_b_file_path)
+
+                        try:
+                            self._process_chunk(joint_file_path, cat_a_file_path, cat_b_file_path)
+                            signal = self.worker_signals['WORK_COMPLETE']
+                        except Exception as e:
+                            # Recover worker on chunk processing error
+                            signal = self.worker_signals['WORK_ERROR']
+                            # TODO More granular error handling
+                            print("Rank {}: failed to process chunk{}. Exception: {}"
+                                  .format(self.rank, e))
+
                         completed_chunk_id = chunk_id
+
+                    sys.stdout.flush()
 
         # Clean up and shut down
         self._cleanup()
