@@ -17,7 +17,8 @@ __all__ = ['source_pairing']
 
 def source_pairing(joint_folder_path, a_cat_folder_path, b_cat_folder_path, a_auf_folder_path,
                    b_auf_folder_path, a_filt_names, b_filt_names, a_auf_pointings, b_auf_pointings,
-                   rho, drho, n_fracs, mem_chunk_num):
+                   a_modelrefinds, b_modelrefinds, rho, drho, n_fracs, mem_chunk_num,
+                   group_sources_data, phot_like_data, use_memmap_files):
     '''
     Function to iterate over all grouped islands of sources, calculating the
     probabilities of all permutations of matches and deriving the most likely
@@ -46,6 +47,14 @@ def source_pairing(joint_folder_path, a_cat_folder_path, b_cat_folder_path, a_au
     b_auf_pointings : numpy.ndarray
         Sky coordinates of locations of catalogue "b" perturbation AUF
         component simulations.
+    a_modelrefinds : numpy.ndarray
+        Catalogue "a" modelrefinds array output from ``create_perturb_auf``. Used
+        only when use_memmap_files is False.
+        TODO Improve description
+    b_modelrefinds : numpy.ndarray
+        Catalogue "b" modelrefinds array output from ``create_perturb_auf``. Used
+        only when use_memmap_files is False.
+        TODO Improve description
     rho : numpy.ndarray
         Array of fourier-space values, used in the convolution of PDFs.
     drho : numpy.ndarray
@@ -57,6 +66,18 @@ def source_pairing(joint_folder_path, a_cat_folder_path, b_cat_folder_path, a_au
     mem_chunk_num : integer
         Number of sub-arrays to break loading of main catalogue into, to
         reduce the amount of memory used.
+    group_sources_data : class.StageData
+        Object containing all outputs from ``make_island_groupings``
+        Used only when use_memmap_files is False.
+        TODO Improve description
+    phot_like_data : class.StageData
+        Object containing all outputs from ``compute_photometric_likelihoods``
+        Used only when use_memmap_files is False.
+        TODO Improve description
+    use_memmap_files : boolean
+        When set to True, memory mapped files are used for several internal
+        arrays. Reduces memory consumption at the cost of increased I/O
+        contention.
     '''
     print("Creating catalogue matches...")
     sys.stdout.flush()
@@ -64,7 +85,10 @@ def source_pairing(joint_folder_path, a_cat_folder_path, b_cat_folder_path, a_au
     print("Pairing sources...")
     sys.stdout.flush()
 
-    isle_len = np.load('{}/group/alist.npy'.format(joint_folder_path), mmap_mode='r').shape[1]
+    if use_memmap_files:
+        isle_len = np.load('{}/group/alist.npy'.format(joint_folder_path), mmap_mode='r').shape[1]
+    else:
+        isle_len = group_sources_data.alist.shape[1]
 
     match_chunk_lengths = np.empty(mem_chunk_num, int)
     afield_chunk_lengths = np.empty(mem_chunk_num, int)
@@ -77,10 +101,15 @@ def source_pairing(joint_folder_path, a_cat_folder_path, b_cat_folder_path, a_au
     for cnum in range(0, mem_chunk_num):
         lowind = np.floor(isle_len*cnum/mem_chunk_num).astype(int)
         highind = np.floor(isle_len*(cnum+1)/mem_chunk_num).astype(int)
-        agrplen = np.load('{}/group/agrplen.npy'.format(joint_folder_path),
-                          mmap_mode='r')[lowind:highind]
-        bgrplen = np.load('{}/group/bgrplen.npy'.format(joint_folder_path),
-                          mmap_mode='r')[lowind:highind]
+
+        if use_memmap_files:
+            agrplen = np.load('{}/group/agrplen.npy'.format(joint_folder_path),
+                            mmap_mode='r')[lowind:highind]
+            bgrplen = np.load('{}/group/bgrplen.npy'.format(joint_folder_path),
+                            mmap_mode='r')[lowind:highind]
+        else:
+            agrplen = group_sources_data.agrplen[lowind:highind]
+            bgrplen = group_sources_data.bgrplen[lowind:highind]
 
         sum_agrp, sum_bgrp = np.sum(agrplen), np.sum(bgrplen)
         match_lens = np.sum(np.minimum(agrplen, bgrplen))
@@ -95,64 +124,100 @@ def source_pairing(joint_folder_path, a_cat_folder_path, b_cat_folder_path, a_au
 
     # Assume that the counterparts, at 100% match rate, can't be more than all
     # of the items in the smaller of the two *list arrays.
-    acountinds = np.lib.format.open_memmap('{}/pairing/ac.npy'.format(joint_folder_path),
-                                           mode='w+', dtype=int, shape=(cprt_max_len,))
-    bcountinds = np.lib.format.open_memmap('{}/pairing/bc.npy'.format(joint_folder_path),
-                                           mode='w+', dtype=int, shape=(cprt_max_len,))
-    acontamprob = np.lib.format.open_memmap('{}/pairing/pacontam.npy'.format(joint_folder_path),
-                                            mode='w+', dtype=float, shape=(n_fracs, cprt_max_len),
-                                            fortran_order=True)
-    bcontamprob = np.lib.format.open_memmap('{}/pairing/pbcontam.npy'.format(joint_folder_path),
-                                            mode='w+', dtype=float, shape=(n_fracs, cprt_max_len),
-                                            fortran_order=True)
-    acontamflux = np.lib.format.open_memmap('{}/pairing/acontamflux.npy'.format(joint_folder_path),
+    if use_memmap_files:
+        acountinds = np.lib.format.open_memmap('{}/pairing/ac.npy'.format(joint_folder_path),
+                                            mode='w+', dtype=int, shape=(cprt_max_len,))
+        bcountinds = np.lib.format.open_memmap('{}/pairing/bc.npy'.format(joint_folder_path),
+                                            mode='w+', dtype=int, shape=(cprt_max_len,))
+        acontamprob = np.lib.format.open_memmap('{}/pairing/pacontam.npy'.format(joint_folder_path),
+                                                mode='w+', dtype=float, shape=(n_fracs, cprt_max_len),
+                                                fortran_order=True)
+        bcontamprob = np.lib.format.open_memmap('{}/pairing/pbcontam.npy'.format(joint_folder_path),
+                                                mode='w+', dtype=float, shape=(n_fracs, cprt_max_len),
+                                                fortran_order=True)
+        acontamflux = np.lib.format.open_memmap('{}/pairing/acontamflux.npy'.format(joint_folder_path),
+                                                mode='w+', dtype=float, shape=(cprt_max_len,))
+        bcontamflux = np.lib.format.open_memmap('{}/pairing/bcontamflux.npy'.format(joint_folder_path),
+                                                mode='w+', dtype=float, shape=(cprt_max_len,))
+        probcarray = np.lib.format.open_memmap('{}/pairing/pc.npy'.format(joint_folder_path),
                                             mode='w+', dtype=float, shape=(cprt_max_len,))
-    bcontamflux = np.lib.format.open_memmap('{}/pairing/bcontamflux.npy'.format(joint_folder_path),
+        etaarray = np.lib.format.open_memmap('{}/pairing/eta.npy'.format(joint_folder_path),
                                             mode='w+', dtype=float, shape=(cprt_max_len,))
-    probcarray = np.lib.format.open_memmap('{}/pairing/pc.npy'.format(joint_folder_path),
-                                           mode='w+', dtype=float, shape=(cprt_max_len,))
-    etaarray = np.lib.format.open_memmap('{}/pairing/eta.npy'.format(joint_folder_path),
-                                         mode='w+', dtype=float, shape=(cprt_max_len,))
-    xiarray = np.lib.format.open_memmap('{}/pairing/xi.npy'.format(joint_folder_path),
-                                        mode='w+', dtype=float, shape=(cprt_max_len,))
-    crptseps = np.lib.format.open_memmap('{}/pairing/crptseps.npy'.format(joint_folder_path),
-                                         mode='w+', dtype=float, shape=(cprt_max_len,))
-    afieldinds = np.lib.format.open_memmap('{}/pairing/af.npy'.format(joint_folder_path),
-                                           mode='w+', dtype=int, shape=(len_a,))
-    probfaarray = np.lib.format.open_memmap('{}/pairing/pfa.npy'.format(joint_folder_path),
+        xiarray = np.lib.format.open_memmap('{}/pairing/xi.npy'.format(joint_folder_path),
+                                            mode='w+', dtype=float, shape=(cprt_max_len,))
+        crptseps = np.lib.format.open_memmap('{}/pairing/crptseps.npy'.format(joint_folder_path),
+                                            mode='w+', dtype=float, shape=(cprt_max_len,))
+        afieldinds = np.lib.format.open_memmap('{}/pairing/af.npy'.format(joint_folder_path),
+                                            mode='w+', dtype=int, shape=(len_a,))
+        probfaarray = np.lib.format.open_memmap('{}/pairing/pfa.npy'.format(joint_folder_path),
+                                                mode='w+', dtype=float, shape=(len_a,))
+        afieldflux = np.lib.format.open_memmap('{}/pairing/afieldflux.npy'.format(joint_folder_path),
                                             mode='w+', dtype=float, shape=(len_a,))
-    afieldflux = np.lib.format.open_memmap('{}/pairing/afieldflux.npy'.format(joint_folder_path),
-                                           mode='w+', dtype=float, shape=(len_a,))
-    afieldseps = np.lib.format.open_memmap('{}/pairing/afieldseps.npy'.format(joint_folder_path),
-                                           mode='w+', dtype=float, shape=(len_a,))
-    afieldeta = np.lib.format.open_memmap('{}/pairing/afieldeta.npy'.format(joint_folder_path),
-                                          mode='w+', dtype=float, shape=(len_a,))
-    afieldxi = np.lib.format.open_memmap('{}/pairing/afieldxi.npy'.format(joint_folder_path),
-                                         mode='w+', dtype=float, shape=(len_a,))
-    bfieldinds = np.lib.format.open_memmap('{}/pairing/bf.npy'.format(joint_folder_path),
-                                           mode='w+', dtype=int, shape=(len_b,))
-    probfbarray = np.lib.format.open_memmap('{}/pairing/pfb.npy'.format(joint_folder_path),
+        afieldseps = np.lib.format.open_memmap('{}/pairing/afieldseps.npy'.format(joint_folder_path),
+                                            mode='w+', dtype=float, shape=(len_a,))
+        afieldeta = np.lib.format.open_memmap('{}/pairing/afieldeta.npy'.format(joint_folder_path),
+                                            mode='w+', dtype=float, shape=(len_a,))
+        afieldxi = np.lib.format.open_memmap('{}/pairing/afieldxi.npy'.format(joint_folder_path),
+                                            mode='w+', dtype=float, shape=(len_a,))
+        bfieldinds = np.lib.format.open_memmap('{}/pairing/bf.npy'.format(joint_folder_path),
+                                            mode='w+', dtype=int, shape=(len_b,))
+        probfbarray = np.lib.format.open_memmap('{}/pairing/pfb.npy'.format(joint_folder_path),
+                                                mode='w+', dtype=float, shape=(len_b,))
+        bfieldflux = np.lib.format.open_memmap('{}/pairing/bfieldflux.npy'.format(joint_folder_path),
                                             mode='w+', dtype=float, shape=(len_b,))
-    bfieldflux = np.lib.format.open_memmap('{}/pairing/bfieldflux.npy'.format(joint_folder_path),
-                                           mode='w+', dtype=float, shape=(len_b,))
-    bfieldseps = np.lib.format.open_memmap('{}/pairing/bfieldseps.npy'.format(joint_folder_path),
-                                           mode='w+', dtype=float, shape=(len_b,))
-    bfieldeta = np.lib.format.open_memmap('{}/pairing/bfieldeta.npy'.format(joint_folder_path),
-                                          mode='w+', dtype=float, shape=(len_b,))
-    bfieldxi = np.lib.format.open_memmap('{}/pairing/bfieldxi.npy'.format(joint_folder_path),
-                                         mode='w+', dtype=float, shape=(len_b,))
+        bfieldseps = np.lib.format.open_memmap('{}/pairing/bfieldseps.npy'.format(joint_folder_path),
+                                            mode='w+', dtype=float, shape=(len_b,))
+        bfieldeta = np.lib.format.open_memmap('{}/pairing/bfieldeta.npy'.format(joint_folder_path),
+                                            mode='w+', dtype=float, shape=(len_b,))
+        bfieldxi = np.lib.format.open_memmap('{}/pairing/bfieldxi.npy'.format(joint_folder_path),
+                                            mode='w+', dtype=float, shape=(len_b,))
 
-    abinsarray = np.load('{}/phot_like/abinsarray.npy'.format(joint_folder_path), mmap_mode='r')
-    abinlengths = np.load('{}/phot_like/abinlengths.npy'.format(joint_folder_path), mmap_mode='r')
-    bbinsarray = np.load('{}/phot_like/bbinsarray.npy'.format(joint_folder_path), mmap_mode='r')
-    bbinlengths = np.load('{}/phot_like/bbinlengths.npy'.format(joint_folder_path), mmap_mode='r')
+        abinsarray = np.load('{}/phot_like/abinsarray.npy'.format(joint_folder_path), mmap_mode='r')
+        abinlengths = np.load('{}/phot_like/abinlengths.npy'.format(joint_folder_path), mmap_mode='r')
+        bbinsarray = np.load('{}/phot_like/bbinsarray.npy'.format(joint_folder_path), mmap_mode='r')
+        bbinlengths = np.load('{}/phot_like/bbinlengths.npy'.format(joint_folder_path), mmap_mode='r')
 
-    c_priors = np.load('{}/phot_like/c_priors.npy'.format(joint_folder_path), mmap_mode='r')
-    c_array = np.load('{}/phot_like/c_array.npy'.format(joint_folder_path), mmap_mode='r')
-    fa_priors = np.load('{}/phot_like/fa_priors.npy'.format(joint_folder_path), mmap_mode='r')
-    fa_array = np.load('{}/phot_like/fa_array.npy'.format(joint_folder_path), mmap_mode='r')
-    fb_priors = np.load('{}/phot_like/fb_priors.npy'.format(joint_folder_path), mmap_mode='r')
-    fb_array = np.load('{}/phot_like/fb_array.npy'.format(joint_folder_path), mmap_mode='r')
+        c_priors = np.load('{}/phot_like/c_priors.npy'.format(joint_folder_path), mmap_mode='r')
+        c_array = np.load('{}/phot_like/c_array.npy'.format(joint_folder_path), mmap_mode='r')
+        fa_priors = np.load('{}/phot_like/fa_priors.npy'.format(joint_folder_path), mmap_mode='r')
+        fa_array = np.load('{}/phot_like/fa_array.npy'.format(joint_folder_path), mmap_mode='r')
+        fb_priors = np.load('{}/phot_like/fb_priors.npy'.format(joint_folder_path), mmap_mode='r')
+        fb_array = np.load('{}/phot_like/fb_array.npy'.format(joint_folder_path), mmap_mode='r')
+    else:
+        acountinds = np.zeros(dtype=int, shape=(cprt_max_len,))
+        bcountinds = np.zeros(dtype=int, shape=(cprt_max_len,))
+        acontamprob = np.zeros(dtype=float, shape=(n_fracs, cprt_max_len), order='F')
+        bcontamprob = np.zeros(dtype=float, shape=(n_fracs, cprt_max_len), order='F')
+        acontamflux = np.zeros(dtype=float, shape=(cprt_max_len,))
+        bcontamflux = np.zeros(dtype=float, shape=(cprt_max_len,))
+        probcarray = np.zeros(dtype=float, shape=(cprt_max_len,))
+        etaarray = np.zeros(dtype=float, shape=(cprt_max_len,))
+        xiarray = np.zeros(dtype=float, shape=(cprt_max_len,))
+        crptseps = np.zeros(dtype=float, shape=(cprt_max_len,))
+        afieldinds = np.zeros(dtype=int, shape=(len_a,))
+        probfaarray = np.zeros(dtype=float, shape=(len_a,))
+        afieldflux = np.zeros(dtype=float, shape=(len_a,))
+        afieldseps = np.zeros(dtype=float, shape=(len_a,))
+        afieldeta = np.zeros(dtype=float, shape=(len_a,))
+        afieldxi = np.zeros(dtype=float, shape=(len_a,))
+        bfieldinds = np.zeros(dtype=int, shape=(len_b,))
+        probfbarray = np.zeros(dtype=float, shape=(len_b,))
+        bfieldflux = np.zeros(dtype=float, shape=(len_b,))
+        bfieldseps = np.zeros(dtype=float, shape=(len_b,))
+        bfieldeta = np.zeros(dtype=float, shape=(len_b,))
+        bfieldxi = np.zeros(dtype=float, shape=(len_b,))
+
+        abinsarray = phot_like_data.abinsarray
+        abinlengths = phot_like_data.abinlengths
+        bbinsarray = phot_like_data.bbinsarray
+        bbinlengths = phot_like_data.bbinlengths
+
+        c_priors = phot_like_data.c_priors
+        c_array = phot_like_data.c_array
+        fa_priors = phot_like_data.fa_priors
+        fa_array = phot_like_data.fa_array
+        fb_priors = phot_like_data.fb_priors
+        fb_array = phot_like_data.fb_array
 
     big_len_a = len(np.load('{}/con_cat_astro.npy'.format(a_cat_folder_path), mmap_mode='r'))
     big_len_b = len(np.load('{}/con_cat_astro.npy'.format(b_cat_folder_path), mmap_mode='r'))
@@ -164,10 +229,15 @@ def source_pairing(joint_folder_path, a_cat_folder_path, b_cat_folder_path, a_au
         lowind = np.floor(isle_len*cnum/mem_chunk_num).astype(int)
         highind = np.floor(isle_len*(cnum+1)/mem_chunk_num).astype(int)
 
-        alist_ = np.load('{}/group/alist.npy'.format(joint_folder_path),
-                         mmap_mode='r')[:, lowind:highind]
-        agrplen = np.load('{}/group/agrplen.npy'.format(joint_folder_path),
-                          mmap_mode='r')[lowind:highind]
+        if use_memmap_files:
+            alist_ = np.load('{}/group/alist.npy'.format(joint_folder_path),
+                            mmap_mode='r')[:, lowind:highind]
+            agrplen = np.load('{}/group/agrplen.npy'.format(joint_folder_path),
+                            mmap_mode='r')[lowind:highind]
+        else:
+            alist_ = group_sources_data.alist[:, lowind:highind]
+            agrplen = group_sources_data.agrplen[lowind:highind]
+
         alist_ = np.asfortranarray(alist_[:np.amax(agrplen), :])
         alistunique_flat = np.unique(alist_[alist_ > -1])
         a_astro = np.load('{}/con_cat_astro.npy'.format(a_cat_folder_path),
@@ -181,13 +251,20 @@ def source_pairing(joint_folder_path, a_cat_folder_path, b_cat_folder_path, a_au
         # *list maps the subarray indices, but *list_ keeps the full catalogue indices
         alist = np.asfortranarray(maparray[alist_.flatten()].reshape(alist_.shape))
 
-        a_sky_inds = np.load('{}/phot_like/a_sky_inds.npy'.format(joint_folder_path),
-                             mmap_mode='r')[alistunique_flat]
+        if use_memmap_files:
+            a_sky_inds = np.load('{}/phot_like/a_sky_inds.npy'.format(joint_folder_path),
+                                mmap_mode='r')[alistunique_flat]
 
-        blist_ = np.load('{}/group/blist.npy'.format(joint_folder_path),
-                         mmap_mode='r')[:, lowind:highind]
-        bgrplen = np.load('{}/group/bgrplen.npy'.format(joint_folder_path),
-                          mmap_mode='r')[lowind:highind]
+            blist_ = np.load('{}/group/blist.npy'.format(joint_folder_path),
+                            mmap_mode='r')[:, lowind:highind]
+            bgrplen = np.load('{}/group/bgrplen.npy'.format(joint_folder_path),
+                            mmap_mode='r')[lowind:highind]
+        else:
+            a_sky_inds = phot_like_data.a_sky_inds
+
+            blist_ = group_sources_data.blist[:, lowind:highind]
+            bgrplen = group_sources_data.bgrplen[lowind:highind]
+
         blist_ = np.asfortranarray(blist_[:np.amax(bgrplen), :])
         blistunique_flat = np.unique(blist_[blist_ > -1])
         b_astro = np.load('{}/con_cat_astro.npy'.format(b_cat_folder_path),
@@ -200,18 +277,24 @@ def source_pairing(joint_folder_path, a_cat_folder_path, b_cat_folder_path, a_au
         maparray[blistunique_flat] = np.arange(0, len(b_astro), dtype=int)
         blist = np.asfortranarray(maparray[blist_.flatten()].reshape(blist_.shape))
 
-        b_sky_inds = np.load('{}/phot_like/b_sky_inds.npy'.format(joint_folder_path),
-                             mmap_mode='r')[blistunique_flat]
+        if use_memmap_files:
+            b_sky_inds = np.load('{}/phot_like/b_sky_inds.npy'.format(joint_folder_path),
+                        mmap_mode='r')[blistunique_flat]
 
-        amodrefind = np.load('{}/modelrefinds.npy'.format(a_auf_folder_path),
-                             mmap_mode='r')[:, alistunique_flat]
+            amodrefind = np.load('{}/modelrefinds.npy'.format(a_auf_folder_path),
+                                mmap_mode='r')[:, alistunique_flat]
+            bmodrefind = np.load('{}/modelrefinds.npy'.format(b_auf_folder_path),
+                                mmap_mode='r')[:, blistunique_flat]
+        else:
+            b_sky_inds = phot_like_data.b_sky_inds
+            amodrefind = a_modelrefinds
+            bmodrefind = b_modelrefinds
+
         [afourier_grids, afrac_grids, aflux_grids], amodrefind = load_small_ref_auf_grid(
             amodrefind, a_auf_folder_path, ['fourier', 'frac', 'flux'])
-
-        bmodrefind = np.load('{}/modelrefinds.npy'.format(b_auf_folder_path),
-                             mmap_mode='r')[:, blistunique_flat]
         [bfourier_grids, bfrac_grids, bflux_grids], bmodrefind = load_small_ref_auf_grid(
             bmodrefind, b_auf_folder_path, ['fourier', 'frac', 'flux'])
+
 
         # Similar to crpts_max_len, mini_crpts_len is the maximum number of
         # counterparts at 100% match rate for this cutout.
@@ -255,12 +338,18 @@ def source_pairing(joint_folder_path, a_cat_folder_path, b_cat_folder_path, a_au
         bfieldeta[ind_start:ind_end] = _bfieldetas
         bfieldxi[ind_start:ind_end] = _bfieldxis
 
-    countfilter = np.lib.format.open_memmap('{}/pairing/countfilt.npy'.format(joint_folder_path),
-                                            mode='w+', dtype=bool, shape=(cprt_max_len,))
-    afieldfilter = np.lib.format.open_memmap('{}/pairing/afieldfilt.npy'.format(joint_folder_path),
-                                             mode='w+', dtype=bool, shape=(len_a,))
-    bfieldfilter = np.lib.format.open_memmap('{}/pairing/bfieldfilt.npy'.format(joint_folder_path),
-                                             mode='w+', dtype=bool, shape=(len_b,))
+    if use_memmap_files:
+        countfilter = np.lib.format.open_memmap('{}/pairing/countfilt.npy'.format(joint_folder_path),
+                                                mode='w+', dtype=bool, shape=(cprt_max_len,))
+        afieldfilter = np.lib.format.open_memmap('{}/pairing/afieldfilt.npy'.format(joint_folder_path),
+                                                mode='w+', dtype=bool, shape=(len_a,))
+        bfieldfilter = np.lib.format.open_memmap('{}/pairing/bfieldfilt.npy'.format(joint_folder_path),
+                                                mode='w+', dtype=bool, shape=(len_b,))
+    else:
+        countfilter = np.zeros(dtype=bool, shape=(cprt_max_len,))
+        afieldfilter = np.zeros(dtype=bool, shape=(len_a,))
+        bfieldfilter = np.zeros(dtype=bool, shape=(len_b,))
+
     for cnum in range(0, mem_chunk_num):
         lowind = np.floor(cprt_max_len*cnum/mem_chunk_num).astype(int)
         highind = np.floor(cprt_max_len*(cnum+1)/mem_chunk_num).astype(int)
@@ -318,8 +407,12 @@ def source_pairing(joint_folder_path, a_cat_folder_path, b_cat_folder_path, a_au
          afieldfilter, bfieldfilter, countfilter, countfilter, countfilter, afieldfilter,
          bfieldfilter, afieldfilter, bfieldfilter, countfilter, afieldfilter, afieldfilter,
          afieldfilter, bfieldfilter, bfieldfilter, bfieldfilter]):
-        temp_variable = np.lib.format.open_memmap('{}/pairing/{}2.npy'.format(
-            joint_folder_path, file_name), mode='w+', dtype=typing, shape=small_shape)
+
+        if use_memmap_files:
+            temp_variable = np.lib.format.open_memmap('{}/pairing/{}2.npy'.format(
+                joint_folder_path, file_name), mode='w+', dtype=typing, shape=small_shape)
+        else:
+            temp_variable = np.zeros(dtype=typing, shape=small_shape)
         if file_name == 'pacontam' or file_name == 'pbcontam':
             large_shape = variable.shape[1]
         else:
@@ -336,8 +429,12 @@ def source_pairing(joint_folder_path, a_cat_folder_path, b_cat_folder_path, a_au
                 n_extra = int(np.sum(filter_variable[i:i+di]))
                 temp_variable[temp_c:temp_c+n_extra] = variable[i:i+di][filter_variable[i:i+di]]
                 temp_c += n_extra
-        os.system('mv {}/pairing/{}2.npy {}/pairing/{}.npy'.format(joint_folder_path, file_name,
-                  joint_folder_path, file_name))
+        if use_memmap_files:
+            os.system('mv {}/pairing/{}2.npy {}/pairing/{}.npy'.format(joint_folder_path, file_name,
+                    joint_folder_path, file_name))
+        else:
+            np.save('{}/pairing/{}.npy'.format(joint_folder_path, file_name), temp_variable)
+
     del acountinds, bcountinds, acontamprob, bcontamprob, acontamflux, bcontamflux, afieldinds
     del bfieldinds, probcarray, etaarray, xiarray, probfaarray, probfbarray
     del afieldflux, bfieldflux
@@ -361,8 +458,9 @@ def source_pairing(joint_folder_path, a_cat_folder_path, b_cat_folder_path, a_au
     sys.stdout.flush()
 
     del countfilter, afieldfilter, bfieldfilter
-    os.remove('{}/pairing/countfilt.npy'.format(joint_folder_path))
-    os.remove('{}/pairing/afieldfilt.npy'.format(joint_folder_path))
-    os.remove('{}/pairing/bfieldfilt.npy'.format(joint_folder_path))
+    if use_memmap_files:
+        os.remove('{}/pairing/countfilt.npy'.format(joint_folder_path))
+        os.remove('{}/pairing/afieldfilt.npy'.format(joint_folder_path))
+        os.remove('{}/pairing/bfieldfilt.npy'.format(joint_folder_path))
 
     return

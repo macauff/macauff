@@ -8,7 +8,7 @@ import os
 import sys
 import numpy as np
 
-from .misc_functions import map_large_index_to_small_index, _load_single_sky_slice
+from .misc_functions import map_large_index_to_small_index, _load_single_sky_slice, StageData
 from .misc_functions_fortran import misc_functions_fortran as mff
 from .photometric_likelihood_fortran import photometric_likelihood_fortran as plf
 
@@ -17,8 +17,8 @@ __all__ = ['compute_photometric_likelihoods']
 
 def compute_photometric_likelihoods(joint_folder_path, a_cat_folder_path, b_cat_folder_path,
                                     afilts, bfilts, mem_chunk_num, cf_points, cf_areas,
-                                    include_phot_like, use_phot_priors, bright_frac=None,
-                                    field_frac=None):
+                                    include_phot_like, use_phot_priors, group_sources_data,
+                                    use_memmap_files, bright_frac=None, field_frac=None):
     '''
     Derives the photometric likelihoods and priors for use in the catalogue
     cross-match process.
@@ -53,6 +53,14 @@ def compute_photometric_likelihoods(joint_folder_path, a_cat_folder_path, b_cat_
         Indicator as to whether to use astrophysical priors, based on the common
         number of likely matches and non-matches in each ``cf_points`` area, or
         use naive, asymmetric priors solely based on number density of sources.
+    group_sources_data : class.StageData
+        Object containing all outputs from ``make_island_groupings``
+        Used only when use_memmap_files is False.
+        TODO Improve description
+    use_memmap_files : boolean
+        When set to True, memory mapped files are used for several internal
+        arrays. Reduces memory consumption at the cost of increased I/O
+        contention.
     bright_frac : float, optional
         Expected fraction of sources inside the "bright" error circles used to
         construct the counterpart distribution, to correct for missing numbers.
@@ -81,42 +89,51 @@ def compute_photometric_likelihoods(joint_folder_path, a_cat_folder_path, b_cat_
     sys.stdout.flush()
 
     a_sky_inds = distribute_sky_indices(joint_folder_path, a_cat_folder_path, 'a', mem_chunk_num,
-                                        cf_points)
+                                        cf_points, use_memmap_files)
     b_sky_inds = distribute_sky_indices(joint_folder_path, b_cat_folder_path, 'b', mem_chunk_num,
-                                        cf_points)
+                                        cf_points, use_memmap_files)
 
     print("Making bins...")
     sys.stdout.flush()
 
     abinlengths, abinsarray, longabinlen = create_magnitude_bins(
         cf_points, afilts, mem_chunk_num, joint_folder_path, a_cat_folder_path, 'a', a_sky_inds,
-        include_phot_like or use_phot_priors)
+        include_phot_like or use_phot_priors, use_memmap_files)
     bbinlengths, bbinsarray, longbbinlen = create_magnitude_bins(
         cf_points, bfilts, mem_chunk_num, joint_folder_path, b_cat_folder_path, 'b', b_sky_inds,
-        include_phot_like or use_phot_priors)
+        include_phot_like or use_phot_priors, use_memmap_files)
 
     print("Calculating PDFs...")
     sys.stdout.flush()
 
-    c_priors = np.lib.format.open_memmap(
-        '{}/phot_like/c_priors.npy'.format(joint_folder_path), mode='w+', dtype=float,
-        shape=(len(bfilts), len(afilts), len(cf_points)), fortran_order=True)
-    fa_priors = np.lib.format.open_memmap(
-        '{}/phot_like/fa_priors.npy'.format(joint_folder_path), mode='w+', dtype=float,
-        shape=(len(bfilts), len(afilts), len(cf_points)), fortran_order=True)
-    fb_priors = np.lib.format.open_memmap(
-        '{}/phot_like/fb_priors.npy'.format(joint_folder_path), mode='w+', dtype=float,
-        shape=(len(bfilts), len(afilts), len(cf_points)), fortran_order=True)
-    c_array = np.lib.format.open_memmap(
-        '{}/phot_like/c_array.npy'.format(joint_folder_path), mode='w+', dtype=float,
-        shape=(longbbinlen-1, longabinlen-1, len(bfilts), len(afilts),
-               len(cf_points)), fortran_order=True)
-    fa_array = np.lib.format.open_memmap(
-        '{}/phot_like/fa_array.npy'.format(joint_folder_path), mode='w+', dtype=float,
-        shape=(longabinlen-1, len(bfilts), len(afilts), len(cf_points)), fortran_order=True)
-    fb_array = np.lib.format.open_memmap(
-        '{}/phot_like/fb_array.npy'.format(joint_folder_path), mode='w+', dtype=float,
-        shape=(longbbinlen-1, len(bfilts), len(afilts), len(cf_points)), fortran_order=True)
+    if use_memmap_files:
+        c_priors = np.lib.format.open_memmap(
+            '{}/phot_like/c_priors.npy'.format(joint_folder_path), mode='w+', dtype=float,
+            shape=(len(bfilts), len(afilts), len(cf_points)), fortran_order=True)
+        fa_priors = np.lib.format.open_memmap(
+            '{}/phot_like/fa_priors.npy'.format(joint_folder_path), mode='w+', dtype=float,
+            shape=(len(bfilts), len(afilts), len(cf_points)), fortran_order=True)
+        fb_priors = np.lib.format.open_memmap(
+            '{}/phot_like/fb_priors.npy'.format(joint_folder_path), mode='w+', dtype=float,
+            shape=(len(bfilts), len(afilts), len(cf_points)), fortran_order=True)
+        c_array = np.lib.format.open_memmap(
+            '{}/phot_like/c_array.npy'.format(joint_folder_path), mode='w+', dtype=float,
+            shape=(longbbinlen-1, longabinlen-1, len(bfilts), len(afilts),
+                len(cf_points)), fortran_order=True)
+        fa_array = np.lib.format.open_memmap(
+            '{}/phot_like/fa_array.npy'.format(joint_folder_path), mode='w+', dtype=float,
+            shape=(longabinlen-1, len(bfilts), len(afilts), len(cf_points)), fortran_order=True)
+        fb_array = np.lib.format.open_memmap(
+            '{}/phot_like/fb_array.npy'.format(joint_folder_path), mode='w+', dtype=float,
+            shape=(longbbinlen-1, len(bfilts), len(afilts), len(cf_points)), fortran_order=True)
+    else:
+        c_priors = np.zeros(dtype=float, shape=(len(bfilts), len(afilts), len(cf_points)), order='F')
+        fa_priors = np.zeros(dtype=float, shape=(len(bfilts), len(afilts), len(cf_points)), order='F')
+        fb_priors = np.zeros(dtype=float, shape=(len(bfilts), len(afilts), len(cf_points)), order='F')
+        c_array = np.zeros(dtype=float, shape=(longbbinlen-1, longabinlen-1, len(bfilts), len(afilts),
+                len(cf_points)), order='F')
+        fa_array = np.zeros(dtype=float, shape=(longabinlen-1, len(bfilts), len(afilts), len(cf_points)), order='F')
+        fb_array = np.zeros(dtype=float, shape=(longbbinlen-1, len(bfilts), len(afilts), len(cf_points)), order='F')
 
     # Within each loop, since we've already assigned all sources to have a closest
     # c/f sky position pointing to be assigned to, we simply slice within the _load
@@ -125,7 +142,8 @@ def compute_photometric_likelihoods(joint_folder_path, a_cat_folder_path, b_cat_
     for m_ in range(0, len(cf_points), mem_chunk_num):
         a_multi_return = _load_multiple_sky_slice(joint_folder_path, 'a', m_, m_+mem_chunk_num,
                                                   a_cat_folder_path, a_sky_inds,
-                                                  include_phot_like or use_phot_priors)
+                                                  include_phot_like or use_phot_priors,
+                                                  use_memmap_files)
         if include_phot_like or use_phot_priors:
             (a_small_photo, a_sky_ind_small, a_small_astro, a_blen_small, a_inds_small,
              a_size_small) = a_multi_return
@@ -135,7 +153,8 @@ def compute_photometric_likelihoods(joint_folder_path, a_cat_folder_path, b_cat_
 
         b_multi_return = _load_multiple_sky_slice(joint_folder_path, 'b', m_, m_+mem_chunk_num,
                                                   b_cat_folder_path, b_sky_inds,
-                                                  include_phot_like or use_phot_priors)
+                                                  include_phot_like or use_phot_priors,
+                                                  use_memmap_files)
         if include_phot_like or use_phot_priors:
             (b_small_photo, b_sky_ind_small, b_small_astro, b_blen_small, b_inds_small,
              b_size_small) = b_multi_return
@@ -147,7 +166,7 @@ def compute_photometric_likelihoods(joint_folder_path, a_cat_folder_path, b_cat_
         for m in range(m_, min(len(cf_points), m_+mem_chunk_num)):
             area = cf_areas[m]
             a_sky_cut = _load_single_sky_slice(
-                joint_folder_path, 'a', m, a_sky_ind_small)
+                joint_folder_path, 'a', m, a_sky_ind_small, use_memmap_files)
             a_photo_cut = a_small_photo[a_sky_cut]
             if include_phot_like or use_phot_priors:
                 a_astro_cut, a_blen_cut, a_inds_cut, a_size_cut = (
@@ -155,7 +174,7 @@ def compute_photometric_likelihoods(joint_folder_path, a_cat_folder_path, b_cat_
                     a_size_small[a_sky_cut])
 
             b_sky_cut = _load_single_sky_slice(
-                joint_folder_path, 'b', m, b_sky_ind_small)
+                joint_folder_path, 'b', m, b_sky_ind_small, use_memmap_files)
             b_photo_cut = b_small_photo[b_sky_cut]
             if include_phot_like or use_phot_priors:
                 b_astro_cut, b_inds_cut, b_size_cut = (
@@ -183,10 +202,15 @@ def compute_photometric_likelihoods(joint_folder_path, a_cat_folder_path, b_cat_
                                       mmap_mode='r')[b_inds_cut_unique]
                 b_photo_ind = np.load('{}/con_cat_photo.npy'.format(b_cat_folder_path),
                                       mmap_mode='r')[a_inds_cut_unique]
-                a_flen_ind = np.load('{}/group/aflen.npy'.format(joint_folder_path),
-                                     mmap_mode='r')[b_inds_cut_unique]
-                b_flen_ind = np.load('{}/group/bflen.npy'.format(joint_folder_path),
-                                     mmap_mode='r')[a_inds_cut_unique]
+
+                if use_memmap_files:
+                    a_flen_ind = np.load('{}/group/aflen.npy'.format(joint_folder_path),
+                                        mmap_mode='r')[b_inds_cut_unique]
+                    b_flen_ind = np.load('{}/group/bflen.npy'.format(joint_folder_path),
+                                        mmap_mode='r')[a_inds_cut_unique]
+                else:
+                    a_flen_ind = group_sources_data.aflen
+                    b_flen_ind = group_sources_data.bflen
 
             for i in range(0, len(afilts)):
                 if not include_phot_like and not use_phot_priors:
@@ -247,15 +271,27 @@ def compute_photometric_likelihoods(joint_folder_path, a_cat_folder_path, b_cat_
     os.system('rm {}/a_small_sky_slice.npy'.format(joint_folder_path))
     os.system('rm {}/b_small_sky_slice.npy'.format(joint_folder_path))
 
-    # *binsarray is passed back from create_magnitude_bins as a memmapped array,
-    # but *binlengths is just a numpy array, so quickly save these before returning.
-    np.save('{}/phot_like/abinlengths.npy'.format(joint_folder_path), abinlengths)
-    np.save('{}/phot_like/bbinlengths.npy'.format(joint_folder_path), bbinlengths)
+    if use_memmap_files:
+        # *binsarray is passed back from create_magnitude_bins as a memmapped array,
+        # but *binlengths is just a numpy array, so quickly save these before returning.
+        np.save('{}/phot_like/abinlengths.npy'.format(joint_folder_path), abinlengths)
+        np.save('{}/phot_like/bbinlengths.npy'.format(joint_folder_path), bbinlengths)
 
-    return
+        # Ensure unused arrays are garbage collected if memory mapped files enabled
+        abinsarray = abinlengths = bbinsarray = bbinlengths = None
+        a_sky_inds = b_sky_inds = None
+        c_priors = c_array = fa_priors = fa_array = fb_priors = fb_array = None
+
+    phot_like_data = StageData(abinsarray=abinsarray, abinlengths=abinlengths,
+                               bbinsarray=bbinsarray, bbinlengths=bbinlengths,
+                               a_sky_inds=a_sky_inds, b_sky_inds=b_sky_inds,
+                               c_priors=c_priors, c_array=c_array,
+                               fa_priors=fa_priors, fa_array=fa_array,
+                               fb_priors=fb_priors, fb_array=fb_array)
+    return phot_like_data
 
 
-def distribute_sky_indices(joint_folder_path, cat_folder, name, mem_chunk_num, cf_points):
+def distribute_sky_indices(joint_folder_path, cat_folder, name, mem_chunk_num, cf_points, use_memmap_files):
     '''
     Function to calculate the nearest on-sky photometric likelihood point for
     each catalogue source.
@@ -276,6 +312,10 @@ def distribute_sky_indices(joint_folder_path, cat_folder, name, mem_chunk_num, c
         The two-point sky coordinates for each point to be used as a central
         point of a small sky area, for calculating "counterpart" and "field"
         photometric likelihoods.
+    use_memmap_files : boolean
+        When set to True, memory mapped files are used for several internal
+        arrays. Reduces memory consumption at the cost of increased I/O
+        contention.
 
     Returns
     -------
@@ -284,9 +324,12 @@ def distribute_sky_indices(joint_folder_path, cat_folder, name, mem_chunk_num, c
         source in this catalogue.
     '''
     n_sources = len(np.load('{}/con_cat_astro.npy'.format(cat_folder), mmap_mode='r'))
-    sky_inds = np.lib.format.open_memmap('{}/phot_like/{}_sky_inds.npy'.format(
-                                         joint_folder_path, name), mode='w+', dtype=int,
-                                         shape=(n_sources,), fortran_order=True)
+    if use_memmap_files:
+        sky_inds = np.lib.format.open_memmap('{}/phot_like/{}_sky_inds.npy'.format(
+                                            joint_folder_path, name), mode='w+', dtype=int,
+                                            shape=(n_sources,), fortran_order=True)
+    else:
+        sky_inds = np.zeros(dtype=int, shape=(n_sources,), order='F')
     for cnum in range(0, mem_chunk_num):
         lowind = np.floor(n_sources*cnum/mem_chunk_num).astype(int)
         highind = np.floor(n_sources*(cnum+1)/mem_chunk_num).astype(int)
@@ -298,7 +341,8 @@ def distribute_sky_indices(joint_folder_path, cat_folder, name, mem_chunk_num, c
 
 
 def create_magnitude_bins(cf_points, filts, mem_chunk_num, joint_folder_path,
-                          cat_folder_path, cat_type, sky_inds, load_extra_arrays):
+                          cat_folder_path, cat_type, sky_inds, load_extra_arrays,
+                          use_memmap_files):
     '''
     Creates the N-dimensional arrays of single-band photometric bins, and
     corresponding array lengths.
@@ -323,11 +367,15 @@ def create_magnitude_bins(cf_points, filts, mem_chunk_num, joint_folder_path,
         String to indicate which catalogue we are creating bins for, either
         "a", or "b".
     sky_inds : numpy.ndarray
-        Array of indices, showing which on-sky photometric point, from
+         Array of indices, showing which on-sky photometric point, from
         ``cf_points``, each source in the catalogue is closest to.
     load_extra_arrays : boolean
         Flag to indicate whether the photometric information is being used in
         the cross-match process, and whether to load additional arrays accordingly.
+    use_memmap_files : boolean
+        When set to True, memory mapped files are used for several internal
+        arrays. Reduces memory consumption at the cost of increased I/O
+        contention.
 
     Returns
     -------
@@ -345,7 +393,7 @@ def create_magnitude_bins(cf_points, filts, mem_chunk_num, joint_folder_path,
     for m_ in range(0, len(cf_points), mem_chunk_num):
         a_multi_return = _load_multiple_sky_slice(
             joint_folder_path, cat_type, m_, m_+mem_chunk_num, cat_folder_path, sky_inds,
-            load_extra_arrays)
+            load_extra_arrays, use_memmap_files)
         if load_extra_arrays:
             (a_phot_, sky_inds_, _, _, _, _) = a_multi_return
         else:
@@ -353,7 +401,7 @@ def create_magnitude_bins(cf_points, filts, mem_chunk_num, joint_folder_path,
         del a_multi_return
         for m in range(m_, min(len(cf_points), m_+mem_chunk_num)):
             sky_cut = _load_single_sky_slice(
-                joint_folder_path, cat_type, m, sky_inds_)
+                joint_folder_path, cat_type, m, sky_inds_, use_memmap_files)
             for i in range(0, len(filts)):
                 a = a_phot_[sky_cut, i]
                 if np.sum(~np.isnan(a)) > 0:
@@ -364,21 +412,24 @@ def create_magnitude_bins(cf_points, filts, mem_chunk_num, joint_folder_path,
                 binlengths[i, m] = len(f)
 
     longbinlen = np.amax(binlengths)
-    binsarray = np.lib.format.open_memmap(
-        '{}/phot_like/{}binsarray.npy'.format(joint_folder_path, cat_type), mode='w+', dtype=float,
-        shape=(longbinlen, len(filts), len(cf_points)), fortran_order=True)
-    binsarray[:, :, :] = -1
+    if use_memmap_files:
+        binsarray = np.lib.format.open_memmap(
+            '{}/phot_like/{}binsarray.npy'.format(joint_folder_path, cat_type), mode='w+', dtype=float,
+            shape=(longbinlen, len(filts), len(cf_points)), fortran_order=True)
+        binsarray[:, :, :] = -1
+    else:
+        binsarray = np.full(dtype=float, shape=(longbinlen, len(filts), len(cf_points)), fill_value=-1, order='F')
     for m_ in range(0, len(cf_points), mem_chunk_num):
         a_multi_return = _load_multiple_sky_slice(
             joint_folder_path, cat_type, m_, m_+mem_chunk_num, cat_folder_path, sky_inds,
-            load_extra_arrays)
+            load_extra_arrays, use_memmap_files)
         if load_extra_arrays:
             (a_phot_, sky_inds_, _, _, _, _) = a_multi_return
         else:
             a_phot_, sky_inds_ = a_multi_return
         for m in range(m_, min(len(cf_points), m_+mem_chunk_num)):
             sky_cut = _load_single_sky_slice(
-                joint_folder_path, cat_type, m, sky_inds_)
+                joint_folder_path, cat_type, m, sky_inds_, use_memmap_files)
             for i in range(0, len(filts)):
                 a = a_phot_[sky_cut, i]
                 if np.sum(~np.isnan(a)) > 0:
@@ -449,7 +500,7 @@ def make_bins(input_mags):
 
 
 def _load_multiple_sky_slice(joint_folder_path, cat_name, ind1, ind2, cat_folder_path, sky_inds,
-                             load_extra_arrays):
+                             load_extra_arrays, use_memmap_files):
     '''
     Function to, in a memmap-friendly way, return a sub-set of the photometry
     of a given catalogue.
@@ -476,6 +527,10 @@ def _load_multiple_sky_slice(joint_folder_path, cat_name, ind1, ind2, cat_folder
     load_extra_arrays : boolean
         Flag to indicate whether the photometric information is being used in
         the cross-match process, and whether to load additional arrays accordingly.
+    use_memmap_files : boolean
+        When set to True, memory mapped files are used for several internal
+        arrays. Reduces memory consumption at the cost of increased I/O
+        contention.
 
     Returns
     -------
@@ -492,8 +547,11 @@ def _load_multiple_sky_slice(joint_folder_path, cat_name, ind1, ind2, cat_folder
         subsets of the astrometry array, and "bright" source error circle length,
         and overlap index and size arrays.
     '''
-    sky_cut = np.lib.format.open_memmap('{}/{}_temporary_sky_slice_combined.npy'.format(
-        joint_folder_path, cat_name), mode='w+', dtype=bool, shape=(len(sky_inds),))
+    if use_memmap_files:
+        sky_cut = np.lib.format.open_memmap('{}/{}_temporary_sky_slice_combined.npy'.format(
+            joint_folder_path, cat_name), mode='w+', dtype=bool, shape=(len(sky_inds),))
+    else:
+        sky_cut = np.zeros(dtype=bool, shape=(len(sky_inds),))
 
     di = max(1, len(sky_inds) // 20)
 
@@ -511,8 +569,11 @@ def _load_multiple_sky_slice(joint_folder_path, cat_name, ind1, ind2, cat_folder
                                 mmap_mode='r')[sky_cut]
 
     photo_cutout = np.load('{}/con_cat_photo.npy'.format(cat_folder_path), mmap_mode='r')[sky_cut]
-    sky_ind_cutout = np.load('{}/phot_like/{}_sky_inds.npy'.format(joint_folder_path, cat_name),
-                             mmap_mode='r')[sky_cut]
+    if use_memmap_files:
+        sky_ind_cutout = np.load('{}/phot_like/{}_sky_inds.npy'.format(joint_folder_path, cat_name),
+                                mmap_mode='r')[sky_cut]
+    else:
+        sky_ind_cutout = sky_inds[sky_cut]
 
     if load_extra_arrays:
         list_of_arrays = (photo_cutout, sky_ind_cutout, astro_cutout, a_blen_cutout, a_inds_cutout,
@@ -520,7 +581,10 @@ def _load_multiple_sky_slice(joint_folder_path, cat_name, ind1, ind2, cat_folder
     else:
         list_of_arrays = (photo_cutout, sky_ind_cutout)
 
-    os.system('rm {}/{}_temporary_sky_slice_combined.npy'.format(joint_folder_path, cat_name))
+    if use_memmap_files:
+        os.system('rm {}/{}_temporary_sky_slice_combined.npy'.format(joint_folder_path, cat_name))
+    else:
+        del sky_cut
 
     return list_of_arrays
 
