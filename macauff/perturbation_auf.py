@@ -360,7 +360,7 @@ def make_perturb_aufs(auf_folder, cat_folder, filters, auf_points, r, dr, rho,
                     localN = calculate_local_density(
                         a_astro_cut[good_mag_slice], a_tot_astro, a_tot_photo[:, j],
                         auf_folder, cat_folder, density_radius, density_mags[j],
-                        memmap_slice_arrays)
+                        memmap_slice_arrays, use_memmap_files)
                     # Because we always calculate the density from the full
                     # catalogue, using just the astrometry, we should be able
                     # to just over-write this N times if there happen to be N
