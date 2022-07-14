@@ -327,7 +327,8 @@ def make_island_groupings(joint_folder_path, a_cat_folder_path, b_cat_folder_pat
          amodrefindsmall, bmodrefindsmall, afouriergrid, bfouriergrid)
 
     # Delete sky slices used to make fourier cutouts.
-    os.system('rm {}/*temporary_sky_slice*.npy'.format(joint_folder_path))
+    if use_memmap_files:
+        os.system('rm {}/*temporary_sky_slice*.npy'.format(joint_folder_path))
 
     print("Cleaning overlaps...")
     sys.stdout.flush()
@@ -609,16 +610,34 @@ def make_island_groupings(joint_folder_path, a_cat_folder_path, b_cat_folder_pat
         os.remove('{}/group/failed_check.npy'.format(joint_folder_path))
 
         # Ensure unused arrays are garbage collected if memory mapped files enabled
+        # Without this, references would persist in StageData object
+        ablen = bblen = None
+        ainds = binds = None
+        asize = bsize = None
         aflen = bflen = None
         new_alist = new_blist = new_agrplen = new_bgrplen = None
 
     # Only return aflen and bflen if they were created
     if not (include_phot_like or use_phot_priors):
+        ablen = bblen = None
         aflen = bflen = None
+    # Only return reject counts if they were created
+    if num_a_failed_checks + a_first_rejected_len > 0:
+        lenrejecta = len(reject_a)
+    else:
+        lenrejecta = 0
+    if num_b_failed_checks + b_first_rejected_len > 0:
+        lenrejectb = len(reject_b)
+    else:
+        lenrejectb = 0
 
-    group_sources_data = StageData(aflen=aflen, bflen=bflen,
+    group_sources_data = StageData(ablen=ablen, bblen=bblen,
+                                   ainds=ainds, binds=binds,
+                                   asize=asize, bsize=bsize,
+                                   aflen=aflen, bflen=bflen,
                                    alist=new_alist, blist=new_blist,
-                                   agrplen=new_agrplen, bgrplen=new_bgrplen)
+                                   agrplen=new_agrplen, bgrplen=new_bgrplen,
+                                   lenrejecta=lenrejecta, lenrejectb=lenrejectb)
     return group_sources_data
 
 

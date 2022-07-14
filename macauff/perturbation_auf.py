@@ -510,12 +510,14 @@ def make_perturb_aufs(auf_folder, cat_folder, filters, auf_points, r, dr, rho,
 
     if include_perturb_auf:
         del Narrays, magarrays
-        os.remove('{}/narrays.npy'.format(auf_folder))
-        os.remove('{}/magarrays.npy'.format(auf_folder))
 
-        # Delete sky slices used to make fourier cutouts.
-        os.system('rm {}/*temporary_sky_slice*.npy'.format(auf_folder))
-        os.system('rm {}/_small_sky_slice.npy'.format(auf_folder))
+        if use_memmap_files:
+          os.remove('{}/narrays.npy'.format(auf_folder))
+          os.remove('{}/magarrays.npy'.format(auf_folder))
+
+          # Delete sky slices used to make fourier cutouts.
+          os.system('rm {}/*temporary_sky_slice*.npy'.format(auf_folder))
+          os.system('rm {}/_small_sky_slice.npy'.format(auf_folder))
 
     return modelrefinds
 
@@ -640,7 +642,7 @@ def calculate_local_density(a_astro, a_tot_astro, a_tot_photo, auf_folder, cat_f
                 dtype=bool, shape=(len(a_astro),)))
     else:
         for _ in range(5):
-            memmap_slice_arrays_2.append(np.zeros(dtype=bool, shape=(len(a_tot_astro),)))
+            memmap_slice_arrays_2.append(np.zeros(dtype=bool, shape=(len(a_astro),)))
 
     overlap_sky_cut = _load_rectangular_slice(auf_folder, '', a_tot_astro, min_lon,
                                               max_lon, min_lat, max_lat, density_radius,

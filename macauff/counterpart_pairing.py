@@ -373,16 +373,21 @@ def source_pairing(joint_folder_path, a_cat_folder_path, b_cat_folder_path, a_au
         highind = np.floor(len_b*(cnum+1)/mem_chunk_num).astype(int)
         bfieldfilter[lowind:highind] = ((bfieldinds[lowind:highind] < large_len+1) &
                                         (probfbarray[lowind:highind] >= 0))
-    if os.path.isfile('{}/reject/reject_a.npy'.format(joint_folder_path)):
-        lenrejecta = len(np.load('{}/reject/reject_a.npy'.format(joint_folder_path),
-                                 mmap_mode='r'))
+
+    if use_memmap_files:
+        if os.path.isfile('{}/reject/reject_a.npy'.format(joint_folder_path)):
+            lenrejecta = len(np.load('{}/reject/reject_a.npy'.format(joint_folder_path),
+                                    mmap_mode='r'))
+        else:
+            lenrejecta = 0
+        if os.path.isfile('{}/reject/reject_b.npy'.format(joint_folder_path)):
+            lenrejectb = len(np.load('{}/reject/reject_b.npy'.format(joint_folder_path),
+                                    mmap_mode='r'))
+        else:
+            lenrejectb = 0
     else:
-        lenrejecta = 0
-    if os.path.isfile('{}/reject/reject_b.npy'.format(joint_folder_path)):
-        lenrejectb = len(np.load('{}/reject/reject_b.npy'.format(joint_folder_path),
-                                 mmap_mode='r'))
-    else:
-        lenrejectb = 0
+        lenrejecta = group_sources_data.lenrejecta
+        lenrejectb = group_sources_data.lenrejectb
 
     countsum = int(np.sum(countfilter))
     afieldsum = int(np.sum(afieldfilter))
