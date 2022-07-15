@@ -215,8 +215,8 @@ def compute_photometric_likelihoods(joint_folder_path, a_cat_folder_path, b_cat_
                     b_flen_ind = np.load('{}/group/bflen.npy'.format(joint_folder_path),
                                         mmap_mode='r')[a_inds_cut_unique]
                 else:
-                    a_flen_ind = group_sources_data.aflen
-                    b_flen_ind = group_sources_data.bflen
+                    a_flen_ind = group_sources_data.aflen[b_inds_cut_unique]
+                    b_flen_ind = group_sources_data.bflen[a_inds_cut_unique]
 
             for i in range(0, len(afilts)):
                 if not include_phot_like and not use_phot_priors:

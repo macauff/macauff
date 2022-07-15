@@ -260,7 +260,7 @@ def source_pairing(joint_folder_path, a_cat_folder_path, b_cat_folder_path, a_au
             bgrplen = np.load('{}/group/bgrplen.npy'.format(joint_folder_path),
                             mmap_mode='r')[lowind:highind]
         else:
-            a_sky_inds = phot_like_data.a_sky_inds
+            a_sky_inds = phot_like_data.a_sky_inds[alistunique_flat]
 
             blist_ = group_sources_data.blist[:, lowind:highind]
             bgrplen = group_sources_data.bgrplen[lowind:highind]
@@ -286,9 +286,9 @@ def source_pairing(joint_folder_path, a_cat_folder_path, b_cat_folder_path, a_au
             bmodrefind = np.load('{}/modelrefinds.npy'.format(b_auf_folder_path),
                                 mmap_mode='r')[:, blistunique_flat]
         else:
-            b_sky_inds = phot_like_data.b_sky_inds
-            amodrefind = a_modelrefinds
-            bmodrefind = b_modelrefinds
+            b_sky_inds = phot_like_data.b_sky_inds[blistunique_flat]
+            amodrefind = a_modelrefinds[:, alistunique_flat]
+            bmodrefind = b_modelrefinds[:, blistunique_flat]
 
         [afourier_grids, afrac_grids, aflux_grids], amodrefind = load_small_ref_auf_grid(
             amodrefind, a_auf_folder_path, ['fourier', 'frac', 'flux'])
