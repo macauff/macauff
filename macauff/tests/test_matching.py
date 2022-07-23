@@ -502,6 +502,9 @@ class TestInputs:
                                      'data/cat_b_params{}.txt'.format('_' if '_b_' in in_file else '')))
 
     def test_crossmatch_perturb_auf_inputs(self):
+        mag_h_params = np.ones((3, 5), float)
+        np.save('mag_h_params.npy', mag_h_params)
+
         f = open(os.path.join(os.path.dirname(__file__), 'data/crossmatch_params.txt')).readlines()
         old_line = 'include_perturb_auf = no'
         new_line = 'include_perturb_auf = yes\n'
@@ -516,20 +519,17 @@ class TestInputs:
                              os.path.join(os.path.dirname(__file__), 'data/cat_b_params.txt'))
         assert cm.num_trials == 10000
         assert not cm.compute_local_density
-        assert cm.dm_max == 10
         assert cm.d_mag == 0.1
 
         for old_line, new_line, match_text in zip(
-                ['num_trials = 10000', 'num_trials = 10000', 'num_trials = 10000', 'dm_max = 10',
-                 'dm_max = 10', 'd_mag = 0.1', 'd_mag = 0.1', 'compute_local_density = no',
+                ['num_trials = 10000', 'num_trials = 10000', 'num_trials = 10000',
+                 'd_mag = 0.1', 'd_mag = 0.1', 'compute_local_density = no',
                  'compute_local_density = no', 'compute_local_density = no'],
-                ['', 'num_trials = word\n', 'num_trials = 10000.1\n', '', 'dm_max = word\n', '',
-                 'd_mag = word\n', '', 'compute_local_density = word\n',
-                 'compute_local_density = 10\n'],
+                ['', 'num_trials = word\n', 'num_trials = 10000.1\n', '', 'd_mag = word\n', '',
+                 'compute_local_density = word\n', 'compute_local_density = 10\n'],
                 ['Missing key num_trials from joint', 'num_trials should be an integer',
-                 'num_trials should be an integer', 'Missing key dm_max from joint',
-                 'dm_max must be a float', 'Missing key d_mag from joint', 'd_mag must be a float',
-                 'Missing key compute_local_density from joint',
+                 'num_trials should be an integer', 'Missing key d_mag from joint',
+                 'd_mag must be a float', 'Missing key compute_local_density from joint',
                  'Boolean flag key not set to allowed', 'Boolean flag key not set to allowed']):
             # Make sure to keep the first edit of crossmatch_params, adding each
             # second change in turn.
@@ -550,23 +550,151 @@ class TestInputs:
                                      os.path.join(os.path.dirname(__file__),
                                      'data/cat_b_params.txt'))
 
+        for old_line, var_name in zip(['fit_gal_flag = no', 'run_fw_auf = yes', 'run_psf_auf = no',
+                                       'mag_h_params_path = .'],
+                                      ['fit_gal_flag', 'run_fw_auf', 'run_psf_auf',
+                                       'mag_h_params_path']):
+            for cat_reg, cat_name in zip(['"a"', '"b"'], ['cat_a_params', 'cat_b_params']):
+                f = open(os.path.join(os.path.dirname(__file__),
+                         'data/{}.txt'.format(cat_name))).readlines()
+                new_line = ''
+                idx = np.where([old_line in line for line in f])[0][0]
+                _replace_line(os.path.join(os.path.dirname(__file__),
+                              'data/{}.txt'.format(cat_name)), idx, new_line, out_file=os.path.join(
+                              os.path.dirname(__file__), 'data/{}_.txt'.format(cat_name)))
+                with pytest.raises(ValueError, match='Missing key {} from catalogue {}'
+                                   .format(var_name, cat_reg)):
+                    cm = CrossMatch(os.path.join(os.path.dirname(__file__),
+                                    'data/crossmatch_params_.txt'),
+                                    os.path.join(os.path.dirname(__file__),
+                                    'data/cat_a_params{}.txt'.format(
+                                        '_' if 'a' in cat_reg else '')),
+                                    os.path.join(os.path.dirname(__file__),
+                                    'data/cat_b_params{}.txt'.format(
+                                        '_' if 'b' in cat_reg else '')))
+
+        cm = CrossMatch(os.path.join(os.path.dirname(__file__),
+                        'data/crossmatch_params_.txt'),
+                        os.path.join(os.path.dirname(__file__),
+                        'data/cat_a_params.txt'),
+                        os.path.join(os.path.dirname(__file__),
+                        'data/cat_b_params.txt'))
+        assert not hasattr(cm, 'a_dd_params_path')
+        assert not hasattr(cm, 'b_l_cut_path')
+
         for cat_reg, cat_name in zip(['"a"', '"b"'], ['cat_a_params', 'cat_b_params']):
             f = open(os.path.join(os.path.dirname(__file__),
-                     'data/{}.txt'.format(cat_name))).readlines()
-            old_line = 'fit_gal_flag = no'
-            new_line = ''
+                                  'data/{}.txt'.format(cat_name))).readlines()
+            old_line = 'run_psf_auf = no'
+            new_line = 'run_psf_auf = yes\n'
             idx = np.where([old_line in line for line in f])[0][0]
             _replace_line(os.path.join(os.path.dirname(__file__),
-                          'data/{}.txt'.format(cat_name)), idx, new_line, out_file=os.path.join(
-                          os.path.dirname(__file__), 'data/{}_.txt'.format(cat_name)))
-            with pytest.raises(ValueError,
-                               match='Missing key fit_gal_flag from catalogue {}'.format(cat_reg)):
+                          'data/{}.txt'.format(cat_name)), idx, new_line,
+                          out_file=os.path.join(os.path.dirname(__file__),
+                          'data/{}_.txt'.format(cat_name)))
+            f = open(os.path.join(os.path.dirname(__file__),
+                     'data/{}_.txt'.format(cat_name))).readlines()
+            old_line = 'mag_h_params_path = .'
+            new_line = 'mag_h_params_path = .\ndd_params_path = .\nl_cut_path = .\n'
+            idx = np.where([old_line in line for line in f])[0][0]
+            _replace_line(os.path.join(os.path.dirname(__file__),
+                          'data/{}_.txt'.format(cat_name)), idx, new_line)
+            for old_line, var_name in zip(['dd_params_path = .', 'l_cut_path = .'],
+                                          ['dd_params_path', 'l_cut_path']):
+                f = open(os.path.join(os.path.dirname(__file__),
+                         'data/{}_.txt'.format(cat_name))).readlines()
+                new_line = ''
+                idx = np.where([old_line in line for line in f])[0][0]
+                _replace_line(os.path.join(os.path.dirname(__file__),
+                              'data/{}_.txt'.format(cat_name)), idx,
+                              new_line, out_file=os.path.join(
+                              os.path.dirname(__file__), 'data/{}__.txt'.format(cat_name)))
+                with pytest.raises(ValueError, match='Missing key {} from catalogue {}'
+                                   .format(var_name, cat_reg)):
+                    cm._initialise_chunk(os.path.join(os.path.dirname(__file__),
+                                         'data/crossmatch_params_.txt'),
+                                         os.path.join(os.path.dirname(__file__),
+                                         'data/cat_a_params{}.txt'.format(
+                                             '__' if 'a' in cat_reg else '')),
+                                         os.path.join(os.path.dirname(__file__),
+                                         'data/cat_b_params{}.txt'.format(
+                                             '__' if 'b' in cat_reg else '')))
+
+        ddp = np.ones((5, 15, 2), float)
+        np.save('dd_params.npy', ddp)
+        lc = np.ones(3, float)
+        np.save('l_cut.npy', lc)
+        for cat_name in ['cat_a_params', 'cat_b_params']:
+            f = open(os.path.join(os.path.dirname(__file__),
+                                  'data/{}.txt'.format(cat_name))).readlines()
+            old_line = 'run_psf_auf = no'
+            new_line = 'run_psf_auf = yes\n'
+            idx = np.where([old_line in line for line in f])[0][0]
+            _replace_line(os.path.join(os.path.dirname(__file__),
+                          'data/{}.txt'.format(cat_name)), idx, new_line,
+                          out_file=os.path.join(os.path.dirname(__file__),
+                          'data/{}_.txt'.format(cat_name)))
+            f = open(os.path.join(os.path.dirname(__file__),
+                     'data/{}_.txt'.format(cat_name))).readlines()
+            old_line = 'mag_h_params_path = .'
+            new_line = 'mag_h_params_path = .\ndd_params_path = .\nl_cut_path = .\n'
+            idx = np.where([old_line in line for line in f])[0][0]
+            _replace_line(os.path.join(os.path.dirname(__file__),
+                          'data/{}_.txt'.format(cat_name)), idx, new_line)
+        f = open(os.path.join(os.path.dirname(__file__),
+                 'data/cat_b_params_.txt')).readlines()
+        old_line = 'mag_h_params_path = .'
+        new_line = 'mag_h_params_path = /some/path/or/other\n'
+        idx = np.where([old_line in line for line in f])[0][0]
+        _replace_line(os.path.join(os.path.dirname(__file__),
+                      'data/cat_b_params_.txt'), idx, new_line,
+                      out_file=os.path.join(os.path.dirname(__file__), 'data/cat_b_params__.txt'))
+        with pytest.raises(OSError, match='b_mag_h_params_path does not exist.'):
+            cm._initialise_chunk(os.path.join(os.path.dirname(__file__),
+                                 'data/crossmatch_params_.txt'),
+                                 os.path.join(os.path.dirname(__file__),
+                                 'data/cat_a_params_.txt'),
+                                 os.path.join(os.path.dirname(__file__),
+                                 'data/cat_b_params__.txt'))
+        os.remove('mag_h_params.npy')
+        with pytest.raises(FileNotFoundError,
+                           match='mag_h_params file not found in catalogue "a" path'):
+            cm._initialise_chunk(os.path.join(os.path.dirname(__file__),
+                                 'data/crossmatch_params_.txt'),
+                                 os.path.join(os.path.dirname(__file__),
+                                 'data/cat_a_params_.txt'),
+                                 os.path.join(os.path.dirname(__file__),
+                                 'data/cat_b_params_.txt'))
+        for fn, array, err_msg in zip([
+                'mag_h_params', 'mag_h_params', 'mag_h_params', 'dd_params', 'dd_params',
+                'dd_params', 'dd_params', 'l_cut', 'l_cut'],
+                [np.ones(4, float), np.ones((5, 3, 2), float), np.ones((4, 4), float),
+                 np.ones(5, float), np.ones((5, 3), float), np.ones((4, 4, 2), float),
+                 np.ones((5, 3, 1), float), np.ones((4, 2), float), np.ones(4, float)],
+                [r'a_mag_h_params should be of shape \(X, 5\)',
+                 r'a_mag_h_params should be of shape \(X, 5\)',
+                 r'a_mag_h_params should be of shape \(X, 5\)',
+                 r'a_dd_params should be of shape \(5, X, 2\)',
+                 r'a_dd_params should be of shape \(5, X, 2\)',
+                 r'a_dd_params should be of shape \(5, X, 2\)',
+                 r'a_dd_params should be of shape \(5, X, 2\)',
+                 r'a_l_cut should be of shape \(3,\) only.',
+                 r'a_l_cut should be of shape \(3,\) only.']):
+            np.save('{}.npy'.format(fn), array)
+            with pytest.raises(ValueError, match=err_msg):
                 cm._initialise_chunk(os.path.join(os.path.dirname(__file__),
                                      'data/crossmatch_params_.txt'),
                                      os.path.join(os.path.dirname(__file__),
-                                     'data/cat_a_params{}.txt'.format('_' if 'a' in cat_reg else '')),
+                                     'data/cat_a_params_.txt'),
                                      os.path.join(os.path.dirname(__file__),
-                                     'data/cat_b_params{}.txt'.format('_' if 'b' in cat_reg else '')))
+                                     'data/cat_b_params_.txt'))
+            # Re-make "good" fake arrays
+            mag_h_params = np.ones((3, 5), float)
+            np.save('mag_h_params.npy', mag_h_params)
+            ddp = np.ones((5, 15, 2), float)
+            np.save('dd_params.npy', ddp)
+            lc = np.ones(3, float)
+            np.save('l_cut.npy', lc)
 
         f = open(os.path.join(os.path.dirname(__file__), 'data/cat_a_params.txt')).readlines()
         old_line = 'fit_gal_flag = no'
