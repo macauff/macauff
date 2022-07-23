@@ -1018,3 +1018,71 @@ def create_single_perturb_auf(tri_folder, auf_point, filt, r, dr, rho, drho, j0s
     np.save('{}/{}/mag.npy'.format(tri_folder, filt), mag_array)
 
     return count_array
+
+
+def _calculate_magnitude_offsets(count_array, mag_array, B, snr, model_mag_mids, log10y,
+                                 model_mags_interval, R, N_norm):
+    '''
+    Derive minimum relative fluxes, or largest magnitude offsets, down to which
+    simulated perturbers need to be simulated, based on both considerations of
+    their flux relative to the noise of the primary object and the fraction of
+    simulations in which there is no simulated perturbation.
+
+    Parameters
+    ----------
+    count_array : numpy.ndarray
+        Local normalising densities of simulations.
+    mag_array : numpy.ndarray
+        Magnitudes of central objects to have perturbations simulated for.
+    B : float
+        Fraction of ``snr`` the flux of the perturber should be; e.g. for
+        1/20th ``B`` should be 0.05.
+    snr : numpy.ndarray
+        Theoretical signal-to-noise ratios of each object in ``mag_array``.
+    model_mag_mids : numpy.ndarray
+        Model magnitudes for simulated densities of background objects.
+    log10y : numpy.ndarray
+        log-10 source densities of simulated objects in the given line of sight.
+    model_mags_interval : numpy.ndarray
+        Widths of the bins for each ``log10y``.
+    R : float
+        Radius of the PSF of the given simulation, in arcseconds.
+    N_norm : float
+        Normalising local density of simulations, to scale to each
+        ``count_array``.
+
+    Returns
+    -------
+    dm : numpy.ndarray
+        Maximum magnitude offset required for simulations, based on SNR and
+        empty simulation fraction.
+    '''
+    Flim = B / snr
+    dm_max_snr = -2.5 * np.log10(Flim)
+
+    dm_max_no_perturb = np.empty_like(mag_array)
+    for i in range(len(mag_array)):
+        q = model_mag_mids >= mag_array[i]
+        _x = model_mag_mids[q]
+        _y = 10**log10y[q] * model_mags_interval[q] * np.pi * (R/3600)**2 * count_array[i] / N_norm
+
+        # Convolution of Poissonian distributions each with l_i is a Poissonian
+        # with mean of sum_i l_i.
+        lamb = np.cumsum(_y)
+        # CDF of Poissonian is regularised gamma Q(floor(k + 1), lambda), and we
+        # want k = 0; we wish to find the dm that gives sufficiently large lambda
+        # that k = 0 only occurs <= x% of the time. If lambda is too small then
+        # k = 0 is too likely. P(X <= 0; lambda) = exp(-lambda).
+        # For 1% chance of no perturber we want 0.01 = exp(-lambda); rearranging
+        # lambda = -ln(0.01).
+        q = np.where(lamb >= -np.log(0.01))[0]
+        if len(q) > 0:
+            dm_max_no_perturb[i] = _x[q[0]] - mag_array[i]
+        else:
+            # In the case that we can't go deep enough in our simulated counts to
+            # get <1% chance of no perturber, just do the best we can.
+            dm_max_no_perturb[i] = _x[-1] - mag_array[i]
+
+    dm = np.maximum(dm_max_snr, dm_max_no_perturb)
+
+    return dm
