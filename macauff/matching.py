@@ -631,11 +631,12 @@ class CrossMatch():
         if self.include_perturb_auf:
             for config, catname in zip([cat_a_config, cat_b_config], ['"a"', '"b"']):
                 for check_flag in ['tri_set_name', 'tri_filt_names', 'psf_fwhms',
-                                   'download_tri', 'dens_mags', 'fit_gal_flag']:
+                                   'download_tri', 'dens_mags', 'fit_gal_flag',
+                                   'run_fw_auf', 'run_psf_auf', 'mag_h_params_path']:
                     if check_flag not in config:
                         raise ValueError("Missing key {} from catalogue {} metadata file.".format(
                                          check_flag, catname))
-            for check_flag in ['num_trials', 'dm_max', 'd_mag', 'compute_local_density']:
+            for check_flag in ['num_trials', 'd_mag', 'compute_local_density']:
                 if check_flag not in joint_config:
                     raise ValueError("Missing key {} from joint metadata file.".format(check_flag))
             self.a_download_tri = self._str2bool(cat_a_config['download_tri'])
@@ -651,6 +652,53 @@ class CrossMatch():
                                      'same number of entries.'.format(flag, flag))
                 setattr(self, '{}tri_filt_names'.format(flag),
                         np.array(config['tri_filt_names'].split()))
+
+                setattr(self, '{}run_fw_auf'.format(flag), self._str2bool(config['run_fw_auf']))
+                setattr(self, '{}run_psf_auf'.format(flag), self._str2bool(config['run_psf_auf']))
+
+            for config, catname, flag in zip([cat_a_config, cat_b_config], ['"a"', '"b"'],
+                                             ['a_', 'b_']):
+                if not getattr(self, '{}run_psf_auf'.format(flag)):
+                    continue
+                for check_flag in ['dd_params_path', 'l_cut_path']:
+                    if check_flag not in config:
+                        raise ValueError("Missing key {} from catalogue {} metadata file.".format(
+                                         check_flag, catname))
+
+            # mag_h_params, dd_params, and l_cut should all be numpy arrays in
+            # specified paths.
+            for path, f, warn_message in zip(['mag_h_params_path', 'dd_params_path', 'l_cut_path'],
+                                             ['mag_h_params', 'dd_params', 'l_cut'],
+                                             ['astrometry corrections',
+                                              'PSF photometry perturbations',
+                                              'PSF photometry perturbations']):
+                for config, catname, flag in zip([cat_a_config, cat_b_config], ['"a"', '"b"'],
+                                                 ['a_', 'b_']):
+                    # Only need dd_params or l_cut if we're using run_psf_auf.
+                    if 'mag_h' not in path and not getattr(self, '{}run_psf_auf'.format(flag)):
+                        continue
+                    if not os.path.exists(config[path]):
+                        raise OSError('{}{} does not exist. Please ensure that path for '
+                                      'catalogue {} is correct.'.format(flag, path, catname))
+                    if not os.path.isfile('{}/{}.npy'.format(config[path], f)):
+                        raise FileNotFoundError('{} file not found in catalogue {} path. '
+                                                'Please ensure {} are '
+                                                'pre-generated.'.format(f, catname, warn_message))
+                    if 'mag_h' in path:
+                        a = np.load('{}/mag_h_params.npy'.format(config['mag_h_params_path']))
+                        if not (len(a.shape) == 2 and a.shape[1] == 5):
+                            raise ValueError('{}mag_h_params should be of shape (X, 5).'
+                                             .format(flag))
+                    if 'dd_params' in path:
+                        a = np.load('{}/dd_params.npy'.format(config['dd_params_path']))
+                        if not (len(a.shape) == 3 and a.shape[0] == 5 and a.shape[2] == 2):
+                            raise ValueError('{}dd_params should be of shape (5, X, 2).'
+                                             .format(flag))
+                    if 'l_cut' in path:
+                        a = np.load('{}/l_cut.npy'.format(config['l_cut_path']))
+                        if not (len(a.shape) == 1 and a.shape[0] == 3):
+                            raise ValueError('{}l_cut should be of shape (3,) only.'.format(flag))
+                    setattr(self, '{}{}'.format(flag, f), a)
 
             for config, catname, flag in zip([cat_a_config, cat_b_config], ['"a"', '"b"'],
                                              ['a_', 'b_']):
@@ -689,7 +737,7 @@ class CrossMatch():
                 raise ValueError("num_trials should be an integer.")
             self.num_trials = int(a)
 
-            for flag in ['dm_max', 'd_mag']:
+            for flag in ['d_mag']:
                 try:
                     setattr(self, flag, float(joint_config[flag]))
                 except ValueError:
@@ -886,12 +934,16 @@ class CrossMatch():
                 _kwargs = {'psf_fwhms': self.a_psf_fwhms, 'tri_download_flag': self.a_download_tri,
                            'delta_mag_cuts': self.delta_mag_cuts, 'num_trials': self.num_trials,
                            'j0s': self.j0s, 'density_mags': self.a_dens_mags,
-                           'dm_max': self.dm_max, 'd_mag': self.d_mag,
-                           'tri_filt_names': self.a_tri_filt_names,
-                           'compute_local_density': self.compute_local_density}
+                           'd_mag': self.d_mag, 'tri_filt_names': self.a_tri_filt_names,
+                           'compute_local_density': self.compute_local_density,
+                           'run_fw': self.a_run_fw_auf, 'run_psf': self.a_run_psf_auf,
+                           'mag_h_params': self.a_mag_h_params}
                 missing_tri_check = np.any(
                     [not os.path.isfile('{}/{}/{}/trilegal_auf_simulation.dat'.format(
                      self.a_auf_folder_path, a, b)) for (a, b) in self.a_auf_region_points])
+                if self.a_run_psf_auf:
+                    _kwargs = dict(_kwargs, **{'dd_params': self.a_dd_params,
+                                               'l_cut': self.a_l_cut})
                 if self.a_download_tri or missing_tri_check:
                     _kwargs = dict(_kwargs,
                                    **{'tri_set_name': self.a_tri_set_name,
@@ -951,12 +1003,16 @@ class CrossMatch():
                 _kwargs = {'psf_fwhms': self.b_psf_fwhms, 'tri_download_flag': self.b_download_tri,
                            'delta_mag_cuts': self.delta_mag_cuts, 'num_trials': self.num_trials,
                            'j0s': self.j0s, 'density_mags': self.b_dens_mags,
-                           'dm_max': self.dm_max, 'd_mag': self.d_mag,
-                           'tri_filt_names': self.b_tri_filt_names,
-                           'compute_local_density': self.compute_local_density}
+                           'd_mag': self.d_mag, 'tri_filt_names': self.b_tri_filt_names,
+                           'compute_local_density': self.compute_local_density,
+                           'run_fw': self.b_run_fw_auf, 'run_psf': self.b_run_psf_auf,
+                           'mag_h_params': self.b_mag_h_params}
                 missing_tri_check = np.any(
                     [not os.path.isfile('{}/{}/{}/trilegal_auf_simulation.dat'.format(
                      self.b_auf_folder_path, a, b)) for (a, b) in self.b_auf_region_points])
+                if self.b_run_psf_auf:
+                    _kwargs = dict(_kwargs, **{'dd_params': self.b_dd_params,
+                                               'l_cut': self.b_l_cut})
                 if self.b_download_tri or missing_tri_check:
                     _kwargs = dict(_kwargs,
                                    **{'tri_set_name': self.b_tri_set_name,
@@ -973,7 +1029,7 @@ class CrossMatch():
                                       'alpha1': self.gal_alpha1,
                                       'alpha_weight': self.gal_alphaweight})
                 else:
-                    _kwargs = dict(_kwargs, **{'fit_gal_flag': self.a_fit_gal_flag})
+                    _kwargs = dict(_kwargs, **{'fit_gal_flag': self.b_fit_gal_flag})
                 if self.b_download_tri:
                     os.system("rm -rf {}/*".format(self.b_auf_folder_path))
                 else:
