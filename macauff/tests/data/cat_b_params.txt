@@ -7,6 +7,12 @@ auf_folder_path = wise_auf_folder
 # Filter names are also used in any output file created
 filt_names = W1 W2 W3 W4
 
+# Flags for which of the two AUF simulation algorithms to run
+run_fw_auf = yes
+run_psf_auf = no
+# Path to array containing pre-computed astrometry corrections.
+mag_h_params_path = .
+
 # Catalogue PSF parameters
 # Full-width at half maximums for each filter, in order, in arcseconds
 psf_fwhms = 6.08 6.84 7.36 11.99
