@@ -354,6 +354,7 @@ subroutine scatter_perturbers(dNs, dms, psfr, maxk, dmcut, psfsig, offsets, frac
                 end if
 
                 if (algorithm_type == 'psf') then
+                    ! Cumulatively keep track of xav and yav with intent(inout).
                     call psf_perturb(x(:loopk), y(:loopk), r(:loopk), f0+df(:loopk), dd_params, fluxes(j), psfsig, l_cut, xav, yav)
                 else
                     xav = xav + sum(x(:loopk) * (f0+df(:loopk)))
@@ -404,7 +405,7 @@ subroutine psf_perturb(x, y, r, fs, dd_params, flux, psfsig, l_cut, xav, yav)
     ! Parameters required to simulat perturbation based on simulations.
     real(dp), intent(in) :: dd_params(:, :, :), psfsig, l_cut(:)
     ! x and y coordinates of average perturbation for these objects.
-    real(dp), intent(out) :: xav, yav
+    real(dp), intent(inout) :: xav, yav
     ! Loop counter
     integer :: k
     ! Temporary parameters for deriving polynomial fits based on dd_params.
@@ -413,8 +414,6 @@ subroutine psf_perturb(x, y, r, fs, dd_params, flux, psfsig, l_cut, xav, yav)
     ! Placeholder for fit_skew calculation
     real(dp) :: g1
 
-    xav = 0.0_dp
-    yav = 0.0_dp
     if (flux >= l_cut(3)) then
         ! If equal-brightness, or close enough as defined by l_cut, "binary" star(s), then the offsets are just
         ! flux weighted between the central sources and perturbers, on an individual basis.
