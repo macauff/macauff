@@ -273,8 +273,12 @@ def make_perturb_aufs(auf_folder, cat_folder, filters, auf_points, r, dr, rho,
     else:
         arraylengths = np.zeros(dtype=int, shape=(len(filters), len(auf_points)), order='f')
 
-    # Overload compute_local_density if it is False but local_N does not exist.
-    if not compute_local_density and not os.path.isfile('{}/local_N.npy'.format(auf_folder)) and use_memmap_files:
+    if use_memmap_files:
+        # Overload compute_local_density if it is False but local_N does not exist.
+        if not compute_local_density and not os.path.isfile('{}/local_N.npy'.format(auf_folder)):
+            compute_local_density = True
+    # Always compute_local_density if not using memmapped files
+    else:
         compute_local_density = True
 
     if include_perturb_auf:
