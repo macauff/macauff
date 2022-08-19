@@ -701,7 +701,7 @@ def _load_fourier_grid_cutouts(a, sky_rect_coords, joint_folder_path, cat_folder
         modrefind = np.load('{}/modelrefinds.npy'.format(auf_folder_path),
                             mmap_mode='r')[:, large_sky_slice][:, sky_cut]
     else:
-        modrefind = modelrefinds
+        modrefind = modelrefinds[:, large_sky_slice][:, sky_cut]
 
     [fouriergrid], modrefindsmall = load_small_ref_auf_grid(modrefind, auf_folder_path,
                                                             ['fourier'])
