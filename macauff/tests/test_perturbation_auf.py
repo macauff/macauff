@@ -943,6 +943,8 @@ class TestMakePerturbAUFs():
             _replace_line(os.path.join(os.path.dirname(__file__), 'data/cat_b_params_.txt'),
                           idx, nl)
 
+        np.save('mag_h_params.npy', np.array([[0.0109, 46.08, 0.119, 130, 0]]))
+
         cm = CrossMatch(os.path.join(os.path.dirname(__file__), 'data'), use_memmap_files=True)
         cm._initialise_chunk(os.path.join(os.path.dirname(__file__),
                                           'data/crossmatch_params_.txt'),
@@ -974,8 +976,6 @@ class TestMakePerturbAUFs():
         cm.a_run_psf = False
         cm.b_run_fw = True
         cm.b_run_psf = False
-        cm.a_mag_h_params = np.array([[0.0109, 46.08, 0.119, 130, 0]])
-        cm.b_mag_h_params = np.array([[0.0109, 46.08, 0.119, 130, 0]])
 
         cm.create_perturb_auf(self.files_per_auf_sim)
 
@@ -1105,6 +1105,8 @@ class TestMakePerturbAUFs():
             _replace_line(os.path.join(os.path.dirname(__file__), 'data/cat_b_params_.txt'),
                           idx, nl)
 
+        np.save('mag_h_params.npy', np.array([[0.0109, 46.08, 0.119, 130, 0]]))
+
         cm = CrossMatch(os.path.join(os.path.dirname(__file__), 'data'), use_memmap_files=True)
         cm._initialise_chunk(os.path.join(os.path.dirname(__file__),
                                           'data/crossmatch_params_.txt'),
@@ -1145,8 +1147,6 @@ class TestMakePerturbAUFs():
         cm.a_run_psf = False
         cm.b_run_fw = True
         cm.b_run_psf = False
-        cm.a_mag_h_params = np.array([[0.0109, 46.08, 0.119, 130, 0]])
-        cm.b_mag_h_params = np.array([[0.0109, 46.08, 0.119, 130, 0]])
 
         cm.create_perturb_auf(self.files_per_auf_sim)
 
