@@ -311,10 +311,7 @@ def test_circle_area():
 
 def test_psf_perturb():
     l_cut = np.load(os.path.join(os.path.dirname(__file__), 'data/l_cut.npy'))
-    Ns = np.load(os.path.join(os.path.dirname(__file__), 'data/Ns.npy'))
     dd_params = np.load(os.path.join(os.path.dirname(__file__), 'data/dd_params.npy'))
-    qd = np.argmin(np.abs(Ns - 15))
-    dd_params = dd_params[qd, :, :Ns[qd]]
 
     R = 1.185 * 6.1
     psf_sig = 6.1 / (2 * np.sqrt(2 * np.log(2)))
@@ -781,10 +778,7 @@ class TestMakePerturbAUFs():
 
             mag_h_params = np.array([[0.0109, 46.08, 0.119, 130, 0]])
             l_cut = np.load(os.path.join(os.path.dirname(__file__), 'data/l_cut.npy'))
-            Ns = np.load(os.path.join(os.path.dirname(__file__), 'data/Ns.npy'))
             dd_params = np.load(os.path.join(os.path.dirname(__file__), 'data/dd_params.npy'))
-            qd = np.argmin(np.abs(Ns - 15))
-            dd_params = dd_params[qd, :, :Ns[qd]]
             run_fw = False if mag < 19 else True
             make_perturb_aufs(*self.args, psf_fwhms=self.psf_fwhms, num_trials=self.num_trials,
                               j0s=self.j0s, density_mags=cutoff_mags, d_mag=d_mag,
