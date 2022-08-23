@@ -632,7 +632,9 @@ class CrossMatch():
             for config, catname in zip([cat_a_config, cat_b_config], ['"a"', '"b"']):
                 for check_flag in ['tri_set_name', 'tri_filt_names', 'psf_fwhms',
                                    'download_tri', 'dens_mags', 'fit_gal_flag',
-                                   'run_fw_auf', 'run_psf_auf', 'mag_h_params_path']:
+                                   'run_fw_auf', 'run_psf_auf', 'mag_h_params_path',
+                                   'tri_maglim_bright', 'tri_maglim_faint', 'tri_num_bright',
+                                   'tri_num_faint']:
                     if check_flag not in config:
                         raise ValueError("Missing key {} from catalogue {} metadata file.".format(
                                          check_flag, catname))
@@ -712,6 +714,29 @@ class CrossMatch():
                 except ValueError:
                     raise ValueError("tri_filt_num should be a single integer number in "
                                      "catalogue {} metadata file.".format(catname))
+
+            for suffix in ['_bright', '_faint']:
+                for config, catname, flag in zip([cat_a_config, cat_b_config], ['"a"', '"b"'],
+                                                 ['a_', 'b_']):
+                    try:
+                        a = config['tri_num{}'.format(suffix)]
+                        if float(a).is_integer():
+                            setattr(self, '{}tri_num{}'.format(flag, suffix), int(a))
+                        else:
+                            raise ValueError("tri_num{} should be a single integer number in "
+                                             "catalogue {} metadata file.".format(suffix, catname))
+                    except ValueError:
+                        raise ValueError("tri_num{} should be a single integer number in "
+                                         "catalogue {} metadata file.".format(suffix, catname))
+
+                    for config, catname, flag in zip([cat_a_config, cat_b_config], ['"a"', '"b"'],
+                                                     ['a_', 'b_']):
+                        try:
+                            setattr(self, '{}tri_maglim{}'.format(flag, suffix),
+                                    float(config['tri_maglim{}'.format(suffix)]))
+                        except ValueError:
+                            raise ValueError("tri_maglim{} in catalogue {} must be a float."
+                                             .format(suffix, catname))
 
             # These parameters are also only used if we are using the
             # Perturbation AUF component.
@@ -939,8 +964,9 @@ class CrossMatch():
                            'run_fw': self.a_run_fw_auf, 'run_psf': self.a_run_psf_auf,
                            'mag_h_params': self.a_mag_h_params}
                 missing_tri_check = np.any(
-                    [not os.path.isfile('{}/{}/{}/trilegal_auf_simulation.dat'.format(
-                     self.a_auf_folder_path, a, b)) for (a, b) in self.a_auf_region_points])
+                    [[not os.path.isfile('{}/{}/{}/trilegal_auf_simulation_{}.dat'.format(
+                     self.a_auf_folder_path, a, b, t)) for (a, b) in self.a_auf_region_points]
+                     for t in ['bright', 'faint']])
                 if self.a_run_psf_auf:
                     _kwargs = dict(_kwargs, **{'dd_params': self.a_dd_params,
                                                'l_cut': self.a_l_cut})
@@ -967,10 +993,14 @@ class CrossMatch():
                     for i in range(len(self.a_auf_region_points)):
                         ax1, ax2 = self.a_auf_region_points[i]
                         ax_folder = '{}/{}/{}'.format(self.a_auf_folder_path, ax1, ax2)
-                        os.system('mv {}/trilegal_auf_simulation.dat {}/..'.format(
+                        os.system('mv {}/trilegal_auf_simulation_bright.dat {}/..'.format(
+                                  ax_folder, ax_folder))
+                        os.system('mv {}/trilegal_auf_simulation_faint.dat {}/..'.format(
                                   ax_folder, ax_folder))
                         os.system("rm -rf {}/*".format(ax_folder))
-                        os.system('mv {}/../trilegal_auf_simulation.dat {}'.format(
+                        os.system('mv {}/../trilegal_auf_simulation_bright.dat {}'.format(
+                                  ax_folder, ax_folder))
+                        os.system('mv {}/../trilegal_auf_simulation_faint.dat {}'.format(
                                   ax_folder, ax_folder))
                 if self.compute_local_density:
                     _kwargs = dict(_kwargs, **{'density_radius': self.a_dens_dist})
@@ -1008,8 +1038,9 @@ class CrossMatch():
                            'run_fw': self.b_run_fw_auf, 'run_psf': self.b_run_psf_auf,
                            'mag_h_params': self.b_mag_h_params}
                 missing_tri_check = np.any(
-                    [not os.path.isfile('{}/{}/{}/trilegal_auf_simulation.dat'.format(
-                     self.b_auf_folder_path, a, b)) for (a, b) in self.b_auf_region_points])
+                    [[not os.path.isfile('{}/{}/{}/trilegal_auf_simulation_{}.dat'.format(
+                     self.b_auf_folder_path, a, b, t)) for (a, b) in self.b_auf_region_points]
+                     for t in ['bright', 'faint']])
                 if self.b_run_psf_auf:
                     _kwargs = dict(_kwargs, **{'dd_params': self.b_dd_params,
                                                'l_cut': self.b_l_cut})
@@ -1036,10 +1067,14 @@ class CrossMatch():
                     for i in range(len(self.b_auf_region_points)):
                         ax1, ax2 = self.b_auf_region_points[i]
                         ax_folder = '{}/{}/{}'.format(self.b_auf_folder_path, ax1, ax2)
-                        os.system('mv {}/trilegal_auf_simulation.dat {}/..'.format(
+                        os.system('mv {}/trilegal_auf_simulation_bright.dat {}/..'.format(
+                                  ax_folder, ax_folder))
+                        os.system('mv {}/trilegal_auf_simulation_faint.dat {}/..'.format(
                                   ax_folder, ax_folder))
                         os.system("rm -rf {}/*".format(ax_folder))
-                        os.system('mv {}/../trilegal_auf_simulation.dat {}'.format(
+                        os.system('mv {}/../trilegal_auf_simulation_bright.dat {}'.format(
+                                  ax_folder, ax_folder))
+                        os.system('mv {}/../trilegal_auf_simulation_faint.dat {}'.format(
                                   ax_folder, ax_folder))
                 if self.compute_local_density:
                     _kwargs = dict(_kwargs, **{'density_radius': self.b_dens_dist})
