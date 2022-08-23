@@ -628,7 +628,10 @@ class TestMakePerturbAUFs():
                 '22.387 22.292 22.015 21.144 19.380 20.878 15.004 22.391 21.637 21.342  0.024')
         os.makedirs('{}/{}/{}'.format(
             self.auf_folder, self.auf_points[0][0], self.auf_points[0][1]), exist_ok=True)
-        with open('{}/{}/{}/trilegal_auf_simulation.dat'.format(
+        with open('{}/{}/{}/trilegal_auf_simulation_bright.dat'.format(
+                  self.auf_folder, self.auf_points[0][0], self.auf_points[0][1]), "w") as f:
+            f.write(text)
+        with open('{}/{}/{}/trilegal_auf_simulation_faint.dat'.format(
                   self.auf_folder, self.auf_points[0][0], self.auf_points[0][1]), "w") as f:
             f.write(text)
 
@@ -744,7 +747,10 @@ class TestMakePerturbAUFs():
                         mag, mag+0.001, mag+0.002, mag+0.003))
             os.makedirs('{}/{}/{}'.format(
                 self.auf_folder, self.auf_points[0][0], self.auf_points[0][1]), exist_ok=True)
-            with open('{}/{}/{}/trilegal_auf_simulation.dat'.format(
+            with open('{}/{}/{}/trilegal_auf_simulation_bright.dat'.format(
+                      self.auf_folder, self.auf_points[0][0], self.auf_points[0][1]), "w") as f:
+                f.write(text)
+            with open('{}/{}/{}/trilegal_auf_simulation_faint.dat'.format(
                       self.auf_folder, self.auf_points[0][0], self.auf_points[0][1]), "w") as f:
                 f.write(text)
 
@@ -862,7 +868,10 @@ class TestMakePerturbAUFs():
         for i in range(len(new_auf_points)):
             os.makedirs('{}/{}/{}'.format(
                 self.auf_folder, new_auf_points[i][0], new_auf_points[i][1]), exist_ok=True)
-            with open('{}/{}/{}/trilegal_auf_simulation.dat'.format(
+            with open('{}/{}/{}/trilegal_auf_simulation_bright.dat'.format(
+                      self.auf_folder, new_auf_points[i][0], new_auf_points[i][1]), "w") as f:
+                f.write(text)
+            with open('{}/{}/{}/trilegal_auf_simulation_faint.dat'.format(
                       self.auf_folder, new_auf_points[i][0], new_auf_points[i][1]), "w") as f:
                 f.write(text)
 
@@ -1026,7 +1035,10 @@ class TestMakePerturbAUFs():
                 '22.387 22.292 22.015 21.144 19.380 20.878 15.004 22.391 21.637 21.342  0.024')
         os.makedirs('{}/{}/{}'.format(
             self.auf_folder, self.auf_points[0][0], self.auf_points[0][1]), exist_ok=True)
-        with open('{}/{}/{}/trilegal_auf_simulation.dat'.format(
+        with open('{}/{}/{}/trilegal_auf_simulation_bright.dat'.format(
+                  self.auf_folder, self.auf_points[0][0], self.auf_points[0][1]), "w") as f:
+            f.write(text)
+        with open('{}/{}/{}/trilegal_auf_simulation_faint.dat'.format(
                   self.auf_folder, self.auf_points[0][0], self.auf_points[0][1]), "w") as f:
             f.write(text)
 
