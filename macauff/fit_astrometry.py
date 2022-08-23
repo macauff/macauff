@@ -11,14 +11,18 @@ from astropy import units as u
 from scipy import spatial
 from scipy.stats import chi2
 
-from macauff import create_galaxy_counts, download_trilegal_simulation, calculate_magnitude_offsets
-from macauff.misc_functions_fortran import misc_functions_fortran as mff
-from macauff.perturbation_auf_fortran import perturbation_auf_fortran as paf
+from .galaxy_counts import create_galaxy_counts, calculate_magnitude_offsets, make_tri_counts
+from .perturbation_auf import download_trilegal_simulation
+from .misc_functions_fortran import misc_functions_fortran as mff
+from .perturbation_auf_fortran import perturbation_auf_fortran as paf
+
+
+__all__ = ['AstrometricCorrections']
 
 
 class AstrometricCorrections:
     def __init__(self, psf_fwhm, numtrials, nn_radius, dens_search_radius, save_folder, trifolder,
-                 triname, maglim_b, maglim_f, magnum, trifilterset, trifiltname, tri_usecols,
+                 triname, maglim_b, maglim_f, magnum, trifilterset, trifiltname,
                  gal_wav_micron, gal_ab_offset, gal_filtname, gal_alav, bright_mag, dm, dd_params,
                  l_cut, lmids, bmids, lb_dimension, cutout_area, cutout_height, mag_array,
                  mag_slice, sig_slice, n_pool, single_sided_auf=True):
@@ -64,9 +68,6 @@ class AstrometricCorrections:
             Name of the TRILEGAL filter set for which to generate simulations.
         trifiltname : string
             Name of the specific filter to generate perturbation AUF component in.
-        tri_usecols : list of floats, numpy.ndarray
-            Zero-indexed columns to load from the TRILEGAL simulation; typically
-            just the ``trifiltname`` and ``Av`` columns are required.
         gal_wav_micron : float
             Wavelength, in microns, of the ``trifiltname`` filter, for use in
             simulating galaxy counts.
@@ -156,7 +157,6 @@ class AstrometricCorrections:
         self.magnum = magnum
         self.trifilterset = trifilterset
         self.trifiltname = trifiltname
-        self.tri_usecols = tri_usecols
         self.gal_wav_micron = gal_wav_micron
         self.gal_ab_offset = gal_ab_offset
         self.gal_filtname = gal_filtname
@@ -596,10 +596,25 @@ class AstrometricCorrections:
                                    self.save_folder, lmin, lmax, bmin, bmax)):
                 continue
 
-            tri_hist, tri_mags, dtri_mags, tri_uncert, tri_av = make_tri_counts(
-                lmid, bmid, self.dm, self.tri_download, self.trifolder,
-                self.triname.format(lmid, bmid), self.maglim_b, self.maglim_f, self.magnum,
-                self.trifilterset, self.trifiltname, self.tri_usecols)
+            num_bright, num_faint = 90000, 0.75e6
+            if (self.tri_download or not
+                    os.path.isfile('{}/{}_faint.dat'.format(self.trifolder,
+                                                            self.triname.format(lmid, bmid)))):
+                download_trilegal_simulation('.', self.trifilterset, lmid, bmid, self.magnum,
+                                             'galactic', self.maglim_f, total_objs=num_faint)
+                os.system('mv trilegal_auf_simulation.dat {}/{}_faint.dat'
+                          .format(self.trifolder, self.triname.format(lmid, bmid)))
+            if (self.tri_download or not
+                    os.path.isfile('{}/{}_bright.dat'.format(self.trifolder,
+                                                             self.triname.format(lmid, bmid)))):
+                download_trilegal_simulation('.', self.trifilterset, lmid, bmid, self.magnum,
+                                             'galactic', self.maglim_b, total_objs=num_bright)
+                os.system('mv trilegal_auf_simulation.dat {}/{}_bright.dat'
+                          .format(self.trifolder, self.triname.format(lmid, bmid)))
+
+            tri_hist, tri_mags, _, dtri_mags, tri_uncert, tri_av = make_tri_counts(
+                self.trifolder, self.triname.format(lmid, bmid), self.maglim_b,
+                self.trifiltname, self.dm)
             gal_dNs = create_galaxy_counts(
                 self.gal_cmau_array, tri_mags+dtri_mags/2, np.linspace(0, 4, 41),
                 self.gal_wav_micron, self.gal_alpha0, self.gal_alpha1, self.gal_alphaweight,
@@ -1377,144 +1392,6 @@ class AstrometricCorrections:
 
             plt.tight_layout()
             plt.savefig('{}/pdf/sig_h_stats.pdf'.format(self.save_folder))
-
-
-# TODO: move into macauff, add some parameters as inputs, import from macauff,
-# use in main code as well. Propagate the API changes in download_trilegal_simulation
-# as well. Backport any necessary dowload_trilegal_simulation arguments like
-# reference frame as needed, and remove hard-coded numbers for bright/faint calls.
-def make_tri_counts(ax1, ax2, dm, download_flag, trifolder, trifilename, maglim_bright,
-                    maglim_faint, magnum, trifilterset, trifiltname, tri_usecols):
-    """
-    Generate TRILEGAL simulations for a given line of sight in the Galaxy, making
-    both a "bright" simulation, with a brighter magnitude limie that allows for
-    more detail in the lower-number statistic bins, and a "faint" or full
-    simulation down to the faint limit to capture the full source count
-    distribution for the filter.
-
-    Parameters
-    ----------
-    ax1 : float
-        The first, longitudinal coordinate of the region to simulate Galaxy
-        counts for.
-    ax2 : float
-        Latitudinal coordinate of the simulated region.
-    dm : float
-        Width of the bins into which to place simulated magnitudes.
-    download_flag : boolean
-        Flag indicating whether to re-download simulations if they already exist
-        on disk.
-    trifolder : string
-        Location on disk into which to save TRILEGAL simulations.
-    trifilename : string
-        Name to save TRILEGAL simulation files to, to which "_bright" and
-        "_faint" will be appended for the two runs respectively.
-    maglim_bright : float
-        Magnitude down to which to generate sources for the "bright"
-        simulation.
-    maglim_faint : float
-        Magnitude down to which to generate sources for the "faint"
-        simulation.
-    magnum : integer
-        Zero-indexed column number of the filter to limit magnitude of in
-        ``trifilterset``, corresponding to ``trifiltname``.
-    trifilterset : string
-        The TRILEGAL filter set name to use when generating simulations.
-    trifiltname : string
-        The individual filter within ``trifilterset`` being used for generating
-        differential source counts.
-    tri_usecols : list of integers, numpy.ndarray
-        List of column indices to load from the downloaded datasets. Should
-        generally only require two, the column corresponding to ``trifiltname``
-        and ``Av``.
-
-    Returns
-    -------
-    hist : numpy.ndarray
-        The probability density function of the resulting merged differential
-        source counts from the two TRILEGAL simulations, weighted by their
-        counting-statistic bin uncertainties.
-    tri_mags : numpy.ndarray
-        The left-hand bin edges of all bins used to generate ``hist``.
-    dtri_mags : numpy.ndarray
-        Bin widths of all bins corresponding to each element of ``hist``.
-    uncert : numpy.ndarray
-        Propagated Poissonian uncertainties of the PDF of ``hist``, using the
-        weighted average of the individual uncertainties of each run for every
-        bin in ``hist``.
-    tri_av : float
-        The largest of all reported V-band extinctions at infinity across all
-        of the simulations used in the generation of the source count histograms.
-    """
-    num_bright, num_faint = 90000, 0.75e6
-    if (download_flag or not os.path.isfile('{}/{}_faint.dat'.format(trifolder, trifilename))):
-        download_trilegal_simulation('.', trifilterset, ax1, ax2, magnum, 'galactic', maglim_faint,
-                                     total_objs=num_faint)
-        os.system('mv trilegal_auf_simulation.dat {}/{}_faint.dat'.format(trifolder, trifilename))
-    if (download_flag or not os.path.isfile('{}/{}_bright.dat'.format(trifolder, trifilename))):
-        download_trilegal_simulation('.', trifilterset, ax1, ax2, magnum, 'galactic', maglim_bright,
-                                     total_objs=num_bright)
-        os.system('mv trilegal_auf_simulation.dat {}/{}_bright.dat'.format(trifolder, trifilename))
-
-    f = open('{}/{}_faint.dat'.format(trifolder, trifilename), "r")
-    area_line = f.readline()
-    av_line = f.readline()
-    f.close()
-    # #area = {} sq deg, #Av at infinity = {} should be the first two lines, so
-    # just split that by whitespace
-    bits = area_line.split(' ')
-    tri_area_faint = float(bits[2])
-    bits = av_line.split(' ')
-    tri_av_inf_faint = float(bits[4])
-    tri_faint = np.genfromtxt('{}/{}_faint.dat'.format(trifolder, trifilename), delimiter=None,
-                              names=True, comments='#', skip_header=2, usecols=tri_usecols)
-
-    f = open('{}/{}_bright.dat'.format(trifolder, trifilename), "r")
-    area_line = f.readline()
-    av_line = f.readline()
-    f.close()
-    bits = area_line.split(' ')
-    tri_area_bright = float(bits[2])
-    bits = av_line.split(' ')
-    tri_av_inf_bright = float(bits[4])
-    tri_bright = np.genfromtxt('{}/{}_bright.dat'.format(trifolder, trifilename), delimiter=None,
-                               names=True, comments='#', skip_header=2, usecols=tri_usecols)
-
-    tridata_faint = tri_faint[:][trifiltname]
-    tri_av_faint = np.amax(tri_faint[:]['Av'])
-    del tri_faint
-    tridata_bright = tri_bright[:][trifiltname]
-    tri_av_bright = np.amax(tri_bright[:]['Av'])
-    del tri_bright
-    minmag = dm * np.floor(min(np.amin(tridata_faint), np.amin(tridata_bright))/dm)
-    maxmag = dm * np.ceil(max(np.amax(tridata_faint), np.amax(tridata_bright))/dm)
-    hist, tri_mags = np.histogram(tridata_faint, bins=np.arange(minmag, maxmag+1e-10, dm))
-    hc_faint = hist > 3
-    dens_faint = hist / np.diff(tri_mags) / tri_area_faint
-    dens_uncert_faint = np.sqrt(hist) / np.diff(tri_mags) / tri_area_faint
-    dens_uncert_faint[dens_uncert_faint == 0] = 1e10
-
-    hist, tri_mags = np.histogram(tridata_bright, bins=tri_mags)
-    hc_bright = hist > 3
-    dens_bright = hist / np.diff(tri_mags) / tri_area_bright
-    dens_uncert_bright = np.sqrt(hist) / np.diff(tri_mags) / tri_area_bright
-    dens_uncert_bright[dens_uncert_bright == 0] = 1e10
-    dens_uncert_bright[tri_mags[:-1] > maglim_bright - 2*dm] = 1e10
-
-    w_f, w_b = 1 / dens_uncert_faint**2, 1 / dens_uncert_bright**2
-    dens = (dens_bright * w_b + dens_faint * w_f) / (w_b + w_f)
-    dens_uncert = np.sqrt(1 / (w_b + w_f))
-
-    hc = hc_bright | hc_faint
-
-    hist = dens[hc]
-    dtri_mags = np.diff(tri_mags)[hc]
-    tri_mags = tri_mags[:-1][hc]
-    uncert = dens_uncert[hc]
-
-    tri_av = max((tri_av_bright, tri_av_inf_bright, tri_av_faint, tri_av_inf_faint))
-
-    return hist, tri_mags, dtri_mags, uncert, tri_av
 
 
 def create_densities(lmid, bmid, b, minmag, maxmag, lon_slice, lat_slice, lmin, lmax, bmin,
