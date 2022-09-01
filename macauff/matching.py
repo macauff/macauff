@@ -82,6 +82,8 @@ class CrossMatch():
             # Chunk queue will not contain chunks recorded as completed in the
             # resume file
             self.chunk_queue = self._make_chunk_queue(completed_chunks)
+            # Used to keep track of progress to completion
+            self.num_chunks_to_process = len(self.chunk_queue)
 
             # In seconds, how often the manager checks for new work requests
             self.polling_rate = polling_rate
@@ -230,9 +232,9 @@ class CrossMatch():
         else:
             # Manager process:
             #   - assigns chunks to workers
+            #   - receives notification of completed or failed cross-matches
             #   - writes completed chunk IDs to resume file
-            #   - TODO receive cross-match results, resolve duplicates and write output
-            #   - TODO handle crashed workers
+            #   - TODO handle crashed workers (segfaults in Fortran routines currently unrecoverable)
             #   - TODO handle crashed manager process
             #   - once queue is empty, workers are sent signal to stop
             if self.rank == 0:
@@ -241,6 +243,7 @@ class CrossMatch():
                 active_workers = self.comm_size - 1
 
                 # Loop until all workers have been instructed there is no more work
+                out_of_walltime = False
                 while active_workers > 0:
                     # If checkpointing disabled, simply wait for any worker to
                     # request a chunk and report completion of any previous chunk
@@ -257,7 +260,9 @@ class CrossMatch():
                             # Check if we're reaching the limit of job walltime. If so,
                             # empty the queue so no further work is issued
                             if self.end_time - datetime.datetime.now() < self.end_within:
-                                print('Rank {}: reaching job walltime. Cancelling all further work'.format(self.rank))
+                                print('Rank {}: reaching job walltime. Cancelling all further work. {} chunks remain unprocessed.'
+                                      .format(self.rank, self.num_chunks_to_process))
+                                out_of_walltime = True
                                 self.chunk_queue.clear()
                                 # Blank end time so we don't re-enter polling loop
                                 self.end_time = None
@@ -280,6 +285,8 @@ class CrossMatch():
                         # https://docs.python.org/3/library/os.html#os.fsync
                         self.resume_file.flush()
                         os.fsync(self.resume_file)
+                        # Update number of remaining chunks to process
+                        self.num_chunks_to_process -= 1
                     # Handle failed chunk
                     elif signal == self.worker_signals['WORK_ERROR']:
                         print('Rank {}: rank {} failed to process chunk {}.'
@@ -299,6 +306,12 @@ class CrossMatch():
                     sys.stdout.flush()
 
                     self.comm.send((signal, new_chunk), dest=worker_id)
+
+                # Completed chunk processing loop. Perform post-processing if all
+                # chunks completed successfully and we are not out of walltime
+                # TODO: parallelise this?
+                if self.num_chunks_to_process == 0 and not out_of_walltime:
+                    self._postprocess_chunk()
 
             # Worker processes:
             #  - request chunk from manager
@@ -367,6 +380,14 @@ class CrossMatch():
         # The final stage of the cross-match process is that of putting together
         # the previous stages, and calculating the cross-match probabilities.
         self.pair_sources(13)
+
+    def _postprocess_chunk(self):
+        '''
+        Runs the post-processing stage, resolving duplicate cross-matches and
+        other edge cases.
+        '''
+        # TODO Function body
+        print("_postprocess_chunk function run")
 
     def _make_chunk_queue(self, completed_chunks):
         '''
