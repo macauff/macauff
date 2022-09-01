@@ -624,10 +624,15 @@ def make_island_groupings(joint_folder_path, a_cat_folder_path, b_cat_folder_pat
     # Only return reject counts if they were created
     if num_a_failed_checks + a_first_rejected_len > 0:
         lenrejecta = len(reject_a)
+        # Save rejects output files. Not needed explicitly if using memmapped files
+        if not use_memmap_files:
+            np.save('{}/reject/reject_a.npy'.format(joint_folder_path), reject_a)
     else:
         lenrejecta = 0
     if num_b_failed_checks + b_first_rejected_len > 0:
         lenrejectb = len(reject_b)
+        if not use_memmap_files:
+            np.save('{}/reject/reject_b.npy'.format(joint_folder_path), reject_b)
     else:
         lenrejectb = 0
 
