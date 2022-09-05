@@ -1274,8 +1274,8 @@ class AstrometricCorrections:
                 The chi-squared value of the sum of data-model astrometric
                 precision residuals, normalised by the data uncertainties.
             """
-            m, a = p
-            modely = np.sqrt((m * x)**2 + a**2)
+            m, n = p
+            modely = np.sqrt((m * x)**2 + n**2)
 
             return np.sum((y - modely)**2 / o**2)
 
@@ -1298,7 +1298,7 @@ class AstrometricCorrections:
                     'silver']
 
         m_sigs = np.empty_like(self.lmids)
-        a_sigs = np.empty_like(self.lmids)
+        n_sigs = np.empty_like(self.lmids)
 
         for i, (lmid, bmid, lmin, lmax, bmin, bmax) in enumerate(zip(
                 self.lmids, self.bmids, self.lmins, self.lmaxs, self.bmins, self.bmaxs)):
@@ -1327,21 +1327,21 @@ class AstrometricCorrections:
                                method='L-BFGS-B', options={'ftol': 1e-12},
                                bounds=[(0, None), (0, None)])
 
-            m_sig, a_sig = res_sig.x
+            m_sig, n_sig = res_sig.x
 
             m_sigs[i] = m_sig
-            a_sigs[i] = a_sig
+            n_sigs[i] = n_sig
 
             if self.make_plots or self.make_summary_plot:
                 x_array = np.linspace(0, ax1.get_xlim()[1], 100)
                 ax1.plot(x_array, x_array, 'g:', label='y=x')
-                ax1.plot(x_array, np.sqrt((m_sig*x_array)**2 + a_sig**2), 'r-.',
+                ax1.plot(x_array, np.sqrt((m_sig*x_array)**2 + n_sig**2), 'r-.',
                          alpha=0.8, label='Fit ma')
 
                 ax1.set_xlabel(r'Input astrometric $\sigma$ / "')
                 ax1.set_ylabel(r'Fit astrometric $\sigma$ / "')
                 ax1.set_title('l = {}, b = {}\nm = {:.2f}, a = {:.2f}'.format(
-                              lmid, bmid, m_sig, a_sig))
+                              lmid, bmid, m_sig, n_sig))
                 ax1.legend()
                 plt.figure('12312')
                 ax_b.errorbar(data_sigs[~skip_flags, 0], fit_sigs[~skip_flags, 0],
@@ -1350,7 +1350,7 @@ class AstrometricCorrections:
                 ylims[1] = max(ylims[1], np.amax(fit_sigs[:, 0]))
 
         np.save('{}/npy/m_sigs_array.npy'.format(self.save_folder), m_sigs)
-        np.save('{}/npy/a_sigs_array.npy'.format(self.save_folder), a_sigs)
+        np.save('{}/npy/n_sigs_array.npy'.format(self.save_folder), n_sigs)
 
         if self.make_plots or self.make_summary_plot:
             plt.figure('123123b')
@@ -1382,7 +1382,7 @@ class AstrometricCorrections:
             ax_b.set_xlabel(r'Input astrometric $\sigma$ / "')
             ax_b.set_ylabel(r'Fit astrometric $\sigma$ / "')
 
-            for i, (f, label) in enumerate(zip([m_sigs, a_sigs], ['m', 'a'])):
+            for i, (f, label) in enumerate(zip([m_sigs, n_sigs], ['m', 'n'])):
                 ax = plt.subplot(gs[i+2])
                 img = ax.scatter(self.lmids, self.bmids, c=f, cmap='viridis')
                 c = plt.colorbar(img, ax=ax, use_gridspec=True)
