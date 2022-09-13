@@ -10,7 +10,11 @@ import datetime
 from configparser import ConfigParser
 from time import sleep
 import numpy as np
-from mpi4py import MPI
+
+try:
+    from mpi4py import MPI
+except:
+    MPI = None
 
 from .perturbation_auf import make_perturb_aufs
 from .group_sources import make_island_groupings
@@ -38,23 +42,41 @@ class CrossMatch():
     resume_file_path : string, optional
         A path to the location of the file containing resume information for the
         cross match.
+    use_mpi : boolean, optional
+        Enable/disable the use of MPI parallelisation (enabled by default).
+    walltime : string, optional
+        Maximum runtime of the cross-match job in format 'HH:MM:SS' (hours, minutes
+        and seconds). Controls checkpointing.
+    end_within : string, optional
+        End time in 'HH:MM:SS' format (hours, minutes and seconds). Default is
+        '00:10:00', i.e. end within 10 minutes of the given walltime.
+    polling_rate : integer, optional
+        Rate in seconds at which manager process checks for new work requests and
+        monitors walltime. Default is 1 second.
     '''
 
     def __init__(self, chunks_folder_path, use_memmap_files=False, resume_file_path=None,
-                 walltime=None, end_within='00:10:00', polling_rate=1):
+                 use_mpi=True, walltime=None, end_within='00:10:00', polling_rate=1):
         '''
         Initialisation function for cross-match class.
         '''
         self.chunks_folder_path = chunks_folder_path
         self.use_memmap_files = use_memmap_files
 
-        # Initialise MPI
-        self.comm = MPI.COMM_WORLD
-        self.rank = self.comm.Get_rank()
-        self.comm_size = self.comm.Get_size()
-        # Set MPI error handling to return exceptions rather than MPI_Abort the.
-        # application. Allows for recovery of crashed workers.
-        self.comm.Set_errhandler(MPI.ERRORS_RETURN)
+        # Initialise MPI if available and enabled
+        if MPI != None and use_mpi:
+            self.comm = MPI.COMM_WORLD
+            self.rank = self.comm.Get_rank()
+            self.comm_size = self.comm.Get_size()
+            # Set MPI error handling to return exceptions rather than MPI_Abort the
+            # application. Allows for recovery of crashed workers.
+            self.comm.Set_errhandler(MPI.ERRORS_RETURN)
+        else:
+            if use_mpi:
+                print("Warning: MPI initialisation failed. Check mpi4py is correctly installed. Falling back to serial mode.")
+            self.rank = 0
+            self.comm_size = 1
+
         # Special signals for MPI processes
         #   'NO_MORE_WORK' - manager uses to signal workers to shut down
         #   'WORK_REQUEST' - manager uses to signal new chunk for processing.
@@ -262,7 +284,6 @@ class CrossMatch():
                             if self.end_time - datetime.datetime.now() < self.end_within:
                                 print('Rank {}: reaching job walltime. Cancelling all further work. {} chunks remain unprocessed.'
                                       .format(self.rank, self.num_chunks_to_process))
-                                out_of_walltime = True
                                 self.chunk_queue.clear()
                                 # Blank end time so we don't re-enter polling loop
                                 self.end_time = None
@@ -306,12 +327,6 @@ class CrossMatch():
                     sys.stdout.flush()
 
                     self.comm.send((signal, new_chunk), dest=worker_id)
-
-                # Completed chunk processing loop. Perform post-processing if all
-                # chunks completed successfully and we are not out of walltime
-                # TODO: parallelise this?
-                if self.num_chunks_to_process == 0 and not out_of_walltime:
-                    self._postprocess_chunk()
 
             # Worker processes:
             #  - request chunk from manager
@@ -380,6 +395,9 @@ class CrossMatch():
         # The final stage of the cross-match process is that of putting together
         # the previous stages, and calculating the cross-match probabilities.
         self.pair_sources(13)
+
+        # Following cross-match completion, perform post-processing
+        self._postprocess_chunk()
 
     def _postprocess_chunk(self):
         '''
