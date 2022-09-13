@@ -11,6 +11,7 @@ import pytest
 from ..matching import CrossMatch
 from ..photometric_likelihood import compute_photometric_likelihoods, make_bins
 from ..photometric_likelihood_fortran import photometric_likelihood_fortran as plf
+from ..misc_functions import StageData
 from .test_matching import _replace_line
 
 
@@ -21,6 +22,9 @@ class TestOneSidedPhotometricLikelihood:
         self.joint_folder_path = 'test_path'
         self.a_cat_folder_path = 'gaia_folder'
         self.b_cat_folder_path = 'wise_folder'
+        self.group_sources_data = StageData(ablen=None, ainds=None, asize=None,
+                                            bblen=None, binds=None, bsize=None)
+        self.use_memmap_files = True
 
         self.area = (134-131)*(1--1)
 
@@ -87,7 +91,7 @@ class TestOneSidedPhotometricLikelihood:
         compute_photometric_likelihoods(
             self.joint_folder_path, self.a_cat_folder_path, self.b_cat_folder_path, self.afilts,
             self.bfilts, self.mem_chunk_num, self.cf_points, self.cf_areas, self.include_phot_like,
-            self.use_phot_priors)
+            self.use_phot_priors, self.group_sources_data, self.use_memmap_files)
 
         for file, shape, value in zip(['c_priors', 'fa_priors', 'fb_priors'],
                                       [(4, 3, 6), (4, 3, 6), (4, 3, 6)],
@@ -143,7 +147,7 @@ class TestOneSidedPhotometricLikelihood:
         compute_photometric_likelihoods(
             self.joint_folder_path, self.a_cat_folder_path, self.b_cat_folder_path, self.afilts,
             self.bfilts, self.mem_chunk_num, self.cf_points, self.cf_areas, self.include_phot_like,
-            self.use_phot_priors)
+            self.use_phot_priors, self.group_sources_data, self.use_memmap_files)
 
         abinlen = np.load('{}/phot_like/abinlengths.npy'.format(self.joint_folder_path))
         assert np.all(abinlen == 51*np.ones((3, 6), int))
@@ -179,7 +183,7 @@ class TestOneSidedPhotometricLikelihood:
         compute_photometric_likelihoods(
             self.joint_folder_path, self.a_cat_folder_path, self.b_cat_folder_path, self.afilts,
             self.bfilts, self.mem_chunk_num, self.cf_points, self.cf_areas, self.include_phot_like,
-            self.use_phot_priors)
+            self.use_phot_priors, self.group_sources_data, self.use_memmap_files)
 
         abinlen = np.load('{}/phot_like/abinlengths.npy'.format(self.joint_folder_path))
         assert np.all(abinlen == 51*np.ones((3, 6), int))
@@ -204,10 +208,12 @@ class TestOneSidedPhotometricLikelihood:
             np.save('{}/magref.npy'.format(folder),
                     np.zeros((len(getattr(self, '{}_astro'.format(name))))))
 
-        self.cm = CrossMatch(os.path.join(os.path.dirname(__file__),
-                                          'data/crossmatch_params_.txt'),
-                             os.path.join(os.path.dirname(__file__), 'data/cat_a_params.txt'),
-                             os.path.join(os.path.dirname(__file__), 'data/cat_b_params.txt'))
+        self.cm = CrossMatch(os.path.join(os.path.dirname(__file__), 'data'), use_memmap_files=True)
+        self.cm._initialise_chunk(os.path.join(os.path.dirname(__file__),
+                                               'data/crossmatch_params_.txt'),
+                                  os.path.join(os.path.dirname(__file__), 'data/cat_a_params.txt'),
+                                  os.path.join(os.path.dirname(__file__), 'data/cat_b_params.txt'))
+        self.cm.group_sources_data = self.group_sources_data
         files_per_phot = 6
         self.cm.calculate_phot_like(files_per_phot)
 
@@ -240,10 +246,12 @@ class TestOneSidedPhotometricLikelihood:
 
     def test_calculate_phot_like_incorrect_files(self):
         os.system('rm -r {}/phot_like/*'.format(self.joint_folder_path))
-        self.cm = CrossMatch(os.path.join(os.path.dirname(__file__),
-                                          'data/crossmatch_params_.txt'),
-                             os.path.join(os.path.dirname(__file__), 'data/cat_a_params.txt'),
-                             os.path.join(os.path.dirname(__file__), 'data/cat_b_params.txt'))
+        self.cm = CrossMatch(os.path.join(os.path.dirname(__file__), 'data'), use_memmap_files=True)
+        self.cm._initialise_chunk(os.path.join(os.path.dirname(__file__),
+                                               'data/crossmatch_params_.txt'),
+                                  os.path.join(os.path.dirname(__file__), 'data/cat_a_params.txt'),
+                                  os.path.join(os.path.dirname(__file__), 'data/cat_b_params.txt'))
+        self.cm.group_sources_data = self.group_sources_data
         self.cm.run_cf = False
         files_per_phot = 6
 
@@ -284,10 +292,12 @@ class TestOneSidedPhotometricLikelihood:
 
     def test_calculate_phot_like_load_files(self, capsys):
         os.system('rm -r {}/phot_like/*'.format(self.joint_folder_path))
-        self.cm = CrossMatch(os.path.join(os.path.dirname(__file__),
-                                          'data/crossmatch_params_.txt'),
-                             os.path.join(os.path.dirname(__file__), 'data/cat_a_params.txt'),
-                             os.path.join(os.path.dirname(__file__), 'data/cat_b_params.txt'))
+        self.cm = CrossMatch(os.path.join(os.path.dirname(__file__), 'data'), use_memmap_files=True)
+        self.cm._initialise_chunk(os.path.join(os.path.dirname(__file__),
+                                               'data/crossmatch_params_.txt'),
+                                  os.path.join(os.path.dirname(__file__), 'data/cat_a_params.txt'),
+                                  os.path.join(os.path.dirname(__file__), 'data/cat_b_params.txt'))
+        self.cm.group_sources_data = self.group_sources_data
         self.cm.run_cf = False
         files_per_phot = 6
 
@@ -418,6 +428,9 @@ class TestFullPhotometricLikelihood:
         self.joint_folder_path = 'test_path'
         self.a_cat_folder_path = 'gaia_folder'
         self.b_cat_folder_path = 'wise_folder'
+        self.group_sources_data = StageData(ablen=None, ainds=None, asize=None,
+                                            bblen=None, binds=None, bsize=None)
+        self.use_memmap_files = True
 
         self.area = 0.25
 
@@ -514,7 +527,8 @@ class TestFullPhotometricLikelihood:
                     compute_photometric_likelihoods(
                         self.joint_folder_path, self.a_cat_folder_path, self.b_cat_folder_path,
                         self.afilts, self.bfilts, self.mem_chunk_num, self.cf_points,
-                        self.cf_areas, ipl, upp, bright_frac=bf, field_frac=ff)
+                        self.cf_areas, ipl, upp, self.group_sources_data, self.use_memmap_files,
+                        bright_frac=bf, field_frac=ff)
 
     def test_compute_phot_like(self):
         os.system('rm -r {}/phot_like/*'.format(self.joint_folder_path))
@@ -524,8 +538,8 @@ class TestFullPhotometricLikelihood:
         compute_photometric_likelihoods(
             self.joint_folder_path, self.a_cat_folder_path, self.b_cat_folder_path,
             self.afilts, self.bfilts, self.mem_chunk_num, self.cf_points,
-            self.cf_areas, self.include_phot_like, self.use_phot_priors, bright_frac=self.Y_b,
-            field_frac=self.Y_f)
+            self.cf_areas, self.include_phot_like, self.use_phot_priors, self.group_sources_data,
+            self.use_memmap_files, bright_frac=self.Y_b, field_frac=self.Y_f)
 
         c_p = np.load('{}/phot_like/c_priors.npy'.format(self.joint_folder_path))
         c_l = np.load('{}/phot_like/c_array.npy'.format(self.joint_folder_path))
@@ -578,8 +592,8 @@ class TestFullPhotometricLikelihood:
         compute_photometric_likelihoods(
             self.joint_folder_path, self.a_cat_folder_path, self.b_cat_folder_path,
             self.afilts, self.bfilts, self.mem_chunk_num, self.cf_points,
-            self.cf_areas, include_phot_like, self.use_phot_priors, bright_frac=self.Y_b,
-            field_frac=self.Y_f)
+            self.cf_areas, include_phot_like, self.use_phot_priors, self.group_sources_data,
+            self.use_memmap_files, bright_frac=self.Y_b, field_frac=self.Y_f)
 
         c_p = np.load('{}/phot_like/c_priors.npy'.format(self.joint_folder_path))
         c_l = np.load('{}/phot_like/c_array.npy'.format(self.joint_folder_path))

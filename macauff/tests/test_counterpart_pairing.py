@@ -292,11 +292,14 @@ class TestCounterpartPairing:
         os.system('rm -r {}/pairing'.format(self.joint_folder_path))
         os.makedirs('{}/pairing'.format(self.joint_folder_path), exist_ok=True)
         mem_chunk_num = 2
+        a_modelrefinds = None
+        b_moderefinds = None
         source_pairing(
             self.joint_folder_path, self.a_cat_folder_path, self.b_cat_folder_path,
             self.a_auf_folder_path, self.b_auf_folder_path, self.a_filt_names, self.b_filt_names,
-            self.a_auf_pointings, self.b_auf_pointings, self.rho, self.drho, self.n_fracs,
-            mem_chunk_num)
+            self.a_auf_pointings, self.b_auf_pointings, a_modelrefinds, b_moderefinds,
+            self.rho, self.drho, self.n_fracs, mem_chunk_num, group_sources_data=None,
+            phot_like_data=None, use_memmap_files=True)
 
         bflux = np.load('{}/pairing/bcontamflux.npy'.format(self.joint_folder_path))
         assert np.all(bflux == np.zeros((2), float))
@@ -385,11 +388,14 @@ class TestCounterpartPairing:
         np.save('{}/group/bgrplen.npy'.format(self.joint_folder_path), bgrplen)
 
         mem_chunk_num = 2
+        a_modelrefinds = None
+        b_moderefinds = None
         source_pairing(
             self.joint_folder_path, self.a_cat_folder_path, self.b_cat_folder_path,
             self.a_auf_folder_path, self.b_auf_folder_path, self.a_filt_names,
-            self.b_filt_names, self.a_auf_pointings, self.b_auf_pointings, self.rho, self.drho,
-            self.n_fracs, mem_chunk_num)
+            self.b_filt_names, self.a_auf_pointings, self.b_auf_pointings, a_modelrefinds, b_moderefinds,
+            self.rho, self.drho, self.n_fracs, mem_chunk_num, group_sources_data=None, phot_like_data=None,
+            use_memmap_files=True)
 
         bflux = np.load('{}/pairing/bcontamflux.npy'.format(self.joint_folder_path))
         assert np.all(bflux == np.zeros((2), float))
@@ -457,12 +463,15 @@ class TestCounterpartPairing:
         np.save('{}/group/bgrplen.npy'.format(self.joint_folder_path), bgrplen)
 
         mem_chunk_num = 2
+        a_modelrefinds = None
+        b_moderefinds = None
         with pytest.warns(UserWarning) as record:
             source_pairing(
                 self.joint_folder_path, self.a_cat_folder_path, self.b_cat_folder_path,
                 self.a_auf_folder_path, self.b_auf_folder_path, self.a_filt_names,
-                self.b_filt_names, self.a_auf_pointings, self.b_auf_pointings, self.rho, self.drho,
-                self.n_fracs, mem_chunk_num)
+                self.b_filt_names, self.a_auf_pointings, self.b_auf_pointings, a_modelrefinds, b_moderefinds,
+                self.rho, self.drho, self.n_fracs, mem_chunk_num, group_sources_data=None, phot_like_data=None,
+                use_memmap_files=True)
         assert len(record) == 2
         assert '2 catalogue a sources not in either counterpart, f' in record[0].message.args[0]
         assert '1 catalogue b source not in either counterpart, f' in record[1].message.args[0]
@@ -514,12 +523,15 @@ class TestCounterpartPairing:
         np.save('{}/group/bgrplen.npy'.format(self.joint_folder_path), bgrplen)
 
         mem_chunk_num = 2
+        a_modelrefinds = None
+        b_moderefinds = None
         with pytest.warns(UserWarning) as record:
             source_pairing(
                 self.joint_folder_path, self.a_cat_folder_path, self.b_cat_folder_path,
                 self.a_auf_folder_path, self.b_auf_folder_path, self.a_filt_names,
-                self.b_filt_names, self.a_auf_pointings, self.b_auf_pointings, self.rho, self.drho,
-                self.n_fracs, mem_chunk_num)
+                self.b_filt_names, self.a_auf_pointings, self.b_auf_pointings, a_modelrefinds, b_moderefinds,
+                self.rho, self.drho, self.n_fracs, mem_chunk_num, group_sources_data=None, phot_like_data=None,
+                use_memmap_files=True)
         assert len(record) == 2
         assert '2 additional catalogue a indices recorded' in record[0].message.args[0]
         assert '1 additional catalogue b index recorded' in record[1].message.args[0]
@@ -548,6 +560,9 @@ class TestCounterpartPairing:
         assert np.all([q not in b_field for q in [0, 1, 3]])
 
     def _setup_cross_match_parameters(self):
+        # Ensure output chunk directory exists
+        os.makedirs(os.path.join(os.path.dirname(__file__), "data/chunk0"), exist_ok=True)
+
         for ol, nl in zip(['cf_region_points = 131 134 4 -1 1 3', 'mem_chunk_num = 10'],
                           ['cf_region_points = 131 131 1 0 0 1\n', 'mem_chunk_num = 2\n']):
             f = open(os.path.join(os.path.dirname(__file__),
@@ -555,7 +570,7 @@ class TestCounterpartPairing:
             idx = np.where([ol in line for line in f])[0][0]
             _replace_line(os.path.join(os.path.dirname(__file__), 'data/crossmatch_params.txt'),
                           idx, nl, out_file=os.path.join(os.path.dirname(__file__),
-                          'data/crossmatch_params_.txt'))
+                          'data/chunk0/crossmatch_params_.txt'))
 
         ol, nl = 'auf_region_points = 131 134 4 -1 1 {}', 'auf_region_points = 0 0 1 0 0 1\n'
         for file_name in ['cat_a_params', 'cat_b_params']:
@@ -565,7 +580,7 @@ class TestCounterpartPairing:
             idx = np.where([_ol in line for line in f])[0][0]
             _replace_line(os.path.join(os.path.dirname(__file__), 'data/{}.txt'.format(file_name)),
                           idx, nl, out_file=os.path.join(os.path.dirname(__file__),
-                          'data/{}_.txt'.format(file_name)))
+                          'data/chunk0/{}_.txt'.format(file_name)))
 
     def test_pair_sources(self):
         os.system('rm -r {}/pairing'.format(self.joint_folder_path))
@@ -578,12 +593,16 @@ class TestCounterpartPairing:
         # Same run as test_source_pairing, but called from CrossMatch rather than
         # directly this time.
         self._setup_cross_match_parameters()
-        self.cm = CrossMatch(os.path.join(os.path.dirname(__file__),
-                             'data/crossmatch_params_.txt'),
-                             os.path.join(os.path.dirname(__file__), 'data/cat_a_params_.txt'),
-                             os.path.join(os.path.dirname(__file__), 'data/cat_b_params_.txt'))
+        self.cm = CrossMatch(os.path.join(os.path.dirname(__file__), 'data'), use_memmap_files=True)
         self.cm.delta_mag_cuts = np.array([2.5, 5])
+        self.cm.a_modelrefinds = None
+        self.cm.b_modelrefinds = None
+        self.cm.group_sources_data = None
+        self.cm.phot_like_data = None
         self.files_per_pairing = 13
+        self.cm._initialise_chunk(os.path.join(os.path.dirname(__file__), 'data/chunk0/crossmatch_params_.txt'),
+                                  os.path.join(os.path.dirname(__file__), 'data/chunk0/cat_a_params_.txt'),
+                                  os.path.join(os.path.dirname(__file__), 'data/chunk0/cat_b_params_.txt'))
         self.cm.pair_sources(self.files_per_pairing)
 
         bflux = np.load('{}/pairing/bcontamflux.npy'.format(self.joint_folder_path))
@@ -653,13 +672,17 @@ class TestCounterpartPairing:
                                   'data/crossmatch_params.txt')).readlines()
             idx = np.where([ol in line for line in f])[0][0]
             _replace_line(os.path.join(os.path.dirname(__file__),
-                          'data/crossmatch_params_.txt'), idx, nl)
-        self.cm = CrossMatch(os.path.join(os.path.dirname(__file__),
-                             'data/crossmatch_params_.txt'),
-                             os.path.join(os.path.dirname(__file__), 'data/cat_a_params_.txt'),
-                             os.path.join(os.path.dirname(__file__), 'data/cat_b_params_.txt'))
+                          'data/chunk0/crossmatch_params_.txt'), idx, nl)
+        self.cm = CrossMatch(os.path.join(os.path.dirname(__file__), 'data'), use_memmap_files=True)
         self.cm.delta_mag_cuts = np.array([2.5, 5])
+        self.cm.a_modelrefinds = None
+        self.cm.b_modelrefinds = None
+        self.cm.group_sources_data = None
+        self.cm.phot_like_data = None
         self.files_per_pairing = 13
+        self.cm._initialise_chunk(os.path.join(os.path.dirname(__file__), 'data/chunk0/crossmatch_params_.txt'),
+                                  os.path.join(os.path.dirname(__file__), 'data/chunk0/cat_a_params_.txt'),
+                                  os.path.join(os.path.dirname(__file__), 'data/chunk0/cat_b_params_.txt'))
         with pytest.warns(UserWarning, match="Incorrect number of counterpart pairing files."):
             self.cm.pair_sources(self.files_per_pairing)
 
@@ -679,12 +702,16 @@ class TestCounterpartPairing:
                                   'data/crossmatch_params.txt')).readlines()
             idx = np.where([ol in line for line in f])[0][0]
             _replace_line(os.path.join(os.path.dirname(__file__),
-                          'data/crossmatch_params_.txt'), idx, nl)
-        self.cm = CrossMatch(os.path.join(os.path.dirname(__file__),
-                             'data/crossmatch_params_.txt'),
-                             os.path.join(os.path.dirname(__file__), 'data/cat_a_params_.txt'),
-                             os.path.join(os.path.dirname(__file__), 'data/cat_b_params_.txt'))
+                          'data/chunk0/crossmatch_params_.txt'), idx, nl)
+        self.cm = CrossMatch(os.path.join(os.path.dirname(__file__), 'data'), use_memmap_files=True)
         self.cm.delta_mag_cuts = np.array([2.5, 5])
+        self.cm.a_modelrefinds = None
+        self.cm.b_modelrefinds = None
+        self.cm.group_sources_data = None
+        self.cm.phot_like_data = None
+        self.cm._initialise_chunk(os.path.join(os.path.dirname(__file__), 'data/chunk0/crossmatch_params_.txt'),
+                                  os.path.join(os.path.dirname(__file__), 'data/chunk0/cat_a_params_.txt'),
+                                  os.path.join(os.path.dirname(__file__), 'data/chunk0/cat_b_params_.txt'))
         capsys.readouterr()
         self.cm.pair_sources(self.files_per_pairing)
         output = capsys.readouterr().out

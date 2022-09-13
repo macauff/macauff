@@ -21,9 +21,10 @@ class TestCreatePerturbAUF:
     def setup_class(self):
         os.makedirs('gaia_auf_folder', exist_ok=True)
         os.makedirs('wise_auf_folder', exist_ok=True)
-        self.cm = CrossMatch(os.path.join(os.path.dirname(__file__), 'data/crossmatch_params.txt'),
-                             os.path.join(os.path.dirname(__file__), 'data/cat_a_params.txt'),
-                             os.path.join(os.path.dirname(__file__), 'data/cat_b_params.txt'))
+        self.cm = CrossMatch(os.path.join(os.path.dirname(__file__), 'data'), use_memmap_files=True)
+        self.cm._initialise_chunk(os.path.join(os.path.dirname(__file__), 'data/crossmatch_params.txt'),
+                                  os.path.join(os.path.dirname(__file__), 'data/cat_a_params.txt'),
+                                  os.path.join(os.path.dirname(__file__), 'data/cat_b_params.txt'))
         self.cm.a_auf_region_points = np.array([[0, 0], [50, 50]], dtype=float)
         self.cm.b_auf_region_points = np.array([[0, 0], [50, 50]], dtype=float)
         self.cm.mem_chunk_num = 4
@@ -86,6 +87,7 @@ class TestCreatePerturbAUF:
         os.system("rm -rf {}/*".format(self.cm.a_auf_folder_path))
         os.system("rm -rf {}/*".format(self.cm.b_auf_folder_path))
         self.cm.run_auf = False
+
         with pytest.warns(UserWarning, match='Incorrect number of files in catalogue "a"'):
             self.cm.create_perturb_auf(self.files_per_auf_sim)
 
@@ -347,7 +349,7 @@ class TestMakePerturbAUFs():
 
         self.args = [self.auf_folder, self.cat_folder, self.filters, self.auf_points,
                      self.r, self.dr, self.rho, self.drho, self.which_cat,
-                     self.include_perturb_auf, self.mem_chunk_num]
+                     self.include_perturb_auf, self.mem_chunk_num, True]
 
         self.files_per_auf_sim = 7
 
@@ -680,10 +682,11 @@ class TestMakePerturbAUFs():
             _replace_line(os.path.join(os.path.dirname(__file__), 'data/cat_b_params_.txt'),
                           idx, nl)
 
-        cm = CrossMatch(os.path.join(os.path.dirname(__file__),
-                                     'data/crossmatch_params_.txt'),
-                        os.path.join(os.path.dirname(__file__), 'data/cat_a_params_.txt'),
-                        os.path.join(os.path.dirname(__file__), 'data/cat_b_params_.txt'))
+        cm = CrossMatch(os.path.join(os.path.dirname(__file__), 'data'), use_memmap_files=True)
+        cm._initialise_chunk(os.path.join(os.path.dirname(__file__),
+                                          'data/crossmatch_params_.txt'),
+                             os.path.join(os.path.dirname(__file__), 'data/cat_a_params_.txt'),
+                             os.path.join(os.path.dirname(__file__), 'data/cat_b_params_.txt'))
 
         cm.a_auf_region_points = new_auf_points
         cm.b_auf_region_points = new_auf_points
@@ -834,10 +837,11 @@ class TestMakePerturbAUFs():
             _replace_line(os.path.join(os.path.dirname(__file__), 'data/cat_b_params_.txt'),
                           idx, nl)
 
-        cm = CrossMatch(os.path.join(os.path.dirname(__file__),
-                                     'data/crossmatch_params_.txt'),
-                        os.path.join(os.path.dirname(__file__), 'data/cat_a_params_.txt'),
-                        os.path.join(os.path.dirname(__file__), 'data/cat_b_params_.txt'))
+        cm = CrossMatch(os.path.join(os.path.dirname(__file__), 'data'), use_memmap_files=True)
+        cm._initialise_chunk(os.path.join(os.path.dirname(__file__),
+                                          'data/crossmatch_params_.txt'),
+                             os.path.join(os.path.dirname(__file__), 'data/cat_a_params_.txt'),
+                             os.path.join(os.path.dirname(__file__), 'data/cat_b_params_.txt'))
 
         cm.a_auf_region_points = self.auf_points
         cm.b_auf_region_points = self.auf_points

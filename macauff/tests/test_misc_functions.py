@@ -45,7 +45,8 @@ def test_create_fourier_offsets_grid():
             np.save('{}/{}/{}/fourier.npy'.format(ax1, ax2, filt),
                     (i + len(filt_names)*j)*np.ones((len(r[:-1]), a_len[i, j]), float))
 
-    create_auf_params_grid('.', auf_pointings, filt_names, 'fourier', len(r)-1)
+    create_auf_params_grid('.', auf_pointings, filt_names, 'fourier',
+                           use_memmap_files=True, len_first_axis=len(r)-1)
     a = np.lib.format.open_memmap('{}/fourier_grid.npy'.format(
         '.'), mode='r', dtype=float, shape=(9, 15, 2, 3), fortran_order=True)
     assert np.all(a.shape == (9, 15, 2, 3))
@@ -99,7 +100,7 @@ def test_hav_dist_constant_lat():
 
 def test_large_small_index():
     inds = np.array([0, 10, 15, 10, 35])
-    a, b = map_large_index_to_small_index(inds, 40, '.')
+    a, b = map_large_index_to_small_index(inds, 40, '.', use_memmap_files=True)
     assert np.all(a == np.array([0, 1, 2, 1, 3]))
     assert np.all(b == np.array([0, 10, 15, 35]))
 
@@ -136,5 +137,5 @@ def test_load_single_sky_slice():
 
     rng = np.random.default_rng(6123123)
     sky_inds = rng.choice(5, size=5000)
-    sky_cut = _load_single_sky_slice(folder_path, cat_name, ind, sky_inds)
+    sky_cut = _load_single_sky_slice(folder_path, cat_name, ind, sky_inds, use_memmap_files=True)
     assert np.all(sky_cut == (sky_inds == ind))
