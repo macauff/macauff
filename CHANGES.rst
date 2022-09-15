@@ -93,7 +93,7 @@ API Changes
 - Removed ``joint_file_path``, ``cat_a_file_path`` and ``cat_b_file_path``
   from ``CrossMatch`` constructor and added ``chunks_folder_path``,
   ``use_memmap_files``, ``resume_file_path``, ``walltime``, ``end_within``,
-  and ``polling_rate. [#49]
+  and ``polling_rate``. [#49]
 
 - Added ``use_memmap_files`` as input parameter to relevant functions. [#49]
 
