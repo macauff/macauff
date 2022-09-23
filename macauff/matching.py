@@ -6,8 +6,15 @@ This module provides the high-level framework for performing catalogue-catalogue
 import os
 import sys
 import warnings
+import datetime
 from configparser import ConfigParser
+from time import sleep
 import numpy as np
+
+try:
+    from mpi4py import MPI
+except:
+    MPI = None
 
 from .perturbation_auf import make_perturb_aufs
 from .group_sources import make_island_groupings
@@ -24,26 +31,120 @@ class CrossMatch():
     A class to cross-match two photometric catalogues with one another, producing
     a composite catalogue of merged sources.
 
-    The class takes three paths, the locations of the metadata files containing
-    all of the necessary parameters for the cross-match, and outputs a file
-    containing the appropriate columns of the datasets plus additional derived
-    parameters.
-
     Parameters
     ----------
-    joint_file_path : string
-        A path to the location of the file containing the cross-match metadata.
-    cat_a_file_path : string
-        A path to the location of the file containing the catalogue "a" specific
-        metadata.
-    cat_b_file_path : string
-        A path to the location of the file containing the catalogue "b" specific
-        metadata.
+    chunks_folder_path : string
+        A path to the location of the folder containing one subfolder per chunk.
+    use_memmap_files : boolean
+        When set to True, memory mapped files are used for several internal
+        arrays. Reduces memory consumption bottlenecks at the cost of increased
+        I/O contention.
+    resume_file_path : string, optional
+        A path to the location of the file containing resume information for the
+        cross match.
+    use_mpi : boolean, optional
+        Enable/disable the use of MPI parallelisation (enabled by default).
+    walltime : string, optional
+        Maximum runtime of the cross-match job in format 'HH:MM:SS' (hours, minutes
+        and seconds). Controls checkpointing.
+    end_within : string, optional
+        End time in 'HH:MM:SS' format (hours, minutes and seconds). Default is
+        '00:10:00', i.e. end within 10 minutes of the given walltime.
+    polling_rate : integer, optional
+        Rate in seconds at which manager process checks for new work requests and
+        monitors walltime. Default is 1 second.
     '''
 
-    def __init__(self, joint_file_path, cat_a_file_path, cat_b_file_path):
+    def __init__(self, chunks_folder_path, use_memmap_files=False, resume_file_path=None,
+                 use_mpi=True, walltime=None, end_within='00:10:00', polling_rate=1):
         '''
         Initialisation function for cross-match class.
+        '''
+        self.chunks_folder_path = chunks_folder_path
+        self.use_memmap_files = use_memmap_files
+
+        # Initialise MPI if available and enabled
+        if MPI != None and use_mpi:
+            self.comm = MPI.COMM_WORLD
+            self.rank = self.comm.Get_rank()
+            self.comm_size = self.comm.Get_size()
+            # Set MPI error handling to return exceptions rather than MPI_Abort the
+            # application. Allows for recovery of crashed workers.
+            self.comm.Set_errhandler(MPI.ERRORS_RETURN)
+        else:
+            if use_mpi:
+                print("Warning: MPI initialisation failed. Check mpi4py is correctly installed. Falling back to serial mode.")
+            self.rank = 0
+            self.comm_size = 1
+
+        # Special signals for MPI processes
+        #   'NO_MORE_WORK' - manager uses to signal workers to shut down
+        #   'WORK_REQUEST' - manager uses to signal new chunk for processing.
+        #                    worker uses to request initial chunk from manager.
+        #   'WORK_COMPLETE' - worker uses to report successfully processed given chunk
+        #   'WORK_ERROR' - worker uses to report failed processing of given chunk
+        self.worker_signals = { 'NO_MORE_WORK': 0,
+                                'WORK_REQUEST': 1,
+                                'WORK_COMPLETE': 2,
+                                'WORK_ERROR': 3 }
+        # Only manager process needs to set up the resume file and queue
+        if self.rank == 0:
+            completed_chunks = set()
+            try:
+                # Open and read existing resume file
+                self.resume_file = open(resume_file_path, 'r+')
+                for line in self.resume_file:
+                    completed_chunks.add(line.rstrip())
+            except FileNotFoundError:
+                # Resume file specified but does not exist. Create new one.
+                self.resume_file = open(resume_file_path, 'w')
+            except TypeError:
+                # Resume file was not specified. Disable checkpointing
+                self.resume_file = None
+            # Chunk queue will not contain chunks recorded as completed in the
+            # resume file
+            self.chunk_queue = self._make_chunk_queue(completed_chunks)
+            # Used to keep track of progress to completion
+            self.num_chunks_to_process = len(self.chunk_queue)
+
+            # In seconds, how often the manager checks for new work requests
+            self.polling_rate = polling_rate
+
+            if walltime != None:
+                # Expect job walltime and "end within" time in Hours:Minutes:Seconds (%H:%M:%S)
+                # format, e.g. 02:44:12 for 2 hours, 44 minutes, 12 seconds
+                # Calculate job end time from start time + walltime
+                t = datetime.datetime.strptime(walltime, '%H:%M:%S')
+                self.end_time = datetime.datetime.now() + \
+                    datetime.timedelta(hours=t.hour, minutes=t.minute, seconds=t.second)
+                # Keep track of "end within" time as a timedelta for easy comparison
+                t = datetime.datetime.strptime(end_within, '%H:%M:%S')
+                self.end_within = \
+                    datetime.timedelta(hours=t.hour, minutes=t.minute, seconds=t.second)
+            else:
+                self.end_time = None
+                self.end_within = None
+
+
+    def _initialise_chunk(self, joint_file_path, cat_a_file_path, cat_b_file_path):
+        '''
+        Initialisation function for a single chunk of sky.
+
+        The function takes three paths, the locations of the metadata files containing
+        all of the necessary parameters for the cross-match, and outputs a file
+        containing the appropriate columns of the datasets plus additional derived
+        parameters.
+
+        Parameters
+        ----------
+        joint_file_path : string
+            A path to the location of the file containing the cross-match metadata.
+        cat_a_file_path : string
+            A path to the location of the file containing the catalogue "a" specific
+            metadata.
+        cat_b_file_path : string
+            A path to the location of the file containing the catalogue "b" specific
+            metadata.
         '''
         for f in [joint_file_path, cat_a_file_path, cat_b_file_path]:
             if not os.path.isfile(f):
@@ -139,9 +240,143 @@ class CrossMatch():
 
     def __call__(self):
         '''
-        Call function for CrossMatch, to run the various stages of cross-matching
-        two photometric catalogues.
+        Call function for CrossMatch, performs cross-matching two photometric catalogues.
         '''
+
+        # Special case for single process, i.e. serial version of code.
+        # Do not use manager-worker pattern. Instead, one process loops over all chunks
+        if self.comm_size == 1:
+            for (chunk_id, joint_file_path, cat_a_file_path, cat_b_file_path) in self.chunk_queue:
+                print('Rank {} processing chunk {}'.format(self.rank, chunk_id))
+                self._process_chunk(joint_file_path, cat_a_file_path, cat_b_file_path)
+                if self.resume_file != None:
+                    self.resume_file.write(chunk_id+'\n')
+        else:
+            # Manager process:
+            #   - assigns chunks to workers
+            #   - receives notification of completed or failed cross-matches
+            #   - writes completed chunk IDs to resume file
+            #   - TODO handle crashed workers (segfaults in Fortran routines currently unrecoverable)
+            #   - TODO handle crashed manager process
+            #   - once queue is empty, workers are sent signal to stop
+            if self.rank == 0:
+                # Maintain count of active workers.
+                # Initially every process other than manager.
+                active_workers = self.comm_size - 1
+
+                # Loop until all workers have been instructed there is no more work
+                out_of_walltime = False
+                while active_workers > 0:
+                    # If checkpointing disabled, simply wait for any worker to
+                    # request a chunk and report completion of any previous chunk
+                    if self.end_time == None:
+                        (signal, worker_id, chunk_id) = self.comm.recv()
+                    # Otherwise, use non-blocking recv to allow manager to keep
+                    # track of job time via polling loop
+                    else:
+                        req = self.comm.irecv()
+                        # Use an infinite loop with break rather than "while not req.Get_status()"
+                        # to ensure walltime is checked even if request returns immediately, i.e.
+                        # emulate a "do-while" loop
+                        while True:
+                            # Check if we're reaching the limit of job walltime. If so,
+                            # empty the queue so no further work is issued
+                            if self.end_time - datetime.datetime.now() < self.end_within:
+                                print('Rank {}: reaching job walltime. Cancelling all further work. {} chunks remain unprocessed.'
+                                      .format(self.rank, self.num_chunks_to_process))
+                                self.chunk_queue.clear()
+                                # Blank end time so we don't re-enter polling loop
+                                self.end_time = None
+                                break
+                            if req.Get_status():
+                                break
+                            sleep(self.polling_rate)
+                        # Request complete, extract data
+                        (signal, worker_id, chunk_id) = req.wait()
+
+                    # Record completed chunk
+                    if signal == self.worker_signals['WORK_COMPLETE'] \
+                    and self.resume_file != None:
+                        print('Rank {}: chunk {} processed by rank {}. Adding to resume file.'
+                              .format(self.rank, chunk_id, worker_id))
+                        self.resume_file.write(chunk_id+'\n')
+                        # Do not buffer. Immediately commit to disk for
+                        # resilience against crashes and overrunning walltime
+                        # flush() alone is not enough. See:
+                        # https://docs.python.org/3/library/os.html#os.fsync
+                        self.resume_file.flush()
+                        os.fsync(self.resume_file)
+                        # Update number of remaining chunks to process
+                        self.num_chunks_to_process -= 1
+                    # Handle failed chunk
+                    elif signal == self.worker_signals['WORK_ERROR']:
+                        print('Rank {}: rank {} failed to process chunk {}.'
+                              .format(self.rank, worker_id, chunk_id))
+
+                    # Assign chunks until no more work.
+                    # Then count "no more work" signals until no more workers.
+                    try:
+                        new_chunk = self.chunk_queue.pop(0)
+                        signal = self.worker_signals['WORK_REQUEST']
+                        print('Rank {}: sending rank {} chunk {}'.format(self.rank, worker_id, new_chunk[0]))
+                    except IndexError:
+                        new_chunk = None
+                        signal = self.worker_signals['NO_MORE_WORK']
+                        active_workers -= 1
+
+                    sys.stdout.flush()
+
+                    self.comm.send((signal, new_chunk), dest=worker_id)
+
+            # Worker processes:
+            #  - request chunk from manager
+            #  - loop until given signal to terminate
+            else:
+                signal = self.worker_signals['WORK_REQUEST']
+                completed_chunk_id = None
+                # Infinite loop until given signal to break
+                while True:
+                    # Send own rank ID to manager so it knows which process to assign work
+                    # in addition to signal and completed chunk id
+                    self.comm.send((signal, self.rank, completed_chunk_id), dest=0)
+                    (signal, chunk) = self.comm.recv(source=0)
+
+                    # Handle received signal.
+                    # Terminate when signalled there is no more work...
+                    if signal == self.worker_signals['NO_MORE_WORK']:
+                        break
+                    # ...or process the given chunk
+                    else:
+                        (chunk_id, joint_file_path, cat_a_file_path, cat_b_file_path) = chunk
+                        print('Rank {}: processing chunk {}'.format(self.rank, chunk_id))
+
+                        try:
+                            self._process_chunk(joint_file_path, cat_a_file_path, cat_b_file_path)
+                            signal = self.worker_signals['WORK_COMPLETE']
+                        except Exception as e:
+                            # Recover worker on chunk processing error
+                            signal = self.worker_signals['WORK_ERROR']
+                            # TODO More granular error handling
+                            print("Rank {}: failed to process chunk{}. Exception: {}"
+                                  .format(self.rank, e))
+
+                        completed_chunk_id = chunk_id
+
+                    sys.stdout.flush()
+
+        # Clean up and shut down
+        self._cleanup()
+
+
+    def _process_chunk(self, joint_file_path, cat_a_file_path, cat_b_file_path):
+        '''
+        Runs the various stages of cross-matching two photometric catalogues
+        '''
+        # Initialise using the current chunk data
+        # TODO Move some initialisation into class constructor?
+        # TODO Have manager perform file loads and broadcast result to reduce I/O
+        self._initialise_chunk(joint_file_path, cat_a_file_path, cat_b_file_path)
+
         # The first step is to create the perturbation AUF components, if needed.
         # If run_auf is set to True or if there are not the appropriate number of
         # pre-saved outputs from a previous run then run perturbation AUF creation.
@@ -160,6 +395,88 @@ class CrossMatch():
         # The final stage of the cross-match process is that of putting together
         # the previous stages, and calculating the cross-match probabilities.
         self.pair_sources(13)
+
+        # Following cross-match completion, perform post-processing
+        self._postprocess_chunk()
+
+    def _postprocess_chunk(self):
+        '''
+        Runs the post-processing stage, resolving duplicate cross-matches and
+        other edge cases.
+        '''
+        # TODO Function body
+        print("_postprocess_chunk function run")
+
+    def _make_chunk_queue(self, completed_chunks):
+        '''
+        Determines the order with which chunks will be processed
+
+        Returns
+        -------
+        chunk_queue : list of tuples of strings
+            List with one element per chunk. Each element a tuple of chunk ID and
+            paths to metadata files in order (ID, cross-match, catalogue "a", catalogue "b")
+        '''
+        # Each metadata file associated with a chunk assumed to be in a subfolder
+        # e.g. Two chunks, "2017" and "2018", have structure:
+        #   chunks_folder_path/2017/crossmatch_params_2017.txt
+        #   chunks_folder_path/2017/cat_a_params_2017.txt
+        #   chunks_folder_path/2017/cat_b_params_2017.txt
+        #   chunks_folder_path/2018/crossmatch_params_2018.txt
+        #   chunks_folder_path/2018/cat_a_params_2018.txt
+        #   chunks_folder_path/2018/cat_b_params_2018.txt
+
+        # List subfolders in chunks folder
+        # Ordering is determined by os.listdir
+        # Skip chunks completed in a previous run
+        subfolders = [name for name in os.listdir(self.chunks_folder_path)
+                      if os.path.isdir(os.path.join(self.chunks_folder_path, name))
+                      and name not in completed_chunks]
+
+        # Loop over subfolders, extracting paths to metadata files contained within
+        chunk_queue = []
+        for folder in subfolders:
+
+            # Identify chunk by subfolder name
+            chunk_id = folder
+            joint_file_path = ""
+            cat_a_file_path = ""
+            cat_b_file_path = ""
+
+            folder_path = os.path.join(self.chunks_folder_path, folder)
+            for filename in os.listdir(folder_path):
+                # Ignore non-txt files
+                if filename.endswith(".txt"):
+                    # TODO Relying on particular naming convention for metadata files
+                    if filename.startswith("crossmatch_params"):
+                        joint_file_path = os.path.join(folder_path, filename)
+                    elif filename.startswith("cat_a_params"):
+                        cat_a_file_path = os.path.join(folder_path, filename)
+                    elif filename.startswith("cat_b_params"):
+                        cat_b_file_path = os.path.join(folder_path, filename)
+
+            # Check results
+            if joint_file_path == "":
+                raise FileNotFoundError('Cross-match metadata file for chunk {} not found in directory {}'
+                                        .format(chunk_id, folder_path))
+            if cat_a_file_path == "":
+                raise FileNotFoundError('Catalogue "a" metadata file for chunk {} not found in directory {}'
+                                        .format(chunk_id, folder_path))
+            if cat_b_file_path == "":
+                raise FileNotFoundError('Catalogue "b" metadata file for chunk {} not found in directory {}'
+                                        .format(chunk_id, folder_path))
+
+            # Append result as tuple of ID and all 3 paths
+            chunk_queue.append((chunk_id, joint_file_path, cat_a_file_path, cat_b_file_path))
+
+        return chunk_queue
+
+    def _cleanup(self):
+        '''
+        Final clean up operations before application shut down
+        '''
+        if self.rank == 0 and self.resume_file != None:
+            self.resume_file.close()
 
     def _str2bool(self, v):
         '''
@@ -608,10 +925,10 @@ class CrossMatch():
             else:
                 os.system("rm -rf {}/*".format(self.a_auf_folder_path))
                 _kwargs = {}
-            perturb_auf_func(self.a_auf_folder_path, self.a_cat_folder_path, self.a_filt_names,
-                             self.a_auf_region_points, self.r, self.dr,
-                             self.rho, self.drho, 'a', self.include_perturb_auf,
-                             self.mem_chunk_num, **_kwargs)
+            self.a_modelrefinds = perturb_auf_func(self.a_auf_folder_path, self.a_cat_folder_path, self.a_filt_names,
+                                                   self.a_auf_region_points, self.r, self.dr,
+                                                   self.rho, self.drho, 'a', self.include_perturb_auf,
+                                                   self.mem_chunk_num, self.use_memmap_files, **_kwargs)
         else:
             print('Loading empirical perturbation AUFs for catalogue "a"...')
             sys.stdout.flush()
@@ -673,10 +990,10 @@ class CrossMatch():
             else:
                 os.system("rm -rf {}/*".format(self.b_auf_folder_path))
                 _kwargs = {}
-            perturb_auf_func(self.b_auf_folder_path, self.b_cat_folder_path, self.b_filt_names,
-                             self.b_auf_region_points, self.r, self.dr,
-                             self.rho, self.drho, 'b', self.include_perturb_auf,
-                             self.mem_chunk_num, **_kwargs)
+            self.b_modelrefinds = perturb_auf_func(self.b_auf_folder_path, self.b_cat_folder_path, self.b_filt_names,
+                                                   self.b_auf_region_points, self.r, self.dr,
+                                                   self.rho, self.drho, 'b', self.include_perturb_auf,
+                                                   self.mem_chunk_num, self.use_memmap_files, **_kwargs)
         else:
             print('Loading empirical perturbation AUFs for catalogue "b"...')
             sys.stdout.flush()
@@ -731,12 +1048,15 @@ class CrossMatch():
                 self.run_cf, self.run_source = True, True
             os.system('rm -rf {}/group/*'.format(self.joint_folder_path))
             os.system('rm -rf {}/reject/*'.format(self.joint_folder_path))
-            group_func(self.joint_folder_path, self.a_cat_folder_path, self.b_cat_folder_path,
-                       self.a_auf_folder_path, self.b_auf_folder_path, self.a_auf_region_points,
-                       self.b_auf_region_points, self.a_filt_names, self.b_filt_names,
-                       self.a_cat_name, self.b_cat_name, self.r, self.dr, self.rho, self.drho,
-                       self.j1s, self.pos_corr_dist, self.cross_match_extent, self.int_fracs,
-                       self.mem_chunk_num, self.include_phot_like, self.use_phot_priors, n_pool)
+            self.group_sources_data = \
+                group_func(self.joint_folder_path, self.a_cat_folder_path, self.b_cat_folder_path,
+                           self.a_auf_folder_path, self.b_auf_folder_path, self.a_auf_region_points,
+                           self.b_auf_region_points, self.a_filt_names, self.b_filt_names,
+                           self.a_cat_name, self.b_cat_name, self.a_modelrefinds, self.b_modelrefinds,
+                           self.r, self.dr, self.rho, self.drho,
+                           self.j1s, self.pos_corr_dist, self.cross_match_extent, self.int_fracs,
+                           self.mem_chunk_num, self.include_phot_like, self.use_phot_priors,
+                           n_pool, self.use_memmap_files)
         else:
             print('Loading catalogue islands and overlaps...')
             sys.stdout.flush()
@@ -779,11 +1099,11 @@ class CrossMatch():
             else:
                 bright_frac = None
                 field_frac = None
-            phot_like_func(
-                self.joint_folder_path, self.a_cat_folder_path, self.b_cat_folder_path,
-                self.a_filt_names, self.b_filt_names, self.mem_chunk_num, self.cf_region_points,
-                self.cf_areas, self.include_phot_like, self.use_phot_priors, bright_frac,
-                field_frac)
+            self.phot_like_data = phot_like_func(
+                    self.joint_folder_path, self.a_cat_folder_path, self.b_cat_folder_path,
+                    self.a_filt_names, self.b_filt_names, self.mem_chunk_num, self.cf_region_points,
+                    self.cf_areas, self.include_phot_like, self.use_phot_priors, self.group_sources_data,
+                    self.use_memmap_files, bright_frac, field_frac)
         else:
             print('Loading photometric priors and likelihoods...')
             sys.stdout.flush()
@@ -850,7 +1170,8 @@ class CrossMatch():
                 self.joint_folder_path, self.a_cat_folder_path, self.b_cat_folder_path,
                 self.a_auf_folder_path, self.b_auf_folder_path, self.a_filt_names,
                 self.b_filt_names, self.a_auf_region_points, self.b_auf_region_points,
-                self.rho, self.drho, len(self.delta_mag_cuts), self.mem_chunk_num)
+                self.a_modelrefinds, self.b_modelrefinds, self.rho, self.drho, len(self.delta_mag_cuts),
+                self.mem_chunk_num, self.group_sources_data, self.phot_like_data, self.use_memmap_files)
         else:
             print('Loading pre-assigned counterparts...')
             sys.stdout.flush()

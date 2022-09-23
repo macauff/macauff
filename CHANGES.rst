@@ -7,6 +7,11 @@ General
 New Features
 ^^^^^^^^^^^^
 
+- Added MPI parallelisation and checkpointing. [#49]
+
+- Added option to disable use of memory-mapped files for internal arrays.
+  Reduces I/O operations at the cost of increased memory consuption. [#49]
+
 - Inclusion of galaxy count model, used in the generation of perturbation
   AUF components. [#41, #44]
 
@@ -85,6 +90,15 @@ Bug Fixes
 API Changes
 ^^^^^^^^^^^
 
+- Removed ``joint_file_path``, ``cat_a_file_path`` and ``cat_b_file_path``
+  from ``CrossMatch`` constructor and added ``chunks_folder_path``,
+  ``use_memmap_files``, ``resume_file_path``, ``walltime``, ``end_within``,
+  and ``polling_rate``. [#49]
+
+- Added ``use_memmap_files`` as input parameter to relevant functions. [#49]
+
+- Added ``StageData`` class to ``misc_functions``. [#49]
+
 - Added ``npool`` as input parameter to ``make_island_groupings``. [#38]
 
 - Removed ``npool`` as input parameter to ``source_pairing``. [#38]
@@ -111,6 +125,8 @@ API Changes
 
 Other Changes
 ^^^^^^^^^^^^^
+
+- Added ``mpi4py`` as a dependency [#49]
 
 - Added ``skypy`` and ``speclite`` as dependencies. [#41]
 

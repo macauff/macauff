@@ -3,7 +3,7 @@ from numpy.distutils.core import Extension, setup
 
 names = ['group_sources_fortran', 'misc_functions_fortran', 'counterpart_pairing_fortran',
          'photometric_likelihood_fortran', 'perturbation_auf_fortran']
-f90_args = ["-Wall", "-Wextra", "-Werror", "-pedantic", "-fbacktrace", "-O0", "-g", "-fcheck=all",
+f90_args = ["-Wall", "-Wextra", "-Werror", "-pedantic", "-fbacktrace", "-O3", "-g", "-fcheck=all",
             "-fopenmp"]
 
 extension = [Extension(name='macauff.{}'.format(name), sources=['macauff/{}.f90'.format(name)],

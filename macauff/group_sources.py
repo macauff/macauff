@@ -13,7 +13,7 @@ import numpy as np
 
 from .misc_functions import (load_small_ref_auf_grid, hav_dist_constant_lat,
                              map_large_index_to_small_index, _load_rectangular_slice,
-                             _create_rectangular_slice_arrays)
+                             _create_rectangular_slice_arrays, StageData)
 from .group_sources_fortran import group_sources_fortran as gsf
 from .make_set_list import set_list
 
@@ -22,9 +22,9 @@ __all__ = ['make_island_groupings']
 
 def make_island_groupings(joint_folder_path, a_cat_folder_path, b_cat_folder_path,
                           a_auf_folder_path, b_auf_folder_path, a_auf_pointings, b_auf_pointings,
-                          a_filt_names, b_filt_names, a_title, b_title, r, dr, rho, drho, j1s,
-                          max_sep, ax_lims, int_fracs, mem_chunk_num, include_phot_like,
-                          use_phot_priors, n_pool):
+                          a_filt_names, b_filt_names, a_title, b_title, a_modelrefinds, b_modelrefinds,
+                          r, dr, rho, drho, j1s, max_sep, ax_lims, int_fracs, mem_chunk_num,
+                          include_phot_like, use_phot_priors, n_pool, use_memmap_files):
     '''
     Function to handle the creation of "islands" of astrometrically coeval
     sources, and identify which overlap to some probability based on their
@@ -59,6 +59,14 @@ def make_island_groupings(joint_folder_path, a_cat_folder_path, b_cat_folder_pat
         Name used to describe catalogue "a" in the cross-match.
     b_title : string
         Catalogue "b" description, for identifying its given folder.
+    a_modelrefinds : numpy.ndarray
+        Catalogue "a" modelrefinds array output from ``create_perturb_auf``. Used
+        only when use_memmap_files is False.
+        TODO Improve description
+    b_modelrefinds : numpy.ndarray
+        Catalogue "b" modelrefinds array output from ``create_perturb_auf``. Used
+        only when use_memmap_files is False.
+        TODO Improve description
     r : numpy.ndarray
         Array of real-space distances, in arcseconds, used in the evaluation of
         convolved AUF integrals; represent bin edges.
@@ -95,6 +103,10 @@ def make_island_groupings(joint_folder_path, a_cat_folder_path, b_cat_folder_pat
         calculate photometric-information dependent priors for cross-matching.
     n_pool : integer
         Number of multiprocessing pools to use when parallelising.
+    use_memmap_files : boolean
+        When set to True, memory mapped files are used for several internal
+        arrays. Reduces memory consumption at the cost of increased I/O
+        contention.
     '''
 
     # Convert from arcseconds to degrees internally.
@@ -134,25 +146,33 @@ def make_island_groupings(joint_folder_path, a_cat_folder_path, b_cat_folder_pat
     b_full = np.load('{}/con_cat_astro.npy'.format(b_cat_folder_path), mmap_mode='r')
 
     # Generate the necessary memmap sky slice arrays now.
-    _create_rectangular_slice_arrays(joint_folder_path, 'a', len(a_full))
     memmap_slice_arrays_a = []
-    for n in ['1', '2', '3', '4', 'combined']:
-        memmap_slice_arrays_a.append(np.lib.format.open_memmap(
-            '{}/{}_temporary_sky_slice_{}.npy'.format(joint_folder_path, 'a', n), mode='r+',
-            dtype=bool, shape=(len(a_full),)))
-    _create_rectangular_slice_arrays(joint_folder_path, 'b', len(b_full))
     memmap_slice_arrays_b = []
-    for n in ['1', '2', '3', '4', 'combined']:
-        memmap_slice_arrays_b.append(np.lib.format.open_memmap(
-            '{}/{}_temporary_sky_slice_{}.npy'.format(joint_folder_path, 'b', n), mode='r+',
-            dtype=bool, shape=(len(b_full),)))
+    if use_memmap_files:
+        _create_rectangular_slice_arrays(joint_folder_path, 'a', len(a_full))
+        for n in ['1', '2', '3', '4', 'combined']:
+            memmap_slice_arrays_a.append(np.lib.format.open_memmap(
+                '{}/{}_temporary_sky_slice_{}.npy'.format(joint_folder_path, 'a', n), mode='r+',
+                dtype=bool, shape=(len(a_full),)))
 
-    asize = np.lib.format.open_memmap('{}/group/asize.npy'.format(joint_folder_path), mode='w+',
+        _create_rectangular_slice_arrays(joint_folder_path, 'b', len(b_full))
+        for n in ['1', '2', '3', '4', 'combined']:
+            memmap_slice_arrays_b.append(np.lib.format.open_memmap(
+                '{}/{}_temporary_sky_slice_{}.npy'.format(joint_folder_path, 'b', n), mode='r+',
+                dtype=bool, shape=(len(b_full),)))
+
+        asize = np.lib.format.open_memmap('{}/group/asize.npy'.format(joint_folder_path), mode='w+',
                                       dtype=int, shape=(len(a_full),))
-    asize[:] = 0
-    bsize = np.lib.format.open_memmap('{}/group/bsize.npy'.format(joint_folder_path), mode='w+',
-                                      dtype=int, shape=(len(b_full),))
-    bsize[:] = 0
+        asize[:] = 0
+        bsize = np.lib.format.open_memmap('{}/group/bsize.npy'.format(joint_folder_path), mode='w+',
+                                        dtype=int, shape=(len(b_full),))
+        bsize[:] = 0
+    else:
+        for _ in range(5):
+            memmap_slice_arrays_a.append(np.zeros(dtype=bool, shape=(len(a_full),)))
+            memmap_slice_arrays_b.append(np.zeros(dtype=bool, shape=(len(b_full),)))
+        asize = np.zeros(dtype=int, shape=(len(a_full),))
+        bsize = np.zeros(dtype=int, shape=(len(b_full),))
 
     for i, (ax1_sparse_start, ax1_sparse_end) in enumerate(zip(ax1_sparse_loops[:-1],
                                                                ax1_sparse_loops[1:])):
@@ -166,18 +186,24 @@ def make_island_groupings(joint_folder_path, a_cat_folder_path, b_cat_folder_pat
                 ax2_sparse_end, max_sep, memmap_slice_arrays_b)
             a_cutout = a_full[a_big_sky_cut]
             b_cutout = b_full[b_big_sky_cut]
-            _create_rectangular_slice_arrays(joint_folder_path, 'a_cutout', len(a_cutout))
+
             small_memmap_slice_arrays_a = []
-            for n in ['1', '2', '3', '4', 'combined']:
-                small_memmap_slice_arrays_a.append(np.lib.format.open_memmap(
-                    '{}/{}_temporary_sky_slice_{}.npy'.format(joint_folder_path, 'a_cutout', n),
-                    mode='r+', dtype=bool, shape=(len(a_cutout),)))
-            _create_rectangular_slice_arrays(joint_folder_path, 'b_cutout', len(b_cutout))
             small_memmap_slice_arrays_b = []
-            for n in ['1', '2', '3', '4', 'combined']:
-                small_memmap_slice_arrays_b.append(np.lib.format.open_memmap(
-                    '{}/{}_temporary_sky_slice_{}.npy'.format(joint_folder_path, 'b_cutout', n),
-                    mode='r+', dtype=bool, shape=(len(b_cutout),)))
+            if use_memmap_files:
+                _create_rectangular_slice_arrays(joint_folder_path, 'a_cutout', len(a_cutout))
+                for n in ['1', '2', '3', '4', 'combined']:
+                    small_memmap_slice_arrays_a.append(np.lib.format.open_memmap(
+                        '{}/{}_temporary_sky_slice_{}.npy'.format(joint_folder_path, 'a_cutout', n),
+                        mode='r+', dtype=bool, shape=(len(a_cutout),)))
+                _create_rectangular_slice_arrays(joint_folder_path, 'b_cutout', len(b_cutout))
+                for n in ['1', '2', '3', '4', 'combined']:
+                    small_memmap_slice_arrays_b.append(np.lib.format.open_memmap(
+                        '{}/{}_temporary_sky_slice_{}.npy'.format(joint_folder_path, 'b_cutout', n),
+                        mode='r+', dtype=bool, shape=(len(b_cutout),)))
+            else:
+                for _ in range(5):
+                    small_memmap_slice_arrays_a.append(np.zeros(dtype=bool, shape=(len(a_cutout),)))
+                    small_memmap_slice_arrays_b.append(np.zeros(dtype=bool, shape=(len(b_cutout),)))
 
             # TODO: avoid np.arange by first iterating an np.sum(big_sky_cut)
             # and pre-generating a memmapped sub-array, and looping over
@@ -191,11 +217,12 @@ def make_island_groupings(joint_folder_path, a_cat_folder_path, b_cat_folder_pat
                     ax_cutout = [ax1_start, ax1_end, ax2_start, ax2_end]
                     a, afouriergrid, amodrefindsmall, a_cut = _load_fourier_grid_cutouts(
                         a_cutout, ax_cutout, joint_folder_path, a_cat_folder_path,
-                        a_auf_folder_path, 0, 'a', small_memmap_slice_arrays_a, a_big_sky_cut)
+                        a_auf_folder_path, 0, 'a', small_memmap_slice_arrays_a, a_big_sky_cut,
+                        a_modelrefinds, use_memmap_files)
                     b, bfouriergrid, bmodrefindsmall, b_cut = _load_fourier_grid_cutouts(
                         b_cutout, ax_cutout, joint_folder_path, b_cat_folder_path,
                         b_auf_folder_path, max_sep, 'b', small_memmap_slice_arrays_b,
-                        b_big_sky_cut)
+                        b_big_sky_cut, b_modelrefinds, use_memmap_files)
 
                     if len(a) > 0 and len(b) > 0:
                         overlapa, overlapb = gsf.get_max_overlap(
@@ -216,10 +243,15 @@ def make_island_groupings(joint_folder_path, a_cat_folder_path, b_cat_folder_pat
     print("Truncating star overlaps by AUF integral...")
     sys.stdout.flush()
 
-    ainds = np.lib.format.open_memmap('{}/group/ainds.npy'.format(joint_folder_path), mode='w+',
-                                      dtype=int, shape=(amaxsize, len(a_full)), fortran_order=True)
-    binds = np.lib.format.open_memmap('{}/group/binds.npy'.format(joint_folder_path), mode='w+',
-                                      dtype=int, shape=(bmaxsize, len(b_full)), fortran_order=True)
+    if use_memmap_files:
+        ainds = np.lib.format.open_memmap('{}/group/ainds.npy'.format(joint_folder_path), mode='w+',
+                                        dtype=int, shape=(amaxsize, len(a_full)), fortran_order=True)
+        binds = np.lib.format.open_memmap('{}/group/binds.npy'.format(joint_folder_path), mode='w+',
+                                        dtype=int, shape=(bmaxsize, len(b_full)), fortran_order=True)
+    else:
+        ainds = np.zeros(dtype=int, shape=(amaxsize, len(a_full)), order='F')
+        binds = np.zeros(dtype=int, shape=(bmaxsize, len(b_full)), order='F')
+
     ainds[:, :] = -1
     binds[:, :] = -1
     asize[:] = 0
@@ -237,18 +269,24 @@ def make_island_groupings(joint_folder_path, a_cat_folder_path, b_cat_folder_pat
                 ax2_sparse_end, max_sep, memmap_slice_arrays_b)
             a_cutout = a_full[a_big_sky_cut]
             b_cutout = b_full[b_big_sky_cut]
-            _create_rectangular_slice_arrays(joint_folder_path, 'a_cutout', len(a_cutout))
+
             small_memmap_slice_arrays_a = []
-            for n in ['1', '2', '3', '4', 'combined']:
-                small_memmap_slice_arrays_a.append(np.lib.format.open_memmap(
-                    '{}/{}_temporary_sky_slice_{}.npy'.format(joint_folder_path, 'a_cutout', n),
-                    mode='r+', dtype=bool, shape=(len(a_cutout),)))
-            _create_rectangular_slice_arrays(joint_folder_path, 'b_cutout', len(b_cutout))
             small_memmap_slice_arrays_b = []
-            for n in ['1', '2', '3', '4', 'combined']:
-                small_memmap_slice_arrays_b.append(np.lib.format.open_memmap(
-                    '{}/{}_temporary_sky_slice_{}.npy'.format(joint_folder_path, 'b_cutout', n),
-                    mode='r+', dtype=bool, shape=(len(b_cutout),)))
+            if use_memmap_files:
+                _create_rectangular_slice_arrays(joint_folder_path, 'a_cutout', len(a_cutout))
+                for n in ['1', '2', '3', '4', 'combined']:
+                    small_memmap_slice_arrays_a.append(np.lib.format.open_memmap(
+                        '{}/{}_temporary_sky_slice_{}.npy'.format(joint_folder_path, 'a_cutout', n),
+                        mode='r+', dtype=bool, shape=(len(a_cutout),)))
+                _create_rectangular_slice_arrays(joint_folder_path, 'b_cutout', len(b_cutout))
+                for n in ['1', '2', '3', '4', 'combined']:
+                    small_memmap_slice_arrays_b.append(np.lib.format.open_memmap(
+                        '{}/{}_temporary_sky_slice_{}.npy'.format(joint_folder_path, 'b_cutout', n),
+                        mode='r+', dtype=bool, shape=(len(b_cutout),)))
+            else:
+                for _ in range(5):
+                    small_memmap_slice_arrays_a.append(np.zeros(dtype=bool, shape=(len(a_cutout),)))
+                    small_memmap_slice_arrays_b.append(np.zeros(dtype=bool, shape=(len(b_cutout),)))
 
             a_sky_inds = np.arange(0, len(a_full))[a_big_sky_cut]
             b_sky_inds = np.arange(0, len(b_full))[b_big_sky_cut]
@@ -259,11 +297,12 @@ def make_island_groupings(joint_folder_path, a_cat_folder_path, b_cat_folder_pat
                     ax_cutout = [ax1_start, ax1_end, ax2_start, ax2_end]
                     a, afouriergrid, amodrefindsmall, a_cut = _load_fourier_grid_cutouts(
                         a_cutout, ax_cutout, joint_folder_path, a_cat_folder_path,
-                        a_auf_folder_path, 0, 'a', small_memmap_slice_arrays_a, a_big_sky_cut)
+                        a_auf_folder_path, 0, 'a', small_memmap_slice_arrays_a, a_big_sky_cut,
+                        a_modelrefinds, use_memmap_files)
                     b, bfouriergrid, bmodrefindsmall, b_cut = _load_fourier_grid_cutouts(
                         b_cutout, ax_cutout, joint_folder_path, b_cat_folder_path,
                         b_auf_folder_path, max_sep, 'b', small_memmap_slice_arrays_b,
-                        b_big_sky_cut)
+                        b_big_sky_cut, b_modelrefinds, use_memmap_files)
 
                     if len(a) > 0 and len(b) > 0:
                         indicesa, indicesb, overlapa, overlapb = gsf.get_overlap_indices(
@@ -288,26 +327,33 @@ def make_island_groupings(joint_folder_path, a_cat_folder_path, b_cat_folder_pat
          amodrefindsmall, bmodrefindsmall, afouriergrid, bfouriergrid)
 
     # Delete sky slices used to make fourier cutouts.
-    os.system('rm {}/*temporary_sky_slice*.npy'.format(joint_folder_path))
+    if use_memmap_files:
+        os.system('rm {}/*temporary_sky_slice*.npy'.format(joint_folder_path))
 
     print("Cleaning overlaps...")
     sys.stdout.flush()
 
-    ainds, asize = _clean_overlaps(ainds, asize, joint_folder_path, 'ainds', n_pool)
-    binds, bsize = _clean_overlaps(binds, bsize, joint_folder_path, 'binds', n_pool)
+    ainds, asize = _clean_overlaps(ainds, asize, joint_folder_path, 'ainds', n_pool, use_memmap_files)
+    binds, bsize = _clean_overlaps(binds, bsize, joint_folder_path, 'binds', n_pool, use_memmap_files)
 
     print("Calculating integral lengths...")
     sys.stdout.flush()
 
     if include_phot_like or use_phot_priors:
-        ablen = np.lib.format.open_memmap('{}/group/ablen.npy'.format(joint_folder_path),
-                                          mode='w+', dtype=float, shape=(len(a_full),))
-        aflen = np.lib.format.open_memmap('{}/group/aflen.npy'.format(joint_folder_path),
-                                          mode='w+', dtype=float, shape=(len(a_full),))
-        bblen = np.lib.format.open_memmap('{}/group/bblen.npy'.format(joint_folder_path),
-                                          mode='w+', dtype=float, shape=(len(b_full),))
-        bflen = np.lib.format.open_memmap('{}/group/bflen.npy'.format(joint_folder_path),
-                                          mode='w+', dtype=float, shape=(len(b_full),))
+        if use_memmap_files:
+            ablen = np.lib.format.open_memmap('{}/group/ablen.npy'.format(joint_folder_path),
+                                            mode='w+', dtype=float, shape=(len(a_full),))
+            aflen = np.lib.format.open_memmap('{}/group/aflen.npy'.format(joint_folder_path),
+                                            mode='w+', dtype=float, shape=(len(a_full),))
+            bblen = np.lib.format.open_memmap('{}/group/bblen.npy'.format(joint_folder_path),
+                                            mode='w+', dtype=float, shape=(len(b_full),))
+            bflen = np.lib.format.open_memmap('{}/group/bflen.npy'.format(joint_folder_path),
+                                            mode='w+', dtype=float, shape=(len(b_full),))
+        else:
+            ablen = np.zeros(dtype=float, shape=(len(a_full),))
+            aflen = np.zeros(dtype=float, shape=(len(a_full),))
+            bblen = np.zeros(dtype=float, shape=(len(b_full),))
+            bflen = np.zeros(dtype=float, shape=(len(b_full),))
 
         for cnum in range(0, mem_chunk_num):
             lowind = np.floor(len(a_full)*cnum/mem_chunk_num).astype(int)
@@ -319,19 +365,28 @@ def make_island_groupings(joint_folder_path, a_cat_folder_path, b_cat_folder_pat
             a_inds_small = np.asfortranarray(a_inds_small[:np.amax(a_size_small), :])
 
             a_inds_map, a_inds_unique = map_large_index_to_small_index(
-                a_inds_small, len(b_full), '{}/group'.format(joint_folder_path))
+                a_inds_small, len(b_full), '{}/group'.format(joint_folder_path), use_memmap_files)
 
             b = b_full[a_inds_unique, 2]
 
-            modrefind = np.load('{}/modelrefinds.npy'.format(a_auf_folder_path),
-                                mmap_mode='r')[:, lowind:highind]
+            if use_memmap_files:
+                modrefind = np.load('{}/modelrefinds.npy'.format(a_auf_folder_path),
+                                    mmap_mode='r')[:, lowind:highind]
+            else:
+                modrefind = a_modelrefinds[:, lowind:highind]
             [a_fouriergrid], a_modrefindsmall = load_small_ref_auf_grid(
                 modrefind, a_auf_folder_path, ['fourier'])
-            modrefind = np.load('{}/modelrefinds.npy'.format(b_auf_folder_path),
-                                mmap_mode='r')[:, a_inds_unique]
+
+            if use_memmap_files:
+                modrefind = np.load('{}/modelrefinds.npy'.format(b_auf_folder_path),
+                                    mmap_mode='r')[:, a_inds_unique]
+            else:
+                modrefind = b_modelrefinds[:, a_inds_unique]
             [b_fouriergrid], b_modrefindsmall = load_small_ref_auf_grid(
                 modrefind, b_auf_folder_path, ['fourier'])
-            del modrefind
+
+            if use_memmap_files:
+                del modrefind
 
             a_int_lens = gsf.get_integral_length(
                 a, b, r[:-1]+dr/2, rho[:-1], drho, j1s, a_fouriergrid, b_fouriergrid,
@@ -349,19 +404,28 @@ def make_island_groupings(joint_folder_path, a_cat_folder_path, b_cat_folder_pat
             b_inds_small = np.asfortranarray(b_inds_small[:np.amax(b_size_small), :])
 
             b_inds_map, b_inds_unique = map_large_index_to_small_index(
-                b_inds_small, len(a_full), '{}/group'.format(joint_folder_path))
+                b_inds_small, len(a_full), '{}/group'.format(joint_folder_path), use_memmap_files)
 
             a = a_full[b_inds_unique, 2]
 
-            modrefind = np.load('{}/modelrefinds.npy'.format(b_auf_folder_path),
-                                mmap_mode='r')[:, lowind:highind]
+            if use_memmap_files:
+                modrefind = np.load('{}/modelrefinds.npy'.format(b_auf_folder_path),
+                                    mmap_mode='r')[:, lowind:highind]
+            else:
+                modrefind = b_modelrefinds[:, lowind:highind]
             [b_fouriergrid], b_modrefindsmall = load_small_ref_auf_grid(
                 modrefind, b_auf_folder_path, ['fourier'])
-            modrefind = np.load('{}/modelrefinds.npy'.format(a_auf_folder_path),
-                                mmap_mode='r')[:, b_inds_unique]
+
+            if use_memmap_files:
+                modrefind = np.load('{}/modelrefinds.npy'.format(a_auf_folder_path),
+                                    mmap_mode='r')[:, b_inds_unique]
+            else:
+                modrefind = a_modelrefinds[:, b_inds_unique]
             [a_fouriergrid], a_modrefindsmall = load_small_ref_auf_grid(
                 modrefind, a_auf_folder_path, ['fourier'])
-            del modrefind
+
+            if use_memmap_files:
+                del modrefind
 
             b_int_lens = gsf.get_integral_length(
                 b, a, r[:-1]+dr/2, rho[:-1], drho, j1s, b_fouriergrid, a_fouriergrid,
@@ -376,19 +440,24 @@ def make_island_groupings(joint_folder_path, a_cat_folder_path, b_cat_folder_pat
     sys.stdout.flush()
 
     alist, blist, agrplen, bgrplen = set_list(ainds, binds, asize, bsize, joint_folder_path,
-                                              n_pool)
+                                              n_pool, use_memmap_files)
 
     # The final act of creating island groups is to clear out any sources too
     # close to the edge of the catalogue -- defined by its rectangular extend.
     # TODO: add flag for allowing the keeping of potentially incomplete islands
     # in the main catalogue; here we default to, and only allow, their removal.
 
-    passed_check = np.lib.format.open_memmap('{}/group/passed_check.npy'.format(joint_folder_path),
-                                             mode='w+', dtype=bool, shape=(alist.shape[1],))
-    passed_check[:] = 0
-    failed_check = np.lib.format.open_memmap('{}/group/failed_check.npy'.format(joint_folder_path),
-                                             mode='w+', dtype=bool, shape=(alist.shape[1],))
-    failed_check[:] = 1
+    if use_memmap_files:
+        passed_check = np.lib.format.open_memmap('{}/group/passed_check.npy'.format(joint_folder_path),
+                                                mode='w+', dtype=bool, shape=(alist.shape[1],))
+        passed_check[:] = 0
+        failed_check = np.lib.format.open_memmap('{}/group/failed_check.npy'.format(joint_folder_path),
+                                                mode='w+', dtype=bool, shape=(alist.shape[1],))
+        failed_check[:] = 1
+    else:
+        passed_check = np.zeros(dtype=bool, shape=(alist.shape[1],))
+        failed_check = np.ones(dtype=bool, shape=(alist.shape[1],))
+
     islelen = alist.shape[1]
     num_good_checks = 0
     num_a_failed_checks = 0
@@ -451,9 +520,12 @@ def make_island_groupings(joint_folder_path, a_cat_folder_path, b_cat_folder_pat
     else:
         a_first_rejected_len = 0
     if num_a_failed_checks + a_first_rejected_len > 0:
-        reject_a = np.lib.format.open_memmap(
-            '{}/reject/reject_a.npy'.format(joint_folder_path), mode='w+', dtype=int,
-            shape=(num_a_failed_checks+a_first_rejected_len,))
+        if use_memmap_files:
+            reject_a = np.lib.format.open_memmap(
+                '{}/reject/reject_a.npy'.format(joint_folder_path), mode='w+', dtype=int,
+                shape=(num_a_failed_checks+a_first_rejected_len,))
+        else:
+            reject_a = np.zeros(dtype=int, shape=(num_a_failed_checks+a_first_rejected_len,))
     if os.path.isfile('{}/reject/areject.npy'.format(joint_folder_path)):
         reject_a[num_a_failed_checks:] = np.load('{}/reject/areject.npy'.format(joint_folder_path),
                                                  mmap_mode='r')
@@ -464,9 +536,12 @@ def make_island_groupings(joint_folder_path, a_cat_folder_path, b_cat_folder_pat
     else:
         b_first_rejected_len = 0
     if num_b_failed_checks + b_first_rejected_len > 0:
-        reject_b = np.lib.format.open_memmap(
-            '{}/reject/reject_b.npy'.format(joint_folder_path), mode='w+', dtype=int,
-            shape=(num_b_failed_checks+b_first_rejected_len,))
+        if use_memmap_files:
+            reject_b = np.lib.format.open_memmap(
+                '{}/reject/reject_b.npy'.format(joint_folder_path), mode='w+', dtype=int,
+                shape=(num_b_failed_checks+b_first_rejected_len,))
+        else:
+            reject_b = np.zeros(dtype=int, shape=(num_b_failed_checks+b_first_rejected_len,))
     if os.path.isfile('{}/reject/breject.npy'.format(joint_folder_path)):
         reject_b[num_b_failed_checks:] = np.load('{}/reject/breject.npy'.format(joint_folder_path),
                                                  mmap_mode='r')
@@ -478,16 +553,23 @@ def make_island_groupings(joint_folder_path, a_cat_folder_path, b_cat_folder_pat
             amaxlen = max(amaxlen, int(np.amax(agrplen[i:i+di][passed_check[i:i+di]])))
             bmaxlen = max(bmaxlen, int(np.amax(bgrplen[i:i+di][passed_check[i:i+di]])))
 
-    new_alist = np.lib.format.open_memmap(
-        '{}/group/alist2.npy'.format(joint_folder_path), mode='w+', dtype=int,
-        shape=(amaxlen, num_good_checks), fortran_order=True)
-    new_blist = np.lib.format.open_memmap(
-        '{}/group/blist2.npy'.format(joint_folder_path), mode='w+', dtype=int,
-        shape=(bmaxlen, num_good_checks), fortran_order=True)
-    new_agrplen = np.lib.format.open_memmap('{}/group/agrplen2.npy'.format(joint_folder_path),
-                                            mode='w+', dtype=int, shape=(num_good_checks,))
-    new_bgrplen = np.lib.format.open_memmap('{}/group/bgrplen2.npy'.format(joint_folder_path),
-                                            mode='w+', dtype=int, shape=(num_good_checks,))
+    if use_memmap_files:
+        new_alist = np.lib.format.open_memmap(
+            '{}/group/alist2.npy'.format(joint_folder_path), mode='w+', dtype=int,
+            shape=(amaxlen, num_good_checks), fortran_order=True)
+        new_blist = np.lib.format.open_memmap(
+            '{}/group/blist2.npy'.format(joint_folder_path), mode='w+', dtype=int,
+            shape=(bmaxlen, num_good_checks), fortran_order=True)
+        new_agrplen = np.lib.format.open_memmap('{}/group/agrplen2.npy'.format(joint_folder_path),
+                                                mode='w+', dtype=int, shape=(num_good_checks,))
+        new_bgrplen = np.lib.format.open_memmap('{}/group/bgrplen2.npy'.format(joint_folder_path),
+                                                mode='w+', dtype=int, shape=(num_good_checks,))
+    else:
+        new_alist = np.zeros(dtype=int, shape=(amaxlen, num_good_checks), order='F')
+        new_blist = np.zeros(dtype=int, shape=(bmaxlen, num_good_checks), order='F')
+        new_agrplen = np.zeros(dtype=int, shape=(num_good_checks,))
+        new_bgrplen = np.zeros(dtype=int, shape=(num_good_checks,))
+
     a_fail_count, b_fail_count, pass_count = 0, 0, 0
     di = max(1, alist.shape[1] // 20)
     for i in range(0, alist.shape[1], di):
@@ -517,21 +599,56 @@ def make_island_groupings(joint_folder_path, a_cat_folder_path, b_cat_folder_pat
         new_bgrplen[pass_count:pass_count+n_extra] = bgrplen[i:i+di][passed_check[i:i+di]]
         pass_count += n_extra
 
-    for cat_kind in ['a', 'b']:
-        os.system('mv {}/group/{}list2.npy {}/group/{}list.npy'.format(
-            joint_folder_path, cat_kind, joint_folder_path, cat_kind))
-        os.system('mv {}/group/{}grplen2.npy {}/group/{}grplen.npy'.format(
-            joint_folder_path, cat_kind, joint_folder_path, cat_kind))
+    if use_memmap_files:
+        for cat_kind in ['a', 'b']:
+            os.system('mv {}/group/{}list2.npy {}/group/{}list.npy'.format(
+                joint_folder_path, cat_kind, joint_folder_path, cat_kind))
+            os.system('mv {}/group/{}grplen2.npy {}/group/{}grplen.npy'.format(
+                joint_folder_path, cat_kind, joint_folder_path, cat_kind))
 
-    os.remove('{}/group/passed_check.npy'.format(joint_folder_path))
-    os.remove('{}/group/failed_check.npy'.format(joint_folder_path))
+        os.remove('{}/group/passed_check.npy'.format(joint_folder_path))
+        os.remove('{}/group/failed_check.npy'.format(joint_folder_path))
 
-    return
+        # Ensure unused arrays are garbage collected if memory mapped files enabled
+        # Without this, references would persist in StageData object
+        ablen = bblen = None
+        ainds = binds = None
+        asize = bsize = None
+        aflen = bflen = None
+        new_alist = new_blist = new_agrplen = new_bgrplen = None
+
+    # Only return aflen and bflen if they were created
+    if not (include_phot_like or use_phot_priors):
+        ablen = bblen = None
+        aflen = bflen = None
+    # Only return reject counts if they were created
+    if num_a_failed_checks + a_first_rejected_len > 0:
+        lenrejecta = len(reject_a)
+        # Save rejects output files. Not needed explicitly if using memmapped files
+        if not use_memmap_files:
+            np.save('{}/reject/reject_a.npy'.format(joint_folder_path), reject_a)
+    else:
+        lenrejecta = 0
+    if num_b_failed_checks + b_first_rejected_len > 0:
+        lenrejectb = len(reject_b)
+        if not use_memmap_files:
+            np.save('{}/reject/reject_b.npy'.format(joint_folder_path), reject_b)
+    else:
+        lenrejectb = 0
+
+    group_sources_data = StageData(ablen=ablen, bblen=bblen,
+                                   ainds=ainds, binds=binds,
+                                   asize=asize, bsize=bsize,
+                                   aflen=aflen, bflen=bflen,
+                                   alist=new_alist, blist=new_blist,
+                                   agrplen=new_agrplen, bgrplen=new_bgrplen,
+                                   lenrejecta=lenrejecta, lenrejectb=lenrejectb)
+    return group_sources_data
 
 
 def _load_fourier_grid_cutouts(a, sky_rect_coords, joint_folder_path, cat_folder_path,
                                auf_folder_path, padding, cat_name, memmap_slice_arrays,
-                               large_sky_slice):
+                               large_sky_slice, modelrefinds, use_memmap_files):
     '''
     Function to load a sub-set of a given catalogue's astrometry, slicing it
     in a given sky coordinate rectangle, and load the appropriate sub-array
@@ -567,6 +684,14 @@ def _load_fourier_grid_cutouts(a, sky_rect_coords, joint_folder_path, cat_folder
     large_sky_slice : boolean
         Slice array containing the ``True`` and ``False`` elements of which
         elements of the full catalogue, in ``con_cat_astro.npy``, are in ``a``.
+    modelrefinds : numpy.ndarray
+        The modelrefinds array output from ``create_perturb_auf``. Used only when
+        use_memmap_files is False.
+        TODO Improve description
+    use_memmap_files : boolean
+        When set to True, memory mapped files are used for several internal
+        arrays. Reduces memory consumption at the cost of increased I/O
+        contention.
     '''
 
     lon1, lon2, lat1, lat2 = sky_rect_coords
@@ -577,8 +702,11 @@ def _load_fourier_grid_cutouts(a, sky_rect_coords, joint_folder_path, cat_folder
     a_cutout = np.load('{}/con_cat_astro.npy'.format(cat_folder_path),
                        mmap_mode='r')[large_sky_slice][sky_cut]
 
-    modrefind = np.load('{}/modelrefinds.npy'.format(auf_folder_path),
-                        mmap_mode='r')[:, large_sky_slice][:, sky_cut]
+    if use_memmap_files:
+        modrefind = np.load('{}/modelrefinds.npy'.format(auf_folder_path),
+                            mmap_mode='r')[:, large_sky_slice][:, sky_cut]
+    else:
+        modrefind = modelrefinds[:, large_sky_slice][:, sky_cut]
 
     [fouriergrid], modrefindsmall = load_small_ref_auf_grid(modrefind, auf_folder_path,
                                                             ['fourier'])
@@ -586,7 +714,7 @@ def _load_fourier_grid_cutouts(a, sky_rect_coords, joint_folder_path, cat_folder
     return a_cutout, fouriergrid, modrefindsmall, sky_cut
 
 
-def _clean_overlaps(inds, size, joint_folder_path, filename, n_pool):
+def _clean_overlaps(inds, size, joint_folder_path, filename, n_pool, use_memmap_files):
     '''
     Convenience function to parse either catalogue's indices array for
     duplicate references to the opposing array on a per-source basis,
@@ -607,6 +735,10 @@ def _clean_overlaps(inds, size, joint_folder_path, filename, n_pool):
         The name of the ``inds`` array saved to disk.
     n_pool : integer
         Number of multiprocessing threads to use.
+    use_memmap_files : boolean
+        When set to True, memory mapped files are used for several internal
+        arrays. Reduces memory consumption at the cost of increased I/O
+        contention.
 
     Returns
     -------
@@ -636,16 +768,23 @@ def _clean_overlaps(inds, size, joint_folder_path, filename, n_pool):
 
     # We ideally want to basically do np.asfortranarray(inds[:maxsize, :]), but
     # this would involve a copy instead of a read so we have to loop.
-    inds2 = np.lib.format.open_memmap('{}/group/{}2.npy'.format(joint_folder_path, filename),
-                                      mode='w+', dtype=int, shape=(maxsize, len(size)),
-                                      fortran_order=True)
+    if use_memmap_files:
+        inds2 = np.lib.format.open_memmap('{}/group/{}2.npy'.format(joint_folder_path, filename),
+                                        mode='w+', dtype=int, shape=(maxsize, len(size)),
+                                        fortran_order=True)
+    else:
+        inds2 = np.zeros(dtype=int, shape=(maxsize, len(size)), order='F')
+
     di = max(1, len(size) // 20)
     for i in range(0, len(size), di):
         inds2[:, i:i+di] = inds[:maxsize, i:i+di]
 
-    os.system('mv {}/group/{}2.npy {}/group/{}.npy'.format(joint_folder_path, filename,
-                                                           joint_folder_path, filename))
-    inds = np.load('{}/group/{}.npy'.format(joint_folder_path, filename), mmap_mode='r+')
+    if use_memmap_files:
+        os.system('mv {}/group/{}2.npy {}/group/{}.npy'.format(joint_folder_path, filename,
+                                                            joint_folder_path, filename))
+        inds = np.load('{}/group/{}.npy'.format(joint_folder_path, filename), mmap_mode='r+')
+    else:
+        inds = inds2
 
     return inds, size
 
