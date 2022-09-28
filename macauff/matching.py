@@ -114,13 +114,13 @@ class CrossMatch():
                 # Expect job walltime and "end within" time in Hours:Minutes:Seconds (%H:%M:%S)
                 # format, e.g. 02:44:12 for 2 hours, 44 minutes, 12 seconds
                 # Calculate job end time from start time + walltime
-                t = datetime.datetime.strptime(walltime, '%H:%M:%S')
+                hour, minute, second = walltime.split(':')
                 self.end_time = datetime.datetime.now() + \
-                    datetime.timedelta(hours=t.hour, minutes=t.minute, seconds=t.second)
+                    datetime.timedelta(hours=int(hour), minutes=int(minute), seconds=int(second))
                 # Keep track of "end within" time as a timedelta for easy comparison
-                t = datetime.datetime.strptime(end_within, '%H:%M:%S')
+                hour, minute, second = end_within.split(':')
                 self.end_within = \
-                    datetime.timedelta(hours=t.hour, minutes=t.minute, seconds=t.second)
+                    datetime.timedelta(hours=int(hour), minutes=int(minute), seconds=int(second))
             else:
                 self.end_time = None
                 self.end_within = None
