@@ -47,6 +47,59 @@ class TestParseCatalogue:
             assert_allclose(photo, self.data[:, [4, 5]])
             assert_allclose(best_index, self.data[:, 6])
 
+    def test_csv_to_npy_process_uncert(self):
+        # Convert data to string to get expected Pandas-esque .csv formatting where
+        # NaN values are empty strings.
+        data1 = self.data.astype(str)
+        data1[data1 == 'nan'] = ''
+
+        header_text, header = '# a, b, c, d, e, f, g', True
+        np.savetxt('test_data.csv', data1, delimiter=',', fmt='%s', header=header_text)
+
+        with pytest.raises(ValueError, match='process_uncerts must either be True or'):
+            csv_to_npy('.', 'test_data', '.', [0, 1, 2], [4, 5], 6, header=header,
+                       process_uncerts=None)
+        with pytest.raises(ValueError, match='astro_sig_fits_filepath must given if process'):
+            csv_to_npy('.', 'test_data', '.', [0, 1, 2], [4, 5], 6, header=header,
+                       process_uncerts=True)
+        with pytest.raises(ValueError, match='cat_in_radec must given if process_uncerts is '):
+            csv_to_npy('.', 'test_data', '.', [0, 1, 2], [4, 5], 6, header=header,
+                       process_uncerts=True, astro_sig_fits_filepath='test_sig_folder')
+        with pytest.raises(ValueError, match='If process_uncerts is True, cat_in_radec must '):
+            csv_to_npy('.', 'test_data', '.', [0, 1, 2], [4, 5], 6, header=header,
+                       process_uncerts=True, astro_sig_fits_filepath='test_sig_folder',
+                       cat_in_radec='something else')
+
+        if os.path.exists('test_sig_folder'):
+            os.system('rm -rf ./test_sig_folder')
+
+        with pytest.raises(ValueError, match='astro_sig_fits_filepath does not exist.'):
+            csv_to_npy('.', 'test_data', '.', [0, 1, 2], [4, 5], 6, header=header,
+                       process_uncerts=True, astro_sig_fits_filepath='test_sig_folder',
+                       cat_in_radec=False)
+
+        os.makedirs('test_sig_folder')
+        np.save('test_sig_folder/m_sigs_array.npy', np.array([2]))
+        np.save('test_sig_folder/n_sigs_array.npy', np.array([0.01]))
+        np.save('test_sig_folder/lmids.npy', np.array([10.0]))
+        np.save('test_sig_folder/bmids.npy', np.array([0.0]))
+
+        csv_to_npy('.', 'test_data', '.', [0, 1, 2], [4, 5], 6, header=header,
+                   process_uncerts=True, astro_sig_fits_filepath='test_sig_folder',
+                   cat_in_radec=False)
+
+        astro = np.load('con_cat_astro.npy')
+        photo = np.load('con_cat_photo.npy')
+        best_index = np.load('magref.npy')
+
+        assert np.all(astro.shape == (self.N, 3))
+        assert np.all(photo.shape == (self.N, 2))
+        assert np.all(best_index.shape == (self.N,))
+        assert_allclose(astro[:, [0, 1]], self.data[:, [0, 1]])
+        assert_allclose(astro[:, 2], np.sqrt((2*self.data[:, 2])**2 + 0.01**2))
+        assert_allclose(photo, self.data[:, [4, 5]])
+        assert_allclose(best_index, self.data[:, 6])
+
     def test_rect_slice_npy(self):
         np.save('con_cat_astro.npy', self.data[:, [1, 2, 3]])
         np.save('con_cat_photo.npy', self.data[:, [4, 5]])
@@ -211,7 +264,7 @@ class TestParseCatalogueNpyToCsv:
         npy_to_csv(['.', '.'], 'test_folder', '.', ['test_a_data', 'test_b_data'],
                    ['match_csv', 'a_nonmatch_csv', 'b_nonmatch_csv'], [a_cols, b_cols],
                    [[0, 1, 2, 4, 5], [0, 1, 2, 4, 5, 6]], ['A', 'B'], 20,
-                   headers=[False, False])
+                   headers=[False, False], input_npy_folders=[None, None])
 
         assert os.path.isfile('match_csv.csv')
         assert os.path.isfile('a_nonmatch_csv.csv')
@@ -258,6 +311,63 @@ class TestParseCatalogueNpyToCsv:
         assert_allclose(df['NNM_ETA'], self.bfeta)
         assert_allclose(df['NNM_XI'], self.bfxi)
 
+    def test_npy_to_csv_process_uncerts(self):
+        a_cols = ['A_Designation', 'A_RA', 'A_Dec', 'G', 'G_RP']
+        b_cols = ['B_Designation', 'B_RA', 'B_Dec', 'W1', 'W2', 'W3']
+        extra_cols = ['MATCH_P', 'SEPARATION', 'ETA', 'XI', 'A_AVG_CONT', 'B_AVG_CONT',
+                      'A_CONT_F1', 'A_CONT_F10', 'B_CONT_F1', 'B_CONT_F10']
+
+        # Save original .npy files to test loading extra step
+        os.makedirs('test_a_out', exist_ok=True)
+        np.save('test_a_out/con_cat_astro.npy', self.data[:, [1, 2, 3]])
+        os.makedirs('test_b_out', exist_ok=True)
+        np.save('test_b_out/con_cat_astro.npy', self.datab[:, [1, 2, 3]])
+
+        npy_to_csv(['.', '.'], 'test_folder', '.', ['test_a_data', 'test_b_data'],
+                   ['match_csv', 'a_nonmatch_csv', 'b_nonmatch_csv'], [a_cols, b_cols],
+                   [[0, 1, 2, 4, 5], [0, 1, 2, 4, 5, 6]], ['A', 'B'], 20,
+                   headers=[False, False], input_npy_folders=['test_a_out', 'test_b_out'])
+
+        assert os.path.isfile('match_csv.csv')
+        assert os.path.isfile('a_nonmatch_csv.csv')
+
+        names = np.append(np.append(np.append(a_cols, b_cols), extra_cols),
+                          ['A_FIT_SIG', 'B_FIT_SIG'])
+
+        df = pd.read_csv('match_csv.csv', header=None, names=names)
+        for i, col in zip([1, 2, 4, 5], a_cols[1:]):
+            assert_allclose(df[col], self.data[self.ac, i])
+        # data1 and data2 are the string representations of catalogues a/b.
+        assert np.all([df[a_cols[0]].iloc[i] == self.data1[self.ac[i], 0] for i in
+                       range(len(self.ac))])
+        # self.data kept as catalogue "a", and datab for cat "b".
+        for i, col in zip([1, 2, 4, 5, 6], b_cols[1:]):
+            assert_allclose(df[col], self.datab[self.bc, i])
+        assert np.all([df[b_cols[0]].iloc[i] == self.data2[self.bc[i], 0] for i in
+                       range(len(self.bc))])
+        assert_allclose(df['A_FIT_SIG'], self.data[self.ac, 3])
+        assert_allclose(df['B_FIT_SIG'], self.datab[self.bc, 3])
+
+        names = np.append(a_cols, ['MATCH_P', 'NNM_SEPARATION', 'NNM_ETA', 'NNM_XI',
+                                   'A_AVG_CONT', 'A_FIT_SIG'])
+        df = pd.read_csv('a_nonmatch_csv.csv', header=None, names=names)
+        for i, col in zip([1, 2, 4, 5], a_cols[1:]):
+            assert_allclose(df[col], self.data[self.af, i])
+        assert np.all([df[a_cols[0]].iloc[i] == self.data1[self.af[i], 0] for i in
+                       range(len(self.af))])
+        assert_allclose(df['MATCH_P'], self.pfa)
+        assert_allclose(df['A_FIT_SIG'], self.data[self.af, 3])
+
+        names = np.append(b_cols, ['MATCH_P', 'NNM_SEPARATION', 'NNM_ETA', 'NNM_XI',
+                                   'B_AVG_CONT', 'B_FIT_SIG'])
+        df = pd.read_csv('b_nonmatch_csv.csv', header=None, names=names)
+        for i, col in zip([1, 2, 4, 5, 6], b_cols[1:]):
+            assert_allclose(df[col], self.datab[self.bf, i])
+        assert np.all([df[b_cols[0]].iloc[i] == self.data2[self.bf[i], 0] for i in
+                       range(len(self.bf))])
+        assert_allclose(df['NNM_XI'], self.bfxi)
+        assert_allclose(df['B_FIT_SIG'], self.datab[self.bf, 3])
+
     def test_npy_to_csv_cols_out_of_order(self):
         a_cols = ['A_RA', 'A_Dec', 'A_Designation', 'G', 'G_RP']
         b_cols = ['W1', 'W2', 'W3', 'B_Designation', 'B_RA', 'B_Dec']
@@ -267,7 +377,7 @@ class TestParseCatalogueNpyToCsv:
         npy_to_csv(['.', '.'], 'test_folder', '.', ['test_a_data', 'test_b_data'],
                    ['match_csv', 'a_nonmatch_csv', 'b_nonmatch_csv'], [a_cols, b_cols],
                    [[1, 2, 0, 4, 5], [4, 5, 6, 0, 1, 2]], ['A', 'B'], 20,
-                   headers=[False, False])
+                   headers=[False, False], input_npy_folders=[None, None])
 
         assert os.path.isfile('match_csv.csv')
         assert os.path.isfile('a_nonmatch_csv.csv')
@@ -322,7 +432,8 @@ class TestParseCatalogueNpyToCsv:
             npy_to_csv(['.', '.'], 'test_folder', '.', ['test_a_data', 'test_b_data'],
                        ['match_csv', 'a_nonmatch_csv', 'b_nonmatch_csv'], [a_cols, b_cols],
                        [[0, 1, 2, 4, 5], [0, 1, 2, 4, 5, 6]], ['A', 'B'], 20,
-                       headers=[False, False], extra_col_name_lists=[[1], [2]])
+                       headers=[False, False], extra_col_name_lists=[[1], [2]],
+                       input_npy_folders=[None, None])
 
     def test_npy_to_csv_both_cat_extra_col(self):
         a_cols = ['A_Designation', 'A_RA', 'A_Dec', 'G', 'G_RP']
@@ -340,7 +451,8 @@ class TestParseCatalogueNpyToCsv:
                                [[0, 1, 2, 4, 5], [0, 1, 2, 4, 5, 6]], ['A', 'B'], 20,
                                headers=[False, False],
                                extra_col_name_lists=[add_a_cols, add_b_cols],
-                               extra_col_num_lists=[add_a_nums, add_b_nums])
+                               extra_col_num_lists=[add_a_nums, add_b_nums],
+                               input_npy_folders=[None, None])
 
         assert os.path.isfile('match_csv.csv')
         assert os.path.isfile('a_nonmatch_csv.csv')
@@ -414,7 +526,8 @@ class TestParseCatalogueNpyToCsv:
                                [[0, 1, 2, 4, 5], [0, 1, 2, 4, 5, 6]], ['A', 'B'], 20,
                                headers=[False, False],
                                extra_col_name_lists=[add_a_cols, add_b_cols],
-                               extra_col_num_lists=[add_a_nums, add_b_nums])
+                               extra_col_num_lists=[add_a_nums, add_b_nums],
+                               input_npy_folders=[None, None])
 
         assert os.path.isfile('match_csv.csv')
         assert os.path.isfile('a_nonmatch_csv.csv')

@@ -10,12 +10,14 @@ from numpy.lib.format import open_memmap
 import pandas as pd
 
 from .misc_functions import _load_rectangular_slice, _create_rectangular_slice_arrays
+from .misc_functions_fortran import misc_functions_fortran as mff
 
 __all__ = ['csv_to_npy', 'rect_slice_npy', 'npy_to_csv', 'rect_slice_csv']
 
 
 def csv_to_npy(input_folder, input_filename, output_folder, astro_cols, photo_cols, bestindex_col,
-               header=False):
+               header=False, process_uncerts=False, astro_sig_fits_filepath=None,
+               cat_in_radec=None):
     '''
     Convert a .csv file representation of a photometric catalogue into the
     appropriate .npy binary files used in the cross-matching process.
@@ -31,7 +33,10 @@ def csv_to_npy(input_folder, input_filename, output_folder, astro_cols, photo_co
     astro_cols : list or numpy.array of integers
         List of zero-indexed columns in the input catalogue representing the
         three required astrometric parameters, two orthogonal sky axis
-        coordinates and a single, circular astrometric precision.
+        coordinates and a single, circular astrometric precision. The precision
+        must be the last column, with the first two columns of ``astro_cols``
+        matching in order to the first two columns of the output astrometry
+        binary file, if ``process_uncerts`` is ``True``.
     photo_cols : list or numpy.array of integers
         List of zero-indexed columns in the input catalogue representing the
         magnitudes of each photometric source to be used in the cross-matching.
@@ -44,7 +49,32 @@ def csv_to_npy(input_folder, input_filename, output_folder, astro_cols, photo_co
         Flag indicating whether the .csv file has a first line with the names
         of the columns in it, or whether the first line of the file is the first
         line of the dataset.
+    process_uncerts : boolean, optional
+        Determines whether uncertainties are re-processed in light of astrometric
+        fitting on large scales.
+    astro_sig_fits_filepath : string, optional
+        Location on disk of the two saved files that contain the parameters
+        that describe best-fit astrometric precision as a function of quoted
+        astrometric precision. Must be provided if ``process_uncerts`` is ``True``.
+    cat_in_radec : boolean, optional
+        If ``process_uncerts`` is ``True``, must be provided, and either be
+        ``True`` or ``False``, indicating whether the catalogue being processed
+        is in RA-Dec coordinates or not. If ``True``, coordinates of mid-points
+        for derivations of ``m`` and ``n`` for quoted-fit uncertainty relations
+        will be converted from Right Ascension and Declination to Galactic
+        Longitude and Latitude for the purposes of nearest-neighbour use.
     '''
+    if not (process_uncerts is True or process_uncerts is False):
+        raise ValueError("process_uncerts must either be True or False.")
+    if process_uncerts and astro_sig_fits_filepath is None:
+        raise ValueError("astro_sig_fits_filepath must given if process_uncerts is True.")
+    if process_uncerts and cat_in_radec is None:
+        raise ValueError("cat_in_radec must given if process_uncerts is True.")
+    if process_uncerts and not (cat_in_radec is True or cat_in_radec is False):
+        raise ValueError("If process_uncerts is True, cat_in_radec must either be True or False.")
+    if process_uncerts and not os.path.exists(astro_sig_fits_filepath):
+        raise ValueError("process_uncerts is True but astro_sig_fits_filepath does not exist. "
+                         "Please ensure file path is correct.")
     astro_cols, photo_cols = np.array(astro_cols), np.array(photo_cols)
     with open('{}/{}.csv'.format(input_folder, input_filename)) as fp:
         n_rows = 0 if not header else -1
@@ -58,6 +88,19 @@ def csv_to_npy(input_folder, input_filename, output_folder, astro_cols, photo_co
     best_index = open_memmap('{}/magref.npy'.format(output_folder), mode='w+', dtype=int,
                              shape=(n_rows,))
 
+    if process_uncerts:
+        m_sigs = np.load('{}/m_sigs_array.npy'.format(astro_sig_fits_filepath))
+        n_sigs = np.load('{}/n_sigs_array.npy'.format(astro_sig_fits_filepath))
+        mn_coords = np.empty((len(m_sigs), 2), float)
+        mn_coords[:, 0] = np.load('{}/lmids.npy'.format(astro_sig_fits_filepath))
+        mn_coords[:, 1] = np.load('{}/bmids.npy'.format(astro_sig_fits_filepath))
+        if cat_in_radec:
+            # Convert mn_coords to RA/Dec if catalogue is in Equatorial coords.
+            from astropy.coordinates import SkyCoord
+            a = SkyCoord(l=mn_coords[:, 0], b=mn_coords[:, 1], unit='deg', frame='galactic')
+            mn_coords[:, 0] = a.icrs.ra.degree
+            mn_coords[:, 1] = a.icrs.dec.degree
+
     used_cols = np.concatenate((astro_cols, photo_cols, [bestindex_col]))
     new_astro_cols = np.array([np.where(used_cols == a)[0][0] for a in astro_cols])
     new_photo_cols = np.array([np.where(used_cols == a)[0][0] for a in photo_cols])
@@ -65,7 +108,17 @@ def csv_to_npy(input_folder, input_filename, output_folder, astro_cols, photo_co
     n = 0
     for chunk in pd.read_csv('{}/{}.csv'.format(input_folder, input_filename), chunksize=100000,
                              usecols=used_cols, header=None if not header else 0):
-        astro[n:n+chunk.shape[0]] = chunk.values[:, new_astro_cols]
+        if not process_uncerts:
+            astro[n:n+chunk.shape[0]] = chunk.values[:, new_astro_cols]
+        else:
+            astro[n:n+chunk.shape[0], 0] = chunk.values[:, new_astro_cols[0]]
+            astro[n:n+chunk.shape[0], 1] = chunk.values[:, new_astro_cols[1]]
+            old_sigs = chunk.values[:, new_astro_cols[2]]
+            sig_mn_inds = mff.find_nearest_point(chunk.values[:, new_astro_cols[0]],
+                                                 chunk.values[:, new_astro_cols[1]],
+                                                 mn_coords[:, 0], mn_coords[:, 1])
+            new_sigs = np.sqrt((m_sigs[sig_mn_inds]*old_sigs)**2 + n_sigs[sig_mn_inds]**2)
+            astro[n:n+chunk.shape[0], 2] = new_sigs
         photo[n:n+chunk.shape[0]] = chunk.values[:, new_photo_cols]
         best_index[n:n+chunk.shape[0]] = chunk.values[:, new_bestindex_col]
         n += chunk.shape[0]
@@ -74,9 +127,9 @@ def csv_to_npy(input_folder, input_filename, output_folder, astro_cols, photo_co
 
 
 def npy_to_csv(input_csv_folders, input_match_folder, output_folder, csv_filenames,
-               output_filenames, column_name_lists, column_num_lists,
-               extra_col_cat_names, mem_chunk_num, headers=[False, False],
-               extra_col_name_lists=None, extra_col_num_lists=None):
+               output_filenames, column_name_lists, column_num_lists, extra_col_cat_names,
+               mem_chunk_num, input_npy_folders, headers=[False, False], extra_col_name_lists=None,
+               extra_col_num_lists=None):
     '''
     Function to convert output .npy files, as created during the cross-match
     process, and create a .csv file of matches and non-matches, combining columns
@@ -113,6 +166,13 @@ def npy_to_csv(input_csv_folders, input_match_folder, output_folder, csv_filenam
     mem_chunk_num : integer
         Indicator of how many subsets of the catalogue to load each catalogue in,
         for memory related issues.
+    input_npy_folders : list of strings
+        List of folders in which the respective catalogues' .npy files were
+        saved to, as part of ``csv_to_npy``, in the same order as
+        ``input_csv_folders``. If a catalogue did not have its uncertainties
+        processed, its entry should be None, so a case where both catalogues in
+        a match had their uncertainties treated as given would be
+        ``[None, None]``.
     headers : list of booleans, optional
         List of two boolmean flags, one per catalogue, indicating whether the
         original input .csv file for this catalogue had a header which provides
@@ -133,14 +193,14 @@ def npy_to_csv(input_csv_folders, input_match_folder, output_folder, csv_filenam
     # contaminant flux, eta/xi, and then M contaminant fractions for M relative fluxes.
     # TODO: un-hardcode number of relative contaminant fractions
     # TODO: remove photometric likelihood when not used.
-    cols = np.append(np.append(column_name_lists[0], column_name_lists[1]),
-                     ['MATCH_P', 'SEPARATION', 'ETA', 'XI',
-                      '{}_AVG_CONT'.format(extra_col_cat_names[0]),
-                      '{}_AVG_CONT'.format(extra_col_cat_names[1]),
-                      '{}_CONT_F1'.format(extra_col_cat_names[0]),
-                      '{}_CONT_F10'.format(extra_col_cat_names[0]),
-                      '{}_CONT_F1'.format(extra_col_cat_names[1]),
-                      '{}_CONT_F10'.format(extra_col_cat_names[1])])
+    our_columns = ['MATCH_P', 'SEPARATION', 'ETA', 'XI',
+                   '{}_AVG_CONT'.format(extra_col_cat_names[0]),
+                   '{}_AVG_CONT'.format(extra_col_cat_names[1]),
+                   '{}_CONT_F1'.format(extra_col_cat_names[0]),
+                   '{}_CONT_F10'.format(extra_col_cat_names[0]),
+                   '{}_CONT_F1'.format(extra_col_cat_names[1]),
+                   '{}_CONT_F10'.format(extra_col_cat_names[1])]
+    cols = np.append(np.append(column_name_lists[0], column_name_lists[1]), our_columns)
     if ((extra_col_name_lists is None and extra_col_num_lists is not None) or
             (extra_col_name_lists is not None and extra_col_num_lists is None)):
         raise UserWarning("extra_col_name_lists and extra_col_num_lists either both "
@@ -157,6 +217,13 @@ def npy_to_csv(input_csv_folders, input_match_folder, output_folder, csv_filenam
     acontprob = np.load('{}/pairing/pacontam.npy'.format(input_match_folder), mmap_mode='r')
     bcontprob = np.load('{}/pairing/pbcontam.npy'.format(input_match_folder), mmap_mode='r')
     seps = np.load('{}/pairing/crptseps.npy'.format(input_match_folder), mmap_mode='r')
+
+    if input_npy_folders[0] is not None:
+        cols = np.append(cols, ['{}_FIT_SIG'.format(extra_col_cat_names[0])])
+        a_concatastro = np.load('{}/con_cat_astro.npy'.format(input_npy_folders[0]), mmap_mode='r')
+    if input_npy_folders[1] is not None:
+        cols = np.append(cols, ['{}_FIT_SIG'.format(extra_col_cat_names[1])])
+        b_concatastro = np.load('{}/con_cat_astro.npy'.format(input_npy_folders[1]), mmap_mode='r')
 
     n_amags, n_bmags = len(column_name_lists[0]) - 3, len(column_name_lists[1]) - 3
     if extra_col_num_lists is None:
@@ -204,6 +271,21 @@ def npy_to_csv(input_csv_folders, input_match_folder, output_folder, csv_filenam
             for i in extra_col_name_lists[1]:
                 match_df[i].iloc[lowind:highind] = cat_b[i].iloc[bc[lowind:highind]].values
 
+        # FIT_SIG are the last 0-2 columns, after [ID+coords(x2)+mag(xN)]x2 +
+        # Q match-made columns, plus len(extra_col_name_lists)x2.
+        if input_npy_folders[0] is not None:
+            ind = (len(column_name_lists[0]) + len(column_name_lists[1]) + len(our_columns) +
+                   (len(extra_col_name_lists[0]) if extra_col_name_lists is not None else 0) +
+                   (len(extra_col_name_lists[1]) if extra_col_name_lists is not None else 0))
+            match_df.iloc[lowind:highind, ind] = a_concatastro[ac[lowind:highind], 2]
+        if input_npy_folders[1] is not None:
+            # Here we also need to check if catalogue "a" has processed uncertainties too.
+            _dx = 1 if input_npy_folders[0] is not None else 0
+            ind = (len(column_name_lists[0]) + len(column_name_lists[1]) + len(our_columns) +
+                   (len(extra_col_name_lists[0]) if extra_col_name_lists is not None else 0) +
+                   (len(extra_col_name_lists[1]) if extra_col_name_lists is not None else 0)) + _dx
+            match_df.iloc[lowind:highind, ind] = b_concatastro[bc[lowind:highind], 2]
+
     match_df.to_csv('{}/{}.csv'.format(output_folder, output_filenames[0]), encoding='utf-8',
                     index=False, header=False)
 
@@ -215,11 +297,14 @@ def npy_to_csv(input_csv_folders, input_match_folder, output_folder, csv_filenam
     seps = np.load('{}/pairing/afieldseps.npy'.format(input_match_folder), mmap_mode='r')
     afeta = np.load('{}/pairing/afieldeta.npy'.format(input_match_folder), mmap_mode='r')
     afxi = np.load('{}/pairing/afieldxi.npy'.format(input_match_folder), mmap_mode='r')
-    cols = np.append(column_name_lists[0],
-                     ['MATCH_P', 'NNM_SEPARATION', 'NNM_ETA', 'NNM_XI',
-                      '{}_AVG_CONT'.format(extra_col_cat_names[0])])
+    our_columns = ['MATCH_P', 'NNM_SEPARATION', 'NNM_ETA', 'NNM_XI',
+                   '{}_AVG_CONT'.format(extra_col_cat_names[0])]
+    cols = np.append(column_name_lists[0], our_columns)
     if extra_col_num_lists is not None:
         cols = np.append(cols, extra_col_name_lists[0])
+    if input_npy_folders[0] is not None:
+        cols = np.append(cols, ['{}_FIT_SIG'.format(extra_col_cat_names[0])])
+        a_concatastro = np.load('{}/con_cat_astro.npy'.format(input_npy_folders[0]), mmap_mode='r')
     n_anonmatches = len(af)
     a_nonmatch_df = pd.DataFrame(columns=cols, index=np.arange(0, n_anonmatches))
     for cnum in range(0, mem_chunk_num):
@@ -236,6 +321,11 @@ def npy_to_csv(input_csv_folders, input_match_folder, output_folder, csv_filenam
             for i in extra_col_name_lists[0]:
                 a_nonmatch_df[i].iloc[lowind:highind] = cat_a[i].iloc[af[lowind:highind]].values
 
+        if input_npy_folders[0] is not None:
+            ind = (len(column_name_lists[0]) + len(our_columns) +
+                   (len(extra_col_name_lists[0]) if extra_col_name_lists is not None else 0))
+            a_nonmatch_df.iloc[lowind:highind, ind] = a_concatastro[af[lowind:highind], 2]
+
     a_nonmatch_df.to_csv('{}/{}.csv'.format(output_folder, output_filenames[1]), encoding='utf-8',
                          index=False, header=False)
 
@@ -245,11 +335,14 @@ def npy_to_csv(input_csv_folders, input_match_folder, output_folder, csv_filenam
     seps = np.load('{}/pairing/bfieldseps.npy'.format(input_match_folder), mmap_mode='r')
     bfeta = np.load('{}/pairing/bfieldeta.npy'.format(input_match_folder), mmap_mode='r')
     bfxi = np.load('{}/pairing/bfieldxi.npy'.format(input_match_folder), mmap_mode='r')
-    cols = np.append(column_name_lists[1],
-                     ['MATCH_P', 'NNM_SEPARATION', 'NNM_ETA', 'NNM_XI',
-                      '{}_AVG_CONT'.format(extra_col_cat_names[1])])
+    our_columns = ['MATCH_P', 'NNM_SEPARATION', 'NNM_ETA', 'NNM_XI',
+                   '{}_AVG_CONT'.format(extra_col_cat_names[1])]
+    cols = np.append(column_name_lists[1], our_columns)
     if extra_col_num_lists is not None:
         cols = np.append(cols, extra_col_name_lists[1])
+    if input_npy_folders[1] is not None:
+        cols = np.append(cols, ['{}_FIT_SIG'.format(extra_col_cat_names[1])])
+        b_concatastro = np.load('{}/con_cat_astro.npy'.format(input_npy_folders[1]), mmap_mode='r')
     n_bnonmatches = len(bf)
     b_nonmatch_df = pd.DataFrame(columns=cols, index=np.arange(0, n_bnonmatches))
     for cnum in range(0, mem_chunk_num):
@@ -265,6 +358,11 @@ def npy_to_csv(input_csv_folders, input_match_folder, output_folder, csv_filenam
         if extra_col_name_lists is not None:
             for i in extra_col_name_lists[1]:
                 b_nonmatch_df[i].iloc[lowind:highind] = cat_b[i].iloc[bf[lowind:highind]].values
+
+        if input_npy_folders[1] is not None:
+            ind = (len(column_name_lists[1]) + len(our_columns) +
+                   (len(extra_col_name_lists[1]) if extra_col_name_lists is not None else 0))
+            b_nonmatch_df.iloc[lowind:highind, ind] = b_concatastro[bf[lowind:highind], 2]
 
     b_nonmatch_df.to_csv('{}/{}.csv'.format(output_folder, output_filenames[2]), encoding='utf-8',
                          index=False, header=False)

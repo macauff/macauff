@@ -243,6 +243,9 @@ class AstrometricCorrections:
                 self.lmins[i] = lmid - delta_lon
                 self.lmaxs[i] = lmid + delta_lon
 
+        np.save('{}/npy/lmids.npy'.format(self.save_folder), self.lmids)
+        np.save('{}/npy/bmids.npy'.format(self.save_folder), self.bmids)
+
     def __call__(self, a_cat_func, b_cat_func, a_cat_name, b_cat_name, snr_model_recreate=True,
                  cat_recreate=True, count_recreate=True, tri_download=True, dens_recreate=True,
                  nn_recreate=True, auf_sim_recreate=True, auf_pdf_recreate=True,
