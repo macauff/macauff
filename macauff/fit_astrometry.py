@@ -1,3 +1,10 @@
+# Licensed under a 3-clause BSD style license - see LICENSE
+'''
+Module for calculating corrections to astrometric uncertainties of photometric catalogues, by
+fitting their AUFs and centroid uncertainties across ensembles of matches between well-understood
+catalogue and one for which precisions are less well known.
+'''
+
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy.stats import binned_statistic

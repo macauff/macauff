@@ -1,3 +1,11 @@
+# Licensed under a 3-clause BSD style license - see LICENSE
+'''
+Provides the framework for calculating theoretical perturbations due to faint, unresolved
+objects blended with brighter sources, under the assumption that sources are fit with PSF
+photometry while in a sky background-dominated regime such that noise is constant across
+the detector.
+'''
+
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
