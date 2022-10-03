@@ -61,7 +61,8 @@ class FitPSFPerturbations:
         if self.plot_save_folder is not None and not os.path.exists(self.plot_save_folder):
             os.makedirs(self.plot_save_folder)
 
-    def __call__(self, run_initial_Ld, run_skew_fit, run_polynomial_fit, make_fit_plots):
+    def __call__(self, run_initial_Ld, run_skew_fit, run_polynomial_fit, make_fit_plots,
+                 draw_sim_num=500000):
         """
         Call function for FitPSFPerturbations.
 
@@ -79,6 +80,9 @@ class FitPSFPerturbations:
             previously.
         make_fit_plots : boolean
             Controls whether summary plot is created for parameterisation run.
+        draw_sim_num : integer, optional
+            Number of realisations to draw when plotting summary figure for
+            goodness-of-fit distributions.
         """
         if self.plot_save_folder is None and not make_fit_plots:
             raise ValueError("plot_save_folder cannot be None if plots are "
@@ -88,6 +92,7 @@ class FitPSFPerturbations:
         self.run_skew_fit = run_skew_fit
         self.run_polynomial_fit = run_polynomial_fit
         self.make_fit_plots = make_fit_plots
+        self.draw_sim_num = draw_sim_num
 
         if self.run_initial_Ld or not os.path.exists('{}/dd_Ld.npy'.format(self.data_save_folder)):
             self.make_initial_Ld_perturbations()
@@ -809,7 +814,7 @@ class FitPSFPerturbations:
         ax.set_ylabel(r'Max $\lvert\Delta x_\mathrm{f} / \sigma_\mathrm{PSF} - '
                       r'\Delta x_\mathrm{t} / \sigma_\mathrm{PSF}\lvert$')
 
-        diff = np.empty((500000, 6), float)
+        diff = np.empty((self.draw_sim_num, 6), float)
         ij = np.arange(diff.shape[0])
         iter_array = zip(ij, itertools.repeat([self.psf_fwhm, self.psf_sig, l_cut,
                                                dd_params_full, Ns[N_ind], N_ind]))
