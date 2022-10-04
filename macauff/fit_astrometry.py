@@ -18,8 +18,9 @@ from astropy import units as u
 from scipy import spatial
 from scipy.stats import chi2
 
-from .galaxy_counts import create_galaxy_counts, calculate_magnitude_offsets, make_tri_counts
-from .perturbation_auf import download_trilegal_simulation
+from .galaxy_counts import create_galaxy_counts
+from .perturbation_auf import (download_trilegal_simulation, _calculate_magnitude_offsets,
+                               make_tri_counts)
 from .misc_functions_fortran import misc_functions_fortran as mff
 from .perturbation_auf_fortran import perturbation_auf_fortran as paf
 
@@ -189,8 +190,6 @@ class AstrometricCorrections:
 
         self.j0s = mff.calc_j0(self.rho[:-1]+self.drho/2, self.r[:-1]+self.dr/2)
 
-        self.make_lb()
-
         self.n_mag_cols = np.ceil(np.sqrt(len(self.mag_array))).astype(int)
         self.n_mag_rows = np.ceil(len(self.mag_array) / self.n_mag_cols).astype(int)
 
@@ -198,6 +197,8 @@ class AstrometricCorrections:
                        '{}/pdf'.format(self.save_folder)]:
             if not os.path.exists(folder):
                 os.makedirs(folder)
+
+        self.make_lb()
 
     def make_lb(self):
         """
@@ -400,13 +401,14 @@ class AstrometricCorrections:
                 lmid, bmid = self.lmids[i], self.bmids[i]
 
                 if self.make_plots:
+                    q = ~np.isnan(s_d_snr_med)
                     _x = np.linspace(s_bins[0], s_bins[-1], 10000)
 
                     ax = plt.subplot(gs[i])
                     ax.plot(_x, np.log10(np.sqrt(c * 10**_x + b + (a * 10**_x)**2)), 'r-', zorder=5)
 
-                    ax.errorbar(s_bins[:-1]+np.diff(s_bins)/2, s_d_snr_med, fmt='k.',
-                                yerr=s_d_snr_dmed, zorder=3)
+                    ax.errorbar((s_bins[:-1]+np.diff(s_bins)/2)[q], s_d_snr_med[q], fmt='k.',
+                                yerr=s_d_snr_dmed[q], zorder=3)
 
                     ax.set_title('l = {}, b = {}\na = {:.2e}, b = {:.2e}, c = {:.2e}'
                                  .format(lmid, bmid, a, b, c), fontsize=28)
@@ -415,8 +417,8 @@ class AstrometricCorrections:
                     ax.set_ylabel('log$_{10}$(S / SNR)')
 
                     ax1 = ax.twinx()
-                    ax1.errorbar(s_bins[:-1]+np.diff(s_bins)/2, snr_med, fmt='b.', yerr=snr_dmed,
-                                 zorder=3)
+                    ax1.errorbar((s_bins[:-1]+np.diff(s_bins)/2)[q], snr_med[q], fmt='b.',
+                                 yerr=snr_dmed[q], zorder=3)
                     ax1.plot(_x, np.log10(10**_x / np.sqrt(c * 10**_x + b + (a * 10**_x)**2)),
                              'r--', zorder=5)
                     ax1.set_ylabel('log$_{10}$(SNR)', color='b')
@@ -553,22 +555,25 @@ class AstrometricCorrections:
                                          statistic='median', bins=s_bins)
         snr_dmed, _, _ = binned_statistic(np.log10(s), np.log10(snr), statistic='std', bins=s_bins)
 
+        q = ~np.isnan(s_d_snr_med)
+
         # Find initial guesses, based on [S/SNR](S) = sqrt(c * S + b + (a * S)^2)
         # or SNR(S) = S / sqrt(c * S + b + (a * S)^2).
         # First, get the systematic inverse-SNR, in the regime where a dominates
         # and SNR(S) ~ 1/a, but remember that parameters are passed as log10(a).
-        a_guess = np.log10(np.mean(1/10**snr_med[-15:]))
+        a_guess = np.log10(np.mean(1/10**snr_med[q][-15:]))
         # Can also directly get b, the background noise term, from S/SNR in the
         # limit that S is small, and S/SNR ~ sqrt(b).
-        b_guess = np.log10(np.mean((10**s_d_snr_med[:15])**2))
+        b_guess = np.log10(np.mean((10**s_d_snr_med[q][:15])**2))
         # Then take average of the difference between the a+b model and the full
         # model to get the photon-noise, sqrt(S)-scaling final parameter.
-        half_model = 10**b_guess + (10**a_guess * 10**(s_bins[:-1]+np.diff(s_bins)/2))
+        half_model = 10**b_guess + (10**a_guess * 10**((s_bins[:-1]+np.diff(s_bins)/2)[q]))
         # If (S/SNR)^2 = c * S + b + (a * S)^2, then c ~ (S/SNR)^2 / half_model:
-        c_guess = np.log10(np.mean((10**s_d_snr_med)**2 / half_model))
+        c_guess = np.log10(np.mean((10**s_d_snr_med[q])**2 / half_model))
 
-        res = minimize(fit_snr_sqrt, args=(s_bins[:-1]+np.diff(s_bins)/2, s_d_snr_med),
-                       x0=[a_guess, b_guess, c_guess], jac=True, method='SLSQP')
+        res = minimize(fit_snr_sqrt, args=((s_bins[:-1]+np.diff(s_bins)/2)[q],
+                       s_d_snr_med[q]), x0=[a_guess, b_guess, c_guess], jac=True,
+                       method='SLSQP')
 
         return i, res, s_bins, s_d_snr_med, s_d_snr_dmed, snr_med, snr_dmed
 
@@ -623,8 +628,7 @@ class AstrometricCorrections:
                           .format(self.trifolder, self.triname.format(lmid, bmid)))
 
             tri_hist, tri_mags, _, dtri_mags, tri_uncert, tri_av = make_tri_counts(
-                self.trifolder, self.triname.format(lmid, bmid), self.maglim_b,
-                self.trifiltname, self.dm)
+                self.trifolder, self.triname.format(lmid, bmid), self.trifiltname, self.dm)
             gal_dNs = create_galaxy_counts(
                 self.gal_cmau_array, tri_mags+dtri_mags/2, np.linspace(0, 4, 41),
                 self.gal_wav_micron, self.gal_alpha0, self.gal_alpha1, self.gal_alphaweight,
@@ -702,6 +706,10 @@ class AstrometricCorrections:
                 ax.plot(tri_mags+dtri_mags/2, np.log10(tri_hist) + np.log10(correction), 'b--')
                 ax.plot(tri_mags+dtri_mags/2, np.log10(gal_dNs) + np.log10(correction), 'b:')
                 ax.set_ylim(*lims)
+
+                ax.set_xlabel('Magnitude')
+                ax.set_ylabel(r'log$_{10}\left(\mathrm{D}\ /\ \mathrm{mag}^{-1}\,'
+                              r'\mathrm{deg}^{-2}\right)$')
             print('')
             plt.figure('123123')
             plt.tight_layout()
@@ -732,8 +740,8 @@ class AstrometricCorrections:
             lat_slice = np.linspace(bmin, bmax, int(np.floor((bmax-bmin)*2 + 1)))
 
             Narray = create_densities(lmid, bmid, b, minmag, maxmag, lon_slice, lat_slice, lmin,
-                                      lmax, bmin, bmax, self.dens_search_radius, self.dens_recreate,
-                                      self.save_folder)
+                                      lmax, bmin, bmax, self.dens_search_radius, self.n_pool,
+                                      self.dens_recreate, self.save_folder)
 
             _, bmatch, dists = create_distances(a, b, lmid, bmid, self.nn_radius, self.nn_recreate,
                                                 self.save_folder)
@@ -779,7 +787,7 @@ class AstrometricCorrections:
             # given in make_snr_model.
             flux = 10**(-1/2.5 * self.mag_array)
             snr = flux / np.sqrt(c * 10**flux + b + (a * 10**flux)**2)
-            dm_max = calculate_magnitude_offsets(
+            dm_max = _calculate_magnitude_offsets(
                 modeN*np.ones_like(self.mag_array), self.mag_array, B, snr, tri_mags, log10y,
                 dtri_mags, self.R, N_norm)
 
