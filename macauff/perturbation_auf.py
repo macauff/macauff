@@ -100,7 +100,8 @@ def make_perturb_aufs(auf_folder, cat_folder, filters, auf_points, r, dr, rho,
     tri_maglim_faint : float
         Magnitude in the primary TRILEGAL filter to simulate sources down to for
         the main, "faint" simulation, used to capture the differential source
-        counts at all appropriate magnitudes. If ``include_perturb_auf`` and        ``tri_download_flag`` are ``True``, this must be set.
+        counts at all appropriate magnitudes. If ``include_perturb_auf`` and
+        ``tri_download_flag`` are ``True``, this must be set.
     tri_num_bright : integer
         Number of objects to simulate in the bright TRILEGAL simulation. Should
         be large enough to capture robust number statistics at bright, low
