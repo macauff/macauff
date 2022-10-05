@@ -1181,7 +1181,7 @@ class TestMakePerturbAUFs():
 @pytest.mark.remote_data
 def test_trilegal_download():
     tri_folder = '.'
-    download_trilegal_simulation(tri_folder, 'gaiaDR2', 15, 6, 1, 'galactic', total_objs=10000)
+    download_trilegal_simulation(tri_folder, 'gaiaDR2', 15, 6, 1, 'galactic', 32, total_objs=10000)
     tri_name = 'trilegal_auf_simulation'
     f = open('{}/{}.dat'.format(tri_folder, tri_name), "r")
     line = f.readline()
