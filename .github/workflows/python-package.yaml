@@ -14,21 +14,21 @@ jobs:
     strategy:
       matrix:
         include:
-          - name: Linux, Python 3.7
+          - name: Linux, Python 3.8
             os: ubuntu-latest
-            python-version: 3.7
-            toxenv: py37-test
+            python-version: 3.8
+            toxenv: py38-test
           - name: Linux, Python 3.9
             os: ubuntu-latest
             python-version: 3.9
             # Include at least one coverage option for codecov.
             toxenv: py39-test-cov
-          - name: macOS, Python 3.7
-            os: macOS-10.15
-            python-version: 3.7
-            toxenv: py37-test
+          - name: macOS, Python 3.8
+            os: macOS-11
+            python-version: 3.8
+            toxenv: py38-test
           - name: macOS, Python 3.9
-            os: macOS-10.15
+            os: macOS-11
             python-version: 3.9
             toxenv: py39-test
 
