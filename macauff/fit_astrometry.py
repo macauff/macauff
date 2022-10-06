@@ -1287,6 +1287,9 @@ class AstrometricCorrections:
             if fit_x2_flag:
                 index, chi_sq = results
                 x2s[index, :, :] = chi_sq
+
+        pool.close()
+
         if fit_x2_flag:
             np.save('{}/npy/fit_x2s.npy'.format(self.save_folder), np.array(x2s))
 
@@ -1555,6 +1558,8 @@ def create_densities(lmid, bmid, b, minmag, maxmag, lon_slice, lat_slice, lmin, 
         for stuff in pool.imap_unordered(ball_point_query, iter_group, chunksize=len(b)//n_pool):
             i, len_query = stuff
             overlap_number[i] = len_query
+
+        pool.close()
 
         area = paf.get_circle_area_overlap(
             b[:, 0], b[:, 1], search_radius/3600, lmin, lmax, bmin, bmax)
