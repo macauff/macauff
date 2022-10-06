@@ -5,8 +5,6 @@ Tests for the "derive_psf_auf_params" module.
 
 import numpy as np
 from numpy.testing import assert_allclose
-import matplotlib.pyplot as plt
-plt.rcParams.update({"text.usetex": True, "text.latex.preamble": r"\usepackage{amsmath}"})
 import os
 
 from ..derive_psf_auf_params import FitPSFPerturbations

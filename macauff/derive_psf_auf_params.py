@@ -17,6 +17,12 @@ import multiprocessing
 from scipy.special import erf
 from scipy.optimize import basinhopping
 import os
+import shutil
+# Assume that usetex = False only applies for tests where no TeX is installed
+# at all, instead of users having half-installed TeX, dvipng et al. somewhere.
+usetex = not not shutil.which("tex")
+if usetex:
+    plt.rcParams.update({"text.usetex": True, "text.latex.preamble": r"\usepackage{amsmath}"})
 
 
 class FitPSFPerturbations:
@@ -742,13 +748,19 @@ class FitPSFPerturbations:
             ax.plot(x, self.dd_combined_fit(ddparams, x, self.Li[i], l_cut[2]), ls='--',
                     c=cm.viridis(norm(self.Li[i])))
 
-        ax.set_xlabel(r'$x / \sigma_\mathrm{PSF}$')
-        ax.set_ylabel(r'$\Delta x / \sigma_\mathrm{PSF}$')
+        if usetex:
+            ax.set_xlabel(r'$x / \sigma_\mathrm{PSF}$')
+            ax.set_ylabel(r'$\Delta x / \sigma_\mathrm{PSF}$')
+        else:
+            ax.set_xlabel(r'x / sigma_PSF')
+            ax.set_ylabel(r'Delta x / sigma_PSF')
 
         ax = plt.subplot(gs[0, 1])
-        for i, (label, c, c2) in enumerate(zip([r'$\sigma$', r'$\mu$', r'$\alpha$', r'$T$',
-                                                r'$r_\mathrm{c}$'],
-                                           ['k', 'r', 'b', 'g', 'purple'],
+        if usetex:
+            label_list = [r'$\sigma$', r'$\mu$', r'$\alpha$', r'$T$', r'$r_\mathrm{c}$']
+        else:
+            label_list = [r'sigma', r'mu', r'alpha', r'T', r'r_c']
+        for i, (label, c, c2) in enumerate(zip(label_list, ['k', 'r', 'b', 'g', 'purple'],
                                            ['gray', 'orange', 'aquamarine', 'olive', 'violet'])):
             ax.plot(self.Li, dd_skew_pars[:, i], ls='-', c=c, label='{}'.format(label))
             q = self.Li <= l_cut[1]
@@ -769,8 +781,12 @@ class FitPSFPerturbations:
         ax1.plot(Ns, np.log10(dd_ic[:, 0]), ls='-', c='r')
 
         ax.set_xlabel('Order of polynomial fit')
-        ax.set_ylabel(r'$\mathrm{log}_{10}(\sum_i (y_i - f(x_i))^2)$')
-        ax1.set_ylabel(r'$\mathrm{log}_{10}(\sum_i \frac{(y_i - f(x_i))^2}{y_i^2})$', c='r')
+        if usetex:
+            ax.set_ylabel(r'$\mathrm{log}_{10}(\sum_i (y_i - f(x_i))^2)$')
+            ax1.set_ylabel(r'$\mathrm{log}_{10}(\sum_i \frac{(y_i - f(x_i))^2}{y_i^2})$', c='r')
+        else:
+            ax.set_ylabel(r'log10(sum_i (y_i - f(x_i))**2)')
+            ax1.set_ylabel(r'log10(sum_i (y_i - f(x_i))**2 / y_i**2)', c='r')
 
         ax = plt.subplot(gs[1, 0])
         ax1 = ax.twinx()
@@ -778,8 +794,12 @@ class FitPSFPerturbations:
         ax.plot(self.Li, np.log10(dd_x2s[N_ind, :, 0]), ls='-', c='r')
 
         ax.set_xlabel('Relative perturber flux')
-        ax.set_ylabel(r'$\mathrm{log}_{10}(\sum_i (y_i - f(x_i))^2)$')
-        ax1.set_ylabel(r'$\mathrm{log}_{10}(\sum_i \frac{(y_i - f(x_i))^2}{y_i^2})$', c='r')
+        if usetex:
+            ax.set_ylabel(r'$\mathrm{log}_{10}(\sum_i (y_i - f(x_i))^2)$')
+            ax1.set_ylabel(r'$\mathrm{log}_{10}(\sum_i \frac{(y_i - f(x_i))^2}{y_i^2})$', c='r')
+        else:
+            ax.set_ylabel(r'log10(sum_i (y_i - f(x_i))**2)')
+            ax1.set_ylabel(r'log10(sum_i (y_i - f(x_i))**2 / y_i**2)', c='r')
 
         ax = plt.subplot(gs[1, 1])
         max_perc_diff = np.empty_like(self.Li)
@@ -794,9 +814,13 @@ class FitPSFPerturbations:
         ax.plot(self.Li, max_perc_diff, ls='-', c='k')
 
         ax.set_xlabel('Relative perturber flux')
-        ax.set_ylabel(r'Max $\lvert\frac{\Delta x_\mathrm{f} / \sigma_\mathrm{PSF} - '
-                      r'\Delta x_\mathrm{t} / \sigma_\mathrm{PSF}}{\Delta x_\mathrm{t} / '
-                      r'\sigma_\mathrm{PSF}}\lvert$')
+        if usetex:
+            ax.set_ylabel(r'Max $\lvert\frac{\Delta x_\mathrm{f} / \sigma_\mathrm{PSF} - '
+                          r'\Delta x_\mathrm{t} / \sigma_\mathrm{PSF}}{\Delta x_\mathrm{t} / '
+                          r'\sigma_\mathrm{PSF}}\lvert$')
+        else:
+            ax.set_ylabel(r'Max abs((Delta x_f / sigma_PSF - Delta x_t / sigma_PSF) / '
+                          r'(Delta x_t / sigma_PSF))')
 
         ax = plt.subplot(gs[1, 2])
         max_abs_diff = np.empty_like(self.Li)
@@ -811,8 +835,11 @@ class FitPSFPerturbations:
         ax.plot(self.Li, max_abs_diff, ls='-', c='k')
 
         ax.set_xlabel('Relative perturber flux')
-        ax.set_ylabel(r'Max $\lvert\Delta x_\mathrm{f} / \sigma_\mathrm{PSF} - '
-                      r'\Delta x_\mathrm{t} / \sigma_\mathrm{PSF}\lvert$')
+        if usetex:
+            ax.set_ylabel(r'Max $\lvert\Delta x_\mathrm{f} / \sigma_\mathrm{PSF} - '
+                          r'\Delta x_\mathrm{t} / \sigma_\mathrm{PSF}\lvert$')
+        else:
+            ax.set_ylabel(r'Max abs(Delta x_f / sigma_PSF - Delta x_t / sigma_PSF)')
 
         diff = np.empty((self.draw_sim_num, 6), float)
         ij = np.arange(diff.shape[0])
@@ -835,16 +862,23 @@ class FitPSFPerturbations:
         ax = plt.subplot(gs[0, 3])
         hist, bins = np.histogram(diff[:, 0], bins='auto')
         ax.plot(bins, np.append(hist, 0), 'k-')
-        ax.set_xlabel(r'$\lvert\frac{\Delta x_\mathrm{f} / \sigma_\mathrm{PSF} - '
-                      r'\Delta x_\mathrm{t} / \sigma_\mathrm{PSF}}{\Delta x_\mathrm{t} / '
-                      r'\sigma_\mathrm{PSF}}\lvert$')
+        if usetex:
+            ax.set_xlabel(r'$\lvert\frac{\Delta x_\mathrm{f} / \sigma_\mathrm{PSF} - '
+                          r'\Delta x_\mathrm{t} / \sigma_\mathrm{PSF}}{\Delta x_\mathrm{t} / '
+                          r'\sigma_\mathrm{PSF}}\lvert$')
+        else:
+            ax.set_xlabel(r'Max abs((Delta x_f / sigma_PSF - Delta x_t / sigma_PSF) / '
+                          r'(Delta x_t / sigma_PSF))')
         ax.set_ylabel('N')
 
         ax = plt.subplot(gs[1, 3])
         hist, bins = np.histogram(diff[:, 1], bins='auto')
         ax.plot(bins, np.append(hist, 0), 'k-')
-        ax.set_xlabel(r'$\lvert\Delta x_\mathrm{f} / \sigma_\mathrm{PSF} - \Delta x_\mathrm{t} / '
-                      r'\sigma_\mathrm{PSF}\lvert$')
+        if usetex:
+            ax.set_xlabel(r'$\lvert\Delta x_\mathrm{f} / \sigma_\mathrm{PSF} - '
+                          r'\Delta x_\mathrm{t} / \sigma_\mathrm{PSF}\lvert$')
+        else:
+            ax.set_xlabel(r'Max abs(Delta x_f / sigma_PSF - Delta x_t / sigma_PSF)')
         ax.set_ylabel('N')
 
         plt.tight_layout()

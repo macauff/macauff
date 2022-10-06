@@ -17,6 +17,12 @@ from astropy.coordinates import SkyCoord, match_coordinates_sky, Angle, UnitSphe
 from astropy import units as u
 from scipy import spatial
 from scipy.stats import chi2
+import shutil
+# Assume that usetex = False only applies for tests where no TeX is installed
+# at all, instead of users having half-installed TeX, dvipng et al. somewhere.
+usetex = not not shutil.which("tex")
+if usetex:
+    plt.rcParams.update({"text.usetex": True, "text.latex.preamble": r"\usepackage{amsmath}"})
 
 from .galaxy_counts import create_galaxy_counts
 from .perturbation_auf import (download_trilegal_simulation, _calculate_magnitude_offsets,
@@ -413,15 +419,22 @@ class AstrometricCorrections:
                     ax.set_title('l = {}, b = {}\na = {:.2e}, b = {:.2e}, c = {:.2e}'
                                  .format(lmid, bmid, a, b, c), fontsize=28)
 
-                    ax.set_xlabel('log$_{10}$(S)')
-                    ax.set_ylabel('log$_{10}$(S / SNR)')
+                    if usetex:
+                        ax.set_xlabel('log$_{10}$(S)')
+                        ax.set_ylabel('log$_{10}$(S / SNR)')
+                    else:
+                        ax.set_xlabel('log10(S)')
+                        ax.set_ylabel('log10(S / SNR)')
 
                     ax1 = ax.twinx()
                     ax1.errorbar((s_bins[:-1]+np.diff(s_bins)/2)[q], snr_med[q], fmt='b.',
                                  yerr=snr_dmed[q], zorder=3)
                     ax1.plot(_x, np.log10(10**_x / np.sqrt(c * 10**_x + b + (a * 10**_x)**2)),
                              'r--', zorder=5)
-                    ax1.set_ylabel('log$_{10}$(SNR)', color='b')
+                    if usetex:
+                        ax1.set_ylabel('log$_{10}$(SNR)', color='b')
+                    else:
+                        ax1.set_ylabel('log10(SNR)', color='b')
 
             pool.close()
 
@@ -708,8 +721,11 @@ class AstrometricCorrections:
                 ax.set_ylim(*lims)
 
                 ax.set_xlabel('Magnitude')
-                ax.set_ylabel(r'log$_{10}\left(\mathrm{D}\ /\ \mathrm{mag}^{-1}\,'
-                              r'\mathrm{deg}^{-2}\right)$')
+                if usetex:
+                    ax.set_ylabel(r'log$_{10}\left(\mathrm{D}\ /\ \mathrm{mag}^{-1}\,'
+                                  r'\mathrm{deg}^{-2}\right)$')
+                else:
+                    ax.set_ylabel(r'log10(D / mag^-1 deg^-2)')
             print('')
             plt.figure('123123')
             plt.tight_layout()
@@ -1164,12 +1180,16 @@ class AstrometricCorrections:
 
             if self.make_plots:
                 ax = ax1s[i]
+                if usetex:
+                    labels_list = [r'H/$\sigma_\mathrm{fit}$', r'1/$\sigma_\mathrm{fit}$',
+                                   r'0/$\sigma_\mathrm{fit}$', r'H/$\sigma_\mathrm{quoted}$',
+                                   r'1/$\sigma_\mathrm{quoted}$', r'0/$\sigma_\mathrm{quoted}$']
+                else:
+                    labels_list = [r'H/sigma_fit', r'1/sigma_fit', r'0/sigma_fit',
+                                   r'H/sigma_quoted', r'1/sigma_quoted', r'0/sigma_quoted']
             for j, (sig, _H, ls, lab) in enumerate(zip(
                     [fit_sig, fit_sig, fit_sig, bsig, bsig, bsig], [H, 1, 0, H, 1, 0],
-                    ['r-', 'r-.', 'r:', 'k-', 'k-.', 'k:'],
-                    [r'H/$\sigma_\mathrm{fit}$', r'1/$\sigma_\mathrm{fit}$',
-                     r'0/$\sigma_\mathrm{fit}$', r'H/$\sigma_\mathrm{quoted}$',
-                     r'1/$\sigma_\mathrm{quoted}$', r'0/$\sigma_\mathrm{quoted}$'])):
+                    ['r-', 'r-.', 'r:', 'k-', 'k-.', 'k:'], labels_list)):
                 if not self.make_plots and j != 0:
                     continue
                 four_gauss = np.exp(-2 * np.pi**2 * (self.rho[:-1]+self.drho/2)**2 * sig**2)
@@ -1213,15 +1233,26 @@ class AstrometricCorrections:
                 ax.plot(r_arr, nn_dist, c='g', ls='-')
 
                 cov = resses[i].hess_inv.todense()
-                ax.set_title(r'mag = {}, H = {:.2f}, $\sigma$ = {:.3f}$\pm${:.3f} ({:.3f})"; '
-                             r'$F$ = {:.2f}; SNR = {:.2f}$^{{+{:.2f}}}_{{-{:.2f}}}$; '
-                             r'N = {}'.format(self.mag_array[i], H, fit_sig,
-                                              np.sqrt(cov[0, 0])/10, bsig, nn_frac,
-                                              avg_snr[i, 0], avg_snr[i, 2], avg_snr[i, 1],
-                                              len(bm)), fontsize=22)
+                if usetex:
+                    ax.set_title(r'mag = {}, H = {:.2f}, $\sigma$ = {:.3f}$\pm${:.3f} ({:.3f})"; '
+                                 r'$F$ = {:.2f}; SNR = {:.2f}$^{{+{:.2f}}}_{{-{:.2f}}}$; '
+                                 r'N = {}'.format(self.mag_array[i], H, fit_sig,
+                                                  np.sqrt(cov[0, 0])/10, bsig, nn_frac,
+                                                  avg_snr[i, 0], avg_snr[i, 2], avg_snr[i, 1],
+                                                  len(bm)), fontsize=22)
+                else:
+                    ax.set_title(r'mag = {}, H = {:.2f}, sigma = {:.3f}+/-{:.3f} ({:.3f})"; '
+                                 r'F = {:.2f}; SNR = {:.2f}+{:.2f}/-{:.2f}; '
+                                 r'N = {}'.format(self.mag_array[i], H, fit_sig,
+                                                  np.sqrt(cov[0, 0])/10, bsig, nn_frac,
+                                                  avg_snr[i, 0], avg_snr[i, 2], avg_snr[i, 1],
+                                                  len(bm)), fontsize=22)
                 ax.legend(fontsize=15)
                 ax.set_xlabel('Radius / arcsecond')
-                ax.set_ylabel('PDF / arcsecond$^{-1}$')
+                if usetex:
+                    ax.set_ylabel('PDF / arcsecond$^{-1}$')
+                else:
+                    ax.set_ylabel('PDF / arcsecond^-1')
         if self.make_plots:
             plt.tight_layout()
             plt.savefig('{}/pdf/auf_fits_{}_{}.pdf'.format(self.save_folder, lmid, bmid))
@@ -1356,8 +1387,12 @@ class AstrometricCorrections:
                 ax1.plot(x_array, np.sqrt((m_sig*x_array)**2 + n_sig**2), 'r-.',
                          alpha=0.8, label='Fit ma')
 
-                ax1.set_xlabel(r'Input astrometric $\sigma$ / "')
-                ax1.set_ylabel(r'Fit astrometric $\sigma$ / "')
+                if usetex:
+                    ax1.set_xlabel(r'Input astrometric $\sigma$ / "')
+                    ax1.set_ylabel(r'Fit astrometric $\sigma$ / "')
+                else:
+                    ax1.set_xlabel(r'Input astrometric sigma / "')
+                    ax1.set_ylabel(r'Fit astrometric sigma / "')
                 ax1.set_title('l = {}, b = {}\nm = {:.2f}, a = {:.2f}'.format(
                               lmid, bmid, m_sig, n_sig))
                 ax1.legend()
@@ -1391,14 +1426,21 @@ class AstrometricCorrections:
             ax_d.plot(np.log10(1 - chi_sq_cdf[q_sort][filter_log_nans]),
                       true_hypothesis_cdf_dist[filter_log_nans], 'k.')
             ax_d.plot(np.log10(1 - true_hypothesis_cdf_dist), true_hypothesis_cdf_dist, 'r--')
-            ax_d.set_xlabel(r'$\log_{10}(1 - \mathrm{CDF})$')
+            if usetex:
+                ax_d.set_xlabel(r'$\log_{10}(1 - \mathrm{CDF})$')
+            else:
+                ax_d.set_xlabel(r'log10(1 - CDF)')
             ax_d.set_ylabel('Fraction')
 
             x_array = np.linspace(0, ax_b.get_xlim()[1], 100)
             ax_b.plot(x_array, x_array, 'g:')
             ax_b.set_ylim(0.95 * ylims[0], 1.05 * ylims[1])
-            ax_b.set_xlabel(r'Input astrometric $\sigma$ / "')
-            ax_b.set_ylabel(r'Fit astrometric $\sigma$ / "')
+            if usetex:
+                ax_b.set_xlabel(r'Input astrometric $\sigma$ / "')
+                ax_b.set_ylabel(r'Fit astrometric $\sigma$ / "')
+            else:
+                ax_b.set_xlabel(r'Input astrometric sigma / "')
+                ax_b.set_ylabel(r'Fit astrometric sigma / "')
 
             for i, (f, label) in enumerate(zip([m_sigs, n_sigs], ['m', 'n'])):
                 ax = plt.subplot(gs[i+2])
