@@ -7,6 +7,30 @@ General
 New Features
 ^^^^^^^^^^^^
 
+- Added new algorithm, based on the assumption that objects within a photometric
+  catalogue were fit with PSF photometry in the sky background dominated regime,
+  where noise is constant, extending Plewa & Sari (2018, MNRAS, 476, 4372). This
+  can then be combined with the original aperture photometry/photon-noise
+  dominated case from Wilson & Naylor (2018, MNRAS, 481, 2148) using
+  signal-to-noise ratio as a measure of the weight to apply to each
+  algorithm. [#50]
+
+- Added ``fit_astrometry`` and ``AstrometricCorrections`` to allow for fitting
+  well-understood datasets against one another to account for systematic
+  astrometric uncertainties not present in the photometric catalogues as
+  given. [#50]
+
+- Added ``derive_psf_auf_params`` and ``FitPSFPerturbations`` to calculate the
+  parameters necessary to fit for the PSF photometry, sky background-dominated
+  algorithm for perturbation due to unresolved contaminant objects. [#50]
+
+- ``csv_to_npy`` now has the option to pre-process astrometric uncertainties
+  based on ``AstrometricCorrections`` outputs. [#50]
+
+- ``npy_to_csv`` now has the option to include within the final output .csv
+  tables made from cross-match results the pre-processed, updated astrometric
+  uncertainties that result from ``AstrometricCorrections``. [#50]
+
 - Added MPI parallelisation and checkpointing. [#49]
 
 - Added option to disable use of memory-mapped files for internal arrays.
@@ -35,6 +59,10 @@ New Features
 
 Bug Fixes
 ^^^^^^^^^
+
+- Updated ``fit_gal_flag`` keyword as passed through to ``make_perturb_aufs``
+  incorrectly using ``self.a_fit_gal_flag`` when running catalogue "b" AUF
+  component generation. [#50]
 
 - Corrected issue where ``local_N`` wasn't having entries saved to memmapped
   array in ``make_perturb_auf``. [#38]
@@ -90,6 +118,28 @@ Bug Fixes
 API Changes
 ^^^^^^^^^^^
 
+- Added ``run_fw_auf``, ``run_psf_auf``, ``mag_h_params_path``,
+  ``tri_maglim_bright``, ``tri_maglim_faint``, ``tri_num_bright``, and
+  ``tri_num_faint`` as required input parameters to ``CrossMatch`` if
+  ``include_perturb_auf`` is ``True``. [#50]
+
+- Added ``tri_maglim_bright``, ``tri_maglim_faint``, ``tri_num_bright``,
+  ``tri_num_faint``, ``run_fw``, ``run_psf``, ``dd_params``, ``l_cut``, and
+  ``mag_h_params`` as optional inputs to ``make_perturb_aufs``. [#50]
+
+- Added ``dd_params_path`` and ``l_cut_path`` as required input parameters if
+  ``include_perturb_auf`` and ``run_psf_auf`` are both ``True``. [#50]
+
+- Removed ``dm_max`` as an input to ``CrossMatch``, now being calculated based
+  on secondary perturber flux vs primary noise and chance of zero perturbers
+  in ``_calculate_magnitude_offsets``. Also removed as input to
+  ``make_perturb_aufs``. [#50]
+
+- ``csv_to_npy`` has ``process_uncerts``, ``astro_sig_fits_filepath``, and
+  ``cat_in_radec`` as optional input parameters. [#50]
+
+- ``npy_to_csv`` added ``input_npy_folders`` as an input parameter. [#50]
+
 - Removed ``joint_file_path``, ``cat_a_file_path`` and ``cat_b_file_path``
   from ``CrossMatch`` constructor and added ``chunks_folder_path``,
   ``use_memmap_files``, ``resume_file_path``, ``walltime``, ``end_within``,
@@ -125,6 +175,9 @@ API Changes
 
 Other Changes
 ^^^^^^^^^^^^^
+
+- Added ``matplotlib`` as a dependency, and explictly defined ``pytest-cov`` as a
+  test dependency. [#50]
 
 - Added ``mpi4py`` as a dependency [#49]
 

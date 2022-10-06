@@ -134,7 +134,7 @@ subroutine chord_integral_eval(x, r, h, integral)
 end subroutine chord_integral_eval
 
 subroutine perturb_aufs(Narray, magarray, r, dr, rbins, j0s, mag_D, dmag_D, Ds, N_norm, num_int, dmcut, psfr, &
-    lentrials, seed, Fracgrid, Fluxav, fouriergrid, rgrid, intrgrid)
+    psfsig, lentrials, seed, dd_params, l_cut, algorithm_type, Fracgrid, Fluxav, fouriergrid, rgrid, intrgrid)
     ! Fortran wrapper for the perturbation AUF component calculation for a set of density-magnitude
     ! combinations, creating the various parameters needed to use the distribution of perturbations.
     integer, parameter :: dp = kind(0.0d0)  ! double precision
@@ -158,8 +158,13 @@ subroutine perturb_aufs(Narray, magarray, r, dr, rbins, j0s, mag_D, dmag_D, Ds, 
     ! Relative fluxes, in magnitude offset, above which to record whether a central object suffers
     ! a contaminating source or not.
     real(dp), intent(in) :: dmcut(:)
-    ! Radius of PSF for given filter, used to define the PSF circle inside which to draw contaminants.
-    real(dp), intent(in) :: psfr
+    ! Radius and Gaussian-sigma of PSF for given filter, used to define the PSF circle inside which to draw contaminants.
+    real(dp), intent(in) :: psfr, psfsig
+    ! Parameters describing the skew-normal distribution, and relative flux regimes in
+    ! which certain algorithm approximations apply, for the background dominated PSF regime algorithm.
+    real(dp), intent(in) :: dd_params(:, :, :), l_cut(:)
+    ! Algorithm type, either "fw" or "psf", for flux-weighted or PSF photometry methods.
+    character(len=3), intent(in) :: algorithm_type
     ! Fraction of sources with contaminant above dmcut, and average contamination of, density-magnitude
     ! combinations to consider for this filter-sightline pair.
     real(dp), intent(out) :: Fracgrid(size(dmcut), size(Narray)), Fluxav(size(Narray))
@@ -188,7 +193,7 @@ subroutine perturb_aufs(Narray, magarray, r, dr, rbins, j0s, mag_D, dmag_D, Ds, 
 !$OMP PARALLEL DO DEFAULT(NONE) PRIVATE(j, k, N_b, mag, mag_Dindex, lendm, dms, dNs, ddms, offsets, fraccontam, maxk, &
 !$OMP& fluxcontam, hist, cumulathist, fourierhist, midr) &
 !$OMP& SHARED(Narray, magarray, mag_D, psfr, dmcut, lentrials, num_int, Ds, dmag_D, N_norm, rbins, r, dr, j0s, rgrid, &
-!$OMP& seed, fouriergrid, intrgrid, Fracgrid, Fluxav) SCHEDULE(guided)
+!$OMP& seed, fouriergrid, intrgrid, Fracgrid, Fluxav, psfsig, dd_params, l_cut, algorithm_type) SCHEDULE(guided)
     do j = 1, size(Narray)
         N_b = Narray(j)
         mag = magarray(j)
@@ -203,7 +208,8 @@ subroutine perturb_aufs(Narray, magarray, r, dr, rbins, j0s, mag_D, dmag_D, Ds, 
             ddms(k) = dmag_D(mag_Dindex+k-1)
         end do
         maxk = max(5, int(10*maxval(dNs)))
-        call scatter_perturbers(dNs, dms, psfr, maxk, dmcut, offsets, fraccontam, fluxcontam, ddms, lentrials, seed(:, j))
+        call scatter_perturbers(dNs, dms, psfr, maxk, dmcut, psfsig, offsets, fraccontam, fluxcontam, dd_params, l_cut, ddms, &
+                                algorithm_type, lentrials, seed(:, j))
         call histogram1d_dp(offsets, rbins(1), rbins(size(rbins)), size(r), midr, hist)
 
         ! r is middle of bins, which are represented by rbins; there's a shift of dr/2 between the two (minus rbins(lenr+1))
@@ -228,7 +234,8 @@ subroutine perturb_aufs(Narray, magarray, r, dr, rbins, j0s, mag_D, dmag_D, Ds, 
 
 end subroutine perturb_aufs
 
-subroutine scatter_perturbers(dNs, dms, psfr, maxk, dmcut, offsets, fraccontam, fluxcontam, ddms, lentrials, seed)
+subroutine scatter_perturbers(dNs, dms, psfr, maxk, dmcut, psfsig, offsets, fraccontam, fluxcontam, dd_params, l_cut, ddms, &
+    algorithm_type, lentrials, seed)
     ! Given a set of average numbers of sources per PSF circle for a series of relative fluxes, populate
     ! a bright, central source's PSF with randomly placed sources, and calculate the flux brightening
     ! and expected PSF centroid shift.
@@ -242,11 +249,17 @@ subroutine scatter_perturbers(dNs, dms, psfr, maxk, dmcut, offsets, fraccontam, 
     ! Average numbers of sources per PSF circle for each magnitude offset; magnitude offsets (or
     ! relative fluxes) to be populated within the PSF, and the bin width of the magnitude offsets.
     real(dp), intent(in) :: dNs(:), dms(:), ddms(:)
-    ! PSF radius, defined by the Rayleigh criterion based on the full-width at half-maximum.
-    real(dp), intent(in) :: psfr
+    ! PSF radius and Gaussian-sigma, defined by the Rayleigh criterion based on the full-width at half-maximum and
+    ! the relation to FWHM respectively.
+    real(dp), intent(in) :: psfr, psfsig
     ! Magnitude offsets above which to consider if a PSF has been contaminated by a source of
     ! this relative flux.
     real(dp), intent(in) :: dmcut(:)
+    ! Parameters describing the skew-normal distribution, and relative flux regimes in
+    ! which certain algorithm approximations apply, for the background dominated PSF regime algorithm.
+    real(dp), intent(in) :: dd_params(:, :, :), l_cut(:)
+    ! Algorithm type, either "fw" or "psf", for flux-weighted or PSF photometry methods.
+    character(len=3), intent(in) :: algorithm_type
 
     real(dp), intent(out) :: offsets(lentrials), fraccontam(size(dmcut)), fluxcontam(lentrials)
     ! Loop counters, and number of sources to be populated within a given PSF for a small dm slice.
@@ -255,13 +268,15 @@ subroutine scatter_perturbers(dNs, dms, psfr, maxk, dmcut, offsets, fraccontam, 
     ! than each dmcut relative flux.
     integer :: ncontams(size(dmcut), lentrials)
     ! Variables related to position within the PSF circle for each object in a dm slice.
-    real(dp) :: x(maxk), y(maxk), xav, yav, t(maxk), r(maxk)
+    real(dp) :: x(maxk), y(maxk), xav, yav, tmp_xav, tmp_yav, t(maxk), r(maxk)
     ! Poissonian-related values, defining the randomly drawn number of small magnitude range objects
     ! in a given PSF.
     real(dp) :: factorial(maxk+1), powercounter, numchance, expdns(size(dNs)), cumulativepoisson(maxk+1, size(dNs))
     ! Variables related to the relative flux of each simulated perturbing source, and the total flux
     ! within a PSF.
     real(dp) :: fluxes(size(dNs)), dfluxes(2, size(dNs)), df(maxk), f0, normf
+    ! Variables related to the parameterisation of the background-dominated PSF algorithm case.
+    real(dp) :: recorded_x(maxk, size(dNs)), recorded_y(maxk, size(dNs)), recorded_f(maxk, size(dNs))
 
     factorial(1) = 1.0_dp
     do i = 1, maxk
@@ -292,6 +307,11 @@ subroutine scatter_perturbers(dNs, dms, psfr, maxk, dmcut, offsets, fraccontam, 
         xav = 0.0_dp
         yav = 0.0_dp
         normf = 1.0_dp
+        if (algorithm_type == 'psf') then
+            recorded_x(:, :) = 0.0d0
+            recorded_y(:, :) = 0.0d0
+            recorded_f(:, :) = -1.0d0 ! initialise fluxes as negative to skip in the fitting process
+        end if
         do j = 1, size(dNs)
             call random_number(numchance)
             numchance = numchance / expdns(j)
@@ -327,15 +347,47 @@ subroutine scatter_perturbers(dNs, dms, psfr, maxk, dmcut, offsets, fraccontam, 
                 x(:loopk) = r(:loopk) * sin(t(:loopk))
                 y(:loopk) = r(:loopk) * cos(t(:loopk))
 
-                xav = xav + sum(x(:loopk) * (f0+df(:loopk)))
-                yav = yav + sum(y(:loopk) * (f0+df(:loopk)))
-                normf = normf + sum(f0+df(:loopk))
+                if (algorithm_type == 'psf') then
+                    recorded_x(:loopk, j) = x(:loopk)
+                    recorded_y(:loopk, j) = y(:loopk)
+                    recorded_f(:loopk, j) = f0 + df(:loopk)
+                end if
+
+                if (algorithm_type == 'psf') then
+                    call psf_perturb(x(:loopk), y(:loopk), r(:loopk), f0+df(:loopk), dd_params, fluxes(j), psfsig, &
+                                     l_cut, tmp_xav, tmp_yav)
+                    ! Cumulatively keep track of xav and yav.
+                    xav = xav + tmp_xav
+                    yav = yav + tmp_yav
+                else
+                    xav = xav + sum(x(:loopk) * (f0+df(:loopk)))
+                    yav = yav + sum(y(:loopk) * (f0+df(:loopk)))
+                    normf = normf + sum(f0+df(:loopk))
+                end if
             end if
         end do
-        xav = xav / normf
-        yav = yav / normf
+        if (algorithm_type == 'fw') then
+            xav = xav / normf
+            yav = yav / normf
+        end if
         offsets(i) = sqrt(xav**2 + yav**2)
-        fluxcontam(i) = normf - 1.0_dp
+
+        if (algorithm_type == 'fw') then
+            fluxcontam(i) = normf - 1.0_dp
+        else
+            fluxcontam(i) = exp(-0.25_dp * offsets(i)**2 / psfsig**2) - 1.0_dp
+            do k = 1, size(dNs)
+                do j = 1, maxk
+                    if (recorded_f(j, k) >= 0.0_dp) then
+                        fluxcontam(i) = fluxcontam(i) + recorded_f(j, k) * exp(-0.25_dp * ((recorded_x(j, k) - xav)**2 + &
+                                                                                           (recorded_y(j, k) - yav)**2)/psfsig**2)
+                    end if
+                end do
+            end do
+            if (fluxcontam(i) < 0.0_dp) then
+                fluxcontam(i) = 0.0_dp
+            end if
+        end if
     end do
     ! TODO: update with mean/median/model/percentiles
     do k = 1, size(dmcut)
@@ -343,6 +395,106 @@ subroutine scatter_perturbers(dNs, dms, psfr, maxk, dmcut, offsets, fraccontam, 
     end do
 
 end subroutine scatter_perturbers
+
+subroutine psf_perturb(x, y, r, fs, dd_params, flux, psfsig, l_cut, xav, yav)
+    ! For a set of cartesian coordinates and relative fluxes for perturbers, depending on the flux
+    ! of the objects, calculate different perturbation offsets based on Gaussian PSF model fits with
+    ! constant background noise.
+    integer, parameter :: dp = kind(0.0d0)  ! double precision
+    ! Positions and radii offsets for perturbers.
+    real(dp), intent(in) :: x(:), y(:), r(:)
+    ! Central and blurred relative fluxes of perturbers.
+    real(dp), intent(in) :: fs(:), flux
+    ! Parameters required to simulat perturbation based on simulations.
+    real(dp), intent(in) :: dd_params(:, :, :), psfsig, l_cut(:)
+    ! x and y coordinates of average perturbation for these objects.
+    real(dp), intent(out) :: xav, yav
+    ! Loop counter
+    integer :: k
+    ! Temporary parameters for deriving polynomial fits based on dd_params.
+    integer :: which_dd_poly
+    real(dp) :: ddparams(size(dd_params, 1)), dddparamsdf(size(dd_params, 1)), param_temp, dparam_temp
+    ! Placeholder for fit_skew calculation
+    real(dp) :: g1
+
+    xav = 0.0_dp
+    yav = 0.0_dp
+    if (flux >= l_cut(3)) then
+        ! If equal-brightness, or close enough as defined by l_cut, "binary" star(s), then the offsets are just
+        ! flux weighted between the central sources and perturbers, on an individual basis.
+        xav = xav + sum(x*fs / (1.0_dp + fs))
+        yav = yav + sum(y*fs / (1.0_dp + fs))
+    else if (flux >= l_cut(1)) then  ! otherwise, if relative flux too large to approximate, fit distribution
+        ! Select which side of the relative flux polynomial we want to model:
+        if (flux >= l_cut(2)) then
+            which_dd_poly = 2
+        else
+            which_dd_poly = 1
+        end if
+        ddparams(:) = dd_params(:, 1, which_dd_poly)
+        dddparamsdf(:) = 0.0_dp
+        param_temp = flux
+        dparam_temp = 1.0_dp
+        ! To avoid computing these polynomials for every source, we compute the bin middle per flux bin and
+        ! compute the linear gradient of each parameter wrt flux, and assume bins are small enough that the
+        ! polynomial parameters at arbitrary flux within a bin can be well modelled as a linear slope.
+        do k = 2, size(dd_params, 2)
+            ! m = sum_i=0^N p_i,m f**i
+            ddparams(:) = ddparams(:) + dd_params(:, k, which_dd_poly) * param_temp
+            param_temp = param_temp * flux
+            ! dm/df = sum_i=1^N p_i,m f**(i-1) * i
+            dddparamsdf(:) = dddparamsdf(:) + dd_params(:, k, which_dd_poly) * dparam_temp * real(k-1)
+            dparam_temp = dparam_temp * flux
+        end do
+        do k = 1, size(x)
+            ! When calling the skew normal remember we fit the paramerisation in psf sigma normalised space, so
+            ! first divide the offset by psfsig, then multiply back out again at the other end.
+            if (abs(x(k)) < (ddparams(5) + dddparamsdf(5) * (fs(k) - flux))*psfsig) then
+                ! if offset is small, just use flux-weighted individual offset
+                xav = xav + sign(1.0_dp, x(k)) * abs(x(k)) * fs(k) / (1 + fs(k))
+            ! Otherwise we fit a skew-normal distribution for the individual vector perturbation.
+            else
+                call fit_skew(ddparams(:4) + dddparamsdf(:4) * (fs(k) - flux), abs(x(k))/psfsig, fs(k), g1)
+                xav = xav + sign(1.0_dp, x(k)) * g1 * psfsig
+            end if
+            if (abs(y(k)) < (ddparams(5) + dddparamsdf(5) * (fs(k) - flux))*psfsig) then
+                yav = yav + sign(1.0_dp, y(k)) * abs(y(k)) * fs(k) / (1 + fs(k))
+            else
+                call fit_skew(ddparams(:4) + dddparamsdf(:4) * (fs(k) - flux), abs(y(k))/psfsig, fs(k), g1)
+                yav = yav + sign(1.0_dp, y(k)) * g1 * psfsig
+            end if
+        end do
+    else
+        xav = xav + sum(fs * x * exp(-0.25_dp * r**2 / psfsig**2))
+        yav = yav + sum(fs * y * exp(-0.25_dp * r**2 / psfsig**2))
+    end if
+
+end subroutine psf_perturb
+
+subroutine fit_skew(params, x, L, y)
+    ! Calculate the skew-normal perturber effect, evaluated at some perturber separation x.
+    integer, parameter :: dp = kind(0.0d0)  ! double precision
+    ! The skew-normal parameters array, the value at which to evaluate the function, and the relative
+    ! flux of the perturber.
+    real(dp), intent(in) :: params(:), x, L
+    ! Perturbation effect experienced by perturber of relative flux L at x.
+    real(dp), intent(out) :: y
+    ! Sigma scale, mean mu, shape alpha, and amplitude T of the scaled skew-normal distribution.
+    real(dp) :: c, u, a, t
+    ! Temporary variables holding the shifted and scaled separation, and skew-normal PDF and CDF.
+    real(dp) :: x2, psipdf, psicdf
+
+    c = params(1)
+    u = params(2)
+    a = params(3)
+    t = params(4)
+    x2 = (x - u) / c
+
+    psipdf = 1.0_dp/sqrt(2.0_dp * pi) * exp(-0.5_dp * x2**2)
+    psicdf = 0.5_dp * (1.0_dp + erf(a * x2 / sqrt(2.0_dp)))
+    y = 2 * t / c * L * psipdf * psicdf
+
+end subroutine fit_skew
 
 ! ------------------------------------------------------------------------------
 ! Copyright (c) 2009-13, Thomas P. Robitaille

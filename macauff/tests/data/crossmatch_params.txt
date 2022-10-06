@@ -43,8 +43,6 @@ int_fracs = 0.63 0.9 0.99
 
 # Number of PSF realisations to draw when simulating perturbation component of AUF
 num_trials = 10000
-# Magnitude offset, or relative flux, down to which to draw blended sources inside PSFs
-dm_max = 10
 # Bin size of magnitudes for number density distributions for perturbation AUF considersation
 d_mag = 0.1
 # Flag to indicate whether to use pre-computed local normalising densities for simulating PSFs

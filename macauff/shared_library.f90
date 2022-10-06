@@ -99,7 +99,7 @@ subroutine jy01a_j0 (x, bj0)
     rp2 = 0.63661977236758D+00
     x2 = x * x
 
-    if ( abs( x ) <= 1.0D-05 ) then
+    if ( abs( x ) <= 1.0D-10 ) then
       bj0 = 1.0D+00
       return
     end if
@@ -210,7 +210,7 @@ subroutine jy01a_j1 (x, bj1)
     rp2 = 0.63661977236758D+00
     x2 = x * x
 
-    if ( abs( x ) <= 1.0D-05 ) then
+    if ( abs( x ) <= 1.0D-10 ) then
       bj1 = 0.0D+00
       return
     end if
