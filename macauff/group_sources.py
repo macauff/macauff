@@ -462,8 +462,6 @@ def make_island_groupings(joint_folder_path, a_cat_folder_path, b_cat_folder_pat
     num_good_checks = 0
     num_a_failed_checks = 0
     num_b_failed_checks = 0
-    # Initialise the multiprocessing loop setup:
-    pool = multiprocessing.Pool(n_pool)
     for cnum in range(0, mem_chunk_num):
         lowind = np.floor(islelen*cnum/mem_chunk_num).astype(int)
         highind = np.floor(islelen*(cnum+1)/mem_chunk_num).astype(int)
@@ -495,6 +493,8 @@ def make_island_groupings(joint_folder_path, a_cat_folder_path, b_cat_folder_pat
         expand_constants = [itertools.repeat(item) for item in [
             a_, b_, alist_1, blist_1, agrplen_small, bgrplen_small, ax_lims, max_sep]]
         iter_group = zip(counter, *expand_constants)
+        # Initialise the multiprocessing loop setup:
+        pool = multiprocessing.Pool(n_pool)
         for return_items in pool.imap_unordered(_distance_check, iter_group,
                                                 chunksize=max(1, len(counter) // n_pool)):
             i, dist_check, a, b = return_items
@@ -509,7 +509,8 @@ def make_island_groupings(joint_folder_path, a_cat_folder_path, b_cat_folder_pat
                 num_a_failed_checks += len(a)
                 num_b_failed_checks += len(b)
 
-    pool.close()
+        pool.close()
+        pool.join()
 
     # If set_list returned any rejected sources, then add any sources too close
     # to match extent to those now. Ensure that we only reject the unique source IDs
@@ -765,6 +766,7 @@ def _clean_overlaps(inds, size, joint_folder_path, filename, n_pool, use_memmap_
         size[i] = y
 
     pool.close()
+    pool.join()
 
     # We ideally want to basically do np.asfortranarray(inds[:maxsize, :]), but
     # this would involve a copy instead of a read so we have to loop.

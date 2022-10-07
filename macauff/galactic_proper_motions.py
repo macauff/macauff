@@ -101,6 +101,7 @@ def calculate_proper_motions(d, l, b, temp, N):
         pm[j, :, :, 3] = mu_b
 
     pool.close()
+    pool.join()
 
     return pm, type_fracs
 
