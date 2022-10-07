@@ -38,7 +38,7 @@ This will save the appropriate three files -- ``con_cat_astro``, ``con_cat_photo
 Input Parameters
 ================
 
-Once you have your catalogue files, you will next require the files containing the input parameters. Examples of these files can be found in the ``macauff`` test data folder, for `catalogue "a" <https://raw.githubusercontent.com/Onoddil/macauff/master/macauff/tests/data/cat_a_params.txt>`_, `catalogue "b" <https://raw.githubusercontent.com/Onoddil/macauff/master/macauff/tests/data/cat_b_params.txt>`_, and the `common cross-match <https://raw.githubusercontent.com/Onoddil/macauff/master/macauff/tests/data/crossmatch_params.txt>`_ parameters.
+Once you have your catalogue files, you will next require the files containing the input parameters. Examples of these files can be found in the ``macauff`` test data folder, for `catalogue "a" <https://raw.githubusercontent.com/Onoddil/macauff/main/macauff/tests/data/cat_a_params.txt>`_, `catalogue "b" <https://raw.githubusercontent.com/Onoddil/macauff/main/macauff/tests/data/cat_b_params.txt>`_, and the `common cross-match <https://raw.githubusercontent.com/Onoddil/macauff/main/macauff/tests/data/crossmatch_params.txt>`_ parameters.
 
 These files are the only inputs to `~macauff.CrossMatch`, the main class for performing a cross-match between the two catalogues.
 
@@ -55,7 +55,7 @@ With both your data and input files, you are now ready to perform your first cro
 .. code-block:: python
 	
 	from macauff import CrossMatch
-	joint_file_path = 'some_location_here/common_match_parameters.txt'
+	joint_file_path = 'some_location_here/crossmatch_params.txt'
 	cat_a_file, cat_b_file = 'loc_one/catalogue_a_params.txt', 'loc_two/catalogue_b_params.txt'
 	cross_match = CrossMatch(joint_folder_path, cat_a_file, cat_b_file)
 	cross_match()
