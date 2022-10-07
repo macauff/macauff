@@ -5,20 +5,30 @@ Installation
 Package Requirements
 ====================
 
-Currently there are no strict criteria for installation; it is suggested that you use the most up-to-date package versions available. The one exception there is that development is currently focused on Python 3.7.
+Currently there are no strict criteria for installation; it is suggested that you use the most up-to-date package versions available. The one exception there is that the minimum version of Python is set to 3.8, and development is currently focused on Python 3.9+.
 
 The current package requirements are:
 
 * ``numpy``
 * ``scipy``
 * ``astropy``
+* ``matplotlib``
+* ``skypy``
+* ``speclite``
+* ``pandas``
 
-and for running the test suite
+with an optional dependency of
+
+* ``mpi4py``.
+
+For running the test suite the requirements are:
 
 * ``tox``
+* ``pytest``
 * ``sphinx-fortran``
 * ``sphinx-astropy``
-* ``pytest-astropy``.
+* ``pytest-astropy``
+* ``pytest-cov``.
 
 Additionally, you will need the following to install ``macauff``:
 
@@ -32,15 +42,15 @@ As of now, the only way to install this package is by downloading it from the `G
 
 Once you have installed your choice of conda, then you can create an initial conda environment::
 
-	conda create -n your_environment_name python=3.7 numpy scipy astropy
+	conda create -n your_environment_name -c conda-forge python=3.9 numpy scipy astropy matplotlib skypy speclite pandas
 
-although you can drop the ``=3.7``, or chose another (later) Python version, if you desire to do so. Then activate this as our Python environment::
+although you can drop the ``=3.9``, or chose another (later) Python version -- remembering the minimum version is 3.8 -- if you desire to do so. Then activate this as our Python environment::
 
 	conda activate your_environment_name
 
 If you require the additional test packages listed above, for running tests, you can install them separately with::
 
-	conda install -c conda-forge tox sphinx-astropy pytest-astropy
+	conda install -c conda-forge tox pytest sphinx-astropy pytest-astropy pytest-cov
 	conda install -c vacumm -c conda-forge sphinx-fortran
 
 You will also need to install ``gfortran`` in order to compile the fortran code in this package. Instructions for how to install this for Windows, MacOS, or Linux can be found `here <https://gcc.gnu.org/wiki/GFortranBinaries>`_. Finally, install ``git`` if you do not have it on your computer; `instructions <https://git-scm.com/book/en/v2/Getting-Started-Installing-Git>`_ for installing it on your operating system are available.
@@ -71,3 +81,9 @@ To run the main unit test suite, assuming you installed it during the above proc
 If you wish to locally build the documentation -- mostly likely if you are improving or extending the documentation, as the docs are available online -- you can run::
 
 	tox -e build_docs
+
+
+Getting Started
+===============
+
+Once you have installed the package, check out the :doc:`Quick Start<quickstart>` page.
