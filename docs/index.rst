@@ -39,7 +39,6 @@ User Documentation
 Index
 *****
 
-* :ref:`genindex`
 * :ref:`search`
 
 .. toctree::
