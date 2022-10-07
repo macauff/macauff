@@ -437,6 +437,7 @@ class AstrometricCorrections:
                         ax1.set_ylabel('log10(SNR)', color='b')
 
             pool.close()
+            pool.join()
 
             if self.make_plots:
                 plt.tight_layout()
@@ -969,6 +970,7 @@ class AstrometricCorrections:
                     fit_nnf[i, 1] = np.sqrt(cov[1, 1])
 
             pool.close()
+            pool.join()
 
             resses = np.array(resses, dtype=object)
 
@@ -1289,6 +1291,7 @@ class AstrometricCorrections:
                 x2s[index, :, :] = chi_sq
 
         pool.close()
+        pool.join()
 
         if fit_x2_flag:
             np.save('{}/npy/fit_x2s.npy'.format(self.save_folder), np.array(x2s))
@@ -1560,6 +1563,7 @@ def create_densities(lmid, bmid, b, minmag, maxmag, lon_slice, lat_slice, lmin, 
             overlap_number[i] = len_query
 
         pool.close()
+        pool.join()
 
         area = paf.get_circle_area_overlap(
             b[:, 0], b[:, 1], search_radius/3600, lmin, lmax, bmin, bmax)

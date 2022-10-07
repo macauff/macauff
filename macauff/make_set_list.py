@@ -103,6 +103,7 @@ def set_list(aindices, bindices, aoverlap, boverlap, joint_folder_path, n_pool, 
         grouplengthexceeded[i] = len_exceeded_flag
 
     pool.close()
+    pool.join()
 
     if np.any(grouplengthexceeded):
         nremoveisland = np.sum(grouplengthexceeded)

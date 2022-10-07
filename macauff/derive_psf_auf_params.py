@@ -133,6 +133,7 @@ class FitPSFPerturbations:
             dd[i, j, 1] = self.di[j]
 
         pool.close()
+        pool.join()
         np.save('{}/dd_Ld.npy'.format(self.data_save_folder), dd)
 
     def min_parallel_dd_fit(self, iterable):
@@ -321,6 +322,7 @@ class FitPSFPerturbations:
                     res = return_res
                     min_val = return_res.fun
             pool.close()
+            pool.join()
 
             dd_skew_pars[i, :-1] = res.x
             dd_skew_pars[i, -1] = cutr
@@ -509,6 +511,7 @@ class FitPSFPerturbations:
                     dd_params[j, i, :N, k] = res
 
             pool.close()
+            pool.join()
 
         # Keep track of the total goodness-of-fit values across all di-Li
         # combinations, as well as the goodness-of-fits just for individual
@@ -858,6 +861,7 @@ class FitPSFPerturbations:
             diff[i, 5] = dx_fit
 
         pool.close()
+        pool.join()
 
         ax = plt.subplot(gs[0, 3])
         hist, bins = np.histogram(diff[:, 0], bins='auto')
