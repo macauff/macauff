@@ -35,9 +35,9 @@ User Documentation
 
    macauff
 
-*****
-Index
-*****
+******
+Search
+******
 
 * :ref:`search`
 
