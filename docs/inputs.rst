@@ -2,13 +2,34 @@
 Input Parameters
 ****************
 
-This page details the various inputs expected by `~macauff.CrossMatch`.
+This page details the various inputs expected by `~macauff.CrossMatch`. These are split into two main sections: inputs that both catalogues need separately (contained in their respective catalogue parameters file) and inputs that are defined with respect to the catalogue-catalogue cross-match.
 
 
 Catalogue-specific Parameters
 =============================
 
 These parameters are required in two separate files, one per catalogue to be cross-matched., the inputs ``cat_a_file_path`` and ``cat_b_file_path`` in `~macauff.CrossMatch`.
+
+These can be divided into those inputs that are always required:
+
+``cat_folder_path``, ``cat_name``, ``filt_names``, ``auf_folder_path``, ``auf_region_type``, ``auf_region_frame``, and ``auf_region_points``;
+
+those that are only required if the `Joint Parameters`_ option ``include_perturb_auf`` is ``True``:
+
+``fit_gal_flag``, ``run_fw_auf``, ``run_psf_auf``, ``psf_fwhms``, ``dens_mags``, ``mag_h_params_path``, ``download_tri``, ``tri_set_name``, ``tri_filt_names``, ``tri_filt_num``, ``tri_maglim_bright``, ``tri_maglim_faint``, ``tri_num_bright``, and ``tri_num_faint``;
+
+parameters required if ``run_psf_auf`` is ``True``:
+
+``dd_params_path`` and ``l_cut_path``;
+
+the parameter only needed if `Joint Parameters`_ option ``compute_local_density`` is ``True``:
+
+``dens_dist``;
+
+and the inputs required in each catalogue parameters file if ``fit_gal_flag`` is ``True``:
+
+``gal_wavs``, ``gal_zmax``, ``gal_nzs``, ``gal_aboffsets``, ``gal_filternames``, and ``gal_al_avs``.
+
 
 Catalogue Parameter Description
 -------------------------------
@@ -74,6 +95,14 @@ Joint Parameters
 
 These parameters are only provided in the single, common-parameter input file, and given as ``joint_file_path`` in `~macauff.CrossMatch`.
 
+Similar to `Catalogue-specific Parameters`_, we first have the parameters that must be given in all runs:
+
+``joint_folder_path``, ``run_auf``, ``run_group``, ``run_cf``, ``run_source``, ``include_perturb_auf``, ``include_phot_like``, ``use_phot_priors``, ``cross_match_extent``, ``mem_chunk_num``, ``pos_corr_dist``, ``cf_region_type``, ``cf_region_frame``, ``cf_region_points``, ``real_hankel_points``, ``four_hankel_points``, ``four_max_rho``, and ``int_fracs``;
+
+and those options which only need to be supplied if ``include_perturb_auf`` is ``True``:
+
+``num_trials``, ``compute_local_density``, and ``d_mag``.
+
 Common Parameter Description
 ----------------------------
 
@@ -95,7 +124,7 @@ Flag to determine whether to calculate the priors on match or non-match using th
 The top-level folder location, into which all intermediate files and folders are placed, when created during the cross-match process.
 
 .. note::
-	The four ``run_`` parameters below are called in order. If an earlier stage flag is set to ``True``, an error will be raised in a subsequent flag is set to ``False``.
+    The four ``run_`` parameters below are called in order. If an earlier stage flag is set to ``True``, an error will be raised in a subsequent flag is set to ``False``.
 
 ``run_auf``
 
