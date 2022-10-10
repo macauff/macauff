@@ -26,6 +26,18 @@ Quick Start
 
 A quick-start guide is available :doc:`here<quickstart>`.
 
+****************
+Input Parameters
+****************
+
+Input parameters are detailed on :doc:`this<inputs>` page.
+
+*********************
+Real-World Match Case
+*********************
+
+A more complex match case, using pre-existing photometric catalogues, is described :doc:`here<real_world_matches>`.
+
 ******************
 User Documentation
 ******************
@@ -47,6 +59,7 @@ Search
    installation
    quickstart
    inputs
+   real_world_matches
    f90_docs/perturb_auf_docs
    f90_docs/group_sources_docs
    f90_docs/phot_like_docs
