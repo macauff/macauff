@@ -154,22 +154,22 @@ which will save all intermediate match data to the ``joint_folder_path`` paramet
 
 .. code-block:: python
 
-        import numpy as np
-        joint_folder_path = 'test_macauff_outputs/test_path'
-        a = np.load('{}/con_cat_astro.npy'.format(a_cat_path))
-        b = np.load('{}/con_cat_astro.npy'.format(b_cat_path))
-        cat_a_match_inds = np.load('{}/pairing/ac.npy'.format(joint_folder_path))
-        cat_b_match_inds = np.load('{}/pairing/bc.npy'.format(joint_folder_path))
+    import numpy as np
+    joint_folder_path = 'test_macauff_outputs/test_path'
+    a = np.load('{}/con_cat_astro.npy'.format(a_cat_path))
+    b = np.load('{}/con_cat_astro.npy'.format(b_cat_path))
+    cat_a_match_inds = np.load('{}/pairing/ac.npy'.format(joint_folder_path))
+    cat_b_match_inds = np.load('{}/pairing/bc.npy'.format(joint_folder_path))
 
-        a_matches, b_matches = a[cat_a_match_inds], b[cat_b_match_inds]
+    a_matches, b_matches = a[cat_a_match_inds], b[cat_b_match_inds]
 
 You can then, for example, calculate the on-sky separations between these sources
 
 .. code-block:: python
 
-        from macauff.misc_functions_fortran import misc_functions_fortan as mff
-        arcsec_seps = np.array([3600 * mff.haversine_wrapper(a_matches[i, 0], b_matches[i, 0],
-                                a_matches[i, 1], b_matches[i, 1]) for i in range(len(a_matches))])
+    from macauff.misc_functions_fortran import misc_functions_fortan as mff
+    arcsec_seps = np.array([3600 * mff.haversine_wrapper(a_matches[i, 0], b_matches[i, 0],
+                            a_matches[i, 1], b_matches[i, 1]) for i in range(len(a_matches))])
 
 Running More Complex Matches
 ============================
