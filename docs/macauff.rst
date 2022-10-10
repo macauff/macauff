@@ -5,12 +5,12 @@
 Python
 ======
 .. automodapi:: macauff
-	:no-inheritance-diagram:
-	:no-heading:
+    :no-inheritance-diagram:
+    :no-heading:
 
 .. automodapi:: macauff.tests
-	:no-inheritance-diagram:
-	:no-heading:
+    :no-inheritance-diagram:
+    :no-heading:
 
 Fortran
 =======

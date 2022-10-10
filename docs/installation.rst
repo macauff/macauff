@@ -42,30 +42,30 @@ As of now, the only way to install this package is by downloading it from the `G
 
 Once you have installed your choice of conda, then you can create an initial conda environment::
 
-	conda create -n your_environment_name -c conda-forge python=3.9 numpy scipy astropy matplotlib skypy speclite pandas
+    conda create -n your_environment_name -c conda-forge python=3.9 numpy scipy astropy matplotlib skypy speclite pandas
 
 although you can drop the ``=3.9``, or chose another (later) Python version -- remembering the minimum version is 3.8 -- if you desire to do so. Then activate this as our Python environment::
 
-	conda activate your_environment_name
+    conda activate your_environment_name
 
 If you require the additional test packages listed above, for running tests, you can install them separately with::
 
-	conda install -c conda-forge tox pytest sphinx-astropy pytest-astropy pytest-cov
-	conda install -c vacumm -c conda-forge sphinx-fortran
+    conda install -c conda-forge tox pytest sphinx-astropy pytest-astropy pytest-cov
+    conda install -c vacumm -c conda-forge sphinx-fortran
 
 You will also need to install ``gfortran`` in order to compile the fortran code in this package. Instructions for how to install this for Windows, MacOS, or Linux can be found `here <https://gcc.gnu.org/wiki/GFortranBinaries>`_. Finally, install ``git`` if you do not have it on your computer; `instructions <https://git-scm.com/book/en/v2/Getting-Started-Installing-Git>`_ for installing it on your operating system are available.
 
 Once you have the required packages installed -- whether in a new ``conda`` environment or otherwise -- you can clone the repository::
 
-	git clone git://github.com/onoddil/macauff.git
+    git clone git://github.com/onoddil/macauff.git
 
 which will place the repository in the folder from which you invoked the ``git`` command. Now, from inside the folder that was just created (``cd macauff`` or equivalent), you can either run::
 
-	pip install .
+    pip install .
 
 which will install ``macauff`` such that you can ``import macauff`` from other folders on your computer. However, if this is to develop the software, your changes will not be reflected in the installed version of the code (and you must re-install using the above command); if you wish to have changes immediately reflected in your ``pip``-installed version of the software, you can install ``macauff`` using::
 
-	pip install -e .
+    pip install -e .
 
 where ``-e`` is the "editable" flag.
 
@@ -76,11 +76,11 @@ Testing
 
 To run the main unit test suite, assuming you installed it during the above process, you can run::
 
-	tox -e test
+    tox -e test
 
 If you wish to locally build the documentation -- mostly likely if you are improving or extending the documentation, as the docs are available online -- you can run::
 
-	tox -e build_docs
+    tox -e build_docs
 
 
 Getting Started
