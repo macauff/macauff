@@ -609,10 +609,10 @@ class CrossMatch():
         cat_b_config = cat_b_config['config']
 
         for check_flag in ['include_perturb_auf', 'include_phot_like', 'run_auf', 'run_group',
-                           'run_cf', 'run_source', 'cf_region_type', 'cf_region_frame',
-                           'cf_region_points', 'joint_folder_path', 'pos_corr_dist',
-                           'real_hankel_points', 'four_hankel_points', 'four_max_rho',
-                           'cross_match_extent', 'mem_chunk_num', 'int_fracs']:
+                           'run_cf', 'run_source', 'use_phot_priors', 'cf_region_type',
+                           'cf_region_frame', 'cf_region_points', 'joint_folder_path',
+                           'pos_corr_dist', 'real_hankel_points', 'four_hankel_points',
+                           'four_max_rho', 'cross_match_extent', 'mem_chunk_num', 'int_fracs']:
             if check_flag not in joint_config:
                 raise ValueError("Missing key {} from joint metadata file.".format(check_flag))
 
@@ -850,18 +850,18 @@ class CrossMatch():
                                          'same number of entries.'.format(flag, flag))
                     setattr(self, '{}gal_filternames'.format(flag), np.array(b))
 
-        for config, catname, flag in zip([cat_a_config, cat_b_config], ['"a"', '"b"'],
-                                         ['a_', 'b_']):
-            a = config['psf_fwhms'].split()
-            try:
-                b = np.array([float(f) for f in a])
-            except ValueError:
-                raise ValueError('psf_fwhms should be a list of floats in catalogue {} metadata '
-                                 'file.'.format(catname))
-            if len(b) != len(getattr(self, '{}filt_names'.format(flag))):
-                raise ValueError('{}psf_fwhms and {}filt_names should contain the '
-                                 'same number of entries.'.format(flag, flag))
-            setattr(self, '{}psf_fwhms'.format(flag), b)
+            for config, catname, flag in zip([cat_a_config, cat_b_config], ['"a"', '"b"'],
+                                             ['a_', 'b_']):
+                a = config['psf_fwhms'].split()
+                try:
+                    b = np.array([float(f) for f in a])
+                except ValueError:
+                    raise ValueError('psf_fwhms should be a list of floats in catalogue {} '
+                                     'metadata file.'.format(catname))
+                if len(b) != len(getattr(self, '{}filt_names'.format(flag))):
+                    raise ValueError('{}psf_fwhms and {}filt_names should contain the '
+                                     'same number of entries.'.format(flag, flag))
+                setattr(self, '{}psf_fwhms'.format(flag), b)
 
         self.a_cat_name = cat_a_config['cat_name']
         self.b_cat_name = cat_b_config['cat_name']
