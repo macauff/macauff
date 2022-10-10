@@ -618,8 +618,7 @@ class CrossMatch():
 
         for config, catname in zip([cat_a_config, cat_b_config], ['"a"', '"b"']):
             for check_flag in ['auf_region_type', 'auf_region_frame', 'auf_region_points',
-                               'filt_names', 'cat_name', 'dens_dist', 'auf_folder_path',
-                               'cat_folder_path']:
+                               'filt_names', 'cat_name', 'auf_folder_path', 'cat_folder_path']:
                 if check_flag not in config:
                     raise ValueError("Missing key {} from catalogue {} metadata file.".format(
                                      check_flag, catname))
@@ -660,7 +659,7 @@ class CrossMatch():
         # parameters if we are using the perturbation AUF component.
         if self.include_perturb_auf:
             for config, catname in zip([cat_a_config, cat_b_config], ['"a"', '"b"']):
-                for check_flag in ['tri_set_name', 'tri_filt_names', 'psf_fwhms',
+                for check_flag in ['tri_set_name', 'tri_filt_names', 'tri_filt_num', 'psf_fwhms',
                                    'download_tri', 'dens_mags', 'fit_gal_flag',
                                    'run_fw_auf', 'run_psf_auf', 'mag_h_params_path',
                                    'tri_maglim_bright', 'tri_maglim_faint', 'tri_num_bright',
@@ -801,6 +800,10 @@ class CrossMatch():
             self.compute_local_density = self._str2bool(joint_config['compute_local_density'])
 
             if self.compute_local_density:
+                for check_flag in ['dens_dist']:
+                    if check_flag not in config:
+                        raise ValueError("Missing key {} from catalogue {} metadata file.".format(
+                                         check_flag, catname))
                 for config, catname, flag in zip([cat_a_config, cat_b_config], ['"a"', '"b"'],
                                                  ['a_', 'b_']):
                     try:

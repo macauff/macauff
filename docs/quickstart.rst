@@ -109,9 +109,6 @@ cat_a_params.txt::
     # For "rectangle" this should be 6 numbers: start coordinate, end coordinate, integer number of data points from start to end (inclusive of both start and end), first for ra/l, then for dec/b (depending on auf_region_type), all separated by spaces
     auf_region_points = 0.1 0.2 2 50.15 50.15 1
 
-    # Local density calculation radius, in degrees
-    dens_dist = 0.25
-
 cat_b_params.txt::
 
     # Catalogue name -- used both for folder creation and output file names
@@ -130,9 +127,6 @@ cat_b_params.txt::
     # For "points" this should be individually specified (ra, dec) or (l, b) coordinates [as "(a, b), (c, d)"]
     # For "rectangle" this should be 6 numbers: start coordinate, end coordinate, integer number of data points from start to end (inclusive of both start and end), first for ra/l, then for dec/b (depending on auf_region_type), all separated by spaces
     auf_region_points = 0.1 0.2 2 50.15 50.15 1
-
-    # Local density calculation radius, in degrees
-    dens_dist = 0.25
 
 .. note::
     Discussion of the input parameters available in the catalogue-specific and joint match-specific input files is provided in more detail :doc:`here<inputs>`.
