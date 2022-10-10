@@ -165,3 +165,13 @@ You can then, for example, calculate the on-sky separations between these source
 	from macauff.misc_functions_fortran import misc_functions_fortan as mff
 	arcsec_seps = np.array([3600 * mff.haversine_wrapper(a_matches[i, 0], b_matches[i, 0],
 	                        a_matches[i, 1], b_matches[i, 1]) for i in range(len(a_matches))])
+
+Running More Complex Matches
+============================
+
+For example cross-matches, including some more advanced features available within ``macauff``, check out the :doc:`Real-World Matching<real_world_matches>` examples.
+
+Documentation
+=============
+
+For the full documentation, click :doc:`here<macauff>`.
