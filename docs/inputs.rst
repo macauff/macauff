@@ -4,6 +4,27 @@ Input Parameters
 
 This page details the various inputs expected by `~macauff.CrossMatch` via its input parameter files. These are split into two main sections: inputs that both catalogues need separately (contained in their respective catalogue parameters file) and inputs that are defined with respect to the catalogue-catalogue cross-match.
 
+These input parameters are required to be in ``crossmatch_params*.txt`` for the `Joint Parameters`_ options, and ``cat_a_params*.txt``, ``cat_b_params*.txt`` for the `Catalogue-specific Parameters`_ options, where the asterisk indicates a wildcard -- i.e., the text files must end ``.txt`` and begin e.g. ``crossmatch_params``,  but can contain text between those two parts of the file.
+
+Depending on the size of the match being performed, it is likely that you may want to use the MPI parallelisation option to save runtime or memory overhead, splitting your matches into "chunks." Even if your cross-match area is small enough that you only have a single file per catalogue, this is treated as a single chunk. Each individual chunk -- or your only chunk -- is required to have its own set of three input text parameter files, within folders inside ``chunks_folder_path`` as passed to `~macauff.CrossMatch`. Most of the parameters within these files will be the same across all chunks -- you'll likely always want to include the perturbation component of the AUF or include photometric likelihoods, or use the same filters across all sub-catalogue cross-matches -- but some will vary on a per-chunk basis, most notably anything that involves astrometric coordiantes, like ``cross_match_extent``.
+
+The sub-folder structure should look something like::
+
+    /path/to/your/chunks_folder_path
+                                   ├─── 2017
+                                   │       ├── crossmatch_params_2017.txt
+                                   │       ├── cat_a_params_2017.txt
+                                   │       └── cat_b_params_2017.txt
+                                   │
+                                   ├─── 2018
+                                   │       ├── crossmatch_params_2018.txt
+                                   │       ├── cat_a_params_2018.txt
+                                   │       └── cat_b_params_2018.txt
+
+where e.g. ``crossmatch_params_2017.txt`` and ``crossmatch_params_2018.txt`` would both contain all of the "Joint Parameters" parameters necessary to run the matches in their respective chunks; again, significant numbers of these would be the same, but e.g. ``cf_region_points`` would differ.
+
+For a simple example of how this works for a one-chunk cross-match, see :doc:`quickstart`, and for more details on the inputs and outputs from individual functions within the cross-match process check the :doc:`documentation<macauff>`.
+
 Joint Parameters
 ================
 
