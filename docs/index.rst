@@ -47,6 +47,30 @@ User Documentation
 
    macauff
 
+************************
+Pre- and Post-Processing
+************************
+
+
+
+********************************
+Interpreting Cross-Match Results
+********************************
+
+
+
+*******************
+Algorithmic Details
+*******************
+
+
+
+**************************
+Starting a New Cross-Match
+**************************
+
+
+
 ******
 Search
 ******
