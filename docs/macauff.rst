@@ -2,6 +2,10 @@
 ``macauff`` Documentation
 *************************
 
+This page details the inputs and outputs for various Python and Fortran functions/subroutines used internally within macauff. While `~macauff.CrossMatch` is the main input for most users, it is possible to overwrite each of the four main steps within the matching process (AUF component creation, island group creation, photometric likelihood derivation, and final match assignment) and hence it may be important to understand the required I/O to a given step for compatibility purposes.
+
+For the details of the inputs that `~macauff.CrossMatch` expects and parses through its `read_metadata` function, see :doc:`inputs` for specifics.
+
 Python
 ======
 .. automodapi:: macauff
