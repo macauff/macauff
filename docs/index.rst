@@ -63,7 +63,7 @@ Interpreting Cross-Match Results
 Algorithmic Details
 *******************
 
-
+For specific implementation details and the mathematics used in macauff, see the :doc:`algorithms<algorithms>` page.
 
 **************************
 Starting a New Cross-Match
@@ -84,6 +84,7 @@ Search
    quickstart
    inputs
    real_world_matches
+   algorithms
    f90_docs/perturb_auf_docs
    f90_docs/group_sources_docs
    f90_docs/phot_like_docs
