@@ -52,10 +52,10 @@ Pre- and Post-Processing
 ************************
 
 
-
-********************************
-Interpreting Cross-Match Results
-********************************
+..
+   ********************************
+   Interpreting Cross-Match Results
+   ********************************
 
 
 
@@ -65,9 +65,10 @@ Algorithmic Details
 
 For specific implementation details and the mathematics used in macauff, see the :doc:`algorithms<algorithms>` page.
 
-**************************
-Starting a New Cross-Match
-**************************
+..
+   **************************
+   Starting a New Cross-Match
+   **************************
 
 
 
