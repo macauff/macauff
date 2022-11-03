@@ -32,11 +32,12 @@ Input Parameters
 
 Input parameters are detailed on :doc:`this<inputs>` page.
 
-*********************
-Real-World Match Case
-*********************
+..
+   *********************
+   Real-World Match Case
+   *********************
 
-A more complex match case, using pre-existing photometric catalogues, is described :doc:`here<real_world_matches>`.
+   A more complex match case, using pre-existing photometric catalogues, is described :doc:`here<real_world_matches>`.
 
 ******************
 User Documentation
