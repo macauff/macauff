@@ -52,6 +52,7 @@ User Documentation
 Pre- and Post-Processing
 ************************
 
+How to prepare a particular dataset for cross-matching, initialise certain algorithmic aspects, and create final composite catalogues after matching check the :doc:`Processing<pre_post_process>` section.
 
 ..
    ********************************
@@ -85,7 +86,7 @@ Search
    installation
    quickstart
    inputs
-   real_world_matches
+   pre_post_process
    algorithms
    f90_docs/perturb_auf_docs
    f90_docs/group_sources_docs
