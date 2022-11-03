@@ -35,6 +35,11 @@ __all__ = ['AstrometricCorrections']
 
 
 class AstrometricCorrections:
+    """
+    Class to calculate any potential corrections to quoted astrometric
+    precisions in photometric catalogues, based on reliable cross-matching
+    to a well-understood second dataset.
+    """
     def __init__(self, psf_fwhm, numtrials, nn_radius, dens_search_radius, save_folder, trifolder,
                  triname, maglim_b, maglim_f, magnum, trifilterset, trifiltname,
                  gal_wav_micron, gal_ab_offset, gal_filtname, gal_alav, bright_mag, dm, dd_params,

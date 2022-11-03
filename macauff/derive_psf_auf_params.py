@@ -25,7 +25,16 @@ if usetex:
     plt.rcParams.update({"text.usetex": True, "text.latex.preamble": r"\usepackage{amsmath}"})
 
 
+__all__ = ['FitPSFPerturbations']
+
+
 class FitPSFPerturbations:
+    """
+    Class that derives a parameterisation of the effect of a hidden, blended
+    contaminant within a brighter source in a photometric image, based on
+    fitting the composite object with a single Gaussian PSF in the limit that
+    sky background dominates and noise is constant across the image.
+    """
     def __init__(self, psf_fwhm, d_di, d_Li, n_pool, data_save_folder, plot_save_folder=None):
         """
         Initialise FitPSFPerturbations with necessary parameters.
@@ -897,7 +906,7 @@ class FitPSFPerturbations:
         Parameters
         ----------
         iterable : list
-            List passed through ``multiprocessing`, containing the index of
+            List passed through ``multiprocessing``, containing the index of
             the fit, as well as PSF FWHM and Gaussian sigma, maximum relative
             flux at which skew-normal distributions still describe
             perturbation offsets, the array of skew-normal parameters as a
