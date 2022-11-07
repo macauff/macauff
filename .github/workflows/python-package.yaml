@@ -23,11 +23,11 @@ jobs:
             python-version: 3.9
             toxenv: py39-test
           - name: macOS, Python 3.8
-            os: macOS-latest
+            os: macOS-11
             python-version: 3.8
             toxenv: py38-test
           - name: macOS, Python 3.10, coverage
-            os: macOS-latest
+            os: macOS-11
             python-version: "3.10"
             # Include at least one coverage option for codecov.
             toxenv: py310-test-cov
@@ -44,7 +44,7 @@ jobs:
         run: |
           sudo ln -s /usr/local/bin/gfortran-9 /usr/local/bin/gfortran
           sudo mkdir /usr/local/gfortran
-          sudo ln -s /usr/local/Cellar/gcc@9/9.3.0_1/lib/gcc/9 /usr/local/gfortran/lib
+          sudo ln -s /usr/local/Cellar/gcc@9/*/lib/gcc/9 /usr/local/gfortran/lib
       - if: runner.os == 'Linux'
         name: ubuntu gfortran
         run: sudo ln -sf /usr/bin/gfortran-9 /usr/bin/gfortran
