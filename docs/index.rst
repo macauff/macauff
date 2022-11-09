@@ -8,7 +8,7 @@ macauff
 #######
 **The Python package for Matching Across Catalogues using the Astrometric Uncertainty Function and Flux**
 
-``macauff`` is a package for cross-matching photometric catalogues. Using the positions, uncertainties, and flux measurements of sources, as well as modelling of the level to which objects are affected by hidden, blended contaminants, ``macauff`` provides posterior probabilities of "many-to-many" matches and non-matches between the two catalogues being merged. It also provides numerous secondary parameters, such as the level to which sources are flux contaminated, and the probability of their suffering blended by a source of a given flux ratio.
+``macauff`` is a package for cross-matching photometric catalogues. Using the positions, uncertainties, and flux measurements of sources, as well as modelling of the level to which objects are affected by hidden, blended contaminants, ``macauff`` provides posterior probabilities of "many-to-many" matches and non-matches between the two catalogues being counterparts to one another. It also provides numerous secondary parameters, such as the level to which sources are flux contaminated, and the probability of their suffering blended by a source of a given flux ratio.
 
 .. _getting-started:
 
