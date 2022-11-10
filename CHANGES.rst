@@ -60,6 +60,10 @@ New Features
 Bug Fixes
 ^^^^^^^^^
 
+- Replaced ``datetime.strptime`` in the ``CrossMatch`` constructor with a
+  string ``split`` to fix a crash when given walltime is greater than
+  ``24:00:00``. [#52]
+
 - Updated ``fit_gal_flag`` keyword as passed through to ``make_perturb_aufs``
   incorrectly using ``self.a_fit_gal_flag`` when running catalogue "b" AUF
   component generation. [#50]
@@ -175,6 +179,9 @@ API Changes
 
 Other Changes
 ^^^^^^^^^^^^^
+
+- Changed ``_make_chunk_queue`` to return a queue ordered by file size in bytes
+  and improve load balancing in MPI parallelised jobs. [#52]
 
 - Added ``matplotlib`` as a dependency, and explictly defined ``pytest-cov`` as a
   test dependency. [#50]

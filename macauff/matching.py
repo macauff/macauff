@@ -114,13 +114,13 @@ class CrossMatch():
                 # Expect job walltime and "end within" time in Hours:Minutes:Seconds (%H:%M:%S)
                 # format, e.g. 02:44:12 for 2 hours, 44 minutes, 12 seconds
                 # Calculate job end time from start time + walltime
-                t = datetime.datetime.strptime(walltime, '%H:%M:%S')
+                hour, minute, second = walltime.split(':')
                 self.end_time = datetime.datetime.now() + \
-                    datetime.timedelta(hours=t.hour, minutes=t.minute, seconds=t.second)
+                    datetime.timedelta(hours=int(hour), minutes=int(minute), seconds=int(second))
                 # Keep track of "end within" time as a timedelta for easy comparison
-                t = datetime.datetime.strptime(end_within, '%H:%M:%S')
+                hour, minute, second = end_within.split(':')
                 self.end_within = \
-                    datetime.timedelta(hours=t.hour, minutes=t.minute, seconds=t.second)
+                    datetime.timedelta(hours=int(hour), minutes=int(minute), seconds=int(second))
             else:
                 self.end_time = None
                 self.end_within = None
@@ -426,16 +426,17 @@ class CrossMatch():
         #   chunks_folder_path/2018/cat_a_params_2018.txt
         #   chunks_folder_path/2018/cat_b_params_2018.txt
 
-        # List subfolders in chunks folder
-        # Ordering is determined by os.listdir
-        # Skip chunks completed in a previous run
-        subfolders = [name for name in os.listdir(self.chunks_folder_path)
-                      if os.path.isdir(os.path.join(self.chunks_folder_path, name))
-                      and name not in completed_chunks]
-
-        # Loop over subfolders, extracting paths to metadata files contained within
+        # Loop over subfolders in chunks folder, extracting paths to metadata files contained within
         chunk_queue = []
-        for folder in subfolders:
+        for folder in os.listdir(self.chunks_folder_path):
+            folder_path = os.path.join(self.chunks_folder_path, folder)
+
+            # Skip non-directories
+            if not os.path.isdir(folder_path):
+                continue
+            # Skip completed chunks
+            if folder in completed_chunks:
+                continue
 
             # Identify chunk by subfolder name
             chunk_id = folder
@@ -443,7 +444,6 @@ class CrossMatch():
             cat_a_file_path = ""
             cat_b_file_path = ""
 
-            folder_path = os.path.join(self.chunks_folder_path, folder)
             for filename in os.listdir(folder_path):
                 # Ignore non-txt files
                 if filename.endswith(".txt"):
@@ -466,10 +466,40 @@ class CrossMatch():
                 raise FileNotFoundError('Catalogue "b" metadata file for chunk {} not found in directory {}'
                                         .format(chunk_id, folder_path))
 
-            # Append result as tuple of ID and all 3 paths
-            chunk_queue.append((chunk_id, joint_file_path, cat_a_file_path, cat_b_file_path))
+            # Determine combined input file size for catalogues "a" and "b"
+            # Used to sort queue
+            chunk_size = 0
+            for file_path in [cat_a_file_path, cat_b_file_path]:
+                # Read input folder path from metadata file.
+                # TODO: Use ConfigParser here?
+                with open(file_path, 'r') as param_file:
+                    cat_folder_path = ""
+                    for line in param_file:
+                        if line.startswith("cat_folder_path"):
+                            cat_folder_path = line.split('=')[-1].strip()
+                            break
 
-        return chunk_queue
+                if not os.path.isdir(cat_folder_path):
+                    raise FileNotFoundError('Catalogue directory {} not found'.format(cat_folder_path))
+
+                # Get size of all files in input folder
+                # Expected to be con_cat_astro.npy, con_cat_photo.npy and magref.npy
+                for path, dirs, files in os.walk(cat_folder_path):
+                    for f in files:
+                        file_path = os.path.join(path, f)
+                        chunk_size += os.path.getsize(file_path)
+
+            # Append result as tuple of size, ID and all 3 paths
+            chunk_queue.append((chunk_size, chunk_id, joint_file_path, cat_a_file_path, cat_b_file_path))
+
+        # Sort chunk list by size, largest to smallest
+        chunk_queue.sort(key=lambda x: x[0], reverse=True)
+        # Remove chunk size from output list
+        chunk_queue_sorted = [ (chunk_id, joint_file_path, cat_a_file_path, cat_b_file_path) for
+                               (chunk_size, chunk_id, joint_file_path, cat_a_file_path, cat_b_file_path) in
+                               chunk_queue ]
+
+        return chunk_queue_sorted
 
     def _cleanup(self):
         '''
