@@ -180,6 +180,9 @@ API Changes
 Other Changes
 ^^^^^^^^^^^^^
 
+- Updated documentation to reflect previous improvements to codebase, and add further
+  introductory and explanatory material. [#54]
+
 - Changed ``_make_chunk_queue`` to return a queue ordered by file size in bytes
   and improve load balancing in MPI parallelised jobs. [#52]
 

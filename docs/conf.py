@@ -19,7 +19,7 @@
 # -- Project information -----------------------------------------------------
 
 project = 'macauff'
-copyright = '2021, Tom J Wilson'
+copyright = '2022, Tom J Wilson'
 author = 'Tom J Wilson'
 
 # Parts of this conf.py use settings from sphinx-astropy's v1.py,

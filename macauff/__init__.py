@@ -7,3 +7,6 @@ from .photometric_likelihood import *
 from .counterpart_pairing import *
 from .galactic_proper_motions import *
 from .galaxy_counts import *
+from .parse_catalogue import *
+from .fit_astrometry import *
+from .derive_psf_auf_params import *
