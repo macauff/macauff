@@ -25,6 +25,27 @@ where e.g. ``crossmatch_params_2017.txt`` and ``crossmatch_params_2018.txt`` wou
 
 For a simple example of how this works for a one-chunk cross-match, see :doc:`quickstart`, and for more details on the inputs and outputs from individual functions within the cross-match process check the :doc:`documentation<macauff>`.
 
+CrossMatch Inputs
+=================
+
+As well as the parameters required that are ingested through the input parameters files, `~macauff.CrossMatch` itself requires some input arguments.
+
+- ``chunks_folder_path``: the directory in which the folders containing parameters files are stored
+
+- ``use_memmap_files``: a boolean flag indicating whether or not to save temporary, intermediate arrays to disk and load variables through memmapping. Should be used if the catalogue regions being matched are sufficiently large that they cannot be stored in memory at once. Alternatively, consider smaller chunks. Optional, defaulting to ``False``.
+
+- ``use_mpi``: boolean flag for whether to parallelise distribution of chunks using MPI. If ``False`` chunks will be run in serial; defaults to ``True``, but with a fallback for if the appropriate module is not available.
+
+If you do not want to (or cannot) use MPI to distribute larger cross-match runs, with numerous chunks that will take significant compute time to run, then the first two inputs, combined with with ``use_mpi=False``, are all you need to consider. However, if you wish to use MPI then the remaining keyword arguments control its use:
+
+- ``resume_file_path``: location of where to store the file that contains information on whether a particular chunk (e.g. ``2018`` in the example above) is finished, to avoid re-running parameters if matches have to be re-started for any reason. Optional, defaulting to having no such checkpointing capabilities.
+
+- ``walltime``: related to ``resume_file_path``, this controls how long a singular run of the cross-matching can be performed for on the particular machine before being stopped (e.g. if being run on a shared machine). Default is no such consideration for duration of match runtimes, but otherwise expects a string in the format ``H:M:S``.
+
+- ``end_within``: combined with ``walltime`` this avoids unnecessarily starting new chunks being run by the MPI manager if within ``end_within`` of the ``walltime`` stoppage. Also expects ``H:M:S`` string format.
+
+- ``polling_rate``: controls the speed at which the MPI manager checks for finished jobs and distributes follow-up jobs to the worker.
+
 Joint Parameters
 ================
 
