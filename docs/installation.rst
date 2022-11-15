@@ -63,13 +63,32 @@ which will place the repository in the folder from which you invoked the ``git``
 
     pip install .
 
-which will install ``macauff`` such that you can ``import macauff`` from other folders on your computer. However, if this is to develop the software, your changes will not be reflected in the installed version of the code (and you must re-install using the above command); if you wish to have changes immediately reflected in your ``pip``-installed version of the software, you can install ``macauff`` using::
+or::
+
+    pip install . --install-option="--full-build"
+
+which will install ``macauff`` such that you can ``import macauff`` from other folders on your computer. However, if this is to develop the software, your changes will not be reflected in the installed version of the code (and you must re-install using the above command); if you wish to have ``Python`` code changes immediately reflected in your ``pip``-installed version of the software, you can install ``macauff`` using::
 
     pip install -e .
 
-where ``-e`` is the "editable" flag.
+or::
+
+    pip install -e . --install-option="--full-build"
+
+where ``-e`` is the "editable" flag. Note that the ``install-option`` parameter passed through ``pip`` controls the optimisation flag for the compilation of Fortran code. Without ``--full-build``, ``macauff`` will install with ``-O0`` optimisation and numerous additional check/debug flags, while using ``--install-option="--full-build"`` will set ``-O3`` optimisation.
 
 To confirm your installation was successful, you can ``import macauff`` in a Python terminal.
+
+OpenMP Setup
+------------
+
+Within the ``Fortran`` codebase, ``OpenMP`` is used in numerous places to parallelise independent operations. For these to work, several additional environment variables must be set.
+
+First, ``OMP_NUM_THREADS`` must be set; in ``bash`` for example this would be ``export OMP_NUM_THREADS=10``. This should be set as high as reasonably possible to decrease overall runtime as much as possible.
+
+Second, if large matches are likely to be used in the future, ``GOMP_STACKSIZE`` (and possibly ``OMP_STACKSIZE``, compiler dependent) should be increased. This should again be set as high as reasonably possible to avoid segmentation faults due to stack size.
+
+Finally, again in the case of large catalogue runs, ``ulimit -s`` should be set to a higher number (in the limit ``ulimit -s unlimited`` can be used to remove the cap entirely) to avoid issues with overall stacksize.
 
 Testing
 =======
