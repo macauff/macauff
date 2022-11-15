@@ -79,6 +79,17 @@ where ``-e`` is the "editable" flag. Note that the ``install-option`` parameter 
 
 To confirm your installation was successful, you can ``import macauff`` in a Python terminal.
 
+OpenMP Setup
+------------
+
+Within the ``Fortran`` codebase, ``OpenMP`` is used in numerous places to parallelise independent operations. For these to work, several additional environment variables must be set.
+
+First, ``OMP_NUM_THREADS`` must be set; in ``bash`` for example this would be ``export OMP_NUM_THREADS=10``. This should be set as high as reasonably possible to decrease overall runtime as much as possible.
+
+Second, if large matches are likely to be used in the future, ``GOMP_STACKSIZE`` (and possibly ``OMP_STACKSIZE``, compiler dependent) should be increased. This should again be set as high as reasonably possible to avoid segmentation faults due to stack size.
+
+Finally, again in the case of large catalogue runs, ``ulimit -s`` should be set to a higher number (in the limit ``ulimit -s unlimited`` can be used to remove the cap entirely) to avoid issues with overall stacksize.
+
 Testing
 =======
 
