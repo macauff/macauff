@@ -727,11 +727,14 @@ class TestMakePerturbAUFs():
 
         N = 15
         for i in range(N):
-            make_perturb_aufs(*self.args, psf_fwhms=self.psf_fwhms, num_trials=self.num_trials,
-                              j0s=self.j0s, density_mags=cutoff_mags, d_mag=d_mag,
-                              delta_mag_cuts=self.delta_mag_cuts, compute_local_density=False,
-                              tri_filt_names=self.tri_filt_names, fit_gal_flag=False,
-                              run_fw=True, run_psf=False, mag_h_params=mag_h_params)
+            make_perturb_aufs(
+                *self.args, tri_set_name='WISE', tri_filt_num=11,
+                tri_filt_names=self.tri_filt_names, tri_maglim_bright=15, tri_maglim_faint=32,
+                tri_num_bright=10000, tri_num_faint=1000000, auf_region_frame='galactic',
+                psf_fwhms=self.psf_fwhms, num_trials=self.num_trials, j0s=self.j0s,
+                density_mags=cutoff_mags, d_mag=d_mag, delta_mag_cuts=self.delta_mag_cuts,
+                compute_local_density=False, fit_gal_flag=False, run_fw=True, run_psf=False,
+                mag_h_params=mag_h_params)
 
             if i == 0:
                 for name, size in zip(
@@ -849,12 +852,14 @@ class TestMakePerturbAUFs():
             l_cut = np.load(os.path.join(os.path.dirname(__file__), 'data/l_cut.npy'))
             dd_params = np.load(os.path.join(os.path.dirname(__file__), 'data/dd_params.npy'))
             run_fw = False if mag < 19 else True
-            make_perturb_aufs(*self.args, psf_fwhms=self.psf_fwhms, num_trials=self.num_trials,
-                              j0s=self.j0s, density_mags=cutoff_mags, d_mag=d_mag,
-                              delta_mag_cuts=self.delta_mag_cuts, compute_local_density=False,
-                              tri_filt_names=self.tri_filt_names, fit_gal_flag=False,
-                              run_fw=run_fw, run_psf=True, mag_h_params=mag_h_params,
-                              dd_params=dd_params, l_cut=l_cut)
+            make_perturb_aufs(
+                *self.args, tri_set_name='WISE', tri_filt_num=11,
+                tri_filt_names=self.tri_filt_names, tri_maglim_bright=15, tri_maglim_faint=32,
+                tri_num_bright=10000, tri_num_faint=1000000, auf_region_frame='galactic',
+                psf_fwhms=self.psf_fwhms, num_trials=self.num_trials, j0s=self.j0s,
+                density_mags=cutoff_mags, d_mag=d_mag, delta_mag_cuts=self.delta_mag_cuts,
+                compute_local_density=False, fit_gal_flag=False, run_fw=run_fw, run_psf=True,
+                mag_h_params=mag_h_params, dd_params=dd_params, l_cut=l_cut)
 
             for name, size in zip(
                     ['frac', 'flux', 'offset', 'cumulative', 'fourier', 'N', 'mag'],
