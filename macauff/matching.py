@@ -995,7 +995,11 @@ class CrossMatch():
                            'd_mag': self.d_mag, 'tri_filt_names': self.a_tri_filt_names,
                            'compute_local_density': self.compute_local_density,
                            'run_fw': self.a_run_fw_auf, 'run_psf': self.a_run_psf_auf,
-                           'mag_h_params': self.a_mag_h_params}
+                           'mag_h_params': self.a_mag_h_params,
+                           'tri_maglim_bright': self.a_tri_maglim_bright,
+                           'tri_maglim_faint': self.a_tri_maglim_faint,
+                           'tri_num_bright': self.a_tri_num_bright,
+                           'tri_num_faint': self.a_tri_num_faint}
                 missing_tri_check = np.any(
                     [[not os.path.isfile('{}/{}/{}/trilegal_auf_simulation_{}.dat'.format(
                      self.a_auf_folder_path, a, b, t)) for (a, b) in self.a_auf_region_points]
@@ -1069,7 +1073,11 @@ class CrossMatch():
                            'd_mag': self.d_mag, 'tri_filt_names': self.b_tri_filt_names,
                            'compute_local_density': self.compute_local_density,
                            'run_fw': self.b_run_fw_auf, 'run_psf': self.b_run_psf_auf,
-                           'mag_h_params': self.b_mag_h_params}
+                           'mag_h_params': self.b_mag_h_params,
+                           'tri_maglim_bright': self.b_tri_maglim_bright,
+                           'tri_maglim_faint': self.b_tri_maglim_faint,
+                           'tri_num_bright': self.b_tri_num_bright,
+                           'tri_num_faint': self.b_tri_num_faint}
                 missing_tri_check = np.any(
                     [[not os.path.isfile('{}/{}/{}/trilegal_auf_simulation_{}.dat'.format(
                      self.b_auf_folder_path, a, b, t)) for (a, b) in self.b_auf_region_points]
