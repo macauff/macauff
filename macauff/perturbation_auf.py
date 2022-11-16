@@ -90,7 +90,7 @@ def make_perturb_aufs(auf_folder, cat_folder, filters, auf_points, r, dr, rho,
     tri_filt_names : list or array of strings, optional
         List of filter names in the TRILEGAL filterset defined in ``tri_set_name``,
         in the same order as provided in ``psf_fwhms``. If ``include_perturb_auf``
-        and ``tri_download_flag`` are ``True``, this must be set.
+        is ``True``, this must be set.
     tri_maglim_bright : float
         Magnitude in the primary ``tri_filt_num`` filter to simulate sources to
         in the smaller "bright" simulation, used to ensure accurate statistics
