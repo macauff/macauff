@@ -82,42 +82,39 @@ def make_perturb_aufs(auf_folder, cat_folder, filters, auf_points, r, dr, rho,
         required if ``include_perturb_auf`` is True; defaults to ``None``.
     tri_set_name : string, optional
         Name of the filter set to generate simulated TRILEGAL Galactic source
-        counts from. If ``include_perturb_auf`` and ``tri_download_flag`` are
-        ``True``, this must be set.
+        counts from. If ``include_perturb_auf`` is ``True``, this must be set.
     tri_filt_num : string, optional
         Column number of the filter defining the magnitude limit of simulated
-        TRILEGAL Galactic sources. If ``include_perturb_auf`` and
-        ``tri_download_flag`` are ``True``, this must be set.
+        TRILEGAL Galactic sources. If ``include_perturb_auf`` is ``True``, this
+        must be set.
     tri_filt_names : list or array of strings, optional
         List of filter names in the TRILEGAL filterset defined in ``tri_set_name``,
         in the same order as provided in ``psf_fwhms``. If ``include_perturb_auf``
-        and ``tri_download_flag`` are ``True``, this must be set.
+        is ``True``, this must be set.
     tri_maglim_bright : float
         Magnitude in the primary ``tri_filt_num`` filter to simulate sources to
         in the smaller "bright" simulation, used to ensure accurate statistics
         at the bright end of the dynamic survey range. If ``include_perturb_auf``
-        and ``tri_download_flag`` are ``True``, this must be set.
+        is ``True``, this must be set.
     tri_maglim_faint : float
         Magnitude in the primary TRILEGAL filter to simulate sources down to for
         the main, "faint" simulation, used to capture the differential source
-        counts at all appropriate magnitudes. If ``include_perturb_auf`` and
-        ``tri_download_flag`` are ``True``, this must be set.
+        counts at all appropriate magnitudes. If ``include_perturb_auf`` is
+        ``True``, this must be set.
     tri_num_bright : integer
         Number of objects to simulate in the bright TRILEGAL simulation. Should
         be large enough to capture robust number statistics at bright, low
         source count brightnesses, but low enough to be realistic in runtime.
-        If ``include_perturb_auf`` and ``tri_download_flag`` are ``True``, this
-        must be set.
+        If ``include_perturb_auf`` is ``True``, this must be set.
     tri_num_faint : integer
         Number of objects to simulate in the main TRILEGAL simulation. Should
         capture sufficient numbers to be accurate without overrunning simulation
-        times. If ``include_perturb_auf`` and ``tri_download_flag`` are ``True``,
-        this must be set.
+        times. If ``include_perturb_auf`` is ``True``, this must be set.
     auf_region_frame : string, optional
         Coordinate reference frame in which sky coordinates are defined, either
         ``equatorial`` or ``galactic``, used to define the coordinates TRILEGAL
-        simulations are generated in. If ``include_perturb_auf`` and
-        ``tri_download_flag`` are ``True``, this must be set.
+        simulations are generated in. If ``include_perturb_auf`` is ``True``,
+        this must be set.
     num_trials : integer, optional
         The number of simulated PSFs to compute in the derivation of the
         perturbation component of the AUF. Must be given if ``include_perturb_auf``
@@ -219,18 +216,22 @@ def make_perturb_aufs(auf_folder, cat_folder, filters, auf_points, r, dr, rho,
     .. [3] Blanton M. R., Roweis S. (2007), AJ, 133, 734
 
     """
-    if include_perturb_auf and tri_download_flag and tri_set_name is None:
-        raise ValueError("tri_set_name must be given if include_perturb_auf and tri_download_flag "
-                         "are both True.")
-    if include_perturb_auf and tri_download_flag and tri_filt_num is None:
-        raise ValueError("tri_filt_num must be given if include_perturb_auf and tri_download_flag "
-                         "are both True.")
-    if include_perturb_auf and tri_download_flag and auf_region_frame is None:
-        raise ValueError("auf_region_frame must be given if include_perturb_auf and "
-                         "tri_download_flag are both True.")
-
+    if include_perturb_auf and tri_set_name is None:
+        raise ValueError("tri_set_name must be given if include_perturb_auf is True.")
+    if include_perturb_auf and tri_filt_num is None:
+        raise ValueError("tri_filt_num must be given if include_perturb_auf is True.")
     if include_perturb_auf and tri_filt_names is None:
         raise ValueError("tri_filt_names must be given if include_perturb_auf is True.")
+    if include_perturb_auf and tri_maglim_bright is None:
+        raise ValueError("tri_maglim_bright must be given if include_perturb_auf is True.")
+    if include_perturb_auf and tri_maglim_faint is None:
+        raise ValueError("tri_maglim_faint must be given if include_perturb_auf is True.")
+    if include_perturb_auf and tri_num_bright is None:
+        raise ValueError("tri_num_bright must be given if include_perturb_auf is True.")
+    if include_perturb_auf and tri_num_faint is None:
+        raise ValueError("tri_num_faint must be given if include_perturb_auf is True.")
+    if include_perturb_auf and auf_region_frame is None:
+        raise ValueError("auf_region_frame must be given if include_perturb_auf is True.")
     if include_perturb_auf and delta_mag_cuts is None:
         raise ValueError("delta_mag_cuts must be given if include_perturb_auf is True.")
     if include_perturb_auf and psf_fwhms is None:

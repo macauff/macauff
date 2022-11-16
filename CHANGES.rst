@@ -60,6 +60,9 @@ New Features
 Bug Fixes
 ^^^^^^^^^
 
+- Pass ``tri_maglim_bright``, ``tri_maglim_faint``, ``tri_num_bright``, and
+  ``tri_num_faint`` through to ``make_perturb_aufs`` in ``CrossMatch`` call. [#56]
+
 - Replaced ``datetime.strptime`` in the ``CrossMatch`` constructor with a
   string ``split`` to fix a crash when given walltime is greater than
   ``24:00:00``. [#52]
@@ -121,6 +124,13 @@ Bug Fixes
 
 API Changes
 ^^^^^^^^^^^
+
+- ``tri_maglim_bright``, ``tri_maglim_faint``, ``tri_num_bright``, and
+  ``tri_num_faint`` are only required if ``tri_download_flag`` is ``True``. [#56]
+
+- ``tri_filt_num``, ``tri_set_name``, and ``auf_region_frame`` updated to be
+  necessary inputs into ``make_perturb_aufs`` even if ``tri_download_flag``
+  is not set. [#56]
 
 - Added ``run_fw_auf``, ``run_psf_auf``, ``mag_h_params_path``,
   ``tri_maglim_bright``, ``tri_maglim_faint``, ``tri_num_bright``, and

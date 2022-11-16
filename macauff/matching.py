@@ -995,19 +995,17 @@ class CrossMatch():
                            'd_mag': self.d_mag, 'tri_filt_names': self.a_tri_filt_names,
                            'compute_local_density': self.compute_local_density,
                            'run_fw': self.a_run_fw_auf, 'run_psf': self.a_run_psf_auf,
-                           'mag_h_params': self.a_mag_h_params}
-                missing_tri_check = np.any(
-                    [[not os.path.isfile('{}/{}/{}/trilegal_auf_simulation_{}.dat'.format(
-                     self.a_auf_folder_path, a, b, t)) for (a, b) in self.a_auf_region_points]
-                     for t in ['bright', 'faint']])
+                           'mag_h_params': self.a_mag_h_params,
+                           'tri_maglim_bright': self.a_tri_maglim_bright,
+                           'tri_maglim_faint': self.a_tri_maglim_faint,
+                           'tri_num_bright': self.a_tri_num_bright,
+                           'tri_num_faint': self.a_tri_num_faint,
+                           'tri_set_name': self.a_tri_set_name,
+                           'tri_filt_num': self.a_tri_filt_num,
+                           'auf_region_frame': self.a_auf_region_frame}
                 if self.a_run_psf_auf:
                     _kwargs = dict(_kwargs, **{'dd_params': self.a_dd_params,
                                                'l_cut': self.a_l_cut})
-                if self.a_download_tri or missing_tri_check:
-                    _kwargs = dict(_kwargs,
-                                   **{'tri_set_name': self.a_tri_set_name,
-                                      'tri_filt_num': self.a_tri_filt_num,
-                                      'auf_region_frame': self.a_auf_region_frame})
                 if self.a_fit_gal_flag:
                     _kwargs = dict(_kwargs,
                                    **{'fit_gal_flag': self.a_fit_gal_flag,
@@ -1069,19 +1067,18 @@ class CrossMatch():
                            'd_mag': self.d_mag, 'tri_filt_names': self.b_tri_filt_names,
                            'compute_local_density': self.compute_local_density,
                            'run_fw': self.b_run_fw_auf, 'run_psf': self.b_run_psf_auf,
-                           'mag_h_params': self.b_mag_h_params}
-                missing_tri_check = np.any(
-                    [[not os.path.isfile('{}/{}/{}/trilegal_auf_simulation_{}.dat'.format(
-                     self.b_auf_folder_path, a, b, t)) for (a, b) in self.b_auf_region_points]
-                     for t in ['bright', 'faint']])
+                           'mag_h_params': self.b_mag_h_params,
+                           'tri_maglim_bright': self.b_tri_maglim_bright,
+                           'tri_maglim_faint': self.b_tri_maglim_faint,
+                           'tri_num_bright': self.b_tri_num_bright,
+                           'tri_num_faint': self.b_tri_num_faint,
+                           'tri_set_name': self.b_tri_set_name,
+                           'tri_filt_num': self.b_tri_filt_num,
+                           'auf_region_frame': self.b_auf_region_frame}
                 if self.b_run_psf_auf:
                     _kwargs = dict(_kwargs, **{'dd_params': self.b_dd_params,
                                                'l_cut': self.b_l_cut})
-                if self.b_download_tri or missing_tri_check:
-                    _kwargs = dict(_kwargs,
-                                   **{'tri_set_name': self.b_tri_set_name,
-                                      'tri_filt_num': self.b_tri_filt_num,
-                                      'auf_region_frame': self.b_auf_region_frame})
+
                 if self.b_fit_gal_flag:
                     _kwargs = dict(_kwargs,
                                    **{'fit_gal_flag': self.b_fit_gal_flag,
