@@ -45,6 +45,22 @@ Determination of the "best" magnitude to use is left to the individual catalogue
 
 Once these new values -- singular astrometric precision and "best detection" index -- are computed, if they are available within a ``.csv`` file, the binary files macauff requires can be derived using `~macauff.csv_to_npy`.
 
+The Core-Halo Chunk Model
+^^^^^^^^^^^^^^^^^^^^^^^^^
+
+While ``macauff`` can be used with a singular monolithic cross-match region, it can be preferable to split a large block of sky into smaller, more manageable sections to have counterparts assigned in an individual basis; the most obvious reason to do so is to parallelise these smaller regions to simultaneously cross-match through e.g. MPI distribution, as ``macauff`` offers.
+
+To do so, you will need to define the particular size of both the *core* and *halo* of each region, as shown in the schematic below.
+
+.. image:: Figures/core_halo_overlap.png
+	:alt: A schematic of the central core of chunks along with their halo regions surrounding them. Cores are squares that touch at the edges while halos are slightly larger than the cores, with a halo centered on each core. There is therefore a small region of each halo area in another core square.
+
+The cores are the red squares; these are defined such that they exactly touch one another with no source being in two cores. Halos, on the other hand, are padded regions around each core (i.e., slightly larger squares centered on the same sky coordinates as their respective core), shown as the black squares. This then means that each halo overlaps multiple different core regions, with each core having multiple overlapping halos.
+
+These should be defined such that you provide, for each so-called "chunk", a region of *halo plus core* size, such that halos effectively contain superfluous matches. Taking into account that ``macauff``'s island creation "bins" any *islands* of sources that are within ``pos_corr_dist`` of the four coordinates defining the rectangle of the match region -- in this case, the *halo* region -- we then further remove any additional objects that are still matched, but come from another region's core.
+
+To this end, the halo should be defined such that, even after removing the ``pos_corr_dist`` edge-of-region-adjacent sources, we are left with all matches that overlap the *core*. A reasonably safe bet is to set the halo size to twice ``pos_corr_dist``, but depending on the relative size of the core and this "unreliable island" region larger or smaller halo width regions may be required.
+
 Update Astrometry Precisions
 ----------------------------
 
@@ -68,10 +84,21 @@ This parameterisation is offered in cases where the user does not have access to
 Post-Processing
 ===============
 
+Filter For Core-Halo Objects
+----------------------------
+
+Contained within the main ``CrossMatch`` routine, and therefore slightly different from the other points here, chunk post-processing is the final step of the cross-matching algorithms. Here we remove any objects that are in the "halo" of a given chunk -- if chunking has been applied to larger match regions -- to avoid the duplications of many objects.
+
+If you have broken a larger cross-match region into small chunks for parallel use, or to reduce memory use, then the duplicate objects must be removed as much as possible. Taking into account that ``macauff`` removes sources which potentially contain incomplete islands (limited by ``pos_corr_dist``, discussed above), we currently filter for sources depending on a ``in_chunk_overlap`` flag, which must be provided at runtime.
+
+For matches, we currently keep any potential match that is in the core in *either* catalogue -- i.e., a core object in catalogue "a" matches across the halo of catalogue "b" is kept, but a halo-halo match isn't. For non-matches, similarly all non-halo sources are removed, but since these objects are "isolated" this is independent across the two catalogues.
+
+This has the small effect of potentially duplicating results -- in the above match case of core A and halo B sources, the chunk over equally believes these to be *halo* A and *core* B sources (see schematic above); if both chunks return these sources as matches, a consolidated catalogue where all matches are combined would see these objects appear twice. At present this is a reasonable trade-off to allow for massive parallelisation of large-scale matches, but means that halos should be as small as possible -- or core regions as *large* as possible -- to minimise the fraction of objects with this potential overlap.
+
 Creating Composite Datasets
 ---------------------------
 
-The singular activity that occurs after the calculation of maximum-probability counterpart assignments is the generation of the merged dataset. Taking each of the key columns from both datasets and combining it with macauff-generated information -- such as match probability, chance of contamination due to blended object, likelihood ratios etc. -- ``npy_to_csv`` generates a singular ``.csv`` file from the multiple separate arrays made for and during the cross-match process.
+The final activity that occurs after the calculation of maximum-probability counterpart assignments is the generation of the merged dataset. Taking each of the key columns from both datasets and combining it with macauff-generated information -- such as match probability, chance of contamination due to blended object, likelihood ratios etc. -- ``npy_to_csv`` generates a singular ``.csv`` file from the multiple separate arrays made for and during the cross-match process.
 
 Here, certain elements are strongly suggested:
 
