@@ -1070,3 +1070,62 @@ class TestInputs:
             [(c[0]+0.5 - (c[0]-0.5))*180/np.pi * (np.sin(np.radians(c[1]+0.5)) -
              np.sin(np.radians(c[1]-0.5))) for c in cm.cf_region_points])
         assert_allclose(cm.cf_areas, calculated_areas, rtol=0.025)
+
+
+@pytest.mark.parametrize('use_memmap', [True, False])
+class TestPostProcess:
+    def setup_class(self):
+        self.joint_folder_path = os.path.abspath('joint')
+        self.a_cat_folder_path = os.path.abspath('a_cat')
+        self.b_cat_folder_path = os.path.abspath('b_cat')
+
+        os.makedirs('{}/pairing'.format(self.joint_folder_path), exist_ok=True)
+        os.makedirs(self.a_cat_folder_path, exist_ok=True)
+        os.makedirs(self.b_cat_folder_path, exist_ok=True)
+
+        Na, Nb, Nmatch = 10000, 7000, 4000
+
+        rng = np.random.default_rng(seed=7893467234)
+        self.ac = rng.choice(Na, size=Nmatch, replace=False)
+        np.save('{}/pairing/ac.npy'.format(self.joint_folder_path), self.ac)
+        self.bc = rng.choice(Nb, size=Nmatch, replace=False)
+        np.save('{}/pairing/bc.npy'.format(self.joint_folder_path), self.bc)
+
+        self.af = np.delete(np.arange(Na), self.ac)
+        np.save('{}/pairing/af.npy'.format(self.joint_folder_path), self.af)
+        self.bf = np.delete(np.arange(Nb), self.bc)
+        np.save('{}/pairing/bf.npy'.format(self.joint_folder_path), self.bf)
+
+        np.save('{}/in_chunk_overlap.npy'.format(self.a_cat_folder_path),
+                rng.choice(2, size=Na).astype(bool))
+        np.save('{}/in_chunk_overlap.npy'.format(self.b_cat_folder_path),
+                rng.choice(2, size=Nb).astype(bool))
+
+    def test_postprocess(self, use_memmap):
+        cm = CrossMatch(os.path.join(os.path.dirname(__file__), 'data'),
+                        use_memmap_files=use_memmap)
+        cm.joint_folder_path = self.joint_folder_path
+        cm.a_cat_folder_path = self.a_cat_folder_path
+        cm.b_cat_folder_path = self.b_cat_folder_path
+
+        cm._postprocess_chunk()
+
+        aino = np.load('{}/in_chunk_overlap.npy'.format(self.a_cat_folder_path))
+        bino = np.load('{}/in_chunk_overlap.npy'.format(self.b_cat_folder_path))
+        ac = np.load('{}/pairing/ac.npy'.format(self.joint_folder_path))
+        af = np.load('{}/pairing/af.npy'.format(self.joint_folder_path))
+        bc = np.load('{}/pairing/bc.npy'.format(self.joint_folder_path))
+        bf = np.load('{}/pairing/bf.npy'.format(self.joint_folder_path))
+
+        assert np.all(~aino[ac] | ~bino[bc])
+        assert np.all(~aino[af])
+        assert np.all(~bino[bf])
+
+        deleted_ac = np.delete(self.ac, np.array([np.argmin(np.abs(q - self.ac)) for q in ac]))
+        deleted_bc = np.delete(self.bc, np.array([np.argmin(np.abs(q - self.bc)) for q in bc]))
+        assert np.all((aino[deleted_ac] & bino[deleted_bc]))
+
+        deleted_af = np.delete(self.af, np.array([np.argmin(np.abs(q - self.af)) for q in af]))
+        deleted_bf = np.delete(self.bf, np.array([np.argmin(np.abs(q - self.bf)) for q in bf]))
+        assert np.all(aino[deleted_af])
+        assert np.all(bino[deleted_bf])

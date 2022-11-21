@@ -401,11 +401,102 @@ class CrossMatch():
 
     def _postprocess_chunk(self):
         '''
-        Runs the post-processing stage, resolving duplicate cross-matches and
-        other edge cases.
+        Runs the post-processing stage, resolving duplicate cross-matches.
+
+        Duplicates are determined by match pairs (or singular non-matches) that
+        are entirely outside of the "core" for a given chunk. This core/halo
+        divide is defined by the ``in_chunk_overlap`` array; if only a singular
+        chunk is being matched (i.e., there is no compartmentalisation of a
+        larger region), then ``in_chunk_overlap`` should all be set to ``False``.
         '''
-        # TODO Function body
-        print("_postprocess_chunk function run")
+        print("Removing halo matches and non-matches...")
+
+        if self.use_memmap_files:
+            _kwargs = {'mmap_mode': 'r'}
+        else:
+            _kwargs = {}
+        ac = np.load('{}/pairing/ac.npy'.format(self.joint_folder_path), **_kwargs)
+        bc = np.load('{}/pairing/bc.npy'.format(self.joint_folder_path), **_kwargs)
+
+        af = np.load('{}/pairing/af.npy'.format(self.joint_folder_path), **_kwargs)
+        bf = np.load('{}/pairing/bf.npy'.format(self.joint_folder_path), **_kwargs)
+
+        a_in_overlaps = np.load('{}/in_chunk_overlap.npy'.format(self.a_cat_folder_path), **_kwargs)
+        b_in_overlaps = np.load('{}/in_chunk_overlap.npy'.format(self.b_cat_folder_path), **_kwargs)
+
+        if self.use_memmap_files:
+            # Do core_matches = ~a_in_overlaps[ac] | ~b_in_overlaps[bc] but in memmap
+            core_matches = np.lib.format.open_memmap(
+                '{}/pairing/core_matches.npy'.format(self.joint_folder_path),
+                mode='w+', dtype=bool, shape=(len(ac),))
+
+            di = max(1, len(ac) // 20)
+            for i in range(0, len(ac), di):
+                core_matches[i:i+di] = ~a_in_overlaps[ac[i:i+di]] | ~b_in_overlaps[bc[i:i+di]]
+
+            di = max(1, len(core_matches) // 20)
+            new_c_length = 0
+            for i in range(0, len(core_matches), di):
+                # Require the manual conversion to integer due to memmap issues.
+                new_c_length += int(np.sum(core_matches[i:i+di]))
+
+            for cat_kind, c in zip(['a', 'b'], [ac, bc]):
+                new_c = np.lib.format.open_memmap(
+                    '{}/pairing/{}c2.npy'.format(self.joint_folder_path, cat_kind),
+                    mode='w+', dtype=int, shape=(new_c_length,))
+                tick = 0
+                for i in range(0, len(c), di):
+                    new_c[tick:tick+np.sum(core_matches[i:i+di])] = c[i:i+di][core_matches[i:i+di]]
+                    tick += np.sum(core_matches[i:i+di])
+                os.system('mv {}/pairing/{}c2.npy {}/pairing/{}c.npy'.format(
+                          self.joint_folder_path, cat_kind, self.joint_folder_path, cat_kind))
+            os.remove('{}/pairing/core_matches.npy'.format(self.joint_folder_path))
+        else:
+            core_matches = ~a_in_overlaps[ac] | ~b_in_overlaps[bc]
+            np.save('{}/pairing/ac.npy'.format(self.joint_folder_path), ac[core_matches])
+            np.save('{}/pairing/bc.npy'.format(self.joint_folder_path), bc[core_matches])
+
+        if self.use_memmap_files:
+            # Do a_core_nonmatches = ~a_in_overlaps[af] but in memmap
+            a_core_nonmatches = np.lib.format.open_memmap(
+                '{}/pairing/a_core_nonmatches.npy'.format(self.joint_folder_path),
+                mode='w+', dtype=bool, shape=(len(af),))
+            b_core_nonmatches = np.lib.format.open_memmap(
+                '{}/pairing/b_core_nonmatches.npy'.format(self.joint_folder_path),
+                mode='w+', dtype=bool, shape=(len(bf),))
+
+            di = max(1, len(af) // 20)
+            for i in range(0, len(af), di):
+                a_core_nonmatches[i:i+di] = ~a_in_overlaps[af[i:i+di]]
+
+            di = max(1, len(bf) // 20)
+            for i in range(0, len(bf), di):
+                b_core_nonmatches[i:i+di] = ~b_in_overlaps[bf[i:i+di]]
+
+            for cat_kind, f, cnm in zip(['a', 'b'], [af, bf],
+                                        [a_core_nonmatches, b_core_nonmatches]):
+                di = max(1, len(cnm) // 20)
+                new_f_length = 0
+                for i in range(0, len(cnm), di):
+                    # Require the manual conversion to integer due to memmap issues.
+                    new_f_length += int(np.sum(cnm[i:i+di]))
+                new_f = np.lib.format.open_memmap(
+                    '{}/pairing/{}f2.npy'.format(self.joint_folder_path, cat_kind),
+                    mode='w+', dtype=int, shape=(new_f_length,))
+                tick = 0
+                for i in range(0, len(f), di):
+                    new_f[tick:tick+np.sum(cnm[i:i+di])] = f[i:i+di][cnm[i:i+di]]
+                    tick += np.sum(cnm[i:i+di])
+                os.system('mv {}/pairing/{}f2.npy {}/pairing/{}f.npy'.format(
+                          self.joint_folder_path, cat_kind, self.joint_folder_path, cat_kind))
+
+            os.remove('{}/pairing/a_core_nonmatches.npy'.format(self.joint_folder_path))
+            os.remove('{}/pairing/b_core_nonmatches.npy'.format(self.joint_folder_path))
+        else:
+            a_core_nonmatches = ~a_in_overlaps[af]
+            b_core_nonmatches = ~b_in_overlaps[bf]
+            np.save('{}/pairing/af.npy'.format(self.joint_folder_path), af[a_core_nonmatches])
+            np.save('{}/pairing/bf.npy'.format(self.joint_folder_path), bf[b_core_nonmatches])
 
     def _make_chunk_queue(self, completed_chunks):
         '''
