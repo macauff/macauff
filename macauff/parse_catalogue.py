@@ -16,7 +16,7 @@ __all__ = ['csv_to_npy', 'rect_slice_npy', 'npy_to_csv', 'rect_slice_csv']
 
 
 def csv_to_npy(input_folder, input_filename, output_folder, astro_cols, photo_cols, bestindex_col,
-               header=False, process_uncerts=False, astro_sig_fits_filepath=None,
+               chunk_overlap_col, header=False, process_uncerts=False, astro_sig_fits_filepath=None,
                cat_in_radec=None):
     '''
     Convert a .csv file representation of a photometric catalogue into the
@@ -45,6 +45,11 @@ def csv_to_npy(input_folder, input_filename, output_folder, astro_cols, photo_co
         photometric brightnesses (represented by ``photo_cols``) is the
         preferred choice -- usually the most precise and highest quality
         detection.
+    chunk_overlap_col : integer
+        Zero-indexed column in the .csv file containing an integer representation
+        of the boolean representation of whether sources are in the "halo"
+        (``1`` in the .csv) or "core" (``0``) of the region. If ``None`` then all
+        objects are assumed to be in the core.
     header : boolean, optional
         Flag indicating whether the .csv file has a first line with the names
         of the columns in it, or whether the first line of the file is the first
@@ -87,6 +92,8 @@ def csv_to_npy(input_folder, input_filename, output_folder, astro_cols, photo_co
                         shape=(n_rows, len(photo_cols)))
     best_index = open_memmap('{}/magref.npy'.format(output_folder), mode='w+', dtype=int,
                              shape=(n_rows,))
+    chunk_overlap = open_memmap('{}/in_chunk_overlap.npy'.format(output_folder), mode='w+',
+                                dtype=bool, shape=(n_rows,))
 
     if process_uncerts:
         m_sigs = np.load('{}/m_sigs_array.npy'.format(astro_sig_fits_filepath))
@@ -102,9 +109,13 @@ def csv_to_npy(input_folder, input_filename, output_folder, astro_cols, photo_co
             mn_coords[:, 1] = a.icrs.dec.degree
 
     used_cols = np.concatenate((astro_cols, photo_cols, [bestindex_col]))
+    if chunk_overlap_col is not None:
+        used_cols = np.concatenate((used_cols, [chunk_overlap_col]))
     new_astro_cols = np.array([np.where(used_cols == a)[0][0] for a in astro_cols])
     new_photo_cols = np.array([np.where(used_cols == a)[0][0] for a in photo_cols])
     new_bestindex_col = np.where(used_cols == bestindex_col)[0][0]
+    if chunk_overlap_col is not None:
+        new_chunk_overlap_col = np.where(used_cols == chunk_overlap_col)[0][0]
     n = 0
     for chunk in pd.read_csv('{}/{}.csv'.format(input_folder, input_filename), chunksize=100000,
                              usecols=used_cols, header=None if not header else 0):
@@ -121,6 +132,11 @@ def csv_to_npy(input_folder, input_filename, output_folder, astro_cols, photo_co
             astro[n:n+chunk.shape[0], 2] = new_sigs
         photo[n:n+chunk.shape[0]] = chunk.values[:, new_photo_cols]
         best_index[n:n+chunk.shape[0]] = chunk.values[:, new_bestindex_col]
+        if chunk_overlap_col is not None:
+            chunk_overlap[n:n+chunk.shape[0]] = chunk.values[:, new_chunk_overlap_col].astype(bool)
+        else:
+            chunk_overlap[n:n+chunk.shape[0]] = False
+
         n += chunk.shape[0]
 
     return
@@ -461,8 +477,8 @@ def rect_slice_csv(input_folder, output_folder, input_filename, output_filename,
 def rect_slice_npy(input_folder, output_folder, rect_coords, padding, mem_chunk_num):
     '''
     Convenience function to take a small rectangular slice of a larger catalogue,
-    represented by three binary .npy files, based on its given orthogonal sky
-    coordinates in the large catalogue.
+    represented by three or four binary .npy files, based on its given orthogonal
+    sky coordinates in the large catalogue.
 
     Parameters
     ----------
@@ -512,6 +528,8 @@ def rect_slice_npy(input_folder, output_folder, rect_coords, padding, mem_chunk_
                               shape=(n_inside_rows, photo.shape[1]))
     small_best_index = open_memmap('{}/magref.npy'.format(output_folder), mode='w+', dtype=int,
                                    shape=(n_inside_rows,))
+    small_chunk_overlap = open_memmap('{}/in_chunk_overlap.npy'.format(output_folder), mode='w+',
+                                      dtype=bool, shape=(n_inside_rows,))
 
     counter = 0
     for cnum in range(0, mem_chunk_num):
@@ -524,6 +542,8 @@ def rect_slice_npy(input_folder, output_folder, rect_coords, padding, mem_chunk_
             combined_memmap[lowind:highind]]
         small_best_index[counter:counter+inside_n] = best_index[lowind:highind][
             combined_memmap[lowind:highind]]
+        # Always assume that a cutout is a single "visit" with no chunk "halo".
+        small_chunk_overlap[counter:counter:inside_n] = False
         counter += inside_n
 
     for n in ['1', '2', '3', '4', 'combined']:
