@@ -524,7 +524,7 @@ end subroutine fit_skew
 ! ------------------------------------------------------------------------------
 ! (Applies to xval_dp, ipos_dp, and histogram1d_dp)
 
-real(dp) function xval_dp(xmin,xmax,i,nbin)
+subroutine xval_dp(xmin,xmax,i,nbin, xval)
   ! Find central value of a bin for a regular histogram
 
   integer, parameter :: dp = kind(0.0d0)  ! double precision
@@ -538,15 +538,17 @@ real(dp) function xval_dp(xmin,xmax,i,nbin)
   integer,intent(in) :: nbin
   ! number of bins
 
+  real(dp), intent(out) :: xval
+
   real(dp) :: frac
 
   frac=(real(i-1)+0.5)/real(nbin)
 
-  xval_dp=frac*(xmax-xmin)+xmin
+  xval=frac*(xmax-xmin)+xmin
 
-end function xval_dp
+end subroutine xval_dp
 
-integer function ipos_dp(xmin,xmax,x,nbin)
+subroutine ipos_dp(xmin,xmax,x,nbin, ipos)
 ! Find bin a value falls in for a regular histogram
 
     integer, parameter :: dp = kind(0.0d0)  ! double precision
@@ -560,37 +562,39 @@ integer function ipos_dp(xmin,xmax,x,nbin)
     integer,intent(in) :: nbin
     ! number of bins
 
+    integer, intent(out) :: ipos
+
     real(dp) :: frac
 
     if(xmax > xmin) then
 
        if(x < xmin) then
-          ipos_dp = 0
+          ipos = 0
        else if(x > xmax) then
-          ipos_dp = nbin+1
+          ipos = nbin+1
        else if(x < xmax) then
           frac=(x-xmin)/(xmax-xmin)
-          ipos_dp=int(frac*real(nbin, dp))+1
+          ipos=int(frac*real(nbin, dp))+1
        else  ! x == xmax
-          ipos_dp = nbin
+          ipos = nbin
        end if
 
     else
 
        if(x < xmax) then
-          ipos_dp = 0
+          ipos = 0
        else if(x > xmin) then
-          ipos_dp = nbin+1
+          ipos = nbin+1
        else if(x < xmin) then
           frac=(x-xmin)/(xmax-xmin)
-          ipos_dp=int(frac*real(nbin, dp))+1
+          ipos=int(frac*real(nbin, dp))+1
        else  ! x == xmin
-          ipos_dp = nbin
+          ipos = nbin
        end if
 
     end if
 
-end function ipos_dp
+end subroutine ipos_dp
 
 subroutine histogram1d_dp(array,xmin,xmax,nbin,hist_x,hist_y,mask,weights)
   ! Bin 1D array of values into 1D regular histogram
@@ -628,7 +632,7 @@ subroutine histogram1d_dp(array,xmin,xmax,nbin,hist_x,hist_y,mask,weights)
 
   do i=1,size(array)
      if(keep(i)) then
-        ibin=ipos_dp(xmin,xmax,array(i),nbin)
+        call ipos_dp(xmin,xmax,array(i),nbin, ibin)
         if(ibin.ge.1.and.ibin.le.nbin) then
            if(present(weights)) then
               hist_y(ibin)=hist_y(ibin)+weights(i)
@@ -640,7 +644,7 @@ subroutine histogram1d_dp(array,xmin,xmax,nbin,hist_x,hist_y,mask,weights)
   end do
 
   do ibin=1,nbin
-     hist_x(ibin)=xval_dp(xmin,xmax,ibin,nbin)
+     call xval_dp(xmin,xmax,ibin,nbin, hist_x(ibin))
   end do
 
   deallocate(keep)
