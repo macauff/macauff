@@ -144,8 +144,8 @@ def csv_to_npy(input_folder, input_filename, output_folder, astro_cols, photo_co
 
 def npy_to_csv(input_csv_folders, input_match_folder, output_folder, csv_filenames,
                output_filenames, column_name_lists, column_num_lists, extra_col_cat_names,
-               mem_chunk_num, input_npy_folders, headers=[False, False], extra_col_name_lists=None,
-               extra_col_num_lists=None):
+               mem_chunk_num, input_npy_folders, headers=[False, False],
+               extra_col_name_lists=[None, None], extra_col_num_lists=[None, None]):
     '''
     Function to convert output .npy files, as created during the cross-match
     process, and create a .csv file of matches and non-matches, combining columns
@@ -194,16 +194,21 @@ def npy_to_csv(input_csv_folders, input_match_folder, output_folder, csv_filenam
         original input .csv file for this catalogue had a header which provides
         names for each column on its first line, or whether its first line is the
         first line of the data.
-    extra_col_name_lists : list of list or array of strings, optional
-        If not ``None``, should be a list of two lists of strings, one per
-        catalogue. As with ``column_name_lists``, these should be names of
-        columns from their respective catalogue in ``csv_filenames``, to be
-        included in the output merged datasets.
-    extra_col_num_lists : list of list or array of integer, optional
-        If not ``None``, should be a list of two lists of strings, analagous
-        to ``column_num_lists``, providing the column indices for additional
+    extra_col_name_lists : list of list or array of strings, or None, optional
+        Should be a list of two lists of strings, one per catalogue. As with
+        ``column_name_lists``, these should be names of columns from their
+        respective catalogue in ``csv_filenames``, to be included in the output
+        merged datasets. For a particular catalogue, if no extra columns should
+        be included, put ``None`` in that entry. For example, to only include
+        an extra single column ``Q`` for the second catalogue,
+        ``extra_col_name_lists=[None, ['Q']]``.
+    extra_col_num_lists : list of list or array of integer, or None, optional
+        Should be a list of two lists of strings, analagous to
+        ``column_num_lists``, providing the column indices for additional
         catalogue columns in the original .csv files to be included in the
-        output datafiles.
+        output datafiles. Like ``extra_col_name_lists``, for either catalogue
+        ``None`` can be entered for no additional columns; for the above example
+        we would use ``extra_col_num_lists=[None, [7]]``.
     '''
     # Need IDs/coordinates x2, mags (xN), then our columns: match probability, average
     # contaminant flux, eta/xi, and then M contaminant fractions for M relative fluxes.
@@ -217,12 +222,14 @@ def npy_to_csv(input_csv_folders, input_match_folder, output_folder, csv_filenam
                    '{}_CONT_F1'.format(extra_col_cat_names[1]),
                    '{}_CONT_F10'.format(extra_col_cat_names[1])]
     cols = np.append(np.append(column_name_lists[0], column_name_lists[1]), our_columns)
-    if ((extra_col_name_lists is None and extra_col_num_lists is not None) or
-            (extra_col_name_lists is not None and extra_col_num_lists is None)):
-        raise UserWarning("extra_col_name_lists and extra_col_num_lists either both "
-                          "need to be None, or both need to not be None.")
-    if extra_col_num_lists is not None:
-        cols = np.append(np.append(cols, extra_col_name_lists[0]), extra_col_name_lists[1])
+    for i, entry in zip([0, 1], ['1st', '2nd']):
+        if ((extra_col_name_lists[i] is None and extra_col_num_lists[i] is not None) or
+                (extra_col_name_lists[i] is not None and extra_col_num_lists[i] is None)):
+            raise UserWarning("extra_col_name_lists and extra_col_num_lists either both "
+                              "need to be None, or both need to not be None, for the {} "
+                              "catalogue.".format(entry))
+        if extra_col_num_lists[i] is not None:
+            cols = np.append(cols, extra_col_name_lists[i])
     ac = np.load('{}/pairing/ac.npy'.format(input_match_folder), mmap_mode='r')
     bc = np.load('{}/pairing/bc.npy'.format(input_match_folder), mmap_mode='r')
     p = np.load('{}/pairing/pc.npy'.format(input_match_folder), mmap_mode='r')
@@ -242,15 +249,17 @@ def npy_to_csv(input_csv_folders, input_match_folder, output_folder, csv_filenam
         b_concatastro = np.load('{}/con_cat_astro.npy'.format(input_npy_folders[1]), mmap_mode='r')
 
     n_amags, n_bmags = len(column_name_lists[0]) - 3, len(column_name_lists[1]) - 3
-    if extra_col_num_lists is None:
+    if extra_col_num_lists[0] is None:
         a_cols = column_num_lists[0]
-        b_cols = column_num_lists[1]
         a_names = column_name_lists[0]
-        b_names = column_name_lists[1]
     else:
         a_cols = np.append(column_num_lists[0], extra_col_num_lists[0]).astype(int)
-        b_cols = np.append(column_num_lists[1], extra_col_num_lists[1]).astype(int)
         a_names = np.append(column_name_lists[0], extra_col_name_lists[0])
+    if extra_col_num_lists[1] is None:
+        b_cols = column_num_lists[1]
+        b_names = column_name_lists[1]
+    else:
+        b_cols = np.append(column_num_lists[1], extra_col_num_lists[1]).astype(int)
         b_names = np.append(column_name_lists[1], extra_col_name_lists[1])
     a_names, b_names = np.array(a_names)[np.argsort(a_cols)], np.array(b_names)[np.argsort(b_cols)]
 
@@ -281,9 +290,10 @@ def npy_to_csv(input_csv_folders, input_match_folder, output_folder, csv_filenam
         for i in range(bcontprob.shape[1]):
             match_df.iloc[lowind:highind, 6+n_amags+n_bmags+6+acontprob.shape[1]+i] = bcontprob[
                 lowind:highind, i]
-        if extra_col_name_lists is not None:
+        if extra_col_name_lists[0] is not None:
             for i in extra_col_name_lists[0]:
                 match_df[i].iloc[lowind:highind] = cat_a[i].iloc[ac[lowind:highind]].values
+        if extra_col_name_lists[1] is not None:
             for i in extra_col_name_lists[1]:
                 match_df[i].iloc[lowind:highind] = cat_b[i].iloc[bc[lowind:highind]].values
 
@@ -291,15 +301,15 @@ def npy_to_csv(input_csv_folders, input_match_folder, output_folder, csv_filenam
         # Q match-made columns, plus len(extra_col_name_lists)x2.
         if input_npy_folders[0] is not None:
             ind = (len(column_name_lists[0]) + len(column_name_lists[1]) + len(our_columns) +
-                   (len(extra_col_name_lists[0]) if extra_col_name_lists is not None else 0) +
-                   (len(extra_col_name_lists[1]) if extra_col_name_lists is not None else 0))
+                   (len(extra_col_name_lists[0]) if extra_col_name_lists[0] is not None else 0) +
+                   (len(extra_col_name_lists[1]) if extra_col_name_lists[1] is not None else 0))
             match_df.iloc[lowind:highind, ind] = a_concatastro[ac[lowind:highind], 2]
         if input_npy_folders[1] is not None:
             # Here we also need to check if catalogue "a" has processed uncertainties too.
             _dx = 1 if input_npy_folders[0] is not None else 0
             ind = (len(column_name_lists[0]) + len(column_name_lists[1]) + len(our_columns) +
-                   (len(extra_col_name_lists[0]) if extra_col_name_lists is not None else 0) +
-                   (len(extra_col_name_lists[1]) if extra_col_name_lists is not None else 0)) + _dx
+                   (len(extra_col_name_lists[0]) if extra_col_name_lists[0] is not None else 0) +
+                   (len(extra_col_name_lists[1]) if extra_col_name_lists[1] is not None else 0)) + _dx
             match_df.iloc[lowind:highind, ind] = b_concatastro[bc[lowind:highind], 2]
 
     match_df.to_csv('{}/{}.csv'.format(output_folder, output_filenames[0]), encoding='utf-8',
@@ -316,7 +326,7 @@ def npy_to_csv(input_csv_folders, input_match_folder, output_folder, csv_filenam
     our_columns = ['MATCH_P', 'NNM_SEPARATION', 'NNM_ETA', 'NNM_XI',
                    '{}_AVG_CONT'.format(extra_col_cat_names[0])]
     cols = np.append(column_name_lists[0], our_columns)
-    if extra_col_num_lists is not None:
+    if extra_col_num_lists[0] is not None:
         cols = np.append(cols, extra_col_name_lists[0])
     if input_npy_folders[0] is not None:
         cols = np.append(cols, ['{}_FIT_SIG'.format(extra_col_cat_names[0])])
@@ -333,13 +343,13 @@ def npy_to_csv(input_csv_folders, input_match_folder, output_folder, csv_filenam
         a_nonmatch_df.iloc[lowind:highind, 3+n_amags+2] = afeta[lowind:highind]
         a_nonmatch_df.iloc[lowind:highind, 3+n_amags+3] = afxi[lowind:highind]
         a_nonmatch_df.iloc[lowind:highind, 3+n_amags+4] = a_avg_cont[lowind:highind]
-        if extra_col_name_lists is not None:
+        if extra_col_name_lists[0] is not None:
             for i in extra_col_name_lists[0]:
                 a_nonmatch_df[i].iloc[lowind:highind] = cat_a[i].iloc[af[lowind:highind]].values
 
         if input_npy_folders[0] is not None:
             ind = (len(column_name_lists[0]) + len(our_columns) +
-                   (len(extra_col_name_lists[0]) if extra_col_name_lists is not None else 0))
+                   (len(extra_col_name_lists[0]) if extra_col_name_lists[0] is not None else 0))
             a_nonmatch_df.iloc[lowind:highind, ind] = a_concatastro[af[lowind:highind], 2]
 
     a_nonmatch_df.to_csv('{}/{}.csv'.format(output_folder, output_filenames[1]), encoding='utf-8',
@@ -354,7 +364,7 @@ def npy_to_csv(input_csv_folders, input_match_folder, output_folder, csv_filenam
     our_columns = ['MATCH_P', 'NNM_SEPARATION', 'NNM_ETA', 'NNM_XI',
                    '{}_AVG_CONT'.format(extra_col_cat_names[1])]
     cols = np.append(column_name_lists[1], our_columns)
-    if extra_col_num_lists is not None:
+    if extra_col_num_lists[1] is not None:
         cols = np.append(cols, extra_col_name_lists[1])
     if input_npy_folders[1] is not None:
         cols = np.append(cols, ['{}_FIT_SIG'.format(extra_col_cat_names[1])])
@@ -371,13 +381,13 @@ def npy_to_csv(input_csv_folders, input_match_folder, output_folder, csv_filenam
         b_nonmatch_df.iloc[lowind:highind, 3+n_bmags+2] = bfeta[lowind:highind]
         b_nonmatch_df.iloc[lowind:highind, 3+n_bmags+3] = bfxi[lowind:highind]
         b_nonmatch_df.iloc[lowind:highind, 3+n_bmags+4] = b_avg_cont[lowind:highind]
-        if extra_col_name_lists is not None:
+        if extra_col_name_lists[1] is not None:
             for i in extra_col_name_lists[1]:
                 b_nonmatch_df[i].iloc[lowind:highind] = cat_b[i].iloc[bf[lowind:highind]].values
 
         if input_npy_folders[1] is not None:
             ind = (len(column_name_lists[1]) + len(our_columns) +
-                   (len(extra_col_name_lists[1]) if extra_col_name_lists is not None else 0))
+                   (len(extra_col_name_lists[1]) if extra_col_name_lists[1] is not None else 0))
             b_nonmatch_df.iloc[lowind:highind, ind] = b_concatastro[bf[lowind:highind], 2]
 
     b_nonmatch_df.to_csv('{}/{}.csv'.format(output_folder, output_filenames[2]), encoding='utf-8',
