@@ -7,6 +7,8 @@ use_phot_priors = no
 # Top-level folder for all temporary cross-match files to be created in. Should be absolute path, or relative to folder script called in
 joint_folder_path = test_path
 
+make_output_csv = no
+
 # Flags for each stage of the match process - must be "yes"/"no", "true"/"false", "t"/"f", or "1"/"0"
 run_auf = no
 run_group = no

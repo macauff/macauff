@@ -1108,6 +1108,8 @@ class TestPostProcess:
         cm.a_cat_folder_path = self.a_cat_folder_path
         cm.b_cat_folder_path = self.b_cat_folder_path
 
+        cm.make_output_csv = False
+
         cm._postprocess_chunk()
 
         aino = np.load('{}/in_chunk_overlap.npy'.format(self.a_cat_folder_path))
