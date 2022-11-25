@@ -7,6 +7,12 @@ General
 New Features
 ^^^^^^^^^^^^
 
+- Added chunk post-processing, removing duplicate sources where in the "halo" of
+  a particular region, if desired. [#58]
+
+- ``CrossMatch`` can now generate output csv files during the matching process if
+  ``make_output_csv`` is set to ``True``. [#58]
+
 - Added new algorithm, based on the assumption that objects within a photometric
   catalogue were fit with PSF photometry in the sky background dominated regime,
   where noise is constant, extending Plewa & Sari (2018, MNRAS, 476, 4372). This
@@ -59,6 +65,10 @@ New Features
 
 Bug Fixes
 ^^^^^^^^^
+
+- ``npy_to_csv`` expected contamination probability arrays to be transposed from
+  their ``CrossMatch`` output shape, but they now correctly assume
+  fortran-ordering. [#58]
 
 - Pass ``tri_maglim_bright``, ``tri_maglim_faint``, ``tri_num_bright``, and
   ``tri_num_faint`` through to ``make_perturb_aufs`` in ``CrossMatch`` call. [#56]
@@ -124,6 +134,10 @@ Bug Fixes
 
 API Changes
 ^^^^^^^^^^^
+
+- ``npy_to_csv`` always requires two nested lists when using ``extra_col_*_lists``,
+  rather than allowing a singular ``None``. The default is now ``[None, None]`` for
+  the passing of no extra columns to be propagated to the output csv file. [#58]
 
 - ``tri_maglim_bright``, ``tri_maglim_faint``, ``tri_num_bright``, and
   ``tri_num_faint`` are only required if ``tri_download_flag`` is ``True``. [#56]
