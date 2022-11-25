@@ -61,6 +61,8 @@ These should be defined such that you provide, for each so-called "chunk", a reg
 
 To this end, the halo should be defined such that, even after removing the ``pos_corr_dist`` edge-of-region-adjacent sources, we are left with all matches that overlap the *core*. A reasonably safe bet is to set the halo size to twice ``pos_corr_dist``, but depending on the relative size of the core and this "unreliable island" region larger or smaller halo width regions may be required.
 
+The difference between core and halo is defined in the accompanying file ``in_chunk_overlap.npy`` which should be in the same folder as ``con_cat_astro.npy`` et al. This 1-D file should be a binary, where ``True`` (or equivalent) is a "yes" to the question "is this object in the halo region", with false being a core-region source.
+
 Update Astrometry Precisions
 ----------------------------
 

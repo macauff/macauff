@@ -56,6 +56,9 @@ crossmatch_params.txt::
     # Top-level folder for all temporary cross-match files to be created in. Should be absolute path, or relative to folder script called in
     joint_folder_path = test_macauff_outputs/test_path
 
+    # Check for whether we want to generate the csv file at the end of the run.
+    make_output_csv = no
+
     # Flags for each stage of the match process - must be "yes"/"no", "true"/"false", "t"/"f", or "1"/"0"
     run_auf = yes
     run_group = yes
