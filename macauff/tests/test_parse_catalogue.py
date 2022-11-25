@@ -254,9 +254,9 @@ class TestParseCatalogueNpyToCsv:
         self.xi = rng.uniform(-10, 10, size=self.N_match)
         np.save('test_folder/pairing/xi.npy', self.xi)
 
-        self.pac = rng.uniform(0, 1, size=(self.N_match, 2))
+        self.pac = rng.uniform(0, 1, size=(2, self.N_match))
         np.save('test_folder/pairing/pacontam.npy', self.pac)
-        self.pbc = rng.uniform(0, 1, size=(self.N_match, 2))
+        self.pbc = rng.uniform(0, 1, size=(2, self.N_match))
         np.save('test_folder/pairing/pbcontam.npy', self.pbc)
 
         self.acf = rng.uniform(0, 0.2, size=self.N_match)

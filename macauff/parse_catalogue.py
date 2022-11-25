@@ -285,11 +285,11 @@ def npy_to_csv(input_csv_folders, input_match_folder, output_folder, csv_filenam
         match_df.iloc[lowind:highind, 6+n_amags+n_bmags+3] = xi[lowind:highind]
         match_df.iloc[lowind:highind, 6+n_amags+n_bmags+4] = a_avg_cont[lowind:highind]
         match_df.iloc[lowind:highind, 6+n_amags+n_bmags+5] = b_avg_cont[lowind:highind]
-        for i in range(acontprob.shape[1]):
-            match_df.iloc[lowind:highind, 6+n_amags+n_bmags+6+i] = acontprob[lowind:highind, i]
-        for i in range(bcontprob.shape[1]):
-            match_df.iloc[lowind:highind, 6+n_amags+n_bmags+6+acontprob.shape[1]+i] = bcontprob[
-                lowind:highind, i]
+        for i in range(acontprob.shape[0]):
+            match_df.iloc[lowind:highind, 6+n_amags+n_bmags+6+i] = acontprob[i, lowind:highind]
+        for i in range(bcontprob.shape[0]):
+            match_df.iloc[lowind:highind, 6+n_amags+n_bmags+6+acontprob.shape[0]+i] = bcontprob[
+                i, lowind:highind]
         if extra_col_name_lists[0] is not None:
             for i in extra_col_name_lists[0]:
                 match_df[i].iloc[lowind:highind] = cat_a[i].iloc[ac[lowind:highind]].values
