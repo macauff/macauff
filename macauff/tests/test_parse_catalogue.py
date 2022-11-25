@@ -315,7 +315,7 @@ class TestParseCatalogueNpyToCsv:
                        range(len(self.bc))])
 
         for f, col in zip([self.pc, self.csep, self.eta, self.xi, self.acf, self.bcf,
-                           self.pac[:, 0], self.pac[:, 1], self.pbc[:, 0], self.pbc[:, 1]],
+                           self.pac[0], self.pac[1], self.pbc[0], self.pbc[1]],
                           extra_cols):
             assert_allclose(df[col], f)
 
@@ -428,7 +428,7 @@ class TestParseCatalogueNpyToCsv:
                        range(len(self.bc))])
 
         for f, col in zip([self.pc, self.csep, self.eta, self.xi, self.acf, self.bcf,
-                           self.pac[:, 0], self.pac[:, 1], self.pbc[:, 0], self.pbc[:, 1]],
+                           self.pac[0], self.pac[1], self.pbc[0], self.pbc[1]],
                           extra_cols):
             assert_allclose(df[col], f)
 
@@ -508,7 +508,7 @@ class TestParseCatalogueNpyToCsv:
                        range(len(self.bc))])
 
         for f, col in zip([self.pc, self.csep, self.eta, self.xi, self.acf, self.bcf,
-                           self.pac[:, 0], self.pac[:, 1], self.pbc[:, 0], self.pbc[:, 1]],
+                           self.pac[0], self.pac[1], self.pbc[0], self.pbc[1]],
                           extra_cols):
             assert_allclose(df[col], f)
 
@@ -586,7 +586,7 @@ class TestParseCatalogueNpyToCsv:
                        range(len(self.bc))])
 
         for f, col in zip([self.pc, self.csep, self.eta, self.xi, self.acf, self.bcf,
-                           self.pac[:, 0], self.pac[:, 1], self.pbc[:, 0], self.pbc[:, 1]],
+                           self.pac[0], self.pac[1], self.pbc[0], self.pbc[1]],
                           extra_cols):
             assert_allclose(df[col], f)
 
