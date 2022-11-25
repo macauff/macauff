@@ -1241,6 +1241,25 @@ class TestInputs:
                     os.path.join(os.path.dirname(__file__), 'data/{}.txt'.format(j)),
                     os.path.join(os.path.dirname(__file__), 'data/{}.txt'.format(a)),
                     os.path.join(os.path.dirname(__file__), 'data/{}.txt'.format(b)))
+        # Check for .csv stripping in output filenames.
+        for old_line, new_line in zip(
+                ['match_out_csv_name = match', 'nonmatch_out_csv_name = nonmatch'],
+                ['match_out_csv_name = match.csv\n', 'nonmatch_out_csv_name = nonmatch.csv\n']):
+            f = open(os.path.join(os.path.dirname(__file__),
+                                  'data/crossmatch_params__.txt')).readlines()
+            idx = np.where([old_line in line for line in f])[0][0]
+            _replace_line(os.path.join(os.path.dirname(__file__),
+                          'data/crossmatch_params__.txt'), idx, new_line,
+                          out_file=os.path.join(os.path.dirname(__file__),
+                          'data/crossmatch_params_3.txt'))
+            cm._initialise_chunk(
+                os.path.join(os.path.dirname(__file__), 'data/crossmatch_params_3.txt'),
+                os.path.join(os.path.dirname(__file__), 'data/cat_a_params_.txt'),
+                os.path.join(os.path.dirname(__file__), 'data/cat_b_params_.txt'))
+            cm.match_out_csv_name = 'match'
+            cm.a_nonmatch_out_csv_name = 'gaia_nonmatch'
+            cm.b_nonmatch_out_csv_name = 'wise_nonmatch'
+
         # Finally, to check for extra_col_* issues, we need to set both
         # to not None first.
         old_line = 'extra_col_names = None'
