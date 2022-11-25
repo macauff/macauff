@@ -22,6 +22,7 @@ from .group_sources_fortran import group_sources_fortran as gsf
 from .misc_functions_fortran import misc_functions_fortran as mff
 from .photometric_likelihood import compute_photometric_likelihoods
 from .counterpart_pairing import source_pairing
+from .parse_catalogue import npy_to_csv
 
 __all__ = ['CrossMatch']
 
@@ -401,7 +402,8 @@ class CrossMatch():
 
     def _postprocess_chunk(self):
         '''
-        Runs the post-processing stage, resolving duplicate cross-matches.
+        Runs the post-processing stage, resolving duplicate cross-matches and
+        optionally creating output .csv files for use elsewhere.
 
         Duplicates are determined by match pairs (or singular non-matches) that
         are entirely outside of the "core" for a given chunk. This core/halo
@@ -450,11 +452,57 @@ class CrossMatch():
                     tick += np.sum(core_matches[i:i+di])
                 os.system('mv {}/pairing/{}c2.npy {}/pairing/{}c.npy'.format(
                           self.joint_folder_path, cat_kind, self.joint_folder_path, cat_kind))
+
+                # While within the a-b loop, also want to loop over the extra
+                # things that need updating: *confamflux, p*contam
+                for fname in ['{}contamflux', 'p{}contam']:
+                    new_name = fname.format(cat_kind)
+                    old_c = np.load('{}/pairing/{}.npy'.format(self.joint_folder_path, new_name),
+                                    **_kwargs)
+                    shape = (new_c_length,) if len(old_c.shape) == 1 else (
+                        old_c.shape[0], new_c_length)
+                    new_c = np.lib.format.open_memmap(
+                        '{}/pairing/{}2.npy'.format(self.joint_folder_path, new_name),
+                        mode='w+', dtype=float, shape=shape)
+                    tick = 0
+                    for i in range(0, len(c), di):
+                        if 'flux' in fname:
+                            new_c[tick:tick+np.sum(core_matches[i:i+di])] = old_c[i:i+di][
+                                core_matches[i:i+di]]
+                        else:
+                            new_c[:, tick:tick+np.sum(core_matches[i:i+di])] = old_c[:, i:i+di][
+                                :, core_matches[i:i+di]]
+                        tick += np.sum(core_matches[i:i+di])
+                    os.system('mv {}/pairing/{}2.npy {}/pairing/{}.npy'.format(
+                              self.joint_folder_path, new_name, self.joint_folder_path, new_name))
+            # Outside of the a-b loop, update shared common items: pc, eta,
+            # xi, sep.
+            for fname in ['pc', 'eta', 'xi', 'crptseps']:
+                old_c = np.load('{}/pairing/{}.npy'.format(self.joint_folder_path, fname),
+                                **_kwargs)
+                new_c = np.lib.format.open_memmap(
+                    '{}/pairing/{}2.npy'.format(self.joint_folder_path, fname),
+                    mode='w+', dtype=float, shape=(new_c_length,))
+                tick = 0
+                for i in range(0, len(c), di):
+                    new_c[tick:tick+np.sum(core_matches[i:i+di])] = old_c[i:i+di][
+                        core_matches[i:i+di]]
+                    tick += np.sum(core_matches[i:i+di])
+                os.system('mv {}/pairing/{}2.npy {}/pairing/{}.npy'.format(
+                          self.joint_folder_path, fname, self.joint_folder_path, fname))
             os.remove('{}/pairing/core_matches.npy'.format(self.joint_folder_path))
         else:
             core_matches = ~a_in_overlaps[ac] | ~b_in_overlaps[bc]
             np.save('{}/pairing/ac.npy'.format(self.joint_folder_path), ac[core_matches])
             np.save('{}/pairing/bc.npy'.format(self.joint_folder_path), bc[core_matches])
+            for fname in ['pc', 'eta', 'xi', 'crptseps', 'acontamflux', 'bcontamflux']:
+                np.save('{}/pairing/{}.npy'.format(self.joint_folder_path, fname),
+                        np.load('{}/pairing/{}.npy'.format(self.joint_folder_path, fname))[
+                            core_matches])
+            for fname in ['pacontam', 'pbcontam']:
+                np.save('{}/pairing/{}.npy'.format(self.joint_folder_path, fname),
+                        np.load('{}/pairing/{}.npy'.format(self.joint_folder_path, fname))[
+                            :, core_matches])
 
         if self.use_memmap_files:
             # Do a_core_nonmatches = ~a_in_overlaps[af] but in memmap
@@ -490,6 +538,21 @@ class CrossMatch():
                 os.system('mv {}/pairing/{}f2.npy {}/pairing/{}f.npy'.format(
                           self.joint_folder_path, cat_kind, self.joint_folder_path, cat_kind))
 
+                # This time all "other" files are also a-b specific.
+                for fname in ['{}fieldflux', 'pf{}', '{}fieldeta', '{}fieldxi', '{}fieldseps']:
+                    new_name = fname.format(cat_kind)
+                    old_f = np.load('{}/pairing/{}.npy'.format(self.joint_folder_path, new_name),
+                                    **_kwargs)
+                    new_f = np.lib.format.open_memmap(
+                        '{}/pairing/{}2.npy'.format(self.joint_folder_path, new_name),
+                        mode='w+', dtype=float, shape=(new_f_length,))
+                    tick = 0
+                    for i in range(0, len(cnm), di):
+                        new_f[tick:tick+np.sum(cnm[i:i+di])] = old_f[i:i+di][cnm[i:i+di]]
+                        tick += np.sum(cnm[i:i+di])
+                    os.system('mv {}/pairing/{}2.npy {}/pairing/{}.npy'.format(
+                              self.joint_folder_path, new_name, self.joint_folder_path, new_name))
+
             os.remove('{}/pairing/a_core_nonmatches.npy'.format(self.joint_folder_path))
             os.remove('{}/pairing/b_core_nonmatches.npy'.format(self.joint_folder_path))
         else:
@@ -497,6 +560,23 @@ class CrossMatch():
             b_core_nonmatches = ~b_in_overlaps[bf]
             np.save('{}/pairing/af.npy'.format(self.joint_folder_path), af[a_core_nonmatches])
             np.save('{}/pairing/bf.npy'.format(self.joint_folder_path), bf[b_core_nonmatches])
+            for fnametype, cnm in zip(['a', 'b'], [a_core_nonmatches, b_core_nonmatches]):
+                for fname_ in ['{}fieldflux', 'pf{}', '{}fieldeta', '{}fieldxi', '{}fieldseps']:
+                    fname = fname_.format(fnametype)
+                    np.save('{}/pairing/{}.npy'.format(self.joint_folder_path, fname),
+                            np.load('{}/pairing/{}.npy'.format(self.joint_folder_path, fname))[cnm])
+
+        if self.make_output_csv:
+            npy_to_csv(
+                [self.a_input_csv_folder, self.b_input_csv_folder], self.joint_folder_path,
+                self.output_csv_folder, [self.a_cat_csv_name, self.b_cat_csv_name],
+                [self.match_out_csv_name, self.a_nonmatch_out_csv_name,
+                 self.b_nonmatch_out_csv_name], [self.a_cat_col_names, self.b_cat_col_names],
+                [self.a_cat_col_nums, self.b_cat_col_nums], [self.a_cat_name, self.b_cat_name],
+                self.mem_chunk_num, [self.a_input_npy_folder, self.b_input_npy_folder],
+                headers=[self.a_csv_has_header, self.b_csv_has_header],
+                extra_col_name_lists=[self.a_extra_col_names, self.b_extra_col_names],
+                extra_col_num_lists=[self.a_extra_col_nums, self.b_extra_col_nums])
 
     def _make_chunk_queue(self, completed_chunks):
         '''
@@ -703,7 +783,8 @@ class CrossMatch():
                            'run_cf', 'run_source', 'use_phot_priors', 'cf_region_type',
                            'cf_region_frame', 'cf_region_points', 'joint_folder_path',
                            'pos_corr_dist', 'real_hankel_points', 'four_hankel_points',
-                           'four_max_rho', 'cross_match_extent', 'mem_chunk_num', 'int_fracs']:
+                           'four_max_rho', 'cross_match_extent', 'mem_chunk_num', 'int_fracs',
+                           'make_output_csv']:
             if check_flag not in joint_config:
                 raise ValueError("Missing key {} from joint metadata file.".format(check_flag))
 
@@ -1001,6 +1082,136 @@ class CrossMatch():
         if len(b) != 3:
             raise ValueError("int_fracs should contain three elements.")
         self.int_fracs = b
+
+        self.make_output_csv = self._str2bool(joint_config['make_output_csv'])
+        if self.make_output_csv:
+            self._read_metadata_csv(joint_config, cat_a_config, cat_b_config)
+
+    def _read_metadata_csv(self, joint_config, cat_a_config, cat_b_config):
+        """
+        Read metadata from input config files relating to outputting combined
+        .csv files during the post-process step, if requested.
+
+        Parameters
+        ----------
+        joint_config : ConfigParser
+            The pre-loaded set of input configuration parameters as related
+            to the joint match between catalogues a and b.
+        cat_a_config : ConfigParser
+            Configuration parameters that are solely related to catalogue "a".
+        cat_b_config : ConfigParser
+            Configuration parameters that are just relate to catalogue "b".
+        """
+
+        for check_flag in ['output_csv_folder', 'match_out_csv_name', 'nonmatch_out_csv_name']:
+            if check_flag not in joint_config:
+                raise ValueError("Missing key {} from joint metadata file.".format(check_flag))
+
+        for config, catname in zip([cat_a_config, cat_b_config], ['"a"', '"b"']):
+            for check_flag in ['input_csv_folder', 'cat_csv_name', 'cat_col_names', 'cat_col_nums',
+                               'input_npy_folder', 'csv_has_header', 'extra_col_names',
+                               'extra_col_nums']:
+                if check_flag not in config:
+                    raise ValueError("Missing key {} from catalogue {} metadata file.".format(
+                                     check_flag, catname))
+
+        self.output_csv_folder = os.path.abspath(joint_config['output_csv_folder'])
+        try:
+            os.makedirs(self.output_csv_folder, exist_ok=True)
+        except OSError:
+            raise OSError("Error when trying to create folder to store output csv files in. "
+                          "Please ensure that output_csv_folder is correct in joint config file.")
+        # Make nonmatch_out_csv_name use *_cat_name + "nonmatch_out_csv_name" so this
+        # is a common
+        if joint_config['match_out_csv_name'][-4:] == '.csv':
+            # npy_to_csv doesn't want duplicate .csv, adding it itself.
+            self.match_out_csv_name = joint_config['match_out_csv_name'][:-4]
+        else:
+            self.match_out_csv_name = joint_config['match_out_csv_name']
+        for config, catname in zip([cat_a_config, cat_b_config], ['a_', 'b_']):
+            # Non-match csv name should be of the format
+            # [cat name]_[some indication this is a non-match], but note that
+            # this is defined in joint_config, not each individual
+            # catalogue config!
+            if joint_config['nonmatch_out_csv_name'][-4:] == '.csv':
+                nonmatch_out_name = joint_config['nonmatch_out_csv_name'][:-4]
+            else:
+                nonmatch_out_name = joint_config['nonmatch_out_csv_name']
+            setattr(self, '{}nonmatch_out_csv_name'.format(catname),
+                    '{}_{}'.format(getattr(self, '{}cat_name'.format(catname)), nonmatch_out_name))
+
+            input_csv_folder = os.path.abspath(config['input_csv_folder'])
+            if not os.path.exists(input_csv_folder):
+                raise OSError('input_csv_folder from catalogue "{}" does not exist.'
+                              .format(catname[0]))
+            setattr(self, '{}input_csv_folder'.format(catname), input_csv_folder)
+
+            setattr(self, '{}cat_csv_name'.format(catname), config['cat_csv_name'])
+
+            # cat_col_names is simply a list/array of strings. However, to
+            # avoid any issues with generic names like "RA" being added to the
+            # output .csv file twice, we prepend the catalogue name to the front
+            # of them all.
+            catcolnames = config['cat_col_names'].split()
+            setattr(self, '{}cat_col_names'.format(catname),
+                    np.array(['{}_{}'.format(getattr(self, '{}cat_name'.format(catname)),
+                              q) for q in catcolnames]))
+
+            # But cat_col_nums is a list/array of integers, and should be of the
+            # same length as cat_col_names.
+            a = config['cat_col_nums'].split(' ')
+            try:
+                b = np.array([float(f) for f in a])
+            except ValueError:
+                raise ValueError('cat_col_nums should be a list of integers '
+                                 'in catalogue "{}" metadata file'.format(catname[0]))
+            if len(b) != len(getattr(self, '{}cat_col_names'.format(catname))):
+                raise ValueError('{}cat_col_names and {}cat_col_nums should contain the same '
+                                 'number of entries.'.format(catname, catname))
+            if not np.all([c.is_integer() for c in b]):
+                raise ValueError('All elements of {}cat_col_nums should be '
+                                 'integers.'.format(catname))
+            setattr(self, '{}cat_col_nums'.format(catname), np.array([int(c) for c in b]))
+
+            input_npy_folder = os.path.abspath(config['input_npy_folder'])
+            if not os.path.exists(input_npy_folder):
+                raise OSError('input_npy_folder from catalogue "{}" does not exist.'
+                              .format(catname[0]))
+            setattr(self, '{}input_npy_folder'.format(catname), input_npy_folder)
+
+            setattr(self, '{}csv_has_header'.format(catname),
+                    self._str2bool(config['csv_has_header']))
+
+            # As above, extra_col_names is just strings but extra_col_names
+            # is a list of integers.
+            # However, both can be None (although if either is None both have to
+            # be None), so check for that first
+            a = config['extra_col_names']
+            b = config['extra_col_nums']
+            if a == 'None' and b == 'None':
+                setattr(self, '{}extra_col_names'.format(catname), None)
+                setattr(self, '{}extra_col_nums'.format(catname), None)
+            else:
+                if a == 'None' and b != 'None' or a != 'None' and b == 'None':
+                    raise ValueError('Both extra_col_names and extra_col_nums must be None if '
+                                     'either is None in catalogue "{}".'.format(catname[0]))
+                catcolnames = config['extra_col_names'].split()
+                setattr(self, '{}extra_col_names'.format(catname),
+                        np.array(['{}_{}'.format(getattr(self, '{}cat_name'.format(catname)),
+                                  q) for q in catcolnames]))
+                a = config['extra_col_nums'].split(' ')
+                try:
+                    b = np.array([float(f) for f in a])
+                except ValueError:
+                    raise ValueError('extra_col_nums should be a list of integers '
+                                     'in catalogue "{}" metadata file'.format(catname[0]))
+                if len(b) != len(getattr(self, '{}extra_col_names'.format(catname))):
+                    raise ValueError('{}extra_col_names and {}extra_col_nums should contain the '
+                                     'same number of entries.'.format(catname, catname))
+                if not np.all([c.is_integer() for c in b]):
+                    raise ValueError('All elements of {}extra_col_nums should be '
+                                     'integers.'.format(catname))
+                setattr(self, '{}extra_col_nums'.format(catname), np.array([int(c) for c in b]))
 
     def make_shared_data(self):
         """
