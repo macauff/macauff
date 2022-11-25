@@ -106,6 +106,11 @@ def generate_random_data(N_a, N_b, N_c, extent, n_a_filts, n_b_filts, a_astro_si
     np.save('{}/magref.npy'.format(a_cat), amagref)
     np.save('{}/magref.npy'.format(b_cat), bmagref)
 
+    # Fake uninformative "overlap" flag data, where no sources are in the
+    # halo of the chunk.
+    np.save('{}/in_chunk_overlap.npy'.format(a_cat), np.zeros(N_a, bool))
+    np.save('{}/in_chunk_overlap.npy'.format(b_cat), np.zeros(N_b, bool))
+
     np.save('{}/test_match_indices.npy'.format(a_cat), a_pair_indices)
     np.save('{}/test_match_indices.npy'.format(b_cat), b_pair_indices)
 

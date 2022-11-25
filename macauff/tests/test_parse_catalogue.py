@@ -17,12 +17,13 @@ class TestParseCatalogue:
         rng = np.random.default_rng(seed=45555)
 
         self.N = 100000
-        data = rng.standard_normal(size=(self.N, 7))
+        data = rng.standard_normal(size=(self.N, 8))
         data[:, 6] = np.round(data[:, 6]).astype(int)
         nan_cols = [rng.choice(self.N, size=(100,), replace=False),
                     rng.choice(self.N, size=(100,), replace=False)]
         data[nan_cols[0], 4] = np.nan
         data[nan_cols[1], 5] = np.nan
+        data[:, 7] = rng.choice(2, size=(self.N))
         self.data = data
 
     def test_csv_to_npy(self):
@@ -31,14 +32,15 @@ class TestParseCatalogue:
         data1 = self.data.astype(str)
         data1[data1 == 'nan'] = ''
 
-        for header_text, header in zip(['', '# a, b, c, d, e, f, g'], [False, True]):
+        for header_text, header in zip(['', '# a, b, c, d, e, f, g, h'], [False, True]):
             np.savetxt('test_data.csv', data1, delimiter=',', fmt='%s', header=header_text)
 
-            csv_to_npy('.', 'test_data', '.', [0, 1, 2], [4, 5], 6, header=header)
+            csv_to_npy('.', 'test_data', '.', [0, 1, 2], [4, 5], 6, None, header=header)
 
             astro = np.load('con_cat_astro.npy')
             photo = np.load('con_cat_photo.npy')
             best_index = np.load('magref.npy')
+            chunk_overlaps = np.load('in_chunk_overlap.npy')
 
             assert np.all(astro.shape == (self.N, 3))
             assert np.all(photo.shape == (self.N, 2))
@@ -46,6 +48,31 @@ class TestParseCatalogue:
             assert_allclose(astro, self.data[:, [0, 1, 2]])
             assert_allclose(photo, self.data[:, [4, 5]])
             assert_allclose(best_index, self.data[:, 6])
+            assert np.all(~chunk_overlaps)
+
+    def test_csv_to_npy_chunk_overlap(self):
+        # Convert data to string to get expected Pandas-esque .csv formatting where
+        # NaN values are empty strings.
+        data1 = self.data.astype(str)
+        data1[data1 == 'nan'] = ''
+
+        for header_text, header in zip(['', '# a, b, c, d, e, f, g, h'], [False, True]):
+            np.savetxt('test_data.csv', data1, delimiter=',', fmt='%s', header=header_text)
+
+            csv_to_npy('.', 'test_data', '.', [0, 1, 2], [4, 5], 6, 7, header=header)
+
+            astro = np.load('con_cat_astro.npy')
+            photo = np.load('con_cat_photo.npy')
+            best_index = np.load('magref.npy')
+            chunk_overlaps = np.load('in_chunk_overlap.npy')
+
+            assert np.all(astro.shape == (self.N, 3))
+            assert np.all(photo.shape == (self.N, 2))
+            assert np.all(best_index.shape == (self.N,))
+            assert_allclose(astro, self.data[:, [0, 1, 2]])
+            assert_allclose(photo, self.data[:, [4, 5]])
+            assert_allclose(best_index, self.data[:, 6])
+            assert np.all(chunk_overlaps == self.data[:, 7])
 
     def test_csv_to_npy_process_uncert(self):
         # Convert data to string to get expected Pandas-esque .csv formatting where
@@ -53,20 +80,20 @@ class TestParseCatalogue:
         data1 = self.data.astype(str)
         data1[data1 == 'nan'] = ''
 
-        header_text, header = '# a, b, c, d, e, f, g', True
+        header_text, header = '# a, b, c, d, e, f, g, h', True
         np.savetxt('test_data.csv', data1, delimiter=',', fmt='%s', header=header_text)
 
         with pytest.raises(ValueError, match='process_uncerts must either be True or'):
-            csv_to_npy('.', 'test_data', '.', [0, 1, 2], [4, 5], 6, header=header,
+            csv_to_npy('.', 'test_data', '.', [0, 1, 2], [4, 5], 6, None, header=header,
                        process_uncerts=None)
         with pytest.raises(ValueError, match='astro_sig_fits_filepath must given if process'):
-            csv_to_npy('.', 'test_data', '.', [0, 1, 2], [4, 5], 6, header=header,
+            csv_to_npy('.', 'test_data', '.', [0, 1, 2], [4, 5], 6, None, header=header,
                        process_uncerts=True)
         with pytest.raises(ValueError, match='cat_in_radec must given if process_uncerts is '):
-            csv_to_npy('.', 'test_data', '.', [0, 1, 2], [4, 5], 6, header=header,
+            csv_to_npy('.', 'test_data', '.', [0, 1, 2], [4, 5], 6, None, header=header,
                        process_uncerts=True, astro_sig_fits_filepath='test_sig_folder')
         with pytest.raises(ValueError, match='If process_uncerts is True, cat_in_radec must '):
-            csv_to_npy('.', 'test_data', '.', [0, 1, 2], [4, 5], 6, header=header,
+            csv_to_npy('.', 'test_data', '.', [0, 1, 2], [4, 5], 6, None, header=header,
                        process_uncerts=True, astro_sig_fits_filepath='test_sig_folder',
                        cat_in_radec='something else')
 
@@ -74,7 +101,7 @@ class TestParseCatalogue:
             os.system('rm -rf ./test_sig_folder')
 
         with pytest.raises(ValueError, match='astro_sig_fits_filepath does not exist.'):
-            csv_to_npy('.', 'test_data', '.', [0, 1, 2], [4, 5], 6, header=header,
+            csv_to_npy('.', 'test_data', '.', [0, 1, 2], [4, 5], 6, None, header=header,
                        process_uncerts=True, astro_sig_fits_filepath='test_sig_folder',
                        cat_in_radec=False)
 
@@ -84,7 +111,7 @@ class TestParseCatalogue:
         np.save('test_sig_folder/lmids.npy', np.array([10.0]))
         np.save('test_sig_folder/bmids.npy', np.array([0.0]))
 
-        csv_to_npy('.', 'test_data', '.', [0, 1, 2], [4, 5], 6, header=header,
+        csv_to_npy('.', 'test_data', '.', [0, 1, 2], [4, 5], 6, None, header=header,
                    process_uncerts=True, astro_sig_fits_filepath='test_sig_folder',
                    cat_in_radec=False)
 
@@ -120,6 +147,7 @@ class TestParseCatalogue:
             astro = np.load('dummy_folder/con_cat_astro.npy')
             photo = np.load('dummy_folder/con_cat_photo.npy')
             best_index = np.load('dummy_folder/magref.npy')
+            chunk_overlaps = np.load('dummy_folder/in_chunk_overlap.npy')
 
             cosd = np.cos(np.radians(self.data[:, 2]))
             qa = (self.data[:, 1] >= rc[0]-pad/cosd) & (self.data[:, 1] <= rc[1]+pad/cosd)
@@ -129,10 +157,12 @@ class TestParseCatalogue:
             assert np.sum(q) == astro.shape[0]
             assert np.sum(q) == photo.shape[0]
             assert np.sum(q) == len(best_index)
+            assert np.sum(q) == len(chunk_overlaps)
 
             assert_allclose(self.data[q][:, [1, 2, 3]], astro)
             assert_allclose(self.data[q][:, [4, 5]], photo)
             assert_allclose(self.data[q][:, 6], best_index)
+            assert np.all(~chunk_overlaps)
 
     def test_rect_slice_csv(self):
         # Convert data to string to get expected Pandas-esque .csv formatting where
@@ -141,8 +171,9 @@ class TestParseCatalogue:
         data1[data1 == 'nan'] = ''
         data1[:, 0] = ['Gaia {}'.format(i) for i in data1[:, 0]]
         rc = [-0.3, 0.3, -0.1, 0.2]
-        col_names = ['A_Designation', 'A_RA', 'A_Dec', 'A_Err', 'G', 'G_RP', 'Best_Index']
-        for header_text, header in zip(['', '# a, b, c, d, e, f, g'], [False, True]):
+        col_names = ['A_Designation', 'A_RA', 'A_Dec', 'A_Err', 'G', 'G_RP', 'Best_Index',
+                     'Chunk_Overlap_index']
+        for header_text, header in zip(['', '# a, b, c, d, e, f, g, h'], [False, True]):
             np.savetxt('test_data.csv', data1, delimiter=',', fmt='%s', header=header_text)
 
             for pad in [0.03, 0]:
@@ -223,9 +254,9 @@ class TestParseCatalogueNpyToCsv:
         self.xi = rng.uniform(-10, 10, size=self.N_match)
         np.save('test_folder/pairing/xi.npy', self.xi)
 
-        self.pac = rng.uniform(0, 1, size=(self.N_match, 2))
+        self.pac = rng.uniform(0, 1, size=(2, self.N_match))
         np.save('test_folder/pairing/pacontam.npy', self.pac)
-        self.pbc = rng.uniform(0, 1, size=(self.N_match, 2))
+        self.pbc = rng.uniform(0, 1, size=(2, self.N_match))
         np.save('test_folder/pairing/pbcontam.npy', self.pbc)
 
         self.acf = rng.uniform(0, 0.2, size=self.N_match)
@@ -284,7 +315,7 @@ class TestParseCatalogueNpyToCsv:
                        range(len(self.bc))])
 
         for f, col in zip([self.pc, self.csep, self.eta, self.xi, self.acf, self.bcf,
-                           self.pac[:, 0], self.pac[:, 1], self.pbc[:, 0], self.pbc[:, 1]],
+                           self.pac[0], self.pac[1], self.pbc[0], self.pbc[1]],
                           extra_cols):
             assert_allclose(df[col], f)
 
@@ -397,7 +428,7 @@ class TestParseCatalogueNpyToCsv:
                        range(len(self.bc))])
 
         for f, col in zip([self.pc, self.csep, self.eta, self.xi, self.acf, self.bcf,
-                           self.pac[:, 0], self.pac[:, 1], self.pbc[:, 0], self.pbc[:, 1]],
+                           self.pac[0], self.pac[1], self.pbc[0], self.pbc[1]],
                           extra_cols):
             assert_allclose(df[col], f)
 
@@ -477,7 +508,7 @@ class TestParseCatalogueNpyToCsv:
                        range(len(self.bc))])
 
         for f, col in zip([self.pc, self.csep, self.eta, self.xi, self.acf, self.bcf,
-                           self.pac[:, 0], self.pac[:, 1], self.pbc[:, 0], self.pbc[:, 1]],
+                           self.pac[0], self.pac[1], self.pbc[0], self.pbc[1]],
                           extra_cols):
             assert_allclose(df[col], f)
 
@@ -555,7 +586,7 @@ class TestParseCatalogueNpyToCsv:
                        range(len(self.bc))])
 
         for f, col in zip([self.pc, self.csep, self.eta, self.xi, self.acf, self.bcf,
-                           self.pac[:, 0], self.pac[:, 1], self.pbc[:, 0], self.pbc[:, 1]],
+                           self.pac[0], self.pac[1], self.pbc[0], self.pbc[1]],
                           extra_cols):
             assert_allclose(df[col], f)
 
