@@ -94,7 +94,9 @@ class TestAstroCorrection:
             trifiltname='W1', gal_wav_micron=3.35, gal_ab_offset=2.699, gal_filtname='wise2010-W1',
             gal_alav=0.039, bright_mag=16, dm=0.1, dd_params=dd_params, l_cut=l_cut, lmids=lmids,
             bmids=bmids, lb_dimension=1, cutout_area=60, cutout_height=6, mag_array=magarray,
-            mag_slice=magslice, sig_slice=sigslice, n_pool=1)
+            mag_slice=magslice, sig_slice=sigslice, n_pool=1,
+            pos_and_err_indices=[[0, 1, 2], [0, 1, 2]], mag_indices=[3], mag_unc_indices=[4],
+            mag_names=['W1'], best_mag_index=0)
 
         a_cat_func = self.fake_cata_cutout
         b_cat_func = self.fake_catb_cutout
@@ -107,7 +109,7 @@ class TestAstroCorrection:
 
         assert os.path.isfile('ac_save_folder/pdf/auf_fits_105.0_0.0.pdf')
         assert os.path.isfile('ac_save_folder/pdf/counts_comparison.pdf')
-        assert os.path.isfile('ac_save_folder/pdf/s_vs_snr.pdf')
+        assert os.path.isfile('ac_save_folder/pdf/s_vs_snr_W1.pdf')
         assert os.path.isfile('ac_save_folder/pdf/sig_fit_comparisons.pdf')
         assert os.path.isfile('ac_save_folder/pdf/sig_h_stats.pdf')
 
@@ -120,5 +122,5 @@ class TestAstroCorrection:
         assert_allclose([lmids[0], bmids[0]], [105, 0], atol=0.001)
 
         abc_array = np.load('ac_save_folder/npy/snr_model.npy')
-        assert_allclose(abc_array[0, 0], 1.2e-2, rtol=0.05, atol=0.001)
-        assert_allclose(abc_array[0, 1], 8e-17, rtol=0.05, atol=5e-19)
+        assert_allclose(abc_array[0, 0, 0], 1.2e-2, rtol=0.05, atol=0.001)
+        assert_allclose(abc_array[0, 0, 1], 8e-17, rtol=0.05, atol=5e-19)
