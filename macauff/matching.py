@@ -889,8 +889,9 @@ class CrossMatch():
                                                 'pre-generated.'.format(f, catname, warn_message))
                     if 'mag_h' in path:
                         a = np.load('{}/mag_h_params.npy'.format(config['mag_h_params_path']))
-                        if not (len(a.shape) == 2 and a.shape[1] == 5):
-                            raise ValueError('{}mag_h_params should be of shape (X, 5).'
+                        if not (len(a.shape) == 3 and a.shape[2] == 5 and
+                                a.shape[0] == len(getattr(self, '{}filt_names'.format(flag)))):
+                            raise ValueError('{}mag_h_params should be of shape (X, Y, 5).'
                                              .format(flag))
                     if 'dd_params' in path:
                         a = np.load('{}/dd_params.npy'.format(config['dd_params_path']))

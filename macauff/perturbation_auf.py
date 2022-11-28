@@ -159,9 +159,10 @@ def make_perturb_aufs(auf_folder, cat_folder, filters, auf_points, r, dr, rho,
         limited PSF-fit algorithm case. Must be given if ``include_perturb_auf``
         is ``True`` and ``run_psf`` is ``True``.
     mag_h_params : numpy.ndarray, optional
-        Array, of shape ``(N, 5)``, containing the pre-determined values of the
+        Array, of shape ``(X, Y, 5)``, containing the pre-determined values of the
         magnitude-perturbation weighting relationship for a series of Galactic
-        sightlines. Must be given if ``include_perturb_auf`` is ``True``.
+        sightlines for each ``filters`` filter. Must be given if
+        ``include_perturb_auf`` is ``True``.
     fit_gal_flag : boolean, optional
         Flag indicating whether to include galaxy counts in derivations of
         perturbation component of the AUF. Must be given if
@@ -444,14 +445,14 @@ def make_perturb_aufs(auf_folder, cat_folder, filters, auf_points, r, dr, rho,
                     Narray = create_single_perturb_auf(
                         ax_folder, auf_points, filters[j], r, dr, rho, drho, j0s, num_trials,
                         psf_fwhms[j], tri_filt_names[j], density_mags[j], a_photo, localN, d_mag,
-                        delta_mag_cuts, dd_params, l_cut, run_fw, run_psf, mag_h_params,
+                        delta_mag_cuts, dd_params, l_cut, run_fw, run_psf, mag_h_params[j],
                         fit_gal_flag, cmau_array, wavs[j], z_maxs[j], nzs[j], alpha0, alpha1,
                         alpha_weight, ab_offsets[j], filter_names[j], al_avs[j])
                 else:
                     Narray = create_single_perturb_auf(
                         ax_folder, auf_points, filters[j], r, dr, rho, drho, j0s, num_trials,
                         psf_fwhms[j], tri_filt_names[j], density_mags[j], a_photo, localN, d_mag,
-                        delta_mag_cuts, dd_params, l_cut, run_fw, run_psf, mag_h_params,
+                        delta_mag_cuts, dd_params, l_cut, run_fw, run_psf, mag_h_params[j],
                         fit_gal_flag)
             else:
                 # Without the simulations to force local normalising density N or
@@ -872,9 +873,9 @@ def create_single_perturb_auf(tri_folder, auf_point, filt, r, dr, rho, drho, j0s
         Flag indicating whether to run the "background-dominated PSF" version
         of the perturbation algorithm.
     mag_h_params : numpy.ndarray
-        Array, of shape ``(N, 5)``, containing the pre-determined values of the
+        Array, of shape ``(Y, 5)``, containing the pre-determined values of the
         magnitude-perturbation weighting relationship for a series of Galactic
-        sightlines.
+        sightlines for this particular filter.
     fit_gal_flag : bool
         Flag to indicate whether to simulate galaxy counts for the purposes of
         simulating the perturbation component of the AUF.

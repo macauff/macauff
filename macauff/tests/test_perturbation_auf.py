@@ -723,7 +723,7 @@ class TestMakePerturbAUFs():
         mod_bin = mod_bins[:-1] + np.diff(mod_bins)/2
         mag_offset = mod_bin - mag_bin
         rel_flux = 10**(-1/2.5 * mag_offset)
-        mag_h_params = np.array([[0.0109, 46.08, 0.119, 130, 0]])
+        mag_h_params = np.array([[[0.0109, 46.08, 0.119, 130, 0]]])
 
         N = 15
         for i in range(N):
@@ -848,7 +848,7 @@ class TestMakePerturbAUFs():
             dfluxes1 = 10**(-(mag_offset-d_mag/2)/2) - 10**(-mag_offset/2.5)
             dfluxes2 = 10**(-mag_offset/2.5) - 10**(-(mag_offset+d_mag/2)/2.5)
 
-            mag_h_params = np.array([[0.0109, 46.08, 0.119, 130, 0]])
+            mag_h_params = np.array([[[0.0109, 46.08, 0.119, 130, 0]]])
             l_cut = np.load(os.path.join(os.path.dirname(__file__), 'data/l_cut.npy'))
             dd_params = np.load(os.path.join(os.path.dirname(__file__), 'data/dd_params.npy'))
             run_fw = False if mag < 19 else True
@@ -1014,7 +1014,7 @@ class TestMakePerturbAUFs():
             _replace_line(os.path.join(os.path.dirname(__file__), 'data/cat_b_params_.txt'),
                           idx, nl)
 
-        np.save('mag_h_params.npy', np.array([[0.0109, 46.08, 0.119, 130, 0]]))
+        np.save('mag_h_params.npy', np.array([[[0.0109, 46.08, 0.119, 130, 0]]]))
 
         cm = CrossMatch(os.path.join(os.path.dirname(__file__), 'data'), use_memmap_files=True)
         cm._initialise_chunk(os.path.join(os.path.dirname(__file__),
@@ -1179,7 +1179,7 @@ class TestMakePerturbAUFs():
             _replace_line(os.path.join(os.path.dirname(__file__), 'data/cat_b_params_.txt'),
                           idx, nl)
 
-        np.save('mag_h_params.npy', np.array([[0.0109, 46.08, 0.119, 130, 0]]))
+        np.save('mag_h_params.npy', np.array([[[0.0109, 46.08, 0.119, 130, 0]]]))
 
         cm = CrossMatch(os.path.join(os.path.dirname(__file__), 'data'), use_memmap_files=True)
         cm._initialise_chunk(os.path.join(os.path.dirname(__file__),
