@@ -44,7 +44,8 @@ class AstrometricCorrections:
                  triname, maglim_b, maglim_f, magnum, trifilterset, trifiltname,
                  gal_wav_micron, gal_ab_offset, gal_filtname, gal_alav, bright_mag, dm, dd_params,
                  l_cut, lmids, bmids, lb_dimension, cutout_area, cutout_height, mag_array,
-                 mag_slice, sig_slice, n_pool, single_sided_auf=True):
+                 mag_slice, sig_slice, n_pool, pos_and_err_indices, mag_indices,
+                 mag_unc_indices, mag_names, best_mag_index, single_sided_auf=True):
         """
         Initialisation of AstrometricCorrections, accepting inputs required for
         the running of the optimisation and parameterisation of astrometry of
@@ -144,6 +145,31 @@ class AstrometricCorrections:
         n_pool : integer
             The maximum number of threads to use when calling
             ``multiprocessing``.
+        pos_and_err_indices : list of list or numpy.ndarray of integers
+            In order, the indices within catalogue "a" and then "b" respecetively
+            of either the .npy or .csv file of the longitudinal (e.g. RA or l),
+            latitudinal (Dec or b), and *singular*, circular astrometric
+            precision array. Coordinates should be in degrees while precision
+            should be in the same units as ``sig_slice`` and those of the
+            nearest-neighbour distances, likely arcseconds. For example,
+            ``[[0, 1, 2], [6, 3, 0]]`` where catalogue "a" has its coordinates
+            in the first three columns in RA/Dec/Err order, while catalogue "b"
+            has its coordinates in a more random order.
+        mag_indices : list or numpy.ndarray
+            In appropriate order, as expected by e.g. `~macauff.CrossMatch` inputs
+            and `~macauff.make_perturb_aufs`, list the indexes of each magnitude
+            column within either the ``.npy`` or ``.csv`` file loaded for each
+            sub-catalogue sightline. These should be zero-indexed.
+        mag_unc_indices : list or numpy.ndarray
+            For each ``mag_indices`` entry, the corresponding magnitude
+            uncertainty index in the catalogue.
+        mag_names : list or numpy.ndarray of strings
+            Names of each ``mag_indices`` magnitude.
+        best_mag_index : integer
+            Index into ``mag_indices`` of the preferred magnitude to use to
+            construct astrometric scaling relations from. Should generally
+            be the one with the most coverage across all detections in a
+            catalogue, or the one with the most precise fluxes.
         single_sided_auf : boolean, optional
             Flag indicating whether the AUF of catalogue "a" can be ignored
             when considering match statistics, or if astrometric corrections
@@ -196,6 +222,12 @@ class AstrometricCorrections:
         self.mag_array = np.array(mag_array)
         self.mag_slice = np.array(mag_slice)
         self.sig_slice = np.array(sig_slice)
+
+        self.pos_and_err_indices = pos_and_err_indices
+        self.mag_indices = mag_indices
+        self.mag_unc_indices = mag_unc_indices
+        self.mag_names = mag_names
+        self.best_mag_index = best_mag_index
 
         self.n_pool = n_pool
 
@@ -393,61 +425,64 @@ class AstrometricCorrections:
         if (self.snr_model_recreate or not
                 os.path.isfile('{}/npy/snr_model.npy'.format(self.save_folder))):
             print("Making SNR model...")
-            if self.make_plots:
-                gs = self.make_gridspec('2', self.b_grid_length, self.l_grid_length, 0.8, 8)
+            abc_array = np.empty((len(self.mag_indices), len(self.lmids), 3), float)
+            for j in range(len(self.mag_indices)):
+                if self.make_plots:
+                    gs = self.make_gridspec('2', self.b_grid_length, self.l_grid_length, 0.8, 8)
 
-            pool = multiprocessing.Pool(self.n_pool)
-            counter = np.arange(0, len(self.lmids))
-            iter_group = zip(counter, self.lmins, self.lmaxs, self.bmins, self.bmaxs,
-                             itertools.repeat(self.b_cat_name))
-            abc_array = np.empty((len(self.lmids), 3), float)
+                pool = multiprocessing.Pool(self.n_pool)
+                counter = np.arange(0, len(self.lmids))
+                iter_group = zip(counter, self.lmins, self.lmaxs, self.bmins, self.bmaxs,
+                                 itertools.repeat(self.b_cat_name), itertools.repeat(j))
 
-            for results in pool.imap_unordered(self.fit_snr_model, iter_group, chunksize=2):
-                i, res, s_bins, s_d_snr_med, s_d_snr_dmed, snr_med, snr_dmed = results
-                a, b, c = 10**res.x
-                abc_array[i, 0] = a
-                abc_array[i, 1] = b
-                abc_array[i, 2] = c
+                for results in pool.imap_unordered(self.fit_snr_model, iter_group, chunksize=2):
+                    i, res, s_bins, s_d_snr_med, s_d_snr_dmed, snr_med, snr_dmed = results
+                    a, b, c = 10**res.x
+                    abc_array[j, i, 0] = a
+                    abc_array[j, i, 1] = b
+                    abc_array[j, i, 2] = c
 
-                lmid, bmid = self.lmids[i], self.bmids[i]
+                    lmid, bmid = self.lmids[i], self.bmids[i]
+
+                    if self.make_plots:
+                        q = ~np.isnan(s_d_snr_med)
+                        _x = np.linspace(s_bins[0], s_bins[-1], 10000)
+
+                        ax = plt.subplot(gs[i])
+                        ax.plot(_x, np.log10(np.sqrt(c * 10**_x + b + (a * 10**_x)**2)),
+                                'r-', zorder=5)
+
+                        ax.errorbar((s_bins[:-1]+np.diff(s_bins)/2)[q], s_d_snr_med[q], fmt='k.',
+                                    yerr=s_d_snr_dmed[q], zorder=3)
+
+                        ax.set_title('l = {}, b = {}\na = {:.2e}, b = {:.2e}, c = {:.2e}'
+                                     .format(lmid, bmid, a, b, c), fontsize=28)
+
+                        if usetex:
+                            ax.set_xlabel('log$_{10}$(S)')
+                            ax.set_ylabel('log$_{10}$(S / SNR)')
+                        else:
+                            ax.set_xlabel('log10(S)')
+                            ax.set_ylabel('log10(S / SNR)')
+
+                        ax1 = ax.twinx()
+                        ax1.errorbar((s_bins[:-1]+np.diff(s_bins)/2)[q], snr_med[q], fmt='b.',
+                                     yerr=snr_dmed[q], zorder=3)
+                        ax1.plot(_x, np.log10(10**_x / np.sqrt(c * 10**_x + b + (a * 10**_x)**2)),
+                                 'r--', zorder=5)
+                        if usetex:
+                            ax1.set_ylabel('log$_{10}$(SNR)', color='b')
+                        else:
+                            ax1.set_ylabel('log10(SNR)', color='b')
+
+                pool.close()
+                pool.join()
 
                 if self.make_plots:
-                    q = ~np.isnan(s_d_snr_med)
-                    _x = np.linspace(s_bins[0], s_bins[-1], 10000)
-
-                    ax = plt.subplot(gs[i])
-                    ax.plot(_x, np.log10(np.sqrt(c * 10**_x + b + (a * 10**_x)**2)), 'r-', zorder=5)
-
-                    ax.errorbar((s_bins[:-1]+np.diff(s_bins)/2)[q], s_d_snr_med[q], fmt='k.',
-                                yerr=s_d_snr_dmed[q], zorder=3)
-
-                    ax.set_title('l = {}, b = {}\na = {:.2e}, b = {:.2e}, c = {:.2e}'
-                                 .format(lmid, bmid, a, b, c), fontsize=28)
-
-                    if usetex:
-                        ax.set_xlabel('log$_{10}$(S)')
-                        ax.set_ylabel('log$_{10}$(S / SNR)')
-                    else:
-                        ax.set_xlabel('log10(S)')
-                        ax.set_ylabel('log10(S / SNR)')
-
-                    ax1 = ax.twinx()
-                    ax1.errorbar((s_bins[:-1]+np.diff(s_bins)/2)[q], snr_med[q], fmt='b.',
-                                 yerr=snr_dmed[q], zorder=3)
-                    ax1.plot(_x, np.log10(10**_x / np.sqrt(c * 10**_x + b + (a * 10**_x)**2)),
-                             'r--', zorder=5)
-                    if usetex:
-                        ax1.set_ylabel('log$_{10}$(SNR)', color='b')
-                    else:
-                        ax1.set_ylabel('log10(SNR)', color='b')
-
-            pool.close()
-            pool.join()
-
-            if self.make_plots:
-                plt.tight_layout()
-                plt.savefig('{}/pdf/s_vs_snr.pdf'.format(self.save_folder))
-                plt.close()
+                    plt.tight_layout()
+                    plt.savefig('{}/pdf/s_vs_snr_{}.pdf'.format(self.save_folder,
+                                                                self.mag_names[j]))
+                    plt.close()
 
             np.save('{}/npy/snr_model.npy'.format(self.save_folder), abc_array)
 
@@ -547,13 +582,13 @@ class AstrometricCorrections:
             return np.sum((f - y)**2), np.array([np.sum(2 * (f - y) * i)
                                                  for i in [dfda, dfdb, dfdc]])
 
-        i, lmin, lmax, bmin, bmax, b_cat_name = iterable
+        i, lmin, lmax, bmin, bmax, b_cat_name, j = iterable
 
         b = np.load(b_cat_name.format(lmin, lmax, bmin, bmax))
         # TODO: un-hardcode magnitude/uncertainty/coordinate column numbers?
-        s = 10**(-1/2.5 * b[:, 3])
+        s = 10**(-1/2.5 * b[:, self.mag_indices[j]])
         # Based on a naive dm = 2.5 log10((S+N)/S).
-        snr = 1 / (10**(b[:, 4] / 2.5) - 1)
+        snr = 1 / (10**(b[:, self.mag_unc_indices[j]] / 2.5) - 1)
 
         q = ~np.isnan(s) & ~np.isnan(snr) & (snr > 2)
         s, snr = s[q], snr[q]
@@ -658,7 +693,8 @@ class AstrometricCorrections:
             dlog10y = 1/np.log(10) * new_uncert / (tri_hist + gal_dNs)
 
             b = np.load(self.b_cat_name.format(lmin, lmax, bmin, bmax))
-            hist_mag, bins = np.histogram(b[~np.isnan(b[:, 3]), 3], bins='auto')
+            mag_ind = self.mag_indices[self.best_mag_index]
+            hist_mag, bins = np.histogram(b[~np.isnan(b[:, mag_ind]), mag_ind], bins='auto')
             minmag = bins[0]
             # Ensure that we're only counting sources for normalisation purposes
             # down to specified bright_mag or the completeness turnover,
@@ -697,7 +733,8 @@ class AstrometricCorrections:
                 rect_area = (lmax - (lmin)) * (
                     np.sin(np.radians(bmax)) - np.sin(np.radians(bmin))) * 180/np.pi
 
-                data_mags = b[~np.isnan(b[:, 3]), 3]
+                mag_ind = self.mag_indices[self.best_mag_index]
+                data_mags = b[~np.isnan(b[:, mag_ind]), mag_ind]
                 # Correction to model is the ratio of data counts per unit area
                 # to model source density.
                 correction = np.sum((data_mags >= minmag) &
@@ -761,12 +798,16 @@ class AstrometricCorrections:
             lon_slice = np.linspace(lmin, lmax, int(np.floor((lmax-lmin)*2 + 1)))
             lat_slice = np.linspace(bmin, bmax, int(np.floor((bmax-bmin)*2 + 1)))
 
-            Narray = create_densities(lmid, bmid, b, minmag, maxmag, lon_slice, lat_slice, lmin,
-                                      lmax, bmin, bmax, self.dens_search_radius, self.n_pool,
-                                      self.dens_recreate, self.save_folder)
+            Narray = create_densities(
+                lmid, bmid, b, minmag, maxmag, lon_slice, lat_slice, lmin, lmax, bmin, bmax,
+                self.dens_search_radius, self.n_pool, self.dens_recreate, self.save_folder,
+                self.mag_indices[self.best_mag_index], self.pos_and_err_indices[1][0],
+                self.pos_and_err_indices[1][1])
 
-            _, bmatch, dists = create_distances(a, b, lmid, bmid, self.nn_radius, self.nn_recreate,
-                                                self.save_folder)
+            _, bmatch, dists = create_distances(
+                a, b, lmid, bmid, self.nn_radius, self.nn_recreate, self.save_folder,
+                self.pos_and_err_indices[0][0], self.pos_and_err_indices[0][1],
+                self.pos_and_err_indices[1][0], self.pos_and_err_indices[1][1])
 
             # TODO: extend to 3-D search around N-m-sig to find as many good
             # enough bins as possible, instead of only keeping one N-sig bin
@@ -803,7 +844,7 @@ class AstrometricCorrections:
             log10y, _, _, tri_mags, dtri_mags, _, _, _, _, _, [N_norm] = \
                 [npyfilez['arr_{}'.format(ii)] for ii in range(11)]
 
-            a, b, c = abc_array[index_]
+            a, b, c = abc_array[self.best_mag_index, index_]
             B = 0.05
             # Self-consistent, non-zeropointed "flux", based on the relation
             # given in make_snr_model.
@@ -865,9 +906,10 @@ class AstrometricCorrections:
             avg_snr = np.empty((len(self.mag_array), 3), float)
             avg_mag = np.empty((len(self.mag_array), 3), float)
 
+            mag_ind = self.mag_indices[self.best_mag_index]
             for i in range(len(self.mag_array)):
-                mag_cut = ((b_matches[:, 3] <= self.mag_array[i]+self.mag_slice[i]) &
-                           (b_matches[:, 3] >= self.mag_array[i]-self.mag_slice[i]))
+                mag_cut = ((b_matches[:, mag_ind] <= self.mag_array[i]+self.mag_slice[i]) &
+                           (b_matches[:, mag_ind] >= self.mag_array[i]-self.mag_slice[i]))
                 if np.sum(mag_cut) == 0:
                     skip_flags[i] = 1
                     pdfs.append([-1])
@@ -875,9 +917,9 @@ class AstrometricCorrections:
                     q_pdfs.append([-1])
                     pdf_bins.append([-1])
                     continue
-                sig = np.percentile(b_matches[mag_cut, 2], 50)
-                sig_cut = ((b_matches[:, 2] <= sig+self.sig_slice[i]) &
-                           (b_matches[:, 2] >= sig-self.sig_slice[i]))
+                sig = np.percentile(b_matches[mag_cut, self.pos_and_err_indices[1][2]], 50)
+                sig_cut = ((b_matches[:, self.pos_and_err_indices[1][2]] <= sig+self.sig_slice[i]) &
+                           (b_matches[:, self.pos_and_err_indices[1][2]] >= sig-self.sig_slice[i]))
                 N_cut = (Narray[bmatch] >= modeN-dN) & (Narray[bmatch] <= modeN+dN)
 
                 final_slice = sig_cut & mag_cut & N_cut & (dists <= 20*sig)
@@ -891,13 +933,16 @@ class AstrometricCorrections:
                     continue
 
                 bm = b_matches[final_slice]
-                snr = 1 / (10**(bm[:, 4] / 2.5) - 1)
+                snr = 1 / (10**(bm[:, self.mag_unc_indices[self.best_mag_index]] / 2.5) - 1)
                 avg_snr[i, 0] = np.median(snr)
                 avg_snr[i, [1, 2]] = np.abs(np.percentile(snr, [16, 84]) - np.median(snr))
-                avg_mag[i, 0] = np.median(bm[:, 3])
-                avg_mag[i, [1, 2]] = np.abs(np.percentile(bm[:, 3], [16, 84]) - np.median(bm[:, 3]))
-                avg_sig[i, 0] = np.median(bm[:, 2])
-                avg_sig[i, [1, 2]] = np.abs(np.percentile(bm[:, 2], [16, 84]) - np.median(bm[:, 2]))
+                avg_mag[i, 0] = np.median(bm[:, mag_ind])
+                avg_mag[i, [1, 2]] = np.abs(np.percentile(bm[:, mag_ind], [16, 84]) -
+                                            np.median(bm[:, mag_ind]))
+                avg_sig[i, 0] = np.median(bm[:, self.pos_and_err_indices[1][2]])
+                avg_sig[i, [1, 2]] = np.abs(np.percentile(bm[:, self.pos_and_err_indices[1][2]],
+                                                          [16, 84]) -
+                                            np.median(bm[:, self.pos_and_err_indices[1][2]]))
 
                 h, bins = np.histogram(final_dists, bins='auto')
                 num = np.sum(h)
@@ -924,7 +969,8 @@ class AstrometricCorrections:
         For each magnitude-sightline combination, fit for the empirical centroid
         uncertainty describing the distribution of match separations.
         """
-        a_array = np.load('{}/npy/snr_model.npy'.format(self.save_folder))[:, 0]
+        a_array = np.load('{}/npy/snr_model.npy'.format(self.save_folder))[
+            self.best_mag_index, :, 0]
         for index_, (lmid, bmid, lmin, lmax, bmin, bmax, _a) in enumerate(zip(
                 self.lmids, self.bmids, self.lmins, self.lmaxs, self.bmins, self.bmaxs, a_array)):
             print('Creating joint H/sig fits... {}/{}'.format(index_+1, len(self.lmids)), end='\r')
@@ -1170,11 +1216,13 @@ class AstrometricCorrections:
                 ax.errorbar((pdf_bin[:-1]+np.diff(pdf_bin)/2)[q_pdf], pdf[q_pdf],
                             yerr=pdf_uncert[q_pdf], c='k', marker='.', zorder=1, ls='None')
 
-            mag_cut = ((b_matches[:, 3] <= self.mag_array[i]+self.mag_slice[i]) &
-                       (b_matches[:, 3] >= self.mag_array[i]-self.mag_slice[i]))
-            bsig = np.percentile(b_matches[mag_cut, 2], 50)
-            sig_cut = ((b_matches[:, 2] <= bsig+self.sig_slice[i]) &
-                       (b_matches[:, 2] >= bsig-self.sig_slice[i]))
+            mag_ind = self.mag_indices[self.best_mag_index]
+            pos_err_ind = self.pos_and_err_indices[1][2]
+            mag_cut = ((b_matches[:, mag_ind] <= self.mag_array[i]+self.mag_slice[i]) &
+                       (b_matches[:, mag_ind] >= self.mag_array[i]-self.mag_slice[i]))
+            bsig = np.percentile(b_matches[mag_cut, pos_err_ind], 50)
+            sig_cut = ((b_matches[:, pos_err_ind] <= bsig+self.sig_slice[i]) &
+                       (b_matches[:, pos_err_ind] >= bsig-self.sig_slice[i]))
             N_cut = (Narray[bmatch] >= modeN-dN) & (Narray[bmatch] <= modeN+dN)
             final_slice = sig_cut & mag_cut & N_cut & (dists <= 20*bsig)
             bm = b_matches[final_slice]
@@ -1278,7 +1326,8 @@ class AstrometricCorrections:
         if fit_x2_flag:
             x2s = np.ones((len(self.lmids), len(self.mag_array), 2), float) * np.nan
 
-        a_array = np.load('{}/npy/snr_model.npy'.format(self.save_folder))[:, 0]
+        a_array = np.load('{}/npy/snr_model.npy'.format(self.save_folder))[
+            self.best_mag_index, :, 0]
         if self.make_plots and fit_x2_flag:
             print('Creating individual AUF figures and calculating goodness-of-fits...')
         elif self.make_plots:
@@ -1466,7 +1515,8 @@ class AstrometricCorrections:
 
 
 def create_densities(lmid, bmid, b, minmag, maxmag, lon_slice, lat_slice, lmin, lmax, bmin,
-                     bmax, search_radius, n_pool, dens_recreate, save_folder):
+                     bmax, search_radius, n_pool, dens_recreate, save_folder,
+                     mag_ind, l_ind, b_ind):
     """
     Generate local normalising densities for all sources in catalogue "b".
 
@@ -1478,8 +1528,7 @@ def create_densities(lmid, bmid, b, minmag, maxmag, lon_slice, lat_slice, lmin, 
         Latitude of the middle of the cutout region.
     b : numpy.ndarray
         Catalogue of the sources for which astrometric corrections should be
-        determined. Requires astrometric coordinates in its first and second
-        columns.
+        determined.
     minmag : float
         Bright limiting magnitude, fainter than which objects are used when
         determining the number of nearby sources for density purposes.
@@ -1512,6 +1561,12 @@ def create_densities(lmid, bmid, b, minmag, maxmag, lon_slice, lat_slice, lmin, 
         file is already on disk.
     save_folder : string
         Location on disk into which to save densities.
+    mag_ind : integer
+        Index in ``b`` where the magnitude being used is stored.
+    l_ind : integer
+        Index of ``b`` for the longitudinal coordinate column.
+    b_ind : integer
+        ``b`` index for the galactic latitude data.
 
     Returns
     -------
@@ -1545,10 +1600,10 @@ def create_densities(lmid, bmid, b, minmag, maxmag, lon_slice, lat_slice, lmin, 
 
     if dens_recreate or not os.path.isfile('{}/npy/narray_sky_{}_{}.npy'.format(
                                            save_folder, lmid, bmid)):
-        cutmag = (b[:, 3] >= minmag) & (b[:, 3] <= maxmag)
+        cutmag = (b[:, mag_ind] >= minmag) & (b[:, mag_ind] <= maxmag)
 
-        full_cat = SkyCoord(l=b[:, 0], b=b[:, 1], unit='deg', frame='galactic')
-        mag_cut_cat = SkyCoord(l=b[cutmag, 0], b=b[cutmag, 1], unit='deg', frame='galactic')
+        full_cat = SkyCoord(l=b[:, l_ind], b=b[:, b_ind], unit='deg', frame='galactic')
+        mag_cut_cat = SkyCoord(l=b[cutmag, l_ind], b=b[cutmag, b_ind], unit='deg', frame='galactic')
 
         full_urepr = full_cat.data.represent_as(UnitSphericalRepresentation)
         full_ucoords = full_cat.realize_frame(full_urepr)
@@ -1570,8 +1625,8 @@ def create_densities(lmid, bmid, b, minmag, maxmag, lon_slice, lat_slice, lmin, 
         pool.close()
         pool.join()
 
-        area = paf.get_circle_area_overlap(
-            b[:, 0], b[:, 1], search_radius/3600, lmin, lmax, bmin, bmax)
+        area = paf.get_circle_area_overlap(b[:, l_ind], b[:, b_ind], search_radius/3600,
+                                           lmin, lmax, bmin, bmax)
 
         Narray = overlap_number / area
 
@@ -1610,7 +1665,8 @@ def ball_point_query(iterable):
     return i, len(kdt_query)
 
 
-def create_distances(a, b, lmid, bmid, nn_radius, match_recreate, save_folder):
+def create_distances(a, b, lmid, bmid, nn_radius, match_recreate, save_folder, a_l_ind, a_b_ind,
+                     b_l_ind, b_b_ind):
     """
     Calculate nearest neighbour matches between two catalogues.
 
@@ -1634,6 +1690,14 @@ def create_distances(a, b, lmid, bmid, nn_radius, match_recreate, save_folder):
         if previous runs on disk can be used instead.
     save_folder : string
         Location on disk where matches should be saved.
+    a_l_ind : integer
+        Index into ``a`` of the galactic longitude data.
+    a_b_ind : integer
+        ``a`` index for galactic latitude column.
+    b_l_ind : integer
+        Longitude index in the ``b`` dataset.
+    b_b_ind : integer
+        Index into ``b`` that holds the galactic latitude data.
 
     Returns
     -------
@@ -1652,8 +1716,8 @@ def create_distances(a, b, lmid, bmid, nn_radius, match_recreate, save_folder):
             not os.path.isfile('{}/npy/b_matchind_{}_{}.npy'.format(save_folder, lmid, bmid)) or
             not os.path.isfile('{}/npy/ab_dists_{}_{}.npy'.format(save_folder, lmid, bmid))):
         # TODO: make flexible if we relax requirement of Galactic coordinates.
-        ac = SkyCoord(l=a[:, 0], b=a[:, 1], unit='deg', frame='galactic')
-        bc = SkyCoord(l=b[:, 0], b=b[:, 1], unit='deg', frame='galactic')
+        ac = SkyCoord(l=a[:, a_l_ind], b=a[:, a_b_ind], unit='deg', frame='galactic')
+        bc = SkyCoord(l=b[:, b_l_ind], b=b[:, b_b_ind], unit='deg', frame='galactic')
         amatchind, adists, _ = match_coordinates_sky(ac, bc)
         bmatchind, bdists, _ = match_coordinates_sky(bc, ac)
         # Since match_coordinates_sky doesn't set a maximum cutoff, we manually
