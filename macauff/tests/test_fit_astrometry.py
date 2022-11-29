@@ -94,9 +94,9 @@ class TestAstroCorrection:
             trifiltname='W1', gal_wav_micron=3.35, gal_ab_offset=2.699, gal_filtname='wise2010-W1',
             gal_alav=0.039, bright_mag=16, dm=0.1, dd_params=dd_params, l_cut=l_cut, lmids=lmids,
             bmids=bmids, lb_dimension=1, cutout_area=60, cutout_height=6, mag_array=magarray,
-            mag_slice=magslice, sig_slice=sigslice, n_pool=1,
-            pos_and_err_indices=[[0, 1, 2], [0, 1, 2]], mag_indices=[3], mag_unc_indices=[4],
-            mag_names=['W1'], best_mag_index=0)
+            mag_slice=magslice, sig_slice=sigslice, n_pool=1, npy_or_csv='npy',
+            coord_or_chunk='coord', pos_and_err_indices=[[0, 1, 2], [0, 1, 2]], mag_indices=[3],
+            mag_unc_indices=[4], mag_names=['W1'], best_mag_index=0)
 
         a_cat_func = self.fake_cata_cutout
         b_cat_func = self.fake_catb_cutout

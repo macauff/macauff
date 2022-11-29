@@ -44,8 +44,9 @@ class AstrometricCorrections:
                  triname, maglim_b, maglim_f, magnum, trifilterset, trifiltname,
                  gal_wav_micron, gal_ab_offset, gal_filtname, gal_alav, bright_mag, dm, dd_params,
                  l_cut, lmids, bmids, lb_dimension, cutout_area, cutout_height, mag_array,
-                 mag_slice, sig_slice, n_pool, pos_and_err_indices, mag_indices,
-                 mag_unc_indices, mag_names, best_mag_index, single_sided_auf=True):
+                 mag_slice, sig_slice, n_pool, npy_or_csv, coord_or_chunk, pos_and_err_indices,
+                 mag_indices, mag_unc_indices, mag_names, best_mag_index, single_sided_auf=True,
+                 chunks=None):
         """
         Initialisation of AstrometricCorrections, accepting inputs required for
         the running of the optimisation and parameterisation of astrometry of
@@ -145,6 +146,16 @@ class AstrometricCorrections:
         n_pool : integer
             The maximum number of threads to use when calling
             ``multiprocessing``.
+        npy_or_csv : string, either ``npy`` or ``csv``
+            Indicator as to whether the small chunks of sky to be loaded for
+            each sightline's evaluation are in binary ``numpy`` format or saved
+            to disk as a comma-separated values file.
+        coord_or_chunk : string, either ``coord`` or ``chunk``
+            String indicating whether intermediate files should be saved with
+            filenames that are unique by two coordinates (l/b or RA/Dec) or
+            some kind of singular "chunk" number. Output filenames would then
+            need to follow ``'file_{}{}'`` or ``'file_{}'`` formatting
+            respectively.
         pos_and_err_indices : list of list or numpy.ndarray of integers
             In order, the indices within catalogue "a" and then "b" respecetively
             of either the .npy or .csv file of the longitudinal (e.g. RA or l),
@@ -175,11 +186,27 @@ class AstrometricCorrections:
             when considering match statistics, or if astrometric corrections
             are being constructed from matches to a catalogue that also suffers
             significant non-noise-based astrometric uncertainty.
+        chunks = list or numpy.ndarray of strings, optional
+            List of IDs for each unique set of data if ``coord_or_chunk`` is
+            ``chunk``. In this case, ``lb_dimension`` must be ``2`` and each
+            ``chunk`` must correspond to its ``lmids``-``bmids`` coordinate.
         """
         if single_sided_auf is not True:
             raise ValueError("single_sided_auf must be True.")
         if not (lb_dimension == 1 or lb_dimension == 2):
             raise ValueError("lb_dimension must either be '1' or '2'.")
+        if npy_or_csv != "npy" and npy_or_csv != "csv":
+            raise ValueError("npy_or_csv must either be 'npy' or 'csv'.")
+        if coord_or_chunk != "coord" and coord_or_chunk != "chunk":
+            raise ValueError("coord_or_chunk must either be 'coord' or 'chunk'.")
+        if coord_or_chunk == "chunk" and chunks is None:
+            raise ValueError("chunks must be provided if coord_or_chunk is 'chunk'.")
+        if coord_or_chunk == "chunk" and lb_dimension == 1:
+            raise ValueError("lb_dimension must be 2, and l-b pairings provided for each chunk "
+                             "in chunks if coord_or_chunk is 'chunk'.")
+        if coord_or_chunk == "chunk" and (len(lmids) != len(chunks) or len(bmids) != len(chunks)):
+            raise ValueError("lmids, bmids, and chunks must all be the same length if "
+                             "coord_or_chunk is 'chunk'.")
         self.psf_fwhm = psf_fwhm
         self.numtrials = numtrials
         self.nn_radius = nn_radius
@@ -223,11 +250,30 @@ class AstrometricCorrections:
         self.mag_slice = np.array(mag_slice)
         self.sig_slice = np.array(sig_slice)
 
-        self.pos_and_err_indices = pos_and_err_indices
-        self.mag_indices = mag_indices
-        self.mag_unc_indices = mag_unc_indices
-        self.mag_names = mag_names
-        self.best_mag_index = best_mag_index
+        self.npy_or_csv = npy_or_csv
+        self.coord_or_chunk = coord_or_chunk
+
+        if npy_or_csv == 'npy':
+            self.pos_and_err_indices = pos_and_err_indices
+            self.mag_indices = mag_indices
+            self.mag_unc_indices = mag_unc_indices
+            self.mag_names = mag_names
+            self.best_mag_index = best_mag_index
+        else:
+            # np.loadtxt will load in pos_and_err or pos_and_err, mag_ind,
+            # mag_unc_ind order for the two catalogues. Each will effectively
+            # change its ordering, since we then load [0] for pos_and_err[0][0],
+            # etc. for all options. These need saving for np.loadtxt but
+            # also for obtaining the correct column in the resulting sub-set of
+            # the loaded csv file.
+            self.a_cols = pos_and_err_indices[0]
+            self.b_cols = np.concatenate((pos_and_err_indices[1], mag_indices, mag_unc_indices))
+
+            self.pos_and_err_indices = [
+                [np.argmin(np.abs(q - self.a_cols)) for q in pos_and_err_indices[0]],
+                [np.argmin(np.abs(q - self.b_cols)) for q in pos_and_err_indices[1]]]
+            self.mag_indices = [np.argmin(np.abs(q - self.b_cols)) for q in mag_indices]
+            self.mag_unc_indices = [np.argmin(np.abs(q - self.b_cols)) for q in mag_unc_indices]
 
         self.n_pool = n_pool
 
@@ -692,7 +738,7 @@ class AstrometricCorrections:
             new_uncert = np.sqrt(tri_uncert**2 + (0.05*gal_dNs)**2)
             dlog10y = 1/np.log(10) * new_uncert / (tri_hist + gal_dNs)
 
-            b = np.load(self.b_cat_name.format(lmin, lmax, bmin, bmax))
+            b = self.load_catalogue('b', (lmin, lmax, bmin, bmax))
             mag_ind = self.mag_indices[self.best_mag_index]
             hist_mag, bins = np.histogram(b[~np.isnan(b[:, mag_ind]), mag_ind], bins='auto')
             minmag = bins[0]
@@ -721,7 +767,7 @@ class AstrometricCorrections:
                 print('Plotting data and model counts... {}/{}'.format(
                       index_+1, len(self.lmids)), end='\r')
 
-                b = np.load(self.b_cat_name.format(lmin, lmax, bmin, bmax))
+                b = self.load_catalogue('b', (lmin, lmax, bmin, bmax))
                 npyfilez = np.load('{}/npy/sim_counts_{}{}{}{}.npz'.format(
                                    self.save_folder, lmin, lmax, bmin, bmax))
                 (log10y, dlog10y, tri_hist, tri_mags, dtri_mags, tri_uncert, [tri_av], gal_dNs,
@@ -788,8 +834,8 @@ class AstrometricCorrections:
                     self.dens_recreate and not self.nn_recreate):
                 continue
 
-            a = np.load(self.a_cat_name.format(lmin, lmax, bmin, bmax))
-            b = np.load(self.b_cat_name.format(lmin, lmax, bmin, bmax))
+            a = self.load_catalogue('a', (lmin, lmax, bmin, bmax))
+            b = self.load_catalogue('b', (lmin, lmax, bmin, bmax))
             npyfilez = np.load('{}/npy/sim_counts_{}{}{}{}.npz'.format(
                                self.save_folder, lmin, lmax, bmin, bmax))
             _, _, _, _, _, _, _, _, [minmag], [maxmag], _ = \
@@ -890,7 +936,7 @@ class AstrometricCorrections:
                     '{}/npy/auf_pdf_{}{}{}{}.npz'.format(self.save_folder, lmin, lmax, bmin, bmax)):
                 continue
 
-            b = np.load(self.b_cat_name.format(lmin, lmax, bmin, bmax))
+            b = self.load_catalogue('b', (lmin, lmax, bmin, bmax))
             npyfilez = np.load('{}/npy/local_dens_nn_matches_{}{}{}{}.npz'.format(
                                self.save_folder, lmin, lmax, bmin, bmax))
             Narray, dists, bmatch, [modeN], [dN] = [npyfilez['arr_{}'.format(ii)] for ii in
@@ -1191,7 +1237,7 @@ class AstrometricCorrections:
                            self.save_folder, lmin, lmax, bmin, bmax))
         four_off_fw, four_off_ps = [npyfilez['arr_{}'.format(ii)] for ii in range(2)]
 
-        b = np.load(self.b_cat_name.format(lmin, lmax, bmin, bmax))
+        b = self.load_catalogue('b', (lmin, lmax, bmin, bmax))
         npyfilez = np.load('{}/npy/local_dens_nn_matches_{}{}{}{}.npz'.format(
                            self.save_folder, lmin, lmax, bmin, bmax))
         Narray, dists, bmatch, [modeN], [dN] = [npyfilez['arr_{}'.format(ii)] for ii in
@@ -1512,6 +1558,35 @@ class AstrometricCorrections:
 
             plt.tight_layout()
             plt.savefig('{}/pdf/sig_h_stats.pdf'.format(self.save_folder))
+
+    def load_catalogue(self, cat_type, sub_cat_id):
+        """
+        Load specific sightline's catalogue, accounting for catalogue "a"
+        vs "b", filetype, and method by which sightlines are divided.
+
+        Parameters
+        ----------
+        cat_type : string, "a" or "b"
+            Identifier for which of the two catalogues to load.
+        sub_cat_id : list
+            Contains the variables to format the name of the catalogue with,
+            in the sense of ``string.format(x, y, ...)``. Should either contain
+            l and b, or chunk ID, depending on ``coord_or_chunk``.
+
+        Returns
+        -------
+        x : numpy.ndarray
+            The catalogue's dataset.
+        """
+        name = (self.a_cat_name.format(*sub_cat_id) if cat_type == 'a' else
+                self.b_cat_name.format(*sub_cat_id))
+        if self.npy_or_csv == 'npy':
+            x = np.load(name)
+        else:
+            cols = self.a_cols if cat_type == 'a' else self.b_cols
+            x = np.loadtxt(name, delimier=',', usecols=cols)
+
+        return x
 
 
 def create_densities(lmid, bmid, b, minmag, maxmag, lon_slice, lat_slice, lmin, lmax, bmin,
