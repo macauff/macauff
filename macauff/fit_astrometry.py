@@ -252,6 +252,7 @@ class AstrometricCorrections:
 
         self.npy_or_csv = npy_or_csv
         self.coord_or_chunk = coord_or_chunk
+        self.chunks = chunks
 
         if npy_or_csv == 'npy':
             self.pos_and_err_indices = pos_and_err_indices
@@ -266,7 +267,7 @@ class AstrometricCorrections:
             # etc. for all options. These need saving for np.loadtxt but
             # also for obtaining the correct column in the resulting sub-set of
             # the loaded csv file.
-            self.a_cols = pos_and_err_indices[0]
+            self.a_cols = np.array(pos_and_err_indices[0])
             self.b_cols = np.concatenate((pos_and_err_indices[1], mag_indices, mag_unc_indices))
 
             self.pos_and_err_indices = [
@@ -274,6 +275,9 @@ class AstrometricCorrections:
                 [np.argmin(np.abs(q - self.b_cols)) for q in pos_and_err_indices[1]]]
             self.mag_indices = [np.argmin(np.abs(q - self.b_cols)) for q in mag_indices]
             self.mag_unc_indices = [np.argmin(np.abs(q - self.b_cols)) for q in mag_unc_indices]
+
+            self.mag_names = mag_names
+            self.best_mag_index = best_mag_index
 
         self.n_pool = n_pool
 
@@ -442,16 +446,28 @@ class AstrometricCorrections:
         Generate cutout catalogues for regions as defined by corner l-b
         coordinates.
         """
-        for index_, (lmid, bmid, lmin, lmax, bmin, bmax) in enumerate(zip(
-                self.lmids, self.bmids, self.lmins, self.lmaxs, self.bmins, self.bmaxs)):
+        if self.coord_or_chunk == 'coord':
+            zip_list = (self.lmids, self.bmids, self.lmins, self.lmaxs, self.bmins, self.bmaxs)
+        else:
+            zip_list = (self.chunks, self.lmins, self.lmaxs, self.bmins, self.bmaxs)
+        for index_, list_of_things in enumerate(zip(*zip_list)):
             print('Creating catalogue cutouts... {}/{}'.format(index_+1, len(self.lmids)), end='\r')
 
-            if (not os.path.isfile(self.a_cat_name.format(lmin, lmax, bmin, bmax)) or
+            if self.coord_or_chunk == 'coord':
+                lmid, bmid, lmin, lmax, bmin, bmax = list_of_things
+            else:
+                chunk, lmin, lmax, bmin, bmax = list_of_things
+
+            if self.coord_or_chunk == 'coord':
+                cat_args = (lmid, bmid)
+            else:
+                cat_args = (chunk,)
+            if (not os.path.isfile(self.a_cat_name.format(*cat_args)) or
                     self.cat_recreate):
-                self.a_cat_func(lmin, lmax, bmin, bmax)
-            if (not os.path.isfile(self.b_cat_name.format(lmin, lmax, bmin, bmax)) or
+                self.a_cat_func(lmin, lmax, bmin, bmax, *cat_args)
+            if (not os.path.isfile(self.b_cat_name.format(*cat_args)) or
                     self.cat_recreate):
-                self.b_cat_func(lmin, lmax, bmin, bmax)
+                self.b_cat_func(lmin, lmax, bmin, bmax, *cat_args)
 
         print('')
 
@@ -478,8 +494,10 @@ class AstrometricCorrections:
 
                 pool = multiprocessing.Pool(self.n_pool)
                 counter = np.arange(0, len(self.lmids))
-                iter_group = zip(counter, self.lmins, self.lmaxs, self.bmins, self.bmaxs,
-                                 itertools.repeat(self.b_cat_name), itertools.repeat(j))
+                if self.coord_or_chunk == 'coord':
+                    iter_group = zip(counter, self.lmids, self.bmids, itertools.repeat(j))
+                else:
+                    iter_group = zip(counter, self.chunks, itertools.repeat(j))
 
                 for results in pool.imap_unordered(self.fit_snr_model, iter_group, chunksize=2):
                     i, res, s_bins, s_d_snr_med, s_d_snr_dmed, snr_med, snr_dmed = results
@@ -628,9 +646,13 @@ class AstrometricCorrections:
             return np.sum((f - y)**2), np.array([np.sum(2 * (f - y) * i)
                                                  for i in [dfda, dfdb, dfdc]])
 
-        i, lmin, lmax, bmin, bmax, b_cat_name, j = iterable
+        if self.coord_or_chunk == 'coord':
+            i, lmid, bmid, j = iterable
+            b = self.load_catalogue('b', (lmid, bmid))
+        else:
+            i, chunk, j = iterable
+            b = self.load_catalogue('b', (chunk,))
 
-        b = np.load(b_cat_name.format(lmin, lmax, bmin, bmax))
         # TODO: un-hardcode magnitude/uncertainty/coordinate column numbers?
         s = 10**(-1/2.5 * b[:, self.mag_indices[j]])
         # Based on a naive dm = 2.5 log10((S+N)/S).
@@ -702,13 +724,25 @@ class AstrometricCorrections:
         self.gal_alpha1 = [[2.265, 3.862, 1.921, 1.685, 2.480], [2.410, 2.340, 2.200, 2.540, 2.464]]
         self.gal_alphaweight = [[3.47e+09, 3.31e+06, 2.13e+09, 1.64e+10, 1.01e+09],
                                 [3.84e+09, 1.57e+06, 3.91e+08, 4.66e+10, 3.03e+07]]
-        for index_, (lmid, bmid, lmin, lmax, bmin, bmax) in enumerate(zip(
-                self.lmids, self.bmids, self.lmins, self.lmaxs, self.bmins, self.bmaxs)):
+
+        if self.coord_or_chunk == 'coord':
+            zip_list = (self.lmids, self.bmids)
+        else:
+            zip_list = (self.lmids, self.bmids, self.chunks)
+        for index_, list_of_things in enumerate(zip(*zip_list)):
             print('Creating simulated star+galaxy counts... {}/{}'.format(
                   index_+1, len(self.lmids)), end='\r')
+            if self.coord_or_chunk == 'coord':
+                lmid, bmid = list_of_things
+                cat_args = (lmid, bmid)
+                file_name = '{}_{}'.format(lmid, bmid)
+            else:
+                lmid, bmid, chunk = list_of_things
+                cat_args = (chunk,)
+                file_name = '{}'.format(chunk)
             if not self.count_recreate and \
-                    os.path.isfile('{}/npy/sim_counts_{}{}{}{}.npz'.format(
-                                   self.save_folder, lmin, lmax, bmin, bmax)):
+                    os.path.isfile('{}/npy/sim_counts_{}.npz'.format(
+                                   self.save_folder, file_name)):
                 continue
 
             num_bright, num_faint = 90000, 0.75e6
@@ -738,7 +772,7 @@ class AstrometricCorrections:
             new_uncert = np.sqrt(tri_uncert**2 + (0.05*gal_dNs)**2)
             dlog10y = 1/np.log(10) * new_uncert / (tri_hist + gal_dNs)
 
-            b = self.load_catalogue('b', (lmin, lmax, bmin, bmax))
+            b = self.load_catalogue('b', cat_args)
             mag_ind = self.mag_indices[self.best_mag_index]
             hist_mag, bins = np.histogram(b[~np.isnan(b[:, mag_ind]), mag_ind], bins='auto')
             minmag = bins[0]
@@ -749,8 +783,8 @@ class AstrometricCorrections:
 
             mag_slice = (tri_mags >= minmag) & (tri_mags+dtri_mags <= maxmag)
             N_norm = np.sum(10**log10y[mag_slice] * dtri_mags[mag_slice])
-            np.savez('{}/npy/sim_counts_{}{}{}{}.npz'.format(
-                     self.save_folder, lmin, lmax, bmin, bmax), log10y, dlog10y, tri_hist, tri_mags,
+            np.savez('{}/npy/sim_counts_{}.npz'.format(
+                     self.save_folder, file_name), log10y, dlog10y, tri_hist, tri_mags,
                      dtri_mags, tri_uncert, [tri_av], gal_dNs, [minmag], [maxmag], [N_norm])
         print('')
 
@@ -762,14 +796,27 @@ class AstrometricCorrections:
         if (self.count_recreate or self.cat_recreate or not
                 os.path.isfile('{}/pdf/counts_comparison.pdf'.format(self.save_folder))):
             gs = self.make_gridspec('123123', self.b_grid_length, self.l_grid_length, 0.8, 15)
-            for index_, (lmid, bmid, lmin, lmax, bmin, bmax) in enumerate(zip(
-                    self.lmids, self.bmids, self.lmins, self.lmaxs, self.bmins, self.bmaxs)):
+            if self.coord_or_chunk == 'coord':
+                zip_list = (self.lmids, self.bmids, self.lmins, self.lmaxs, self.bmins, self.bmaxs)
+            else:
+                zip_list = (self.lmids, self.bmids, self.lmins, self.lmaxs, self.bmins,
+                            self.bmaxs, self.chunks)
+            for index_, list_of_things in enumerate(zip(*zip_list)):
                 print('Plotting data and model counts... {}/{}'.format(
                       index_+1, len(self.lmids)), end='\r')
 
-                b = self.load_catalogue('b', (lmin, lmax, bmin, bmax))
-                npyfilez = np.load('{}/npy/sim_counts_{}{}{}{}.npz'.format(
-                                   self.save_folder, lmin, lmax, bmin, bmax))
+                if self.coord_or_chunk == 'coord':
+                    lmid, bmid, lmin, lmax, bmin, bmax = list_of_things
+                    cat_args = (lmid, bmid)
+                    file_name = '{}_{}'.format(lmid, bmid)
+                else:
+                    lmid, bmid, lmin, lmax, bmin, bmax, chunk = list_of_things
+                    cat_args = (chunk,)
+                    file_name = '{}'.format(chunk)
+
+                b = self.load_catalogue('b', cat_args)
+                npyfilez = np.load('{}/npy/sim_counts_{}.npz'.format(
+                                   self.save_folder, file_name))
                 (log10y, dlog10y, tri_hist, tri_mags, dtri_mags, tri_uncert, [tri_av], gal_dNs,
                  [minmag], [maxmag], [N_norm]) = [npyfilez['arr_{}'.format(ii)] for ii in range(11)]
 
@@ -819,25 +866,39 @@ class AstrometricCorrections:
             plt.figure('123123')
             plt.tight_layout()
             plt.savefig('{}/pdf/counts_comparison.pdf'.format(self.save_folder))
+            plt.close()
 
     def calculate_local_densities_and_nearest_neighbours(self):
         """
         Calculate local normalising catalogue densities and catalogue-catalogue
         nearest neighbour match pairings for each cutout region.
         """
-        for index_, (lmid, bmid, lmin, lmax, bmin, bmax) in enumerate(zip(
-                self.lmids, self.bmids, self.lmins, self.lmaxs, self.bmins, self.bmaxs)):
+        if self.coord_or_chunk == 'coord':
+            zip_list = (self.lmids, self.bmids, self.lmins, self.lmaxs, self.bmins, self.bmaxs)
+        else:
+            zip_list = (self.lmids, self.bmids, self.lmins, self.lmaxs, self.bmins,
+                        self.bmaxs, self.chunks)
+        for index_, list_of_things in enumerate(zip(*zip_list)):
             print('Creating local densities and nearest neighbour matches... {}/{}'.format(
                 index_+1, len(self.lmids)), end='\r')
-            if (os.path.isfile('{}/npy/local_dens_nn_matches_{}{}{}{}.npz'.format(
-                               self.save_folder, lmin, lmax, bmin, bmax)) and not
+
+            if self.coord_or_chunk == 'coord':
+                lmid, bmid, lmin, lmax, bmin, bmax = list_of_things
+                cat_args = (lmid, bmid)
+                file_name = '{}_{}'.format(lmid, bmid)
+            else:
+                lmid, bmid, lmin, lmax, bmin, bmax, chunk = list_of_things
+                cat_args = (chunk,)
+                file_name = '{}'.format(chunk)
+
+            if (os.path.isfile('{}/npy/local_dens_nn_matches_{}.npz'.format(
+                               self.save_folder, file_name)) and not
                     self.dens_recreate and not self.nn_recreate):
                 continue
 
-            a = self.load_catalogue('a', (lmin, lmax, bmin, bmax))
-            b = self.load_catalogue('b', (lmin, lmax, bmin, bmax))
-            npyfilez = np.load('{}/npy/sim_counts_{}{}{}{}.npz'.format(
-                               self.save_folder, lmin, lmax, bmin, bmax))
+            a = self.load_catalogue('a', cat_args)
+            b = self.load_catalogue('b', cat_args)
+            npyfilez = np.load('{}/npy/sim_counts_{}.npz'.format(self.save_folder, file_name))
             _, _, _, _, _, _, _, _, [minmag], [maxmag], _ = \
                 [npyfilez['arr_{}'.format(ii)] for ii in range(11)]
 
@@ -862,9 +923,8 @@ class AstrometricCorrections:
             modeN = (_b[:-1]+np.diff(_b)/2)[np.argmax(_h)]
             dN = 0.05*modeN
 
-            np.savez('{}/npy/local_dens_nn_matches_{}{}{}{}.npz'.format(
-                     self.save_folder, lmin, lmax, bmin, bmax), Narray, dists, bmatch, [modeN],
-                     [dN])
+            np.savez('{}/npy/local_dens_nn_matches_{}.npz'.format(
+                     self.save_folder, file_name), Narray, dists, bmatch, [modeN], [dN])
         print('')
 
     def simulate_aufs(self):
@@ -874,19 +934,29 @@ class AstrometricCorrections:
         algorithms.
         """
         abc_array = np.load('{}/npy/snr_model.npy'.format(self.save_folder))
-        for index_, (lmid, bmid, lmin, lmax, bmin, bmax) in enumerate(zip(
-                self.lmids, self.bmids, self.lmins, self.lmaxs, self.bmins, self.bmaxs)):
+        if self.coord_or_chunk == 'coord':
+            zip_list = (self.lmids, self.bmids)
+        else:
+            zip_list = (self.chunks,)
+        for index_, list_of_things in enumerate(zip(*zip_list)):
             print('Creating AUF simulations... {}/{}'.format(index_+1, len(self.lmids)), end='\r')
+            if self.coord_or_chunk == 'coord':
+                lmid, bmid = list_of_things
+                file_name = '{}_{}'.format(lmid, bmid)
+            else:
+                chunk, = list_of_things
+                file_name = '{}'.format(chunk)
+
             if not self.auf_sim_recreate and os.path.isfile(
-                    '{}/npy/four_auf_{}{}{}{}.npz'.format(
-                    self.save_folder, lmin, lmax, bmin, bmax)):
+                    '{}/npy/four_auf_{}.npz'.format(
+                    self.save_folder, file_name)):
                 continue
 
-            npyfilez = np.load('{}/npy/local_dens_nn_matches_{}{}{}{}.npz'.format(
-                self.save_folder, lmin, lmax, bmin, bmax))
+            npyfilez = np.load('{}/npy/local_dens_nn_matches_{}.npz'.format(
+                self.save_folder, file_name))
             _, _, _, [modeN], _ = [npyfilez['arr_{}'.format(ii)] for ii in range(5)]
-            npyfilez = np.load('{}/npy/sim_counts_{}{}{}{}.npz'.format(
-                               self.save_folder, lmin, lmax, bmin, bmax))
+            npyfilez = np.load('{}/npy/sim_counts_{}.npz'.format(
+                               self.save_folder, file_name))
             log10y, _, _, tri_mags, dtri_mags, _, _, _, _, _, [N_norm] = \
                 [npyfilez['arr_{}'.format(ii)] for ii in range(11)]
 
@@ -918,8 +988,8 @@ class AstrometricCorrections:
                     (dm_max/self.dm).astype(int), self.dmcut, self.R, self.psfsig,
                     self.numtrials, seed, self.dd_params, self.l_cut, 'psf')
 
-            np.savez('{}/npy/four_auf_{}{}{}{}.npz'.format(
-                     self.save_folder, lmin, lmax, bmin, bmax), four_off_fw, four_off_ps)
+            np.savez('{}/npy/four_auf_{}.npz'.format(
+                     self.save_folder, file_name), four_off_fw, four_off_ps)
         print('')
 
     def create_auf_pdfs(self):
@@ -928,17 +998,28 @@ class AstrometricCorrections:
         of perturbation distance for all cutout regions, as well as recording key
         statistics such as average magnitude or SNR.
         """
-        for index_, (lmid, bmid, lmin, lmax, bmin, bmax) in enumerate(zip(
-                self.lmids, self.bmids, self.lmins, self.lmaxs, self.bmins, self.bmaxs)):
+        if self.coord_or_chunk == 'coord':
+            zip_list = (self.lmids, self.bmids)
+        else:
+            zip_list = (self.chunks,)
+        for index_, list_of_things in enumerate(zip(*zip_list)):
             print('Creating catalogue AUF probability densities... {}/{}'.format(
                   index_+1, len(self.lmids)), end='\r')
+            if self.coord_or_chunk == 'coord':
+                lmid, bmid = list_of_things
+                cat_args = (lmid, bmid)
+                file_name = '{}_{}'.format(lmid, bmid)
+            else:
+                chunk, = list_of_things
+                cat_args = (chunk,)
+                file_name = '{}'.format(chunk)
             if not self.auf_pdf_recreate and os.path.isfile(
-                    '{}/npy/auf_pdf_{}{}{}{}.npz'.format(self.save_folder, lmin, lmax, bmin, bmax)):
+                    '{}/npy/auf_pdf_{}.npz'.format(self.save_folder, file_name)):
                 continue
 
-            b = self.load_catalogue('b', (lmin, lmax, bmin, bmax))
-            npyfilez = np.load('{}/npy/local_dens_nn_matches_{}{}{}{}.npz'.format(
-                               self.save_folder, lmin, lmax, bmin, bmax))
+            b = self.load_catalogue('b', cat_args)
+            npyfilez = np.load('{}/npy/local_dens_nn_matches_{}.npz'.format(
+                               self.save_folder, file_name))
             Narray, dists, bmatch, [modeN], [dN] = [npyfilez['arr_{}'.format(ii)] for ii in
                                                     range(5)]
 
@@ -1005,7 +1086,7 @@ class AstrometricCorrections:
                 np.array(pdfs, dtype=object), np.array(pdf_uncerts, dtype=object),
                 np.array(q_pdfs, dtype=object), np.array(pdf_bins, dtype=object))
 
-            np.savez('{}/npy/auf_pdf_{}{}{}{}.npz'.format(self.save_folder, lmin, lmax, bmin, bmax),
+            np.savez('{}/npy/auf_pdf_{}.npz'.format(self.save_folder, file_name),
                      avg_snr, avg_mag, avg_sig, pdfs, pdf_uncerts, q_pdfs, pdf_bins, skip_flags)
 
         print('')
@@ -1017,27 +1098,36 @@ class AstrometricCorrections:
         """
         a_array = np.load('{}/npy/snr_model.npy'.format(self.save_folder))[
             self.best_mag_index, :, 0]
-        for index_, (lmid, bmid, lmin, lmax, bmin, bmax, _a) in enumerate(zip(
-                self.lmids, self.bmids, self.lmins, self.lmaxs, self.bmins, self.bmaxs, a_array)):
+        if self.coord_or_chunk == 'coord':
+            zip_list = (self.lmids, self.bmids, a_array)
+        else:
+            zip_list = (self.chunks, a_array)
+        for index_, list_of_things in enumerate(zip(*zip_list)):
             print('Creating joint H/sig fits... {}/{}'.format(index_+1, len(self.lmids)), end='\r')
+            if self.coord_or_chunk == 'coord':
+                lmid, bmid, _a = list_of_things
+                file_name = '{}_{}'.format(lmid, bmid)
+            else:
+                chunk, _a = list_of_things
+                file_name = '{}'.format(chunk)
             if not self.h_o_fit_recreate and os.path.isfile(
-                    '{}/npy/h_o_fit_res_{}{}{}{}.npz'.format(
-                    self.save_folder, lmin, lmax, bmin, bmax)):
+                    '{}/npy/h_o_fit_res_{}.npz'.format(
+                    self.save_folder, file_name)):
                 continue
 
             fit_sigs = np.zeros((len(self.mag_array), 2), float)
             fit_nnf = np.zeros((len(self.mag_array), 2), float)
 
-            npyfilez = np.load('{}/npy/auf_pdf_{}{}{}{}.npz'.format(
-                               self.save_folder, lmin, lmax, bmin, bmax), allow_pickle=True)
+            npyfilez = np.load('{}/npy/auf_pdf_{}.npz'.format(
+                               self.save_folder, file_name), allow_pickle=True)
             avg_snr, avg_mag, avg_sig, pdfs, pdf_uncerts, q_pdfs, pdf_bins, skip_flags = \
                 [npyfilez['arr_{}'.format(ii)] for ii in range(8)]
-            npyfilez = np.load('{}/npy/four_auf_{}{}{}{}.npz'.format(
-                               self.save_folder, lmin, lmax, bmin, bmax))
+            npyfilez = np.load('{}/npy/four_auf_{}.npz'.format(
+                               self.save_folder, file_name))
             four_off_fw, four_off_ps = [npyfilez['arr_{}'.format(ii)] for ii in range(2)]
 
-            npyfilez = np.load('{}/npy/local_dens_nn_matches_{}{}{}{}.npz'.format(self.save_folder,
-                               lmin, lmax, bmin, bmax))
+            npyfilez = np.load('{}/npy/local_dens_nn_matches_{}.npz'.format(self.save_folder,
+                               file_name))
             _, _, _, [modeN], _ = [npyfilez['arr_{}'.format(ii)] for ii in range(5)]
 
             resses = [0]*len(self.mag_array)
@@ -1071,8 +1161,8 @@ class AstrometricCorrections:
 
             resses = np.array(resses, dtype=object)
 
-            np.savez('{}/npy/h_o_fit_res_{}{}{}{}.npz'.format(
-                     self.save_folder, lmin, lmax, bmin, bmax), resses, fit_sigs, skip_flags)
+            np.savez('{}/npy/h_o_fit_res_{}.npz'.format(
+                     self.save_folder, file_name), resses, fit_sigs, skip_flags)
 
         print('')
 
@@ -1222,31 +1312,38 @@ class AstrometricCorrections:
             The chi-squared goodness-of-fit results from all fits performed
             in this sightline. Only returned if ``fit_x2_flag`` is ``True``.
         """
-        index, lmid, bmid, lmin, lmax, bmin, bmax, _a, (fit_x2_flag) = iterable
+        if self.coord_or_chunk == 'coord':
+            index, lmid, bmid, _a, (fit_x2_flag) = iterable
+            cat_args = (lmid, bmid)
+            file_name = '{}_{}'.format(lmid, bmid)
+        else:
+            index, chunk, _a, (fit_x2_flag) = iterable
+            cat_args = (chunk,)
+            file_name = '{}'.format(chunk)
         if self.make_plots:
             # Grid just big enough square to cover mag_array entries.
             gs1 = self.make_gridspec('34242b', self.n_mag_rows, self.n_mag_cols, 0.8, 15)
             ax1s = [plt.subplot(gs1[i]) for i in range(len(self.mag_array))]
 
-        npyfilez = np.load('{}/npy/auf_pdf_{}{}{}{}.npz'.format(
-                           self.save_folder, lmin, lmax, bmin, bmax), allow_pickle=True)
+        npyfilez = np.load('{}/npy/auf_pdf_{}.npz'.format(
+                           self.save_folder, file_name), allow_pickle=True)
         avg_snr, avg_mag, avg_sig, pdfs, pdf_uncerts, q_pdfs, pdf_bins, _ = \
             [npyfilez['arr_{}'.format(ii)] for ii in range(8)]
 
-        npyfilez = np.load('{}/npy/four_auf_{}{}{}{}.npz'.format(
-                           self.save_folder, lmin, lmax, bmin, bmax))
+        npyfilez = np.load('{}/npy/four_auf_{}.npz'.format(
+                           self.save_folder, file_name))
         four_off_fw, four_off_ps = [npyfilez['arr_{}'.format(ii)] for ii in range(2)]
 
-        b = self.load_catalogue('b', (lmin, lmax, bmin, bmax))
-        npyfilez = np.load('{}/npy/local_dens_nn_matches_{}{}{}{}.npz'.format(
-                           self.save_folder, lmin, lmax, bmin, bmax))
+        b = self.load_catalogue('b', cat_args)
+        npyfilez = np.load('{}/npy/local_dens_nn_matches_{}.npz'.format(
+                           self.save_folder, file_name))
         Narray, dists, bmatch, [modeN], [dN] = [npyfilez['arr_{}'.format(ii)] for ii in
                                                 range(5)]
 
         b_matches = b[bmatch]
 
-        npyfilez = np.load('{}/npy/h_o_fit_res_{}{}{}{}.npz'.format(
-                           self.save_folder, lmin, lmax, bmin, bmax), allow_pickle=True)
+        npyfilez = np.load('{}/npy/h_o_fit_res_{}.npz'.format(
+                           self.save_folder, file_name), allow_pickle=True)
         resses, _, skip_flags = [npyfilez['arr_{}'.format(ii)] for ii in range(3)]
 
         if fit_x2_flag:
@@ -1356,7 +1453,7 @@ class AstrometricCorrections:
                     ax.set_ylabel('PDF / arcsecond^-1')
         if self.make_plots:
             plt.tight_layout()
-            plt.savefig('{}/pdf/auf_fits_{}_{}.pdf'.format(self.save_folder, lmid, bmid))
+            plt.savefig('{}/pdf/auf_fits_{}.pdf'.format(self.save_folder, file_name))
             plt.close()
 
         if fit_x2_flag:
@@ -1382,8 +1479,11 @@ class AstrometricCorrections:
             print('Calculating goodness-of-fits...')
         pool = multiprocessing.Pool(self.n_pool)
         counter = np.arange(0, len(self.lmids))
-        iter_group = zip(counter, self.lmids, self.bmids, self.lmins, self.lmaxs, self.bmins,
-                         self.bmaxs, a_array, itertools.repeat(fit_x2_flag))
+        if self.coord_or_chunk == 'coord':
+            iter_group = zip(counter, self.lmids, self.bmids, a_array,
+                             itertools.repeat(fit_x2_flag))
+        else:
+            iter_group = zip(counter, self.chunks, a_array, itertools.repeat(fit_x2_flag))
         for results in pool.imap_unordered(self.make_plot_calc_chisq, iter_group,
                                            chunksize=len(self.lmids)//self.n_pool):
             if fit_x2_flag:
@@ -1455,15 +1555,25 @@ class AstrometricCorrections:
         m_sigs = np.empty_like(self.lmids)
         n_sigs = np.empty_like(self.lmids)
 
-        for i, (lmid, bmid, lmin, lmax, bmin, bmax) in enumerate(zip(
-                self.lmids, self.bmids, self.lmins, self.lmaxs, self.bmins, self.bmaxs)):
-            npyfilez = np.load('{}/npy/auf_pdf_{}{}{}{}.npz'.format(
-                               self.save_folder, lmin, lmax, bmin, bmax), allow_pickle=True)
+        if self.coord_or_chunk == 'coord':
+            zip_list = (self.lmids, self.bmids)
+        else:
+            zip_list = (self.lmids, self.bmids, self.chunks)
+
+        for i, list_of_things in enumerate(zip(*zip_list)):
+            if self.coord_or_chunk == 'coord':
+                lmid, bmid = list_of_things
+                file_name = '{}_{}'.format(lmid, bmid)
+            else:
+                lmid, bmid, chunk = list_of_things
+                file_name = '{}'.format(chunk)
+            npyfilez = np.load('{}/npy/auf_pdf_{}.npz'.format(
+                               self.save_folder, file_name), allow_pickle=True)
             _, _, data_sigs, _, _, _, _, _ = \
                 [npyfilez['arr_{}'.format(ii)] for ii in range(8)]
 
-            npyfilez = np.load('{}/npy/h_o_fit_res_{}{}{}{}.npz'.format(
-                               self.save_folder, lmin, lmax, bmin, bmax), allow_pickle=True)
+            npyfilez = np.load('{}/npy/h_o_fit_res_{}.npz'.format(
+                               self.save_folder, file_name), allow_pickle=True)
             _, fit_sigs, skip_flags = [npyfilez['arr_{}'.format(ii)] for ii in range(3)]
 
             if self.make_plots or self.make_summary_plot:
@@ -1515,6 +1625,7 @@ class AstrometricCorrections:
             plt.figure('123123b')
             plt.tight_layout()
             plt.savefig('{}/pdf/sig_fit_comparisons.pdf'.format(self.save_folder))
+            plt.close()
             plt.figure('12312')
 
             q = ~np.isnan(x2s[:, :, 0])
@@ -1558,6 +1669,7 @@ class AstrometricCorrections:
 
             plt.tight_layout()
             plt.savefig('{}/pdf/sig_h_stats.pdf'.format(self.save_folder))
+            plt.close()
 
     def load_catalogue(self, cat_type, sub_cat_id):
         """
@@ -1584,7 +1696,7 @@ class AstrometricCorrections:
             x = np.load(name)
         else:
             cols = self.a_cols if cat_type == 'a' else self.b_cols
-            x = np.loadtxt(name, delimier=',', usecols=cols)
+            x = np.loadtxt(name, delimiter=',', usecols=cols)
 
         return x
 

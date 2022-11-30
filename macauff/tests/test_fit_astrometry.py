@@ -4,6 +4,7 @@ Tests for the "fit_astrometry" module.
 '''
 
 
+import pytest
 import numpy as np
 from numpy.testing import assert_allclose
 import os
@@ -11,6 +12,7 @@ import os
 from ..fit_astrometry import AstrometricCorrections
 
 
+@pytest.mark.parametrize("npy_or_csv,coord_or_chunk", [("csv", "chunk"), ("npy", "coord")])
 class TestAstroCorrection:
     def setup_class(self):
         self.rng = np.random.default_rng(seed=43578345)
@@ -38,14 +40,17 @@ class TestAstroCorrection:
         with open('tri_folder/trilegal_sim_105.0_0.0_faint.dat', "w") as f:
             f.write(text)
 
-    def fake_cata_cutout(self, l1, l2, b1, b2):
+    def fake_cata_cutout(self, lmin, lmax, bmin, bmax, *cat_args):
         astro_uncert = self.rng.uniform(0.001, 0.002, size=self.N)
         mag = self.rng.uniform(12, 12.1, size=self.N)
         mag_uncert = self.rng.uniform(0.01, 0.02, size=self.N)
         a = np.array([self.true_ra, self.true_dec, astro_uncert, mag, mag_uncert]).T
-        np.save('store_data/a_cat{}{}{}{}.npy'.format(l1, l2, b1, b2), a)
+        if self.npy_or_csv == 'npy':
+            np.save(self.a_cat_name.format(*cat_args), a)
+        else:
+            np.savetxt(self.a_cat_name.format(*cat_args), a, delimiter=',')
 
-    def fake_catb_cutout(self, l1, l2, b1, b2):
+    def fake_catb_cutout(self, lmin, lmax, bmin, bmax, *cat_args):
         mag = np.empty(self.N, float)
         # Fake some data to plot SNR(S) = S / sqrt(c S + b (aS)^2)
         mag[:50] = np.linspace(10, 18, 50)
@@ -78,36 +83,55 @@ class TestAstroCorrection:
         rand_ra = self.true_ra + dist * ra_angle
         rand_dec = self.true_dec + dist * dec_angle
         b = np.array([rand_ra, rand_dec, astro_uncert, mag, mag_uncert]).T
-        np.save('store_data/b_cat{}{}{}{}.npy'.format(l1, l2, b1, b2), b)
+        if self.npy_or_csv == 'npy':
+            np.save(self.b_cat_name.format(*cat_args), b)
+        else:
+            np.savetxt(self.b_cat_name.format(*cat_args), b, delimiter=',')
 
-    def test_fit_astrometry(self):
+    def test_fit_astrometry(self, npy_or_csv, coord_or_chunk):
+        self.npy_or_csv = npy_or_csv
+        self.coord_or_chunk = coord_or_chunk
         dd_params = np.load(os.path.join(os.path.dirname(__file__), 'data/dd_params.npy'))
         l_cut = np.load(os.path.join(os.path.dirname(__file__), 'data/l_cut.npy'))
         lmids, bmids = np.array([105], dtype=float), np.array([0], dtype=float)
         magarray = np.array([14.07, 14.17, 14.27, 14.37])
         magslice = np.array([0.05, 0.05, 0.05, 0.05])
         sigslice = np.array([0.1, 0.1, 0.1, 0.1])
+        if coord_or_chunk == 'coord':
+            chunks = None
+            lb_dimension = 1
+        else:
+            chunks = [2017]
+            lb_dimension = 2
         ac = AstrometricCorrections(
             psf_fwhm=6.1, numtrials=10000, nn_radius=30, dens_search_radius=900,
             save_folder='ac_save_folder', trifolder='tri_folder', triname='trilegal_sim',
             maglim_b=13, maglim_f=25, magnum=11, trifilterset='2mass_spitzer_wise',
             trifiltname='W1', gal_wav_micron=3.35, gal_ab_offset=2.699, gal_filtname='wise2010-W1',
             gal_alav=0.039, bright_mag=16, dm=0.1, dd_params=dd_params, l_cut=l_cut, lmids=lmids,
-            bmids=bmids, lb_dimension=1, cutout_area=60, cutout_height=6, mag_array=magarray,
-            mag_slice=magslice, sig_slice=sigslice, n_pool=1, npy_or_csv='npy',
-            coord_or_chunk='coord', pos_and_err_indices=[[0, 1, 2], [0, 1, 2]], mag_indices=[3],
-            mag_unc_indices=[4], mag_names=['W1'], best_mag_index=0)
+            bmids=bmids, lb_dimension=lb_dimension, cutout_area=60, cutout_height=6,
+            mag_array=magarray, mag_slice=magslice, sig_slice=sigslice, n_pool=1,
+            npy_or_csv=npy_or_csv, coord_or_chunk=coord_or_chunk,
+            pos_and_err_indices=[[0, 1, 2], [0, 1, 2]], mag_indices=[3], mag_unc_indices=[4],
+            mag_names=['W1'], best_mag_index=0, chunks=chunks)
 
         a_cat_func = self.fake_cata_cutout
         b_cat_func = self.fake_catb_cutout
-        a_cat_name = 'store_data/a_cat{}{}{}{}.npy'
-        b_cat_name = 'store_data/b_cat{}{}{}{}.npy'
-        ac(a_cat_func, b_cat_func, a_cat_name, b_cat_name, cat_recreate=True,
+        if coord_or_chunk == 'coord':
+            self.a_cat_name = 'store_data/a_cat{}{}.npy'
+            self.b_cat_name = 'store_data/b_cat{}{}.npy'
+        else:
+            self.a_cat_name = 'store_data/a_cat{}.npy'
+            self.b_cat_name = 'store_data/b_cat{}.npy'
+        ac(a_cat_func, b_cat_func, self.a_cat_name, self.b_cat_name, cat_recreate=True,
            snr_model_recreate=True, count_recreate=True, tri_download=False, dens_recreate=True,
            nn_recreate=True, auf_sim_recreate=True, auf_pdf_recreate=True,
            h_o_fit_recreate=True, fit_x2s_recreate=True, make_plots=True, make_summary_plot=True)
 
-        assert os.path.isfile('ac_save_folder/pdf/auf_fits_105.0_0.0.pdf')
+        if coord_or_chunk == 'coord':
+            assert os.path.isfile('ac_save_folder/pdf/auf_fits_105.0_0.0.pdf')
+        else:
+            assert os.path.isfile('ac_save_folder/pdf/auf_fits_2017.pdf')
         assert os.path.isfile('ac_save_folder/pdf/counts_comparison.pdf')
         assert os.path.isfile('ac_save_folder/pdf/s_vs_snr_W1.pdf')
         assert os.path.isfile('ac_save_folder/pdf/sig_fit_comparisons.pdf')
