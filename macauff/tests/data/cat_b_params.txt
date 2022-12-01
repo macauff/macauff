@@ -11,7 +11,7 @@ filt_names = W1 W2 W3 W4
 run_fw_auf = yes
 run_psf_auf = no
 # Path to array containing pre-computed astrometry corrections.
-mag_h_params_path = .
+snr_mag_params_path = b_snr_mag
 
 # Catalogue PSF parameters
 # Full-width at half maximums for each filter, in order, in arcseconds

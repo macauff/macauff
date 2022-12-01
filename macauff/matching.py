@@ -833,7 +833,7 @@ class CrossMatch():
             for config, catname in zip([cat_a_config, cat_b_config], ['"a"', '"b"']):
                 for check_flag in ['tri_set_name', 'tri_filt_names', 'tri_filt_num', 'psf_fwhms',
                                    'download_tri', 'dens_mags', 'fit_gal_flag',
-                                   'run_fw_auf', 'run_psf_auf', 'mag_h_params_path',
+                                   'run_fw_auf', 'run_psf_auf', 'snr_mag_params_path',
                                    'tri_maglim_bright', 'tri_maglim_faint', 'tri_num_bright',
                                    'tri_num_faint']:
                     if check_flag not in config:
@@ -868,17 +868,18 @@ class CrossMatch():
                         raise ValueError("Missing key {} from catalogue {} metadata file.".format(
                                          check_flag, catname))
 
-            # mag_h_params, dd_params, and l_cut should all be numpy arrays in
+            # snr_mag_params, dd_params, and l_cut should all be numpy arrays in
             # specified paths.
-            for path, f, warn_message in zip(['mag_h_params_path', 'dd_params_path', 'l_cut_path'],
-                                             ['mag_h_params', 'dd_params', 'l_cut'],
+            for path, f, warn_message in zip(['snr_mag_params_path', 'dd_params_path',
+                                              'l_cut_path'], ['snr_mag_params', 'dd_params',
+                                                              'l_cut'],
                                              ['astrometry corrections',
                                               'PSF photometry perturbations',
                                               'PSF photometry perturbations']):
                 for config, catname, flag in zip([cat_a_config, cat_b_config], ['"a"', '"b"'],
                                                  ['a_', 'b_']):
                     # Only need dd_params or l_cut if we're using run_psf_auf.
-                    if 'mag_h' not in path and not getattr(self, '{}run_psf_auf'.format(flag)):
+                    if 'snr_mag' not in path and not getattr(self, '{}run_psf_auf'.format(flag)):
                         continue
                     if not os.path.exists(config[path]):
                         raise OSError('{}{} does not exist. Please ensure that path for '
@@ -887,11 +888,11 @@ class CrossMatch():
                         raise FileNotFoundError('{} file not found in catalogue {} path. '
                                                 'Please ensure {} are '
                                                 'pre-generated.'.format(f, catname, warn_message))
-                    if 'mag_h' in path:
-                        a = np.load('{}/mag_h_params.npy'.format(config['mag_h_params_path']))
+                    if 'snr_mag' in path:
+                        a = np.load('{}/snr_mag_params.npy'.format(config['snr_mag_params_path']))
                         if not (len(a.shape) == 3 and a.shape[2] == 5 and
                                 a.shape[0] == len(getattr(self, '{}filt_names'.format(flag)))):
-                            raise ValueError('{}mag_h_params should be of shape (X, Y, 5).'
+                            raise ValueError('{}snr_mag_params should be of shape (X, Y, 5).'
                                              .format(flag))
                     if 'dd_params' in path:
                         a = np.load('{}/dd_params.npy'.format(config['dd_params_path']))
@@ -1298,7 +1299,7 @@ class CrossMatch():
                            'd_mag': self.d_mag, 'tri_filt_names': self.a_tri_filt_names,
                            'compute_local_density': self.compute_local_density,
                            'run_fw': self.a_run_fw_auf, 'run_psf': self.a_run_psf_auf,
-                           'mag_h_params': self.a_mag_h_params,
+                           'snr_mag_params': self.a_snr_mag_params,
                            'tri_maglim_bright': self.a_tri_maglim_bright,
                            'tri_maglim_faint': self.a_tri_maglim_faint,
                            'tri_num_bright': self.a_tri_num_bright,
@@ -1370,7 +1371,7 @@ class CrossMatch():
                            'd_mag': self.d_mag, 'tri_filt_names': self.b_tri_filt_names,
                            'compute_local_density': self.compute_local_density,
                            'run_fw': self.b_run_fw_auf, 'run_psf': self.b_run_psf_auf,
-                           'mag_h_params': self.b_mag_h_params,
+                           'snr_mag_params': self.b_snr_mag_params,
                            'tri_maglim_bright': self.b_tri_maglim_bright,
                            'tri_maglim_faint': self.b_tri_maglim_faint,
                            'tri_num_bright': self.b_tri_num_bright,

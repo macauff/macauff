@@ -485,7 +485,7 @@ class AstrometricCorrections:
         relations are completely described by ``a``, ``b``, and ``c``.
         """
         if (self.snr_model_recreate or not
-                os.path.isfile('{}/npy/snr_model.npy'.format(self.save_folder))):
+                os.path.isfile('{}/npy/snr_mag_params.npy'.format(self.save_folder))):
             print("Making SNR model...")
             abc_array = np.empty((len(self.mag_indices), len(self.lmids), 3), float)
             for j in range(len(self.mag_indices)):
@@ -548,7 +548,7 @@ class AstrometricCorrections:
                                                                 self.mag_names[j]))
                     plt.close()
 
-            np.save('{}/npy/snr_model.npy'.format(self.save_folder), abc_array)
+            np.save('{}/npy/snr_mag_params.npy'.format(self.save_folder), abc_array)
 
     def make_gridspec(self, name, y, x, ratio, z, **kwargs):
         """
@@ -933,7 +933,7 @@ class AstrometricCorrections:
         combination, for both aperture photometry and background-dominated PSF
         algorithms.
         """
-        abc_array = np.load('{}/npy/snr_model.npy'.format(self.save_folder))
+        abc_array = np.load('{}/npy/snr_mag_params.npy'.format(self.save_folder))
         if self.coord_or_chunk == 'coord':
             zip_list = (self.lmids, self.bmids)
         else:
@@ -1096,7 +1096,7 @@ class AstrometricCorrections:
         For each magnitude-sightline combination, fit for the empirical centroid
         uncertainty describing the distribution of match separations.
         """
-        a_array = np.load('{}/npy/snr_model.npy'.format(self.save_folder))[
+        a_array = np.load('{}/npy/snr_mag_params.npy'.format(self.save_folder))[
             self.best_mag_index, :, 0]
         if self.coord_or_chunk == 'coord':
             zip_list = (self.lmids, self.bmids, a_array)
@@ -1469,7 +1469,7 @@ class AstrometricCorrections:
         if fit_x2_flag:
             x2s = np.ones((len(self.lmids), len(self.mag_array), 2), float) * np.nan
 
-        a_array = np.load('{}/npy/snr_model.npy'.format(self.save_folder))[
+        a_array = np.load('{}/npy/snr_mag_params.npy'.format(self.save_folder))[
             self.best_mag_index, :, 0]
         if self.make_plots and fit_x2_flag:
             print('Creating individual AUF figures and calculating goodness-of-fits...')

@@ -26,9 +26,9 @@ def make_perturb_aufs(auf_folder, cat_folder, filters, auf_points, r, dr, rho,
                       tri_num_faint=None, auf_region_frame=None, num_trials=None, j0s=None,
                       density_mags=None, d_mag=None, compute_local_density=None,
                       density_radius=None, run_fw=None, run_psf=None, dd_params=None, l_cut=None,
-                      mag_h_params=None, fit_gal_flag=None, cmau_array=None, wavs=None, z_maxs=None,
-                      nzs=None, ab_offsets=None, filter_names=None, al_avs=None, alpha0=None,
-                      alpha1=None, alpha_weight=None):
+                      snr_mag_params=None, fit_gal_flag=None, cmau_array=None, wavs=None,
+                      z_maxs=None, nzs=None, ab_offsets=None, filter_names=None, al_avs=None,
+                      alpha0=None, alpha1=None, alpha_weight=None):
     r"""
     Function to perform the creation of the blended object perturbation component
     of the AUF.
@@ -158,7 +158,7 @@ def make_perturb_aufs(auf_folder, cat_folder, filters, auf_points, r, dr, rho,
         Relative flux cutoffs for which algorithm to use in the background
         limited PSF-fit algorithm case. Must be given if ``include_perturb_auf``
         is ``True`` and ``run_psf`` is ``True``.
-    mag_h_params : numpy.ndarray, optional
+    snr_mag_params : numpy.ndarray, optional
         Array, of shape ``(X, Y, 5)``, containing the pre-determined values of the
         magnitude-perturbation weighting relationship for a series of Galactic
         sightlines for each ``filters`` filter. Must be given if
@@ -259,8 +259,8 @@ def make_perturb_aufs(auf_folder, cat_folder, filters, auf_points, r, dr, rho,
     elif include_perturb_auf and l_cut is None:
         # Fake an array to pass only to run_fw that fortran will accept:
         l_cut = np.zeros((1), float)
-    if include_perturb_auf and mag_h_params is None:
-        raise ValueError("mag_h_params must be given if include_perturb_auf is True.")
+    if include_perturb_auf and snr_mag_params is None:
+        raise ValueError("snr_mag_params must be given if include_perturb_auf is True.")
     if include_perturb_auf and compute_local_density is None:
         raise ValueError("compute_local_density must be given if include_perturb_auf is True.")
     if include_perturb_auf and compute_local_density and density_radius is None:
@@ -445,14 +445,14 @@ def make_perturb_aufs(auf_folder, cat_folder, filters, auf_points, r, dr, rho,
                     Narray = create_single_perturb_auf(
                         ax_folder, auf_points, filters[j], r, dr, rho, drho, j0s, num_trials,
                         psf_fwhms[j], tri_filt_names[j], density_mags[j], a_photo, localN, d_mag,
-                        delta_mag_cuts, dd_params, l_cut, run_fw, run_psf, mag_h_params[j],
+                        delta_mag_cuts, dd_params, l_cut, run_fw, run_psf, snr_mag_params[j],
                         fit_gal_flag, cmau_array, wavs[j], z_maxs[j], nzs[j], alpha0, alpha1,
                         alpha_weight, ab_offsets[j], filter_names[j], al_avs[j])
                 else:
                     Narray = create_single_perturb_auf(
                         ax_folder, auf_points, filters[j], r, dr, rho, drho, j0s, num_trials,
                         psf_fwhms[j], tri_filt_names[j], density_mags[j], a_photo, localN, d_mag,
-                        delta_mag_cuts, dd_params, l_cut, run_fw, run_psf, mag_h_params[j],
+                        delta_mag_cuts, dd_params, l_cut, run_fw, run_psf, snr_mag_params[j],
                         fit_gal_flag)
             else:
                 # Without the simulations to force local normalising density N or
@@ -809,7 +809,7 @@ def calculate_local_density(a_astro, a_tot_astro, a_tot_photo, auf_folder, cat_f
 
 def create_single_perturb_auf(tri_folder, auf_point, filt, r, dr, rho, drho, j0s, num_trials,
                               psf_fwhm, header, density_mag, a_photo, localN, d_mag, mag_cut,
-                              dd_params, l_cut, run_fw, run_psf, mag_h_params, fit_gal_flag,
+                              dd_params, l_cut, run_fw, run_psf, snr_mag_params, fit_gal_flag,
                               cmau_array=None, wav=None, z_max=None, nz=None, alpha0=None,
                               alpha1=None, alpha_weight=None, ab_offset=None, filter_name=None,
                               al_av=None):
@@ -872,7 +872,7 @@ def create_single_perturb_auf(tri_folder, auf_point, filt, r, dr, rho, drho, j0s
     run_psf : bool
         Flag indicating whether to run the "background-dominated PSF" version
         of the perturbation algorithm.
-    mag_h_params : numpy.ndarray
+    snr_mag_params : numpy.ndarray
         Array, of shape ``(Y, 5)``, containing the pre-determined values of the
         magnitude-perturbation weighting relationship for a series of Galactic
         sightlines for this particular filter.
@@ -981,10 +981,10 @@ def create_single_perturb_auf(tri_folder, auf_point, filt, r, dr, rho, drho, j0s
 
     s_flux = 10**(-1/2.5 * mag_array)
     lb_ind = mff.find_nearest_point(auf_point[:, 0], auf_point[:, 1],
-                                    mag_h_params[:, 3], mag_h_params[:, 4])[0]
-    a_snr = mag_h_params[lb_ind, 0]
-    b_snr = mag_h_params[lb_ind, 1]
-    c_snr = mag_h_params[lb_ind, 2]
+                                    snr_mag_params[:, 3], snr_mag_params[:, 4])[0]
+    a_snr = snr_mag_params[lb_ind, 0]
+    b_snr = snr_mag_params[lb_ind, 1]
+    c_snr = snr_mag_params[lb_ind, 2]
     snr = s_flux / np.sqrt(c_snr * s_flux + b_snr + (a_snr * s_flux)**2)
 
     B = 0.05
