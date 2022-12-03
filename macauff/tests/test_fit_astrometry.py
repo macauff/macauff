@@ -12,8 +12,6 @@ import os
 from ..fit_astrometry import AstrometricCorrections
 
 
-@pytest.mark.parametrize("npy_or_csv,coord_or_chunk,coord_system",
-                         [("csv", "chunk", "equatorial"), ("npy", "coord", "galactic")])
 class TestAstroCorrection:
     def setup_class(self):
         self.rng = np.random.default_rng(seed=43578345)
@@ -89,6 +87,65 @@ class TestAstroCorrection:
         else:
             np.savetxt(self.b_cat_name.format(*cat_args), b, delimiter=',')
 
+    def test_fit_astrometry_load_errors(self):
+        dd_params = np.load(os.path.join(os.path.dirname(__file__), 'data/dd_params.npy'))
+        l_cut = np.load(os.path.join(os.path.dirname(__file__), 'data/l_cut.npy'))
+        ax1_mids, ax2_mids = np.array([105], dtype=float), np.array([0], dtype=float)
+        magarray = np.array([14.07, 14.17, 14.27, 14.37])
+        magslice = np.array([0.05, 0.05, 0.05, 0.05])
+        sigslice = np.array([0.1, 0.1, 0.1, 0.1])
+
+        _kwargs = {
+            'psf_fwhm': 6.1, 'numtrials': 10000, 'nn_radius': 30, 'dens_search_radius': 900,
+            'save_folder': 'ac_save_folder', 'trifolder': 'tri_folder', 'triname': 'trilegal_sim',
+            'maglim_b': 13, 'maglim_f': 25, 'magnum': 11, 'trifilterset': '2mass_spitzer_wise',
+            'trifiltname': 'W1', 'gal_wav_micron': 3.35, 'gal_ab_offset': 2.699,
+            'gal_filtname': 'wise2010-W1', 'gal_alav': 0.039, 'bright_mag': 16, 'dm': 0.1,
+            'dd_params': dd_params, 'l_cut': l_cut, 'ax1_mids': ax1_mids, 'ax2_mids': ax2_mids,
+            'cutout_area': 60, 'cutout_height': 6, 'mag_array': magarray, 'mag_slice': magslice,
+            'sig_slice': sigslice, 'n_pool': 1, 'pos_and_err_indices': [[0, 1, 2], [0, 1, 2]],
+            'mag_indices': [3], 'mag_unc_indices': [4], 'mag_names': ['W1'], 'best_mag_index': 0}
+
+        with pytest.raises(ValueError, match='single_sided_auf must be True.'):
+            AstrometricCorrections(
+                **_kwargs, single_sided_auf=False, ax_dimension=1, npy_or_csv='npy',
+                coord_or_chunk='coord', coord_system='equatorial')
+        for ax_dim in [3, 'A']:
+            with pytest.raises(ValueError, match="ax_dimension must either be '1' or "):
+                AstrometricCorrections(
+                    **_kwargs, ax_dimension=ax_dim, npy_or_csv='npy',
+                    coord_or_chunk='coord', coord_system='equatorial')
+        for n_or_c in ['x', 4, 'npys']:
+            with pytest.raises(ValueError, match="npy_or_csv must either be 'npy' or"):
+                AstrometricCorrections(
+                    **_kwargs, ax_dimension=1, npy_or_csv=n_or_c,
+                    coord_or_chunk='coord', coord_system='equatorial')
+        for c_or_c in ['x', 4, 'npys']:
+            with pytest.raises(ValueError, match="coord_or_chunk must either be 'coord' or"):
+                AstrometricCorrections(
+                    **_kwargs, ax_dimension=1, npy_or_csv='csv',
+                    coord_or_chunk=c_or_c, coord_system='equatorial')
+        with pytest.raises(ValueError, match="chunks must be provided"):
+            AstrometricCorrections(
+                **_kwargs, ax_dimension=1, npy_or_csv='csv',
+                coord_or_chunk='chunk', coord_system='equatorial')
+        with pytest.raises(ValueError, match="ax_dimension must be 2, and ax1-ax2 pairings "):
+            AstrometricCorrections(
+                **_kwargs, ax_dimension=1, npy_or_csv='csv',
+                coord_or_chunk='chunk', coord_system='equatorial', chunks=[2017])
+        with pytest.raises(ValueError, match="ax1_mids, ax2_mids, and chunks must all be the "):
+            AstrometricCorrections(
+                **_kwargs, ax_dimension=2, npy_or_csv='csv',
+                coord_or_chunk='chunk', coord_system='equatorial', chunks=[2017, 2018])
+        for e_or_g in ['x', 4, 'galacticorial']:
+            with pytest.raises(ValueError, match="coord_system must either be 'equatorial'"):
+                AstrometricCorrections(
+                    **_kwargs, ax_dimension=1, npy_or_csv='csv',
+                    coord_or_chunk='coord', coord_system=e_or_g)
+
+
+    @pytest.mark.parametrize("npy_or_csv,coord_or_chunk,coord_system",
+                             [("csv", "chunk", "equatorial"), ("npy", "coord", "galactic")])
     def test_fit_astrometry(self, npy_or_csv, coord_or_chunk, coord_system):
         self.npy_or_csv = npy_or_csv
         self.coord_or_chunk = coord_or_chunk
