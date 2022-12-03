@@ -43,10 +43,10 @@ class AstrometricCorrections:
     def __init__(self, psf_fwhm, numtrials, nn_radius, dens_search_radius, save_folder, trifolder,
                  triname, maglim_b, maglim_f, magnum, trifilterset, trifiltname,
                  gal_wav_micron, gal_ab_offset, gal_filtname, gal_alav, bright_mag, dm, dd_params,
-                 l_cut, lmids, bmids, lb_dimension, cutout_area, cutout_height, mag_array,
+                 l_cut, ax1_mids, ax2_mids, ax_dimension, cutout_area, cutout_height, mag_array,
                  mag_slice, sig_slice, n_pool, npy_or_csv, coord_or_chunk, pos_and_err_indices,
-                 mag_indices, mag_unc_indices, mag_names, best_mag_index, single_sided_auf=True,
-                 chunks=None):
+                 mag_indices, mag_unc_indices, mag_names, best_mag_index, coord_system,
+                 single_sided_auf=True, chunks=None):
         """
         Initialisation of AstrometricCorrections, accepting inputs required for
         the running of the optimisation and parameterisation of astrometry of
@@ -75,7 +75,7 @@ class AstrometricCorrections:
             Filepath of the location into which to save TRILEGAL simulations.
         triname : string
             Name to give TRILEGAL simulations when downloaded. Will have
-            suffix appended to the end, for unique l-b sightline combination
+            suffix appended to the end, for unique ax1-ax2 sightline combination
             downloads.
         maglim_b : float
             Magnitude in the ``magnum`` filter down to which sources should be
@@ -111,20 +111,21 @@ class AstrometricCorrections:
         l_cut : numpy.ndarray
             Array of shape ``(3,)`` containing the cuts between the different
             regimes of background-dominated PSF perturbation.
-        lmids : numpy.ndarray
-            Array of Galactic longitudes used to center regions used to determine
-            astrometric corrections across the sky. Depending on
-            ``lb_correction``, either the unique values that with ``bmids`` form
-            a rectangle, or a unique l-b combination with a corresponding
-            ``bmid``.
-        bmids : numpy.ndarray
-            Array of Galactic latitudes defining regions for calculating
+        ax1_mids : numpy.ndarray
+            Array of longitudes (e.g. RA or l) used to center regions used to
+            determine astrometric corrections across the sky. Depending on
+            ``ax_correction``, either the unique values that with ``ax2_mids``
+            form a rectangle, or a unique ax-ax combination with a corresponding
+            ``ax2_mid``.
+        ax2_mids : numpy.ndarray
+            Array of latitudes (Dec/b) defining regions for calculating
             astrometric corrections. Either unique rectangle values to combine
-            with ``lmids`` or unique ``lmids``-``bmids`` pairs, one per entry.
-        lb_dimension : integer, either ``1`` or ``2``
-            If ``1`` then ``lmids`` and ``bmids`` form unique sides of a
+            with ``ax1_mids`` or unique ``ax1_mids``-``ax2_mids`` pairs, one
+            per entry.
+        ax_dimension : integer, either ``1`` or ``2``
+            If ``1`` then ``ax1_mids`` and ``ax2_mids`` form unique sides of a
             rectangle when combined in a grid, or if ``2`` each
-            ``lmids``-``bmids`` combination is a unique l-b pairing used
+            ``ax1_mids``-``ax2_mids`` combination is a unique ax-ax pairing used
             as given.
         cutout_area : float
             The size, in square degrees, of the regions used to simulate
@@ -181,6 +182,10 @@ class AstrometricCorrections:
             construct astrometric scaling relations from. Should generally
             be the one with the most coverage across all detections in a
             catalogue, or the one with the most precise fluxes.
+        coord_system : string, "equatorial" or "galactic"
+            Identifier of which coordinate system the data are in. Both datasets
+            must be in the same system, which can either be RA/Dec (equatorial)
+            or l/b (galactic) coordinates.
         single_sided_auf : boolean, optional
             Flag indicating whether the AUF of catalogue "a" can be ignored
             when considering match statistics, or if astrometric corrections
@@ -188,25 +193,28 @@ class AstrometricCorrections:
             significant non-noise-based astrometric uncertainty.
         chunks = list or numpy.ndarray of strings, optional
             List of IDs for each unique set of data if ``coord_or_chunk`` is
-            ``chunk``. In this case, ``lb_dimension`` must be ``2`` and each
-            ``chunk`` must correspond to its ``lmids``-``bmids`` coordinate.
+            ``chunk``. In this case, ``ax_dimension`` must be ``2`` and each
+            ``chunk`` must correspond to its ``ax1_mids``-``ax2_mids`` coordinate.
         """
         if single_sided_auf is not True:
             raise ValueError("single_sided_auf must be True.")
-        if not (lb_dimension == 1 or lb_dimension == 2):
-            raise ValueError("lb_dimension must either be '1' or '2'.")
+        if not (ax_dimension == 1 or ax_dimension == 2):
+            raise ValueError("ax_dimension must either be '1' or '2'.")
         if npy_or_csv != "npy" and npy_or_csv != "csv":
             raise ValueError("npy_or_csv must either be 'npy' or 'csv'.")
         if coord_or_chunk != "coord" and coord_or_chunk != "chunk":
             raise ValueError("coord_or_chunk must either be 'coord' or 'chunk'.")
         if coord_or_chunk == "chunk" and chunks is None:
             raise ValueError("chunks must be provided if coord_or_chunk is 'chunk'.")
-        if coord_or_chunk == "chunk" and lb_dimension == 1:
-            raise ValueError("lb_dimension must be 2, and l-b pairings provided for each chunk "
+        if coord_or_chunk == "chunk" and ax_dimension == 1:
+            raise ValueError("ax_dimension must be 2, and ax1-ax2 pairings provided for each chunk "
                              "in chunks if coord_or_chunk is 'chunk'.")
-        if coord_or_chunk == "chunk" and (len(lmids) != len(chunks) or len(bmids) != len(chunks)):
-            raise ValueError("lmids, bmids, and chunks must all be the same length if "
+        if coord_or_chunk == "chunk" and (len(ax1_mids) != len(chunks) or
+                                          len(ax2_mids) != len(chunks)):
+            raise ValueError("ax1_mids, ax2_mids, and chunks must all be the same length if "
                              "coord_or_chunk is 'chunk'.")
+        if not (coord_system == "equatorial" or coord_system == "galactic"):
+            raise ValueError("coord_system must either be 'equatorial' or 'galactic'.")
         self.psf_fwhm = psf_fwhm
         self.numtrials = numtrials
         self.nn_radius = nn_radius
@@ -240,9 +248,9 @@ class AstrometricCorrections:
         self.dd_params = dd_params
         self.l_cut = l_cut
 
-        self.lmids = lmids
-        self.bmids = bmids
-        self.lb_dimension = lb_dimension
+        self.ax1_mids = ax1_mids
+        self.ax2_mids = ax2_mids
+        self.ax_dimension = ax_dimension
         self.cutout_area = cutout_area
         self.cutout_height = cutout_height
 
@@ -253,6 +261,8 @@ class AstrometricCorrections:
         self.npy_or_csv = npy_or_csv
         self.coord_or_chunk = coord_or_chunk
         self.chunks = chunks
+
+        self.coord_system = coord_system
 
         if npy_or_csv == 'npy':
             self.pos_and_err_indices = pos_and_err_indices
@@ -291,61 +301,61 @@ class AstrometricCorrections:
             if not os.path.exists(folder):
                 os.makedirs(folder)
 
-        self.make_lb()
+        self.make_ax_coords()
 
-    def make_lb(self):
+    def make_ax_coords(self):
         """
-        Derive the unique l-b combinations used in fitting astrometry, and
+        Derive the unique ax1-ax2 combinations used in fitting astrometry, and
         calculate corner coordinates based on the size of the box and its
         central coordinates.
         """
-        # If l and b are given as one-dimensional arrays, we need to propagate
-        # those into two-dimensional grids first. Otherwise we can skip this
-        # step.
-        if self.lb_dimension == 1:
-            self.lmids_ = np.copy(self.lmids)
-            self.bmids_ = np.copy(self.bmids)
-            self.lmids, self.bmids = np.meshgrid(self.lmids_, self.bmids_)
-            self.lmids, self.bmids = self.lmids.flatten(), self.bmids.flatten()
-            self.l_grid_length = len(self.lmids_)
-            self.b_grid_length = len(self.bmids_)
+        # If ax1 and ax2 are given as one-dimensional arrays, we need to
+        # propagate those into two-dimensional grids first. Otherwise we
+        # can skip this step.
+        if self.ax_dimension == 1:
+            self.ax1_mids_ = np.copy(self.ax1_mids)
+            self.ax2_mids_ = np.copy(self.ax2_mids)
+            self.ax1_mids, self.ax2_mids = np.meshgrid(self.ax1_mids_, self.ax2_mids_)
+            self.ax1_mids, self.ax2_mids = self.ax1_mids.flatten(), self.ax2_mids.flatten()
+            self.ax1_grid_length = len(self.ax1_mids_)
+            self.ax2_grid_length = len(self.ax2_mids_)
         else:
-            self.l_grid_length = np.ceil(np.sqrt(len(self.lmids))).astype(int)
-            self.b_grid_length = np.ceil(len(self.lmids) / self.l_grid_length).astype(int)
+            self.ax1_grid_length = np.ceil(np.sqrt(len(self.ax1_mids))).astype(int)
+            self.ax2_grid_length = np.ceil(len(self.ax1_mids) / self.ax1_grid_length).astype(int)
 
         # Force constant box height, but allow longitude to float to make sure
         # that we get good area coverage as the cos-delta factor increases
         # towards the poles.
 
-        self.lmins, self.lmaxs = np.empty_like(self.lmids), np.empty_like(self.lmids)
-        self.bmins, self.bmaxs = np.empty_like(self.lmids), np.empty_like(self.lmids)
-        for i, (lmid, bmid) in enumerate(zip(self.lmids, self.bmids)):
-            self.bmins[i], self.bmaxs[i] = bmid-self.cutout_height/2, bmid+self.cutout_height/2
+        self.ax1_mins, self.ax1_maxs = np.empty_like(self.ax1_mids), np.empty_like(self.ax1_mids)
+        self.ax2_mins, self.ax2_maxs = np.empty_like(self.ax1_mids), np.empty_like(self.ax1_mids)
+        for i, (ax1_mid, ax2_mid) in enumerate(zip(self.ax1_mids, self.ax2_mids)):
+            self.ax2_mins[i] = ax2_mid-self.cutout_height/2
+            self.ax2_maxs[i] = ax2_mid+self.cutout_height/2
 
-            lat_integral = (np.sin(np.radians(self.bmaxs[i])) -
-                            np.sin(np.radians(self.bmins[i]))) * 180/np.pi
+            lat_integral = (np.sin(np.radians(self.ax2_maxs[i])) -
+                            np.sin(np.radians(self.ax2_mins[i]))) * 180/np.pi
 
             if 360 * lat_integral < self.cutout_area:
-                # If sufficiently high in latitude, assuming Galactic coordinates,
-                # we ought to be able to take a full latitudinal slice around
-                # the entire sphere.
+                # If sufficiently high in latitude, we ought to be able to take
+                # a full latitudinal slice around the entire sphere.
                 delta_lon = 180
             else:
                 delta_lon = np.around(0.5 * self.cutout_area / lat_integral, decimals=1)
             # Handle wrap-around longitude maths naively by forcing 0/360 as the
             # minimum/maximum allowed limits of each box.
-            if lmid - delta_lon < 0:
-                self.lmins[i] = 0
-                self.lmaxs[i] = 2 * delta_lon
-            elif lmid + delta_lon > 360:
-                self.lmaxs[i] = 360
-                self.lmins[i] = 360 - 2 * delta_lon
+            if ax1_mid - delta_lon < 0:
+                self.ax1_mins[i] = 0
+                self.ax1_maxs[i] = 2 * delta_lon
+            elif ax1_mid + delta_lon > 360:
+                self.ax1_maxs[i] = 360
+                self.ax1_mins[i] = 360 - 2 * delta_lon
             else:
-                self.lmins[i] = lmid - delta_lon
-                self.lmaxs[i] = lmid + delta_lon
+                self.ax1_mins[i] = ax1_mid - delta_lon
+                self.ax1_maxs[i] = ax1_mid + delta_lon
 
-        np.save('{}/npy/lmids.npy'.format(self.save_folder), self.lmids)
-        np.save('{}/npy/bmids.npy'.format(self.save_folder), self.bmids)
+        np.save('{}/npy/ax1_mids.npy'.format(self.save_folder), self.ax1_mids)
+        np.save('{}/npy/ax2_mids.npy'.format(self.save_folder), self.ax2_mids)
 
     def __call__(self, a_cat_func, b_cat_func, a_cat_name, b_cat_name, snr_model_recreate=True,
                  cat_recreate=True, count_recreate=True, tri_download=True, dens_recreate=True,
@@ -362,19 +372,19 @@ class AstrometricCorrections:
         b_cat_func : callable
             Function used to generate reduced catalogue table for catalogue "b".
         a_cat_name : string
-            Name of the catalogue "a" filename, as saved by ``a_cat_func``. Must
-            accept four formats via Python string formatting (e.g.
-            ``'a_string_{}'``) that represent ``lmin``, ``lmax``, ``bmin``, and
-            ``bmax`` respectively.
+            Name of the catalogue "a" filename, pre-generated or saved by
+            ``a_cat_func``. Must accept one or two formats via Python string
+            formatting (e.g. ``'a_string_{}'``) that represent ``chunk``, or
+            ``ax1_mid`` and ``ax2_mid``, depending on ``coord_or_chunk``.
         b_cat_name : string
-            Name of the catalogue "b" filename created by ``b_cat_func``. Must
-            accept astometric coordinate box corners within string formatting.
+            Name of the catalogue "b" filename. Must accept the same string
+            formatting as ``a_cat_name``.
         snr_model_recreate : boolean, optional
             If ``True`` magnitude-SNR relations are re-calculated even if outputs
             exist on disk.
         cat_recreate : boolean, optional
-            Flag indicating whether to re-make reduced catalogue tables if they
-            already exist on the disk.
+            Flag indicating whether to re-make reduced catalogue tables if
+            required, and they already exist on the disk.
         count_recreate : boolean, optional
             Determines whether to recreate the combined star-galaxy differential
             magnitude counts for each sightline if they exist.
@@ -443,31 +453,33 @@ class AstrometricCorrections:
 
     def make_catalogue_cutouts(self):
         """
-        Generate cutout catalogues for regions as defined by corner l-b
+        Generate cutout catalogues for regions as defined by corner ax1-ax2
         coordinates.
         """
         if self.coord_or_chunk == 'coord':
-            zip_list = (self.lmids, self.bmids, self.lmins, self.lmaxs, self.bmins, self.bmaxs)
+            zip_list = (self.ax1_mids, self.ax2_mids, self.ax1_mins, self.ax1_maxs,
+                        self.ax2_mins, self.ax2_maxs)
         else:
-            zip_list = (self.chunks, self.lmins, self.lmaxs, self.bmins, self.bmaxs)
+            zip_list = (self.chunks, self.ax1_mins, self.ax1_maxs, self.ax2_mins, self.ax2_maxs)
         for index_, list_of_things in enumerate(zip(*zip_list)):
-            print('Creating catalogue cutouts... {}/{}'.format(index_+1, len(self.lmids)), end='\r')
+            print('Creating catalogue cutouts... {}/{}'.format(index_+1, len(self.ax1_mids)),
+                  end='\r')
 
             if self.coord_or_chunk == 'coord':
-                lmid, bmid, lmin, lmax, bmin, bmax = list_of_things
+                ax1_mid, ax2_mid, ax1_min, ax1_max, ax2_min, ax2_max = list_of_things
             else:
-                chunk, lmin, lmax, bmin, bmax = list_of_things
+                chunk, ax1_min, ax1_max, ax2_min, ax2_max = list_of_things
 
             if self.coord_or_chunk == 'coord':
-                cat_args = (lmid, bmid)
+                cat_args = (ax1_mid, ax2_mid)
             else:
                 cat_args = (chunk,)
             if (not os.path.isfile(self.a_cat_name.format(*cat_args)) or
                     self.cat_recreate):
-                self.a_cat_func(lmin, lmax, bmin, bmax, *cat_args)
+                self.a_cat_func(ax1_min, ax1_max, ax2_min, ax2_max, *cat_args)
             if (not os.path.isfile(self.b_cat_name.format(*cat_args)) or
                     self.cat_recreate):
-                self.b_cat_func(lmin, lmax, bmin, bmax, *cat_args)
+                self.b_cat_func(ax1_min, ax1_max, ax2_min, ax2_max, *cat_args)
 
         print('')
 
@@ -487,15 +499,15 @@ class AstrometricCorrections:
         if (self.snr_model_recreate or not
                 os.path.isfile('{}/npy/snr_mag_params.npy'.format(self.save_folder))):
             print("Making SNR model...")
-            abc_array = np.empty((len(self.mag_indices), len(self.lmids), 3), float)
+            abc_array = np.empty((len(self.mag_indices), len(self.ax1_mids), 3), float)
             for j in range(len(self.mag_indices)):
                 if self.make_plots:
-                    gs = self.make_gridspec('2', self.b_grid_length, self.l_grid_length, 0.8, 8)
+                    gs = self.make_gridspec('2', self.ax2_grid_length, self.ax1_grid_length, 0.8, 8)
 
                 pool = multiprocessing.Pool(self.n_pool)
-                counter = np.arange(0, len(self.lmids))
+                counter = np.arange(0, len(self.ax1_mids))
                 if self.coord_or_chunk == 'coord':
-                    iter_group = zip(counter, self.lmids, self.bmids, itertools.repeat(j))
+                    iter_group = zip(counter, self.ax1_mids, self.ax2_mids, itertools.repeat(j))
                 else:
                     iter_group = zip(counter, self.chunks, itertools.repeat(j))
 
@@ -506,7 +518,7 @@ class AstrometricCorrections:
                     abc_array[j, i, 1] = b
                     abc_array[j, i, 2] = c
 
-                    lmid, bmid = self.lmids[i], self.bmids[i]
+                    ax1_mid, ax2_mid = self.ax1_mids[i], self.ax2_mids[i]
 
                     if self.make_plots:
                         q = ~np.isnan(s_d_snr_med)
@@ -519,8 +531,11 @@ class AstrometricCorrections:
                         ax.errorbar((s_bins[:-1]+np.diff(s_bins)/2)[q], s_d_snr_med[q], fmt='k.',
                                     yerr=s_d_snr_dmed[q], zorder=3)
 
-                        ax.set_title('l = {}, b = {}\na = {:.2e}, b = {:.2e}, c = {:.2e}'
-                                     .format(lmid, bmid, a, b, c), fontsize=28)
+                        ax1_name = 'l' if self.coord_system == 'galactic' else 'RA'
+                        ax2_name = 'b' if self.coord_system == 'galactic' else 'Dec'
+                        ax.set_title('{} = {}, {} = {}\na = {:.2e}, b = {:.2e}, c = {:.2e}'
+                                     .format(ax1_name, ax1_mid, ax2_name, ax2_mid, a, b, c),
+                                     fontsize=28)
 
                         if usetex:
                             ax.set_xlabel('log$_{10}$(S)')
@@ -594,7 +609,7 @@ class AstrometricCorrections:
         Returns
         -------
         i : integer
-            Index into ``self.lmids``.
+            Index into ``self.ax1_mids``.
         res : ~scipy.optimize.OptimizeResult`
             Contains the results of the minimisation, as determined by `scipy`.
         s_bins : numpy.ndarray
@@ -647,13 +662,12 @@ class AstrometricCorrections:
                                                  for i in [dfda, dfdb, dfdc]])
 
         if self.coord_or_chunk == 'coord':
-            i, lmid, bmid, j = iterable
-            b = self.load_catalogue('b', (lmid, bmid))
+            i, ax1_mid, ax2_mid, j = iterable
+            b = self.load_catalogue('b', (ax1_mid, ax2_mid))
         else:
             i, chunk, j = iterable
             b = self.load_catalogue('b', (chunk,))
 
-        # TODO: un-hardcode magnitude/uncertainty/coordinate column numbers?
         s = 10**(-1/2.5 * b[:, self.mag_indices[j]])
         # Based on a naive dm = 2.5 log10((S+N)/S).
         snr = 1 / (10**(b[:, self.mag_unc_indices[j]] / 2.5) - 1)
@@ -726,18 +740,18 @@ class AstrometricCorrections:
                                 [3.84e+09, 1.57e+06, 3.91e+08, 4.66e+10, 3.03e+07]]
 
         if self.coord_or_chunk == 'coord':
-            zip_list = (self.lmids, self.bmids)
+            zip_list = (self.ax1_mids, self.ax2_mids)
         else:
-            zip_list = (self.lmids, self.bmids, self.chunks)
+            zip_list = (self.ax1_mids, self.ax2_mids, self.chunks)
         for index_, list_of_things in enumerate(zip(*zip_list)):
             print('Creating simulated star+galaxy counts... {}/{}'.format(
-                  index_+1, len(self.lmids)), end='\r')
+                  index_+1, len(self.ax1_mids)), end='\r')
             if self.coord_or_chunk == 'coord':
-                lmid, bmid = list_of_things
-                cat_args = (lmid, bmid)
-                file_name = '{}_{}'.format(lmid, bmid)
+                ax1_mid, ax2_mid = list_of_things
+                cat_args = (ax1_mid, ax2_mid)
+                file_name = '{}_{}'.format(ax1_mid, ax2_mid)
             else:
-                lmid, bmid, chunk = list_of_things
+                ax1_mid, ax2_mid, chunk = list_of_things
                 cat_args = (chunk,)
                 file_name = '{}'.format(chunk)
             if not self.count_recreate and \
@@ -747,22 +761,23 @@ class AstrometricCorrections:
 
             num_bright, num_faint = 90000, 0.75e6
             if (self.tri_download or not
-                    os.path.isfile('{}/{}_faint.dat'.format(self.trifolder,
-                                                            self.triname.format(lmid, bmid)))):
-                download_trilegal_simulation('.', self.trifilterset, lmid, bmid, self.magnum,
-                                             'galactic', self.maglim_f, total_objs=num_faint)
+                    os.path.isfile('{}/{}_faint.dat'.format(
+                        self.trifolder, self.triname.format(ax1_mid, ax2_mid)))):
+                download_trilegal_simulation('.', self.trifilterset, ax1_mid, ax2_mid, self.magnum,
+                                             self.coord_system, self.maglim_f, total_objs=num_faint)
                 os.system('mv trilegal_auf_simulation.dat {}/{}_faint.dat'
-                          .format(self.trifolder, self.triname.format(lmid, bmid)))
+                          .format(self.trifolder, self.triname.format(ax1_mid, ax2_mid)))
             if (self.tri_download or not
-                    os.path.isfile('{}/{}_bright.dat'.format(self.trifolder,
-                                                             self.triname.format(lmid, bmid)))):
-                download_trilegal_simulation('.', self.trifilterset, lmid, bmid, self.magnum,
-                                             'galactic', self.maglim_b, total_objs=num_bright)
+                    os.path.isfile('{}/{}_bright.dat'.format(
+                        self.trifolder, self.triname.format(ax1_mid, ax2_mid)))):
+                download_trilegal_simulation('.', self.trifilterset, ax1_mid, ax2_mid, self.magnum,
+                                             self.coord_system, self.maglim_b,
+                                             total_objs=num_bright)
                 os.system('mv trilegal_auf_simulation.dat {}/{}_bright.dat'
-                          .format(self.trifolder, self.triname.format(lmid, bmid)))
+                          .format(self.trifolder, self.triname.format(ax1_mid, ax2_mid)))
 
             tri_hist, tri_mags, _, dtri_mags, tri_uncert, tri_av = make_tri_counts(
-                self.trifolder, self.triname.format(lmid, bmid), self.trifiltname, self.dm)
+                self.trifolder, self.triname.format(ax1_mid, ax2_mid), self.trifiltname, self.dm)
             gal_dNs = create_galaxy_counts(
                 self.gal_cmau_array, tri_mags+dtri_mags/2, np.linspace(0, 4, 41),
                 self.gal_wav_micron, self.gal_alpha0, self.gal_alpha1, self.gal_alphaweight,
@@ -795,22 +810,23 @@ class AstrometricCorrections:
         """
         if (self.count_recreate or self.cat_recreate or not
                 os.path.isfile('{}/pdf/counts_comparison.pdf'.format(self.save_folder))):
-            gs = self.make_gridspec('123123', self.b_grid_length, self.l_grid_length, 0.8, 15)
+            gs = self.make_gridspec('123123', self.ax2_grid_length, self.ax1_grid_length, 0.8, 15)
             if self.coord_or_chunk == 'coord':
-                zip_list = (self.lmids, self.bmids, self.lmins, self.lmaxs, self.bmins, self.bmaxs)
+                zip_list = (self.ax1_mids, self.ax2_mids, self.ax1_mins, self.ax1_maxs,
+                            self.ax2_mins, self.ax2_maxs)
             else:
-                zip_list = (self.lmids, self.bmids, self.lmins, self.lmaxs, self.bmins,
-                            self.bmaxs, self.chunks)
+                zip_list = (self.ax1_mids, self.ax2_mids, self.ax1_mins, self.ax1_maxs,
+                            self.ax2_mins, self.ax2_maxs, self.chunks)
             for index_, list_of_things in enumerate(zip(*zip_list)):
                 print('Plotting data and model counts... {}/{}'.format(
-                      index_+1, len(self.lmids)), end='\r')
+                      index_+1, len(self.ax1_mids)), end='\r')
 
                 if self.coord_or_chunk == 'coord':
-                    lmid, bmid, lmin, lmax, bmin, bmax = list_of_things
-                    cat_args = (lmid, bmid)
-                    file_name = '{}_{}'.format(lmid, bmid)
+                    ax1_mid, ax2_mid, ax1_min, ax1_max, ax2_min, ax2_max = list_of_things
+                    cat_args = (ax1_mid, ax2_mid)
+                    file_name = '{}_{}'.format(ax1_mid, ax2_mid)
                 else:
-                    lmid, bmid, lmin, lmax, bmin, bmax, chunk = list_of_things
+                    ax1_mid, ax2_mid, ax1_min, ax1_max, ax2_min, ax2_max, chunk = list_of_things
                     cat_args = (chunk,)
                     file_name = '{}'.format(chunk)
 
@@ -821,10 +837,10 @@ class AstrometricCorrections:
                  [minmag], [maxmag], [N_norm]) = [npyfilez['arr_{}'.format(ii)] for ii in range(11)]
 
                 # Unit area is cos(t) dt dx for 0 <= t <= 90deg, 0 <= x <= 360 deg,
-                # integrated between bmin < t < bmax, lmin < x < lmax, converted
+                # integrated between ax2_min < t < ax2_max, ax1_min < x < ax1_max, converted
                 # to degrees.
-                rect_area = (lmax - (lmin)) * (
-                    np.sin(np.radians(bmax)) - np.sin(np.radians(bmin))) * 180/np.pi
+                rect_area = (ax1_max - (ax1_min)) * (
+                    np.sin(np.radians(ax2_max)) - np.sin(np.radians(ax2_min))) * 180/np.pi
 
                 mag_ind = self.mag_indices[self.best_mag_index]
                 data_mags = b[~np.isnan(b[:, mag_ind]), mag_ind]
@@ -834,7 +850,9 @@ class AstrometricCorrections:
                                     (data_mags <= maxmag)) / rect_area / N_norm
 
                 ax = plt.subplot(gs[index_])
-                ax.set_title('l = {}, b = {}'.format(lmid, bmid))
+                ax1_name = 'l' if self.coord_system == 'galactic' else 'RA'
+                ax2_name = 'b' if self.coord_system == 'galactic' else 'Dec'
+                ax.set_title('{} = {}, {} = {}'.format(ax1_name, ax1_mid, ax2_name, ax2_mid))
                 ax.errorbar(tri_mags+dtri_mags/2, log10y + np.log10(correction), yerr=dlog10y,
                             c='k', marker='.', zorder=1, ls='None')
 
@@ -874,20 +892,21 @@ class AstrometricCorrections:
         nearest neighbour match pairings for each cutout region.
         """
         if self.coord_or_chunk == 'coord':
-            zip_list = (self.lmids, self.bmids, self.lmins, self.lmaxs, self.bmins, self.bmaxs)
+            zip_list = (self.ax1_mids, self.ax2_mids, self.ax1_mins, self.ax1_maxs,
+                        self.ax2_mins, self.ax2_maxs)
         else:
-            zip_list = (self.lmids, self.bmids, self.lmins, self.lmaxs, self.bmins,
-                        self.bmaxs, self.chunks)
+            zip_list = (self.ax1_mids, self.ax2_mids, self.ax1_mins, self.ax1_maxs, self.ax2_mins,
+                        self.ax2_maxs, self.chunks)
         for index_, list_of_things in enumerate(zip(*zip_list)):
             print('Creating local densities and nearest neighbour matches... {}/{}'.format(
-                index_+1, len(self.lmids)), end='\r')
+                index_+1, len(self.ax1_mids)), end='\r')
 
             if self.coord_or_chunk == 'coord':
-                lmid, bmid, lmin, lmax, bmin, bmax = list_of_things
-                cat_args = (lmid, bmid)
-                file_name = '{}_{}'.format(lmid, bmid)
+                ax1_mid, ax2_mid, ax1_min, ax1_max, ax2_min, ax2_max = list_of_things
+                cat_args = (ax1_mid, ax2_mid)
+                file_name = '{}_{}'.format(ax1_mid, ax2_mid)
             else:
-                lmid, bmid, lmin, lmax, bmin, bmax, chunk = list_of_things
+                ax1_mid, ax2_mid, ax1_min, ax1_max, ax2_min, ax2_max, chunk = list_of_things
                 cat_args = (chunk,)
                 file_name = '{}'.format(chunk)
 
@@ -902,19 +921,19 @@ class AstrometricCorrections:
             _, _, _, _, _, _, _, _, [minmag], [maxmag], _ = \
                 [npyfilez['arr_{}'.format(ii)] for ii in range(11)]
 
-            lon_slice = np.linspace(lmin, lmax, int(np.floor((lmax-lmin)*2 + 1)))
-            lat_slice = np.linspace(bmin, bmax, int(np.floor((bmax-bmin)*2 + 1)))
+            lon_slice = np.linspace(ax1_min, ax1_max, int(np.floor((ax1_max-ax1_min)*2 + 1)))
+            lat_slice = np.linspace(ax2_min, ax2_max, int(np.floor((ax2_max-ax2_min)*2 + 1)))
 
             Narray = create_densities(
-                lmid, bmid, b, minmag, maxmag, lon_slice, lat_slice, lmin, lmax, bmin, bmax,
-                self.dens_search_radius, self.n_pool, self.dens_recreate, self.save_folder,
-                self.mag_indices[self.best_mag_index], self.pos_and_err_indices[1][0],
-                self.pos_and_err_indices[1][1])
+                ax1_mid, ax2_mid, b, minmag, maxmag, lon_slice, lat_slice, ax1_min, ax1_max,
+                ax2_min, ax2_max, self.dens_search_radius, self.n_pool, self.dens_recreate,
+                self.save_folder, self.mag_indices[self.best_mag_index],
+                self.pos_and_err_indices[1][0], self.pos_and_err_indices[1][1], self.coord_system)
 
             _, bmatch, dists = create_distances(
-                a, b, lmid, bmid, self.nn_radius, self.nn_recreate, self.save_folder,
+                a, b, ax1_mid, ax2_mid, self.nn_radius, self.nn_recreate, self.save_folder,
                 self.pos_and_err_indices[0][0], self.pos_and_err_indices[0][1],
-                self.pos_and_err_indices[1][0], self.pos_and_err_indices[1][1])
+                self.pos_and_err_indices[1][0], self.pos_and_err_indices[1][1], self.coord_system)
 
             # TODO: extend to 3-D search around N-m-sig to find as many good
             # enough bins as possible, instead of only keeping one N-sig bin
@@ -935,14 +954,15 @@ class AstrometricCorrections:
         """
         abc_array = np.load('{}/npy/snr_mag_params.npy'.format(self.save_folder))
         if self.coord_or_chunk == 'coord':
-            zip_list = (self.lmids, self.bmids)
+            zip_list = (self.ax1_mids, self.ax2_mids)
         else:
             zip_list = (self.chunks,)
         for index_, list_of_things in enumerate(zip(*zip_list)):
-            print('Creating AUF simulations... {}/{}'.format(index_+1, len(self.lmids)), end='\r')
+            print('Creating AUF simulations... {}/{}'.format(index_+1, len(self.ax1_mids)),
+                  end='\r')
             if self.coord_or_chunk == 'coord':
-                lmid, bmid = list_of_things
-                file_name = '{}_{}'.format(lmid, bmid)
+                ax1_mid, ax2_mid = list_of_things
+                file_name = '{}_{}'.format(ax1_mid, ax2_mid)
             else:
                 chunk, = list_of_things
                 file_name = '{}'.format(chunk)
@@ -999,16 +1019,16 @@ class AstrometricCorrections:
         statistics such as average magnitude or SNR.
         """
         if self.coord_or_chunk == 'coord':
-            zip_list = (self.lmids, self.bmids)
+            zip_list = (self.ax1_mids, self.ax2_mids)
         else:
             zip_list = (self.chunks,)
         for index_, list_of_things in enumerate(zip(*zip_list)):
             print('Creating catalogue AUF probability densities... {}/{}'.format(
-                  index_+1, len(self.lmids)), end='\r')
+                  index_+1, len(self.ax1_mids)), end='\r')
             if self.coord_or_chunk == 'coord':
-                lmid, bmid = list_of_things
-                cat_args = (lmid, bmid)
-                file_name = '{}_{}'.format(lmid, bmid)
+                ax1_mid, ax2_mid = list_of_things
+                cat_args = (ax1_mid, ax2_mid)
+                file_name = '{}_{}'.format(ax1_mid, ax2_mid)
             else:
                 chunk, = list_of_things
                 cat_args = (chunk,)
@@ -1099,14 +1119,15 @@ class AstrometricCorrections:
         a_array = np.load('{}/npy/snr_mag_params.npy'.format(self.save_folder))[
             self.best_mag_index, :, 0]
         if self.coord_or_chunk == 'coord':
-            zip_list = (self.lmids, self.bmids, a_array)
+            zip_list = (self.ax1_mids, self.ax2_mids, a_array)
         else:
             zip_list = (self.chunks, a_array)
         for index_, list_of_things in enumerate(zip(*zip_list)):
-            print('Creating joint H/sig fits... {}/{}'.format(index_+1, len(self.lmids)), end='\r')
+            print('Creating joint H/sig fits... {}/{}'.format(index_+1, len(self.ax1_mids)),
+                  end='\r')
             if self.coord_or_chunk == 'coord':
-                lmid, bmid, _a = list_of_things
-                file_name = '{}_{}'.format(lmid, bmid)
+                ax1_mid, ax2_mid, _a = list_of_things
+                file_name = '{}_{}'.format(ax1_mid, ax2_mid)
             else:
                 chunk, _a = list_of_things
                 file_name = '{}'.format(chunk)
@@ -1306,16 +1327,16 @@ class AstrometricCorrections:
         Returns
         -------
         index : integer
-            Index into ``lmids`` for the run. Only returned if ``fit_x2_flag``
+            Index into ``ax1_mids`` for the run. Only returned if ``fit_x2_flag``
             is ``True``.
         x2s : numpy.ndarray
             The chi-squared goodness-of-fit results from all fits performed
             in this sightline. Only returned if ``fit_x2_flag`` is ``True``.
         """
         if self.coord_or_chunk == 'coord':
-            index, lmid, bmid, _a, (fit_x2_flag) = iterable
-            cat_args = (lmid, bmid)
-            file_name = '{}_{}'.format(lmid, bmid)
+            index, ax1_mid, ax2_mid, _a, (fit_x2_flag) = iterable
+            cat_args = (ax1_mid, ax2_mid)
+            file_name = '{}_{}'.format(ax1_mid, ax2_mid)
         else:
             index, chunk, _a, (fit_x2_flag) = iterable
             cat_args = (chunk,)
@@ -1467,7 +1488,7 @@ class AstrometricCorrections:
         fit_x2_flag = (self.fit_x2s_recreate or not
                        os.path.isfile('{}/npy/fit_x2s.npy'.format(self.save_folder)))
         if fit_x2_flag:
-            x2s = np.ones((len(self.lmids), len(self.mag_array), 2), float) * np.nan
+            x2s = np.ones((len(self.ax1_mids), len(self.mag_array), 2), float) * np.nan
 
         a_array = np.load('{}/npy/snr_mag_params.npy'.format(self.save_folder))[
             self.best_mag_index, :, 0]
@@ -1478,14 +1499,14 @@ class AstrometricCorrections:
         elif fit_x2_flag:
             print('Calculating goodness-of-fits...')
         pool = multiprocessing.Pool(self.n_pool)
-        counter = np.arange(0, len(self.lmids))
+        counter = np.arange(0, len(self.ax1_mids))
         if self.coord_or_chunk == 'coord':
-            iter_group = zip(counter, self.lmids, self.bmids, a_array,
+            iter_group = zip(counter, self.ax1_mids, self.ax2_mids, a_array,
                              itertools.repeat(fit_x2_flag))
         else:
             iter_group = zip(counter, self.chunks, a_array, itertools.repeat(fit_x2_flag))
         for results in pool.imap_unordered(self.make_plot_calc_chisq, iter_group,
-                                           chunksize=len(self.lmids)//self.n_pool):
+                                           chunksize=len(self.ax1_mids)//self.n_pool):
             if fit_x2_flag:
                 index, chi_sq = results
                 x2s[index, :, :] = chi_sq
@@ -1540,7 +1561,8 @@ class AstrometricCorrections:
             print("Creating sig-sig relations...")
         else:
             print("Creating sig-sig relations and SNR-H summary figure...")
-            gs_s = self.make_gridspec('123123b', self.b_grid_length, self.l_grid_length, 0.8, 15)
+            gs_s = self.make_gridspec('123123b', self.ax2_grid_length, self.ax1_grid_length,
+                                      0.8, 15)
             gs = self.make_gridspec('12312', 2, 2, 0.8, 10)
             ax_b = plt.subplot(gs[0])
             ax_d = plt.subplot(gs[1])
@@ -1552,20 +1574,20 @@ class AstrometricCorrections:
                     'chocolate', 'darksalmon', 'steelblue', 'slateblue', 'tan', 'yellowgreen',
                     'silver']
 
-        m_sigs = np.empty_like(self.lmids)
-        n_sigs = np.empty_like(self.lmids)
+        m_sigs = np.empty_like(self.ax1_mids)
+        n_sigs = np.empty_like(self.ax1_mids)
 
         if self.coord_or_chunk == 'coord':
-            zip_list = (self.lmids, self.bmids)
+            zip_list = (self.ax1_mids, self.ax2_mids)
         else:
-            zip_list = (self.lmids, self.bmids, self.chunks)
+            zip_list = (self.ax1_mids, self.ax2_mids, self.chunks)
 
         for i, list_of_things in enumerate(zip(*zip_list)):
             if self.coord_or_chunk == 'coord':
-                lmid, bmid = list_of_things
-                file_name = '{}_{}'.format(lmid, bmid)
+                ax1_mid, ax2_mid = list_of_things
+                file_name = '{}_{}'.format(ax1_mid, ax2_mid)
             else:
-                lmid, bmid, chunk = list_of_things
+                ax1_mid, ax2_mid, chunk = list_of_things
                 file_name = '{}'.format(chunk)
             npyfilez = np.load('{}/npy/auf_pdf_{}.npz'.format(
                                self.save_folder, file_name), allow_pickle=True)
@@ -1609,8 +1631,10 @@ class AstrometricCorrections:
                 else:
                     ax1.set_xlabel(r'Input astrometric sigma / "')
                     ax1.set_ylabel(r'Fit astrometric sigma / "')
-                ax1.set_title('l = {}, b = {}\nm = {:.2f}, a = {:.2f}'.format(
-                              lmid, bmid, m_sig, n_sig))
+                ax1_name = 'l' if self.coord_system == 'galactic' else 'RA'
+                ax2_name = 'b' if self.coord_system == 'galactic' else 'Dec'
+                ax1.set_title('{} = {}, {} = {}\nm = {:.2f}, a = {:.2f}'.format(
+                              ax1_name, ax1_mid, ax2_name, ax2_mid, m_sig, n_sig))
                 ax1.legend()
                 plt.figure('12312')
                 ax_b.errorbar(data_sigs[~skip_flags, 0], fit_sigs[~skip_flags, 0],
@@ -1661,11 +1685,13 @@ class AstrometricCorrections:
 
             for i, (f, label) in enumerate(zip([m_sigs, n_sigs], ['m', 'n'])):
                 ax = plt.subplot(gs[i+2])
-                img = ax.scatter(self.lmids, self.bmids, c=f, cmap='viridis')
+                img = ax.scatter(self.ax1_mids, self.ax2_mids, c=f, cmap='viridis')
                 c = plt.colorbar(img, ax=ax, use_gridspec=True)
                 c.ax.set_ylabel(label)
-                ax.set_xlabel('l / deg')
-                ax.set_ylabel('b / deg')
+                ax1_name = 'l' if self.coord_system == 'galactic' else 'RA'
+                ax2_name = 'b' if self.coord_system == 'galactic' else 'Dec'
+                ax.set_xlabel('{} / deg'.format(ax1_name))
+                ax.set_ylabel('{} / deg'.format(ax2_name))
 
             plt.tight_layout()
             plt.savefig('{}/pdf/sig_h_stats.pdf'.format(self.save_folder))
@@ -1683,7 +1709,7 @@ class AstrometricCorrections:
         sub_cat_id : list
             Contains the variables to format the name of the catalogue with,
             in the sense of ``string.format(x, y, ...)``. Should either contain
-            l and b, or chunk ID, depending on ``coord_or_chunk``.
+            ax1 and ax2, or chunk ID, depending on ``coord_or_chunk``.
 
         Returns
         -------
@@ -1701,17 +1727,17 @@ class AstrometricCorrections:
         return x
 
 
-def create_densities(lmid, bmid, b, minmag, maxmag, lon_slice, lat_slice, lmin, lmax, bmin,
-                     bmax, search_radius, n_pool, dens_recreate, save_folder,
-                     mag_ind, l_ind, b_ind):
+def create_densities(ax1_mid, ax2_mid, b, minmag, maxmag, lon_slice, lat_slice, ax1_min, ax1_max,
+                     ax2_min, ax2_max, search_radius, n_pool, dens_recreate, save_folder,
+                     mag_ind, ax1_ind, ax2_ind, coord_system):
     """
     Generate local normalising densities for all sources in catalogue "b".
 
     Parameters
     ----------
-    lmid : float
+    ax1_mid : float
         Longitude of the center of the cutout region.
-    bmid : float
+    ax2_mid : float
         Latitude of the middle of the cutout region.
     b : numpy.ndarray
         Catalogue of the sources for which astrometric corrections should be
@@ -1723,18 +1749,18 @@ def create_densities(lmid, bmid, b, minmag, maxmag, lon_slice, lat_slice, lmin, 
         Faintest magnitude within which to determine the density of catalogue
         ``b`` objects.
     lon_slice : numpy.ndarray
-        Array of intermediate longitude values, between ``lmin`` and
-        ``lmax``, used to load smaller sub-sets of the catalogue ``b``.
+        Array of intermediate longitude values, between ``ax1_min`` and
+        ``ax1_max``, used to load smaller sub-sets of the catalogue ``b``.
     lat_slice : numpy.ndarray
-        An array of intermediate latitude values, between ``bmin`` and
-        ``bmax``, used to load smaller sub-sets of the catalogue ``b``.
-    lmin : float
+        An array of intermediate latitude values, between ``ax2_min`` and
+        ``ax2_max``, used to load smaller sub-sets of the catalogue ``b``.
+    ax1_min : float
         The minimum longitude of the box of the cutout region.
-    lmax : float
+    ax1_max : float
         The maximum longitude of the box of the cutout region.
-    bmin : float
+    ax2_min : float
         The minimum latitude of the box of the cutout region.
-    bmax : float
+    ax2_max : float
         The maximum latitude of the box of the cutout region.
     search_radius : float
         Radius, in arcseconds, around which to calculate the density of objects.
@@ -1750,10 +1776,13 @@ def create_densities(lmid, bmid, b, minmag, maxmag, lon_slice, lat_slice, lmin, 
         Location on disk into which to save densities.
     mag_ind : integer
         Index in ``b`` where the magnitude being used is stored.
-    l_ind : integer
+    ax1_ind : integer
         Index of ``b`` for the longitudinal coordinate column.
-    b_ind : integer
-        ``b`` index for the galactic latitude data.
+    ax2_ind : integer
+        ``b`` index for the latitude data.
+    coord_system : string
+        Determines whether we are in equatorial or galactic coordinates for
+        separation considerations.
 
     Returns
     -------
@@ -1786,11 +1815,17 @@ def create_densities(lmid, bmid, b, minmag, maxmag, lon_slice, lat_slice, lmin, 
         return kdt
 
     if dens_recreate or not os.path.isfile('{}/npy/narray_sky_{}_{}.npy'.format(
-                                           save_folder, lmid, bmid)):
+                                           save_folder, ax1_mid, ax2_mid)):
         cutmag = (b[:, mag_ind] >= minmag) & (b[:, mag_ind] <= maxmag)
 
-        full_cat = SkyCoord(l=b[:, l_ind], b=b[:, b_ind], unit='deg', frame='galactic')
-        mag_cut_cat = SkyCoord(l=b[cutmag, l_ind], b=b[cutmag, b_ind], unit='deg', frame='galactic')
+        if coord_system == 'galactic':
+            full_cat = SkyCoord(l=b[:, ax1_ind], b=b[:, ax2_ind], unit='deg', frame='galactic')
+            mag_cut_cat = SkyCoord(l=b[cutmag, ax1_ind], b=b[cutmag, ax2_ind], unit='deg',
+                                   frame='galactic')
+        else:
+            full_cat = SkyCoord(ra=b[:, ax1_ind], dec=b[:, ax2_ind], unit='deg', frame='icrs')
+            mag_cut_cat = SkyCoord(ra=b[cutmag, ax1_ind], dec=b[cutmag, ax2_ind], unit='deg',
+                                   frame='icrs')
 
         full_urepr = full_cat.data.represent_as(UnitSphericalRepresentation)
         full_ucoords = full_cat.realize_frame(full_urepr)
@@ -1812,13 +1847,13 @@ def create_densities(lmid, bmid, b, minmag, maxmag, lon_slice, lat_slice, lmin, 
         pool.close()
         pool.join()
 
-        area = paf.get_circle_area_overlap(b[:, l_ind], b[:, b_ind], search_radius/3600,
-                                           lmin, lmax, bmin, bmax)
+        area = paf.get_circle_area_overlap(b[:, ax1_ind], b[:, ax2_ind], search_radius/3600,
+                                           ax1_min, ax1_max, ax2_min, ax2_max)
 
         Narray = overlap_number / area
 
-        np.save('{}/npy/narray_sky_{}_{}.npy'.format(save_folder, lmid, bmid), Narray)
-    Narray = np.load('{}/npy/narray_sky_{}_{}.npy'.format(save_folder, lmid, bmid))
+        np.save('{}/npy/narray_sky_{}_{}.npy'.format(save_folder, ax1_mid, ax2_mid), Narray)
+    Narray = np.load('{}/npy/narray_sky_{}_{}.npy'.format(save_folder, ax1_mid, ax2_mid))
 
     return Narray
 
@@ -1852,8 +1887,8 @@ def ball_point_query(iterable):
     return i, len(kdt_query)
 
 
-def create_distances(a, b, lmid, bmid, nn_radius, match_recreate, save_folder, a_l_ind, a_b_ind,
-                     b_l_ind, b_b_ind):
+def create_distances(a, b, ax1_mid, ax2_mid, nn_radius, match_recreate, save_folder, a_ax1_ind,
+                     a_ax2_ind, b_ax1_ind, b_ax2_ind, coord_system):
     """
     Calculate nearest neighbour matches between two catalogues.
 
@@ -1865,9 +1900,9 @@ def create_distances(a, b, lmid, bmid, nn_radius, match_recreate, save_folder, a
     b : numpy.ndarray
         Catalogue "b"'s object array. Longitude and latitude must be its first
         two axes respectively.
-    lmid : float
+    ax1_mid : float
         Center of the cutout region in longitude.
-    bmid : float
+    ax2_mid : float
         Latitude of the cutout region's central coordinate.
     nn_radius : float
         Maximum match radius within which to consider potential counterpart
@@ -1877,14 +1912,16 @@ def create_distances(a, b, lmid, bmid, nn_radius, match_recreate, save_folder, a
         if previous runs on disk can be used instead.
     save_folder : string
         Location on disk where matches should be saved.
-    a_l_ind : integer
-        Index into ``a`` of the galactic longitude data.
-    a_b_ind : integer
-        ``a`` index for galactic latitude column.
-    b_l_ind : integer
+    a_ax1_ind : integer
+        Index into ``a`` of the longitude data.
+    a_ax2_ind : integer
+        ``a`` index for latitude column.
+    b_ax1_ind : integer
         Longitude index in the ``b`` dataset.
-    b_b_ind : integer
-        Index into ``b`` that holds the galactic latitude data.
+    b_ax2_ind : integer
+        Index into ``b`` that holds the latitude data.
+    coord_system : string
+        Sets coordinate system to equatorial or galactic.
 
     Returns
     -------
@@ -1899,12 +1936,17 @@ def create_distances(a, b, lmid, bmid, nn_radius, match_recreate, save_folder, a
         The separations between each nearest neighbour match, in arcseconds.
     """
     if (match_recreate or
-            not os.path.isfile('{}/npy/a_matchind_{}_{}.npy'.format(save_folder, lmid, bmid)) or
-            not os.path.isfile('{}/npy/b_matchind_{}_{}.npy'.format(save_folder, lmid, bmid)) or
-            not os.path.isfile('{}/npy/ab_dists_{}_{}.npy'.format(save_folder, lmid, bmid))):
-        # TODO: make flexible if we relax requirement of Galactic coordinates.
-        ac = SkyCoord(l=a[:, a_l_ind], b=a[:, a_b_ind], unit='deg', frame='galactic')
-        bc = SkyCoord(l=b[:, b_l_ind], b=b[:, b_b_ind], unit='deg', frame='galactic')
+            not os.path.isfile('{}/npy/a_matchind_{}_{}.npy'.format(
+                save_folder, ax1_mid, ax2_mid)) or
+            not os.path.isfile('{}/npy/b_matchind_{}_{}.npy'.format(
+                save_folder, ax1_mid, ax2_mid)) or
+            not os.path.isfile('{}/npy/ab_dists_{}_{}.npy'.format(save_folder, ax1_mid, ax2_mid))):
+        if coord_system == 'galactic':
+            ac = SkyCoord(l=a[:, a_ax1_ind], b=a[:, a_ax2_ind], unit='deg', frame='galactic')
+            bc = SkyCoord(l=b[:, b_ax1_ind], b=b[:, b_ax2_ind], unit='deg', frame='galactic')
+        else:
+            ac = SkyCoord(ra=a[:, a_ax1_ind], dec=a[:, a_ax2_ind], unit='deg', frame='icrs')
+            bc = SkyCoord(ra=b[:, b_ax1_ind], dec=b[:, b_ax2_ind], unit='deg', frame='icrs')
         amatchind, adists, _ = match_coordinates_sky(ac, bc)
         bmatchind, bdists, _ = match_coordinates_sky(bc, ac)
         # Since match_coordinates_sky doesn't set a maximum cutoff, we manually
@@ -1928,11 +1970,11 @@ def create_distances(a, b, lmid, bmid, nn_radius, match_recreate, save_folder, a
         amatch = _ainds[found_match_slice][found_match_slice2]
         dists = adists[found_match_slice][found_match_slice2]
 
-        np.save('{}/npy/a_matchind_{}_{}.npy'.format(save_folder, lmid, bmid), amatch)
-        np.save('{}/npy/b_matchind_{}_{}.npy'.format(save_folder, lmid, bmid), bmatch)
-        np.save('{}/npy/ab_dists_{}_{}.npy'.format(save_folder, lmid, bmid), dists)
-    amatch = np.load('{}/npy/a_matchind_{}_{}.npy'.format(save_folder, lmid, bmid))
-    bmatch = np.load('{}/npy/b_matchind_{}_{}.npy'.format(save_folder, lmid, bmid))
-    dists = np.load('{}/npy/ab_dists_{}_{}.npy'.format(save_folder, lmid, bmid))
+        np.save('{}/npy/a_matchind_{}_{}.npy'.format(save_folder, ax1_mid, ax2_mid), amatch)
+        np.save('{}/npy/b_matchind_{}_{}.npy'.format(save_folder, ax1_mid, ax2_mid), bmatch)
+        np.save('{}/npy/ab_dists_{}_{}.npy'.format(save_folder, ax1_mid, ax2_mid), dists)
+    amatch = np.load('{}/npy/a_matchind_{}_{}.npy'.format(save_folder, ax1_mid, ax2_mid))
+    bmatch = np.load('{}/npy/b_matchind_{}_{}.npy'.format(save_folder, ax1_mid, ax2_mid))
+    dists = np.load('{}/npy/ab_dists_{}_{}.npy'.format(save_folder, ax1_mid, ax2_mid))
 
     return amatch, bmatch, dists
