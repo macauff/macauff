@@ -146,6 +146,6 @@ class TestAstroCorrection:
         bmids = np.load('ac_save_folder/npy/ax2_mids.npy')
         assert_allclose([lmids[0], bmids[0]], [105, 0], atol=0.001)
 
-        abc_array = np.load('ac_save_folder/npy/snr_model.npy')
+        abc_array = np.load('ac_save_folder/npy/snr_mag_params.npy')
         assert_allclose(abc_array[0, 0, 0], 1.2e-2, rtol=0.05, atol=0.001)
         assert_allclose(abc_array[0, 0, 1], 8e-17, rtol=0.05, atol=5e-19)
