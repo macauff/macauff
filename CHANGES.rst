@@ -66,6 +66,9 @@ New Features
 Bug Fixes
 ^^^^^^^^^
 
+- ``AstrometricCorrections`` makes a correctly multi-magnitude SNR model
+  array. [#59]
+
 - ``npy_to_csv`` expected contamination probability arrays to be transposed from
   their ``CrossMatch`` output shape, but they now correctly assume
   fortran-ordering. [#58]
@@ -134,6 +137,34 @@ Bug Fixes
 
 API Changes
 ^^^^^^^^^^^
+
+- Added new keyword ``pregenerate_cutouts`` to ``AstometricCorrections``, indicating
+  whether sightlines can be assumed to be pre-made or if they should be able to be
+  made on-the-fly as part of the correction-fitting process. [#59]
+
+- ``AstrometricCorrection`` had ``cutout_area`` and ``cutout_height``, as well as
+  ``a_cat_func`` and ``b_cat_func``, made optional keywords. [#59]
+
+- ``AstrometricCorrections`` now takes keyword input ``coord_system`` to determine
+  whether coordinates fed into the class are in equatorial or galactic coordinates,
+  handling conversions and consistency where necessary. Additionally, keywords were
+  given more general names reflecting this change and now the class requires
+  ``ax1_mids``, ``ax2_mids``, and ``ax_dimension`` instead of ``lmids``, ``bmids``,
+  or ``lb_dimension``. [#59]
+
+- ``CrossMatch`` now expects ``snr_mag_params_path`` rather than
+  ``mag_h_params_path``, and ``CrossMatch`` loads and ``AstrometricCorrections``
+  saves ``snr_mag_params.npy`` as the file containing the magnitude-SNR
+  correlation parameterisation. [#59]
+
+- Added new input keywords to ``AstrometricCorrections`` for the indexes of position
+  and magnitudes and their uncertainties, along with the most complete magnitude to
+  use in construction of any updates to astrometry of a given catalogue. [#59]
+
+- ``AstrometricCorrections`` accepts three new keywords: ``npy_or_csv``,
+  ``coords_or_chunk``, and ``chunks`` which allow for the specification of file
+  type and structure of small sightlines used to check astrometry of a
+  catalogue. [#59]
 
 - ``npy_to_csv`` always requires two nested lists when using ``extra_col_*_lists``,
   rather than allowing a singular ``None``. The default is now ``[None, None]`` for
