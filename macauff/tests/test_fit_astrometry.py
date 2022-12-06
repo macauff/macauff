@@ -157,6 +157,23 @@ class TestAstroCorrection:
             AstrometricCorrections(
                 **_kwargs, ax_dimension=1, npy_or_csv='csv', pregenerate_cutouts=False,
                 coord_or_chunk='coord', coord_system='equatorial')
+        ac = AstrometricCorrections(
+            **_kwargs, ax_dimension=1, npy_or_csv='csv', pregenerate_cutouts=False,
+            coord_or_chunk='coord', coord_system='equatorial', cutout_area=60, cutout_height=6)
+        self.a_cat_name = 'store_data/a_cat{}{}.npy'
+        self.b_cat_name = 'store_data/b_cat{}{}.npy'
+        with pytest.raises(ValueError, match='a_cat_func must be given if pregenerate_cutouts '):
+            ac(self.a_cat_name, self.b_cat_name, a_cat_func=None, b_cat_func=None,
+               cat_recreate=True, snr_model_recreate=True, count_recreate=True, tri_download=False,
+               dens_recreate=True, nn_recreate=True, auf_sim_recreate=True, auf_pdf_recreate=True,
+               h_o_fit_recreate=True, fit_x2s_recreate=True, make_plots=True,
+               make_summary_plot=True)
+        with pytest.raises(ValueError, match='b_cat_func must be given if pregenerate_cutouts '):
+            ac(self.a_cat_name, self.b_cat_name, a_cat_func=self.fake_cata_cutout, b_cat_func=None,
+               cat_recreate=True, snr_model_recreate=True, count_recreate=True, tri_download=False,
+               dens_recreate=True, nn_recreate=True, auf_sim_recreate=True, auf_pdf_recreate=True,
+               h_o_fit_recreate=True, fit_x2s_recreate=True, make_plots=True,
+               make_summary_plot=True)
         dd_params = np.load(os.path.join(os.path.dirname(__file__), 'data/dd_params.npy'))
         l_cut = np.load(os.path.join(os.path.dirname(__file__), 'data/l_cut.npy'))
         ax1_mids, ax2_mids = np.array([105], dtype=float), np.array([0], dtype=float)
@@ -178,8 +195,6 @@ class TestAstroCorrection:
             mag_names=['W1'], best_mag_index=0, coord_system='equatorial', chunks=chunks,
             pregenerate_cutouts=True)
         self.npy_or_csv = 'npy'
-        self.a_cat_name = 'store_data/a_cat{}{}.npy'
-        self.b_cat_name = 'store_data/b_cat{}{}.npy'
         cat_args = (105.0, 0.0)
         if os.path.isfile(self.a_cat_name.format(*cat_args)):
             os.remove(self.a_cat_name.format(*cat_args))
