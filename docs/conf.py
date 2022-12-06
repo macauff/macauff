@@ -90,6 +90,8 @@ automodapi_toctreedirnm = 'api'
 # the __init__ docstring
 autoclass_content = "both"
 
+toc_object_entries = False
+
 # -- Options for HTML output -------------------------------------------------
 
 # The theme to use for HTML and HTML Help pages.  See the documentation for

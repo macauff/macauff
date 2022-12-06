@@ -67,8 +67,10 @@ class TestInputs:
         np.save('{}/con_cat_photo.npy'.format(self.b_cat_folder_path), np.zeros((2, 4), float))
         np.save('{}/magref.npy'.format(self.b_cat_folder_path), np.zeros(2, float))
 
-        mag_h_params = np.ones((3, 5), float)
-        np.save('mag_h_params.npy', mag_h_params)
+        os.makedirs('a_snr_mag', exist_ok=True)
+        os.makedirs('b_snr_mag', exist_ok=True)
+        np.save('a_snr_mag/snr_mag_params.npy', np.ones((3, 3, 5), float))
+        np.save('b_snr_mag/snr_mag_params.npy', np.ones((4, 3, 5), float))
 
     def test_crossmatch_run_input(self):
         cm = CrossMatch(os.path.join(os.path.dirname(__file__), 'data'), use_memmap_files=True)
@@ -580,9 +582,9 @@ class TestInputs:
                                      'data/cat_b_params.txt'))
 
         for old_line, var_name in zip(['fit_gal_flag = no', 'run_fw_auf = yes', 'run_psf_auf = no',
-                                       'mag_h_params_path = .'],
+                                       'snr_mag_params_path = '],
                                       ['fit_gal_flag', 'run_fw_auf', 'run_psf_auf',
-                                       'mag_h_params_path']):
+                                       'snr_mag_params_path']):
             for cat_reg, cat_name in zip(['"a"', '"b"'], ['cat_a_params', 'cat_b_params']):
                 f = open(os.path.join(os.path.dirname(__file__),
                          'data/{}.txt'.format(cat_name))).readlines()
@@ -624,8 +626,9 @@ class TestInputs:
                           'data/{}_.txt'.format(cat_name)))
             f = open(os.path.join(os.path.dirname(__file__),
                      'data/{}_.txt'.format(cat_name))).readlines()
-            old_line = 'mag_h_params_path = .'
-            new_line = 'mag_h_params_path = .\ndd_params_path = .\nl_cut_path = .\n'
+            old_line = 'snr_mag_params_path = '
+            new_line = ('snr_mag_params_path = {}_snr_mag\ndd_params_path = .\n'
+                        'l_cut_path = .\n'.format(cat_reg[1]))
             idx = np.where([old_line in line for line in f])[0][0]
             _replace_line(os.path.join(os.path.dirname(__file__),
                           'data/{}_.txt'.format(cat_name)), idx, new_line)
@@ -666,29 +669,30 @@ class TestInputs:
                           'data/{}_.txt'.format(cat_name)))
             f = open(os.path.join(os.path.dirname(__file__),
                      'data/{}_.txt'.format(cat_name))).readlines()
-            old_line = 'mag_h_params_path = .'
-            new_line = 'mag_h_params_path = .\ndd_params_path = .\nl_cut_path = .\n'
+            old_line = 'snr_mag_params_path = {}_snr_mag'.format(cat_name[4])
+            new_line = ('snr_mag_params_path = {}_snr_mag\ndd_params_path = .\n'
+                        'l_cut_path = .\n'.format(cat_name[4]))
             idx = np.where([old_line in line for line in f])[0][0]
             _replace_line(os.path.join(os.path.dirname(__file__),
                           'data/{}_.txt'.format(cat_name)), idx, new_line)
         f = open(os.path.join(os.path.dirname(__file__),
                  'data/cat_b_params_.txt')).readlines()
-        old_line = 'mag_h_params_path = .'
-        new_line = 'mag_h_params_path = /some/path/or/other\n'
+        old_line = 'snr_mag_params_path = b_snr_mag'
+        new_line = 'snr_mag_params_path = /some/path/or/other\n'
         idx = np.where([old_line in line for line in f])[0][0]
         _replace_line(os.path.join(os.path.dirname(__file__),
                       'data/cat_b_params_.txt'), idx, new_line,
                       out_file=os.path.join(os.path.dirname(__file__), 'data/cat_b_params__.txt'))
-        with pytest.raises(OSError, match='b_mag_h_params_path does not exist.'):
+        with pytest.raises(OSError, match='b_snr_mag_params_path does not exist.'):
             cm._initialise_chunk(os.path.join(os.path.dirname(__file__),
                                  'data/crossmatch_params_.txt'),
                                  os.path.join(os.path.dirname(__file__),
                                  'data/cat_a_params_.txt'),
                                  os.path.join(os.path.dirname(__file__),
                                  'data/cat_b_params__.txt'))
-        os.remove('mag_h_params.npy')
+        os.remove('a_snr_mag/snr_mag_params.npy')
         with pytest.raises(FileNotFoundError,
-                           match='mag_h_params file not found in catalogue "a" path'):
+                           match='snr_mag_params file not found in catalogue "a" path'):
             cm._initialise_chunk(os.path.join(os.path.dirname(__file__),
                                  'data/crossmatch_params_.txt'),
                                  os.path.join(os.path.dirname(__file__),
@@ -696,21 +700,21 @@ class TestInputs:
                                  os.path.join(os.path.dirname(__file__),
                                  'data/cat_b_params_.txt'))
         for fn, array, err_msg in zip([
-                'mag_h_params', 'mag_h_params', 'mag_h_params', 'dd_params', 'dd_params',
+                'snr_mag_params', 'snr_mag_params', 'snr_mag_params', 'dd_params', 'dd_params',
                 'dd_params', 'dd_params', 'l_cut', 'l_cut'],
                 [np.ones(4, float), np.ones((5, 3, 2), float), np.ones((4, 4), float),
                  np.ones(5, float), np.ones((5, 3), float), np.ones((4, 4, 2), float),
                  np.ones((5, 3, 1), float), np.ones((4, 2), float), np.ones(4, float)],
-                [r'a_mag_h_params should be of shape \(X, 5\)',
-                 r'a_mag_h_params should be of shape \(X, 5\)',
-                 r'a_mag_h_params should be of shape \(X, 5\)',
+                [r'a_snr_mag_params should be of shape \(X, Y, 5\)',
+                 r'a_snr_mag_params should be of shape \(X, Y, 5\)',
+                 r'a_snr_mag_params should be of shape \(X, Y, 5\)',
                  r'a_dd_params should be of shape \(5, X, 2\)',
                  r'a_dd_params should be of shape \(5, X, 2\)',
                  r'a_dd_params should be of shape \(5, X, 2\)',
                  r'a_dd_params should be of shape \(5, X, 2\)',
                  r'a_l_cut should be of shape \(3,\) only.',
                  r'a_l_cut should be of shape \(3,\) only.']):
-            np.save('{}.npy'.format(fn), array)
+            np.save('{}{}.npy'.format('a_snr_mag/' if 'snr_mag' in fn else '', fn), array)
             with pytest.raises(ValueError, match=err_msg):
                 cm._initialise_chunk(os.path.join(os.path.dirname(__file__),
                                      'data/crossmatch_params_.txt'),
@@ -719,8 +723,8 @@ class TestInputs:
                                      os.path.join(os.path.dirname(__file__),
                                      'data/cat_b_params_.txt'))
             # Re-make "good" fake arrays
-            mag_h_params = np.ones((3, 5), float)
-            np.save('mag_h_params.npy', mag_h_params)
+            snr_mag_params = np.ones((3, 3, 5), float)
+            np.save('a_snr_mag/snr_mag_params.npy', snr_mag_params)
             ddp = np.ones((5, 15, 2), float)
             np.save('dd_params.npy', ddp)
             lc = np.ones(3, float)
@@ -1129,11 +1133,11 @@ class TestInputs:
                       out_file=os.path.join(os.path.dirname(__file__),
                                             'data/crossmatch_params__.txt'))
 
-        old_line = 'mag_h_params_path = .\n'
+        old_line = 'snr_mag_params_path = a_snr_mag\n'
         f = open(os.path.join(os.path.dirname(__file__),
                               'data/cat_a_params.txt')).readlines()
         idx = np.where([old_line in line for line in f])[0][0]
-        lines = ['mag_h_params_path = .\n\n', 'input_csv_folder = input_csv_folder\n',
+        lines = ['snr_mag_params_path = a_snr_mag\n\n', 'input_csv_folder = input_csv_folder\n',
                  'cat_csv_name = catalogue\n', 'cat_col_names = A B C\n', 'cat_col_nums = 1 2 3\n',
                  'input_npy_folder = blah\n', 'csv_has_header = no\n', 'extra_col_names = None\n']
         for i, key in enumerate(['input_csv_folder', 'cat_csv_name', 'cat_col_names',
