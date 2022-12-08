@@ -60,6 +60,7 @@ jobs:
           pip install tox
       - name: Run tests with remote
         run: |
+          mkdir ./.tmp
           mkdir ./.tmp/${{ matrix. toxenv }}
           tox -e ${{ matrix.toxenv }} -- --remote-data
       - name: Run documentation
