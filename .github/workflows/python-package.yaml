@@ -59,7 +59,10 @@ jobs:
           pip install numpy
           pip install tox
       - name: Run tests with remote
-        run: tox -e ${{ matrix.toxenv }} -- --remote-data
+        run: |
+          mkdir ./.tmp
+          mkdir ./.tmp/${{ matrix. toxenv }}
+          tox -e ${{ matrix.toxenv }} -- --remote-data
       - name: Run documentation
         run: tox -e build_docs
       - name: Upload coverage to codecov
