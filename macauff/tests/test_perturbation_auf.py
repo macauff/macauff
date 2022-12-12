@@ -13,7 +13,7 @@ from scipy.stats import skewnorm
 from ..matching import CrossMatch
 from ..misc_functions_fortran import misc_functions_fortran as mff
 from ..perturbation_auf import (make_perturb_aufs, download_trilegal_simulation,
-                                _calculate_magnitude_offsets)
+                                _calculate_magnitude_offsets, make_tri_counts)
 from ..perturbation_auf_fortran import perturbation_auf_fortran as paf
 
 from .test_matching import _replace_line
@@ -1213,6 +1213,47 @@ class TestMakePerturbAUFs():
                                          (cm.rho[:-1]+cm.drho/2))
 
         assert_allclose(fake_fourier, fourier[:, 0], rtol=0.05)
+
+
+@pytest.mark.parametrize("run_type", ['faint', 'bright', 'both', 'neither'])
+def test_make_tri_counts(run_type):
+    # Faint from 10-20, bright from 5-15
+    rng = np.random.default_rng(seed=464564399234)
+    if run_type != 'bright':
+        script = '#area = 1 sq deg\n#Av at infinity = 1\n#W1 Av\n'
+        mags = rng.uniform(10, 20, size=10000)
+        for mag in mags:
+            script += '{} 1\n'.format(mag)
+        out = open('trilegal_auf_simulation_faint.dat', 'w')
+        out.writelines(script)
+        out.close()
+    if run_type != 'faint':
+        script = '#area = 1 sq deg\n#Av at infinity = 1\n#W1 Av\n'
+        mags = rng.uniform(5, 15, size=9000)
+        for mag in mags:
+            script += '{} 1\n'.format(mag)
+        out = open('trilegal_auf_simulation_bright.dat', 'w')
+        out.writelines(script)
+        out.close()
+    if run_type != "neither":
+        dens, tri_mags, tri_mags_mids, dtri_mags, uncert, tri_av = make_tri_counts(
+            '.', 'trilegal_auf_simulation', 'W1', 0.1, use_bright=run_type != "faint",
+            use_faint=run_type != "bright")
+        if run_type == "both":
+            assert tri_mags[0] < 6
+            assert tri_mags[-1] > 19
+        if run_type == "faint":
+            assert tri_mags[0] > 9
+            assert tri_mags[-1] > 19
+        if run_type == "bright":
+            assert tri_mags[0] < 6
+            assert tri_mags[-1] < 16
+        for i in range(len(tri_mags_mids)):
+            assert_allclose(1/0.1/len(tri_mags_mids), dens[i], rtol=2*uncert[i])
+    else:
+        with pytest.raises(ValueError, match="use_bright and use_faint cannot both be "):
+            dens, tri_mags, tri_mags_mids, dtri_mags, uncert, tri_av = make_tri_counts(
+                '.', 'trilegal_auf_simulation', 'W1', 0.1, use_bright=False, use_faint=False)
 
 
 @pytest.mark.remote_data
