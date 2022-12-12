@@ -138,6 +138,15 @@ Bug Fixes
 API Changes
 ^^^^^^^^^^^
 
+- Removed expectation of parameters ``tri_num_bright`` and ``tri_maglim_bright`` from
+  ``CrossMatch`` input parameter files. Currently only expect the "faint" versions
+  due to limits with requesting significant numbers of bright TRILEGAL objects. [#61]
+
+- Added ``tri_num_faint`` to ``AstrometricCorrections`` to control the resolution of
+  TRILEGAL simulations used in fitting for astrometry systematics, and removed
+  ``maglim_b`` from expected keywords, limiting the number of TRILEGAL simulations
+  to just one across the entire dynamic range, as with ``CrossMatch``. [#61]
+
 - Added new keyword ``pregenerate_cutouts`` to ``AstometricCorrections``, indicating
   whether sightlines can be assumed to be pre-made or if they should be able to be
   made on-the-fly as part of the correction-fitting process. [#59]
