@@ -22,13 +22,12 @@ def make_perturb_aufs(auf_folder, cat_folder, filters, auf_points, r, dr, rho,
                       drho, which_cat, include_perturb_auf, mem_chunk_num, use_memmap_files,
                       tri_download_flag=False, delta_mag_cuts=None, psf_fwhms=None,
                       tri_set_name=None, tri_filt_num=None, tri_filt_names=None,
-                      tri_maglim_bright=None, tri_maglim_faint=None, tri_num_bright=None,
-                      tri_num_faint=None, auf_region_frame=None, num_trials=None, j0s=None,
-                      density_mags=None, d_mag=None, compute_local_density=None,
-                      density_radius=None, run_fw=None, run_psf=None, dd_params=None, l_cut=None,
-                      snr_mag_params=None, fit_gal_flag=None, cmau_array=None, wavs=None,
-                      z_maxs=None, nzs=None, ab_offsets=None, filter_names=None, al_avs=None,
-                      alpha0=None, alpha1=None, alpha_weight=None):
+                      tri_maglim_faint=None, tri_num_faint=None, auf_region_frame=None,
+                      num_trials=None, j0s=None, density_mags=None, d_mag=None,
+                      compute_local_density=None, density_radius=None, run_fw=None, run_psf=None,
+                      dd_params=None, l_cut=None, snr_mag_params=None, fit_gal_flag=None,
+                      cmau_array=None, wavs=None, z_maxs=None, nzs=None, ab_offsets=None,
+                      filter_names=None, al_avs=None, alpha0=None, alpha1=None, alpha_weight=None):
     r"""
     Function to perform the creation of the blended object perturbation component
     of the AUF.
@@ -91,21 +90,11 @@ def make_perturb_aufs(auf_folder, cat_folder, filters, auf_points, r, dr, rho,
         List of filter names in the TRILEGAL filterset defined in ``tri_set_name``,
         in the same order as provided in ``psf_fwhms``. If ``include_perturb_auf``
         is ``True``, this must be set.
-    tri_maglim_bright : float
-        Magnitude in the primary ``tri_filt_num`` filter to simulate sources to
-        in the smaller "bright" simulation, used to ensure accurate statistics
-        at the bright end of the dynamic survey range. If ``include_perturb_auf``
-        is ``True``, this must be set.
     tri_maglim_faint : float
         Magnitude in the primary TRILEGAL filter to simulate sources down to for
         the main, "faint" simulation, used to capture the differential source
         counts at all appropriate magnitudes. If ``include_perturb_auf`` is
         ``True``, this must be set.
-    tri_num_bright : integer
-        Number of objects to simulate in the bright TRILEGAL simulation. Should
-        be large enough to capture robust number statistics at bright, low
-        source count brightnesses, but low enough to be realistic in runtime.
-        If ``include_perturb_auf`` is ``True``, this must be set.
     tri_num_faint : integer
         Number of objects to simulate in the main TRILEGAL simulation. Should
         capture sufficient numbers to be accurate without overrunning simulation
@@ -223,12 +212,8 @@ def make_perturb_aufs(auf_folder, cat_folder, filters, auf_points, r, dr, rho,
         raise ValueError("tri_filt_num must be given if include_perturb_auf is True.")
     if include_perturb_auf and tri_filt_names is None:
         raise ValueError("tri_filt_names must be given if include_perturb_auf is True.")
-    if include_perturb_auf and tri_maglim_bright is None:
-        raise ValueError("tri_maglim_bright must be given if include_perturb_auf is True.")
     if include_perturb_auf and tri_maglim_faint is None:
         raise ValueError("tri_maglim_faint must be given if include_perturb_auf is True.")
-    if include_perturb_auf and tri_num_bright is None:
-        raise ValueError("tri_num_bright must be given if include_perturb_auf is True.")
     if include_perturb_auf and tri_num_faint is None:
         raise ValueError("tri_num_faint must be given if include_perturb_auf is True.")
     if include_perturb_auf and auf_region_frame is None:
@@ -373,14 +358,6 @@ def make_perturb_aufs(auf_folder, cat_folder, filters, auf_points, r, dr, rho,
                                          auf_region_frame, tri_maglim_faint,
                                          total_objs=tri_num_faint)
             os.system('mv {}/trilegal_auf_simulation.dat {}/trilegal_auf_simulation_faint.dat'
-                      .format(ax_folder, ax_folder))
-        if include_perturb_auf and (tri_download_flag or not
-                                    os.path.isfile('{}/trilegal_auf_simulation_bright.dat'
-                                                   .format(ax_folder))):
-            download_trilegal_simulation(ax_folder, tri_set_name, ax1, ax2, tri_filt_num,
-                                         auf_region_frame, tri_maglim_bright,
-                                         total_objs=tri_num_bright)
-            os.system('mv {}/trilegal_auf_simulation.dat {}/trilegal_auf_simulation_bright.dat'
                       .format(ax_folder, ax_folder))
 
         if include_perturb_auf:
@@ -639,11 +616,15 @@ def download_trilegal_simulation(tri_folder, tri_filter_set, ax1, ax2, mag_num, 
         # third in a moment, however
         nobjs = len(contents) - 2
         # If too few stars then increase by factor 10 and loop, or scale to give
-        # about 1.5 million stars and come out of area increase loop --
+        # about total_objs stars and come out of area increase loop --
         # simulations can't be more than 10 sq deg, so accept if that's as large
         # as we can go.
-        if nobjs < 10000 and triarea < 10:
+        if nobjs < 10000:
             triarea = min(10, triarea*10)
+            # If we can't multiple by 10 since we get to 10 sq deg area, then
+            # we can just quit immediately since we can't do any better.
+            if triarea == 10:
+                areaflag = 1
         else:
             triarea = min(10, triarea / nobjs * total_objs)
             areaflag = 1
@@ -1041,7 +1022,7 @@ def create_single_perturb_auf(tri_folder, auf_point, filt, r, dr, rho, drho, j0s
     return count_array
 
 
-def make_tri_counts(trifolder, trifilename, trifiltname, dm):
+def make_tri_counts(trifolder, trifilename, trifiltname, dm, use_bright=False, use_faint=True):
     """
     Combine TRILEGAL simulations for a given line of sight in the Galaxy, using
     both a "bright" simulation, with a brighter magnitude limit that allows for
@@ -1081,64 +1062,93 @@ def make_tri_counts(trifolder, trifilename, trifiltname, dm):
     tri_av : float
         The largest of all reported V-band extinctions at infinity across all
         of the simulations used in the generation of the source count histograms.
+    use_bright : boolean, optional
+        Controls whether we load a "bright" set of TRILEGAL sources or not.
+    use_faint : boolean, optional
+        Determines whether we use a larger dynamic range, fainter TRILEGAL
+        simulation to create a histogram of source counts.
     """
-    f = open('{}/{}_faint.dat'.format(trifolder, trifilename), "r")
-    area_line = f.readline()
-    av_line = f.readline()
-    f.close()
-    # #area = {} sq deg, #Av at infinity = {} should be the first two lines, so
-    # just split that by whitespace
-    bits = area_line.split(' ')
-    tri_area_faint = float(bits[2])
-    bits = av_line.split(' ')
-    tri_av_inf_faint = float(bits[4])
-    tri_faint = np.genfromtxt('{}/{}_faint.dat'.format(trifolder, trifilename), delimiter=None,
-                              names=True, comments='#', skip_header=2, usecols=[trifiltname, 'Av'])
+    if not use_bright and not use_faint:
+        raise ValueError("use_bright and use_faint cannot both be 'False'.")
+    if use_faint:
+        f = open('{}/{}_faint.dat'.format(trifolder, trifilename), "r")
+        area_line = f.readline()
+        av_line = f.readline()
+        f.close()
+        # #area = {} sq deg, #Av at infinity = {} should be the first two lines, so
+        # just split that by whitespace
+        bits = area_line.split(' ')
+        tri_area_faint = float(bits[2])
+        bits = av_line.split(' ')
+        tri_av_inf_faint = float(bits[4])
+        tri_faint = np.genfromtxt('{}/{}_faint.dat'.format(trifolder, trifilename), delimiter=None,
+                                  names=True, comments='#', skip_header=2,
+                                  usecols=[trifiltname, 'Av'])
 
-    f = open('{}/{}_bright.dat'.format(trifolder, trifilename), "r")
-    area_line = f.readline()
-    av_line = f.readline()
-    f.close()
-    bits = area_line.split(' ')
-    tri_area_bright = float(bits[2])
-    bits = av_line.split(' ')
-    tri_av_inf_bright = float(bits[4])
-    tri_bright = np.genfromtxt('{}/{}_bright.dat'.format(trifolder, trifilename), delimiter=None,
-                               names=True, comments='#', skip_header=2, usecols=[trifiltname, 'Av'])
+    if use_bright:
+        f = open('{}/{}_bright.dat'.format(trifolder, trifilename), "r")
+        area_line = f.readline()
+        av_line = f.readline()
+        f.close()
+        bits = area_line.split(' ')
+        tri_area_bright = float(bits[2])
+        bits = av_line.split(' ')
+        tri_av_inf_bright = float(bits[4])
+        tri_bright = np.genfromtxt('{}/{}_bright.dat'.format(trifolder, trifilename),
+                                   delimiter=None, names=True, comments='#', skip_header=2,
+                                   usecols=[trifiltname, 'Av'])
 
-    tridata_faint = tri_faint[:][trifiltname]
-    tri_av_faint = np.amax(tri_faint[:]['Av'])
-    del tri_faint
-    tridata_bright = tri_bright[:][trifiltname]
-    tri_av_bright = np.amax(tri_bright[:]['Av'])
-    del tri_bright
-    minmag = dm * np.floor(min(np.amin(tridata_faint), np.amin(tridata_bright))/dm)
-    maxmag = dm * np.ceil(max(np.amax(tridata_faint), np.amax(tridata_bright))/dm)
-    hist, tri_mags = np.histogram(tridata_faint, bins=np.arange(minmag, maxmag+1e-10, dm))
-    hc_faint = hist > 3
-    dens_faint = hist / np.diff(tri_mags) / tri_area_faint
-    dens_uncert_faint = np.sqrt(hist) / np.diff(tri_mags) / tri_area_faint
-    dens_uncert_faint[dens_uncert_faint == 0] = 1e10
-
-    hist, tri_mags = np.histogram(tridata_bright, bins=tri_mags)
-    hc_bright = hist > 3
-    dens_bright = hist / np.diff(tri_mags) / tri_area_bright
-    dens_uncert_bright = np.sqrt(hist) / np.diff(tri_mags) / tri_area_bright
-    dens_uncert_bright[dens_uncert_bright == 0] = 1e10
-    # Assume that the number of objects in the bright dataset is truncated such
-    # that it should be most dense at its faintest magnitude, and ignore cases
-    # where objects may have "scattered" outside of that limit. These are most
-    # likely to be objects in magnitudes that don't define the TRILEGAL cutoff,
-    # where differential reddening can make a few of them slightly fainter than
-    # average.
-    bright_mag = tri_mags[1:][np.argmax(hist)]
-    dens_uncert_bright[tri_mags[1:] > bright_mag] = 1e10
-
-    w_f, w_b = 1 / dens_uncert_faint**2, 1 / dens_uncert_bright**2
-    dens = (dens_bright * w_b + dens_faint * w_f) / (w_b + w_f)
-    dens_uncert = np.sqrt(1 / (w_b + w_f))
-
-    hc = hc_bright | hc_faint
+    if use_faint:
+        tridata_faint = tri_faint[:][trifiltname]
+        tri_av_faint = np.amax(tri_faint[:]['Av'])
+        del tri_faint
+    if use_bright:
+        tridata_bright = tri_bright[:][trifiltname]
+        tri_av_bright = np.amax(tri_bright[:]['Av'])
+        del tri_bright
+    if use_bright and use_faint:
+        minmag = dm * np.floor(min(np.amin(tridata_faint), np.amin(tridata_bright))/dm)
+        maxmag = dm * np.ceil(max(np.amax(tridata_faint), np.amax(tridata_bright))/dm)
+    elif use_bright:
+        minmag = dm * np.floor(np.amin(tridata_bright)/dm)
+        maxmag = dm * np.ceil(np.amax(tridata_bright)/dm)
+    elif use_faint:
+        minmag = dm * np.floor(np.amin(tridata_faint)/dm)
+        maxmag = dm * np.ceil(np.amax(tridata_faint)/dm)
+    tri_mags = np.arange(minmag, maxmag+1e-10, dm)
+    if use_faint:
+        hist, tri_mags = np.histogram(tridata_faint, bins=tri_mags)
+        hc_faint = hist > 3
+        dens_faint = hist / np.diff(tri_mags) / tri_area_faint
+        dens_uncert_faint = np.sqrt(hist) / np.diff(tri_mags) / tri_area_faint
+        dens_uncert_faint[dens_uncert_faint == 0] = 1e10
+    if use_bright:
+        hist, tri_mags = np.histogram(tridata_bright, bins=tri_mags)
+        hc_bright = hist > 3
+        dens_bright = hist / np.diff(tri_mags) / tri_area_bright
+        dens_uncert_bright = np.sqrt(hist) / np.diff(tri_mags) / tri_area_bright
+        dens_uncert_bright[dens_uncert_bright == 0] = 1e10
+        # Assume that the number of objects in the bright dataset is truncated such
+        # that it should be most dense at its faintest magnitude, and ignore cases
+        # where objects may have "scattered" outside of that limit. These are most
+        # likely to be objects in magnitudes that don't define the TRILEGAL cutoff,
+        # where differential reddening can make a few of them slightly fainter than
+        # average.
+        bright_mag = tri_mags[1:][np.argmax(hist)]
+        dens_uncert_bright[tri_mags[1:] > bright_mag] = 1e10
+    if use_bright and use_faint:
+        w_f, w_b = 1 / dens_uncert_faint**2, 1 / dens_uncert_bright**2
+        dens = (dens_bright * w_b + dens_faint * w_f) / (w_b + w_f)
+        dens_uncert = np.sqrt(1 / (w_b + w_f))
+        hc = hc_bright | hc_faint
+    elif use_bright:
+        dens = dens_bright
+        dens_uncert = dens_uncert_bright
+        hc = hc_bright
+    elif use_faint:
+        dens = dens_faint
+        dens_uncert = dens_uncert_faint
+        hc = hc_faint
 
     dens = dens[hc]
     dtri_mags = np.diff(tri_mags)[hc]
@@ -1146,7 +1156,12 @@ def make_tri_counts(trifolder, trifilename, trifiltname, dm):
     tri_mags = tri_mags[:-1][hc]
     uncert = dens_uncert[hc]
 
-    tri_av = max((tri_av_bright, tri_av_inf_bright, tri_av_faint, tri_av_inf_faint))
+    if use_bright and use_faint:
+        tri_av = max((tri_av_bright, tri_av_inf_bright, tri_av_faint, tri_av_inf_faint))
+    elif use_bright:
+        tri_av = max(tri_av_bright, tri_av_inf_bright)
+    elif use_faint:
+        tri_av = max(tri_av_faint, tri_av_inf_faint)
 
     return dens, tri_mags, tri_mags_mids, dtri_mags, uncert, tri_av
 
