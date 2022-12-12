@@ -834,8 +834,7 @@ class CrossMatch():
                 for check_flag in ['tri_set_name', 'tri_filt_names', 'tri_filt_num', 'psf_fwhms',
                                    'download_tri', 'dens_mags', 'fit_gal_flag',
                                    'run_fw_auf', 'run_psf_auf', 'snr_mag_params_path',
-                                   'tri_maglim_bright', 'tri_maglim_faint', 'tri_num_bright',
-                                   'tri_num_faint']:
+                                   'tri_maglim_faint', 'tri_num_faint']:
                     if check_flag not in config:
                         raise ValueError("Missing key {} from catalogue {} metadata file.".format(
                                          check_flag, catname))
@@ -918,7 +917,7 @@ class CrossMatch():
                     raise ValueError("tri_filt_num should be a single integer number in "
                                      "catalogue {} metadata file.".format(catname))
 
-            for suffix in ['_bright', '_faint']:
+            for suffix in ['_faint']:
                 for config, catname, flag in zip([cat_a_config, cat_b_config], ['"a"', '"b"'],
                                                  ['a_', 'b_']):
                     try:
@@ -1300,9 +1299,7 @@ class CrossMatch():
                            'compute_local_density': self.compute_local_density,
                            'run_fw': self.a_run_fw_auf, 'run_psf': self.a_run_psf_auf,
                            'snr_mag_params': self.a_snr_mag_params,
-                           'tri_maglim_bright': self.a_tri_maglim_bright,
                            'tri_maglim_faint': self.a_tri_maglim_faint,
-                           'tri_num_bright': self.a_tri_num_bright,
                            'tri_num_faint': self.a_tri_num_faint,
                            'tri_set_name': self.a_tri_set_name,
                            'tri_filt_num': self.a_tri_filt_num,
@@ -1328,13 +1325,9 @@ class CrossMatch():
                     for i in range(len(self.a_auf_region_points)):
                         ax1, ax2 = self.a_auf_region_points[i]
                         ax_folder = '{}/{}/{}'.format(self.a_auf_folder_path, ax1, ax2)
-                        os.system('mv {}/trilegal_auf_simulation_bright.dat {}/..'.format(
-                                  ax_folder, ax_folder))
                         os.system('mv {}/trilegal_auf_simulation_faint.dat {}/..'.format(
                                   ax_folder, ax_folder))
                         os.system("rm -rf {}/*".format(ax_folder))
-                        os.system('mv {}/../trilegal_auf_simulation_bright.dat {}'.format(
-                                  ax_folder, ax_folder))
                         os.system('mv {}/../trilegal_auf_simulation_faint.dat {}'.format(
                                   ax_folder, ax_folder))
                 if self.compute_local_density:
@@ -1372,9 +1365,7 @@ class CrossMatch():
                            'compute_local_density': self.compute_local_density,
                            'run_fw': self.b_run_fw_auf, 'run_psf': self.b_run_psf_auf,
                            'snr_mag_params': self.b_snr_mag_params,
-                           'tri_maglim_bright': self.b_tri_maglim_bright,
                            'tri_maglim_faint': self.b_tri_maglim_faint,
-                           'tri_num_bright': self.b_tri_num_bright,
                            'tri_num_faint': self.b_tri_num_faint,
                            'tri_set_name': self.b_tri_set_name,
                            'tri_filt_num': self.b_tri_filt_num,
@@ -1401,13 +1392,9 @@ class CrossMatch():
                     for i in range(len(self.b_auf_region_points)):
                         ax1, ax2 = self.b_auf_region_points[i]
                         ax_folder = '{}/{}/{}'.format(self.b_auf_folder_path, ax1, ax2)
-                        os.system('mv {}/trilegal_auf_simulation_bright.dat {}/..'.format(
-                                  ax_folder, ax_folder))
                         os.system('mv {}/trilegal_auf_simulation_faint.dat {}/..'.format(
                                   ax_folder, ax_folder))
                         os.system("rm -rf {}/*".format(ax_folder))
-                        os.system('mv {}/../trilegal_auf_simulation_bright.dat {}'.format(
-                                  ax_folder, ax_folder))
                         os.system('mv {}/../trilegal_auf_simulation_faint.dat {}'.format(
                                   ax_folder, ax_folder))
                 if self.compute_local_density:
