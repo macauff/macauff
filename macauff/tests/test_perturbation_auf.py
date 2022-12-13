@@ -1219,9 +1219,10 @@ class TestMakePerturbAUFs():
 def test_make_tri_counts(run_type):
     # Faint from 10-20, bright from 5-15
     rng = np.random.default_rng(seed=464564399234)
+    N_b, N_f = 100000, 90000
     if run_type != 'bright':
         script = '#area = 1 sq deg\n#Av at infinity = 1\n#W1 Av\n'
-        mags = rng.uniform(10, 20, size=10000)
+        mags = rng.uniform(10, 20, size=N_f)
         for mag in mags:
             script += '{} 1\n'.format(mag)
         out = open('trilegal_auf_simulation_faint.dat', 'w')
@@ -1229,7 +1230,21 @@ def test_make_tri_counts(run_type):
         out.close()
     if run_type != 'faint':
         script = '#area = 1 sq deg\n#Av at infinity = 1\n#W1 Av\n'
-        mags = rng.uniform(5, 15, size=9000)
+        mags = rng.uniform(5, 15, size=N_b)
+        fake_mags = np.arange(5, 15.01, 0.1)
+        h, _ = np.histogram(mags, fake_mags)
+        if run_type == 'both':
+            # Fake it that the final bin has the most sources to avoid
+            # make_tri_count's physical-counts-driven completeness limit
+            # cull.
+            big_bin_value = np.argmax(h)
+            big_number = np.amax(h)
+            final_number = h[-1]
+            big_bin_values = np.where((mags >= fake_mags[big_bin_value]) &
+                                      (mags <= fake_mags[big_bin_value+1]))[0]
+            for i in big_bin_values[:(big_number-final_number)+2]:
+                mags[i] = rng.uniform(fake_mags[-2], fake_mags[-1])
+
         for mag in mags:
             script += '{} 1\n'.format(mag)
         out = open('trilegal_auf_simulation_bright.dat', 'w')
@@ -1249,7 +1264,26 @@ def test_make_tri_counts(run_type):
             assert tri_mags[0] < 6
             assert tri_mags[-1] < 16
         for i in range(len(tri_mags_mids)):
-            assert_allclose(1/0.1/len(tri_mags_mids), dens[i], rtol=2*uncert[i])
+            if tri_mags_mids[i] < 10:
+                # 10-20 vs 5-15 mags with 0.1 mag bins for N/100. This is
+                # not len(tri_mags) since each gets its density separately
+                # from where its 10 mags of dynamic range get placed in the
+                # larger bin set!
+                expect_dens = N_b/100 / 0.1 / 1
+            elif tri_mags_mids[i] > 15:
+                expect_dens = N_f/100 / 0.1 / 1
+            else:
+                if run_type == 'faint':
+                    expect_dens = N_f/100 / 0.1 / 1
+                elif run_type == 'bright':
+                    expect_dens = N_b/100 / 0.1 / 1
+                else:
+                    d_u_f = np.sqrt(N_f/100) / 0.1 / 1
+                    d_u_b = np.sqrt(N_b/100) / 0.1 / 1
+                    w_f, w_b = 1 / d_u_f**2, 1 / d_u_b**2
+                    d_f, d_b = N_f/100 / 0.1 / 1, N_b/100 / 0.1 / 1
+                    expect_dens = (d_b * w_b + d_f * w_f) / (w_b + w_f)
+            assert_allclose(expect_dens, dens[i], atol=3*uncert[i], rtol=0.01)
     else:
         with pytest.raises(ValueError, match="use_bright and use_faint cannot both be "):
             dens, tri_mags, tri_mags_mids, dtri_mags, uncert, tri_av = make_tri_counts(

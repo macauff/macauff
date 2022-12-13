@@ -1128,6 +1128,7 @@ def make_tri_counts(trifolder, trifilename, trifiltname, dm, use_bright=False, u
         dens_bright = hist / np.diff(tri_mags) / tri_area_bright
         dens_uncert_bright = np.sqrt(hist) / np.diff(tri_mags) / tri_area_bright
         dens_uncert_bright[dens_uncert_bright == 0] = 1e10
+    if use_bright and use_faint:
         # Assume that the number of objects in the bright dataset is truncated such
         # that it should be most dense at its faintest magnitude, and ignore cases
         # where objects may have "scattered" outside of that limit. These are most
@@ -1136,10 +1137,9 @@ def make_tri_counts(trifolder, trifilename, trifiltname, dm, use_bright=False, u
         # average.
         bright_mag = tri_mags[1:][np.argmax(hist)]
         dens_uncert_bright[tri_mags[1:] > bright_mag] = 1e10
-    if use_bright and use_faint:
         w_f, w_b = 1 / dens_uncert_faint**2, 1 / dens_uncert_bright**2
         dens = (dens_bright * w_b + dens_faint * w_f) / (w_b + w_f)
-        dens_uncert = np.sqrt(1 / (w_b + w_f))
+        dens_uncert = (dens_uncert_bright * w_b + dens_uncert_faint * w_f) / (w_b + w_f)
         hc = hc_bright | hc_faint
     elif use_bright:
         dens = dens_bright
@@ -1152,7 +1152,7 @@ def make_tri_counts(trifolder, trifilename, trifiltname, dm, use_bright=False, u
 
     dens = dens[hc]
     dtri_mags = np.diff(tri_mags)[hc]
-    tri_mags_mids = (tri_mags[:-1]+np.diff(tri_mags))[hc]
+    tri_mags_mids = (tri_mags[:-1]+np.diff(tri_mags)/2)[hc]
     tri_mags = tri_mags[:-1][hc]
     uncert = dens_uncert[hc]
 
