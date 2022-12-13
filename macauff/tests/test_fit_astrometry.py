@@ -98,13 +98,14 @@ class TestAstroCorrection:
         _kwargs = {
             'psf_fwhm': 6.1, 'numtrials': 10000, 'nn_radius': 30, 'dens_search_radius': 900,
             'save_folder': 'ac_save_folder', 'trifolder': 'tri_folder', 'triname': 'trilegal_sim',
-            'maglim_b': 13, 'maglim_f': 25, 'magnum': 11, 'trifilterset': '2mass_spitzer_wise',
-            'trifiltname': 'W1', 'gal_wav_micron': 3.35, 'gal_ab_offset': 2.699,
-            'gal_filtname': 'wise2010-W1', 'gal_alav': 0.039, 'bright_mag': 16, 'dm': 0.1,
-            'dd_params': dd_params, 'l_cut': l_cut, 'ax1_mids': ax1_mids, 'ax2_mids': ax2_mids,
-            'cutout_area': 60, 'cutout_height': 6, 'mag_array': magarray, 'mag_slice': magslice,
-            'sig_slice': sigslice, 'n_pool': 1, 'pos_and_err_indices': [[0, 1, 2], [0, 1, 2]],
-            'mag_indices': [3], 'mag_unc_indices': [4], 'mag_names': ['W1'], 'best_mag_index': 0}
+            'maglim_f': 25, 'magnum': 11, 'tri_num_faint': 1500000,
+            'trifilterset': '2mass_spitzer_wise', 'trifiltname': 'W1', 'gal_wav_micron': 3.35,
+            'gal_ab_offset': 2.699, 'gal_filtname': 'wise2010-W1', 'gal_alav': 0.039,
+            'bright_mag': 16, 'dm': 0.1, 'dd_params': dd_params, 'l_cut': l_cut,
+            'ax1_mids': ax1_mids, 'ax2_mids': ax2_mids, 'cutout_area': 60, 'cutout_height': 6,
+            'mag_array': magarray, 'mag_slice': magslice, 'sig_slice': sigslice, 'n_pool': 1,
+            'pos_and_err_indices': [[0, 1, 2], [0, 1, 2]], 'mag_indices': [3],
+            'mag_unc_indices': [4], 'mag_names': ['W1'], 'best_mag_index': 0}
 
         with pytest.raises(ValueError, match='single_sided_auf must be True.'):
             AstrometricCorrections(
@@ -185,7 +186,7 @@ class TestAstroCorrection:
         ac = AstrometricCorrections(
             psf_fwhm=6.1, numtrials=1000, nn_radius=30, dens_search_radius=900,
             save_folder='ac_save_folder', trifolder='tri_folder', triname='trilegal_sim',
-            maglim_b=13, maglim_f=25, magnum=11, trifilterset='2mass_spitzer_wise',
+            maglim_f=25, magnum=11, tri_num_faint=1500000, trifilterset='2mass_spitzer_wise',
             trifiltname='W1', gal_wav_micron=3.35, gal_ab_offset=2.699, gal_filtname='wise2010-W1',
             gal_alav=0.039, bright_mag=16, dm=0.1, dd_params=dd_params, l_cut=l_cut,
             ax1_mids=ax1_mids, ax2_mids=ax2_mids, ax_dimension=ax_dimension, cutout_area=60,
@@ -241,7 +242,7 @@ class TestAstroCorrection:
         ac = AstrometricCorrections(
             psf_fwhm=6.1, numtrials=1000, nn_radius=30, dens_search_radius=900,
             save_folder='ac_save_folder', trifolder='tri_folder', triname='trilegal_sim',
-            maglim_b=13, maglim_f=25, magnum=11, trifilterset='2mass_spitzer_wise',
+            maglim_f=25, magnum=11, tri_num_faint=1500000, trifilterset='2mass_spitzer_wise',
             trifiltname='W1', gal_wav_micron=3.35, gal_ab_offset=2.699, gal_filtname='wise2010-W1',
             gal_alav=0.039, bright_mag=16, dm=0.1, dd_params=dd_params, l_cut=l_cut,
             ax1_mids=ax1_mids, ax2_mids=ax2_mids, ax_dimension=ax_dimension, mag_array=magarray,

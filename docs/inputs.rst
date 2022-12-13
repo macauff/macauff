@@ -161,7 +161,7 @@ These can be divided into those inputs that are always required:
 
 those that are only required if the `Joint Parameters`_ option ``include_perturb_auf`` is ``True``:
 
-``fit_gal_flag``, ``run_fw_auf``, ``run_psf_auf``, ``psf_fwhms``, ``dens_mags``, ``mag_h_params_path``, ``download_tri``, ``tri_set_name``, ``tri_filt_names``, ``tri_filt_num``, ``tri_maglim_bright``, ``tri_maglim_faint``, ``tri_num_bright``, and ``tri_num_faint``;
+``fit_gal_flag``, ``run_fw_auf``, ``run_psf_auf``, ``psf_fwhms``, ``dens_mags``, ``mag_h_params_path``, ``download_tri``, ``tri_set_name``, ``tri_filt_names``, ``tri_filt_num``, ``tri_maglim_faint``, and ``tri_num_faint``;
 
 parameters required if ``run_psf_auf`` is ``True``:
 
@@ -247,21 +247,13 @@ The names of the filters, in the same order as ``filt_names``, as given in the d
 
 The one-indexed column number of the magnitude, as determined by the column order of the saved data returned by the TRILEGAL API, to which to set the maximum magnitude limit for the simulation. Optional if ``include_perturb_aufs`` is ``False``.
 
-``tri_maglim_bright``
-
-When using TRILEGAL to simulated Galactic sources for perturbation AUF component purposes, two simulations are run: one, with a brighter limiting magnitude, to capture the shape of the differential source counts at bright magnitudes, and one, with a sufficiently deep limiting magnitude that it contains all potentially perturbing objects for the dynamic range of this catalogue (approximately 10 magnitudes fainter than the limiting magnitude of the survey). ``tri_maglim_bright`` is the faintest magnitude down to which to draw TRILEGAL sources for the bright-end simulation.
-
 ``tri_maglim_faint``
 
-Complementary to ``tri_maglim_bright``, this is the float that represents the magnitude down to which to simulate TRILEGAL sources in the full-scale simulation, bearing in mind the limiting magnitude cut of the public API.
-
-``tri_num_bright``
-
-The integer number of sources to simulate -- affecting the area of simulation, up to the limit imposed by TRILEGAL -- for the bright simulation of Galactic sources.
+This is the float that represents the magnitude down to which to simulate TRILEGAL sources in the full-scale simulation, bearing in mind the limiting magnitude cut of the public API but also making sure this value is sufficiently faint that it contains all potentially perturbing objects for the dynamic range of this catalogue (approximately 10 magnitudes fainter than the limiting magnitude of the survey)
 
 ``tri_num_faint``
 
-Number of objects to draw from the TRILEGAL simulation down to the full ``tri_maglim_faint`` magnitude.
+Integer number of objects to draw from the TRILEGAL simulation -- affecting the area of simulation, up to the limit imposed by TRILEGAL -- down to the full ``tri_maglim_faint`` magnitude.
 
 ``dd_params_path``
 

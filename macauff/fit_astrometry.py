@@ -41,7 +41,7 @@ class AstrometricCorrections:
     to a well-understood second dataset.
     """
     def __init__(self, psf_fwhm, numtrials, nn_radius, dens_search_radius, save_folder, trifolder,
-                 triname, maglim_b, maglim_f, magnum, trifilterset, trifiltname,
+                 triname, maglim_f, magnum, tri_num_faint, trifilterset, trifiltname,
                  gal_wav_micron, gal_ab_offset, gal_filtname, gal_alav, bright_mag, dm, dd_params,
                  l_cut, ax1_mids, ax2_mids, ax_dimension, mag_array, mag_slice, sig_slice, n_pool,
                  npy_or_csv, coord_or_chunk, pos_and_err_indices, mag_indices, mag_unc_indices,
@@ -77,14 +77,14 @@ class AstrometricCorrections:
             Name to give TRILEGAL simulations when downloaded. Will have
             suffix appended to the end, for unique ax1-ax2 sightline combination
             downloads.
-        maglim_b : float
-            Magnitude in the ``magnum`` filter down to which sources should be
-            drawn for the "bright" sample.
         maglim_f : float
             Magnitude in the ``magnum`` filter down to which sources should be
             drawn for the "faint" sample.
         magnum : float
             Zero-indexed column number of the chosen filter limiting magnitude.
+        tri_num_faint : integer
+            Approximate number of objects to simulate in the chosen filter for
+            TRILEGAL simulations.
         trifilterset : string
             Name of the TRILEGAL filter set for which to generate simulations.
         trifiltname : string
@@ -244,9 +244,9 @@ class AstrometricCorrections:
 
         self.trifolder = trifolder
         self.triname = triname + '_{}_{}'
-        self.maglim_b = maglim_b
         self.maglim_f = maglim_f
         self.magnum = magnum
+        self.tri_num_faint = tri_num_faint
         self.trifilterset = trifilterset
         self.trifiltname = trifiltname
         self.gal_wav_micron = gal_wav_micron
@@ -813,21 +813,13 @@ class AstrometricCorrections:
                                    self.save_folder, file_name)):
                 continue
 
-            num_bright, num_faint = 90000, 0.75e6
             if (self.tri_download or not
                     os.path.isfile('{}/{}_faint.dat'.format(
                         self.trifolder, self.triname.format(ax1_mid, ax2_mid)))):
                 download_trilegal_simulation('.', self.trifilterset, ax1_mid, ax2_mid, self.magnum,
-                                             self.coord_system, self.maglim_f, total_objs=num_faint)
+                                             self.coord_system, self.maglim_f,
+                                             total_objs=self.tri_num_faint)
                 os.system('mv trilegal_auf_simulation.dat {}/{}_faint.dat'
-                          .format(self.trifolder, self.triname.format(ax1_mid, ax2_mid)))
-            if (self.tri_download or not
-                    os.path.isfile('{}/{}_bright.dat'.format(
-                        self.trifolder, self.triname.format(ax1_mid, ax2_mid)))):
-                download_trilegal_simulation('.', self.trifilterset, ax1_mid, ax2_mid, self.magnum,
-                                             self.coord_system, self.maglim_b,
-                                             total_objs=num_bright)
-                os.system('mv trilegal_auf_simulation.dat {}/{}_bright.dat'
                           .format(self.trifolder, self.triname.format(ax1_mid, ax2_mid)))
 
             tri_hist, tri_mags, _, dtri_mags, tri_uncert, tri_av = make_tri_counts(

@@ -26,9 +26,7 @@ tri_filt_num = 1
 # Flag to determine whether to re-download TRILEGAL simulations if they exist - must be "yes"/"no", "true"/"false", "t"/"f", or "1"/"0"
 download_tri = no
 # Parameters controlling the size of the bright/faint TRILEGAL simulations
-tri_maglim_bright = 13.1
 tri_maglim_faint = 32
-tri_num_bright = 500000
 tri_num_faint = 1500000
 # Galaxy Perturbation AUF parameters
 fit_gal_flag = no
