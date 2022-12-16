@@ -277,11 +277,15 @@ class TestAstroCorrection:
 
         if coord_or_chunk == 'coord':
             assert os.path.isfile('ac_save_folder/pdf/auf_fits_105.0_0.0.pdf')
+            assert os.path.isfile('ac_save_folder/pdf/counts_comparison_105.0_0.0.pdf')
+            assert os.path.isfile('ac_save_folder/pdf/s_vs_snr_105.0_0.0.pdf')
+            assert os.path.isfile('ac_save_folder/pdf/sig_fit_comparisons_105.0_0.0.pdf')
         else:
             assert os.path.isfile('ac_save_folder/pdf/auf_fits_2017.pdf')
-        assert os.path.isfile('ac_save_folder/pdf/counts_comparison.pdf')
-        assert os.path.isfile('ac_save_folder/pdf/s_vs_snr_W1.pdf')
-        assert os.path.isfile('ac_save_folder/pdf/sig_fit_comparisons.pdf')
+            assert os.path.isfile('ac_save_folder/pdf/counts_comparison_2017.pdf')
+            assert os.path.isfile('ac_save_folder/pdf/s_vs_snr_2017.pdf')
+            assert os.path.isfile('ac_save_folder/pdf/sig_fit_comparisons_2017.pdf')
+
         assert os.path.isfile('ac_save_folder/pdf/sig_h_stats.pdf')
 
         marray = np.load('ac_save_folder/npy/m_sigs_array.npy')
