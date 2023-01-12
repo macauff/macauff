@@ -316,11 +316,8 @@ class AstrometricCorrections:
             if not os.path.exists(folder):
                 os.makedirs(folder)
 
-    def __call__(self, a_cat_name, b_cat_name, a_cat_func=None, b_cat_func=None,
-                 snr_model_recreate=True, cat_recreate=True, count_recreate=True, tri_download=True,
-                 dens_recreate=True, nn_recreate=True, auf_sim_recreate=True, auf_pdf_recreate=True,
-                 h_o_fit_recreate=True, fit_x2s_recreate=True, make_plots=False,
-                 make_summary_plot=True):
+    def __call__(self, a_cat_name, b_cat_name, a_cat_func=None, b_cat_func=None, tri_download=True,
+                 make_plots=False, make_summary_plot=True):
         """
         Call function for the correction calculation process.
 
@@ -340,36 +337,9 @@ class AstrometricCorrections:
         b_cat_func : callable
             Function used to generate reduced catalogue table for catalogue "b".
             Must be given if ``pregenerate_cutouts`` is ``False``.
-        snr_model_recreate : boolean, optional
-            If ``True`` magnitude-SNR relations are re-calculated even if outputs
-            exist on disk.
-        cat_recreate : boolean, optional
-            Flag indicating whether to re-make reduced catalogue tables if
-            required, and they already exist on the disk.
-        count_recreate : boolean, optional
-            Determines whether to recreate the combined star-galaxy differential
-            magnitude counts for each sightline if they exist.
         tri_download : boolean, optional
             Flag determining if TRILEGAL simulations should be re-downloaded
             if they already exist on disk.
-        dens_recreate : boolean, optional
-            Controls whether the local normalising density is re-calculated for
-            sources again, even if outputs are saved.
-        nn_recreate : boolean, optional
-            Re-calculate nearest neighbour matches if ``True``.
-        auf_sim_recreate : boolean, optional
-            Controls if perturbations due to unresolved, blended contaminant
-            objects are re-simulated even if outputs exist on disk.
-        auf_pdf_recreate : boolean, optional
-            Flag controlling whether probability density functions are
-            calculated based on previously derived AUF simulations, or
-            if previous PDFs are loaded from disk.
-        h_o_fit_recreate : boolean, optional
-            If ``True`` empirical astrometric uncertainties are re-derived even
-            if previously calculated.
-        fit_x2s_recreate : boolean, optional
-            Flag controlling whether chi-squared statistics are calculated for
-            derived fits, or if previously determined results are loaded.
         make_plots : boolean, optional
             Determines if intermediate figures are generated in the process
             of deriving astrometric corrections.
@@ -386,16 +356,7 @@ class AstrometricCorrections:
         self.a_cat_name = a_cat_name
         self.b_cat_name = b_cat_name
 
-        self.cat_recreate = cat_recreate
-        self.count_recreate = count_recreate
         self.tri_download = tri_download
-        self.dens_recreate = dens_recreate
-        self.nn_recreate = nn_recreate
-        self.auf_sim_recreate = auf_sim_recreate
-        self.auf_pdf_recreate = auf_pdf_recreate
-        self.snr_model_recreate = snr_model_recreate
-        self.h_o_fit_recreate = h_o_fit_recreate
-        self.fit_x2s_recreate = fit_x2s_recreate
 
         self.make_plots = make_plots
         self.make_summary_plot = make_summary_plot
@@ -601,11 +562,9 @@ class AstrometricCorrections:
                 cat_args = (ax1_mid, ax2_mid)
             else:
                 cat_args = (chunk,)
-            if (not os.path.isfile(self.a_cat_name.format(*cat_args)) or
-                    self.cat_recreate):
+            if not os.path.isfile(self.a_cat_name.format(*cat_args)):
                 self.a_cat_func(ax1_min, ax1_max, ax2_min, ax2_max, *cat_args)
-            if (not os.path.isfile(self.b_cat_name.format(*cat_args)) or
-                    self.cat_recreate):
+            if not os.path.isfile(self.b_cat_name.format(*cat_args)):
                 self.b_cat_func(ax1_min, ax1_max, ax2_min, ax2_max, *cat_args)
 
         print('')
@@ -969,12 +928,12 @@ class AstrometricCorrections:
 
         Narray = create_densities(
             ax1_mid, ax2_mid, self.b, self.minmag, self.maxmag, lon_slice, lat_slice, ax1_min,
-            ax1_max, ax2_min, ax2_max, self.dens_search_radius, self.n_pool, self.dens_recreate,
-            self.save_folder, self.mag_indices[self.best_mag_index],
-            self.pos_and_err_indices[1][0], self.pos_and_err_indices[1][1], self.coord_system)
+            ax1_max, ax2_min, ax2_max, self.dens_search_radius, self.n_pool, self.save_folder,
+            self.mag_indices[self.best_mag_index], self.pos_and_err_indices[1][0],
+            self.pos_and_err_indices[1][1], self.coord_system)
 
         _, bmatch, dists = create_distances(
-            self.a, self.b, ax1_mid, ax2_mid, self.nn_radius, self.nn_recreate, self.save_folder,
+            self.a, self.b, ax1_mid, ax2_mid, self.nn_radius, self.save_folder,
             self.pos_and_err_indices[0][0], self.pos_and_err_indices[0][1],
             self.pos_and_err_indices[1][0], self.pos_and_err_indices[1][1], self.coord_system)
 
@@ -1550,8 +1509,8 @@ class AstrometricCorrections:
 
 
 def create_densities(ax1_mid, ax2_mid, b, minmag, maxmag, lon_slice, lat_slice, ax1_min, ax1_max,
-                     ax2_min, ax2_max, search_radius, n_pool, dens_recreate, save_folder,
-                     mag_ind, ax1_ind, ax2_ind, coord_system):
+                     ax2_min, ax2_max, search_radius, n_pool, save_folder, mag_ind, ax1_ind,
+                     ax2_ind, coord_system):
     """
     Generate local normalising densities for all sources in catalogue "b".
 
@@ -1591,9 +1550,6 @@ def create_densities(ax1_mid, ax2_mid, b, minmag, maxmag, lon_slice, lat_slice, 
     n_pool : integer
         Number of parallel threads to run when calculating densities via
         ``multiprocessing``.
-    dens_recreate : boolean
-        Flag indicating whether or not to run density calculations if output
-        file is already on disk.
     save_folder : string
         Location on disk into which to save densities.
     mag_ind : integer
@@ -1636,8 +1592,7 @@ def create_densities(ax1_mid, ax2_mid, b, minmag, maxmag, lon_slice, lat_slice, 
         kdt = KDTree(flatxyz.value.T, compact_nodes=False, balanced_tree=False)
         return kdt
 
-    if dens_recreate or not os.path.isfile('{}/npy/narray_sky_{}_{}.npy'.format(
-                                           save_folder, ax1_mid, ax2_mid)):
+    if not os.path.isfile('{}/npy/narray_sky_{}_{}.npy'.format(save_folder, ax1_mid, ax2_mid)):
         cutmag = (b[:, mag_ind] >= minmag) & (b[:, mag_ind] <= maxmag)
 
         if coord_system == 'galactic':
@@ -1709,8 +1664,8 @@ def ball_point_query(iterable):
     return i, len(kdt_query)
 
 
-def create_distances(a, b, ax1_mid, ax2_mid, nn_radius, match_recreate, save_folder, a_ax1_ind,
-                     a_ax2_ind, b_ax1_ind, b_ax2_ind, coord_system):
+def create_distances(a, b, ax1_mid, ax2_mid, nn_radius, save_folder, a_ax1_ind, a_ax2_ind,
+                     b_ax1_ind, b_ax2_ind, coord_system):
     """
     Calculate nearest neighbour matches between two catalogues.
 
@@ -1729,9 +1684,6 @@ def create_distances(a, b, ax1_mid, ax2_mid, nn_radius, match_recreate, save_fol
     nn_radius : float
         Maximum match radius within which to consider potential counterpart
         assignments, in arcseconds.
-    match_recreate : boolean
-        Flag determining whether we re-run the neighbour finding process or
-        if previous runs on disk can be used instead.
     save_folder : string
         Location on disk where matches should be saved.
     a_ax1_ind : integer
@@ -1757,9 +1709,8 @@ def create_distances(a, b, ax1_mid, ax2_mid, nn_radius, match_recreate, save_fol
     dists : numpy.ndarray
         The separations between each nearest neighbour match, in arcseconds.
     """
-    if (match_recreate or
-            not os.path.isfile('{}/npy/a_matchind_{}_{}.npy'.format(
-                save_folder, ax1_mid, ax2_mid)) or
+    if (not os.path.isfile('{}/npy/a_matchind_{}_{}.npy'.format(
+            save_folder, ax1_mid, ax2_mid)) or
             not os.path.isfile('{}/npy/b_matchind_{}_{}.npy'.format(
                 save_folder, ax1_mid, ax2_mid)) or
             not os.path.isfile('{}/npy/ab_dists_{}_{}.npy'.format(save_folder, ax1_mid, ax2_mid))):
