@@ -6,6 +6,7 @@ catalogue and one for which precisions are less well known.
 '''
 
 import numpy as np
+from numpy.lib.format import open_memmap
 import matplotlib.pyplot as plt
 from scipy.stats import binned_statistic
 import multiprocessing
@@ -321,7 +322,7 @@ class AstrometricCorrections:
                 os.makedirs(folder)
 
     def __call__(self, a_cat_name, b_cat_name, a_cat_func=None, b_cat_func=None, tri_download=True,
-                 make_plots=False, make_summary_plot=True):
+                 overwrite_all_sightlines=False, make_plots=False, make_summary_plot=True):
         """
         Call function for the correction calculation process.
 
@@ -344,6 +345,10 @@ class AstrometricCorrections:
         tri_download : boolean, optional
             Flag determining if TRILEGAL simulations should be re-downloaded
             if they already exist on disk.
+        overwrite_all_sightlines : boolean
+            Flag for whether to create a totally fresh run of astrometric
+            corrections, regardless of whether ``abc_array`` or ``m_sigs_array``
+            are saved on disk. Defaults to ``False``.
         make_plots : boolean, optional
             Determines if intermediate figures are generated in the process
             of deriving astrometric corrections.
@@ -378,12 +383,25 @@ class AstrometricCorrections:
         else:
             zip_list = (self.ax1_mids, self.ax2_mids, self.ax1_mins, self.ax1_maxs, self.ax2_mins,
                         self.ax2_maxs, self.chunks)
-        # TODO: add checkpointing -- some kind of saved binary file?
-        # TODO: memmap save abc_array to also checkpoint its determination
-        abc_array = np.empty((len(self.mag_indices), len(self.ax1_mids), 5), float)
-        # TODO: memmap save m_sigs/n_sigs to also checkpoint them
-        m_sigs = np.empty_like(self.ax1_mids)
-        n_sigs = np.empty_like(self.ax1_mids)
+
+        if (overwrite_all_sightlines or
+                not os.path.isfile('{}/npy/snr_mag_params.npy'.format(self.save_folder)) or
+                not os.path.isfile('{}/npy/m_sigs_array.npy'.format(self.save_folder)) or
+                not os.path.isfile('{}/npy/n_sigs_array.npy'.format(self.save_folder))):
+            abc_array = open_memmap('{}/npy/snr_mag_params.npy'.format(self.save_folder), mode='w+',
+                                    dtype=float,
+                                    shape=(len(self.mag_indices), len(self.ax1_mids), 5))
+            abc_array[:, :, :] = -1
+            m_sigs = open_memmap('{}/npy/m_sigs_array.npy'.format(self.save_folder), mode='w+',
+                                 dtype=float, shape=(len(self.ax1_mids),))
+            m_sigs[:] = -1
+            n_sigs = open_memmap('{}/npy/n_sigs_array.npy'.format(self.save_folder), mode='w+',
+                                 dtype=float, shape=(len(self.ax1_mids),))
+            n_sigs[:] = -1
+        else:
+            abc_array = open_memmap('{}/npy/snr_mag_params.npy'.format(self.save_folder), mode='r+')
+            m_sigs = open_memmap('{}/npy/m_sigs_array.npy'.format(self.save_folder), mode='r+')
+            n_sigs = open_memmap('{}/npy/n_sigs_array.npy'.format(self.save_folder), mode='r+')
 
         if self.make_summary_plot:
             self.gs = self.make_gridspec('12312', 2, 2, 0.8, 10)
@@ -397,6 +415,8 @@ class AstrometricCorrections:
                          'silver']
 
         for index_, list_of_things in enumerate(zip(*zip_list)):
+            if not np.all(abc_array[:, index_, :] == [-1, -1, -1, -1, -1]):
+                continue
             print('Running astrometry fits for sightline {}/{}...'.format(
                 index_+1, len(self.ax1_mids)))
 
@@ -442,9 +462,6 @@ class AstrometricCorrections:
                 self.ylims[0] = min(self.ylims[0], np.amin(self.fit_sigs[:, 0]))
                 self.ylims[1] = max(self.ylims[1], np.amax(self.fit_sigs[:, 0]))
 
-        np.save('{}/npy/snr_mag_params.npy'.format(self.save_folder), abc_array)
-        np.save('{}/npy/m_sigs_array.npy'.format(self.save_folder), m_sigs)
-        np.save('{}/npy/n_sigs_array.npy'.format(self.save_folder), n_sigs)
         self.m_sigs, self.n_sigs = m_sigs, n_sigs
         if self.make_summary_plot:
             plt.figure('12312')

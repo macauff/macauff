@@ -138,6 +138,12 @@ Bug Fixes
 API Changes
 ^^^^^^^^^^^
 
+- Added parameters ... to inputs to ``CrossMatch`` to allow for astrometric corrections
+  through ``AstrometricCorrections`` directly before a cross-match. [#62]
+
+- Requirements for ... inputs to ``CrossMatch`` changed to either require
+  ``include_perturb_auf`` or ``correct_astrometry``. [#62]
+
 - Removed expectation of parameters ``tri_num_bright`` and ``tri_maglim_bright`` from
   ``CrossMatch`` input parameter files. Currently only expect the "faint" versions
   due to limits with requesting significant numbers of bright TRILEGAL objects. [#61]

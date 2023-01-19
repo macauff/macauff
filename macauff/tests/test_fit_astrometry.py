@@ -212,12 +212,20 @@ class TestAstroCorrection:
 
     @pytest.mark.parametrize("npy_or_csv,coord_or_chunk,coord_system,pregenerate_cutouts",
                              [("csv", "chunk", "equatorial", True),
-                              ("npy", "coord", "galactic", False)])
+                              ("npy", "coord", "galactic", False),
+                              ("npy", "chunk", "equatorial", False)])
     def test_fit_astrometry(self, npy_or_csv, coord_or_chunk, coord_system, pregenerate_cutouts):
         self.npy_or_csv = npy_or_csv
         dd_params = np.load(os.path.join(os.path.dirname(__file__), 'data/dd_params.npy'))
         l_cut = np.load(os.path.join(os.path.dirname(__file__), 'data/l_cut.npy'))
-        ax1_mids, ax2_mids = np.array([105], dtype=float), np.array([0], dtype=float)
+        # Flag telling us to test for the non-running of all sightlines,
+        # but to leave pre-generated ones alone
+        half_run_flag = (npy_or_csv == "npy" and coord_or_chunk == "chunk" and
+                         coord_system == "equatorial" and pregenerate_cutouts is False)
+        if half_run_flag:
+            ax1_mids, ax2_mids = np.array([105, 120], dtype=float), np.array([0, 10], dtype=float)
+        else:
+            ax1_mids, ax2_mids = np.array([105], dtype=float), np.array([0], dtype=float)
         magarray = np.array([14.07, 14.17, 14.27, 14.37])
         magslice = np.array([0.05, 0.05, 0.05, 0.05])
         sigslice = np.array([0.1, 0.1, 0.1, 0.1])
@@ -225,7 +233,10 @@ class TestAstroCorrection:
             chunks = None
             ax_dimension = 1
         else:
-            chunks = [2017]
+            if half_run_flag:
+                chunks = [2017, 2018]
+            else:
+                chunks = [2017]
             ax_dimension = 2
         ac = AstrometricCorrections(
             psf_fwhm=6.1, numtrials=1000, nn_radius=30, dens_search_radius=900,
@@ -258,6 +269,14 @@ class TestAstroCorrection:
         else:
             a_cat_func = self.fake_cata_cutout
             b_cat_func = self.fake_catb_cutout
+        if os.path.isfile('ac_save_folder/npy/snr_mag_params.npy'):
+            os.remove('ac_save_folder/npy/snr_mag_params.npy')
+
+        if half_run_flag:
+            np.save('ac_save_folder/npy/snr_mag_params.npy',
+                    np.array([[[-1, -1, -1, -1, -1], [-1, -2, -3, -4, -5]]], dtype=float))
+            np.save('ac_save_folder/npy/m_sigs_array.npy', np.array([-1, 12], dtype=float))
+            np.save('ac_save_folder/npy/n_sigs_array.npy', np.array([-1, 15], dtype=float))
         ac(self.a_cat_name, self.b_cat_name, a_cat_func, b_cat_func,
            tri_download=False, make_plots=True, make_summary_plot=True)
 
@@ -290,3 +309,12 @@ class TestAstroCorrection:
         assert_allclose(ac.ax1_maxs[0], 110, rtol=0.01)
         assert_allclose(ac.ax2_mins[0], -3, rtol=0.01)
         assert_allclose(ac.ax2_maxs[0], 3, rtol=0.01)
+
+        if half_run_flag:
+            # For the pre-determined set of parameters we should have skipped
+            # one of the sightlines and want to check if its parameters are
+            # unchanged.
+            assert_allclose([marray[1], narray[1]], [12, 15], atol=0.001)
+            assert_allclose(abc_array[0, 1, 0], -1, atol=0.001)
+            assert_allclose(abc_array[0, 1, 1], -2, atol=0.001)
+            assert_allclose(abc_array[0, 1, 3], -4, atol=0.001)
