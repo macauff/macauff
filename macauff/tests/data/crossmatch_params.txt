@@ -49,3 +49,6 @@ num_trials = 10000
 d_mag = 0.1
 # Flag to indicate whether to use pre-computed local normalising densities for simulating PSFs
 compute_local_density = no
+
+# Multiprocessing CPU count
+n_pool = 2

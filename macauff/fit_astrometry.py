@@ -74,9 +74,10 @@ class AstrometricCorrections:
         trifolder : string
             Filepath of the location into which to save TRILEGAL simulations.
         triname : string
-            Name to give TRILEGAL simulations when downloaded. Will have
-            suffix appended to the end, for unique ax1-ax2 sightline combination
-            downloads.
+            Name to give TRILEGAL simulations when downloaded. Is required to have
+            two format ``{}`` options in string, for unique ax1-ax2 sightline
+            combination downloads. Should not contain any file types, just the
+            name of the file up to, but not including, the final ".".
         maglim_f : float
             Magnitude in the ``magnum`` filter down to which sources should be
             drawn for the "faint" sample.
@@ -243,7 +244,7 @@ class AstrometricCorrections:
         self.save_folder = save_folder
 
         self.trifolder = trifolder
-        self.triname = triname + '_{}_{}'
+        self.triname = triname
         self.maglim_f = maglim_f
         self.magnum = magnum
         self.tri_num_faint = tri_num_faint
@@ -311,6 +312,9 @@ class AstrometricCorrections:
         self.n_mag_cols = np.ceil(np.sqrt(len(self.mag_array))).astype(int)
         self.n_mag_rows = np.ceil(len(self.mag_array) / self.n_mag_cols).astype(int)
 
+        self.n_filt_cols = np.ceil(np.sqrt(len(self.mag_indices))).astype(int)
+        self.n_filt_rows = np.ceil(len(self.mag_indices) / self.n_filt_cols).astype(int)
+
         for folder in [self.save_folder, '{}/npy'.format(self.save_folder),
                        '{}/pdf'.format(self.save_folder)]:
             if not os.path.exists(folder):
@@ -376,7 +380,7 @@ class AstrometricCorrections:
                         self.ax2_maxs, self.chunks)
         # TODO: add checkpointing -- some kind of saved binary file?
         # TODO: memmap save abc_array to also checkpoint its determination
-        abc_array = np.empty((len(self.mag_indices), len(self.ax1_mids), 3), float)
+        abc_array = np.empty((len(self.mag_indices), len(self.ax1_mids), 5), float)
         # TODO: memmap save m_sigs/n_sigs to also checkpoint them
         m_sigs = np.empty_like(self.ax1_mids)
         n_sigs = np.empty_like(self.ax1_mids)
@@ -415,6 +419,8 @@ class AstrometricCorrections:
             abc_array[:, index_, 0] = self.a_array
             abc_array[:, index_, 1] = self.b_array
             abc_array[:, index_, 2] = self.c_array
+            abc_array[:, index_, 3] = ax1_mid
+            abc_array[:, index_, 4] = ax2_mid
 
             self.make_star_galaxy_counts()
             if self.make_plots:
@@ -592,7 +598,7 @@ class AstrometricCorrections:
         else:
             ax1_mid, ax2_mid, _, _, _, _, _ = self.list_of_things
         if self.make_plots:
-            gs = self.make_gridspec('2', self.n_mag_cols, self.n_mag_rows, 0.8, 8)
+            gs = self.make_gridspec('2', self.n_filt_cols, self.n_filt_rows, 0.8, 8)
         for j in range(len(self.mag_indices)):
             (res, s_bins, s_d_snr_med,
              s_d_snr_dmed, snr_med, snr_dmed) = self.fit_snr_model(j)
@@ -615,8 +621,9 @@ class AstrometricCorrections:
 
                 ax1_name = 'l' if self.coord_system == 'galactic' else 'RA'
                 ax2_name = 'b' if self.coord_system == 'galactic' else 'Dec'
-                ax.set_title('{} = {}, {} = {}\na = {:.2e}, b = {:.2e}, c = {:.2e}'
-                             .format(ax1_name, ax1_mid, ax2_name, ax2_mid, a, b, c),
+                ax.set_title('{} = {}, {} = {}, {}\na = {:.2e}, b = {:.2e}, c = {:.2e}'
+                             .format(ax1_name, ax1_mid, ax2_name, ax2_mid, self.mag_names[j],
+                                     a, b, c),
                              fontsize=28)
 
                 if usetex:
@@ -815,6 +822,14 @@ class AstrometricCorrections:
         if (self.tri_download or not
                 os.path.isfile('{}/{}_faint.dat'.format(
                     self.trifolder, self.triname.format(ax1_mid, ax2_mid)))):
+            # Have to check for the existence of the folder as well as just
+            # the lack of file. However, we can't guarantee that self.triname
+            # doesn't contain folder sub-structure (e.g.
+            # trifolder/ax1/ax2/file_faint.dat) and hence check generically.
+            base_auf_folder = os.path.split('{}/{}_faint.dat'.format(
+                self.trifolder, self.triname.format(ax1_mid, ax2_mid)))[0]
+            if not os.path.exists(base_auf_folder):
+                os.makedirs(base_auf_folder, exist_ok=True)
             download_trilegal_simulation('.', self.trifilterset, ax1_mid, ax2_mid, self.magnum,
                                          self.coord_system, self.maglim_f,
                                          total_objs=self.tri_num_faint)
