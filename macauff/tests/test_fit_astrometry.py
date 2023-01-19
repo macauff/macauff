@@ -165,16 +165,10 @@ class TestAstroCorrection:
         self.b_cat_name = 'store_data/b_cat{}{}.npy'
         with pytest.raises(ValueError, match='a_cat_func must be given if pregenerate_cutouts '):
             ac(self.a_cat_name, self.b_cat_name, a_cat_func=None, b_cat_func=None,
-               cat_recreate=True, snr_model_recreate=True, count_recreate=True, tri_download=False,
-               dens_recreate=True, nn_recreate=True, auf_sim_recreate=True, auf_pdf_recreate=True,
-               h_o_fit_recreate=True, fit_x2s_recreate=True, make_plots=True,
-               make_summary_plot=True)
+               tri_download=False, make_plots=True, make_summary_plot=True)
         with pytest.raises(ValueError, match='b_cat_func must be given if pregenerate_cutouts '):
             ac(self.a_cat_name, self.b_cat_name, a_cat_func=self.fake_cata_cutout, b_cat_func=None,
-               cat_recreate=True, snr_model_recreate=True, count_recreate=True, tri_download=False,
-               dens_recreate=True, nn_recreate=True, auf_sim_recreate=True, auf_pdf_recreate=True,
-               h_o_fit_recreate=True, fit_x2s_recreate=True, make_plots=True,
-               make_summary_plot=True)
+               tri_download=False, make_plots=True, make_summary_plot=True)
         dd_params = np.load(os.path.join(os.path.dirname(__file__), 'data/dd_params.npy'))
         l_cut = np.load(os.path.join(os.path.dirname(__file__), 'data/l_cut.npy'))
         ax1_mids, ax2_mids = np.array([105], dtype=float), np.array([0], dtype=float)
@@ -185,7 +179,7 @@ class TestAstroCorrection:
         ax_dimension = 1
         ac = AstrometricCorrections(
             psf_fwhm=6.1, numtrials=1000, nn_radius=30, dens_search_radius=900,
-            save_folder='ac_save_folder', trifolder='tri_folder', triname='trilegal_sim',
+            save_folder='ac_save_folder', trifolder='tri_folder', triname='trilegal_sim_{}_{}',
             maglim_f=25, magnum=11, tri_num_faint=1500000, trifilterset='2mass_spitzer_wise',
             trifiltname='W1', gal_wav_micron=3.35, gal_ab_offset=2.699, gal_filtname='wise2010-W1',
             gal_alav=0.039, bright_mag=16, dm=0.1, dd_params=dd_params, l_cut=l_cut,
@@ -206,21 +200,15 @@ class TestAstroCorrection:
         with pytest.raises(ValueError, match="If pregenerate_cutouts is 'True' all files must "
                            "exist already, but {} does not.".format(
                                self.a_cat_name.format(*cat_args))):
-            ac(self.a_cat_name, self.b_cat_name, a_cat_func, b_cat_func, cat_recreate=True,
-               snr_model_recreate=True, count_recreate=True, tri_download=False, dens_recreate=True,
-               nn_recreate=True, auf_sim_recreate=True, auf_pdf_recreate=True,
-               h_o_fit_recreate=True, fit_x2s_recreate=True, make_plots=True,
-               make_summary_plot=True)
+            ac(self.a_cat_name, self.b_cat_name, a_cat_func, b_cat_func,
+               tri_download=False, make_plots=True, make_summary_plot=True)
         ax1_min, ax1_max, ax2_min, ax2_max = 100, 110, -3, 3
         self.fake_cata_cutout(ax1_min, ax1_max, ax2_min, ax2_max, *cat_args)
         with pytest.raises(ValueError, match="If pregenerate_cutouts is 'True' all files must "
                            "exist already, but {} does not.".format(
                                self.b_cat_name.format(*cat_args))):
-            ac(self.a_cat_name, self.b_cat_name, a_cat_func, b_cat_func, cat_recreate=True,
-               snr_model_recreate=True, count_recreate=True, tri_download=False, dens_recreate=True,
-               nn_recreate=True, auf_sim_recreate=True, auf_pdf_recreate=True,
-               h_o_fit_recreate=True, fit_x2s_recreate=True, make_plots=True,
-               make_summary_plot=True)
+            ac(self.a_cat_name, self.b_cat_name, a_cat_func, b_cat_func,
+               tri_download=False, make_plots=True, make_summary_plot=True)
 
     @pytest.mark.parametrize("npy_or_csv,coord_or_chunk,coord_system,pregenerate_cutouts",
                              [("csv", "chunk", "equatorial", True),
@@ -241,7 +229,7 @@ class TestAstroCorrection:
             ax_dimension = 2
         ac = AstrometricCorrections(
             psf_fwhm=6.1, numtrials=1000, nn_radius=30, dens_search_radius=900,
-            save_folder='ac_save_folder', trifolder='tri_folder', triname='trilegal_sim',
+            save_folder='ac_save_folder', trifolder='tri_folder', triname='trilegal_sim_{}_{}',
             maglim_f=25, magnum=11, tri_num_faint=1500000, trifilterset='2mass_spitzer_wise',
             trifiltname='W1', gal_wav_micron=3.35, gal_ab_offset=2.699, gal_filtname='wise2010-W1',
             gal_alav=0.039, bright_mag=16, dm=0.1, dd_params=dd_params, l_cut=l_cut,
@@ -254,11 +242,11 @@ class TestAstroCorrection:
             cutout_height=6 if not pregenerate_cutouts else None)
 
         if coord_or_chunk == 'coord':
-            self.a_cat_name = 'store_data/a_cat{}{}.npy'
-            self.b_cat_name = 'store_data/b_cat{}{}.npy'
+            self.a_cat_name = 'store_data/a_cat{}{}' + ('.csv' if npy_or_csv == 'csv' else '.npy')
+            self.b_cat_name = 'store_data/b_cat{}{}' + ('.csv' if npy_or_csv == 'csv' else '.npy')
         else:
-            self.a_cat_name = 'store_data/a_cat{}.npy'
-            self.b_cat_name = 'store_data/b_cat{}.npy'
+            self.a_cat_name = 'store_data/a_cat{}' + ('.csv' if npy_or_csv == 'csv' else '.npy')
+            self.b_cat_name = 'store_data/b_cat{}' + ('.csv' if npy_or_csv == 'csv' else '.npy')
         if pregenerate_cutouts:
             # Cutout area is 60 sq deg with a height of 6 deg for a 10x6 box around (105, 0).
             cat_args = (chunks[0],)
@@ -270,10 +258,8 @@ class TestAstroCorrection:
         else:
             a_cat_func = self.fake_cata_cutout
             b_cat_func = self.fake_catb_cutout
-        ac(self.a_cat_name, self.b_cat_name, a_cat_func, b_cat_func, cat_recreate=True,
-           snr_model_recreate=True, count_recreate=True, tri_download=False, dens_recreate=True,
-           nn_recreate=True, auf_sim_recreate=True, auf_pdf_recreate=True,
-           h_o_fit_recreate=True, fit_x2s_recreate=True, make_plots=True, make_summary_plot=True)
+        ac(self.a_cat_name, self.b_cat_name, a_cat_func, b_cat_func,
+           tri_download=False, make_plots=True, make_summary_plot=True)
 
         if coord_or_chunk == 'coord':
             assert os.path.isfile('ac_save_folder/pdf/auf_fits_105.0_0.0.pdf')
