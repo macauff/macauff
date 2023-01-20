@@ -1417,11 +1417,13 @@ class TestInputs:
                  'correct_mag_array = 14.07 14.17 14.27 14.37\n',
                  'correct_mag_slice = 0.05 0.05 0.05 0.05\n',
                  'correct_sig_slice = 0.1 0.1 0.1 0.1\n', 'pos_and_err_indices = 0 1 2 0 1 2\n',
-                 'mag_indices = 3 5 7\n', 'mag_unc_indices = 4 6 8\n']
+                 'mag_indices = 3 5 7\n', 'mag_unc_indices = 4 6 8\n', 'chunk_overlap_col = None\n',
+                 'best_mag_index_col = 8\n']
         for i, key in enumerate(['best_mag_index', 'nn_radius', 'correct_astro_save_folder',
                                  'csv_cat_file_string', 'ref_csv_cat_file_string',
                                  'correct_mag_array', 'correct_mag_slice', 'correct_sig_slice',
-                                 'pos_and_err_indices', 'mag_indices', 'mag_unc_indices']):
+                                 'pos_and_err_indices', 'mag_indices', 'mag_unc_indices',
+                                 'chunk_overlap_col', 'best_mag_index_col']):
             new_line = ''
             for j in range(i+1):
                 new_line = new_line + lines[j]
@@ -1443,10 +1445,14 @@ class TestInputs:
                                   'data/cat_{}_params_.txt'.format(x))).readlines()
             idx = np.where([old_line in line for line in f])[0][0]
             if x == 'b':
-                lines[np.where(['mag_indices' in x for x in
+                lines[np.where(['mag_indices' in y for y in
                       lines])[0][0]] = 'mag_indices = 3 5 7 9\n'
-                lines[np.where(['mag_unc_indices' in x for x in
+                lines[np.where(['mag_unc_indices' in y for y in
                       lines])[0][0]] = 'mag_unc_indices = 4 6 8 10\n'
+                lines[np.where(['best_mag_index_col' in y for y in
+                      lines])[0][0]] = 'best_mag_index_col = 11\n'
+                lines[np.where(['chunk_overlap_col' in y for y in
+                      lines])[0][0]] = 'chunk_overlap_col = 12\n'
             new_line = ''
             for j in range(len(lines)):
                 new_line = new_line + lines[j]
@@ -1485,22 +1491,30 @@ class TestInputs:
         t_a_c.fake_catb_cutout(ax1_min, ax1_max, ax2_min, ax2_max, *cat_args)
         # Re-fake data with multiple magnitude columns.
         x = np.loadtxt('ref_1.csv', delimiter=',')
-        y = np.empty((len(x), 9), float)
-        y[:, [0, 1, 2]] = x[:, [0, 1, 2]]
-        y[:, [3, 4]] = x[:, [3, 4]]
-        y[:, [5, 6]] = x[:, [3, 4]]
-        y[:, [7, 8]] = x[:, [3, 4]]
-        np.savetxt('ref_1.csv', y, delimiter=',')
-        x = np.loadtxt('file_1.csv', delimiter=',')
         y = np.empty((len(x), 11), float)
         y[:, [0, 1, 2]] = x[:, [0, 1, 2]]
         y[:, [3, 4]] = x[:, [3, 4]]
         y[:, [5, 6]] = x[:, [3, 4]]
         y[:, [7, 8]] = x[:, [3, 4]]
+        # Pad with both a best index and chunk overlap column
+        y[:, 9] = 2
+        y[:, 10] = 1
+        np.savetxt('ref_1.csv', y, delimiter=',')
+        x = np.loadtxt('file_1.csv', delimiter=',')
+        y = np.empty((len(x), 13), float)
+        y[:, [0, 1, 2]] = x[:, [0, 1, 2]]
+        y[:, [3, 4]] = x[:, [3, 4]]
+        y[:, [5, 6]] = x[:, [3, 4]]
+        y[:, [7, 8]] = x[:, [3, 4]]
         y[:, [9, 10]] = x[:, [3, 4]]
+        y[:, 11] = np.random.default_rng(seed=5673523).choice(4, size=len(x), replace=True)
+        y[:, 12] = np.random.default_rng(seed=45645132234).choice(2, size=len(x), replace=True)
         np.savetxt('file_1.csv', y, delimiter=',')
         # Check for outputs
         cm.chunk_id = 1
+        # Force the removal of ancillary checkpoints.
+        if os.path.isfile('ac_folder/npy/snr_mag_params.npy'):
+            os.remove('ac_folder/npy/snr_mag_params.npy')
         # Using the ORIGINAL cat_a_params means we don't fit for corrections
         # to catalogue 'a'.
         cm._initialise_chunk(os.path.join(os.path.dirname(__file__),
@@ -1524,13 +1538,17 @@ class TestInputs:
         narray = np.load('ac_folder/npy/n_sigs_array.npy')
         assert_allclose([marray[0], narray[0]], [2, 0], rtol=0.1, atol=0.01)
 
+        assert np.all(np.load('wise_folder/in_chunk_overlap.npy') == y[:, 12].astype(int))
+
         for old_line, new_line, x, match_text in zip(
                 ['best_mag_index = ', 'best_mag_index = ', 'best_mag_index = ',
                  'nn_radius = ', 'nn_radius = ', 'correct_mag_array = ',
                  'correct_mag_slice = ', 'correct_mag_slice = ', 'correct_sig_slice = ',
                  'correct_sig_slice = ', 'pos_and_err_indices = ', 'pos_and_err_indices = ',
                  'pos_and_err_indices = ', 'mag_indices =', 'mag_indices =', 'mag_indices =',
-                 'mag_unc_indices =', 'mag_unc_indices =', 'mag_unc_indices ='],
+                 'mag_unc_indices =', 'mag_unc_indices =', 'mag_unc_indices =',
+                 'chunk_overlap_col = ', 'chunk_overlap_col = ', 'chunk_overlap_col = ',
+                 'best_mag_index_col = ', 'best_mag_index_col = '],
                 ['best_mag_index = A\n', 'best_mag_index = 2.5\n', 'best_mag_index = 7\n',
                  'nn_radius = A\n', 'nn_radius = 1 2\n', 'correct_mag_array = 1 2 A 4 5\n',
                  'correct_mag_slice = 0.1 0.1 0.1 A 0.1\n', 'correct_mag_slice = 0.1 0.1 0.1\n',
@@ -1538,9 +1556,12 @@ class TestInputs:
                  'pos_and_err_indices = 1 2 3 4 5 A\n', 'pos_and_err_indices = 1 2 3 4 5.5 6\n',
                  'pos_and_err_indices = 1 2 3 4 5\n', 'mag_indices = A 1 2\n',
                  'mag_indices = 1 2\n', 'mag_indices = 1.2 2 3 4\n', 'mag_unc_indices = A 1 2\n',
-                 'mag_unc_indices = 1 2\n', 'mag_unc_indices = 1.2 2 3\n'],
+                 'mag_unc_indices = 1 2\n', 'mag_unc_indices = 1.2 2 3\n',
+                 'chunk_overlap_col = Non\n', 'chunk_overlap_col = A\n',
+                 'chunk_overlap_col = 1.2\n', 'best_mag_index_col = A\n',
+                 'best_mag_index_col = 1.2\n'],
                 ['a', 'b', 'a', 'b', 'a', 'a', 'b', 'a', 'b', 'a', 'b', 'a', 'a', 'a', 'b', 'b',
-                 'b', 'a', 'a'],
+                 'b', 'a', 'a', 'a', 'b', 'a', 'a', 'b'],
                 ['best_mag_index should be an integer in the catalogue "a"',
                  'best_mag_index should be an integer in the catalogue "b"',
                  'best_mag_index cannot be a larger index than the list of filters '
@@ -1559,8 +1580,12 @@ class TestInputs:
                  'All elements of b_mag_indices should be integers.',
                  'mag_unc_indices should be a list of integers in the catalogue "b" ',
                  'a_mag_unc_indices and a_mag_indices should contain the',
-                 'All elements of a_mag_unc_indices should be integers.']):
-            print(new_line, x, match_text)
+                 'All elements of a_mag_unc_indices should be integers.',
+                 'chunk_overlap_col should be an integer in the catalogue "a"',
+                 'chunk_overlap_col should be an integer in the catalogue "b"',
+                 'chunk_overlap_col should be an integer in the catalogue "a"',
+                 'best_mag_index_col should be an integer in the catalogue "a"',
+                 'best_mag_index_col should be an integer in the catalogue "b"']):
             f = open(os.path.join(os.path.dirname(__file__),
                                   'data/cat_{}_params_2.txt'.format(x))).readlines()
             idx = np.where([old_line in line for line in f])[0][0]

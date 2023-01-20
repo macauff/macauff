@@ -22,7 +22,7 @@ from .group_sources_fortran import group_sources_fortran as gsf
 from .misc_functions_fortran import misc_functions_fortran as mff
 from .photometric_likelihood import compute_photometric_likelihoods
 from .counterpart_pairing import source_pairing
-from .parse_catalogue import npy_to_csv
+from .parse_catalogue import npy_to_csv, csv_to_npy
 from .fit_astrometry import AstrometricCorrections
 
 __all__ = ['CrossMatch']
@@ -188,7 +188,13 @@ class CrossMatch():
 
             # Having corrected the astrometry, we have to call csv_to_npy
             # now, rather than pre-generating our binary input catalogues.
-
+            csv_folder, csv_filename = os.path.split(
+                self.a_csv_cat_file_string.format(self.chunk_id))
+            if csv_filename[-4:] == '.csv':
+                csv_filename = csv_filename[:-4]
+            csv_to_npy(csv_folder, csv_filename, self.a_cat_folder_path,
+                       self.a_pos_and_err_indices[1], self.a_mag_indices, self.a_best_mag_index_col,
+                       self.a_chunk_overlap_col)
 
             # If we re-made either side's astrometry then we need to load its
             # SNR-mag relation now.
@@ -231,12 +237,14 @@ class CrossMatch():
             ac(self.b_ref_csv_cat_file_string, self.b_csv_cat_file_string,
                tri_download=self.b_download_tri, make_plots=True)
 
-            # Having corrected the astrometry, we have to call csv_to_npy
-            # now, rather than pre-generating our binary input catalogues.
+            csv_folder, csv_filename = os.path.split(
+                self.b_csv_cat_file_string.format(self.chunk_id))
+            if csv_filename[-4:] == '.csv':
+                csv_filename = csv_filename[:-4]
+            csv_to_npy(csv_folder, csv_filename, self.b_cat_folder_path,
+                       self.b_pos_and_err_indices[1], self.b_mag_indices, self.b_best_mag_index_col,
+                       self.b_chunk_overlap_col)
 
-
-            # If we re-made either side's astrometry then we need to load its
-            # SNR-mag relation now.
             os.system('cp {}/npy/snr_mag_params.npy {}'.format(self.b_correct_astro_save_folder,
                       self.b_snr_mag_params_path))
             f = 'snr_mag_params'
@@ -1228,7 +1236,8 @@ class CrossMatch():
                 for check_flag in ['best_mag_index', 'nn_radius', 'correct_astro_save_folder',
                                    'csv_cat_file_string', 'ref_csv_cat_file_string',
                                    'correct_mag_array', 'correct_mag_slice', 'correct_sig_slice',
-                                   'pos_and_err_indices', 'mag_indices', 'mag_unc_indices']:
+                                   'pos_and_err_indices', 'mag_indices', 'mag_unc_indices',
+                                   'chunk_overlap_col', 'best_mag_index_col']:
                     if check_flag not in config:
                         raise ValueError("Missing key {} from catalogue {} metadata file.".format(
                                          check_flag, catname))
@@ -1246,6 +1255,31 @@ class CrossMatch():
                     raise ValueError("best_mag_index cannot be a larger index than the list of "
                                      "filters in the catalogue {} metadata file.".format(catname))
                 setattr(self, '{}best_mag_index'.format(flag), int(a))
+
+                a = config['best_mag_index_col']
+                try:
+                    a = float(a)
+                except ValueError:
+                    raise ValueError("best_mag_index_col should be an integer in the catalogue {} "
+                                     "metadata file.".format(catname))
+                if not a.is_integer():
+                    raise ValueError("best_mag_index_col should be an integer in the catalogue {} "
+                                     "metadata file.".format(catname))
+                setattr(self, '{}best_mag_index_col'.format(flag), int(a))
+
+                a = config['chunk_overlap_col']
+                if a == "None":
+                    setattr(self, '{}chunk_overlap_col'.format(flag), None)
+                else:
+                    try:
+                        a = float(a)
+                    except ValueError:
+                        raise ValueError("chunk_overlap_col should be an integer in the "
+                                         "catalogue {} metadata file.".format(catname))
+                    if not a.is_integer():
+                        raise ValueError("chunk_overlap_col should be an integer in the "
+                                         "catalogue {} metadata file.".format(catname))
+                    setattr(self, '{}chunk_overlap_col'.format(flag), int(a))
 
                 try:
                     setattr(self, '{}nn_radius'.format(flag), float(config['nn_radius']))
