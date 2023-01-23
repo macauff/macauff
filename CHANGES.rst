@@ -66,6 +66,9 @@ New Features
 Bug Fixes
 ^^^^^^^^^
 
+- ``mag_h_params`` renamed to ``snr_mag_params`` to ensure commonality of the
+  reference and parameter without the codebase. [#62]
+
 - ``AstrometricCorrections`` makes a correctly multi-magnitude SNR model
   array. [#59]
 
@@ -138,11 +141,31 @@ Bug Fixes
 API Changes
 ^^^^^^^^^^^
 
-- Added parameters ... to inputs to ``CrossMatch`` to allow for astrometric corrections
-  through ``AstrometricCorrections`` directly before a cross-match. [#62]
+- In ``AstrometricCorrections``, ``triname`` now requires either one or two
+  ``{}`` Python string formats, depending on ``coord_or_chunk``. [#62]
 
-- Requirements for ... inputs to ``CrossMatch`` changed to either require
-  ``include_perturb_auf`` or ``correct_astrometry``. [#62]
+- All ``recreate`` flags all removed from ``AstrometricCorrections``, which now
+  loops on a per-sightline basis instead of using per-step loops. [#62]
+
+- Added ``n_pool`` as input to ``CrossMatch`` to control the number of threads used
+  in ``multiprocessing`` calls. [#62]
+
+- Added parameters ``correct_astrometry``, ``best_mag_index``, ``nn_radius``,
+  ``correct_astro_save_folder``, ``csv_cat_file_string``,
+  ``ref_csv_cat_file_string``, ``correct_mag_array``, ``correct_mag_slice``,
+  ``correct_sig_slice``, ``pos_and_err_indices``, ``mag_indices``, and
+  ``mag_unc_indices`` as catalogue-level inputs to ``CrossMatch`` to allow for
+  astrometric corrections through ``AstrometricCorrections`` directly before a
+  cross-match. [#62]
+
+- Requirements for ``num_trials``, ``d_mag``, ``run_fw_auf``, ``run_psf_auf``,
+  ``psf_fwhms``, ``dens_mags``, ``snr_mag_params_path``, ``download_tri``,
+  ``tri_set_name``, ``tri_filt_names``, ``tri_filt_num``, ``tri_maglim_faint``,
+  ``tri_num_faint``, ``dens_dist``, ``dd_params_path``, ``l_cut_path``,
+  ``gal_wavs``, ``gal_zmax``, ``gal_nzs``, ``gal_aboffsets``,
+  ``gal_filternames``, and ``gal_al_avs`` inputs to ``CrossMatch`` changed to
+  either require ``include_perturb_auf`` (and lower-level input criteria) or
+  ``correct_astrometry``. [#62]
 
 - Removed expectation of parameters ``tri_num_bright`` and ``tri_maglim_bright`` from
   ``CrossMatch`` input parameter files. Currently only expect the "faint" versions
