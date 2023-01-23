@@ -53,11 +53,14 @@ These parameters are only provided in the single, common-parameter input file, a
 
 There are some parameters that must be given in all runs:
 
-``joint_folder_path``, ``run_auf``, ``run_group``, ``run_cf``, ``run_source``, ``include_perturb_auf``, ``include_phot_like``, ``use_phot_priors``, ``cross_match_extent``, ``mem_chunk_num``, ``pos_corr_dist``, ``cf_region_type``, ``cf_region_frame``, ``cf_region_points``, ``real_hankel_points``, ``four_hankel_points``, ``four_max_rho``, and ``int_fracs``;
+``joint_folder_path``, ``run_auf``, ``run_group``, ``run_cf``, ``run_source``, ``include_perturb_auf``, ``include_phot_like``, ``use_phot_priors``, ``cross_match_extent``, ``mem_chunk_num``, ``pos_corr_dist``, ``cf_region_type``, ``cf_region_frame``, ``cf_region_points``, ``real_hankel_points``, ``four_hankel_points``, ``four_max_rho``, ``int_fracs``, and ``n_pool``;
 
 and those options which only need to be supplied if ``include_perturb_auf`` is ``True``:
 
 ``num_trials``, ``compute_local_density``, and ``d_mag``.
+
+.. note::
+    ``num_trials`` and ``d_mag`` currently need to be supplied if either ``correct_astrometry`` option in the two `Catalogue-specific Parameters`_ config files is ``True`` as well.
 
 Common Parameter Description
 ----------------------------
@@ -133,6 +136,10 @@ The integer number of points for approximating the inverse Hankel transformation
 
 The largest fourier-space value, up to which inverse Hankel transformation integrals are considered. Should typically be larger than the inverse of the smallest typical centroiding Gaussian one-dimensional uncertainty.
 
+``n_pool``
+
+Determines how many CPUs are used when parallelising within ``Python`` using ``multiprocessing``.
+
 ``int_fracs``
 
 The integral fractions of the various so-called "error circles" used in the cross-match process. Should be space-separated floats, in the order of: bright error circle fraction, "field" error circle fraction, and potential counterpart cutoff limit.
@@ -157,23 +164,30 @@ These parameters are required in two separate files, one per catalogue to be cro
 
 These can be divided into those inputs that are always required:
 
-``cat_folder_path``, ``cat_name``, ``filt_names``, ``auf_folder_path``, ``auf_region_type``, ``auf_region_frame``, and ``auf_region_points``;
+``cat_folder_path``, ``cat_name``, ``filt_names``, ``auf_folder_path``, ``auf_region_type``, ``auf_region_frame``, ``auf_region_points``, and ``correct_astrometry``;
 
 those that are only required if the `Joint Parameters`_ option ``include_perturb_auf`` is ``True``:
 
-``fit_gal_flag``, ``run_fw_auf``, ``run_psf_auf``, ``psf_fwhms``, ``dens_mags``, ``mag_h_params_path``, ``download_tri``, ``tri_set_name``, ``tri_filt_names``, ``tri_filt_num``, ``tri_maglim_faint``, and ``tri_num_faint``;
+``fit_gal_flag``, ``run_fw_auf``, ``run_psf_auf``, ``psf_fwhms``, ``dens_mags``, ``snr_mag_params_path``, ``download_tri``, ``tri_set_name``, ``tri_filt_names``, ``tri_filt_num``, ``tri_maglim_faint``, and ``tri_num_faint``;
 
 parameters required if ``run_psf_auf`` is ``True``:
 
 ``dd_params_path`` and ``l_cut_path``;
 
-the parameter only needed if `Joint Parameters`_ option ``compute_local_density`` is ``True``:
+the parameter needed if `Joint Parameters`_ option ``compute_local_density`` is ``True`` (and hence ``include_perturb_auf`` is ``True``):
 
 ``dens_dist``;
 
-and the inputs required in each catalogue parameters file if ``fit_gal_flag`` is ``True``:
+the inputs required in each catalogue parameters file if ``fit_gal_flag`` is ``True`` (and hence ``include_perturb_auf`` is ``True``):
 
-``gal_wavs``, ``gal_zmax``, ``gal_nzs``, ``gal_aboffsets``, ``gal_filternames``, and ``gal_al_avs``.
+``gal_wavs``, ``gal_zmax``, ``gal_nzs``, ``gal_aboffsets``, ``gal_filternames``, and ``gal_al_avs``;
+
+and the inputs required if ``correct_astrometry`` is ``True``:
+
+``best_mag_index``, ``nn_radius``, ``correct_astro_save_folder``, ``csv_cat_file_string``, ``ref_csv_cat_file_string``, ``correct_mag_array``, ``correct_mag_slice``, ``correct_sig_slice``, ``pos_and_err_indices``, ``mag_indices``, ``mag_unc_indices``, ``chunk_overlap_col``, and ``best_mag_index_col``.
+
+.. note::
+    ``run_fw_auf``, ``run_psf_auf``, ``psf_fwhms``, ``dens_mags``, ``snr_mag_params_path``, ``download_tri``, ``tri_set_name``, ``tri_filt_names``, ``tri_filt_num``, ``tri_maglim_faint``, ``tri_num_faint``, ``dens_dist``, ``dd_params_path``, ``l_cut_path``, ``gal_wavs``, ``gal_zmax``, ``gal_nzs``, ``gal_aboffsets``, ``gal_filternames``, and ``gal_al_avs`` are all currently required if ``correct_astrometry`` is ``True``, bypassing the nested flags above. For example, ``dens_dist`` is required as an input if ``compute_local_density`` and ``include_perturb_auf`` are both ``True``, or if ``correct_astrometry`` is set. This means that ``AstrometricCorrections`` implicitly always runs and fits for a full Astrometric Uncertainty Function.
 
 
 Catalogue Parameter Description
@@ -207,6 +221,10 @@ As with ``auf_region_frame``, this flag indicates which frame the data, and thus
 
 Based on ``auf_region_type``, this must either by six space-separated floats, controlling the start and end, and number of, longitude and latitude points in ``start lon end lon # steps start lat end lat #steps`` order (see ``cf_region_points``), or a series of comma-separated tuples cf. ``(a, b), (c, d)``.
 
+``correct_astrometry``
+
+In cases where catalogues have unreliable *centroid* uncertainties, before catalogue matching occurs the dataset can be fit for systematic corrections to its quoted astrometric precisions through ensemble match separation distance distributions to a higher-precision dataset (see the :doc:`Processing<pre_post_process>` section). This flag controls whether this is performed on a chunk-by-chunk basis during the initialisation step of ``CrossMatch``.
+
 ``fit_gal_flag``
 
 Optional flag for whether to include simulated external galaxy counts, or just include Galactic sources when deriving the perturbation component of the AUF. Only needed if ``include_perturb_auf`` is ``True``.
@@ -227,9 +245,9 @@ The Full-Width-At-Half-Maximum of each filter's Point Spread Function (PSF), in 
 
 The magnitude, in each bandpass -- the same order as ``filt_names`` -- down to which to count the number of nearby sources when deriving the local normalising density of each object. Should be space-separated floats, of the same number as those given in ``filt_names``.
 
-``mag_h_params_path``
+``snr_mag_params_path``
 
-File path, either absolute or relative to the location of the script the cross-matches are run from, of a binary ``.npy`` file containing the parameterisation of the signal-to-noise ratio of sources as a function of magnitude, in a series of given sightlines. Must be of shape ``(N, M, 5)`` where ``N`` is the number of filters in ``filt_names`` order, ``M`` is the number of sightlines for which SNR vs mag has been derived, and the 5 entries for each filter-sightline combination must be in order ``a``, ``b``, ``c``, ``coord1`` (e.g. RA), and ``coord2`` (e.g. Dec). See pre-processing for more information on the meaning of those terms and how ``mag_h_params`` is used.
+File path, either absolute or relative to the location of the script the cross-matches are run from, of a binary ``.npy`` file containing the parameterisation of the signal-to-noise ratio of sources as a function of magnitude, in a series of given sightlines. Must be of shape ``(N, M, 5)`` where ``N`` is the number of filters in ``filt_names`` order, ``M`` is the number of sightlines for which SNR vs mag has been derived, and the 5 entries for each filter-sightline combination must be in order ``a``, ``b``, ``c``, ``coord1`` (e.g. RA), and ``coord2`` (e.g. Dec). See pre-processing for more information on the meaning of those terms and how ``snr_mag_params`` is used.
 
 ``download_tri``
 
@@ -290,6 +308,59 @@ Name of each filter as appropriate for providing to ``speclite`` for each filter
 ``gal_al_avs``
 
 Differential extinction relative to the V-band for each filter, a set of space-separated floats. Must be provided if ``fit_gal_flag`` is ``True``.
+
+``best_mag_index``
+
+For the purposes of correcting systematic biases in a given catalogue, a single photometric band is used. ``best_mag_index`` indicates which filter to use -- e.g., ``best_mag_index = 0`` says to use the first filter as given in ``filt_names`` or ``mag_indices``. Must be a single integer value no larger than ``len(filt_names)-1``.
+
+``nn_radius``
+
+Nearest neighbour radius out to which to search for potential counterparts for the purposes of ensemble match separation distributions; should be a single float.
+
+``correct_astro_save_folder``
+
+File path, relative or absolute, into which to save files as generated by the astrometric correction process.
+
+``csv_cat_file_string``
+
+Path and filename, all in a single string, containing the location of each correction sightline's dataset to test. Must contain the appropriate number of string format ``{}`` identifiers depending on ``coord_or_chunk`` -- in this case, a single "chunk" identifier for corrections done through ``CrossMatch``. For example, ``/your/path/to/file/data_{}.csv`` where each "chunk" is saved into a csv file called ``data_1``, ``data_2``, ``data_104`` etc.
+
+``ref_csv_cat_file_string``
+
+Similar to ``csv_cat_file_string``, but the path and filename of the *reference* dataset used in the matching process. These chunks should correspond one-to-one with those used in ``csv_cat_file_string`` -- i.e., ``data_1.csv`` in ``/your/path/to/file`` should be the same region of the sky as the reference catalogue in ``/another/path/to/elsewhere/reference_data_1.csv``, potentially with some buffer overlap to avoid false matches at the edges.
+
+``correct_mag_array``
+
+List of magnitudes at which to evaluate the distribution of matches to the higher-astrometric-precision dataset in the chosen ``best_mag_index`` filter. Accepts a list of floats.
+
+``correct_mag_slice``
+
+Corresponding to each magnitude in ``correct_mag_array``, each element of this list of floats should be a width around each ``correct_mag_array`` element to select sources, ensuring a small sub-set of similar brightness objects are used to determine the Astrometric Uncertainty Function of.
+
+``correct_sig_slice``
+
+Elementwise with ``correct_mag_array`` and ``correct_mag_slice``, a list of floats of widths of astrometric precision to select a robust sub-sample of objects in each magnitude bin for, ensuring a self-similar AUF.
+
+``pos_and_err_indices``
+
+A list of six integers, the first three elements of which are the zero-indexed indices into the *reference* catalogue .csv file (``ref_csv_cat_file_string``) for the longitudinal coordinate, latitudinal coordinate, and circular astrometric precision respectively, followed by the lon/lat/uncert of the *input* catalogue. For example, ``0 1 2 10 9 8`` suggests that the reference catalogue begins with the position and uncertainty of its objects while the catalogue "a" or "b" sources have, in their original .csv file, a backwards list of coordinates and precisions towards the final columns of the filing system.
+
+``mag_indices``
+
+Just for the input catalogue, a list of ``len(filt_names)`` space-separated integers detailing the zero-indexed column number of the magnitudes in the dataset.
+
+``mag_unc_indices``
+
+Similar to ``mag_indices``, a list of ``len(mag_indices)`` space-separated integers, one for each column in ``mag_indices`` for where the corresponding uncertainty column is held for each magnitude in the input .csv file.
+
+``chunk_overlap_col``
+
+Column number in the original csv file for the column containing the boolean flag indicating whether sources are in the "halo" or "core" of the chunk. Used within ``CrossMatch`` after calling ``AstrometricCorrections`` to create final npy files via ``csv_to_npy``. Should be a single integer number.
+
+``best_mag_index_col``
+
+The zero-indexed integer column number in the original input csv file used in ``AstrometricCorrections`` that corresponds to the column containing the highest quality detection for each source in the catalogue, used when calling ``csv_to_npy``.
+
 
 .. rubric:: Footnotes
 
