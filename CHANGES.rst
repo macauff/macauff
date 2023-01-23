@@ -153,10 +153,10 @@ API Changes
 - Added parameters ``correct_astrometry``, ``best_mag_index``, ``nn_radius``,
   ``correct_astro_save_folder``, ``csv_cat_file_string``,
   ``ref_csv_cat_file_string``, ``correct_mag_array``, ``correct_mag_slice``,
-  ``correct_sig_slice``, ``pos_and_err_indices``, ``mag_indices``, and
-  ``mag_unc_indices`` as catalogue-level inputs to ``CrossMatch`` to allow for
-  astrometric corrections through ``AstrometricCorrections`` directly before a
-  cross-match. [#62]
+  ``correct_sig_slice``, ``pos_and_err_indices``, ``mag_indices``,
+  ``mag_unc_indices``, ``chunk_overlap_col``, and ``best_mag_index_col`` as
+  catalogue-level inputs to ``CrossMatch`` to allow for astrometric corrections
+  through ``AstrometricCorrections`` directly before a cross-match. [#62]
 
 - Requirements for ``num_trials``, ``d_mag``, ``run_fw_auf``, ``run_psf_auf``,
   ``psf_fwhms``, ``dens_mags``, ``snr_mag_params_path``, ``download_tri``,
