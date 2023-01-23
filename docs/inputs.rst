@@ -59,7 +59,8 @@ and those options which only need to be supplied if ``include_perturb_auf`` is `
 
 ``num_trials``, ``compute_local_density``, and ``d_mag``.
 
-Note that ``num_trials`` and ``d_mag`` currently need to be supplied if either ``correct_astrometry`` option in the two `Catalogue-specific Parameters`_ config files is ``True`` as well.
+.. note::
+    ``num_trials`` and ``d_mag`` currently need to be supplied if either ``correct_astrometry`` option in the two `Catalogue-specific Parameters`_ config files is ``True`` as well.
 
 Common Parameter Description
 ----------------------------
@@ -185,7 +186,8 @@ and the inputs required if ``correct_astrometry`` is ``True``:
 
 ``best_mag_index``, ``nn_radius``, ``correct_astro_save_folder``, ``csv_cat_file_string``, ``ref_csv_cat_file_string``, ``correct_mag_array``, ``correct_mag_slice``, ``correct_sig_slice``, ``pos_and_err_indices``, ``mag_indices``, and ``mag_unc_indices``.
 
-Note that ``run_fw_auf``, ``run_psf_auf``, ``psf_fwhms``, ``dens_mags``, ``snr_mag_params_path``, ``download_tri``, ``tri_set_name``, ``tri_filt_names``, ``tri_filt_num``, ``tri_maglim_faint``, ``tri_num_faint``, ``dens_dist``, ``dd_params_path``, ``l_cut_path``, ``gal_wavs``, ``gal_zmax``, ``gal_nzs``, ``gal_aboffsets``, ``gal_filternames``, and ``gal_al_avs`` are all currently required if ``correct_astrometry`` is ``True``, bypassing the nested flags above. For example, ``dens_dist`` is required as an input if ``compute_local_density`` and ``include_perturb_auf`` are both ``True``, or if ``correct_astrometry`` is set. This means that ``AstrometricCorrections`` implicitly always runs and fits for a full Astrometric Uncertainty Function.
+.. note::
+    ``run_fw_auf``, ``run_psf_auf``, ``psf_fwhms``, ``dens_mags``, ``snr_mag_params_path``, ``download_tri``, ``tri_set_name``, ``tri_filt_names``, ``tri_filt_num``, ``tri_maglim_faint``, ``tri_num_faint``, ``dens_dist``, ``dd_params_path``, ``l_cut_path``, ``gal_wavs``, ``gal_zmax``, ``gal_nzs``, ``gal_aboffsets``, ``gal_filternames``, and ``gal_al_avs`` are all currently required if ``correct_astrometry`` is ``True``, bypassing the nested flags above. For example, ``dens_dist`` is required as an input if ``compute_local_density`` and ``include_perturb_auf`` are both ``True``, or if ``correct_astrometry`` is set. This means that ``AstrometricCorrections`` implicitly always runs and fits for a full Astrometric Uncertainty Function.
 
 
 Catalogue Parameter Description
