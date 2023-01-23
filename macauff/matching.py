@@ -170,7 +170,7 @@ class CrossMatch():
             ax_dimension = 2
             a_npy_or_csv = 'csv'
             a_coord_or_chunk = 'chunk'
-            a_correct_astro_tri_name = '{}/{}/trilegal_auf_simulation_faint.dat'
+            a_correct_astro_tri_name = '{}/{}/trilegal_auf_simulation'
             ac = AstrometricCorrections(
                 self.a_psf_fwhms[acbi], self.num_trials, self.a_nn_radius,
                 self.a_dens_dist, self.a_correct_astro_save_folder, self.a_auf_folder_path,

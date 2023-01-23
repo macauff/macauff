@@ -1540,6 +1540,40 @@ class TestInputs:
 
         assert np.all(np.load('wise_folder/in_chunk_overlap.npy') == y[:, 12].astype(int))
 
+        old_line = 'chunk_overlap_col = '
+        new_line = 'chunk_overlap_col = None\n'
+        f = open(os.path.join(os.path.dirname(__file__),
+                              'data/cat_b_params_2.txt')).readlines()
+        idx = np.where([old_line in line for line in f])[0][0]
+        _replace_line(os.path.join(os.path.dirname(__file__),
+                      'data/cat_b_params_2.txt'), idx, new_line)
+
+        if os.path.isfile('ac_folder/npy/snr_mag_params.npy'):
+            os.remove('ac_folder/npy/snr_mag_params.npy')
+        # Swapped a+b to test a_* versions of things
+        cm._initialise_chunk(os.path.join(os.path.dirname(__file__),
+                             'data/crossmatch_params.txt'),
+                             os.path.join(os.path.dirname(__file__),
+                             'data/cat_b_params_2.txt'),
+                             os.path.join(os.path.dirname(__file__),
+                             'data/cat_a_params.txt'))
+        assert cm.a_best_mag_index == 0
+        assert_allclose(cm.a_nn_radius, 30)
+        assert cm.a_correct_astro_save_folder == os.path.abspath('ac_folder')
+        assert cm.a_csv_cat_file_string == os.path.abspath('file_{}.csv')
+        assert cm.a_ref_csv_cat_file_string == os.path.abspath('ref_{}.csv')
+        assert_allclose(cm.a_correct_mag_array, np.array([14.07, 14.17, 14.27, 14.37]))
+        assert_allclose(cm.a_correct_mag_slice, np.array([0.05, 0.05, 0.05, 0.05]))
+        assert_allclose(cm.a_correct_sig_slice, np.array([0.1, 0.1, 0.1, 0.1]))
+        assert np.all(cm.a_pos_and_err_indices == np.array([[0, 1, 2], [0, 1, 2]]))
+        assert np.all(cm.a_mag_indices == np.array([3, 5, 7, 9]))
+        assert np.all(cm.a_mag_unc_indices == np.array([4, 6, 8, 10]))
+        marray = np.load('ac_folder/npy/m_sigs_array.npy')
+        narray = np.load('ac_folder/npy/n_sigs_array.npy')
+        assert_allclose([marray[0], narray[0]], [2, 0], rtol=0.1, atol=0.01)
+
+        assert np.all(np.load('wise_folder/in_chunk_overlap.npy') == 0)
+
         for old_line, new_line, x, match_text in zip(
                 ['best_mag_index = ', 'best_mag_index = ', 'best_mag_index = ',
                  'nn_radius = ', 'nn_radius = ', 'correct_mag_array = ',
