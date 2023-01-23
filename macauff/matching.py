@@ -1010,10 +1010,6 @@ class CrossMatch():
                 setattr(self, '{}tri_filt_names'.format(flag),
                         np.array(config['tri_filt_names'].split()))
 
-                for check_flag in ['psf_fwhms']:
-                    if check_flag not in config:
-                        raise ValueError("Missing key {} from catalogue {} metadata file.".format(
-                                         check_flag, catname))
                 a = config['psf_fwhms'].split()
                 try:
                     b = np.array([float(f) for f in a])
