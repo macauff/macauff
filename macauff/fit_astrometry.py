@@ -1474,6 +1474,11 @@ class AstrometricCorrections:
         return m_sig, n_sig
 
     def finalise_summary_plot(self):
+        """
+        After running all of the sightlines' fits, generate a final
+        summary plot of the sig-sig relations, quality of fits, and
+        resulting "m" and "n" scaling parameters.
+        """
         ax_d = plt.subplot(self.gs[1])
         q = ~np.isnan(self.x2s[:, 0])
         chi_sqs, dofs = self.x2s[:, 0][q].flatten(), self.x2s[:, 1][q].flatten()
