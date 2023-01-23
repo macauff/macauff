@@ -59,6 +59,8 @@ and those options which only need to be supplied if ``include_perturb_auf`` is `
 
 ``num_trials``, ``compute_local_density``, and ``d_mag``.
 
+Note that ``num_trials`` and ``d_mag`` currently need to be supplied if either ``correct_astrometry`` option in the two `Catalogue-specific Parameters`_ config files is ``True`` as well.
+
 Common Parameter Description
 ----------------------------
 
@@ -165,13 +167,13 @@ These can be divided into those inputs that are always required:
 
 those that are only required if the `Joint Parameters`_ option ``include_perturb_auf`` is ``True``:
 
-``fit_gal_flag``, ``run_fw_auf``, ``run_psf_auf``, ``psf_fwhms``, ``dens_mags``, ``mag_h_params_path``, ``download_tri``, ``tri_set_name``, ``tri_filt_names``, ``tri_filt_num``, ``tri_maglim_faint``, and ``tri_num_faint``;
+``fit_gal_flag``, ``run_fw_auf``, ``run_psf_auf``, ``psf_fwhms``, ``dens_mags``, ``snr_mag_params_path``, ``download_tri``, ``tri_set_name``, ``tri_filt_names``, ``tri_filt_num``, ``tri_maglim_faint``, and ``tri_num_faint``;
 
 parameters required if ``run_psf_auf`` is ``True``:
 
 ``dd_params_path`` and ``l_cut_path``;
 
-the parameter needed if `Joint Parameters`_ option ``compute_local_density`` is ``True`` (and hence ``include_perturb_auf`` is ``True``) or if ``correct_astrometry`` is ``True``:
+the parameter needed if `Joint Parameters`_ option ``compute_local_density`` is ``True`` (and hence ``include_perturb_auf`` is ``True``):
 
 ``dens_dist``;
 
@@ -182,6 +184,8 @@ the inputs required in each catalogue parameters file if ``fit_gal_flag`` is ``T
 and the inputs required if ``correct_astrometry`` is ``True``:
 
 ``best_mag_index``, ``nn_radius``, ``correct_astro_save_folder``, ``csv_cat_file_string``, ``ref_csv_cat_file_string``, ``correct_mag_array``, ``correct_mag_slice``, ``correct_sig_slice``, ``pos_and_err_indices``, ``mag_indices``, and ``mag_unc_indices``.
+
+Note that ``run_fw_auf``, ``run_psf_auf``, ``psf_fwhms``, ``dens_mags``, ``snr_mag_params_path``, ``download_tri``, ``tri_set_name``, ``tri_filt_names``, ``tri_filt_num``, ``tri_maglim_faint``, ``tri_num_faint``, ``dens_dist``, ``dd_params_path``, ``l_cut_path``, ``gal_wavs``, ``gal_zmax``, ``gal_nzs``, ``gal_aboffsets``, ``gal_filternames``, and ``gal_al_avs`` are all currently required if ``correct_astrometry`` is ``True``, bypassing the nested flags above. For example, ``dens_dist`` is required as an input if ``compute_local_density`` and ``include_perturb_auf`` are both ``True``, or if ``correct_astrometry`` is set. This means that ``AstrometricCorrections`` implicitly always runs and fits for a full Astrometric Uncertainty Function.
 
 
 Catalogue Parameter Description
@@ -239,9 +243,9 @@ The Full-Width-At-Half-Maximum of each filter's Point Spread Function (PSF), in 
 
 The magnitude, in each bandpass -- the same order as ``filt_names`` -- down to which to count the number of nearby sources when deriving the local normalising density of each object. Should be space-separated floats, of the same number as those given in ``filt_names``.
 
-``mag_h_params_path``
+``snr_mag_params_path``
 
-File path, either absolute or relative to the location of the script the cross-matches are run from, of a binary ``.npy`` file containing the parameterisation of the signal-to-noise ratio of sources as a function of magnitude, in a series of given sightlines. Must be of shape ``(N, M, 5)`` where ``N`` is the number of filters in ``filt_names`` order, ``M`` is the number of sightlines for which SNR vs mag has been derived, and the 5 entries for each filter-sightline combination must be in order ``a``, ``b``, ``c``, ``coord1`` (e.g. RA), and ``coord2`` (e.g. Dec). See pre-processing for more information on the meaning of those terms and how ``mag_h_params`` is used.
+File path, either absolute or relative to the location of the script the cross-matches are run from, of a binary ``.npy`` file containing the parameterisation of the signal-to-noise ratio of sources as a function of magnitude, in a series of given sightlines. Must be of shape ``(N, M, 5)`` where ``N`` is the number of filters in ``filt_names`` order, ``M`` is the number of sightlines for which SNR vs mag has been derived, and the 5 entries for each filter-sightline combination must be in order ``a``, ``b``, ``c``, ``coord1`` (e.g. RA), and ``coord2`` (e.g. Dec). See pre-processing for more information on the meaning of those terms and how ``snr_mag_params`` is used.
 
 ``download_tri``
 
