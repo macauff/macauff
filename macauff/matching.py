@@ -1030,52 +1030,52 @@ class CrossMatch():
                             raise ValueError("Missing key {} from catalogue {} metadata file."
                                              .format(check_flag, catname))
 
-                    # snr_mag_params, dd_params, and l_cut should all be numpy arrays in
-                    # specified paths.
-                    for path, f, warn_message in zip(['snr_mag_params_path', 'dd_params_path',
-                                                      'l_cut_path'], ['snr_mag_params', 'dd_params',
-                                                                      'l_cut'],
-                                                     ['astrometry corrections',
-                                                      'PSF photometry perturbations',
-                                                      'PSF photometry perturbations']):
-                        # Only need dd_params or l_cut if we're using run_psf_auf or
-                        # correct_astrometry is True.
-                        if ('snr_mag' not in path and not
-                                getattr(self, '{}run_psf_auf'.format(flag)) and not correct_astro):
-                            continue
-                        if not os.path.exists(config[path]):
-                            raise OSError('{}{} does not exist. Please ensure that path for '
-                                          'catalogue {} is correct.'.format(flag, path, catname))
-                        # If we are correcting the astrometry, we will be
-                        # re-making the SNR-mag relations so skip loading that
-                        # for now.
-                        if not ('snr_mag' in path and correct_astro):
-                            if not os.path.isfile('{}/{}.npy'.format(config[path], f)):
-                                raise FileNotFoundError('{} file not found in catalogue {} path. '
-                                                        'Please ensure {} are pre-generated.'
-                                                        .format(f, catname, warn_message))
-                        if 'snr_mag' in path and not correct_astro:
-                            a = np.load('{}/snr_mag_params.npy'.format(
-                                        config['snr_mag_params_path']))
-                            if not (len(a.shape) == 3 and a.shape[2] == 5 and
-                                    a.shape[0] == len(getattr(self, '{}filt_names'.format(flag)))):
-                                raise ValueError('{}snr_mag_params should be of shape (X, Y, 5).'
-                                                 .format(flag))
-                        else:
-                            setattr(self, '{}{}'.format(flag, path), config[path])
-                        if 'dd_params' in path:
-                            a = np.load('{}/dd_params.npy'.format(config['dd_params_path']))
-                            if not (len(a.shape) == 3 and a.shape[0] == 5 and a.shape[2] == 2):
-                                raise ValueError('{}dd_params should be of shape (5, X, 2).'
-                                                 .format(flag))
-                        if 'l_cut' in path:
-                            a = np.load('{}/l_cut.npy'.format(config['l_cut_path']))
-                            if not (len(a.shape) == 1 and a.shape[0] == 3):
-                                raise ValueError('{}l_cut should be of shape (3,) only.'
-                                                 .format(flag))
-                        if (('snr_mag' in path and not correct_astro) or 'dd_params' in path or
-                                'l_cut' in path):
-                            setattr(self, '{}{}'.format(flag, f), a)
+                # snr_mag_params, dd_params, and l_cut should all be numpy arrays in
+                # specified paths.
+                for path, f, warn_message in zip(['snr_mag_params_path', 'dd_params_path',
+                                                  'l_cut_path'], ['snr_mag_params', 'dd_params',
+                                                                  'l_cut'],
+                                                 ['astrometry corrections',
+                                                  'PSF photometry perturbations',
+                                                  'PSF photometry perturbations']):
+                    # Only need dd_params or l_cut if we're using run_psf_auf or
+                    # correct_astrometry is True.
+                    if ('snr_mag' not in path and not
+                            getattr(self, '{}run_psf_auf'.format(flag)) and not correct_astro):
+                        continue
+                    if not os.path.exists(config[path]):
+                        raise OSError('{}{} does not exist. Please ensure that path for '
+                                      'catalogue {} is correct.'.format(flag, path, catname))
+                    # If we are correcting the astrometry, we will be
+                    # re-making the SNR-mag relations so skip loading that
+                    # for now.
+                    if not ('snr_mag' in path and correct_astro):
+                        if not os.path.isfile('{}/{}.npy'.format(config[path], f)):
+                            raise FileNotFoundError('{} file not found in catalogue {} path. '
+                                                    'Please ensure {} are pre-generated.'
+                                                    .format(f, catname, warn_message))
+                    if 'snr_mag' in path and not correct_astro:
+                        a = np.load('{}/snr_mag_params.npy'.format(
+                                    config['snr_mag_params_path']))
+                        if not (len(a.shape) == 3 and a.shape[2] == 5 and
+                                a.shape[0] == len(getattr(self, '{}filt_names'.format(flag)))):
+                            raise ValueError('{}snr_mag_params should be of shape (X, Y, 5).'
+                                             .format(flag))
+                    else:
+                        setattr(self, '{}{}'.format(flag, path), config[path])
+                    if 'dd_params' in path:
+                        a = np.load('{}/dd_params.npy'.format(config['dd_params_path']))
+                        if not (len(a.shape) == 3 and a.shape[0] == 5 and a.shape[2] == 2):
+                            raise ValueError('{}dd_params should be of shape (5, X, 2).'
+                                             .format(flag))
+                    if 'l_cut' in path:
+                        a = np.load('{}/l_cut.npy'.format(config['l_cut_path']))
+                        if not (len(a.shape) == 1 and a.shape[0] == 3):
+                            raise ValueError('{}l_cut should be of shape (3,) only.'
+                                             .format(flag))
+                    if (('snr_mag' in path and not correct_astro) or 'dd_params' in path or
+                            'l_cut' in path):
+                        setattr(self, '{}{}'.format(flag, f), a)
 
                 try:
                     a = config['tri_filt_num']
