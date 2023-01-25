@@ -460,8 +460,8 @@ class CrossMatch():
                             # Recover worker on chunk processing error
                             signal = self.worker_signals['WORK_ERROR']
                             # TODO More granular error handling
-                            print("Rank {}: failed to process chunk{}. Exception: {}"
-                                  .format(self.rank, e))
+                            print("Rank {}: failed to process chunk {}. Exception: {}"
+                                  .format(self.rank, chunk_id, e))
 
                         completed_chunk_id = chunk_id
 
