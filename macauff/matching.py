@@ -171,6 +171,9 @@ class CrossMatch():
             a_npy_or_csv = 'csv'
             a_coord_or_chunk = 'chunk'
             a_correct_astro_tri_name = '{}/{}/trilegal_auf_simulation'
+            t = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            print("{} Rank {}, chunk {}: Calculating catalogue 'a' uncertainty corrections..."
+                  .format(t, self.rank, self.chunk_id))
             ac = AstrometricCorrections(
                 self.a_psf_fwhms[acbi], self.num_trials, self.a_nn_radius,
                 self.a_dens_dist, self.a_correct_astro_save_folder, self.a_auf_folder_path,
@@ -222,6 +225,9 @@ class CrossMatch():
             b_npy_or_csv = 'csv'
             b_coord_or_chunk = 'chunk'
             b_correct_astro_tri_name = '{}/{}/trilegal_auf_simulation'
+            t = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            print("{} Rank {}, chunk {}: Calculating catalogue 'b' uncertainty corrections..."
+                  .format(t, self.rank, self.chunk_id))
             ac = AstrometricCorrections(
                 self.b_psf_fwhms[bcbi], self.num_trials, self.b_nn_radius,
                 self.b_dens_dist, self.b_correct_astro_save_folder, self.b_auf_folder_path,
@@ -348,7 +354,8 @@ class CrossMatch():
         # Do not use manager-worker pattern. Instead, one process loops over all chunks
         if self.comm_size == 1:
             for (chunk_id, joint_file_path, cat_a_file_path, cat_b_file_path) in self.chunk_queue:
-                print('Rank {} processing chunk {}'.format(self.rank, chunk_id))
+                t = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                print('{} Rank {} processing chunk {}'.format(t, self.rank, chunk_id))
                 self.chunk_id = chunk_id
                 self._process_chunk(joint_file_path, cat_a_file_path, cat_b_file_path)
                 if self.resume_file != None:
@@ -384,8 +391,10 @@ class CrossMatch():
                             # Check if we're reaching the limit of job walltime. If so,
                             # empty the queue so no further work is issued
                             if self.end_time - datetime.datetime.now() < self.end_within:
-                                print('Rank {}: reaching job walltime. Cancelling all further work. {} chunks remain unprocessed.'
-                                      .format(self.rank, self.num_chunks_to_process))
+                                t = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                                print('{} Rank {}: reaching job walltime. Cancelling all further '
+                                      'work. {} chunks remain unprocessed.'
+                                      .format(t, self.rank, self.num_chunks_to_process))
                                 self.chunk_queue.clear()
                                 # Blank end time so we don't re-enter polling loop
                                 self.end_time = None
@@ -399,8 +408,9 @@ class CrossMatch():
                     # Record completed chunk
                     if signal == self.worker_signals['WORK_COMPLETE'] \
                     and self.resume_file != None:
-                        print('Rank {}: chunk {} processed by rank {}. Adding to resume file.'
-                              .format(self.rank, chunk_id, worker_id))
+                        t = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                        print('{} Rank {}: chunk {} processed by rank {}. Adding to resume file.'
+                              .format(t, self.rank, chunk_id, worker_id))
                         self.resume_file.write(chunk_id+'\n')
                         # Do not buffer. Immediately commit to disk for
                         # resilience against crashes and overrunning walltime
@@ -412,15 +422,18 @@ class CrossMatch():
                         self.num_chunks_to_process -= 1
                     # Handle failed chunk
                     elif signal == self.worker_signals['WORK_ERROR']:
-                        print('Rank {}: rank {} failed to process chunk {}.'
-                              .format(self.rank, worker_id, chunk_id))
+                        t = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                        print('{} Rank {}: rank {} failed to process chunk {}.'
+                              .format(t, self.rank, worker_id, chunk_id))
 
                     # Assign chunks until no more work.
                     # Then count "no more work" signals until no more workers.
                     try:
                         new_chunk = self.chunk_queue.pop(0)
                         signal = self.worker_signals['WORK_REQUEST']
-                        print('Rank {}: sending rank {} chunk {}'.format(self.rank, worker_id, new_chunk[0]))
+                        t = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                        print('{} Rank {}: sending rank {} chunk {}'.format(
+                              t, self.rank, worker_id, new_chunk[0]))
                     except IndexError:
                         new_chunk = None
                         signal = self.worker_signals['NO_MORE_WORK']
@@ -451,7 +464,8 @@ class CrossMatch():
                     else:
                         (chunk_id, joint_file_path, cat_a_file_path, cat_b_file_path) = chunk
                         self.chunk_id = chunk_id
-                        print('Rank {}: processing chunk {}'.format(self.rank, chunk_id))
+                        t = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                        print('{} Rank {}: processing chunk {}'.format(t, self.rank, chunk_id))
 
                         try:
                             self._process_chunk(joint_file_path, cat_a_file_path, cat_b_file_path)
@@ -460,8 +474,9 @@ class CrossMatch():
                             # Recover worker on chunk processing error
                             signal = self.worker_signals['WORK_ERROR']
                             # TODO More granular error handling
-                            print("Rank {}: failed to process chunk {}. Exception: {}"
-                                  .format(self.rank, chunk_id, e))
+                            t = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                            print("{} Rank {}: failed to process chunk {}. Exception: {}"
+                                  .format(t, self.rank, chunk_id, e))
 
                         completed_chunk_id = chunk_id
 
@@ -513,7 +528,9 @@ class CrossMatch():
         chunk is being matched (i.e., there is no compartmentalisation of a
         larger region), then ``in_chunk_overlap`` should all be set to ``False``.
         '''
-        print("Removing halo matches and non-matches...")
+        t = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        print("{} Rank {}, chunk {}: Removing halo matches and non-matches..."
+              .format(t, self.rank, self.chunk_id))
 
         if self.use_memmap_files:
             _kwargs = {'mmap_mode': 'r'}
@@ -1563,14 +1580,18 @@ class CrossMatch():
                                 [3.84e+09, 1.57e+06, 3.91e+08, 4.66e+10, 3.03e+07]]
 
         if self.run_auf or not a_correct_file_number:
+            t = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            print('{} Rank {}, chunk {}: Creating empirical perturbation AUFs for catalogue "a"...'
+                  .format(t, self.rank, self.chunk_id))
+            sys.stdout.flush()
             if self.j0s is None:
                 self.j0s = mff.calc_j0(self.rho[:-1]+self.drho/2, self.r[:-1]+self.dr/2)
             # Only warn if we did NOT choose to run AUF, but DID hit wrong file
             # number.
             if not a_correct_file_number and not self.run_auf:
-                warnings.warn('Incorrect number of files in catalogue "a" perturbation '
-                              'AUF simulation folder. Deleting all files and re-running '
-                              'cross-match process.')
+                warnings.warn('Rank {}, chunk {}: Incorrect number of files in catalogue "a" '
+                              'perturbation AUF simulation folder. Deleting all files and '
+                              're-running cross-match process.'.format(self.rank, self.chunk_id))
                 # Once run AUF flag is updated, all other flags need to be set to run
                 self.run_group, self.run_cf, self.run_source = True, True, True
             if self.include_perturb_auf:
@@ -1622,7 +1643,9 @@ class CrossMatch():
                                                    self.rho, self.drho, 'a', self.include_perturb_auf,
                                                    self.mem_chunk_num, self.use_memmap_files, **_kwargs)
         else:
-            print('Loading empirical perturbation AUFs for catalogue "a"...')
+            t = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            print('{} Rank {}, chunk {}: Loading empirical perturbation AUFs for catalogue "a"...'
+                  .format(t, self.rank, self.chunk_id))
             sys.stdout.flush()
 
         b_expected_files = 6 + len(self.b_auf_region_points) + (
@@ -1632,12 +1655,16 @@ class CrossMatch():
         b_correct_file_number = b_expected_files == b_file_number
 
         if self.run_auf or not b_correct_file_number:
+            t = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            print('{} Rank {}, chunk {}: Creating empirical perturbation AUFs for catalogue "b"...'
+                  .format(t, self.rank, self.chunk_id))
+            sys.stdout.flush()
             if self.j0s is None:
                 self.j0s = mff.calc_j0(self.rho[:-1]+self.drho/2, self.r[:-1]+self.dr/2)
             if not b_correct_file_number and not self.run_auf:
-                warnings.warn('Incorrect number of files in catalogue "b" perturbation '
-                              'AUF simulation folder. Deleting all files and re-running '
-                              'cross-match process.')
+                warnings.warn('Rank {}, chunk {}: Incorrect number of files in catalogue "b" '
+                              'perturbation AUF simulation folder. Deleting all files and '
+                              're-running cross-match process.'.format(self.rank, self.chunk_id))
                 self.run_group, self.run_cf, self.run_source = True, True, True
             if self.include_perturb_auf:
                 _kwargs = {'psf_fwhms': self.b_psf_fwhms, 'tri_download_flag': self.b_download_tri,
@@ -1689,7 +1716,9 @@ class CrossMatch():
                                                    self.rho, self.drho, 'b', self.include_perturb_auf,
                                                    self.mem_chunk_num, self.use_memmap_files, **_kwargs)
         else:
-            print('Loading empirical perturbation AUFs for catalogue "b"...')
+            t = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            print('{} Rank {}, chunk {}: Loading empirical perturbation AUFs for catalogue "b"...'
+                  .format(t, self.rank, self.chunk_id))
             sys.stdout.flush()
 
     def group_sources(self, files_per_grouping, group_func=make_island_groupings):
@@ -1729,13 +1758,18 @@ class CrossMatch():
         # First check whether we actually need to dip into the group sources
         # routine or not.
         if self.run_group or not correct_file_number:
+            t = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            print('{} Rank {}, chunk {}: Creating catalogue islands and overlaps...'
+                  .format(t, self.rank, self.chunk_id))
+            sys.stdout.flush()
             if self.j1s is None:
                 self.j1s = gsf.calc_j1s(self.rho[:-1]+self.drho/2, self.r[:-1]+self.dr/2)
             # Only worry about the warning if we didn't choose to run the grouping
             # but hit incorrect file numbers.
             if not correct_file_number and not self.run_group:
-                warnings.warn('Incorrect number of grouping files. Deleting all '
-                              'grouping files and re-running cross-match process.')
+                warnings.warn('Rank {}, chunk {}: Incorrect number of grouping files. Deleting all '
+                              'grouping files and re-running cross-match process.'
+                              .format(self.rank, self.chunk_id))
                 self.run_cf, self.run_source = True, True
             os.system('rm -rf {}/group/*'.format(self.joint_folder_path))
             os.system('rm -rf {}/reject/*'.format(self.joint_folder_path))
@@ -1749,7 +1783,9 @@ class CrossMatch():
                            self.mem_chunk_num, self.include_phot_like, self.use_phot_priors,
                            self.n_pool, self.use_memmap_files)
         else:
-            print('Loading catalogue islands and overlaps...')
+            t = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            print('{} Rank {}, chunk {}: Loading catalogue islands and overlaps...'
+                  .format(t, self.rank, self.chunk_id))
             sys.stdout.flush()
 
     def calculate_phot_like(self, files_per_phot, phot_like_func=compute_photometric_likelihoods):
@@ -1778,9 +1814,14 @@ class CrossMatch():
         correct_file_number = expected_file_number == file_number
 
         if self.run_cf or not correct_file_number:
+            t = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            print('{} Rank {}, chunk {}: Creating photometric priors and likelihoods...'
+                  .format(t, self.rank, self.chunk_id))
+            sys.stdout.flush()
             if not correct_file_number and not self.run_cf:
-                warnings.warn('Incorrect number of photometric likelihood files. Deleting all '
-                              'c/f files and re-running calculations.')
+                warnings.warn('Rank {}, chunk {}: Incorrect number of photometric likelihood '
+                              'files. Deleting all c/f files and re-running calculations.'
+                              .format(self.rank, self.chunk_id))
                 self.run_source = True
             os.system('rm -r {}/phot_like/*'.format(self.joint_folder_path))
             self._calculate_cf_areas()
@@ -1796,7 +1837,9 @@ class CrossMatch():
                     self.cf_areas, self.include_phot_like, self.use_phot_priors, self.group_sources_data,
                     self.use_memmap_files, bright_frac, field_frac)
         else:
-            print('Loading photometric priors and likelihoods...')
+            t = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            print('{} Rank {}, chunk {}: Loading photometric priors and likelihoods...'
+                  .format(t, self.rank, self.chunk_id))
             sys.stdout.flush()
 
     def _calculate_cf_areas(self):
@@ -1805,7 +1848,9 @@ class CrossMatch():
         ``cross_match_extent`` sky coordinate where it is defined as having the
         smallest on-sky separation.
         '''
-        print("Calculating photometric region areas...")
+        t = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        print("{} Rank {}, chunk {}: Calculating photometric region areas..."
+              .format(t, self.rank, self.chunk_id))
         dlon, dlat = 0.01, 0.01
         test_lons = np.arange(self.cross_match_extent[0], self.cross_match_extent[1], dlon)
         test_lats = np.arange(self.cross_match_extent[2], self.cross_match_extent[3], dlat)
@@ -1853,9 +1898,14 @@ class CrossMatch():
         correct_file_number = expected_file_number == file_number
 
         if self.run_source or not correct_file_number:
+            t = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            print('{} Rank {}, chunk {}: Determining counterparts...'
+                  .format(t, self.rank, self.chunk_id))
+            sys.stdout.flush()
             if not correct_file_number and not self.run_source:
-                warnings.warn('Incorrect number of counterpart pairing files. Deleting all '
-                              'files and re-running calculations.')
+                warnings.warn('Rank {}, chunk {}: Incorrect number of counterpart pairing files. '
+                              'Deleting all files and re-running calculations.'
+                              .format(self.rank, self.chunk_id))
             os.system('rm -r {}/pairing/*'.format(self.joint_folder_path))
             count_pair_func(
                 self.joint_folder_path, self.a_cat_folder_path, self.b_cat_folder_path,
@@ -1864,5 +1914,7 @@ class CrossMatch():
                 self.a_modelrefinds, self.b_modelrefinds, self.rho, self.drho, len(self.delta_mag_cuts),
                 self.mem_chunk_num, self.group_sources_data, self.phot_like_data, self.use_memmap_files)
         else:
-            print('Loading pre-assigned counterparts...')
+            t = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            print('{} Rank {}, chunk {}: Loading pre-assigned counterparts...'
+                  .format(t, self.rank, self.chunk_id))
             sys.stdout.flush()
