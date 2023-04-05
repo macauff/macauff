@@ -600,6 +600,7 @@ class TestCounterpartPairing:
         self.cm.group_sources_data = None
         self.cm.phot_like_data = None
         self.files_per_pairing = 13
+        self.cm.chunk_id = 1
         self.cm._initialise_chunk(os.path.join(os.path.dirname(__file__), 'data/chunk0/crossmatch_params_.txt'),
                                   os.path.join(os.path.dirname(__file__), 'data/chunk0/cat_a_params_.txt'),
                                   os.path.join(os.path.dirname(__file__), 'data/chunk0/cat_b_params_.txt'))
@@ -680,6 +681,7 @@ class TestCounterpartPairing:
         self.cm.group_sources_data = None
         self.cm.phot_like_data = None
         self.files_per_pairing = 13
+        self.cm.chunk_id = 1
         self.cm._initialise_chunk(os.path.join(os.path.dirname(__file__), 'data/chunk0/crossmatch_params_.txt'),
                                   os.path.join(os.path.dirname(__file__), 'data/chunk0/cat_a_params_.txt'),
                                   os.path.join(os.path.dirname(__file__), 'data/chunk0/cat_b_params_.txt'))
@@ -709,6 +711,7 @@ class TestCounterpartPairing:
         self.cm.b_modelrefinds = None
         self.cm.group_sources_data = None
         self.cm.phot_like_data = None
+        self.cm.chunk_id = 1
         self.cm._initialise_chunk(os.path.join(os.path.dirname(__file__), 'data/chunk0/crossmatch_params_.txt'),
                                   os.path.join(os.path.dirname(__file__), 'data/chunk0/cat_a_params_.txt'),
                                   os.path.join(os.path.dirname(__file__), 'data/chunk0/cat_b_params_.txt'))

@@ -1065,6 +1065,7 @@ class TestInputs:
         cm.cross_match_extent = np.array([131, 134, -1, 1])
         cm.cf_region_points = np.array([[a, b] for a in [131.5, 132.5, 133.5]
                                         for b in [-0.5, 0.5]])
+        cm.chunk_id = 1
         cm._calculate_cf_areas()
         assert_allclose(cm.cf_areas, np.ones((6), float), rtol=0.02)
 
@@ -1724,6 +1725,8 @@ class TestPostProcess:
 
         cm.make_output_csv = False
 
+        cm.chunk_id = 1
+
         cm._postprocess_chunk()
 
         aino = np.load('{}/in_chunk_overlap.npy'.format(self.a_cat_folder_path))
@@ -1793,6 +1796,7 @@ class TestPostProcess:
         cm.a_extra_col_nums = None
         cm.b_extra_col_names = ['WErr']
         cm.b_extra_col_nums = [3]
+        cm.chunk_id = 1
 
         cm._postprocess_chunk()
 

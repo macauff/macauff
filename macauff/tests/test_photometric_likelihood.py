@@ -214,6 +214,7 @@ class TestOneSidedPhotometricLikelihood:
                                   os.path.join(os.path.dirname(__file__), 'data/cat_a_params.txt'),
                                   os.path.join(os.path.dirname(__file__), 'data/cat_b_params.txt'))
         self.cm.group_sources_data = self.group_sources_data
+        self.cm.chunk_id = 1
         files_per_phot = 6
         self.cm.calculate_phot_like(files_per_phot)
 
@@ -252,6 +253,7 @@ class TestOneSidedPhotometricLikelihood:
                                   os.path.join(os.path.dirname(__file__), 'data/cat_a_params.txt'),
                                   os.path.join(os.path.dirname(__file__), 'data/cat_b_params.txt'))
         self.cm.group_sources_data = self.group_sources_data
+        self.cm.chunk_id = 1
         self.cm.run_cf = False
         files_per_phot = 6
 
@@ -298,6 +300,7 @@ class TestOneSidedPhotometricLikelihood:
                                   os.path.join(os.path.dirname(__file__), 'data/cat_a_params.txt'),
                                   os.path.join(os.path.dirname(__file__), 'data/cat_b_params.txt'))
         self.cm.group_sources_data = self.group_sources_data
+        self.cm.chunk_id = 1
         self.cm.run_cf = False
         files_per_phot = 6
 

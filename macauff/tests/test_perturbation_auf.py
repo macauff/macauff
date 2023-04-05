@@ -60,6 +60,7 @@ class TestCreatePerturbAUF:
 
         self.cm.include_perturb_auf = False
         self.cm.run_auf = True
+        self.cm.chunk_id = 1
         self.cm.create_perturb_auf(self.files_per_auf_sim)
         lenr = len(self.cm.r)
         lenrho = len(self.cm.rho)
@@ -96,6 +97,7 @@ class TestCreatePerturbAUF:
         os.system("rm -rf {}/*".format(self.cm.a_auf_folder_path))
         os.system("rm -rf {}/*".format(self.cm.b_auf_folder_path))
         self.cm.run_auf = False
+        self.cm.chunk_id = 1
 
         with pytest.warns(UserWarning, match='Incorrect number of files in catalogue "a"'):
             self.cm.create_perturb_auf(self.files_per_auf_sim)
@@ -124,6 +126,7 @@ class TestCreatePerturbAUF:
         capsys.readouterr()
         # This test will create catalogue "a" files because of the wrong
         # number of files (zero) in the folder.
+        self.cm.chunk_id = 1
         self.cm.create_perturb_auf(self.files_per_auf_sim)
         output = capsys.readouterr().out
         assert 'Loading empirical perturbation AUFs for catalogue "a"' not in output
@@ -1017,6 +1020,8 @@ class TestMakePerturbAUFs():
         cm.b_run_fw = True
         cm.b_run_psf = False
 
+        cm.chunk_id = 1
+
         cm.create_perturb_auf(self.files_per_auf_sim)
 
         fracs = np.load('{}/{}/{}/{}/frac.npy'.format(
@@ -1190,6 +1195,8 @@ class TestMakePerturbAUFs():
         cm.a_run_psf = False
         cm.b_run_fw = True
         cm.b_run_psf = False
+
+        cm.chunk_id = 1
 
         cm.create_perturb_auf(self.files_per_auf_sim)
 
