@@ -73,6 +73,9 @@ def get_trilegal(filename, ra, dec, folder='.', galactic=False,
 
     if os.path.isabs(filename):
         folder = ''
+        outfolder = os.path.dirname(filename)
+    else:
+        outfolder = folder
 
     if not re.search(r'\.dat$', filename):
         outfile = '{}/{}.dat'.format(folder, filename)
@@ -81,13 +84,13 @@ def get_trilegal(filename, ra, dec, folder='.', galactic=False,
     AV = get_AV_infinity(l, b, frame='galactic')
 
     trilegal_webcall(trilegal_version, l, b, area, binaries, AV, sigma_AV, filterset, magnum,
-                     maglim, outfile)
+                     maglim, outfile, outfolder)
 
     return AV
 
 
 def trilegal_webcall(trilegal_version, l, b, area, binaries, AV, sigma_AV, filterset, magnum,
-                     maglim, outfile):
+                     maglim, outfile, outfolder):
     """
     Calls TRILEGAL webserver and downloads results file.
 
@@ -113,8 +116,10 @@ def trilegal_webcall(trilegal_version, l, b, area, binaries, AV, sigma_AV, filte
         Number of filter in given filterset to limit magnitudes to.
     maglim : float
         Limiting magnitude down to which to simulate sources.
-    :outfile : string
+    outfile : string
         Output filename.
+    outfolder : string
+        Output filename's containing folder.
     """
     webserver = 'http://stev.oapd.inaf.it'
     args = [l, b, area, AV, sigma_AV, filterset, maglim, magnum, binaries]
@@ -137,9 +142,9 @@ def trilegal_webcall(trilegal_version, l, b, area, binaries, AV, sigma_AV, filte
                   'object_av=1.504&object_avkind=1&object_cutoffmass=0.8&'
                   'object_file=tab_sfr%2Ffile_sfr_m4.dat&object_a=1&object_b=0&'
                   'output_kind=1').format(AV, sigma_AV)
-    cmdargs = [trilegal_version, l, b, area, filterset, magnum, maglim, binaries, mainparams,
-               webserver, trilegal_version]
-    cmd = ("wget -o lixo -Otmpfile --post-data='submit_form=Submit&trilegal_version={}"
+    cmdargs = [outfolder, outfolder, trilegal_version, l, b, area, filterset, magnum, maglim,
+               binaries, mainparams, webserver, trilegal_version]
+    cmd = ("wget -o {}/lixo -O {}/tmpfile --post-data='submit_form=Submit&trilegal_version={}"
            "&gal_coord=1&gc_l={}&gc_b={}&eq_alpha=0&eq_delta=0&field={}&photsys_file="
            "tab_mag_odfnew%2Ftab_mag_{}.dat&icm_lim={}&mag_lim={}&mag_res=0.1&"
            "binary_kind={}&{}' {}/cgi-bin/trilegal_{}").format(*cmdargs)
@@ -151,19 +156,20 @@ def trilegal_webcall(trilegal_version, l, b, area, binaries, AV, sigma_AV, filte
               "Av={} with {} fractional r.m.s. spread \n in the {} system, complete down to "
               "mag={} in its {}th filter, use_binaries set to {}.".format(*args))
         sp.Popen(cmd, shell=True).wait()
-        if os.path.exists('tmpfile') and os.path.getsize('tmpfile') > 0:
+        if (os.path.exists('{}/tmpfile'.format(outfolder)) and
+                os.path.getsize('{}/tmpfile'.format(outfolder)) > 0):
             notconnected = False
         else:
             print("No communication with {}, will retry in 2 min".format(webserver))
             time.sleep(120)
         if not notconnected:
-            with open('tmpfile', 'r') as f:
+            with open('{}/tmpfile'.format(outfolder), 'r') as f:
                 lines = f.readlines()
             for line in lines:
                 if 'The results will be available after about 2 minutes' in line:
                     busy = False
                     break
-            sp.Popen('rm -f lixo tmpfile', shell=True)
+            sp.Popen('rm -f {}/lixo {}/tmpfile'.format(outfolder, outfolder), shell=True)
             if not busy:
                 filenameidx = line.find('<a href=../tmp/') + 15
                 fileendidx = line[filenameidx:].find('.dat')
@@ -171,10 +177,11 @@ def trilegal_webcall(trilegal_version, l, b, area, binaries, AV, sigma_AV, filte
                 print("retrieving data from {} ...".format(filename))
                 while not complete:
                     time.sleep(40)
-                    modcmd = 'wget -o lixo -O{} {}/tmp/{}'.format(filename, webserver, filename)
+                    modcmd = 'wget -o {}/lixo -O {}/{} {}/tmp/{}'.format(
+                        outfolder, outfolder, filename, webserver, filename)
                     sp.Popen(modcmd, shell=True).wait()
-                    if os.path.getsize(filename) > 0:
-                        with open(filename, 'r') as f:
+                    if os.path.getsize('{}/{}'.format(outfolder, filename)) > 0:
+                        with open('{}/{}'.format(outfolder, filename), 'r') as f:
                             lastline = f.readlines()[-1]
                         if 'normally' in lastline:
                             complete = True
@@ -184,7 +191,7 @@ def trilegal_webcall(trilegal_version, l, b, area, binaries, AV, sigma_AV, filte
             else:
                 print('Server busy, trying again in 2 minutes')
                 time.sleep(120)
-    sp.Popen('mv {} {}'.format(filename, outfile), shell=True).wait()
+    sp.Popen('mv {}/{} {}'.format(outfolder, filename, outfile), shell=True).wait()
     print('results copied to {}'.format(outfile))
 
 
