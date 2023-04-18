@@ -544,6 +544,11 @@ class TestMakePerturbAUFs():
                               tri_maglim_faint=1, tri_num_faint=1, auf_region_frame=1,
                               delta_mag_cuts=1, psf_fwhms=1, num_trials=1, j0s=1, density_mags=1,
                               d_mag=1, run_fw=1, run_psf=1, dd_params=1, l_cut=1)
+        with pytest.raises(ValueError, match='al_avs must be given if include_perturb_auf is Tru'):
+            make_perturb_aufs(*self.args, tri_set_name='WISE', tri_filt_num=1, tri_filt_names=1,
+                              tri_maglim_faint=1, tri_num_faint=1, auf_region_frame=1,
+                              delta_mag_cuts=1, psf_fwhms=1, num_trials=1, j0s=1, d_mag=1, run_fw=1,
+                              run_psf=1, dd_params=1, l_cut=1, snr_mag_params=1, density_mags=1)
         with pytest.raises(ValueError, match='compute_local_density must be given if ' +
                            'include_perturb_auf is True'):
             make_perturb_aufs(*self.args, tri_set_name='WISE', tri_filt_num=1, tri_filt_names=1,
@@ -604,13 +609,6 @@ class TestMakePerturbAUFs():
                               num_trials=1, j0s=1, density_mags=1, d_mag=1, fit_gal_flag=True,
                               cmau_array=1, wavs=1, z_maxs=1, nzs=1, ab_offsets=1, run_fw=1,
                               run_psf=1, dd_params=1, l_cut=1, snr_mag_params=1)
-        with pytest.raises(ValueError, match='al_avs must be given if fit_gal_flag is True.'):
-            make_perturb_aufs(*self.args, tri_set_name='WISE', tri_filt_num=1, tri_filt_names=1,
-                              tri_maglim_faint=1, tri_num_faint=1, auf_region_frame=1,
-                              delta_mag_cuts=1, compute_local_density=False, psf_fwhms=1,
-                              num_trials=1, j0s=1, density_mags=1, d_mag=1, fit_gal_flag=True,
-                              cmau_array=1, wavs=1, z_maxs=1, nzs=1, ab_offsets=1, filter_names=1,
-                              run_fw=1, run_psf=1, dd_params=1, l_cut=1, snr_mag_params=1)
         with pytest.raises(ValueError, match='alpha0 must be given if fit_gal_flag is True.'):
             make_perturb_aufs(*self.args, tri_set_name='WISE', tri_filt_num=1, tri_filt_names=1,
                               tri_maglim_faint=1, tri_num_faint=1, auf_region_frame=1,
@@ -655,7 +653,7 @@ class TestMakePerturbAUFs():
 
         # Fake up a TRILEGAL simulation data file. Need to paste the same source
         # four times to pass a check for more than three sources in a histogram.
-        text = ('#area = 4.0 sq deg\n#Av at infinity = 0\n' +
+        text = ('#area = 4.0 sq deg\n#Av at infinity = 1\n' +
                 'Gc logAge [M/H] m_ini   logL   logTe logg  m-M0   Av    ' +
                 'm2/m1 mbol   J      H      Ks     IRAC_3.6 IRAC_4.5 IRAC_5.8 IRAC_8.0 MIPS_24 ' +
                 'MIPS_70 MIPS_160 W1     W2     W3     W4       Mact\n 1   6.65 -0.39  0.02415 ' +
@@ -709,7 +707,7 @@ class TestMakePerturbAUFs():
                 auf_region_frame='galactic', psf_fwhms=self.psf_fwhms, num_trials=self.num_trials,
                 j0s=self.j0s, density_mags=cutoff_mags, d_mag=d_mag,
                 delta_mag_cuts=self.delta_mag_cuts, compute_local_density=False, fit_gal_flag=False,
-                run_fw=True, run_psf=False, snr_mag_params=snr_mag_params)
+                run_fw=True, run_psf=False, snr_mag_params=snr_mag_params, al_avs=[0])
 
             if i == 0:
                 for name, size in zip(
@@ -771,7 +769,7 @@ class TestMakePerturbAUFs():
         for mag in [15.15, 16.1, 19.1]:
             # Fake up a TRILEGAL simulation data file. Need to paste the same source
             # four times to pass a check for more than three sources in a histogram.
-            text = ('#area = 4.0 sq deg\n#Av at infinity = 0\n' +
+            text = ('#area = 4.0 sq deg\n#Av at infinity = 1\n' +
                     'Gc logAge [M/H] m_ini   logL   logTe logg  m-M0   Av    ' +
                     'm2/m1 mbol   J      H      Ks     IRAC_3.6 IRAC_4.5 IRAC_5.8 IRAC_8.0  '
                     'MIPS_24 MIPS_70 MIPS_160 W1     W2     W3     W4       Mact\n 1   6.65 -0.39 '
@@ -831,7 +829,7 @@ class TestMakePerturbAUFs():
                 j0s=self.j0s, density_mags=cutoff_mags, d_mag=d_mag,
                 delta_mag_cuts=self.delta_mag_cuts, compute_local_density=False, fit_gal_flag=False,
                 run_fw=run_fw, run_psf=True, snr_mag_params=snr_mag_params, dd_params=dd_params,
-                l_cut=l_cut)
+                l_cut=l_cut, al_avs=[0])
 
             for name, size in zip(
                     ['frac', 'flux', 'offset', 'cumulative', 'fourier', 'N', 'mag'],
@@ -892,7 +890,7 @@ class TestMakePerturbAUFs():
 
         # Fake up a TRILEGAL simulation data file. Need to paste the same source
         # four times to pass a check for more than three sources in a histogram.
-        text = ('#area = 4.0 sq deg\n#Av at infinity = 0\n' +
+        text = ('#area = 4.0 sq deg\n#Av at infinity = 1\n' +
                 'Gc logAge [M/H] m_ini   logL   logTe logg  m-M0   Av    ' +
                 'm2/m1 mbol   J      H      Ks     IRAC_3.6 IRAC_4.5 IRAC_5.8 IRAC_8.0 MIPS_24 ' +
                 'MIPS_70 MIPS_160 W1     W2     W3     W4       Mact\n 1   6.65 -0.39  0.02415 ' +
@@ -954,10 +952,10 @@ class TestMakePerturbAUFs():
                       'data/cat_a_params_.txt'))
         for ol, nl in zip(['psf_fwhms = 0.12 0.12 0.12', 'cat_folder_path = gaia_folder',
                            'auf_folder_path = gaia_auf_folder', 'tri_filt_names = G_BP G G_RP',
-                           'dens_mags = 20 20 20'],
+                           'dens_mags = 20 20 20', 'gal_al_avs = '],
                           ['psf_fwhms = 0.12\n', 'cat_folder_path = cat_folder\n',
                            'auf_folder_path = auf_folder\n', 'tri_filt_names = W1\n',
-                           'dens_mags = 20\n']):
+                           'dens_mags = 20\n', 'gal_al_avs = 0\n']):
             f = open(os.path.join(os.path.dirname(__file__),
                                   'data/cat_a_params.txt')).readlines()
             idx = np.where([ol in line for line in f])[0][0]
@@ -973,10 +971,10 @@ class TestMakePerturbAUFs():
                       'data/cat_b_params_.txt'))
         for ol, nl in zip(['psf_fwhms = 6.08 6.84 7.36 11.99', 'cat_folder_path = wise_folder',
                            'auf_folder_path = wise_auf_folder', 'tri_filt_names = W1 W2 W3 W4',
-                           'dens_mags = 20 20 20 20'],
+                           'dens_mags = 20 20 20 20', 'gal_al_avs = '],
                           ['psf_fwhms = 6.08\n', 'cat_folder_path = cat_folder\n',
                            'auf_folder_path = auf_folder\n', 'tri_filt_names = W1\n',
-                           'dens_mags = 20\n']):
+                           'dens_mags = 20\n', 'gal_al_avs = 0\n']):
             f = open(os.path.join(os.path.dirname(__file__),
                                   'data/cat_b_params.txt')).readlines()
             idx = np.where([ol in line for line in f])[0][0]
@@ -1062,7 +1060,7 @@ class TestMakePerturbAUFs():
 
         # Fake up a TRILEGAL simulation data file. Need to paste the same source
         # four times to pass a check for more than three sources in a histogram.
-        text = ('#area = 4.0 sq deg\n#Av at infinity = 10\n' +
+        text = ('#area = 4.0 sq deg\n#Av at infinity = 1\n' +
                 'Gc logAge [M/H] m_ini   logL   logTe logg  m-M0   Av    ' +
                 'm2/m1 mbol   J      H      Ks     IRAC_3.6 IRAC_4.5 IRAC_5.8 IRAC_8.0 MIPS_24 ' +
                 'MIPS_70 MIPS_160 W1     W2     W3     W4       Mact\n 1   6.65 -0.39  0.02415 ' +
@@ -1121,10 +1119,10 @@ class TestMakePerturbAUFs():
                       'data/cat_a_params_.txt'))
         for ol, nl in zip(['psf_fwhms = 0.12 0.12 0.12', 'cat_folder_path = gaia_folder',
                            'auf_folder_path = gaia_auf_folder', 'tri_filt_names = G_BP G G_RP',
-                           'dens_mags = 20 20 20'],
+                           'dens_mags = 20 20 20', 'gal_al_avs = '],
                           ['psf_fwhms = 0.12\n', 'cat_folder_path = cat_folder\n',
                            'auf_folder_path = auf_folder\n', 'tri_filt_names = W1\n',
-                           'dens_mags = 20\n']):
+                           'dens_mags = 20\n', 'gal_al_avs = 0\n']):
             f = open(os.path.join(os.path.dirname(__file__),
                                   'data/cat_a_params.txt')).readlines()
             idx = np.where([ol in line for line in f])[0][0]
@@ -1140,10 +1138,10 @@ class TestMakePerturbAUFs():
                       'data/cat_b_params_.txt'))
         for ol, nl in zip(['psf_fwhms = 6.08 6.84 7.36 11.99', 'cat_folder_path = wise_folder',
                            'auf_folder_path = wise_auf_folder', 'tri_filt_names = W1 W2 W3 W4',
-                           'dens_mags = 20 20 20 20'],
+                           'dens_mags = 20 20 20 20', 'gal_al_avs = '],
                           ['psf_fwhms = 6.08\n', 'cat_folder_path = cat_folder\n',
                            'auf_folder_path = auf_folder\n', 'tri_filt_names = W1\n',
-                           'dens_mags = 20\n']):
+                           'dens_mags = 20\n', 'gal_al_avs = 0\n']):
             f = open(os.path.join(os.path.dirname(__file__),
                                   'data/cat_b_params.txt')).readlines()
             idx = np.where([ol in line for line in f])[0][0]
@@ -1182,14 +1180,14 @@ class TestMakePerturbAUFs():
         cm.a_gal_nzs = np.array([2])
         cm.a_gal_aboffsets = np.array([0.105])
         cm.a_gal_filternames = np.array(['gaiadr2-G'])
-        cm.a_gal_al_avs = np.array([0.789])
+        cm.a_gal_al_avs = np.array([0])
 
         cm.b_gal_wavs = np.array([3.4])
         cm.b_gal_zmax = np.array([1])
         cm.b_gal_nzs = np.array([10])
         cm.b_gal_aboffsets = np.array([2.699])
         cm.b_gal_filternames = ['wise2010-W1']
-        cm.b_gal_al_avs = np.array([0.030])
+        cm.b_gal_al_avs = np.array([0])
 
         cm.a_run_fw = True
         cm.a_run_psf = False
@@ -1295,6 +1293,48 @@ def test_make_tri_counts(run_type):
         with pytest.raises(ValueError, match="use_bright and use_faint cannot both be "):
             dens, tri_mags, tri_mags_mids, dtri_mags, uncert, tri_av = make_tri_counts(
                 '.', 'trilegal_auf_simulation', 'W1', 0.1, use_bright=False, use_faint=False)
+
+    if run_type == "both":
+        with pytest.raises(ValueError, match="If one of al_av or av_grid is provided "):
+            dens, tri_mags, tri_mags_mids, dtri_mags, uncert, tri_av = make_tri_counts(
+                '.', 'trilegal_auf_simulation', 'W1', 0.1,
+                use_bright=False, use_faint=True, al_av=0.9)
+
+        dens, tri_mags, tri_mags_mids, dtri_mags, uncert, tri_av = make_tri_counts(
+            '.', 'trilegal_auf_simulation', 'W1', 0.1, use_bright=True, use_faint=True,
+            al_av=0.9, av_grid=np.array([2, 2, 2, 2, 2]))
+        for i in range(len(tri_mags_mids)):
+            if tri_mags_mids[i] < 10 + 0.9:
+                expect_dens = N_b/100 / 0.1 / 1
+            elif tri_mags_mids[i] > 15 + 0.9:
+                expect_dens = N_f/100 / 0.1 / 1
+            else:
+                d_u_f = np.sqrt(N_f/100) / 0.1 / 1
+                d_u_b = np.sqrt(N_b/100) / 0.1 / 1
+                w_f, w_b = 1 / d_u_f**2, 1 / d_u_b**2
+                d_f, d_b = N_f/100 / 0.1 / 1, N_b/100 / 0.1 / 1
+                expect_dens = (d_b * w_b + d_f * w_f) / (w_b + w_f)
+            assert_allclose(expect_dens, dens[i], atol=3*uncert[i], rtol=0.01)
+    if run_type == "faint":
+        ol = '#Av at infinity = 1'
+        nl = '#Av at infinity = 0.05\n'
+        f = open('trilegal_auf_simulation_faint.dat').readlines()
+        idx = np.where([ol in line for line in f])[0][0]
+        _replace_line('trilegal_auf_simulation_faint.dat', idx, nl)
+        with pytest.raises(ValueError, match="tri_av_inf_faint cannot be smaller than 0.1 while"):
+            dens, tri_mags, tri_mags_mids, dtri_mags, uncert, tri_av = make_tri_counts(
+                '.', 'trilegal_auf_simulation', 'W1', 0.1,
+                use_bright=False, use_faint=True, al_av=0.9, av_grid=np.array([2, 2, 2, 2]))
+    if run_type == "bright":
+        ol = '#Av at infinity = 1'
+        nl = '#Av at infinity = 0.05\n'
+        f = open('trilegal_auf_simulation_bright.dat').readlines()
+        idx = np.where([ol in line for line in f])[0][0]
+        _replace_line('trilegal_auf_simulation_bright.dat', idx, nl)
+        with pytest.raises(ValueError, match="tri_av_inf_bright cannot be smaller than 0.1 while"):
+            dens, tri_mags, tri_mags_mids, dtri_mags, uncert, tri_av = make_tri_counts(
+                '.', 'trilegal_auf_simulation', 'W1', 0.1,
+                use_bright=True, use_faint=False, al_av=0.9, av_grid=np.array([2, 2, 2, 2]))
 
 
 @pytest.mark.remote_data

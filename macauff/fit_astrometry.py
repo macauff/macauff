@@ -30,6 +30,7 @@ from .perturbation_auf import (download_trilegal_simulation, _calculate_magnitud
                                make_tri_counts)
 from .misc_functions_fortran import misc_functions_fortran as mff
 from .perturbation_auf_fortran import perturbation_auf_fortran as paf
+from .get_trilegal_wrapper import get_AV_infinity
 
 
 __all__ = ['AstrometricCorrections']
@@ -832,9 +833,9 @@ class AstrometricCorrections:
 
         print('Creating simulated star+galaxy counts...')
         if self.coord_or_chunk == 'coord':
-            ax1_mid, ax2_mid, _, _, _, _ = self.list_of_things
+            ax1_mid, ax2_mid, ax1_min, ax1_max, ax2_min, ax2_max = self.list_of_things
         else:
-            ax1_mid, ax2_mid, _, _, _, _, _ = self.list_of_things
+            ax1_mid, ax2_mid, ax1_min, ax1_max, ax2_min, ax2_max, _ = self.list_of_things
 
         if (self.tri_download or not
                 os.path.isfile('{}/{}_faint.dat'.format(
@@ -849,16 +850,31 @@ class AstrometricCorrections:
                 os.makedirs(base_auf_folder, exist_ok=True)
             download_trilegal_simulation('.', self.trifilterset, ax1_mid, ax2_mid, self.magnum,
                                          self.coord_system, self.maglim_f,
-                                         total_objs=self.tri_num_faint)
+                                         AV=1, sigma_AV=0, total_objs=self.tri_num_faint)
             os.system('mv trilegal_auf_simulation.dat {}/{}_faint.dat'
                       .format(self.trifolder, self.triname.format(ax1_mid, ax2_mid)))
 
-        tri_hist, tri_mags, _, dtri_mags, tri_uncert, tri_av = make_tri_counts(
-            self.trifolder, self.triname.format(ax1_mid, ax2_mid), self.trifiltname, self.dm)
+        ax1s = np.linspace(ax1_min, ax1_max, 7)
+        ax2s = np.linspace(ax2_min, ax2_max, 7)
+        avs = np.empty((len(ax1s), len(ax2s)), float)
+        for j, ax1 in enumerate(ax1s):
+            for k, ax2 in enumerate(ax2s):
+                if self.coord_system == 'equatorial':
+                    c = SkyCoord(ra=ax1, dec=ax2, unit='deg', frame='icrs')
+                    l, b = c.galactic.l.degree, c.galactic.b.degree
+                else:
+                    l, b = ax1, ax2
+                AV = get_AV_infinity(l, b, frame='galactic')[0]
+                avs[j, k] = AV
+        avs = avs.flatten()
+        tri_hist, tri_mags, _, dtri_mags, tri_uncert, _ = make_tri_counts(
+            self.trifolder, self.triname.format(ax1_mid, ax2_mid), self.trifiltname, self.dm,
+            al_av=self.gal_alav, av_grid=avs)
+
         gal_dNs = create_galaxy_counts(
             self.gal_cmau_array, tri_mags+dtri_mags/2, np.linspace(0, 4, 41),
             self.gal_wav_micron, self.gal_alpha0, self.gal_alpha1, self.gal_alphaweight,
-            self.gal_ab_offset, self.gal_filtname, self.gal_alav*tri_av)
+            self.gal_ab_offset, self.gal_filtname, self.gal_alav*avs)
 
         log10y = np.log10(tri_hist + gal_dNs)
         new_uncert = np.sqrt(tri_uncert**2 + (0.05*gal_dNs)**2)
@@ -876,7 +892,7 @@ class AstrometricCorrections:
         N_norm = np.sum(10**log10y[mag_slice] * dtri_mags[mag_slice])
         self.log10y, self.dlog10y = log10y, dlog10y
         self.tri_hist, self.tri_mags, self.dtri_mags = tri_hist, tri_mags, dtri_mags
-        self.tri_uncert, self.tri_av, self.gal_dNs = tri_uncert, tri_av, gal_dNs
+        self.tri_uncert, self.gal_dNs = tri_uncert, gal_dNs
         self.minmag, self.maxmag, self.N_norm = minmag, maxmag, N_norm
 
     def plot_star_galaxy_counts(self):

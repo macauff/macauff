@@ -62,7 +62,7 @@ class TestCreateGalaxyCounts():
         filter_name = 'wise2010-W1'
         gal_dens = create_galaxy_counts(gal_values.cmau, self.mag_bins, self.z_array, wav,
                                         gal_values.alpha0, gal_values.alpha1,
-                                        gal_values.alphaweight, self.ab_offset, filter_name, 0)
+                                        gal_values.alphaweight, self.ab_offset, filter_name, [0])
         tot_fake_sch = np.zeros_like(gal_dens)
         for i in [0, 1]:
             fake_m, fake_phi, fake_alpha = self._calculate_params(np.log10(wav), i)
@@ -84,7 +84,7 @@ class TestCreateGalaxyCounts():
 
         gal_dens = create_galaxy_counts(gal_values.cmau, self.mag_bins, self.z_array, wav,
                                         gal_values.alpha0, gal_values.alpha1,
-                                        gal_values.alphaweight, self.ab_offset, filter_name, 1.5)
+                                        gal_values.alphaweight, self.ab_offset, filter_name, [1.5])
         tot_fake_sch = np.zeros_like(gal_dens)
         for i in [0, 1]:
             fake_m, fake_phi, fake_alpha = self._calculate_params(np.log10(wav), i)

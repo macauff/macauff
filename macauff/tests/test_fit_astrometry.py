@@ -24,7 +24,7 @@ class TestAstroCorrection:
 
         os.makedirs('tri_folder', exist_ok=True)
         # Fake some TRILEGAL downloads with random data.
-        text = ('#area = 4.0 sq deg\n#Av at infinity = 0\n' +
+        text = ('#area = 4.0 sq deg\n#Av at infinity = 1\n' +
                 'Gc logAge [M/H] m_ini   logL   logTe logg  m-M0   Av    ' +
                 'm2/m1 mbol   J      H      Ks     IRAC_3.6 IRAC_4.5 IRAC_5.8 IRAC_8.0 MIPS_24 ' +
                 'MIPS_70 MIPS_160 W1     W2     W3     W4       Mact\n')

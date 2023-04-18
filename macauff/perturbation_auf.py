@@ -7,11 +7,12 @@ component of the astrometric uncertainty function.
 import os
 import sys
 import numpy as np
+from astropy.coordinates import SkyCoord
 
 from .misc_functions import (create_auf_params_grid, _load_single_sky_slice,
                              _load_rectangular_slice, _create_rectangular_slice_arrays)
 from .misc_functions_fortran import misc_functions_fortran as mff
-from .get_trilegal_wrapper import get_trilegal
+from .get_trilegal_wrapper import get_trilegal, get_AV_infinity
 from .perturbation_auf_fortran import perturbation_auf_fortran as paf
 from .galaxy_counts import create_galaxy_counts
 
@@ -25,9 +26,10 @@ def make_perturb_aufs(auf_folder, cat_folder, filters, auf_points, r, dr, rho,
                       tri_maglim_faint=None, tri_num_faint=None, auf_region_frame=None,
                       num_trials=None, j0s=None, density_mags=None, d_mag=None,
                       compute_local_density=None, density_radius=None, run_fw=None, run_psf=None,
-                      dd_params=None, l_cut=None, snr_mag_params=None, fit_gal_flag=None,
-                      cmau_array=None, wavs=None, z_maxs=None, nzs=None, ab_offsets=None,
-                      filter_names=None, al_avs=None, alpha0=None, alpha1=None, alpha_weight=None):
+                      dd_params=None, l_cut=None, snr_mag_params=None, al_avs=None,
+                      fit_gal_flag=None, cmau_array=None, wavs=None, z_maxs=None, nzs=None,
+                      ab_offsets=None, filter_names=None, alpha0=None, alpha1=None,
+                      alpha_weight=None):
     r"""
     Function to perform the creation of the blended object perturbation component
     of the AUF.
@@ -152,6 +154,11 @@ def make_perturb_aufs(auf_folder, cat_folder, filters, auf_points, r, dr, rho,
         magnitude-perturbation weighting relationship for a series of Galactic
         sightlines for each ``filters`` filter. Must be given if
         ``include_perturb_auf`` is ``True``.
+    al_avs : list of numpy.ndarray or numpy.ndarray, optional
+        Relative extinction curve vectors for each filter in ``filters``,
+        :math:`\frac{A_\lambda}{A_V}`, to convert exinction in the V-band
+        to extinction in the relevant filter. Must be given if
+        ``include_perturb_auf`` is ``True``.
     fit_gal_flag : boolean, optional
         Flag indicating whether to include galaxy counts in derivations of
         perturbation component of the AUF. Must be given if
@@ -182,11 +189,6 @@ def make_perturb_aufs(auf_folder, cat_folder, filters, auf_points, r, dr, rho,
         Names for each filter in ``filters`` in a ``speclite``-appropriate
         naming scheme (``group_name``-``band_name``), for loading response
         curves to calculate galaxy k-corrections. Must be given if
-        ``include_perturb_auf`` and ``fit_gal_flag`` are ``True``.
-    al_avs : list of numpy.ndarray or numpy.ndarray, optional
-        Relative extinction curve vectors for each filter in ``filters``,
-        :math:`\frac{A_\lambda}{A_V}`, to convert exinction in the V-band
-        to extinction in the relevant filter. Must be given if
         ``include_perturb_auf`` and ``fit_gal_flag`` are ``True``.
     alpha0 : list of numpy.ndarray or numpy.ndarray, optional
         Indices used to calculate parameters :math:`\alpha_i`, used in deriving
@@ -246,6 +248,8 @@ def make_perturb_aufs(auf_folder, cat_folder, filters, auf_points, r, dr, rho,
         l_cut = np.zeros((1), float)
     if include_perturb_auf and snr_mag_params is None:
         raise ValueError("snr_mag_params must be given if include_perturb_auf is True.")
+    if include_perturb_auf and al_avs is None:
+        raise ValueError("al_avs must be given if include_perturb_auf is True.")
     if include_perturb_auf and compute_local_density is None:
         raise ValueError("compute_local_density must be given if include_perturb_auf is True.")
     if include_perturb_auf and compute_local_density and density_radius is None:
@@ -266,8 +270,6 @@ def make_perturb_aufs(auf_folder, cat_folder, filters, auf_points, r, dr, rho,
         raise ValueError("ab_offsets must be given if fit_gal_flag is True.")
     if include_perturb_auf and fit_gal_flag and filter_names is None:
         raise ValueError("filter_names must be given if fit_gal_flag is True.")
-    if include_perturb_auf and fit_gal_flag and al_avs is None:
-        raise ValueError("al_avs must be given if fit_gal_flag is True.")
     if include_perturb_auf and fit_gal_flag and alpha0 is None:
         raise ValueError("alpha0 must be given if fit_gal_flag is True.")
     if include_perturb_auf and fit_gal_flag and alpha1 is None:
@@ -323,8 +325,8 @@ def make_perturb_aufs(auf_folder, cat_folder, filters, auf_points, r, dr, rho,
 
     if include_perturb_auf:
         a_tot_photo = np.load('{}/con_cat_photo.npy'.format(cat_folder), mmap_mode='r')
+        a_tot_astro = np.load('{}/con_cat_astro.npy'.format(cat_folder), mmap_mode='r')
         if compute_local_density:
-            a_tot_astro = np.load('{}/con_cat_astro.npy'.format(cat_folder), mmap_mode='r')
             # Set up the temporary sky slice memmap arrays quickly, as they will
             # be needed in calculate_local_density later.
             memmap_slice_arrays = []
@@ -354,9 +356,10 @@ def make_perturb_aufs(auf_folder, cat_folder, filters, auf_points, r, dr, rho,
         if include_perturb_auf and (tri_download_flag or not
                                     os.path.isfile('{}/trilegal_auf_simulation_faint.dat'
                                                    .format(ax_folder))):
+            # Hard-coding the AV=1 trick to allow for using av_grid later.
             download_trilegal_simulation(ax_folder, tri_set_name, ax1, ax2, tri_filt_num,
                                          auf_region_frame, tri_maglim_faint,
-                                         total_objs=tri_num_faint)
+                                         AV=1, sigma_AV=0, total_objs=tri_num_faint)
             os.system('mv {}/trilegal_auf_simulation.dat {}/trilegal_auf_simulation_faint.dat'
                       .format(ax_folder, ax_folder))
 
@@ -368,8 +371,11 @@ def make_perturb_aufs(auf_folder, cat_folder, filters, auf_points, r, dr, rho,
                 # putting the correct indices into place.
                 med_index_slice = np.arange(0, len(local_N))[sky_cut]
             a_photo_cut = a_tot_photo[sky_cut]
-            if compute_local_density:
-                a_astro_cut = a_tot_astro[sky_cut]
+            a_astro_cut = a_tot_astro[sky_cut]
+
+            if len(a_astro_cut) > 0:
+                ax1_min, ax1_max = np.amin(a_astro_cut[:, 0]), np.amax(a_astro_cut[:, 0])
+                ax2_min, ax2_max = np.amin(a_astro_cut[:, 1]), np.amax(a_astro_cut[:, 1])
 
         for j in range(len(filters)):
             filt = filters[j]
@@ -418,19 +424,22 @@ def make_perturb_aufs(auf_folder, cat_folder, filters, auf_points, r, dr, rho,
                 else:
                     localN = np.load('{}/local_N.npy'.format(auf_folder),
                                      mmap_mode='r')[sky_cut][good_mag_slice, j]
+                ax1_list = np.linspace(ax1_min, ax1_max, 7)
+                ax2_list = np.linspace(ax2_min, ax2_max, 7)
                 if fit_gal_flag:
                     Narray = create_single_perturb_auf(
                         ax_folder, auf_points, filters[j], r, dr, rho, drho, j0s, num_trials,
                         psf_fwhms[j], tri_filt_names[j], density_mags[j], a_photo, localN, d_mag,
                         delta_mag_cuts, dd_params, l_cut, run_fw, run_psf, snr_mag_params[j],
-                        fit_gal_flag, cmau_array, wavs[j], z_maxs[j], nzs[j], alpha0, alpha1,
-                        alpha_weight, ab_offsets[j], filter_names[j], al_avs[j])
+                        al_avs[j], auf_region_frame, ax1_list, ax2_list, fit_gal_flag, cmau_array,
+                        wavs[j], z_maxs[j], nzs[j], alpha0, alpha1, alpha_weight, ab_offsets[j],
+                        filter_names[j], al_avs[j])
                 else:
                     Narray = create_single_perturb_auf(
                         ax_folder, auf_points, filters[j], r, dr, rho, drho, j0s, num_trials,
                         psf_fwhms[j], tri_filt_names[j], density_mags[j], a_photo, localN, d_mag,
                         delta_mag_cuts, dd_params, l_cut, run_fw, run_psf, snr_mag_params[j],
-                        fit_gal_flag)
+                        al_avs[j], auf_region_frame, ax1_list, ax2_list, fit_gal_flag)
             else:
                 # Without the simulations to force local normalising density N or
                 # individual source brightness magnitudes, we can simply combine
@@ -572,7 +581,7 @@ def make_perturb_aufs(auf_folder, cat_folder, filters, auf_points, r, dr, rho,
 
 
 def download_trilegal_simulation(tri_folder, tri_filter_set, ax1, ax2, mag_num, region_frame,
-                                 mag_lim, total_objs=1.5e6):
+                                 mag_lim, total_objs=1.5e6, AV=None, sigma_AV=0.1):
     '''
     Get a single Galactic sightline TRILEGAL simulation of an appropriate sky
     size, and save it in a folder for use in the perturbation AUF simulations.
@@ -601,6 +610,14 @@ def download_trilegal_simulation(tri_folder, tri_filter_set, ax1, ax2, mag_num, 
     total_objs : integer, optional
         The approximate number of objects to simulate in a TRILEGAL sightline,
         affecting how large an area to request a simulated Galactic region of.
+    AV : float, optional
+        If specified, pass a pre-determined value of infinite-Av to the simulation
+        API; otherwise pass its own "default" value and request it derive one
+        internally.
+    sigma_AV : float, optional
+        If given, bypasses the default value specified in ~`macauff.get_trilegal`,
+        setting the fractional scaling around `AV` in which to randomise
+        extinction values.
     '''
     areaflag = 0
     triarea = 0.001
@@ -608,7 +625,8 @@ def download_trilegal_simulation(tri_folder, tri_filter_set, ax1, ax2, mag_num, 
     galactic_flag = True if region_frame == 'galactic' else False
     while areaflag == 0:
         _ = get_trilegal(tri_name, ax1, ax2, folder=tri_folder, galactic=galactic_flag,
-                         filterset=tri_filter_set, area=triarea, maglim=mag_lim, magnum=mag_num)
+                         filterset=tri_filter_set, area=triarea, maglim=mag_lim, magnum=mag_num,
+                         AV=AV, sigma_AV=sigma_AV)
         f = open('{}/{}.dat'.format(tri_folder, tri_name), "r")
         contents = f.readlines()
         f.close()
@@ -630,7 +648,8 @@ def download_trilegal_simulation(tri_folder, tri_filter_set, ax1, ax2, mag_num, 
             areaflag = 1
         os.system('rm {}/{}.dat'.format(tri_folder, tri_name))
     av_inf = get_trilegal(tri_name, ax1, ax2, folder=tri_folder, galactic=galactic_flag,
-                          filterset=tri_filter_set, area=triarea, maglim=mag_lim, magnum=mag_num)
+                          filterset=tri_filter_set, area=triarea, maglim=mag_lim, magnum=mag_num,
+                          AV=AV, sigma_AV=sigma_AV)
     f = open('{}/{}.dat'.format(tri_folder, tri_name), "r")
     contents = f.readlines()
     f.close()
@@ -790,10 +809,10 @@ def calculate_local_density(a_astro, a_tot_astro, a_tot_photo, auf_folder, cat_f
 
 def create_single_perturb_auf(tri_folder, auf_point, filt, r, dr, rho, drho, j0s, num_trials,
                               psf_fwhm, header, density_mag, a_photo, localN, d_mag, mag_cut,
-                              dd_params, l_cut, run_fw, run_psf, snr_mag_params, fit_gal_flag,
-                              cmau_array=None, wav=None, z_max=None, nz=None, alpha0=None,
-                              alpha1=None, alpha_weight=None, ab_offset=None, filter_name=None,
-                              al_av=None):
+                              dd_params, l_cut, run_fw, run_psf, snr_mag_params, al_av,
+                              region_frame, ax1s, ax2s, fit_gal_flag, cmau_array=None, wav=None,
+                              z_max=None, nz=None, alpha0=None, alpha1=None, alpha_weight=None,
+                              ab_offset=None, filter_name=None):
     r'''
     Creates the associated parameters for describing a single perturbation AUF
     component, for a single sky position.
@@ -857,6 +876,17 @@ def create_single_perturb_auf(tri_folder, auf_point, filt, r, dr, rho, drho, j0s
         Array, of shape ``(Y, 5)``, containing the pre-determined values of the
         magnitude-perturbation weighting relationship for a series of Galactic
         sightlines for this particular filter.
+    al_av : float
+        Reddening vector for the filter, :math:`\frac{A_\lambda}{A_V}`.
+    region_frame : string
+        Indicator as to whether we are in ``equatorial`` or ``galactic``
+        coordinates.
+    ax1s : list or numpy.ndarray of floats
+        The unique longitudinal coordinates which, when combined with ``ax1s``,
+        form a rectangular grid of extinctions to sample for model counts.
+    ax2s : list or numpy.ndarray of floats
+        Unique latitudinal coordinates to combine with ``ax1s`` for individual
+        ra-dec or l-b pairings for which to simulate extinction-at-infinity.
     fit_gal_flag : bool
         Flag to indicate whether to simulate galaxy counts for the purposes of
         simulating the perturbation component of the AUF.
@@ -889,8 +919,6 @@ def create_single_perturb_auf(tri_folder, auf_point, filt, r, dr, rho, drho, j0s
     filter_name : string, optional
         The ``speclite`` style ``group_name-band_name`` name for the filter,
         for use in the creation of simulated galaxy counts.
-    al_av : float
-        Reddening vector for the filter, :math:`\frac{A_\lambda}{A_V}`.
 
     Returns
     -------
@@ -907,8 +935,20 @@ def create_single_perturb_auf(tri_folder, auf_point, filt, r, dr, rho, drho, j0s
     '''
     # TODO: extend to allow a Galactic source model that doesn't depend on TRILEGAL
     tri_name = 'trilegal_auf_simulation'
+    avs = np.empty((len(ax1s), len(ax2s)), float)
+    for j, ax1 in enumerate(ax1s):
+        for k, ax2 in enumerate(ax2s):
+            if region_frame == 'equatorial':
+                c = SkyCoord(ra=ax1, dec=ax2, unit='deg', frame='icrs')
+                l, b = c.galactic.l.degree, c.galactic.b.degree
+            else:
+                l, b = ax1, ax2
+            AV = get_AV_infinity(l, b, frame='galactic')
+            avs[j, k] = AV
+    avs = avs.flatten()
     dens_hist_tri, model_mags, model_mag_mids, model_mags_interval, _, av_inf = make_tri_counts(
-        tri_folder, tri_name, header, d_mag)
+        tri_folder, tri_name, header, d_mag, np.amin(a_photo), density_mag, al_av=al_av,
+        av_grid=avs)
 
     log10y_tri = -np.inf * np.ones_like(dens_hist_tri)
     log10y_tri[dens_hist_tri > 0] = np.log10(dens_hist_tri[dens_hist_tri > 0])
@@ -917,12 +957,11 @@ def create_single_perturb_auf(tri_folder, auf_point, filt, r, dr, rho, drho, j0s
     tri_count = np.sum(10**log10y_tri[mag_slice] * model_mags_interval[mag_slice])
 
     if fit_gal_flag:
-        al_inf = al_av * av_inf
+        al_grid = al_av * avs
         z_array = np.linspace(0, z_max, nz)
         gal_dens = create_galaxy_counts(cmau_array, model_mag_mids, z_array, wav, alpha0, alpha1,
-                                        alpha_weight, ab_offset, filter_name, al_inf)
-        max_mag_bin = np.argwhere(model_mags+model_mags_interval <= density_mag)[0][-1] + 1
-        gal_count = np.sum(gal_dens[:max_mag_bin]*model_mags_interval[:max_mag_bin])
+                                        alpha_weight, ab_offset, filter_name, al_grid)
+        gal_count = np.sum(gal_dens[mag_slice] * model_mags_interval[mag_slice])
         log10y_gal = -np.inf * np.ones_like(log10y_tri)
         log10y_gal[gal_dens > 0] = np.log10(gal_dens[gal_dens > 0])
     else:
@@ -1022,7 +1061,8 @@ def create_single_perturb_auf(tri_folder, auf_point, filt, r, dr, rho, drho, j0s
     return count_array
 
 
-def make_tri_counts(trifolder, trifilename, trifiltname, dm, use_bright=False, use_faint=True):
+def make_tri_counts(trifolder, trifilename, trifiltname, dm, use_bright=False, use_faint=True,
+                    al_av=None, av_grid=None):
     """
     Combine TRILEGAL simulations for a given line of sight in the Galaxy, using
     both a "bright" simulation, with a brighter magnitude limit that allows for
@@ -1042,6 +1082,19 @@ def make_tri_counts(trifolder, trifilename, trifiltname, dm, use_bright=False, u
         differential source counts.
     dm : float
         Width of the bins into which to place simulated magnitudes.
+    use_bright : boolean, optional
+        Controls whether we load a "bright" set of TRILEGAL sources or not.
+    use_faint : boolean, optional
+        Determines whether we use a larger dynamic range, fainter TRILEGAL
+        simulation to create a histogram of source counts.
+    al_av : float, optional
+        Differential extinction vector relative to the V-band. If given,
+        ``av_grid`` must also be provided; together these will be used
+        to manually extinct the TRILEGAL counts (assumed to be subject to zero
+        reddening) to simulate differential extinction within the region.
+    av_grid : numpy.ndarray, optional
+        Grid of extinctions across the region TRILEGAL simulations are valid
+        for. Must be provided if ``al_av`` is given.
 
     Returns
     -------
@@ -1062,14 +1115,11 @@ def make_tri_counts(trifolder, trifilename, trifiltname, dm, use_bright=False, u
     tri_av : float
         The largest of all reported V-band extinctions at infinity across all
         of the simulations used in the generation of the source count histograms.
-    use_bright : boolean, optional
-        Controls whether we load a "bright" set of TRILEGAL sources or not.
-    use_faint : boolean, optional
-        Determines whether we use a larger dynamic range, fainter TRILEGAL
-        simulation to create a histogram of source counts.
     """
     if not use_bright and not use_faint:
         raise ValueError("use_bright and use_faint cannot both be 'False'.")
+    if (al_av is None and av_grid is not None) or (al_av is not None and av_grid is None):
+        raise ValueError("If one of al_av or av_grid is provided the other must be given as well.")
     if use_faint:
         f = open('{}/{}_faint.dat'.format(trifolder, trifilename), "r")
         area_line = f.readline()
@@ -1081,6 +1131,8 @@ def make_tri_counts(trifolder, trifilename, trifiltname, dm, use_bright=False, u
         tri_area_faint = float(bits[2])
         bits = av_line.split(' ')
         tri_av_inf_faint = float(bits[4])
+        if tri_av_inf_faint < 0.1 and av_grid is not None:
+            raise ValueError("tri_av_inf_faint cannot be smaller than 0.1 while using av_grid.")
         tri_faint = np.genfromtxt('{}/{}_faint.dat'.format(trifolder, trifilename), delimiter=None,
                                   names=True, comments='#', skip_header=2,
                                   usecols=[trifiltname, 'Av'])
@@ -1094,6 +1146,8 @@ def make_tri_counts(trifolder, trifilename, trifiltname, dm, use_bright=False, u
         tri_area_bright = float(bits[2])
         bits = av_line.split(' ')
         tri_av_inf_bright = float(bits[4])
+        if tri_av_inf_bright < 0.1 and av_grid is not None:
+            raise ValueError("tri_av_inf_bright cannot be smaller than 0.1 while using av_grid.")
         tri_bright = np.genfromtxt('{}/{}_bright.dat'.format(trifolder, trifilename),
                                    delimiter=None, names=True, comments='#', skip_header=2,
                                    usecols=[trifiltname, 'Av'])
@@ -1101,10 +1155,14 @@ def make_tri_counts(trifolder, trifilename, trifiltname, dm, use_bright=False, u
     if use_faint:
         tridata_faint = tri_faint[:][trifiltname]
         tri_av_faint = np.amax(tri_faint[:]['Av'])
+        if al_av is not None:
+            avs_faint = tri_faint[:]['Av']
         del tri_faint
     if use_bright:
         tridata_bright = tri_bright[:][trifiltname]
         tri_av_bright = np.amax(tri_bright[:]['Av'])
+        if al_av is not None:
+            avs_bright = tri_bright[:]['Av']
         del tri_bright
     if use_bright and use_faint:
         minmag = dm * np.floor(min(np.amin(tridata_faint), np.amin(tridata_bright))/dm)
@@ -1115,18 +1173,62 @@ def make_tri_counts(trifolder, trifilename, trifiltname, dm, use_bright=False, u
     elif use_faint:
         minmag = dm * np.floor(np.amin(tridata_faint)/dm)
         maxmag = dm * np.ceil(np.amax(tridata_faint)/dm)
-    tri_mags = np.arange(minmag, maxmag+1e-10, dm)
+    if al_av is None:
+        tri_mags = np.arange(minmag, maxmag+1e-10, dm)
+    else:
+        # Pad the brightest magnitude (minmag) by the possibility of AV=0,
+        # scaled to current reddening vector.
+        if use_bright and use_faint:
+            tri_mags = np.arange(minmag-al_av*max(tri_av_faint, tri_av_bright), maxmag+1e-10, dm)
+        elif use_bright:
+            tri_mags = np.arange(minmag-al_av*tri_av_bright, maxmag+1e-10, dm)
+        elif use_faint:
+            tri_mags = np.arange(minmag-al_av*tri_av_faint, maxmag+1e-10, dm)
+    tri_mags_mids = (tri_mags[:-1]+np.diff(tri_mags)/2)
     if use_faint:
-        hist, tri_mags = np.histogram(tridata_faint, bins=tri_mags)
+        if al_av is None:
+            hist, tri_mags = np.histogram(tridata_faint, bins=tri_mags)
+        else:
+            hist = np.zeros((len(tri_mags) - 1), int)
+            for av in av_grid:
+                # Take the ratio of AVs for scaling (i.e., if we'd run TRILEGAL
+                # with AV=1 but av_grid[0] = 2, we get 2x the extinction at each
+                # distance we'd otherwise have found. Or, if AV=1,
+                # av_grid[1]=0.25, then we have a quarter the infinite-distance
+                # extinction and hence 25% the extinction applied to the source.
+                av_ratio = av / tri_av_inf_faint
+                # Apply the correction. Here if av_grid[i] = AV then we do
+                # nothing; otherwise av_ratio = 2 gives an extra 100% AV,
+                # and e.g. av_ratio = 0.25 subtracts three-quarters of the
+                # applied AV value. These are scaled to the correct extinction
+                # vector subsequently.
+                m = tridata_faint + (av_ratio - 1) * avs_faint * al_av
+                y, _ = np.histogram(m, bins=tri_mags)
+                hist += y
         hc_faint = hist > 3
         dens_faint = hist / np.diff(tri_mags) / tri_area_faint
         dens_uncert_faint = np.sqrt(hist) / np.diff(tri_mags) / tri_area_faint
+        # Account for summing NxM Avs here by dividing out len(av_grid).
+        if av_grid is not None:
+            dens_faint = dens_faint / len(av_grid)
+            dens_uncert_faint = dens_uncert_faint / np.sqrt(len(av_grid))
         dens_uncert_faint[dens_uncert_faint == 0] = 1e10
     if use_bright:
-        hist, tri_mags = np.histogram(tridata_bright, bins=tri_mags)
+        if al_av is None:
+            hist, tri_mags = np.histogram(tridata_bright, bins=tri_mags)
+        else:
+            hist = np.zeros((len(tri_mags) - 1), int)
+            for av in av_grid:
+                av_ratio = av / tri_av_inf_bright
+                m = tridata_bright + (av_ratio - 1) * avs_bright * al_av
+                y, _ = np.histogram(m, bins=tri_mags)
+                hist += y
         hc_bright = hist > 3
         dens_bright = hist / np.diff(tri_mags) / tri_area_bright
         dens_uncert_bright = np.sqrt(hist) / np.diff(tri_mags) / tri_area_bright
+        if av_grid is not None:
+            dens_bright = dens_bright / len(av_grid)
+            dens_uncert_bright = dens_uncert_bright / np.sqrt(len(av_grid))
         dens_uncert_bright[dens_uncert_bright == 0] = 1e10
     if use_bright and use_faint:
         # Assume that the number of objects in the bright dataset is truncated such
@@ -1152,7 +1254,7 @@ def make_tri_counts(trifolder, trifilename, trifiltname, dm, use_bright=False, u
 
     dens = dens[hc]
     dtri_mags = np.diff(tri_mags)[hc]
-    tri_mags_mids = (tri_mags[:-1]+np.diff(tri_mags)/2)[hc]
+    tri_mags_mids = tri_mags_mids[hc]
     tri_mags = tri_mags[:-1][hc]
     uncert = dens_uncert[hc]
 

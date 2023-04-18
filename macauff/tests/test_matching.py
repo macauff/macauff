@@ -1463,7 +1463,7 @@ class TestInputs:
                                                 'data/cat_{}_params_2.txt'.format(x)))
         # Fake some TRILEGAL downloads with random data.
         os.makedirs('wise_auf_folder/134.5/0.0', exist_ok=True)
-        text = ('#area = 4.0 sq deg\n#Av at infinity = 0\n' +
+        text = ('#area = 4.0 sq deg\n#Av at infinity = 1\n' +
                 'Gc logAge [M/H] m_ini   logL   logTe logg  m-M0   Av    ' +
                 'm2/m1 mbol   J      H      Ks     IRAC_3.6 IRAC_4.5 IRAC_5.8 IRAC_8.0 MIPS_24 ' +
                 'MIPS_70 MIPS_160 W1     W2     W3     W4       Mact\n')

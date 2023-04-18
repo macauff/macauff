@@ -33,7 +33,7 @@ __all__ = []
 
 def get_trilegal(filename, ra, dec, folder='.', galactic=False,
                  filterset='kepler_2mass', area=1, magnum=1, maglim=27, binaries=False,
-                 trilegal_version='1.7', sigma_AV=0.1):
+                 trilegal_version='1.7', AV=None, sigma_AV=0.1):
     """
     Calls the TRILEGAL web form simulation and downloads the file.
 
@@ -59,8 +59,18 @@ def get_trilegal(filename, ra, dec, folder='.', galactic=False,
         Whether to have TRILEGAL include binary stars. Default ``False``.
     trilegal_version : float, optional
         Version of the TRILEGAL API to call. Default ``'1.7'``.
+    AV : float, optional
+        Extinction at infinity in the V band. If not provided, defaults to
+        ``None``, in which case it is calculated from the coordinates given.
     sigma_AV : float, optional
         Fractional spread in A_V along the line of sight.
+
+    Returns
+    -------
+    AV : float
+        The extinction at infinity of the particular TRILEGAL call, if
+        ``AV`` as passed into the function is ``None``, otherwise just
+        returns the input value.
     """
     if galactic:
         l, b = ra, dec
@@ -81,7 +91,8 @@ def get_trilegal(filename, ra, dec, folder='.', galactic=False,
         outfile = '{}/{}.dat'.format(folder, filename)
     else:
         outfile = '{}/{}'.format(folder, filename)
-    AV = get_AV_infinity(l, b, frame='galactic')
+    if AV is None:
+        AV = get_AV_infinity(l, b, frame='galactic')
 
     trilegal_webcall(trilegal_version, l, b, area, binaries, AV, sigma_AV, filterset, magnum,
                      maglim, outfile, outfolder)
