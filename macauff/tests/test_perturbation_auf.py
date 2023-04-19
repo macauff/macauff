@@ -311,6 +311,22 @@ def test_circle_area():
             assert_allclose(calc_area, manual_area, rtol=0.05)
         done += 1
 
+    # Verify that we don't mind if coordinates are negative:
+    x, y = -0.1, 0.08
+    x_edges = [-0.15, 0.15]
+    y_edges = [-0.15, 0.15]
+    calc_area = paf.get_circle_area_overlap([x], [y], R, x_edges[0], x_edges[1],
+                                            y_edges[0], y_edges[1])
+    xp = np.linspace(*x_edges, 100)
+    yp = np.linspace(*y_edges, 100)
+    dx, dy = xp[1] - xp[0], yp[1] - yp[0]
+    manual_area = 0
+    for i in range(len(xp)):
+        for j in range(len(yp)):
+            if np.sqrt((xp[i] - x)**2 + (yp[j] - y)**2) <= R:
+                manual_area += dx*dy
+    assert_allclose(calc_area, manual_area, rtol=0.05)
+
 
 def test_psf_perturb():
     l_cut = np.load(os.path.join(os.path.dirname(__file__), 'data/l_cut.npy'))

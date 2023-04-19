@@ -10,7 +10,7 @@ import numpy as np
 from astropy.coordinates import SkyCoord
 
 from .misc_functions import (create_auf_params_grid, _load_single_sky_slice,
-                             _load_rectangular_slice, _create_rectangular_slice_arrays)
+                             _load_rectangular_slice, _create_rectangular_slice_arrays, min_max_lon)
 from .misc_functions_fortran import misc_functions_fortran as mff
 from .get_trilegal_wrapper import get_trilegal, get_AV_infinity
 from .perturbation_auf_fortran import perturbation_auf_fortran as paf
@@ -354,7 +354,7 @@ def make_perturb_aufs(auf_folder, cat_folder, filters, auf_points, r, dr, rho,
             a_astro_cut = a_tot_astro[sky_cut]
 
             if len(a_astro_cut) > 0:
-                ax1_min, ax1_max = np.amin(a_astro_cut[:, 0]), np.amax(a_astro_cut[:, 0])
+                ax1_min, ax1_max = min_max_lon(a_astro_cut[:, 0])
                 ax2_min, ax2_max = np.amin(a_astro_cut[:, 1]), np.amax(a_astro_cut[:, 1])
 
                 dens_mags = np.empty(len(filters), float)
@@ -722,7 +722,7 @@ def calculate_local_density(a_astro, a_tot_astro, a_tot_photo, auf_folder, cat_f
         ``a_astro`` that are above ``density_mag`` in ``a_tot_astro``.
     '''
 
-    min_lon, max_lon = np.amin(a_astro[:, 0]), np.amax(a_astro[:, 0])
+    min_lon, max_lon = min_max_lon(a_astro[:, 0])
     min_lat, max_lat = np.amin(a_astro[:, 1]), np.amax(a_astro[:, 1])
 
     memmap_slice_arrays_2 = []
@@ -809,7 +809,7 @@ def calculate_local_density(a_astro, a_tot_astro, a_tot_photo, auf_folder, cat_f
                 # in the error circle, slightly over-representing bright objects
                 # but still giving them a very low normalising sky density.
                 full_counts[small_sky_cut] = 1
-    min_lon, max_lon = np.amin(a_astro_overlap_cut[:, 0]), np.amax(a_astro_overlap_cut[:, 0])
+    min_lon, max_lon = min_max_lon(a_astro_overlap_cut[:, 0])
     min_lat, max_lat = np.amin(a_astro_overlap_cut[:, 1]), np.amax(a_astro_overlap_cut[:, 1])
 
     circle_overlap_area = paf.get_circle_area_overlap(a_astro[:, 0], a_astro[:, 1], density_radius,

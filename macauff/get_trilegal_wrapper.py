@@ -75,14 +75,12 @@ def get_trilegal(filename, ra, dec, folder='.', galactic=False,
         ``AV`` as passed into the function is ``None``, otherwise just
         returns the input value.
     """
-    if galactic:
-        l, b = ra, dec
-    else:
-        try:
-            c = SkyCoord(ra, dec)
-        except UnitsError:
-            c = SkyCoord(ra, dec, unit='deg')
-        l, b = (c.galactic.l.value, c.galactic.b.value)
+    frame = 'galactic' if galactic else 'icrs'
+    try:
+        c = SkyCoord(ra, dec, frame=frame)
+    except UnitsError:
+        c = SkyCoord(ra, dec, unit='deg', frame=frame)
+    l, b = (c.galactic.l.value, c.galactic.b.value)
 
     if os.path.isabs(filename):
         folder = ''

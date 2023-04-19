@@ -28,6 +28,7 @@ if usetex:
 from .galaxy_counts import create_galaxy_counts
 from .perturbation_auf import (download_trilegal_simulation, _calculate_magnitude_offsets,
                                make_tri_counts)
+from .misc_functions import min_max_lon
 from .misc_functions_fortran import misc_functions_fortran as mff
 from .perturbation_auf_fortran import perturbation_auf_fortran as paf
 from .get_trilegal_wrapper import get_AV_infinity
@@ -516,6 +517,8 @@ class AstrometricCorrections:
                     delta_lon = np.around(0.5 * self.cutout_area / lat_integral, decimals=1)
                 # Handle wrap-around longitude maths naively by forcing 0/360 as the
                 # minimum/maximum allowed limits of each box.
+                # TODO: once the rest of AstrometricCorrections handles the wraparound
+                # logic, relax this requirement.
                 if ax1_mid - delta_lon < 0:
                     self.ax1_mins[i] = 0
                     self.ax1_maxs[i] = 2 * delta_lon

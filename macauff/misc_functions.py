@@ -5,7 +5,6 @@ framework.
 '''
 
 import os
-import operator
 import numpy as np
 
 __all__ = []
@@ -292,15 +291,16 @@ def _load_rectangular_slice(folder_path, cat_name, a, lon1, lon2, lat1, lat2, pa
     di = max(1, len(a) // 20)
     # Iterate over each small slice of the larger array, checking for upper
     # and lower longitude, then latitude, criterion matching.
+    lon_shift = 180 - (lon2 + lon1)/2
     for i in range(0, len(a), di):
-        _lon_cut(i, a, di, lon1, padding, sky_cut_1, operator.ge)
+        _lon_cut(i, a, di, lon1, padding, sky_cut_1, 'greater', lon_shift)
     for i in range(0, len(a), di):
-        _lon_cut(i, a, di, lon2, padding, sky_cut_2, operator.le)
+        _lon_cut(i, a, di, lon2, padding, sky_cut_2, 'lesser', lon_shift)
 
     for i in range(0, len(a), di):
-        _lat_cut(i, a, di, lat1, padding, sky_cut_3, operator.ge)
+        _lat_cut(i, a, di, lat1, padding, sky_cut_3, 'greater')
     for i in range(0, len(a), di):
-        _lat_cut(i, a, di, lat2, padding, sky_cut_4, operator.le)
+        _lat_cut(i, a, di, lat2, padding, sky_cut_4, 'lesser')
 
     for i in range(0, len(a), di):
         sky_cut[i:i+di] = (sky_cut_1[i:i+di] & sky_cut_2[i:i+di] &
@@ -309,7 +309,7 @@ def _load_rectangular_slice(folder_path, cat_name, a, lon1, lon2, lat1, lat2, pa
     return sky_cut
 
 
-def _lon_cut(i, a, di, lon, padding, sky_cut, inequality):
+def _lon_cut(i, a, di, lon, padding, sky_cut, inequality, lon_shift):
     '''
     Function to calculate the longitude inequality criterion for astrometric
     sources relative to a rectangle defining boundary limits.
@@ -331,23 +331,37 @@ def _lon_cut(i, a, di, lon, padding, sky_cut, inequality):
     sky_cut : numpy.ndarray
         Array into which to store boolean flags for whether source meets the
         sky position criterion.
-    inequality : ``operator.le`` or ``operator.ge``
-        Function to determine whether a source is either above or below the
+    inequality : string, ``greater`` or ``lesser``
+        Flag to determine whether a source is either above or below the
         given ``lon`` value.
+    lon_shift : float
+        Value by which to "move" longitudes to avoid meridian overflow issues.
     '''
+    b = a[i:i+di, 0] + lon_shift
+    b[b > 360] = b[b > 360] - 360
+    b[b < 0] = b[b < 0] + 360
+    # While longitudes in the data are 358, 359, 0/360, 1, 2, longitude
+    # cutout values should go -2, -1, 0, 1, 2, and hence we ought to be able
+    # to avoid the 360-wrap here.
+    new_lon = lon + lon_shift
+    if inequality == 'lesser':
+        # Allow for small floating point rounding errors in comparison.
+        inequal_lon_cut = b <= new_lon + 1e-6
+    else:
+        inequal_lon_cut = b >= new_lon - 1e-6
     # To check whether a source should be included in this slice or not if the
     # "padding" factor is non-zero, add an extra caveat to check whether
     # Haversine great-circle distance is less than the padding factor. For
     # constant latitude this reduces to
     # r = 2 arcsin(|cos(lat) * sin(delta-lon/2)|).
+    if padding > 0:
+        sky_cut[i:i+di] = (hav_dist_constant_lat(a[i:i+di, 0], a[i:i+di, 1], lon) <=
+                           padding) | inequal_lon_cut
     # However, in both zero and non-zero padding factor cases, we always require
     # the source to be above or below the longitude for sky_cut_1 and sky_cut_2
     # in load_fourier_grid_cutouts, respectively.
-    if padding > 0:
-        sky_cut[i:i+di] = (hav_dist_constant_lat(a[i:i+di, 0], a[i:i+di, 1], lon) <=
-                           padding) | inequality(a[i:i+di, 0], lon)
     else:
-        sky_cut[i:i+di] = inequality(a[i:i+di, 0], lon)
+        sky_cut[i:i+di] = inequal_lon_cut
 
 
 def _lat_cut(i, a, di, lat, padding, sky_cut, inequality):
@@ -372,8 +386,8 @@ def _lat_cut(i, a, di, lat, padding, sky_cut, inequality):
     sky_cut : numpy.ndarray
         Array into which to store boolean flags for whether source meets the
         sky position criterion.
-    inequality : ``operator.le`` or ``operator.ge``
-        Function to determine whether a source is either above or below the
+    inequality : string, ``greater`` or ``lesser``
+        Flag to determine whether a source is either above or below the
         given ``lat`` value.
     '''
 
@@ -382,9 +396,53 @@ def _lat_cut(i, a, di, lat, padding, sky_cut, inequality):
     # can simply move the required latitude padding factor to within the
     # latitude comparison.
     if padding > 0:
-        if inequality is operator.le:
-            sky_cut[i:i+di] = inequality(a[i:i+di, 1] - padding, lat)
+        if inequality == 'lesser':
+            # Allow for small floating point rounding errors in comparison.
+            sky_cut[i:i+di] = a[i:i+di, 1] <= lat + padding + 1e-6
         else:
-            sky_cut[i:i+di] = inequality(a[i:i+di, 1] + padding, lat)
+            sky_cut[i:i+di] = a[i:i+di, 1] >= lat - padding - 1e-6
     else:
-        sky_cut[i:i+di] = inequality(a[i:i+di, 1], lat)
+        if inequality == 'lesser':
+            sky_cut[i:i+di] = a[i:i+di, 1] <= lat + 1e-6
+        else:
+            sky_cut[i:i+di] = a[i:i+di, 1] >= lat - 1e-6
+
+
+def min_max_lon(a):
+    """
+    Returns the minimum and maximum longitude of a set of sky coordinates,
+    accounting for 0 degrees being the same as 360 degrees and hence
+    358 deg and -2 deg being equal, effectively re-wrapping longitude to be
+    between -pi and +pi radians in cases where data exist either side of the
+    boundary.
+
+    Parameters
+    ----------
+    a : numpy.ndarray
+        1-D array of longitudes, which are limited to between 0 and 360 degrees.
+
+    Returns
+    -------
+    min_lon : float
+        The longitude furthest to the "left" of 0 degrees.
+    max_lon : float
+        The longitude furthest around the other way from 0 degrees, with the
+        largest longitude in the first quadrant of the Galaxy.
+    """
+    # TODO: can this be simplified with a lon_shift like lon_cut above?
+    min_lon, max_lon = np.amin(a), np.amax(a)
+    if min_lon <= 1 and max_lon >= 359 and np.any(np.abs(a - 180) < 1):
+        # If there is data both either side of 0/360 and at 180 degrees,
+        # return the entire longitudinal circle as the limits.
+        return 0, 360
+    elif min_lon <= 1 and max_lon >= 359:
+        # If there's no data around the anti-longitude but data either
+        # side of zero degrees exists, return the [-pi, +pi] wrapped
+        # values.
+        min_lon = np.amin(a[a > 180] - 360)
+        max_lon = np.amax(a[a < 180])
+        return min_lon, max_lon
+    else:
+        # Otherwise, the limits are inside [0, 360] and should be returned
+        # as the "normal" minimum and maximum values.
+        return min_lon, max_lon

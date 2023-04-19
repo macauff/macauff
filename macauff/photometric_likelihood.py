@@ -340,6 +340,8 @@ def distribute_sky_indices(joint_folder_path, cat_folder, name, mem_chunk_num, c
         lowind = np.floor(n_sources*cnum/mem_chunk_num).astype(int)
         highind = np.floor(n_sources*(cnum+1)/mem_chunk_num).astype(int)
         a = np.load('{}/con_cat_astro.npy'.format(cat_folder), mmap_mode='r')[lowind:highind]
+        # Haversine doesn't mind 0-360 wraparound so a can be in [0, 360] range
+        # but cf_points in the negative-to-positive cutout.
         sky_inds[lowind:highind] = mff.find_nearest_point(a[:, 0], a[:, 1],
                                                           cf_points[:, 0], cf_points[:, 1])
 
