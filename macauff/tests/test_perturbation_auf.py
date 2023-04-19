@@ -114,7 +114,7 @@ class TestCreatePerturbAUF:
         assert len(record) == 1
         assert 'Incorrect number of files in catalogue "b"' in record[0].message.args[0]
 
-    @pytest.mark.filterwarnings("ignore:Incorrect number of files in")
+    @pytest.mark.filterwarnings("ignore:*Incorrect number of files in")
     def test_load_auf_print(self, capsys):
         # Reset any saved files from the above tests
         os.system("rm -rf {}/*".format(self.cm.a_auf_folder_path))
