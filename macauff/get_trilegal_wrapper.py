@@ -183,6 +183,7 @@ def trilegal_webcall(trilegal_version, l, b, area, binaries, AV, sigma_AV, filte
         else:
             print("No communication with {}, will retry in 2 min".format(webserver))
             time.sleep(120)
+            return "timeout"
         if not notconnected:
             with open('{}/tmpfile'.format(outfolder), 'r') as f:
                 lines = f.readlines()
