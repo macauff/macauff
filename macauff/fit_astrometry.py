@@ -70,7 +70,7 @@ class AstrometricCorrections:
         dens_search_radius : float
             Radius out to which to search around objects internal to a
             catalogue, to determine the local normalising density for each
-            source, in arcseconds.
+            source, in degrees.
         save_folder : string
             Absolute or relative filepath of folder into which to store
             temporary and generated outputs from the fitting process.
