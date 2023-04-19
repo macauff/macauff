@@ -88,7 +88,11 @@ def set_list(aindices, bindices, aoverlap, boverlap, joint_folder_path, n_pool, 
 
     # However we can't do x! / (x-k)! so we do prod(range(x-k+1, x, 1)) for
     # computational simplicity.
-    maxiters = 50000
+    # Since 21! is larger than a 64-bit integer (see factorial maths in
+    # counterpart_pairing_fortran.find_single_island_prob), we also filter for
+    # islands with more than 20 objects in both catalogues within
+    # _calc_group_length_exceeded.
+    maxiters = 5000000
     if use_memmap_files:
         grouplengthexceeded = np.lib.format.open_memmap('{}/group/grplenexceed.npy'.format(
             joint_folder_path), mode='w+', dtype=bool, shape=(len(agrouplengths),))
@@ -394,6 +398,8 @@ def _b_to_a(ind, grp, N, aindices, bindices, aoverlap, boverlap, agroup, bgroup)
 
 def _calc_group_length_exceeded(iterable):
     i, n_a, n_b, maxiters = iterable
+    if max(n_a, n_b) > 20:
+        return i, 1
     counter = 0
     for k in np.arange(0, min(n_a, n_b)+1e-10, 1):
         kcomb = (np.prod([qq for qq in np.arange(n_a-k+1, n_a+1e-10, 1)]) /
