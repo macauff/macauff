@@ -1542,11 +1542,15 @@ class CrossMatch():
                                  'integers.'.format(catname))
             setattr(self, '{}cat_col_nums'.format(catname), np.array([int(c) for c in b]))
 
-            input_npy_folder = os.path.abspath(config['input_npy_folder'])
-            if not os.path.exists(input_npy_folder):
+            input_npy_folder = config['input_npy_folder']
+            if input_npy_folder != 'None' and not os.path.exists(input_npy_folder):
                 raise OSError('input_npy_folder from catalogue "{}" does not exist.'
                               .format(catname[0]))
-            setattr(self, '{}input_npy_folder'.format(catname), input_npy_folder)
+            if input_npy_folder == 'None':
+                setattr(self, '{}input_npy_folder'.format(catname), None)
+            else:
+                setattr(self, '{}input_npy_folder'.format(catname),
+                        os.path.abspath(input_npy_folder))
 
             setattr(self, '{}csv_has_header'.format(catname),
                     self._str2bool(config['csv_has_header']))

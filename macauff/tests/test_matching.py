@@ -1180,14 +1180,24 @@ class TestInputs:
                       'data/cat_b_params.txt'), idx, new_line,
                       out_file=os.path.join(os.path.dirname(__file__),
                                             'data/cat_b_params_.txt'))
+        old_line = 'input_npy_folder = '
+        new_line = 'input_npy_folder = None\n'
+        f = open(os.path.join(os.path.dirname(__file__),
+                              'data/cat_a_params_.txt')).readlines()
+        idx = np.where([old_line in line for line in f])[0][0]
+        _replace_line(os.path.join(os.path.dirname(__file__),
+                      'data/cat_a_params_.txt'), idx, new_line,
+                      out_file=os.path.join(os.path.dirname(__file__),
+                                            'data/cat_a_params_.txt'))
 
         # Initially this will fail because we don't have input_csv_folder
         # created, then it will fail without input_npy_folder:
-        for error_key, folder in zip(['input_csv_folder', 'input_npy_folder'],
-                                     ['input_csv_folder', 'blah']):
+        for error_key, folder, cat_ in zip(['input_csv_folder', 'input_npy_folder'],
+                                           ['input_csv_folder', 'blah'], ['a', 'b']):
             if os.path.exists(folder):
                 os.rmdir(folder)
-            with pytest.raises(OSError, match='{} from catalogue "a" does '.format(error_key)):
+            with pytest.raises(OSError, match='{} from catalogue "{}" does '.format(
+                    error_key, cat_)):
                 cm._initialise_chunk(os.path.join(os.path.dirname(__file__),
                                      'data/crossmatch_params__.txt'),
                                      os.path.join(os.path.dirname(__file__),
@@ -1211,6 +1221,7 @@ class TestInputs:
         assert cm.a_cat_csv_name == 'catalogue.csv'
         assert np.all(cm.a_cat_col_names == np.array(['Gaia_A', 'Gaia_B', 'Gaia_C']))
         assert np.all(cm.b_cat_col_nums == np.array([1, 2, 3]))
+        assert cm.a_input_npy_folder is None
         assert cm.b_input_npy_folder == os.path.abspath('blah')
         assert cm.a_csv_has_header is False
         assert cm.a_extra_col_names is None
