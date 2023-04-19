@@ -541,7 +541,11 @@ def make_perturb_aufs(auf_folder, cat_folder, filters, auf_points, r, dr, rho,
         highind = np.floor(n_sources*(cnum+1)/mem_chunk_num).astype(int)
         if include_perturb_auf:
             a = np.load('{}/con_cat_photo.npy'.format(cat_folder), mmap_mode='r')[lowind:highind]
-            local_N = np.load('{}/local_N.npy'.format(auf_folder), mmap_mode='r')[lowind:highind]
+            if (not compute_local_density) or use_memmap_files:
+                localN = np.load('{}/local_N.npy'.format(auf_folder),
+                                 mmap_mode='r')[lowind:highind]
+            else:
+                localN = local_N[lowind:highind]
         magref = np.load('{}/magref.npy'.format(cat_folder), mmap_mode='r')[lowind:highind]
         # As we chunk in even steps through the files this is simple for now,
         # but could be replaced with a more complex mapping in the future.
@@ -551,8 +555,8 @@ def make_perturb_aufs(auf_folder, cat_folder, filters, auf_points, r, dr, rho,
             for i in range(0, len(a)):
                 axind = modelrefinds[2, indexmap[i]]
                 filterind = magref[i]
-                Nmind = np.argmin((local_N[i, filterind] - Narrays[:arraylengths[filterind, axind],
-                                                                   filterind, axind])**2 +
+                Nmind = np.argmin((localN[i, filterind] - Narrays[:arraylengths[filterind, axind],
+                                                                  filterind, axind])**2 +
                                   (a[i, filterind] - magarrays[:arraylengths[filterind, axind],
                                                                filterind, axind])**2)
                 modelrefinds[0, indexmap[i]] = Nmind
