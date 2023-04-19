@@ -1676,45 +1676,43 @@ def create_densities(ax1_mid, ax2_mid, b, minmag, maxmag, lon_slice, lat_slice, 
         kdt = KDTree(flatxyz.value.T, compact_nodes=False, balanced_tree=False)
         return kdt
 
-    if not os.path.isfile('{}/npy/narray_sky_{}_{}.npy'.format(save_folder, ax1_mid, ax2_mid)):
-        cutmag = (b[:, mag_ind] >= minmag) & (b[:, mag_ind] <= maxmag)
+    cutmag = (b[:, mag_ind] >= minmag) & (b[:, mag_ind] <= maxmag)
 
-        if coord_system == 'galactic':
-            full_cat = SkyCoord(l=b[:, ax1_ind], b=b[:, ax2_ind], unit='deg', frame='galactic')
-            mag_cut_cat = SkyCoord(l=b[cutmag, ax1_ind], b=b[cutmag, ax2_ind], unit='deg',
-                                   frame='galactic')
-        else:
-            full_cat = SkyCoord(ra=b[:, ax1_ind], dec=b[:, ax2_ind], unit='deg', frame='icrs')
-            mag_cut_cat = SkyCoord(ra=b[cutmag, ax1_ind], dec=b[cutmag, ax2_ind], unit='deg',
-                                   frame='icrs')
+    if coord_system == 'galactic':
+        full_cat = SkyCoord(l=b[:, ax1_ind], b=b[:, ax2_ind], unit='deg', frame='galactic')
+        mag_cut_cat = SkyCoord(l=b[cutmag, ax1_ind], b=b[cutmag, ax2_ind], unit='deg',
+                               frame='galactic')
+    else:
+        full_cat = SkyCoord(ra=b[:, ax1_ind], dec=b[:, ax2_ind], unit='deg', frame='icrs')
+        mag_cut_cat = SkyCoord(ra=b[cutmag, ax1_ind], dec=b[cutmag, ax2_ind], unit='deg',
+                               frame='icrs')
 
-        full_urepr = full_cat.data.represent_as(UnitSphericalRepresentation)
-        full_ucoords = full_cat.realize_frame(full_urepr)
+    full_urepr = full_cat.data.represent_as(UnitSphericalRepresentation)
+    full_ucoords = full_cat.realize_frame(full_urepr)
 
-        mag_cut_urepr = mag_cut_cat.data.represent_as(UnitSphericalRepresentation)
-        mag_cut_ucoords = mag_cut_cat.realize_frame(mag_cut_urepr)
-        mag_cut_kdt = _get_cart_kdt(mag_cut_ucoords)
+    mag_cut_urepr = mag_cut_cat.data.represent_as(UnitSphericalRepresentation)
+    mag_cut_ucoords = mag_cut_cat.realize_frame(mag_cut_urepr)
+    mag_cut_kdt = _get_cart_kdt(mag_cut_ucoords)
 
-        r = (2 * np.sin(Angle(search_radius * u.degree) / 2.0)).value
-        overlap_number = np.empty(len(b), int)
+    r = (2 * np.sin(Angle(search_radius * u.degree) / 2.0)).value
+    overlap_number = np.empty(len(b), int)
 
-        pool = multiprocessing.Pool(n_pool)
-        counter = np.arange(0, len(b))
-        iter_group = zip(counter, itertools.repeat([full_ucoords, mag_cut_kdt, r]))
-        for stuff in pool.imap_unordered(ball_point_query, iter_group, chunksize=len(b)//n_pool):
-            i, len_query = stuff
-            overlap_number[i] = len_query
+    pool = multiprocessing.Pool(n_pool)
+    counter = np.arange(0, len(b))
+    iter_group = zip(counter, itertools.repeat([full_ucoords, mag_cut_kdt, r]))
+    for stuff in pool.imap_unordered(ball_point_query, iter_group, chunksize=len(b)//n_pool):
+        i, len_query = stuff
+        overlap_number[i] = len_query
 
-        pool.close()
-        pool.join()
+    pool.close()
+    pool.join()
 
-        area = paf.get_circle_area_overlap(b[:, ax1_ind], b[:, ax2_ind], search_radius,
-                                           ax1_min, ax1_max, ax2_min, ax2_max)
+    area = paf.get_circle_area_overlap(b[:, ax1_ind], b[:, ax2_ind], search_radius,
+                                       ax1_min, ax1_max, ax2_min, ax2_max)
 
-        Narray = overlap_number / area
+    Narray = overlap_number / area
 
-        np.save('{}/npy/narray_sky_{}_{}.npy'.format(save_folder, ax1_mid, ax2_mid), Narray)
-    Narray = np.load('{}/npy/narray_sky_{}_{}.npy'.format(save_folder, ax1_mid, ax2_mid))
+    np.save('{}/npy/narray_sky_{}_{}.npy'.format(save_folder, ax1_mid, ax2_mid), Narray)
 
     return Narray
 
@@ -1793,46 +1791,37 @@ def create_distances(a, b, ax1_mid, ax2_mid, nn_radius, save_folder, a_ax1_ind, 
     dists : numpy.ndarray
         The separations between each nearest neighbour match, in arcseconds.
     """
-    if (not os.path.isfile('{}/npy/a_matchind_{}_{}.npy'.format(
-            save_folder, ax1_mid, ax2_mid)) or
-            not os.path.isfile('{}/npy/b_matchind_{}_{}.npy'.format(
-                save_folder, ax1_mid, ax2_mid)) or
-            not os.path.isfile('{}/npy/ab_dists_{}_{}.npy'.format(save_folder, ax1_mid, ax2_mid))):
-        if coord_system == 'galactic':
-            ac = SkyCoord(l=a[:, a_ax1_ind], b=a[:, a_ax2_ind], unit='deg', frame='galactic')
-            bc = SkyCoord(l=b[:, b_ax1_ind], b=b[:, b_ax2_ind], unit='deg', frame='galactic')
-        else:
-            ac = SkyCoord(ra=a[:, a_ax1_ind], dec=a[:, a_ax2_ind], unit='deg', frame='icrs')
-            bc = SkyCoord(ra=b[:, b_ax1_ind], dec=b[:, b_ax2_ind], unit='deg', frame='icrs')
-        amatchind, adists, _ = match_coordinates_sky(ac, bc)
-        bmatchind, bdists, _ = match_coordinates_sky(bc, ac)
-        # Since match_coordinates_sky doesn't set a maximum cutoff, we manually
-        # ensure only matches within nn_radius return by setting larger matches
-        # to unique negative indices, so that found_match_slice and
-        # found_match_slice2 fail for those later.
-        q = adists.arcsecond > nn_radius
-        amatchind[q] = -1
-        q = bdists.arcsecond > nn_radius
-        bmatchind[q] = -2
-        adists = adists.arcsecond
+    if coord_system == 'galactic':
+        ac = SkyCoord(l=a[:, a_ax1_ind], b=a[:, a_ax2_ind], unit='deg', frame='galactic')
+        bc = SkyCoord(l=b[:, b_ax1_ind], b=b[:, b_ax2_ind], unit='deg', frame='galactic')
+    else:
+        ac = SkyCoord(ra=a[:, a_ax1_ind], dec=a[:, a_ax2_ind], unit='deg', frame='icrs')
+        bc = SkyCoord(ra=b[:, b_ax1_ind], dec=b[:, b_ax2_ind], unit='deg', frame='icrs')
+    amatchind, adists, _ = match_coordinates_sky(ac, bc)
+    bmatchind, bdists, _ = match_coordinates_sky(bc, ac)
+    # Since match_coordinates_sky doesn't set a maximum cutoff, we manually
+    # ensure only matches within nn_radius return by setting larger matches
+    # to unique negative indices, so that found_match_slice and
+    # found_match_slice2 fail for those later.
+    q = adists.arcsecond > nn_radius
+    amatchind[q] = -1
+    q = bdists.arcsecond > nn_radius
+    bmatchind[q] = -2
+    adists = adists.arcsecond
 
-        _ainds = np.arange(0, len(a), dtype=int)
-        found_match_slice = amatchind >= 0
-        found_match_slice2 = _ainds[found_match_slice] == bmatchind[amatchind[found_match_slice]]
+    _ainds = np.arange(0, len(a), dtype=int)
+    found_match_slice = amatchind >= 0
+    found_match_slice2 = _ainds[found_match_slice] == bmatchind[amatchind[found_match_slice]]
 
-        # The indices should swap here. amatchind is the catalogue b indices
-        # for each catalogue a object, but we really just care about which
-        # catalogue b objects are matched.
-        bmatch = amatchind[found_match_slice][found_match_slice2]
-        amatch = _ainds[found_match_slice][found_match_slice2]
-        dists = adists[found_match_slice][found_match_slice2]
+    # The indices should swap here. amatchind is the catalogue b indices
+    # for each catalogue a object, but we really just care about which
+    # catalogue b objects are matched.
+    bmatch = amatchind[found_match_slice][found_match_slice2]
+    amatch = _ainds[found_match_slice][found_match_slice2]
+    dists = adists[found_match_slice][found_match_slice2]
 
-        np.save('{}/npy/a_matchind_{}_{}.npy'.format(save_folder, ax1_mid, ax2_mid), amatch)
-        np.save('{}/npy/b_matchind_{}_{}.npy'.format(save_folder, ax1_mid, ax2_mid), bmatch)
-        np.save('{}/npy/ab_dists_{}_{}.npy'.format(save_folder, ax1_mid, ax2_mid), dists)
-    amatch = np.load('{}/npy/a_matchind_{}_{}.npy'.format(save_folder, ax1_mid, ax2_mid))
-    bmatch = np.load('{}/npy/b_matchind_{}_{}.npy'.format(save_folder, ax1_mid, ax2_mid))
-    dists = np.load('{}/npy/ab_dists_{}_{}.npy'.format(save_folder, ax1_mid, ax2_mid))
+    np.save('{}/npy/a_matchind_{}_{}.npy'.format(save_folder, ax1_mid, ax2_mid), amatch)
+    np.save('{}/npy/b_matchind_{}_{}.npy'.format(save_folder, ax1_mid, ax2_mid), bmatch)
 
     return amatch, bmatch, dists
 
