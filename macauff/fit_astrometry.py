@@ -878,9 +878,9 @@ class AstrometricCorrections:
             min_bright_tri_number = 1000
             min_area = min_bright_tri_number / data_bright_dens
 
-            download_trilegal_simulation('.', self.trifilterset, ax1_mid, ax2_mid, self.magnum,
-                                         self.coord_system, self.maglim_f, min_area, AV=1,
-                                         sigma_AV=0, total_objs=self.tri_num_faint)
+            download_trilegal_simulation(self.trifolder, self.trifilterset, ax1_mid, ax2_mid,
+                                         self.magnum, self.coord_system, self.maglim_f, min_area,
+                                         AV=1, sigma_AV=0, total_objs=self.tri_num_faint)
             os.system('mv {}/trilegal_auf_simulation.dat {}/{}_faint.dat'
                       .format(self.trifolder, self.trifolder,
                               self.triname.format(ax1_mid, ax2_mid)))
