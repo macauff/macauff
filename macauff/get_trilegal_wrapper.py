@@ -26,6 +26,9 @@ import time
 
 from astropy.units import UnitsError
 from astropy.coordinates import SkyCoord
+from astropy.io import fits
+from scipy.interpolate import RegularGridInterpolator
+import numpy as np
 
 
 __all__ = []
@@ -92,7 +95,7 @@ def get_trilegal(filename, ra, dec, folder='.', galactic=False,
     else:
         outfile = '{}/{}'.format(folder, filename)
     if AV is None:
-        AV = get_AV_infinity(l, b, frame='galactic')
+        AV = get_AV_infinity(l, b, frame='galactic')[0]
 
     trilegal_webcall(trilegal_version, l, b, area, binaries, AV, sigma_AV, filterset, magnum,
                      maglim, outfile, outfolder)
@@ -208,8 +211,8 @@ def trilegal_webcall(trilegal_version, l, b, area, binaries, AV, sigma_AV, filte
 
 def get_AV_infinity(ra, dec, frame='icrs'):
     """
-    Gets the A_V exctinction at infinity for a given line of sight.
-    Queries the NED database using ``curl``.
+    Gets the A_V exctinction at infinity for a given line of sight, using the
+    updated parameters from Schlafly & Finkbeiner 2011 (ApJ 737, 103), table 6.
 
     Parameters
     ----------
@@ -219,36 +222,72 @@ def get_AV_infinity(ra, dec, frame='icrs'):
         Sky coordinate.
     frame : string, optional
         Frame of input coordinates (e.g., ``'icrs', 'galactic'``)
+
+    Returns
+    -------
+    AV : float
+        Extinction at infinity as given by the SFD dust maps for the chosen sky
+        coordinates.
     """
-    coords = SkyCoord(ra, dec, unit='deg', frame=frame).transform_to('icrs')
+    coords = SkyCoord(ra, dec, unit='deg', frame=frame).transform_to('galactic')
 
-    rah, ram, ras = coords.ra.hms
-    decd, decm, decs = coords.dec.dms
-    if decd > 0:
-        decsign = '%2B'
-    else:
-        decsign = '%2D'
-    url = (
-        'http://ned.ipac.caltech.edu/cgi-bin/nph-calc?'
-        'in_csys=Equatorial&in_equinox=J2000.0&obs_epoch=2010&lon='+'%i' % rah +
-        '%3A'+'%i' % ram + '%3A' + '%05.2f' % ras + '&lat=%s' % decsign + '%i' % abs(decd) +
-        '%3A' + '%i' % abs(decm) + '%3A' + '%05.2f' % abs(decs) +
-        '&pa=0.0&out_csys=Equatorial&out_equinox=J2000.0')
+    l = coords.l.degree
+    b = coords.b.degree
 
-    tmpfile = '/tmp/nedsearch%s%s.html' % (ra, dec)
-    cmd = 'curl -s \'%s\' -o %s' % (url, tmpfile)
-    sp.Popen(cmd, shell=True).wait()
-    AV = None
-    with open(tmpfile, 'r') as f:
-        for line in f:
-            m = re.search(r'V \(0.54\)\s+(\S+)', line)
-            if m:
-                AV = float(m.group(1))
-    if AV is None:
-        print('Error accessing NED, url={}'.format(url))
-        with open(tmpfile) as f:
-            for line in f:
-                print(line)
+    ebv = sfd_ebv.get_sfd_ebv(l, b)
+    AV = 2.742 * ebv
 
-    os.remove(tmpfile)
     return AV
+
+
+class SFDEBV:
+    def __init__(self):
+        """
+        Load the necessary dust maps from Schlegel, Finkbeiner & Davis 1998
+        (ApJ, 500, 525) to extract E(B-V) at infinity.
+        """
+        data_ngp = fits.open(os.path.join(os.path.dirname(__file__),
+                                          'tests/data/SFD_dust_4096_ngp.fits'))[0].data
+        data_sgp = fits.open(os.path.join(os.path.dirname(__file__),
+                                          'tests/data/SFD_dust_4096_sgp.fits'))[0].data
+
+        xs, ys = np.meshgrid(np.arange(4096), np.arange(4096), indexing='ij', sparse=True)
+        self.f_interp_ngp = RegularGridInterpolator((np.arange(4096), np.arange(4096)), data_ngp,
+                                                    bounds_error=False, fill_value=None)
+        self.f_interp_sgp = RegularGridInterpolator((np.arange(4096), np.arange(4096)), data_sgp,
+                                                    bounds_error=False, fill_value=None)
+        self.n_ngp = 1
+        self.n_sgp = -1
+
+    def get_sfd_ebv(self, l, b):
+        """
+        Interpolate the grid of SFD dust maps to the desired coordinates.
+
+        Parameters
+        ----------
+        l : float or list or numpy.ndarray of floats
+            The Galactic longitudes of the places to evaluate extinction.
+        b : float or list or numpy.ndarray of floats
+            Galatic latitudes to evaluate E(B-V) at.
+
+        Returns
+        ebv : numpy.ndarray of floats
+            E(B-V) at each ``l``-``b`` pair.
+        """
+        l, b = np.atleast_1d(l), np.atleast_1d(b)
+        if np.all(l.shape == b.shape) and len(l.shape) > 1:
+            l, b = l.flatten(), b.flatten()
+        ebv = np.empty(len(l), float)
+        for q, n, f in zip([b >= 0, b < 0], [self.n_ngp, self.n_sgp],
+                           [self.f_interp_ngp, self.f_interp_sgp]):
+            if np.sum(q) > 0:
+                x = (2048 * np.sqrt(1 - n * np.sin(np.radians(b[q]))) *
+                     np.cos(np.radians(l[q])) + 2047.5)
+                y = (-2048 * n * np.sqrt(1 - n * np.sin(np.radians(b[q]))) *
+                     np.sin(np.radians(l[q])) + 2047.5)
+
+                ebv[q] = f(np.array([y, x]).T)
+        return ebv
+
+
+sfd_ebv = SFDEBV()

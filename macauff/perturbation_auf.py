@@ -961,7 +961,7 @@ def create_single_perturb_auf(tri_folder, auf_point, filt, r, dr, rho, drho, j0s
                 l, b = c.galactic.l.degree, c.galactic.b.degree
             else:
                 l, b = ax1, ax2
-            AV = get_AV_infinity(l, b, frame='galactic')
+            AV = get_AV_infinity(l, b, frame='galactic')[0]
             avs[j, k] = AV
     avs = avs.flatten()
     (dens_hist_tri, model_mags, model_mag_mids, model_mags_interval, _,
