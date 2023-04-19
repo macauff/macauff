@@ -8,6 +8,7 @@ import pandas as pd
 import numpy as np
 import pytest
 from numpy.testing import assert_allclose
+from astropy.coordinates import SkyCoord
 
 from ..parse_catalogue import csv_to_npy, npy_to_csv, rect_slice_npy, rect_slice_csv
 
@@ -92,10 +93,18 @@ class TestParseCatalogue:
         with pytest.raises(ValueError, match='cat_in_radec must given if process_uncerts is '):
             csv_to_npy('.', 'test_data.csv', '.', [0, 1, 2], [4, 5], 6, None, header=header,
                        process_uncerts=True, astro_sig_fits_filepath='test_sig_folder')
-        with pytest.raises(ValueError, match='If process_uncerts is True, cat_in_radec must '):
+        with pytest.raises(ValueError, match='mn_in_radec must given if process_uncerts is '):
             csv_to_npy('.', 'test_data.csv', '.', [0, 1, 2], [4, 5], 6, None, header=header,
                        process_uncerts=True, astro_sig_fits_filepath='test_sig_folder',
                        cat_in_radec='something else')
+        with pytest.raises(ValueError, match='If process_uncerts is True, cat_in_radec must '):
+            csv_to_npy('.', 'test_data.csv', '.', [0, 1, 2], [4, 5], 6, None, header=header,
+                       process_uncerts=True, astro_sig_fits_filepath='test_sig_folder',
+                       cat_in_radec='something else', mn_in_radec='something else')
+        with pytest.raises(ValueError, match='If process_uncerts is True, mn_in_radec must '):
+            csv_to_npy('.', 'test_data.csv', '.', [0, 1, 2], [4, 5], 6, None, header=header,
+                       process_uncerts=True, astro_sig_fits_filepath='test_sig_folder',
+                       cat_in_radec=False, mn_in_radec='something else')
 
         if os.path.exists('test_sig_folder'):
             os.system('rm -rf ./test_sig_folder')
@@ -108,12 +117,32 @@ class TestParseCatalogue:
         os.makedirs('test_sig_folder')
         np.save('test_sig_folder/m_sigs_array.npy', np.array([2]))
         np.save('test_sig_folder/n_sigs_array.npy', np.array([0.01]))
-        np.save('test_sig_folder/lmids.npy', np.array([10.0]))
-        np.save('test_sig_folder/bmids.npy', np.array([0.0]))
+        np.save('test_sig_folder/ax1_mids.npy', np.array([10.0]))
+        np.save('test_sig_folder/ax2_mids.npy', np.array([0.0]))
 
         csv_to_npy('.', 'test_data.csv', '.', [0, 1, 2], [4, 5], 6, None, header=header,
                    process_uncerts=True, astro_sig_fits_filepath='test_sig_folder',
-                   cat_in_radec=False)
+                   cat_in_radec=False, mn_in_radec=False)
+
+        astro = np.load('con_cat_astro.npy')
+        photo = np.load('con_cat_photo.npy')
+        best_index = np.load('magref.npy')
+
+        assert np.all(astro.shape == (self.N, 3))
+        assert np.all(photo.shape == (self.N, 2))
+        assert np.all(best_index.shape == (self.N,))
+        assert_allclose(astro[:, [0, 1]], self.data[:, [0, 1]])
+        assert_allclose(astro[:, 2], np.sqrt((2*self.data[:, 2])**2 + 0.01**2))
+        assert_allclose(photo, self.data[:, [4, 5]])
+        assert_allclose(best_index, self.data[:, 6])
+
+        a = SkyCoord(ra=[10.0], dec=[0.0], unit='deg', frame='icrs')
+        np.save('test_sig_folder/ax1_mids.npy', np.array([a.galactic.l.degree]))
+        np.save('test_sig_folder/ax2_mids.npy', np.array([a.galactic.b.degree]))
+
+        csv_to_npy('.', 'test_data.csv', '.', [0, 1, 2], [4, 5], 6, None, header=header,
+                   process_uncerts=True, astro_sig_fits_filepath='test_sig_folder',
+                   cat_in_radec=False, mn_in_radec=False)
 
         astro = np.load('con_cat_astro.npy')
         photo = np.load('con_cat_photo.npy')

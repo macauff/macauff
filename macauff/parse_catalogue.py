@@ -17,7 +17,7 @@ __all__ = ['csv_to_npy', 'rect_slice_npy', 'npy_to_csv', 'rect_slice_csv']
 
 def csv_to_npy(input_folder, input_filename, output_folder, astro_cols, photo_cols, bestindex_col,
                chunk_overlap_col, header=False, process_uncerts=False, astro_sig_fits_filepath=None,
-               cat_in_radec=None):
+               cat_in_radec=None, mn_in_radec=None):
     '''
     Convert a .csv file representation of a photometric catalogue into the
     appropriate .npy binary files used in the cross-matching process.
@@ -66,8 +66,15 @@ def csv_to_npy(input_folder, input_filename, output_folder, astro_cols, photo_co
         ``True`` or ``False``, indicating whether the catalogue being processed
         is in RA-Dec coordinates or not. If ``True``, coordinates of mid-points
         for derivations of ``m`` and ``n`` for quoted-fit uncertainty relations
-        will be converted from Right Ascension and Declination to Galactic
-        Longitude and Latitude for the purposes of nearest-neighbour use.
+        will be converted from Galactic Longitude and Latitude to Right Ascension
+        and Declination for the purposes of nearest-neighbour use, if
+        ``mn_in_radec`` is ``False`` (and m-n coordinates are in l/b).
+    mn_in_radec : boolean, optional
+        If ``process_uncerts`` is ``True``, must be provided, and similar to
+        ``cat_in_radec`` is a flag indcating whether the coordinates used to
+        compute m-n scaling relations are in RA/Dec or not. If ``mn_in_radec``
+        disagrees with ``cat_in_radec`` then m-n coordinates will be converted
+        to the coordinate system of the catalogue.
     '''
     if not (process_uncerts is True or process_uncerts is False):
         raise ValueError("process_uncerts must either be True or False.")
@@ -75,8 +82,12 @@ def csv_to_npy(input_folder, input_filename, output_folder, astro_cols, photo_co
         raise ValueError("astro_sig_fits_filepath must given if process_uncerts is True.")
     if process_uncerts and cat_in_radec is None:
         raise ValueError("cat_in_radec must given if process_uncerts is True.")
+    if process_uncerts and mn_in_radec is None:
+        raise ValueError("mn_in_radec must given if process_uncerts is True.")
     if process_uncerts and not (cat_in_radec is True or cat_in_radec is False):
         raise ValueError("If process_uncerts is True, cat_in_radec must either be True or False.")
+    if process_uncerts and not (mn_in_radec is True or mn_in_radec is False):
+        raise ValueError("If process_uncerts is True, mn_in_radec must either be True or False.")
     if process_uncerts and not os.path.exists(astro_sig_fits_filepath):
         raise ValueError("process_uncerts is True but astro_sig_fits_filepath does not exist. "
                          "Please ensure file path is correct.")
@@ -99,14 +110,20 @@ def csv_to_npy(input_folder, input_filename, output_folder, astro_cols, photo_co
         m_sigs = np.load('{}/m_sigs_array.npy'.format(astro_sig_fits_filepath))
         n_sigs = np.load('{}/n_sigs_array.npy'.format(astro_sig_fits_filepath))
         mn_coords = np.empty((len(m_sigs), 2), float)
-        mn_coords[:, 0] = np.load('{}/lmids.npy'.format(astro_sig_fits_filepath))
-        mn_coords[:, 1] = np.load('{}/bmids.npy'.format(astro_sig_fits_filepath))
-        if cat_in_radec:
+        mn_coords[:, 0] = np.load('{}/ax1_mids.npy'.format(astro_sig_fits_filepath))
+        mn_coords[:, 1] = np.load('{}/ax2_mids.npy'.format(astro_sig_fits_filepath))
+        if cat_in_radec and not mn_in_radec:
             # Convert mn_coords to RA/Dec if catalogue is in Equatorial coords.
             from astropy.coordinates import SkyCoord
             a = SkyCoord(l=mn_coords[:, 0], b=mn_coords[:, 1], unit='deg', frame='galactic')
             mn_coords[:, 0] = a.icrs.ra.degree
             mn_coords[:, 1] = a.icrs.dec.degree
+        if not cat_in_radec and mn_in_radec:
+            # Convert mn_coords to l/b if catalogue is in Galactic coords.
+            from astropy.coordinates import SkyCoord
+            a = SkyCoord(ra=mn_coords[:, 0], dec=mn_coords[:, 1], unit='deg', frame='icrs')
+            mn_coords[:, 0] = a.galactic.l.degree
+            mn_coords[:, 1] = a.galactic.b.degree
 
     used_cols = np.concatenate((astro_cols, photo_cols, [bestindex_col]))
     if chunk_overlap_col is not None:
