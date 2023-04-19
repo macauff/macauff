@@ -750,4 +750,12 @@ def test_f90_perm_comb():
 
 def test_factorial():
     for k in range(21):
-        assert np.math.factorial(k) == cpf.factorial(k)
+        assert np.math.factorial(k) == cpf.factorial(k, k-1)
+        assert np.math.factorial(k) == cpf.factorial(k, k)
+
+    for k in range(21):
+        assert cpf.factorial(k, 1) == k
+
+    for k in range(21):
+        for l in range(1, k+1):
+            assert cpf.factorial(k, l) == np.math.factorial(k) / np.math.factorial(k - l)
