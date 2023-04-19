@@ -19,6 +19,7 @@ except:
 from .perturbation_auf import make_perturb_aufs
 from .group_sources import make_island_groupings
 from .group_sources_fortran import group_sources_fortran as gsf
+from .misc_functions import StageData
 from .misc_functions_fortran import misc_functions_fortran as mff
 from .photometric_likelihood import compute_photometric_likelihoods
 from .counterpart_pairing import source_pairing
@@ -1708,6 +1709,8 @@ class CrossMatch():
             print('{} Rank {}, chunk {}: Loading empirical perturbation AUFs for catalogue "a"...'
                   .format(t, self.rank, self.chunk_id))
             sys.stdout.flush()
+            self.a_modelrefinds = np.load('{}/modelrefinds.npy'.format(self.a_auf_folder_path),
+                                          mmap_mode='r')
 
         b_expected_files = 6 + len(self.b_auf_region_points) + (
             files_per_auf_sim * len(self.b_filt_names) * len(self.b_auf_region_points))
@@ -1780,6 +1783,8 @@ class CrossMatch():
             print('{} Rank {}, chunk {}: Loading empirical perturbation AUFs for catalogue "b"...'
                   .format(t, self.rank, self.chunk_id))
             sys.stdout.flush()
+            self.b_modelrefinds = np.load('{}/modelrefinds.npy'.format(self.b_auf_folder_path),
+                                          mmap_mode='r')
 
     def group_sources(self, files_per_grouping, group_func=make_island_groupings):
         '''
@@ -1847,6 +1852,20 @@ class CrossMatch():
             print('{} Rank {}, chunk {}: Loading catalogue islands and overlaps...'
                   .format(t, self.rank, self.chunk_id))
             sys.stdout.flush()
+            if os.path.isfile('{}/reject/reject_a.npy'.format(self.joint_folder_path)):
+                lenrejecta = len(np.load('{}/reject/reject_a.npy'.format(self.joint_folder_path),
+                                         mmap_mode='r'))
+            else:
+                lenrejecta = 0
+            if os.path.isfile('{}/reject/reject_b.npy'.format(self.joint_folder_path)):
+                lenrejectb = len(np.load('{}/reject/reject_b.npy'.format(self.joint_folder_path),
+                                         mmap_mode='r'))
+            else:
+                lenrejectb = 0
+            self.group_sources_data = StageData(
+                ablen=None, bblen=None, ainds=None, binds=None, asize=None, bsize=None, aflen=None,
+                bflen=None, alist=None, blist=None, agrplen=None, bgrplen=None,
+                lenrejecta=lenrejecta, lenrejectb=lenrejectb)
 
     def calculate_phot_like(self, files_per_phot, phot_like_func=compute_photometric_likelihoods):
         '''
@@ -1901,6 +1920,10 @@ class CrossMatch():
             print('{} Rank {}, chunk {}: Loading photometric priors and likelihoods...'
                   .format(t, self.rank, self.chunk_id))
             sys.stdout.flush()
+            self.phot_like_data = StageData(
+                abinsarray=None, abinlengths=None, bbinsarray=None, bbinlengths=None,
+                a_sky_inds=None, b_sky_inds=None, c_priors=None, c_array=None, fa_priors=None,
+                fa_array=None, fb_priors=None, fb_array=None)
 
     def _calculate_cf_areas(self):
         '''

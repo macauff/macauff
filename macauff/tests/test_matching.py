@@ -1523,13 +1523,13 @@ class TestInputs:
         y[:, 11] = np.random.default_rng(seed=5673523).choice(4, size=len(x), replace=True)
         y[:, 12] = np.random.default_rng(seed=45645132234).choice(2, size=len(x), replace=True)
         np.savetxt('file_1.csv', y, delimiter=',')
-        # Check for outputs
-        cm.chunk_id = 1
-        # Force the removal of ancillary checkpoints.
+        # Check for outputs, but first force the removal of ancillary checkpoints.
         if os.path.isfile('ac_folder/npy/snr_mag_params.npy'):
             os.remove('ac_folder/npy/snr_mag_params.npy')
         # Using the ORIGINAL cat_a_params means we don't fit for corrections
         # to catalogue 'a'.
+        cm = CrossMatch(os.path.join(os.path.dirname(__file__), 'data'), use_memmap_files=True)
+        cm.chunk_id = 1
         cm._initialise_chunk(os.path.join(os.path.dirname(__file__),
                              'data/crossmatch_params.txt'),
                              os.path.join(os.path.dirname(__file__),
@@ -1564,6 +1564,8 @@ class TestInputs:
         if os.path.isfile('ac_folder/npy/snr_mag_params.npy'):
             os.remove('ac_folder/npy/snr_mag_params.npy')
         # Swapped a+b to test a_* versions of things
+        cm = CrossMatch(os.path.join(os.path.dirname(__file__), 'data'), use_memmap_files=True)
+        cm.chunk_id = 1
         cm._initialise_chunk(os.path.join(os.path.dirname(__file__),
                              'data/crossmatch_params.txt'),
                              os.path.join(os.path.dirname(__file__),

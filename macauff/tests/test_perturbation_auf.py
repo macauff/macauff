@@ -101,6 +101,10 @@ class TestCreatePerturbAUF:
 
         with pytest.warns(UserWarning, match='Incorrect number of files in catalogue "a"'):
             self.cm.create_perturb_auf(self.files_per_auf_sim)
+        # Delete reference to modelrefinds as passed back to self.cm to
+        # allow for its deallocation and deletion below.
+        del self.cm.a_modelrefinds
+        del self.cm.b_modelrefinds
 
         # Now create fake files to simulate catalogue "a" having the right files.
         # For 2 AUF pointings this comes to 8 + 2*N_filt*files_per_auf_sim files.
@@ -111,6 +115,7 @@ class TestCreatePerturbAUF:
         # This should still return the same warning, just for catalogue "b" now.
         with pytest.warns(UserWarning) as record:
             self.cm.create_perturb_auf(self.files_per_auf_sim)
+        del self.cm.b_modelrefinds
         assert len(record) == 1
         assert 'Incorrect number of files in catalogue "b"' in record[0].message.args[0]
 
@@ -128,6 +133,7 @@ class TestCreatePerturbAUF:
         # number of files (zero) in the folder.
         self.cm.chunk_id = 1
         self.cm.create_perturb_auf(self.files_per_auf_sim)
+        del self.cm.a_modelrefinds
         output = capsys.readouterr().out
         assert 'Loading empirical perturbation AUFs for catalogue "a"' not in output
         assert 'Loading empirical perturbation AUFs for catalogue "b"' in output
