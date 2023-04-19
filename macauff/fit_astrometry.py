@@ -1628,7 +1628,7 @@ def create_densities(ax1_mid, ax2_mid, b, minmag, maxmag, lon_slice, lat_slice, 
     ax2_max : float
         The maximum latitude of the box of the cutout region.
     search_radius : float
-        Radius, in arcseconds, around which to calculate the density of objects.
+        Radius, in degrees, around which to calculate the density of objects.
         Smaller values will allow for more fluctuations and handle smaller scale
         variation better, but be subject to low-number statistics.
     n_pool : integer
@@ -1649,7 +1649,7 @@ def create_densities(ax1_mid, ax2_mid, b, minmag, maxmag, lon_slice, lat_slice, 
     Returns
     -------
     Narray : numpy.ndarray
-        The density of objects within ``search_radius`` arcseconds of each object
+        The density of objects within ``search_radius`` degrees of each object
         in catalogue ``b``.
 
     """
@@ -1695,7 +1695,7 @@ def create_densities(ax1_mid, ax2_mid, b, minmag, maxmag, lon_slice, lat_slice, 
         mag_cut_ucoords = mag_cut_cat.realize_frame(mag_cut_urepr)
         mag_cut_kdt = _get_cart_kdt(mag_cut_ucoords)
 
-        r = (2 * np.sin(Angle(search_radius * u.arcsecond) / 2.0)).value
+        r = (2 * np.sin(Angle(search_radius * u.degree) / 2.0)).value
         overlap_number = np.empty(len(b), int)
 
         pool = multiprocessing.Pool(n_pool)
@@ -1708,7 +1708,7 @@ def create_densities(ax1_mid, ax2_mid, b, minmag, maxmag, lon_slice, lat_slice, 
         pool.close()
         pool.join()
 
-        area = paf.get_circle_area_overlap(b[:, ax1_ind], b[:, ax2_ind], search_radius/3600,
+        area = paf.get_circle_area_overlap(b[:, ax1_ind], b[:, ax2_ind], search_radius,
                                            ax1_min, ax1_max, ax2_min, ax2_max)
 
         Narray = overlap_number / area

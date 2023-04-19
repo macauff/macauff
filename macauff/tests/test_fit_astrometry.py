@@ -96,7 +96,7 @@ class TestAstroCorrection:
         sigslice = np.array([0.1, 0.1, 0.1, 0.1])
 
         _kwargs = {
-            'psf_fwhm': 6.1, 'numtrials': 10000, 'nn_radius': 30, 'dens_search_radius': 900,
+            'psf_fwhm': 6.1, 'numtrials': 10000, 'nn_radius': 30, 'dens_search_radius': 0.25,
             'save_folder': 'ac_save_folder', 'trifolder': 'tri_folder', 'triname': 'trilegal_sim',
             'maglim_f': 25, 'magnum': 11, 'tri_num_faint': 1500000,
             'trifilterset': '2mass_spitzer_wise', 'trifiltname': 'W1', 'gal_wav_micron': 3.35,
@@ -178,7 +178,7 @@ class TestAstroCorrection:
         chunks = None
         ax_dimension = 1
         ac = AstrometricCorrections(
-            psf_fwhm=6.1, numtrials=1000, nn_radius=30, dens_search_radius=900,
+            psf_fwhm=6.1, numtrials=1000, nn_radius=30, dens_search_radius=0.25,
             save_folder='ac_save_folder', trifolder='tri_folder', triname='trilegal_sim_{}_{}',
             maglim_f=25, magnum=11, tri_num_faint=1500000, trifilterset='2mass_spitzer_wise',
             trifiltname='W1', gal_wav_micron=3.35, gal_ab_offset=2.699, gal_filtname='wise2010-W1',
@@ -238,7 +238,7 @@ class TestAstroCorrection:
                 chunks = [2017]
             ax_dimension = 2
         ac = AstrometricCorrections(
-            psf_fwhm=6.1, numtrials=1000, nn_radius=30, dens_search_radius=900,
+            psf_fwhm=6.1, numtrials=1000, nn_radius=30, dens_search_radius=0.25,
             save_folder='ac_save_folder', trifolder='tri_folder', triname='trilegal_sim_{}_{}',
             maglim_f=25, magnum=11, tri_num_faint=1500000, trifilterset='2mass_spitzer_wise',
             trifiltname='W1', gal_wav_micron=3.35, gal_ab_offset=2.699, gal_filtname='wise2010-W1',
