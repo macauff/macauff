@@ -6,6 +6,7 @@ component of the astrometric uncertainty function.
 
 import os
 import sys
+import signal
 import numpy as np
 from astropy.coordinates import SkyCoord
 
@@ -637,14 +638,49 @@ def download_trilegal_simulation(tri_folder, tri_filter_set, ax1, ax2, mag_num, 
         setting the fractional scaling around `AV` in which to randomise
         extinction values.
     '''
+    class TimeoutException(Exception):
+        pass
+
+    def timeout_handler(signum, frame):
+        raise TimeoutException
+
     areaflag = 0
     triarea = min(10, min_area)
     tri_name = 'trilegal_auf_simulation'
     galactic_flag = True if region_frame == 'galactic' else False
+    # To avoid a loop where we start at some area, halve repeatedly until
+    # the API call limit is satisfied, but then get nobjs < total_objs and
+    # try to scale back up again only to time out, only allow that to happen
+    # if we haven't halved our area within the loop at all.
+    area_halved = False
     while areaflag == 0:
-        _ = get_trilegal(tri_name, ax1, ax2, folder=tri_folder, galactic=galactic_flag,
-                         filterset=tri_filter_set, area=triarea, maglim=mag_lim, magnum=mag_num,
-                         AV=AV, sigma_AV=sigma_AV)
+        import timeit
+        start = timeit.default_timer()
+        result = "timeout"
+        try:
+            while result == "timeout":
+                signal.signal(signal.SIGALRM, timeout_handler)
+                # Set a 10 minute "timer" to raise an error if get_trilegal takes
+                # longer than, as this indicates the API call has run out of CPU
+                # time on the other end. As get_trilegal has an internal "busy"
+                # tone, we need to reset this alarm for each call, if we don't
+                # get a "good" result from the function call.
+                signal.alarm(10*60)
+                av_inf, result = get_trilegal(
+                    tri_name, ax1, ax2, folder=tri_folder, galactic=galactic_flag,
+                    filterset=tri_filter_set, area=triarea, maglim=mag_lim, magnum=mag_num, AV=AV,
+                    sigma_AV=sigma_AV)
+        except TimeoutException:
+            triarea /= 2
+            area_halved = True
+            end = timeit.default_timer()
+            print('TRILEGAL call time: {:.2f}'.format(end-start))
+            print("Timed out, halving area")
+            continue
+        else:
+            end = timeit.default_timer()
+            print('TRILEGAL call time: {:.2f}'.format(end-start))
+            signal.alarm(0)
         f = open('{}/{}.dat'.format(tri_folder, tri_name), "r")
         contents = f.readlines()
         f.close()
@@ -655,19 +691,35 @@ def download_trilegal_simulation(tri_folder, tri_filter_set, ax1, ax2, mag_num, 
         # about total_objs stars and come out of area increase loop --
         # simulations can't be more than 10 sq deg, so accept if that's as large
         # as we can go.
-        if nobjs < 10000:
+        if nobjs < 10000 and not area_halved:
+            print("Too few numbers, increasing area...")
             triarea = min(10, triarea*10)
+            accept_results = False
             # If we can't multiple by 10 since we get to 10 sq deg area, then
             # we can just quit immediately since we can't do any better.
             if triarea == 10:
                 areaflag = 1
-        else:
+        # If number counts are too low for either nobjs < X comparison but
+        # the area had to be reduced by 50% previously, just accept the area
+        # we got, since it's basically the best the TRILEGAL API will provide.
+        elif nobjs < total_objs and not area_halved:
+            print("Scaling area to total_objs counts...")
             triarea = min(10, triarea / nobjs * total_objs)
             areaflag = 1
-        os.system('rm {}/{}.dat'.format(tri_folder, tri_name))
-    av_inf = get_trilegal(tri_name, ax1, ax2, folder=tri_folder, galactic=galactic_flag,
-                          filterset=tri_filter_set, area=triarea, maglim=mag_lim, magnum=mag_num,
-                          AV=AV, sigma_AV=sigma_AV)
+            accept_results = False
+        else:
+            print("Sufficient counts or area halved, accepting run...")
+            areaflag = 1
+            accept_results = True
+        if not accept_results:
+            os.system('rm {}/{}.dat'.format(tri_folder, tri_name))
+    if not accept_results:
+        result = "timeout"
+        while result == "timeout":
+            av_inf, result = get_trilegal(
+                tri_name, ax1, ax2, folder=tri_folder, galactic=galactic_flag,
+                filterset=tri_filter_set, area=triarea, maglim=mag_lim, magnum=mag_num, AV=AV,
+                sigma_AV=sigma_AV)
     f = open('{}/{}.dat'.format(tri_folder, tri_name), "r")
     contents = f.readlines()
     f.close()

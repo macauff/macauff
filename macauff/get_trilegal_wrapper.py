@@ -74,6 +74,9 @@ def get_trilegal(filename, ra, dec, folder='.', galactic=False,
         The extinction at infinity of the particular TRILEGAL call, if
         ``AV`` as passed into the function is ``None``, otherwise just
         returns the input value.
+    result : string
+        ``timeout`` or ``good`` depending on whether the run was successful
+        or not.
     """
     frame = 'galactic' if galactic else 'icrs'
     try:
@@ -95,10 +98,10 @@ def get_trilegal(filename, ra, dec, folder='.', galactic=False,
     if AV is None:
         AV = get_AV_infinity(l, b, frame='galactic')[0]
 
-    trilegal_webcall(trilegal_version, l, b, area, binaries, AV, sigma_AV, filterset, magnum,
-                     maglim, outfile, outfolder)
+    result = trilegal_webcall(trilegal_version, l, b, area, binaries, AV, sigma_AV, filterset,
+                              magnum, maglim, outfile, outfolder)
 
-    return AV
+    return AV, result
 
 
 def trilegal_webcall(trilegal_version, l, b, area, binaries, AV, sigma_AV, filterset, magnum,
@@ -132,6 +135,12 @@ def trilegal_webcall(trilegal_version, l, b, area, binaries, AV, sigma_AV, filte
         Output filename.
     outfolder : string
         Output filename's containing folder.
+
+    Returns
+    -------
+    string
+        ``timeout`` or ``good`` depending on whether the run was successful
+        or not.
     """
     webserver = 'http://stev.oapd.inaf.it'
     args = [l, b, area, AV, sigma_AV, filterset, maglim, magnum, binaries]
@@ -203,8 +212,14 @@ def trilegal_webcall(trilegal_version, l, b, area, binaries, AV, sigma_AV, filte
             else:
                 print('Server busy, trying again in 2 minutes')
                 time.sleep(120)
+                # The way the "breakout" return calls work now we don't loop
+                # within trilegal_webcall any more, but the loops and if
+                # statements are left in for backwards compatibility.
+                return "timeout"
     sp.Popen('mv {}/{} {}'.format(outfolder, filename, outfile), shell=True).wait()
     print('results copied to {}'.format(outfile))
+
+    return "good"
 
 
 def get_AV_infinity(ra, dec, frame='icrs'):
