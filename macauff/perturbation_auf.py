@@ -443,7 +443,7 @@ def make_perturb_aufs(auf_folder, cat_folder, filters, auf_points, r, dr, rho,
                 ax2_list = np.linspace(ax2_min, ax2_max, 7)
                 if fit_gal_flag:
                     Narray = create_single_perturb_auf(
-                        ax_folder, auf_points, filters[j], r, dr, rho, drho, j0s, num_trials,
+                        ax_folder, auf_points[i], filters[j], r, dr, rho, drho, j0s, num_trials,
                         psf_fwhms[j], tri_filt_names[j], dens_mags[j], a_photo, localN, d_mag,
                         delta_mag_cuts, dd_params, l_cut, run_fw, run_psf, snr_mag_params[j],
                         al_avs[j], auf_region_frame, ax1_list, ax2_list, fit_gal_flag, cmau_array,
@@ -451,7 +451,7 @@ def make_perturb_aufs(auf_folder, cat_folder, filters, auf_points, r, dr, rho,
                         filter_names[j], al_avs[j])
                 else:
                     Narray = create_single_perturb_auf(
-                        ax_folder, auf_points, filters[j], r, dr, rho, drho, j0s, num_trials,
+                        ax_folder, auf_points[i], filters[j], r, dr, rho, drho, j0s, num_trials,
                         psf_fwhms[j], tri_filt_names[j], dens_mags[j], a_photo, localN, d_mag,
                         delta_mag_cuts, dd_params, l_cut, run_fw, run_psf, snr_mag_params[j],
                         al_avs[j], auf_region_frame, ax1_list, ax2_list, fit_gal_flag)
@@ -1089,7 +1089,7 @@ def create_single_perturb_auf(tri_folder, auf_point, filt, r, dr, rho, drho, j0s
     R = 1.185 * psf_fwhm
 
     s_flux = 10**(-1/2.5 * mag_array)
-    lb_ind = mff.find_nearest_point(auf_point[:, 0], auf_point[:, 1],
+    lb_ind = mff.find_nearest_point(auf_point[0], auf_point[1],
                                     snr_mag_params[:, 3], snr_mag_params[:, 4])[0]
     a_snr = snr_mag_params[lb_ind, 0]
     b_snr = snr_mag_params[lb_ind, 1]
