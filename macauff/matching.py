@@ -1078,10 +1078,23 @@ class CrossMatch():
             if self.include_perturb_auf or correct_astro:
                 for check_flag in ['tri_set_name', 'tri_filt_names', 'tri_filt_num',
                                    'download_tri', 'psf_fwhms', 'run_fw_auf', 'run_psf_auf',
-                                   'snr_mag_params_path', 'tri_maglim_faint', 'tri_num_faint']:
+                                   'tri_maglim_faint', 'tri_num_faint', 'gal_al_avs']:
                     if check_flag not in config:
                         raise ValueError("Missing key {} from catalogue {} metadata file.".format(
                                          check_flag, catname))
+
+                # Set as a list of floats
+                for var in ['gal_al_avs']:
+                    a = config[var].split(' ')
+                    try:
+                        b = np.array([float(f) for f in a])
+                    except ValueError:
+                        raise ValueError('{} should be a list of floats in catalogue '
+                                         '{} metadata file'.format(var, catname))
+                    if len(b) != len(getattr(self, '{}filt_names'.format(flag))):
+                        raise ValueError('{}{} and {}filt_names should contain the same '
+                                         'number of entries.'.format(flag, var, flag))
+                    setattr(self, '{}{}'.format(flag, var), b)
 
                 setattr(self, '{}download_tri'.format(flag), self._str2bool(config['download_tri']))
                 setattr(self, '{}tri_set_name'.format(flag), config['tri_set_name'])
@@ -1169,17 +1182,6 @@ class CrossMatch():
                         raise ValueError("tri_maglim{} in catalogue {} must be a float."
                                          .format(suffix, catname))
 
-                a = config['dens_mags'].split()
-                try:
-                    b = np.array([float(f) for f in a])
-                except ValueError:
-                    raise ValueError('dens_mags should be a list of floats in '
-                                     'catalogue {} metadata file.'.format(catname))
-                if len(b) != len(getattr(self, '{}filt_names'.format(flag))):
-                    raise ValueError('{}dens_mags and {}filt_names should contain the '
-                                     'same number of entries.'.format(flag, flag))
-                setattr(self, '{}dens_mags'.format(flag), b)
-
                 if not correct_astro:
                     if flag == "a_":
                         fit_gal_flag = self.a_fit_gal_flag
@@ -1187,12 +1189,12 @@ class CrossMatch():
                         fit_gal_flag = self.b_fit_gal_flag
                 if correct_astro or fit_gal_flag:
                     for check_flag in ['gal_wavs', 'gal_zmax', 'gal_nzs',
-                                       'gal_aboffsets', 'gal_filternames', 'gal_al_avs']:
+                                       'gal_aboffsets', 'gal_filternames']:
                         if check_flag not in config:
                             raise ValueError("Missing key {} from catalogue {} metadata file."
                                              .format(check_flag, catname))
                     # Set all lists of floats
-                    for var in ['gal_wavs', 'gal_zmax', 'gal_aboffsets', 'gal_al_avs']:
+                    for var in ['gal_wavs', 'gal_zmax', 'gal_aboffsets']:
                         a = config[var].split(' ')
                         try:
                             b = np.array([float(f) for f in a])
@@ -1672,19 +1674,18 @@ class CrossMatch():
                            'tri_num_faint': self.a_tri_num_faint,
                            'tri_set_name': self.a_tri_set_name,
                            'tri_filt_num': self.a_tri_filt_num,
-                           'auf_region_frame': self.a_auf_region_frame}
+                           'auf_region_frame': self.a_auf_region_frame,
+                           'al_avs': self.a_gal_al_avs, 'fit_gal_flag': self.a_fit_gal_flag}
                 if self.a_run_psf_auf:
                     _kwargs = dict(_kwargs, **{'dd_params': self.a_dd_params,
                                                'l_cut': self.a_l_cut})
                 if self.a_fit_gal_flag:
                     _kwargs = dict(_kwargs,
-                                   **{'fit_gal_flag': self.a_fit_gal_flag,
-                                      'cmau_array': self.gal_cmau_array, 'wavs': self.a_gal_wavs,
+                                   **{'cmau_array': self.gal_cmau_array, 'wavs': self.a_gal_wavs,
                                       'z_maxs': self.a_gal_zmax, 'nzs': self.a_gal_nzs,
                                       'ab_offsets': self.a_gal_aboffsets,
                                       'filter_names': self.a_gal_filternames,
-                                      'al_avs': self.a_gal_al_avs, 'alpha0': self.gal_alpha0,
-                                      'alpha1': self.gal_alpha1,
+                                      'alpha0': self.gal_alpha0, 'alpha1': self.gal_alpha1,
                                       'alpha_weight': self.gal_alphaweight})
                 else:
                     _kwargs = dict(_kwargs, **{'fit_gal_flag': self.a_fit_gal_flag})
@@ -1744,20 +1745,19 @@ class CrossMatch():
                            'tri_num_faint': self.b_tri_num_faint,
                            'tri_set_name': self.b_tri_set_name,
                            'tri_filt_num': self.b_tri_filt_num,
-                           'auf_region_frame': self.b_auf_region_frame}
+                           'auf_region_frame': self.b_auf_region_frame,
+                           'al_avs': self.b_gal_al_avs, 'fit_gal_flag': self.b_fit_gal_flag}
                 if self.b_run_psf_auf:
                     _kwargs = dict(_kwargs, **{'dd_params': self.b_dd_params,
                                                'l_cut': self.b_l_cut})
 
                 if self.b_fit_gal_flag:
                     _kwargs = dict(_kwargs,
-                                   **{'fit_gal_flag': self.b_fit_gal_flag,
-                                      'cmau_array': self.gal_cmau_array, 'wavs': self.b_gal_wavs,
+                                   **{'cmau_array': self.gal_cmau_array, 'wavs': self.b_gal_wavs,
                                       'z_maxs': self.b_gal_zmax, 'nzs': self.b_gal_nzs,
                                       'ab_offsets': self.b_gal_aboffsets,
                                       'filter_names': self.b_gal_filternames,
-                                      'al_avs': self.b_gal_al_avs, 'alpha0': self.gal_alpha0,
-                                      'alpha1': self.gal_alpha1,
+                                      'alpha0': self.gal_alpha0, 'alpha1': self.gal_alpha1,
                                       'alpha_weight': self.gal_alphaweight})
                 else:
                     _kwargs = dict(_kwargs, **{'fit_gal_flag': self.b_fit_gal_flag})

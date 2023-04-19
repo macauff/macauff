@@ -31,6 +31,8 @@ tri_num_faint = 1500000
 # Galaxy Perturbation AUF parameters
 fit_gal_flag = no
 
+gal_al_avs = 1.002 0.789 0.589
+
 # AUF region definition - either "rectangle" for NxM evenly spaced grid points, or "points" to define a list of two-point tuple coordinates, separated by a comma
 auf_region_type = rectangle
 # Frame of the coordinates must be specified -- either "equatorial" or "galactic"
