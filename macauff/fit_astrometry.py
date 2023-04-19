@@ -286,10 +286,10 @@ class AstrometricCorrections:
             self.mag_names = mag_names
             self.best_mag_index = best_mag_index
         else:
-            # np.loadtxt will load in pos_and_err or pos_and_err, mag_ind,
+            # np.genfromtxt will load in pos_and_err or pos_and_err, mag_ind,
             # mag_unc_ind order for the two catalogues. Each will effectively
             # change its ordering, since we then load [0] for pos_and_err[0][0],
-            # etc. for all options. These need saving for np.loadtxt but
+            # etc. for all options. These need saving for np.genfromtxt but
             # also for obtaining the correct column in the resulting sub-set of
             # the loaded csv file.
             self.a_cols = np.array(pos_and_err_indices[0])
@@ -1587,7 +1587,7 @@ class AstrometricCorrections:
             x = np.load(name)
         else:
             cols = self.a_cols if cat_type == 'a' else self.b_cols
-            x = np.loadtxt(name, delimiter=',', usecols=cols)
+            x = np.genfromtxt(name, delimiter=',', usecols=cols)
 
         return x
 
