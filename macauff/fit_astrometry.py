@@ -652,7 +652,7 @@ class AstrometricCorrections:
                 ax.set_title('{} = {}, {} = {}, {}\na = {:.2e}, b = {:.2e}, c = {:.2e}'
                              .format(ax1_name, ax1_mid, ax2_name, ax2_mid, self.mag_names[j],
                                      a, b, c),
-                             fontsize=28)
+                             fontsize=15)
 
                 if usetex:
                     ax.set_xlabel('log$_{10}$(S)')
