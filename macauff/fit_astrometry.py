@@ -413,7 +413,7 @@ class AstrometricCorrections:
                          'silver']
 
         for index_, list_of_things in enumerate(zip(*zip_list)):
-            if not np.all(abc_array[:, index_, :] == [-1, -1, -1, -1, -1]):
+            if not (m_sigs[index_] == -1 and n_sigs[index_] == -1):
                 continue
             print('Running astrometry fits for sightline {}/{}...'.format(
                 index_+1, len(self.ax1_mids)))
@@ -474,11 +474,18 @@ class AstrometricCorrections:
                 self.ax_b.set_ylabel(r'Fit astrometric sigma / "')
             self.finalise_summary_plot()
 
-    def make_ax_coords(self):
+    def make_ax_coords(self, check_b_only=False):
         """
         Derive the unique ax1-ax2 combinations used in fitting astrometry, and
         calculate corner coordinates based on the size of the box and its
         central coordinates.
+
+        Parameters
+        ==========
+        check_b_only : boolean, optional
+            Overloadable flag for cases where we can ignore catalogue 'a' and
+            only need to check for catalogue 'b' existing if pregenerate_cutouts
+            is True.
         """
         # If ax1 and ax2 are given as one-dimensional arrays, we need to
         # propagate those into two-dimensional grids first. Otherwise we
@@ -543,21 +550,25 @@ class AstrometricCorrections:
                 else:
                     chunk, = list_of_things
                     cat_args = (chunk,)
-                if not os.path.isfile(self.a_cat_name.format(*cat_args)):
-                    raise ValueError("If pregenerate_cutouts is 'True' all files must "
-                                     "exist already, but {} does not.".format(
-                                         self.a_cat_name.format(*cat_args)))
+                if not check_b_only:
+                    if not os.path.isfile(self.a_cat_name.format(*cat_args)):
+                        raise ValueError("If pregenerate_cutouts is 'True' all files must "
+                                         "exist already, but {} does not.".format(
+                                             self.a_cat_name.format(*cat_args)))
                 if not os.path.isfile(self.b_cat_name.format(*cat_args)):
                     raise ValueError("If pregenerate_cutouts is 'True' all files must "
                                      "exist already, but {} does not.".format(
                                          self.b_cat_name.format(*cat_args)))
                 # Check for both files, but assume they are the same size
                 # for ax1_min et al. purposes.
-                a = self.load_catalogue('a', cat_args)
-                self.ax1_mins[i] = np.amin(a[:, self.pos_and_err_indices[0][0]])
-                self.ax1_maxs[i] = np.amax(a[:, self.pos_and_err_indices[0][0]])
-                self.ax2_mins[i] = np.amin(a[:, self.pos_and_err_indices[0][1]])
-                self.ax2_maxs[i] = np.amax(a[:, self.pos_and_err_indices[0][1]])
+                b = self.load_catalogue('b', cat_args)
+                # Handle "minimum" longitude on the interval [-pi, +pi], such that
+                # if data straddles the 0-360 boundary we don't return 0 and 360
+                # for min and max values.
+                self.ax1_mins[i], self.ax1_maxs[i] = min_max_lon(
+                    b[:, self.pos_and_err_indices[1][0]])
+                self.ax2_mins[i] = np.amin(b[:, self.pos_and_err_indices[1][1]])
+                self.ax2_maxs[i] = np.amax(b[:, self.pos_and_err_indices[1][1]])
 
         np.save('{}/npy/ax1_mids.npy'.format(self.save_folder), self.ax1_mids)
         np.save('{}/npy/ax2_mids.npy'.format(self.save_folder), self.ax2_mids)
@@ -1816,3 +1827,210 @@ def create_distances(a, b, ax1_mid, ax2_mid, nn_radius, save_folder, a_ax1_ind, 
     dists = np.load('{}/npy/ab_dists_{}_{}.npy'.format(save_folder, ax1_mid, ax2_mid))
 
     return amatch, bmatch, dists
+
+
+class SNRMagnitudeRelationship(AstrometricCorrections):
+    """
+    Class to derive signal-to-noise ratio-magnitude relationships for sources
+    in photometric catalogues.
+    """
+    def __init__(self, save_folder, ax1_mids, ax2_mids, ax_dimension, npy_or_csv, coord_or_chunk,
+                 pos_and_err_indices, mag_indices, mag_unc_indices, mag_names, coord_system,
+                 chunks=None):
+        """
+        Initialisation of AstrometricCorrections, accepting inputs required for
+        the running of the optimisation and parameterisation of astrometry of
+        a photometric catalogue, benchmarked against a catalogue of much higher
+        astrometric resolution and precision, such as Gaia or the Hubble Source
+        Catalog.
+
+        Parameters
+        ----------
+        save_folder : string
+            Absolute or relative filepath of folder into which to store
+            temporary and generated outputs from the fitting process.
+        ax1_mids : numpy.ndarray
+            Array of longitudes (e.g. RA or l) used to center regions used to
+            determine astrometric corrections across the sky. Depending on
+            ``ax_correction``, either the unique values that with ``ax2_mids``
+            form a rectangle, or a unique ax-ax combination with a corresponding
+            ``ax2_mid``.
+        ax2_mids : numpy.ndarray
+            Array of latitudes (Dec/b) defining regions for calculating
+            astrometric corrections. Either unique rectangle values to combine
+            with ``ax1_mids`` or unique ``ax1_mids``-``ax2_mids`` pairs, one
+            per entry.
+        ax_dimension : integer, either ``1`` or ``2``
+            If ``1`` then ``ax1_mids`` and ``ax2_mids`` form unique sides of a
+            rectangle when combined in a grid, or if ``2`` each
+            ``ax1_mids``-``ax2_mids`` combination is a unique ax-ax pairing used
+            as given.
+        npy_or_csv : string, either ``npy`` or ``csv``
+            Indicator as to whether the small chunks of sky to be loaded for
+            each sightline's evaluation are in binary ``numpy`` format or saved
+            to disk as a comma-separated values file.
+        coord_or_chunk : string, either ``coord`` or ``chunk``
+            String indicating whether intermediate files should be saved with
+            filenames that are unique by two coordinates (l/b or RA/Dec) or
+            some kind of singular "chunk" number. Output filenames would then
+            need to follow ``'file_{}{}'`` or ``'file_{}'`` formatting
+            respectively.
+        pos_and_err_indices : list or numpy.ndarray of integers
+            In order, the indices within the catalogue, either a .npy or .csv
+            file, of the longitudinal (e.g. RA or l), latitudinal (Dec or b),
+            and *singular*, circular astrometric precision array. Coordinates
+            should be in degrees while precision should be in the same units as
+            ``sig_slice`` and those of the nearest-neighbour distances, likely
+            arcseconds. For example, ``[0, 1, 2]`` or ``[6, 3, 0]`` where the
+            first example has its coordinates in the first three columns in
+            RA/Dec/Err order, while the second has its coordinates in a more
+            random order.
+        mag_indices : list or numpy.ndarray
+            In appropriate order, as expected by e.g. `~macauff.CrossMatch` inputs
+            and `~macauff.make_perturb_aufs`, list the indexes of each magnitude
+            column within either the ``.npy`` or ``.csv`` file loaded for each
+            sub-catalogue sightline. These should be zero-indexed.
+        mag_unc_indices : list or numpy.ndarray
+            For each ``mag_indices`` entry, the corresponding magnitude
+            uncertainty index in the catalogue.
+        mag_names : list or numpy.ndarray of strings
+            Names of each ``mag_indices`` magnitude.
+        coord_system : string, "equatorial" or "galactic"
+            Identifier of which coordinate system the data are in. Both datasets
+            must be in the same system, which can either be RA/Dec (equatorial)
+            or l/b (galactic) coordinates.
+        chunks = list or numpy.ndarray of strings, optional
+            List of IDs for each unique set of data if ``coord_or_chunk`` is
+            ``chunk``. In this case, ``ax_dimension`` must be ``2`` and each
+            ``chunk`` must correspond to its ``ax1_mids``-``ax2_mids`` coordinate.
+        """
+        if not (ax_dimension == 1 or ax_dimension == 2):
+            raise ValueError("ax_dimension must either be '1' or '2'.")
+        if npy_or_csv != "npy" and npy_or_csv != "csv":
+            raise ValueError("npy_or_csv must either be 'npy' or 'csv'.")
+        if coord_or_chunk != "coord" and coord_or_chunk != "chunk":
+            raise ValueError("coord_or_chunk must either be 'coord' or 'chunk'.")
+        if coord_or_chunk == "chunk" and chunks is None:
+            raise ValueError("chunks must be provided if coord_or_chunk is 'chunk'.")
+        if coord_or_chunk == "chunk" and ax_dimension == 1:
+            raise ValueError("ax_dimension must be 2, and ax1-ax2 pairings provided for each chunk "
+                             "in chunks if coord_or_chunk is 'chunk'.")
+        if coord_or_chunk == "chunk" and (len(ax1_mids) != len(chunks) or
+                                          len(ax2_mids) != len(chunks)):
+            raise ValueError("ax1_mids, ax2_mids, and chunks must all be the same length if "
+                             "coord_or_chunk is 'chunk'.")
+        if not (coord_system == "equatorial" or coord_system == "galactic"):
+            raise ValueError("coord_system must either be 'equatorial' or 'galactic'.")
+
+        self.save_folder = save_folder
+
+        self.ax1_mids = ax1_mids
+        self.ax2_mids = ax2_mids
+        self.ax_dimension = ax_dimension
+
+        self.npy_or_csv = npy_or_csv
+        self.coord_or_chunk = coord_or_chunk
+        self.chunks = chunks
+
+        self.coord_system = coord_system
+
+        if npy_or_csv == 'npy':
+            self.pos_and_err_indices = [None, pos_and_err_indices]
+            self.mag_indices = mag_indices
+            self.mag_unc_indices = mag_unc_indices
+            self.mag_names = mag_names
+        else:
+            # np.genfromtxt will load in pos_and_err or pos_and_err, mag_ind,
+            # mag_unc_ind order for the two catalogues. Each will effectively
+            # change its ordering, since we then load [0] for pos_and_err[0][0],
+            # etc. for all options. These need saving for np.genfromtxt but
+            # also for obtaining the correct column in the resulting sub-set of
+            # the loaded csv file.
+            self.b_cols = np.concatenate((pos_and_err_indices, mag_indices, mag_unc_indices))
+
+            self.pos_and_err_indices = [
+                None, [np.argmin(np.abs(q - self.b_cols)) for q in pos_and_err_indices]]
+
+            self.mag_indices = [np.argmin(np.abs(q - self.b_cols)) for q in mag_indices]
+            self.mag_unc_indices = [np.argmin(np.abs(q - self.b_cols)) for q in mag_unc_indices]
+
+            self.mag_names = mag_names
+
+        self.n_filt_cols = np.ceil(np.sqrt(len(self.mag_indices))).astype(int)
+        self.n_filt_rows = np.ceil(len(self.mag_indices) / self.n_filt_cols).astype(int)
+
+        for folder in [self.save_folder, '{}/npy'.format(self.save_folder),
+                       '{}/pdf'.format(self.save_folder)]:
+            if not os.path.exists(folder):
+                os.makedirs(folder)
+
+    def __call__(self, b_cat_name, overwrite_all_sightlines=False, make_plots=False):
+        """
+        Call function for the correction calculation process.
+
+        Parameters
+        ----------
+        a_cat_name : string
+            Name of the catalogue "b" filename, pre-generated. Must accept one
+            or two formats via Python string formatting (e.g. ``'a_string_{}'``)
+            that represent ``chunk``, or ``ax1_mid`` and ``ax2_mid``, depending
+            on ``coord_or_chunk``.
+        overwrite_all_sightlines : boolean
+            Flag for whether to create a totally fresh run of astrometric
+            corrections, regardless of whether ``abc_array`` is saved on disk.
+            Defaults to ``False``.
+        make_plots : boolean, optional
+            Determines if intermediate figures are generated in the process
+            of deriving astrometric corrections.
+        """
+        self.b_cat_name = b_cat_name
+        self.make_plots = make_plots
+
+        # Force pregenerate_cutouts for super purposes.
+        self.pregenerate_cutouts = True
+        self.make_ax_coords(check_b_only=True)
+
+        # Making coords/cutouts happens for all sightlines, and then we
+        # loop through each individually:
+        if self.coord_or_chunk == 'coord':
+            zip_list = (self.ax1_mids, self.ax2_mids, self.ax1_mins, self.ax1_maxs,
+                        self.ax2_mins, self.ax2_maxs)
+        else:
+            zip_list = (self.ax1_mids, self.ax2_mids, self.ax1_mins, self.ax1_maxs, self.ax2_mins,
+                        self.ax2_maxs, self.chunks)
+
+        if (overwrite_all_sightlines or
+                not os.path.isfile('{}/npy/snr_mag_params.npy'.format(self.save_folder))):
+            abc_array = open_memmap('{}/npy/snr_mag_params.npy'.format(self.save_folder), mode='w+',
+                                    dtype=float,
+                                    shape=(len(self.mag_indices), len(self.ax1_mids), 5))
+            abc_array[:, :, :] = -1
+        else:
+            abc_array = open_memmap('{}/npy/snr_mag_params.npy'.format(self.save_folder), mode='r+')
+
+        for index_, list_of_things in enumerate(zip(*zip_list)):
+            if not np.all(abc_array[:, index_, :] == [-1, -1, -1, -1, -1]):
+                continue
+            print('Running SNR-mag fits for sightline {}/{}...'.format(
+                index_+1, len(self.ax1_mids)))
+
+            if self.coord_or_chunk == 'coord':
+                ax1_mid, ax2_mid, _, _, _, _ = list_of_things
+                cat_args = (ax1_mid, ax2_mid)
+                file_name = '{}_{}'.format(ax1_mid, ax2_mid)
+            else:
+                ax1_mid, ax2_mid, _, _, _, _, chunk = list_of_things
+                cat_args = (chunk,)
+                file_name = '{}'.format(chunk)
+            self.list_of_things = list_of_things
+            self.cat_args = cat_args
+            self.file_name = file_name
+
+            self.b = self.load_catalogue('b', self.cat_args)
+
+            self.a_array, self.b_array, self.c_array = self.make_snr_model()
+            abc_array[:, index_, 0] = self.a_array
+            abc_array[:, index_, 1] = self.b_array
+            abc_array[:, index_, 2] = self.c_array
+            abc_array[:, index_, 3] = ax1_mid
+            abc_array[:, index_, 4] = ax2_mid
