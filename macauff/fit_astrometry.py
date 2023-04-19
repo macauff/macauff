@@ -965,9 +965,12 @@ class AstrometricCorrections:
                     marker='.', zorder=1, ls='None')
 
         lims = ax.get_ylim()
-        ax.plot(self.tri_mags+self.dtri_mags/2, np.log10(self.tri_hist) + np.log10(correction),
-                'b--')
-        ax.plot(self.tri_mags+self.dtri_mags/2, np.log10(self.gal_dNs) + np.log10(correction), 'b:')
+        q = self.tri_hist > 0
+        ax.plot((self.tri_mags+self.dtri_mags/2)[q], np.log10(self.tri_hist[q]) +
+                np.log10(correction), 'b--')
+        q = self.gal_dNs > 0
+        ax.plot((self.tri_mags+self.dtri_mags/2)[q], np.log10(self.gal_dNs[q]) +
+                np.log10(correction), 'b:')
         ax.set_ylim(*lims)
 
         ax.set_xlabel('Magnitude')
