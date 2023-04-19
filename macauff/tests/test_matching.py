@@ -412,6 +412,11 @@ class TestInputs:
                       'data/crossmatch_params.txt'), idx, new_line, out_file=os.path.join(
                       os.path.dirname(__file__), 'data/crossmatch_params_.txt'))
 
+        os.makedirs('a_snr_mag', exist_ok=True)
+        os.makedirs('b_snr_mag', exist_ok=True)
+        np.save('a_snr_mag/snr_mag_params.npy', np.ones((3, 1, 5), float))
+        np.save('b_snr_mag/snr_mag_params.npy', np.ones((4, 1, 5), float))
+
         cm._initialise_chunk(os.path.join(os.path.dirname(__file__), 'data/crossmatch_params_.txt'),
                              os.path.join(os.path.dirname(__file__), 'data/cat_a_params.txt'),
                              os.path.join(os.path.dirname(__file__), 'data/cat_b_params.txt'))
@@ -428,6 +433,10 @@ class TestInputs:
                  'b_psf_fwhms and b_filt_names should contain the same',
                  'psf_fwhms should be a list of floats in catalogue "b".'],
                 ['cat_a_params', 'cat_a_params', 'cat_b_params', 'cat_b_params']):
+            # For the singular filt_names change we need to dummy snr_mag_params
+            # as well, remembering to change it back afterwards
+            if 'G\n' in new_line:
+                np.save('a_snr_mag/snr_mag_params.npy', np.ones((2, 1, 5), float))
             f = open(os.path.join(os.path.dirname(__file__),
                                   'data/{}.txt'.format(in_file))).readlines()
             idx = np.where([old_line in line for line in f])[0][0]
@@ -444,6 +453,8 @@ class TestInputs:
                                      os.path.join(os.path.dirname(__file__),
                                      'data/cat_b_params{}.txt'
                                                   .format('_' if '_b_' in in_file else '')))
+            if 'G\n' in new_line:
+                np.save('a_snr_mag/snr_mag_params.npy', np.ones((3, 1, 5), float))
 
     def test_crossmatch_cat_name_inputs(self):
         cm = CrossMatch(os.path.join(os.path.dirname(__file__), 'data'), use_memmap_files=True)
@@ -597,6 +608,11 @@ class TestInputs:
                                          os.path.join(os.path.dirname(__file__),
                                          'data/cat_b_params{}.txt'.format(
                                              '_' if 'b' in cat_reg else '')))
+
+        os.makedirs('a_snr_mag', exist_ok=True)
+        os.makedirs('b_snr_mag', exist_ok=True)
+        np.save('a_snr_mag/snr_mag_params.npy', np.ones((3, 1, 5), float))
+        np.save('b_snr_mag/snr_mag_params.npy', np.ones((4, 1, 5), float))
 
         cm = CrossMatch(os.path.join(os.path.dirname(__file__), 'data'), use_memmap_files=True)
         cm._initialise_chunk(os.path.join(os.path.dirname(__file__),
@@ -1313,6 +1329,30 @@ class TestInputs:
         assert cm.n_pool == 2
         assert cm.a_correct_astrometry is False
         assert cm.b_correct_astrometry is False
+        assert cm.a_compute_snr_mag_relation is False
+
+        for cat_n in ['a', 'b']:
+            old_line = "correct_astrometry = no"
+            new_line = "correct_astrometry = yes\n"
+            f = open(os.path.join(os.path.dirname(__file__),
+                                  'data/cat_{}_params.txt'.format(cat_n))).readlines()
+            idx = np.where([old_line in line for line in f])[0][0]
+            _replace_line(os.path.join(os.path.dirname(__file__),
+                          'data/cat_{}_params.txt'.format(cat_n)), idx, new_line,
+                          out_file=os.path.join(os.path.dirname(__file__),
+                          'data/cat_{}_params_.txt'.format(cat_n)))
+            old_line = "compute_snr_mag_relation = no"
+            new_line = "compute_snr_mag_relation = yes\n"
+            idx = np.where([old_line in line for line in f])[0][0]
+            _replace_line(os.path.join(os.path.dirname(__file__),
+                          'data/cat_{}_params_.txt'.format(cat_n)), idx, new_line)
+            with pytest.raises(ValueError, match="Ambiguity in catalogue '{}' hav".format(cat_n)):
+                cm._initialise_chunk(
+                    os.path.join(os.path.dirname(__file__), 'data/crossmatch_params.txt'),
+                    os.path.join(os.path.dirname(__file__),
+                                 'data/cat_a_params{}.txt'.format('_' if 'a' in cat_n else '')),
+                    os.path.join(os.path.dirname(__file__),
+                                 'data/cat_b_params{}.txt'.format('_' if 'b' in cat_n else '')))
 
         old_line = "n_pool = 2"
         new_line = ""
@@ -1405,18 +1445,18 @@ class TestInputs:
                               'data/cat_a_params_.txt')).readlines()
         idx = np.where([old_line in line for line in f])[0][0]
         lines = ['correct_astrometry = yes\n\ndd_params_path = {}\nl_cut_path = {}\n'
-                 .format(dd_l_path, dd_l_path), 'best_mag_index = 0\n', 'nn_radius = 30\n',
-                 'correct_astro_save_folder = ac_folder\n', 'csv_cat_file_string = file_{}.csv\n',
-                 'ref_csv_cat_file_string = ref_{}.csv\n',
+                 .format(dd_l_path, dd_l_path), 'correct_astro_save_folder = ac_folder\n',
+                 'csv_cat_file_string = file_{}.csv\n', 'pos_and_err_indices = 0 1 2 0 1 2\n',
+                 'mag_indices = 3 5 7\n', 'mag_unc_indices = 4 6 8\n', 'best_mag_index = 0\n',
+                 'nn_radius = 30\n', 'ref_csv_cat_file_string = ref_{}.csv\n',
                  'correct_mag_array = 14.07 14.17 14.27 14.37\n',
                  'correct_mag_slice = 0.05 0.05 0.05 0.05\n',
-                 'correct_sig_slice = 0.1 0.1 0.1 0.1\n', 'pos_and_err_indices = 0 1 2 0 1 2\n',
-                 'mag_indices = 3 5 7\n', 'mag_unc_indices = 4 6 8\n', 'chunk_overlap_col = None\n',
+                 'correct_sig_slice = 0.1 0.1 0.1 0.1\n', 'chunk_overlap_col = None\n',
                  'best_mag_index_col = 8\n']
-        for i, key in enumerate(['best_mag_index', 'nn_radius', 'correct_astro_save_folder',
-                                 'csv_cat_file_string', 'ref_csv_cat_file_string',
-                                 'correct_mag_array', 'correct_mag_slice', 'correct_sig_slice',
+        for i, key in enumerate(['correct_astro_save_folder', 'csv_cat_file_string',
                                  'pos_and_err_indices', 'mag_indices', 'mag_unc_indices',
+                                 'best_mag_index', 'nn_radius', 'ref_csv_cat_file_string',
+                                 'correct_mag_array', 'correct_mag_slice', 'correct_sig_slice',
                                  'chunk_overlap_col', 'best_mag_index_col']):
             new_line = ''
             for j in range(i+1):
@@ -1568,6 +1608,73 @@ class TestInputs:
 
         assert np.all(np.load('wise_folder/in_chunk_overlap.npy') == 0)
 
+        # Set up a completely valid test of cat_a_params and cat_b_params
+        # for compute_snr_mag_relation.
+        lines = [
+            'compute_snr_mag_relation = yes\n', 'correct_astro_save_folder = ac_folder\n',
+            'csv_cat_file_string = file_{}.csv\n', 'pos_and_err_indices = 0 1 2\n',
+            'mag_indices = 3 5 7\n', 'mag_unc_indices = 4 6 8\n']
+        for x in ['a', 'b']:
+            old_line = 'compute_snr_mag_relation = no'
+            f = open(os.path.join(os.path.dirname(__file__),
+                                  'data/cat_{}_params.txt'.format(x))).readlines()
+            idx = np.where([old_line in line for line in f])[0][0]
+            if x == 'b':
+                lines[np.where(['mag_indices' in y for y in
+                      lines])[0][0]] = 'mag_indices = 3 5 7 9\n'
+                lines[np.where(['mag_unc_indices' in y for y in
+                      lines])[0][0]] = 'mag_unc_indices = 4 6 8 10\n'
+            new_line = ''
+            for j in range(len(lines)):
+                new_line = new_line + lines[j]
+            _replace_line(os.path.join(os.path.dirname(__file__),
+                          'data/cat_{}_params.txt'.format(x)), idx, new_line,
+                          out_file=os.path.join(os.path.dirname(__file__),
+                                                'data/cat_{}_params_2b.txt'.format(x)))
+        if os.path.isfile('ac_folder/npy/snr_mag_params.npy'):
+            os.remove('ac_folder/npy/snr_mag_params.npy')
+        cm = CrossMatch(os.path.join(os.path.dirname(__file__), 'data'), use_memmap_files=True)
+        cm.chunk_id = 1
+        cm._initialise_chunk(os.path.join(os.path.dirname(__file__),
+                             'data/crossmatch_params.txt'),
+                             os.path.join(os.path.dirname(__file__),
+                             'data/cat_a_params.txt'),
+                             os.path.join(os.path.dirname(__file__),
+                             'data/cat_b_params_2b.txt'))
+        assert cm.b_compute_snr_mag_relation is True
+        assert not hasattr(cm, 'b_correct_mag_slice')
+        assert cm.b_correct_astro_save_folder == os.path.abspath('ac_folder')
+        assert cm.b_csv_cat_file_string == os.path.abspath('file_{}.csv')
+        assert np.all(cm.b_pos_and_err_indices == np.array([[0, 1, 2], [0, 1, 2]]))
+        assert np.all(cm.b_mag_indices == np.array([3, 5, 7, 9]))
+        assert np.all(cm.b_mag_unc_indices == np.array([4, 6, 8, 10]))
+        marray = np.load('ac_folder/npy/m_sigs_array.npy')
+        narray = np.load('ac_folder/npy/n_sigs_array.npy')
+        assert_allclose([marray[0], narray[0]], [2, 0], rtol=0.1, atol=0.01)
+        if os.path.isfile('ac_folder/npy/snr_mag_params.npy'):
+            os.remove('ac_folder/npy/snr_mag_params.npy')
+        cm = CrossMatch(os.path.join(os.path.dirname(__file__), 'data'), use_memmap_files=True)
+        cm.chunk_id = 1
+        cm._initialise_chunk(os.path.join(os.path.dirname(__file__),
+                             'data/crossmatch_params.txt'),
+                             os.path.join(os.path.dirname(__file__),
+                             'data/cat_a_params_2b.txt'),
+                             os.path.join(os.path.dirname(__file__),
+                             'data/cat_b_params.txt'))
+        assert cm.a_compute_snr_mag_relation is True
+        assert not hasattr(cm, 'a_best_mag_index')
+        assert cm.a_correct_astro_save_folder == os.path.abspath('ac_folder')
+        assert cm.a_csv_cat_file_string == os.path.abspath('file_{}.csv')
+        assert np.all(cm.a_pos_and_err_indices == np.array([[0, 1, 2], [0, 1, 2]]))
+        assert np.all(cm.a_mag_indices == np.array([3, 5, 7]))
+        assert np.all(cm.a_mag_unc_indices == np.array([4, 6, 8]))
+        marray = np.load('ac_folder/npy/m_sigs_array.npy')
+        narray = np.load('ac_folder/npy/n_sigs_array.npy')
+        assert_allclose([marray[0], narray[0]], [2, 0], rtol=0.1, atol=0.01)
+
+        # Dummy folder that won't contain l_cut.npy
+        os.makedirs('./l_cut_dummy_folder', exist_ok=True)
+
         for old_line, new_line, x, match_text in zip(
                 ['best_mag_index = ', 'best_mag_index = ', 'best_mag_index = ',
                  'nn_radius = ', 'nn_radius = ', 'correct_mag_array = ',
@@ -1576,7 +1683,8 @@ class TestInputs:
                  'pos_and_err_indices = ', 'mag_indices =', 'mag_indices =', 'mag_indices =',
                  'mag_unc_indices =', 'mag_unc_indices =', 'mag_unc_indices =',
                  'chunk_overlap_col = ', 'chunk_overlap_col = ', 'chunk_overlap_col = ',
-                 'best_mag_index_col = ', 'best_mag_index_col = '],
+                 'best_mag_index_col = ', 'best_mag_index_col = ', 'dd_params_path = ',
+                 'l_cut_path = '],
                 ['best_mag_index = A\n', 'best_mag_index = 2.5\n', 'best_mag_index = 7\n',
                  'nn_radius = A\n', 'nn_radius = 1 2\n', 'correct_mag_array = 1 2 A 4 5\n',
                  'correct_mag_slice = 0.1 0.1 0.1 A 0.1\n', 'correct_mag_slice = 0.1 0.1 0.1\n',
@@ -1587,9 +1695,10 @@ class TestInputs:
                  'mag_unc_indices = 1 2\n', 'mag_unc_indices = 1.2 2 3\n',
                  'chunk_overlap_col = Non\n', 'chunk_overlap_col = A\n',
                  'chunk_overlap_col = 1.2\n', 'best_mag_index_col = A\n',
-                 'best_mag_index_col = 1.2\n'],
+                 'best_mag_index_col = 1.2\n', 'dd_params_path = ./some_folder\n',
+                 'l_cut_path = ./l_cut_dummy_folder\n'],
                 ['a', 'b', 'a', 'b', 'a', 'a', 'b', 'a', 'b', 'a', 'b', 'a', 'a', 'a', 'b', 'b',
-                 'b', 'a', 'a', 'a', 'b', 'a', 'a', 'b'],
+                 'b', 'a', 'a', 'a', 'b', 'a', 'a', 'b', 'b', 'a'],
                 ['best_mag_index should be an integer in the catalogue "a"',
                  'best_mag_index should be an integer in the catalogue "b"',
                  'best_mag_index cannot be a larger index than the list of filters '
@@ -1602,7 +1711,7 @@ class TestInputs:
                  'a_correct_mag_array and a_correct_sig_slice should contain the same',
                  'pos_and_err_indices should be a list of integers in the catalogue "b"',
                  'All elements of a_pos_and_err_indices should be integers',
-                 'a_pos_and_err_indices should contain six elements.',
+                 'a_pos_and_err_indices should contain six elements when correct_astrometry',
                  'mag_indices should be a list of integers in the catalogue "a" ',
                  'b_filt_names and b_mag_indices should contain the',
                  'All elements of b_mag_indices should be integers.',
@@ -1613,7 +1722,9 @@ class TestInputs:
                  'chunk_overlap_col should be an integer in the catalogue "b"',
                  'chunk_overlap_col should be an integer in the catalogue "a"',
                  'best_mag_index_col should be an integer in the catalogue "a"',
-                 'best_mag_index_col should be an integer in the catalogue "b"']):
+                 'best_mag_index_col should be an integer in the catalogue "b"',
+                 'b_dd_params_path does not exist. Please ensure that path for catalogue "b"',
+                 'l_cut file not found in catalogue "a" path. Please ensure PSF ']):
             f = open(os.path.join(os.path.dirname(__file__),
                                   'data/cat_{}_params_2.txt'.format(x))).readlines()
             idx = np.where([old_line in line for line in f])[0][0]
@@ -1622,7 +1733,13 @@ class TestInputs:
                           out_file=os.path.join(os.path.dirname(__file__),
                                                 'data/cat_{}_params_3.txt'.format(x)))
 
-            with pytest.raises(ValueError, match=match_text):
+            if 'folder' not in new_line:
+                type_of_error = ValueError
+            elif 'dd_params' in new_line:
+                type_of_error = OSError
+            else:
+                type_of_error = FileNotFoundError
+            with pytest.raises(type_of_error, match=match_text):
                 cm._initialise_chunk(os.path.join(os.path.dirname(__file__),
                                      'data/crossmatch_params.txt'),
                                      os.path.join(os.path.dirname(__file__),
@@ -1631,6 +1748,42 @@ class TestInputs:
                                      os.path.join(os.path.dirname(__file__),
                                      'data/cat_b_params{}.txt'
                                                   .format('_2' if x == 'a' else '_3')))
+
+        x = 'b'
+        old_line = 'correct_astrometry = '
+        new_line = 'correct_astrometry = no\n'
+        f = open(os.path.join(os.path.dirname(__file__),
+                              'data/cat_{}_params_2.txt'.format(x))).readlines()
+        idx = np.where([old_line in line for line in f])[0][0]
+        _replace_line(os.path.join(os.path.dirname(__file__),
+                      'data/cat_{}_params_2.txt'.format(x)), idx, new_line,
+                      out_file=os.path.join(os.path.dirname(__file__),
+                                            'data/cat_{}_params_3.txt'.format(x)))
+        old_line = 'compute_snr_mag_relation = '
+        new_line = 'compute_snr_mag_relation = yes\n'
+        f = open(os.path.join(os.path.dirname(__file__),
+                              'data/cat_{}_params_3.txt'.format(x))).readlines()
+        idx = np.where([old_line in line for line in f])[0][0]
+        _replace_line(os.path.join(os.path.dirname(__file__),
+                      'data/cat_{}_params_3.txt'.format(x)), idx, new_line)
+        old_line = 'pos_and_err_indices = '
+        new_line = 'pos_and_err_indices = 1 2 3 4 5\n'
+        match_text = ('b_pos_and_err_indices should contain three elements '
+                      'when compute_snr_mag_relation ')
+        f = open(os.path.join(os.path.dirname(__file__),
+                              'data/cat_{}_params_3.txt'.format(x))).readlines()
+        idx = np.where([old_line in line for line in f])[0][0]
+        _replace_line(os.path.join(os.path.dirname(__file__),
+                      'data/cat_{}_params_3.txt'.format(x)), idx, new_line)
+        with pytest.raises(ValueError, match=match_text):
+            cm._initialise_chunk(os.path.join(os.path.dirname(__file__),
+                                 'data/crossmatch_params.txt'),
+                                 os.path.join(os.path.dirname(__file__),
+                                 'data/cat_a_params{}.txt'
+                                              .format('_2' if x == 'b' else '_3')),
+                                 os.path.join(os.path.dirname(__file__),
+                                 'data/cat_b_params{}.txt'
+                                              .format('_2' if x == 'a' else '_3')))
 
 
 @pytest.mark.parametrize('use_memmap', [True, False])
