@@ -475,7 +475,6 @@ class TestInputs:
                              os.path.join(os.path.dirname(__file__), 'data/cat_b_params.txt'))
         assert cm.pos_corr_dist == 11
         assert not hasattr(cm, 'a_dens_dist')
-        assert not hasattr(cm, 'b_dens_mags')
         f = open(os.path.join(os.path.dirname(__file__), 'data/crossmatch_params.txt')).readlines()
         old_line = 'include_perturb_auf = no'
         new_line = 'include_perturb_auf = yes\n'
@@ -486,7 +485,7 @@ class TestInputs:
         cm._initialise_chunk(os.path.join(os.path.dirname(__file__), 'data/crossmatch_params_.txt'),
                              os.path.join(os.path.dirname(__file__), 'data/cat_a_params.txt'),
                              os.path.join(os.path.dirname(__file__), 'data/cat_b_params.txt'))
-        assert np.all(cm.a_dens_mags == np.array([20, 20, 20]))
+        assert np.all(cm.a_psf_fwhms == np.array([0.12, 0.12, 0.12]))
         assert not hasattr(cm, 'b_dens_dist')
 
         f = open(os.path.join(os.path.dirname(__file__), 'data/crossmatch_params.txt')).readlines()
@@ -500,23 +499,17 @@ class TestInputs:
                                           'data/crossmatch_params_2.txt'),
                              os.path.join(os.path.dirname(__file__), 'data/cat_a_params.txt'),
                              os.path.join(os.path.dirname(__file__), 'data/cat_b_params.txt'))
-        assert np.all(cm.a_dens_mags == np.array([20, 20, 20]))
+        assert np.all(cm.a_psf_fwhms == np.array([0.12, 0.12, 0.12]))
         assert cm.b_dens_dist == 0.25
 
         # List of simple one line config file replacements for error message checking
         for old_line, new_line, match_text, in_file in zip(
                 ['pos_corr_dist = 11', 'pos_corr_dist = 11', 'dens_dist = 0.25',
-                 'dens_dist = 0.25', 'dens_mags = 20 20 20 20', 'dens_mags = 20 20 20 20',
-                 'dens_mags = 20 20 20'],
-                ['', 'pos_corr_dist = word\n', '', 'dens_dist = word\n', '',
-                 'dens_mags = 20 20 20\n', 'dens_mags = word word word\n'],
+                 'dens_dist = 0.25'],
+                ['', 'pos_corr_dist = word\n', '', 'dens_dist = word\n'],
                 ['Missing key pos_corr_dist', 'pos_corr_dist must be a float',
-                 'Missing key dens_dist from catalogue "b"', 'dens_dist in catalogue "a" must',
-                 'Missing key dens_mags from catalogue "b"',
-                 'b_dens_mags and b_filt_names should contain the same number',
-                 'dens_mags should be a list of floats in catalogue "a'],
-                ['crossmatch_params', 'crossmatch_params', 'cat_b_params', 'cat_a_params',
-                 'cat_b_params', 'cat_b_params', 'cat_a_params']):
+                 'Missing key dens_dist from catalogue "b"', 'dens_dist in catalogue "a" must'],
+                ['crossmatch_params', 'crossmatch_params', 'cat_b_params', 'cat_a_params']):
             f = open(os.path.join(os.path.dirname(__file__),
                                   'data/{}.txt'.format(in_file))).readlines()
             idx = np.where([old_line in line for line in f])[0][0]
@@ -1468,7 +1461,7 @@ class TestInputs:
                 'm2/m1 mbol   J      H      Ks     IRAC_3.6 IRAC_4.5 IRAC_5.8 IRAC_8.0 MIPS_24 ' +
                 'MIPS_70 MIPS_160 W1     W2     W3     W4       Mact\n')
         self.rng = np.random.default_rng(seed=67235589)
-        w1s = self.rng.uniform(14, 16, size=1000)
+        w1s = self.rng.uniform(13.5, 15.5, size=1000)
         for w1 in w1s:
             text = text + (
                 '1   6.65 -0.39  0.02415 -2.701 3.397  4.057 14.00  8.354 0.00 25.523 25.839 ' +

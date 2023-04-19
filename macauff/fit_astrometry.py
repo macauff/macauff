@@ -44,8 +44,8 @@ class AstrometricCorrections:
     """
     def __init__(self, psf_fwhm, numtrials, nn_radius, dens_search_radius, save_folder, trifolder,
                  triname, maglim_f, magnum, tri_num_faint, trifilterset, trifiltname,
-                 gal_wav_micron, gal_ab_offset, gal_filtname, gal_alav, bright_mag, dm, dd_params,
-                 l_cut, ax1_mids, ax2_mids, ax_dimension, mag_array, mag_slice, sig_slice, n_pool,
+                 gal_wav_micron, gal_ab_offset, gal_filtname, gal_alav, dm, dd_params, l_cut,
+                 ax1_mids, ax2_mids, ax_dimension, mag_array, mag_slice, sig_slice, n_pool,
                  npy_or_csv, coord_or_chunk, pos_and_err_indices, mag_indices, mag_unc_indices,
                  mag_names, best_mag_index, coord_system, pregenerate_cutouts, cutout_area=None,
                  cutout_height=None, single_sided_auf=True, chunks=None):
@@ -102,9 +102,6 @@ class AstrometricCorrections:
             Name of the filter in the ``speclite`` compound naming convention.
         gal_alav : float
             Differential reddening vector of the given filter.
-        bright_mag : float
-            Limiting magnitude down to which to calculate normalising density
-            of sources.
         dm : float
             Bin spacing for magnitude histograms of TRILEGAL simulations.
         dd_params : numpy.ndarray
@@ -257,7 +254,6 @@ class AstrometricCorrections:
         self.gal_filtname = gal_filtname
         self.gal_alav = gal_alav
 
-        self.bright_mag = bright_mag
         self.dm = dm
 
         self.dd_params = dd_params
@@ -837,6 +833,17 @@ class AstrometricCorrections:
         else:
             ax1_mid, ax2_mid, ax1_min, ax1_max, ax2_min, ax2_max, _ = self.list_of_things
 
+        mag_ind = self.mag_indices[self.best_mag_index]
+        b_mag_data = self.b[~np.isnan(self.b[:, mag_ind]), mag_ind]
+
+        hist_mag, bins = np.histogram(b_mag_data, bins='auto')
+        minmag = bins[0]
+        # Ensure that we're only counting sources for normalisation purposes
+        # down to the completeness turnover.
+        # TODO: make the half-mag offset flexible, passing from CrossMatch and/or
+        # directly into AstrometricCorrections.
+        maxmag = bins[:-1][np.argmax(hist_mag)] - 0.5
+
         if (self.tri_download or not
                 os.path.isfile('{}/{}_faint.dat'.format(
                     self.trifolder, self.triname.format(ax1_mid, ax2_mid)))):
@@ -848,11 +855,21 @@ class AstrometricCorrections:
                 self.trifolder, self.triname.format(ax1_mid, ax2_mid)))[0]
             if not os.path.exists(base_auf_folder):
                 os.makedirs(base_auf_folder, exist_ok=True)
+
+            rect_area = (ax1_max - (ax1_min)) * (
+                np.sin(np.radians(ax2_max)) - np.sin(np.radians(ax2_min))) * 180/np.pi
+
+            data_bright_dens = np.sum(~np.isnan(b_mag_data) & (b_mag_data <= maxmag)) / rect_area
+            # TODO: un-hardcode min_bright_tri_number
+            min_bright_tri_number = 1000
+            min_area = min_bright_tri_number / data_bright_dens
+
             download_trilegal_simulation('.', self.trifilterset, ax1_mid, ax2_mid, self.magnum,
-                                         self.coord_system, self.maglim_f,
-                                         AV=1, sigma_AV=0, total_objs=self.tri_num_faint)
-            os.system('mv trilegal_auf_simulation.dat {}/{}_faint.dat'
-                      .format(self.trifolder, self.triname.format(ax1_mid, ax2_mid)))
+                                         self.coord_system, self.maglim_f, min_area, AV=1,
+                                         sigma_AV=0, total_objs=self.tri_num_faint)
+            os.system('mv {}/trilegal_auf_simulation.dat {}/{}_faint.dat'
+                      .format(self.trifolder, self.trifolder,
+                              self.triname.format(ax1_mid, ax2_mid)))
 
         ax1s = np.linspace(ax1_min, ax1_max, 7)
         ax2s = np.linspace(ax2_min, ax2_max, 7)
@@ -869,7 +886,7 @@ class AstrometricCorrections:
         avs = avs.flatten()
         tri_hist, tri_mags, _, dtri_mags, tri_uncert, _ = make_tri_counts(
             self.trifolder, self.triname.format(ax1_mid, ax2_mid), self.trifiltname, self.dm,
-            al_av=self.gal_alav, av_grid=avs)
+            np.amin(b_mag_data), maxmag, al_av=self.gal_alav, av_grid=avs)
 
         gal_dNs = create_galaxy_counts(
             self.gal_cmau_array, tri_mags+dtri_mags/2, np.linspace(0, 4, 41),
@@ -879,14 +896,6 @@ class AstrometricCorrections:
         log10y = np.log10(tri_hist + gal_dNs)
         new_uncert = np.sqrt(tri_uncert**2 + (0.05*gal_dNs)**2)
         dlog10y = 1/np.log(10) * new_uncert / (tri_hist + gal_dNs)
-
-        mag_ind = self.mag_indices[self.best_mag_index]
-        hist_mag, bins = np.histogram(self.b[~np.isnan(self.b[:, mag_ind]), mag_ind], bins='auto')
-        minmag = bins[0]
-        # Ensure that we're only counting sources for normalisation purposes
-        # down to specified bright_mag or the completeness turnover,
-        # whichever is brighter.
-        maxmag = min(self.bright_mag, bins[:-1][np.argmax(hist_mag)])
 
         mag_slice = (tri_mags >= minmag) & (tri_mags+dtri_mags <= maxmag)
         N_norm = np.sum(10**log10y[mag_slice] * dtri_mags[mag_slice])

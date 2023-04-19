@@ -28,7 +28,7 @@ class TestAstroCorrection:
                 'Gc logAge [M/H] m_ini   logL   logTe logg  m-M0   Av    ' +
                 'm2/m1 mbol   J      H      Ks     IRAC_3.6 IRAC_4.5 IRAC_5.8 IRAC_8.0 MIPS_24 ' +
                 'MIPS_70 MIPS_160 W1     W2     W3     W4       Mact\n')
-        w1s = self.rng.uniform(14, 16, size=1000)
+        w1s = self.rng.uniform(13.5, 15.5, size=1000)
         for w1 in w1s:
             text = text + (
                 '1   6.65 -0.39  0.02415 -2.701 3.397  4.057 14.00  8.354 0.00 25.523 25.839 ' +
@@ -101,9 +101,9 @@ class TestAstroCorrection:
             'maglim_f': 25, 'magnum': 11, 'tri_num_faint': 1500000,
             'trifilterset': '2mass_spitzer_wise', 'trifiltname': 'W1', 'gal_wav_micron': 3.35,
             'gal_ab_offset': 2.699, 'gal_filtname': 'wise2010-W1', 'gal_alav': 0.039,
-            'bright_mag': 16, 'dm': 0.1, 'dd_params': dd_params, 'l_cut': l_cut,
-            'ax1_mids': ax1_mids, 'ax2_mids': ax2_mids, 'cutout_area': 60, 'cutout_height': 6,
-            'mag_array': magarray, 'mag_slice': magslice, 'sig_slice': sigslice, 'n_pool': 1,
+            'dm': 0.1, 'dd_params': dd_params, 'l_cut': l_cut, 'ax1_mids': ax1_mids,
+            'ax2_mids': ax2_mids, 'cutout_area': 60, 'cutout_height': 6, 'mag_array': magarray,
+            'mag_slice': magslice, 'sig_slice': sigslice, 'n_pool': 1,
             'pos_and_err_indices': [[0, 1, 2], [0, 1, 2]], 'mag_indices': [3],
             'mag_unc_indices': [4], 'mag_names': ['W1'], 'best_mag_index': 0}
 
@@ -182,13 +182,12 @@ class TestAstroCorrection:
             save_folder='ac_save_folder', trifolder='tri_folder', triname='trilegal_sim_{}_{}',
             maglim_f=25, magnum=11, tri_num_faint=1500000, trifilterset='2mass_spitzer_wise',
             trifiltname='W1', gal_wav_micron=3.35, gal_ab_offset=2.699, gal_filtname='wise2010-W1',
-            gal_alav=0.039, bright_mag=16, dm=0.1, dd_params=dd_params, l_cut=l_cut,
-            ax1_mids=ax1_mids, ax2_mids=ax2_mids, ax_dimension=ax_dimension, cutout_area=60,
-            cutout_height=6, mag_array=magarray, mag_slice=magslice, sig_slice=sigslice, n_pool=1,
-            npy_or_csv='npy', coord_or_chunk='coord',
-            pos_and_err_indices=[[0, 1, 2], [0, 1, 2]], mag_indices=[3], mag_unc_indices=[4],
-            mag_names=['W1'], best_mag_index=0, coord_system='equatorial', chunks=chunks,
-            pregenerate_cutouts=True)
+            gal_alav=0.039, dm=0.1, dd_params=dd_params, l_cut=l_cut, ax1_mids=ax1_mids,
+            ax2_mids=ax2_mids, ax_dimension=ax_dimension, cutout_area=60, cutout_height=6,
+            mag_array=magarray, mag_slice=magslice, sig_slice=sigslice, n_pool=1, npy_or_csv='npy',
+            coord_or_chunk='coord', pos_and_err_indices=[[0, 1, 2], [0, 1, 2]], mag_indices=[3],
+            mag_unc_indices=[4], mag_names=['W1'], best_mag_index=0, coord_system='equatorial',
+            chunks=chunks, pregenerate_cutouts=True)
         self.npy_or_csv = 'npy'
         cat_args = (105.0, 0.0)
         if os.path.isfile(self.a_cat_name.format(*cat_args)):
@@ -243,12 +242,12 @@ class TestAstroCorrection:
             save_folder='ac_save_folder', trifolder='tri_folder', triname='trilegal_sim_{}_{}',
             maglim_f=25, magnum=11, tri_num_faint=1500000, trifilterset='2mass_spitzer_wise',
             trifiltname='W1', gal_wav_micron=3.35, gal_ab_offset=2.699, gal_filtname='wise2010-W1',
-            gal_alav=0.039, bright_mag=16, dm=0.1, dd_params=dd_params, l_cut=l_cut,
-            ax1_mids=ax1_mids, ax2_mids=ax2_mids, ax_dimension=ax_dimension, mag_array=magarray,
-            mag_slice=magslice, sig_slice=sigslice, n_pool=1, npy_or_csv=npy_or_csv,
-            coord_or_chunk=coord_or_chunk, pos_and_err_indices=[[0, 1, 2], [0, 1, 2]],
-            mag_indices=[3], mag_unc_indices=[4], mag_names=['W1'], best_mag_index=0,
-            coord_system=coord_system, chunks=chunks, pregenerate_cutouts=pregenerate_cutouts,
+            gal_alav=0.039, dm=0.1, dd_params=dd_params, l_cut=l_cut, ax1_mids=ax1_mids,
+            ax2_mids=ax2_mids, ax_dimension=ax_dimension, mag_array=magarray, mag_slice=magslice,
+            sig_slice=sigslice, n_pool=1, npy_or_csv=npy_or_csv, coord_or_chunk=coord_or_chunk,
+            pos_and_err_indices=[[0, 1, 2], [0, 1, 2]], mag_indices=[3], mag_unc_indices=[4],
+            mag_names=['W1'], best_mag_index=0, coord_system=coord_system, chunks=chunks,
+            pregenerate_cutouts=pregenerate_cutouts,
             cutout_area=60 if not pregenerate_cutouts else None,
             cutout_height=6 if not pregenerate_cutouts else None)
 

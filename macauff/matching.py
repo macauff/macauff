@@ -1011,9 +1011,8 @@ class CrossMatch():
 
             if self.include_perturb_auf or correct_astro:
                 for check_flag in ['tri_set_name', 'tri_filt_names', 'tri_filt_num',
-                                   'download_tri', 'dens_mags', 'psf_fwhms',
-                                   'run_fw_auf', 'run_psf_auf', 'snr_mag_params_path',
-                                   'tri_maglim_faint', 'tri_num_faint']:
+                                   'download_tri', 'psf_fwhms', 'run_fw_auf', 'run_psf_auf',
+                                   'snr_mag_params_path', 'tri_maglim_faint', 'tri_num_faint']:
                     if check_flag not in config:
                         raise ValueError("Missing key {} from catalogue {} metadata file.".format(
                                          check_flag, catname))
@@ -1597,8 +1596,8 @@ class CrossMatch():
             if self.include_perturb_auf:
                 _kwargs = {'psf_fwhms': self.a_psf_fwhms, 'tri_download_flag': self.a_download_tri,
                            'delta_mag_cuts': self.delta_mag_cuts, 'num_trials': self.num_trials,
-                           'j0s': self.j0s, 'density_mags': self.a_dens_mags,
-                           'd_mag': self.d_mag, 'tri_filt_names': self.a_tri_filt_names,
+                           'j0s': self.j0s, 'd_mag': self.d_mag,
+                           'tri_filt_names': self.a_tri_filt_names,
                            'compute_local_density': self.compute_local_density,
                            'run_fw': self.a_run_fw_auf, 'run_psf': self.a_run_psf_auf,
                            'snr_mag_params': self.a_snr_mag_params,
@@ -1669,8 +1668,8 @@ class CrossMatch():
             if self.include_perturb_auf:
                 _kwargs = {'psf_fwhms': self.b_psf_fwhms, 'tri_download_flag': self.b_download_tri,
                            'delta_mag_cuts': self.delta_mag_cuts, 'num_trials': self.num_trials,
-                           'j0s': self.j0s, 'density_mags': self.b_dens_mags,
-                           'd_mag': self.d_mag, 'tri_filt_names': self.b_tri_filt_names,
+                           'j0s': self.j0s, 'd_mag': self.d_mag,
+                           'tri_filt_names': self.b_tri_filt_names,
                            'compute_local_density': self.compute_local_density,
                            'run_fw': self.b_run_fw_auf, 'run_psf': self.b_run_psf_auf,
                            'snr_mag_params': self.b_snr_mag_params,

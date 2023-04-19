@@ -41,8 +41,6 @@ auf_region_points = 131 134 4 -1 1 4
 
 # Local density calculation radius, in degrees
 dens_dist = 0.25
-# Magnitudes, in each bandpass, down to which to count nearby local sources when calculating local density
-dens_mags = 20 20 20 20
 
 # Test for whether we need to correct astrometry of catalogue for systematic biases before performing matches
 correct_astrometry = no
