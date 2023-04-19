@@ -300,6 +300,12 @@ class CrossMatch():
                 raise ValueError("Inconsistency between run/no run flags; please ensure that "
                                  "if a sub-process is set to run that all subsequent "
                                  "processes are also set to run.")
+        if not self.use_memmap_files and np.any(~flags):
+            warnings.warn("use_memmap_files is False but one or more of run_auf, run_group, "
+                          "run_cf, or run_source were set to False. These must all be run if "
+                          "save states are not saved, please double check which is the preferred "
+                          "option. Setting run flags all to True.")
+            self.run_auf, self.run_group, self.run_cf, self.run_source = True, True, True, True
 
         # Ensure that we can create the folders for outputs.
         for path in ['group', 'reject', 'phot_like', 'pairing']:
