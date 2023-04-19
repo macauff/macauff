@@ -194,8 +194,6 @@ class CrossMatch():
             # now, rather than pre-generating our binary input catalogues.
             csv_folder, csv_filename = os.path.split(
                 self.a_csv_cat_file_string.format(self.chunk_id))
-            if csv_filename[-4:] == '.csv':
-                csv_filename = csv_filename[:-4]
             csv_to_npy(csv_folder, csv_filename, self.a_cat_folder_path,
                        self.a_pos_and_err_indices[1], self.a_mag_indices, self.a_best_mag_index_col,
                        self.a_chunk_overlap_col)
@@ -258,8 +256,6 @@ class CrossMatch():
 
             csv_folder, csv_filename = os.path.split(
                 self.b_csv_cat_file_string.format(self.chunk_id))
-            if csv_filename[-4:] == '.csv':
-                csv_filename = csv_filename[:-4]
             csv_to_npy(csv_folder, csv_filename, self.b_cat_folder_path,
                        self.b_pos_and_err_indices[1], self.b_mag_indices, self.b_best_mag_index_col,
                        self.b_chunk_overlap_col)
@@ -1489,22 +1485,14 @@ class CrossMatch():
         except OSError:
             raise OSError("Error when trying to create folder to store output csv files in. "
                           "Please ensure that output_csv_folder is correct in joint config file.")
-        # Make nonmatch_out_csv_name use *_cat_name + "nonmatch_out_csv_name" so this
-        # is a common
-        if joint_config['match_out_csv_name'][-4:] == '.csv':
-            # npy_to_csv doesn't want duplicate .csv, adding it itself.
-            self.match_out_csv_name = joint_config['match_out_csv_name'][:-4]
-        else:
-            self.match_out_csv_name = joint_config['match_out_csv_name']
+
+        self.match_out_csv_name = joint_config['match_out_csv_name']
         for config, catname in zip([cat_a_config, cat_b_config], ['a_', 'b_']):
             # Non-match csv name should be of the format
             # [cat name]_[some indication this is a non-match], but note that
             # this is defined in joint_config, not each individual
             # catalogue config!
-            if joint_config['nonmatch_out_csv_name'][-4:] == '.csv':
-                nonmatch_out_name = joint_config['nonmatch_out_csv_name'][:-4]
-            else:
-                nonmatch_out_name = joint_config['nonmatch_out_csv_name']
+            nonmatch_out_name = joint_config['nonmatch_out_csv_name']
             setattr(self, '{}nonmatch_out_csv_name'.format(catname),
                     '{}_{}'.format(getattr(self, '{}cat_name'.format(catname)), nonmatch_out_name))
 

@@ -1116,7 +1116,7 @@ class TestInputs:
                               'data/crossmatch_params_.txt')).readlines()
         idx = np.where([old_line in line for line in f])[0][0]
         lines = ['make_output_csv = yes\n', 'output_csv_folder = output_csv_folder\n',
-                 'match_out_csv_name = match\n']
+                 'match_out_csv_name = match.csv\n']
         for i, key in enumerate(['output_csv_folder', 'match_out_csv_name',
                                  'nonmatch_out_csv_name']):
             new_line = ''
@@ -1136,7 +1136,7 @@ class TestInputs:
         new_line = ''
         for line in lines:
             new_line = new_line + line
-        new_line = new_line + 'nonmatch_out_csv_name = nonmatch\n'
+        new_line = new_line + 'nonmatch_out_csv_name = nonmatch.csv\n'
         _replace_line(os.path.join(os.path.dirname(__file__),
                       'data/crossmatch_params_.txt'), idx, new_line,
                       out_file=os.path.join(os.path.dirname(__file__),
@@ -1147,8 +1147,9 @@ class TestInputs:
                               'data/cat_a_params.txt')).readlines()
         idx = np.where([old_line in line for line in f])[0][0]
         lines = ['snr_mag_params_path = a_snr_mag\n\n', 'input_csv_folder = input_csv_folder\n',
-                 'cat_csv_name = catalogue\n', 'cat_col_names = A B C\n', 'cat_col_nums = 1 2 3\n',
-                 'input_npy_folder = blah\n', 'csv_has_header = no\n', 'extra_col_names = None\n']
+                 'cat_csv_name = catalogue.csv\n', 'cat_col_names = A B C\n',
+                 'cat_col_nums = 1 2 3\n', 'input_npy_folder = blah\n', 'csv_has_header = no\n',
+                 'extra_col_names = None\n']
         for i, key in enumerate(['input_csv_folder', 'cat_csv_name', 'cat_col_names',
                                  'cat_col_nums', 'input_npy_folder', 'csv_has_header',
                                  'extra_col_names', 'extra_col_nums']):
@@ -1203,11 +1204,11 @@ class TestInputs:
                              os.path.join(os.path.dirname(__file__),
                              'data/cat_b_params_.txt'))
         assert cm.output_csv_folder == os.path.abspath('output_csv_folder')
-        assert cm.match_out_csv_name == 'match'
-        assert cm.b_nonmatch_out_csv_name == 'WISE_nonmatch'
+        assert cm.match_out_csv_name == 'match.csv'
+        assert cm.b_nonmatch_out_csv_name == 'WISE_nonmatch.csv'
 
         assert cm.b_input_csv_folder == os.path.abspath('input_csv_folder')
-        assert cm.a_cat_csv_name == 'catalogue'
+        assert cm.a_cat_csv_name == 'catalogue.csv'
         assert np.all(cm.a_cat_col_names == np.array(['Gaia_A', 'Gaia_B', 'Gaia_C']))
         assert np.all(cm.b_cat_col_nums == np.array([1, 2, 3]))
         assert cm.b_input_npy_folder == os.path.abspath('blah')
@@ -1254,24 +1255,6 @@ class TestInputs:
                     os.path.join(os.path.dirname(__file__), 'data/{}.txt'.format(j)),
                     os.path.join(os.path.dirname(__file__), 'data/{}.txt'.format(a)),
                     os.path.join(os.path.dirname(__file__), 'data/{}.txt'.format(b)))
-        # Check for .csv stripping in output filenames.
-        for old_line, new_line in zip(
-                ['match_out_csv_name = match', 'nonmatch_out_csv_name = nonmatch'],
-                ['match_out_csv_name = match.csv\n', 'nonmatch_out_csv_name = nonmatch.csv\n']):
-            f = open(os.path.join(os.path.dirname(__file__),
-                                  'data/crossmatch_params__.txt')).readlines()
-            idx = np.where([old_line in line for line in f])[0][0]
-            _replace_line(os.path.join(os.path.dirname(__file__),
-                          'data/crossmatch_params__.txt'), idx, new_line,
-                          out_file=os.path.join(os.path.dirname(__file__),
-                          'data/crossmatch_params_3.txt'))
-            cm._initialise_chunk(
-                os.path.join(os.path.dirname(__file__), 'data/crossmatch_params_3.txt'),
-                os.path.join(os.path.dirname(__file__), 'data/cat_a_params_.txt'),
-                os.path.join(os.path.dirname(__file__), 'data/cat_b_params_.txt'))
-            cm.match_out_csv_name = 'match'
-            cm.a_nonmatch_out_csv_name = 'gaia_nonmatch'
-            cm.b_nonmatch_out_csv_name = 'wise_nonmatch'
 
         # Finally, to check for extra_col_* issues, we need to set both
         # to not None first.
@@ -1905,22 +1888,22 @@ class TestPostProcess:
         os.makedirs(cm.output_csv_folder, exist_ok=True)
         cm.a_input_csv_folder = 'a_input_csv_folder'
         os.makedirs(cm.a_input_csv_folder, exist_ok=True)
-        cm.a_cat_csv_name = 'gaia_catalogue'
+        cm.a_cat_csv_name = 'gaia_catalogue.csv'
         cm.a_csv_has_header = False
         acat, acatstring = self.make_temp_catalogue(self.Na, 8, 100, 'Gaia ')
-        np.savetxt('{}/{}.csv'.format(cm.a_input_csv_folder, cm.a_cat_csv_name),
+        np.savetxt('{}/{}'.format(cm.a_input_csv_folder, cm.a_cat_csv_name),
                    acatstring, delimiter=',', fmt='%s', header='')
         cm.b_input_csv_folder = 'b_input_csv_folder'
         os.makedirs(cm.b_input_csv_folder, exist_ok=True)
-        cm.b_cat_csv_name = 'wise_catalogue'
+        cm.b_cat_csv_name = 'wise_catalogue.csv'
         cm.b_csv_has_header = True
         bcat, bcatstring = self.make_temp_catalogue(self.Nb, 10, 500, 'J')
-        np.savetxt('{}/{}.csv'.format(cm.b_input_csv_folder, cm.b_cat_csv_name), bcatstring,
+        np.savetxt('{}/{}'.format(cm.b_input_csv_folder, cm.b_cat_csv_name), bcatstring,
                    delimiter=',', fmt='%s',
                    header='ID, RA, Dec, Err, W1, W2, W3, W4, bestflag, inchunk')
-        cm.match_out_csv_name = 'match'
-        cm.a_nonmatch_out_csv_name = 'gaia_nonmatch'
-        cm.b_nonmatch_out_csv_name = 'wise_nonmatch'
+        cm.match_out_csv_name = 'match.csv'
+        cm.a_nonmatch_out_csv_name = 'gaia_nonmatch.csv'
+        cm.b_nonmatch_out_csv_name = 'wise_nonmatch.csv'
         # These would be ['Des', 'RA', 'Dec', 'G', 'RP'] as passed to CrossMatch,
         # but to avoid exactly this situation we prepend the catalogue name on the
         # front since RA and Dec are likely duplicated in all matches...
@@ -1965,9 +1948,9 @@ class TestPostProcess:
         # Check that the outputs make sense, treating this more like a
         # parse_catalogue test than anything else, but importantly
         # checking for correct lengths of produced outputs like pc.
-        assert os.path.isfile('{}/{}.csv'.format(cm.output_csv_folder, cm.match_out_csv_name))
-        assert os.path.isfile('{}/{}.csv'.format(cm.output_csv_folder, cm.a_nonmatch_out_csv_name))
-        assert os.path.isfile('{}/{}.csv'.format(cm.output_csv_folder, cm.b_nonmatch_out_csv_name))
+        assert os.path.isfile('{}/{}'.format(cm.output_csv_folder, cm.match_out_csv_name))
+        assert os.path.isfile('{}/{}'.format(cm.output_csv_folder, cm.a_nonmatch_out_csv_name))
+        assert os.path.isfile('{}/{}'.format(cm.output_csv_folder, cm.b_nonmatch_out_csv_name))
 
         pc = np.load('{}/pairing/pc.npy'.format(self.joint_folder_path))
         eta = np.load('{}/pairing/eta.npy'.format(self.joint_folder_path))
@@ -1993,7 +1976,7 @@ class TestPostProcess:
         names = np.append(np.append(cm.a_cat_col_names, cm.b_cat_col_names),
                           np.append(extra_cols, cm.b_extra_col_names))
 
-        df = pd.read_csv('{}/{}.csv'.format(cm.output_csv_folder, cm.match_out_csv_name),
+        df = pd.read_csv('{}/{}'.format(cm.output_csv_folder, cm.match_out_csv_name),
                          header=None, names=names)
         for i, col in zip([1, 2, 4, 5], cm.a_cat_col_names[1:]):
             assert_allclose(df[col], acat[ac, i])
@@ -2012,7 +1995,7 @@ class TestPostProcess:
 
         names = np.append(cm.a_cat_col_names,
                           ['MATCH_P', 'NNM_SEPARATION', 'NNM_ETA', 'NNM_XI', 'A_AVG_CONT'])
-        df = pd.read_csv('{}/{}.csv'.format(cm.output_csv_folder, cm.a_nonmatch_out_csv_name),
+        df = pd.read_csv('{}/{}'.format(cm.output_csv_folder, cm.a_nonmatch_out_csv_name),
                          header=None, names=names)
         for i, col in zip([1, 2, 4, 5], cm.a_cat_col_names[1:]):
             assert_allclose(df[col], acat[af, i])
@@ -2026,7 +2009,7 @@ class TestPostProcess:
         names = np.append(np.append(cm.b_cat_col_names,
                           ['MATCH_P', 'NNM_SEPARATION', 'NNM_ETA', 'NNM_XI', 'B_AVG_CONT']),
                           cm.b_extra_col_names)
-        df = pd.read_csv('{}/{}.csv'.format(cm.output_csv_folder, cm.b_nonmatch_out_csv_name),
+        df = pd.read_csv('{}/{}'.format(cm.output_csv_folder, cm.b_nonmatch_out_csv_name),
                          header=None, names=names)
         for i, col in zip([1, 2, 4, 5, 6], cm.b_cat_col_names[1:]):
             assert_allclose(df[col], bcat[bf, i])
