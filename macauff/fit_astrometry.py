@@ -1518,27 +1518,32 @@ class AstrometricCorrections:
         summary plot of the sig-sig relations, quality of fits, and
         resulting "m" and "n" scaling parameters.
         """
-        ax_d = plt.subplot(self.gs[1])
-        q = ~np.isnan(self.x2s[:, 0])
-        chi_sqs, dofs = self.x2s[:, 0][q].flatten(), self.x2s[:, 1][q].flatten()
-        chi_sq_cdf = np.empty(np.sum(q), float)
-        for i, (chi_sq, dof) in enumerate(zip(chi_sqs, dofs)):
-            chi_sq_cdf[i] = chi2.cdf(chi_sq, dof)
-        # Under the hypothesis all CDFs are "true" we should expect
-        # the distribution of CDFs to be linear with fraction of the way
-        # through the sorted list of CDFs -- that is, the CDF ranked 30%
-        # in order should be ~0.3.
-        q_sort = np.argsort(chi_sq_cdf)
-        filter_log_nans = chi_sq_cdf[q_sort] < 1
-        true_hypothesis_cdf_dist = (np.arange(1, len(chi_sq_cdf)+1, 1) - 0.5) / len(chi_sq_cdf)
-        ax_d.plot(np.log10(1 - chi_sq_cdf[q_sort][filter_log_nans]),
-                  true_hypothesis_cdf_dist[filter_log_nans], 'k.')
-        ax_d.plot(np.log10(1 - true_hypothesis_cdf_dist), true_hypothesis_cdf_dist, 'r--')
-        if usetex:
-            ax_d.set_xlabel(r'$\log_{10}(1 - \mathrm{CDF})$')
-        else:
-            ax_d.set_xlabel(r'log10(1 - CDF)')
-        ax_d.set_ylabel('Fraction')
+        # TODO: put chi-squred distribution comparison back, but that needs
+        # self.x2s saving out somehow so that we can skip to the end and just
+        # run finalise_summary_plot on re-runs when we don't need to fit any
+        # astrometry, and currently that isn't possible.
+
+        # ax_d = plt.subplot(self.gs[1])
+        # q = ~np.isnan(self.x2s[:, 0])
+        # chi_sqs, dofs = self.x2s[:, 0][q].flatten(), self.x2s[:, 1][q].flatten()
+        # chi_sq_cdf = np.empty(np.sum(q), float)
+        # for i, (chi_sq, dof) in enumerate(zip(chi_sqs, dofs)):
+        #     chi_sq_cdf[i] = chi2.cdf(chi_sq, dof)
+        # # Under the hypothesis all CDFs are "true" we should expect
+        # # the distribution of CDFs to be linear with fraction of the way
+        # # through the sorted list of CDFs -- that is, the CDF ranked 30%
+        # # in order should be ~0.3.
+        # q_sort = np.argsort(chi_sq_cdf)
+        # filter_log_nans = chi_sq_cdf[q_sort] < 1
+        # true_hypothesis_cdf_dist = (np.arange(1, len(chi_sq_cdf)+1, 1) - 0.5) / len(chi_sq_cdf)
+        # ax_d.plot(np.log10(1 - chi_sq_cdf[q_sort][filter_log_nans]),
+        #           true_hypothesis_cdf_dist[filter_log_nans], 'k.')
+        # ax_d.plot(np.log10(1 - true_hypothesis_cdf_dist), true_hypothesis_cdf_dist, 'r--')
+        # if usetex:
+        #     ax_d.set_xlabel(r'$\log_{10}(1 - \mathrm{CDF})$')
+        # else:
+        #     ax_d.set_xlabel(r'log10(1 - CDF)')
+        # ax_d.set_ylabel('Fraction')
 
         for i, (f, label) in enumerate(zip([self.m_sigs, self.n_sigs], ['m', 'n'])):
             ax = plt.subplot(self.gs[i+2])
