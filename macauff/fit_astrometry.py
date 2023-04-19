@@ -1822,6 +1822,7 @@ def create_distances(a, b, ax1_mid, ax2_mid, nn_radius, save_folder, a_ax1_ind, 
 
     np.save('{}/npy/a_matchind_{}_{}.npy'.format(save_folder, ax1_mid, ax2_mid), amatch)
     np.save('{}/npy/b_matchind_{}_{}.npy'.format(save_folder, ax1_mid, ax2_mid), bmatch)
+    np.save('{}/npy/ab_dists_{}_{}.npy'.format(save_folder, ax1_mid, ax2_mid), dists)
 
     return amatch, bmatch, dists
 
