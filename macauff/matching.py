@@ -196,7 +196,10 @@ class CrossMatch():
                 self.a_csv_cat_file_string.format(self.chunk_id))
             csv_to_npy(csv_folder, csv_filename, self.a_cat_folder_path,
                        self.a_pos_and_err_indices[1], self.a_mag_indices, self.a_best_mag_index_col,
-                       self.a_chunk_overlap_col)
+                       self.a_chunk_overlap_col, header=False, process_uncerts=True,
+                       astro_sig_fits_filepath='{}/npy'.format(self.a_correct_astro_save_folder),
+                       cat_in_radec=self.a_auf_region_frame == 'equatorial',
+                       mn_in_radec=self.a_auf_region_frame == 'equatorial')
         if self.a_compute_snr_mag_relation:
             t = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             print("{} Rank {}, chunk {}: Calculating catalogue 'a' SNR-mag relations..."
@@ -258,7 +261,10 @@ class CrossMatch():
                 self.b_csv_cat_file_string.format(self.chunk_id))
             csv_to_npy(csv_folder, csv_filename, self.b_cat_folder_path,
                        self.b_pos_and_err_indices[1], self.b_mag_indices, self.b_best_mag_index_col,
-                       self.b_chunk_overlap_col)
+                       self.b_chunk_overlap_col, header=False, process_uncerts=True,
+                       astro_sig_fits_filepath='{}/npy'.format(self.b_correct_astro_save_folder),
+                       cat_in_radec=self.b_auf_region_frame == 'equatorial',
+                       mn_in_radec=self.b_auf_region_frame == 'equatorial')
         if self.b_compute_snr_mag_relation:
             t = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             print("{} Rank {}, chunk {}: Calculating catalogue 'b' SNR-mag relations..."
