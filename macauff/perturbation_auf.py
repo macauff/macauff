@@ -448,7 +448,7 @@ def make_perturb_aufs(auf_folder, cat_folder, filters, auf_points, r, dr, rho,
                         delta_mag_cuts, dd_params, l_cut, run_fw, run_psf, snr_mag_params[j],
                         al_avs[j], auf_region_frame, ax1_list, ax2_list, fit_gal_flag, cmau_array,
                         wavs[j], z_maxs[j], nzs[j], alpha0, alpha1, alpha_weight, ab_offsets[j],
-                        filter_names[j], al_avs[j])
+                        filter_names[j])
                 else:
                     Narray = create_single_perturb_auf(
                         ax_folder, auf_points[i], filters[j], r, dr, rho, drho, j0s, num_trials,
@@ -1094,7 +1094,7 @@ def create_single_perturb_auf(tri_folder, auf_point, filt, r, dr, rho, drho, j0s
 
     s_flux = 10**(-1/2.5 * mag_array)
     lb_ind = mff.find_nearest_point(auf_point[0], auf_point[1],
-                                    snr_mag_params[:, 3], snr_mag_params[:, 4])[0]
+                                    snr_mag_params[:, 3], snr_mag_params[:, 4])
     a_snr = snr_mag_params[lb_ind, 0]
     b_snr = snr_mag_params[lb_ind, 1]
     c_snr = snr_mag_params[lb_ind, 2]

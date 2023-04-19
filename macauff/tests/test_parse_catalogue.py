@@ -112,7 +112,7 @@ class TestParseCatalogue:
         with pytest.raises(ValueError, match='astro_sig_fits_filepath does not exist.'):
             csv_to_npy('.', 'test_data.csv', '.', [0, 1, 2], [4, 5], 6, None, header=header,
                        process_uncerts=True, astro_sig_fits_filepath='test_sig_folder',
-                       cat_in_radec=False)
+                       cat_in_radec=False, mn_in_radec=False)
 
         os.makedirs('test_sig_folder')
         np.save('test_sig_folder/m_sigs_array.npy', np.array([2]))

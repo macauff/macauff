@@ -27,7 +27,7 @@ def csv_to_npy(input_folder, input_filename, output_folder, astro_cols, photo_co
     input_folder : string
         Folder on disk where the catalogue .csv file is stored.
     input_filename : string
-        Name of the CSV file, without the extension, to convert to binary files.
+        Name of the CSV file, including extension, to convert to binary files.
     output_folder : string
         Folder on disk of where to save the .npy versions of the catalogue.
     astro_cols : list or numpy.array of integers

@@ -119,7 +119,7 @@ class TestCreatePerturbAUF:
         assert len(record) == 1
         assert 'Incorrect number of files in catalogue "b"' in record[0].message.args[0]
 
-    @pytest.mark.filterwarnings("ignore:*Incorrect number of files in")
+    @pytest.mark.filterwarnings("ignore:.*Incorrect number of files in")
     def test_load_auf_print(self, capsys):
         # Reset any saved files from the above tests
         os.system("rm -rf {}/*".format(self.cm.a_auf_folder_path))
@@ -909,8 +909,8 @@ class TestMakePerturbAUFs():
 
             for name, size in zip(
                     ['frac', 'flux', 'offset', 'cumulative', 'fourier', 'N', 'mag'],
-                    [(len(self.delta_mag_cuts), 1), (1,), (len(self.r)-1, 1),
-                     (len(self.r)-1, 1), (len(self.rho)-1, 1), (1,), (1,)]):
+                    [(len(self.delta_mag_cuts), 2), (2,), (len(self.r)-1, 2),
+                     (len(self.r)-1, 2), (len(self.rho)-1, 2), (2,), (2,)]):
                 var = np.load('{}/{}/{}/{}/{}.npy'.format(
                               self.auf_folder, ax1, ax2, self.filters[0], name))
                 assert np.all(var.shape == size)
@@ -1220,10 +1220,10 @@ class TestMakePerturbAUFs():
                       'data/cat_b_params_.txt'))
         for ol, nl in zip(['psf_fwhms = 6.08 6.84 7.36 11.99', 'cat_folder_path = wise_folder',
                            'auf_folder_path = wise_auf_folder', 'tri_filt_names = W1 W2 W3 W4',
-                           'dens_mags = 20 20 20 20', 'gal_al_avs = '],
+                           'gal_al_avs = '],
                           ['psf_fwhms = 6.08\n', 'cat_folder_path = cat_folder\n',
                            'auf_folder_path = auf_folder\n', 'tri_filt_names = W1\n',
-                           'dens_mags = 20\n', 'gal_al_avs = 0\n']):
+                           'gal_al_avs = 0\n']):
             f = open(os.path.join(os.path.dirname(__file__),
                                   'data/cat_b_params.txt')).readlines()
             idx = np.where([ol in line for line in f])[0][0]
