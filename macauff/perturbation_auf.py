@@ -1119,7 +1119,7 @@ def create_single_perturb_auf(tri_folder, auf_point, filt, r, dr, rho, drho, j0s
             l_cut, 'psf')
 
     if run_fw and run_psf:
-        h = 1 - np.sqrt(1 - min(1, a_snr**2 * snr**2))
+        h = 1 - np.sqrt(1 - np.minimum(np.ones_like(snr), a_snr**2 * snr**2))
         Flux = h * Flux_fw + (1 - h) * Flux_psf
         h = h.reshape(1, -1)
         Frac = h * Frac_fw + (1 - h) * Frac_psf
