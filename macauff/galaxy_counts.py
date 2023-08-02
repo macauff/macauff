@@ -118,7 +118,13 @@ def create_galaxy_counts(cmau_array, mag_bins, z_array, wav, alpha0, alpha1, wei
                 fs = f.create_shifted(_z)
                 non_shift_ab_maggy, shift_ab_maggy = 0, 0
                 for k in range(len(t)):
-                    non_shift_ab_maggy += spectral_coefficients[j, k] * f.get_ab_maggies(t[k], w)
+                    try:
+                        non_shift_ab_maggy += spectral_coefficients[j, k] * f.get_ab_maggies(t[k],
+                                                                                             w)
+                    except ValueError:
+                        _t, _w = fs.pad_spectrum(t[k], w, method='edge')
+                        non_shift_ab_maggy += spectral_coefficients[j, k] * fs.get_ab_maggies(_t,
+                                                                                              _w)
                     try:
                         shift_ab_maggy += spectral_coefficients[j, k] * fs.get_ab_maggies(t[k], w)
                     except ValueError:

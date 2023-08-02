@@ -75,6 +75,9 @@ New Features
 Bug Fixes
 ^^^^^^^^^
 
+- Fixed cases where wavelength range of filter response can cause a non-shifted
+  spectrum to fail due to non-padding in ``create_galaxy_counts``. [#64]
+
 - ``create_single_perturb_auf`` raises an error if the number of simulated
   sources in a given sightline is insufficient to draw reliable number density
   measurements from. [#64]
