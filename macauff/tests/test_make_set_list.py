@@ -37,7 +37,7 @@ def test_initial_group_numbering():
 def test_set_list_maximum_exceeded():
     os.makedirs('./group', exist_ok=True)
     os.makedirs('./reject', exist_ok=True)
-    for i, (N_a, N_b) in enumerate(zip([8, 7, 7], [6, 7, 6])):
+    for i, (N_a, N_b) in enumerate(zip([21, 10, 7], [5, 10, 6])):
         a_overlaps = np.empty((N_b, N_a+2), int)
         a_overlaps[:, :-2] = np.arange(N_b).reshape(-1, 1)
         a_overlaps[:, -2:] = -1
