@@ -109,8 +109,11 @@ class TestCreatePerturbAUF:
         # Now create fake files to simulate catalogue "a" having the right files.
         # For 2 AUF pointings this comes to 8 + 2*N_filt*files_per_auf_sim files.
         os.system("rm -rf {}/*".format(self.cm.a_auf_folder_path))
-        for i in range(6 + 2 + 2 * 3 * self.files_per_auf_sim):
+        for i in range(5 + 2 + 2 * 3 * self.files_per_auf_sim):
             np.save('{}/random_file_{}.npy'.format(self.cm.a_auf_folder_path, i), np.zeros(1))
+        # For the other files we don't care what the name is, but modelrefinds
+        # is loaded by name when skipping a catalogue in create_perturb_auf.
+        np.save('{}/modelrefinds.npy'.format(self.cm.a_auf_folder_path), np.array([1]))
 
         # This should still return the same warning, just for catalogue "b" now.
         with pytest.warns(UserWarning) as record:
@@ -126,14 +129,18 @@ class TestCreatePerturbAUF:
         os.system("rm -rf {}/*".format(self.cm.b_auf_folder_path))
 
         # Generate new dummy data for catalogue "b"'s AUF folder.
-        for i in range(6 + 2 + 2 * 4 * self.files_per_auf_sim):
+        for i in range(5 + 2 + 2 * 4 * self.files_per_auf_sim):
             np.save('{}/random_file_{}.npy'.format(self.cm.b_auf_folder_path, i), np.zeros(1))
+            # Similar to above, modelrefinds needs to not just have a
+            # random filename.
+        np.save('{}/modelrefinds.npy'.format(self.cm.b_auf_folder_path), np.array([1]))
         capsys.readouterr()
         # This test will create catalogue "a" files because of the wrong
         # number of files (zero) in the folder.
         self.cm.chunk_id = 1
         self.cm.create_perturb_auf(self.files_per_auf_sim)
         del self.cm.a_modelrefinds
+        del self.cm.b_modelrefinds
         output = capsys.readouterr().out
         assert 'Loading empirical perturbation AUFs for catalogue "a"' not in output
         assert 'Loading empirical perturbation AUFs for catalogue "b"' in output
@@ -142,8 +149,9 @@ class TestCreatePerturbAUF:
         os.system("rm -rf {}/*".format(self.cm.b_auf_folder_path))
         # Generate new dummy data for each catalogue's AUF folder.
         for path, fn in zip([self.cm.a_auf_folder_path, self.cm.b_auf_folder_path], [3, 4]):
-            for i in range(6 + 2 + 2 * fn * self.files_per_auf_sim):
+            for i in range(5 + 2 + 2 * fn * self.files_per_auf_sim):
                 np.save('{}/random_file_{}.npy'.format(path, i), np.zeros(1))
+            np.save('{}/modelrefinds.npy'.format(path), np.array([1]))
         capsys.readouterr()
         self.cm.create_perturb_auf(self.files_per_auf_sim)
         output = capsys.readouterr().out
