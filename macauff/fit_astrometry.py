@@ -671,10 +671,10 @@ class AstrometricCorrections:
                 else:
                     ax1.set_ylabel('log10(SNR)', color='b')
 
-            if self.make_plots:
-                plt.tight_layout()
-                plt.savefig('{}/pdf/s_vs_snr_{}.pdf'.format(self.save_folder, self.file_name))
-                plt.close()
+        if self.make_plots:
+            plt.tight_layout()
+            plt.savefig('{}/pdf/s_vs_snr_{}.pdf'.format(self.save_folder, self.file_name))
+            plt.close()
 
         return a_array, b_array, c_array
 
@@ -1494,7 +1494,7 @@ class AstrometricCorrections:
             x_array = np.linspace(0, ax1.get_xlim()[1], 100)
             ax1.plot(x_array, x_array, 'g:', label='y=x')
             ax1.plot(x_array, np.sqrt((m_sig*x_array)**2 + n_sig**2), 'r-.',
-                     alpha=0.8, label='Fit ma')
+                     alpha=0.8, label='Fit mn')
 
             if usetex:
                 ax1.set_xlabel(r'Input astrometric $\sigma$ / "')
@@ -1504,7 +1504,7 @@ class AstrometricCorrections:
                 ax1.set_ylabel(r'Fit astrometric sigma / "')
             ax1_name = 'l' if self.coord_system == 'galactic' else 'RA'
             ax2_name = 'b' if self.coord_system == 'galactic' else 'Dec'
-            ax1.set_title('{} = {}, {} = {}\nm = {:.2f}, a = {:.2f}'.format(
+            ax1.set_title('{} = {}, {} = {}\nm = {:.2f}, n = {:.2f}'.format(
                           ax1_name, ax1_mid, ax2_name, ax2_mid, m_sig, n_sig))
             ax1.legend()
             plt.figure('123123b')
