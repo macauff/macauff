@@ -353,18 +353,18 @@ subroutine find_single_island_prob(a_astro, a_photo, b_astro, b_photo, c_array, 
             cdmdm = c_array(binb(k), bina(j), bused(k), aused(j), qb(k))
             counterpartgrid(j, k) = Nc * G * cdmdm
 
-            if (abs(fa(j) * fb(k)) < 1e-7_dp) then
-                etagrid(j, k) = 10.0_dp
-            else if (abs(cdmdm) < 1e-7_dp) then
-                etagrid(j, k) = -10.0_dp
+            if (abs(fa(j) * fb(k)) < 1e-30_dp) then
+                etagrid(j, k) = 30.0_dp
+            else if (abs(cdmdm) < 1e-30_dp) then
+                etagrid(j, k) = -30.0_dp
             else
                 etagrid(j, k) = log10(cdmdm / (fa(j) * fb(k)))
             end if
 
-            if (abs(Nfa(j) * Nfb(k)) < 1e-7_dp) then
-                xigrid(j, k) = 10.0_dp
-            else if (abs(Nc * G) < 1e-7_dp) then
-                xigrid(j, k) = -10.0_dp
+            if (abs(Nfa(j) * Nfb(k)) < 1e-30_dp) then
+                xigrid(j, k) = 30.0_dp
+            else if (abs(Nc * G) < 1e-30_dp) then
+                xigrid(j, k) = -30.0_dp
             else
                 xigrid(j, k) = log10(Nc * G / (Nfa(j) * Nfb(k)))
             end if
