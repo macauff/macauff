@@ -290,7 +290,7 @@ subroutine find_single_island_prob(a_astro, a_photo, b_astro, b_photo, c_array, 
     nan = IEEE_VALUE(nan, IEEE_QUIET_NAN)
 
     do j = 1, size(aperm)
-        bina(j) = maxloc(a_photo(aperm(j), aused(j)) - abinsarray(:abinlengths(aused(j), qa(j)), aused(j), qa(j)), &
+        bina(j) = minloc(a_photo(aperm(j), aused(j)) - abinsarray(:abinlengths(aused(j), qa(j)), aused(j), qa(j)), &
                          mask=(a_photo(aperm(j), aused(j)) - abinsarray(:abinlengths(aused(j), qa(j)), aused(j), qa(j)) >= 0), &
                          dim=1)
         ! For the field sources we don't know which other filter to use, so we
@@ -302,7 +302,7 @@ subroutine find_single_island_prob(a_astro, a_photo, b_astro, b_photo, c_array, 
     end do
 
     do j = 1, size(bperm)
-        binb(j) = maxloc(b_photo(bperm(j), bused(j)) - bbinsarray(:bbinlengths(bused(j), qb(j)), bused(j), qb(j)), &
+        binb(j) = minloc(b_photo(bperm(j), bused(j)) - bbinsarray(:bbinlengths(bused(j), qb(j)), bused(j), qb(j)), &
                          mask=(b_photo(bperm(j), bused(j)) - bbinsarray(:bbinlengths(bused(j), qb(j)), bused(j), qb(j)) >= 0), &
                          dim=1)
         Nfb(j) = fb_priors(bused(j), 1, qb(j))
