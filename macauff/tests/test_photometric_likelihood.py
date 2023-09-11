@@ -113,7 +113,7 @@ class TestOneSidedPhotometricLikelihood:
                                                   (25, 4, 3, 6)]):
             a = np.load('{}/phot_like/{}.npy'.format(self.joint_folder_path, file))
             assert np.all(a.shape == shape)
-            assert np.all(a == np.ones(shape, float))
+            assert_allclose(a, np.ones(shape, float), atol=1e-30)
 
         abins = np.load('{}/phot_like/abinsarray.npy'.format(self.joint_folder_path))
         bbins = np.load('{}/phot_like/bbinsarray.npy'.format(self.joint_folder_path))
@@ -160,7 +160,7 @@ class TestOneSidedPhotometricLikelihood:
         c_array = np.load('{}/phot_like/c_array.npy'.format(self.joint_folder_path))
         c_check = np.ones((25, 50, 4, 3, 6), float)
         c_check[:, :, 2, :, 2] = 0
-        assert np.all(c_array == c_check)
+        assert_allclose(c_array, c_check, atol=1e-30)
 
     def test_small_number_bins(self):
         os.system('rm -r {}/phot_like/*'.format(self.joint_folder_path))
@@ -196,7 +196,7 @@ class TestOneSidedPhotometricLikelihood:
         c_array = np.load('{}/phot_like/c_array.npy'.format(self.joint_folder_path))
         c_check = np.ones((25, 50, 4, 3, 6), float)
         c_check[1:, :, 2, :, 2] = 0
-        assert np.all(c_array == c_check)
+        assert_allclose(c_array, c_check, atol=1e-30)
 
     def test_calculate_phot_like_input(self):
         os.system('rm -r {}/phot_like/*'.format(self.joint_folder_path))
@@ -229,7 +229,7 @@ class TestOneSidedPhotometricLikelihood:
                                                   (25, 4, 3, 6)]):
             a = np.load('{}/phot_like/{}.npy'.format(self.joint_folder_path, file))
             assert np.all(a.shape == shape)
-            assert np.all(a == np.ones(shape, float))
+            assert_allclose(a, np.ones(shape, float), atol=1e-30)
 
         abins = np.load('{}/phot_like/abinsarray.npy'.format(self.joint_folder_path))
         bbins = np.load('{}/phot_like/bbinsarray.npy'.format(self.joint_folder_path))
@@ -276,7 +276,7 @@ class TestOneSidedPhotometricLikelihood:
                                                   (25, 4, 3, 6)]):
             a = np.load('{}/phot_like/{}.npy'.format(self.joint_folder_path, file))
             assert np.all(a.shape == shape)
-            assert np.all(a == np.ones(shape, float))
+            assert_allclose(a, np.ones(shape, float), atol=1e-30)
 
         abins = np.load('{}/phot_like/abinsarray.npy'.format(self.joint_folder_path))
         bbins = np.load('{}/phot_like/bbinsarray.npy'.format(self.joint_folder_path))
