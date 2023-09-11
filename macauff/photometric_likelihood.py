@@ -266,11 +266,13 @@ def compute_photometric_likelihoods(joint_folder_path, a_cat_folder_path, b_cat_
                     # likelihoods and priors, to avoid ever having exactly zero
                     # value in either, which would mean all island permutations
                     # were rejected.
-                    c_priors[j, i, m] = c_prior + 1e-10
+                    c_priors[j, i, m] = c_prior + 1e-100
                     fa_priors[j, i, m] = fa_prior + 1e-10
                     fb_priors[j, i, m] = fb_prior + 1e-10
+                    # c should be equal to f^2 in the limit of indifference, so
+                    # add 1e-10 and (1e-10)^2 to f and c respectively.
                     c_array[:bbinlengths[j, m]-1,
-                            :abinlengths[i, m]-1, j, i, m] = c_like + 1e-10
+                            :abinlengths[i, m]-1, j, i, m] = c_like + 1e-100
                     fa_array[:abinlengths[i, m]-1, j, i, m] = fa_like + 1e-10
                     fb_array[:bbinlengths[j, m]-1, j, i, m] = fb_like + 1e-10
 
