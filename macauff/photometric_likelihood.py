@@ -244,7 +244,7 @@ def compute_photometric_likelihoods(joint_folder_path, a_cat_folder_path, b_cat_
                         fb_prior = Nb - c_prior
                         # To fake no photometric likelihoods, simply set all
                         # values to one, to cancel in the ratio later.
-                        c_like, fa_like, fb_like = 1-1e-10, 1-1e-10, 1-1e-10
+                        c_like, fa_like, fb_like = (1-1e-10)**2, 1-1e-10, 1-1e-10
                     else:
                         b_bins = bbinsarray[:bbinlengths[j, m], j, m]
                         b_mag = b_photo_cut[:, j]
@@ -260,7 +260,7 @@ def compute_photometric_likelihoods(joint_folder_path, a_cat_folder_path, b_cat_
                     if use_phot_priors and not include_phot_like:
                         # If we only used the create_c_and_f routine to derive
                         # priors, then quickly update likelihoods here.
-                        c_like, fa_like, fb_like = 1-1e-10, 1-1e-10, 1-1e-10
+                        c_like, fa_like, fb_like = (1-1e-10)**2, 1-1e-10, 1-1e-10
 
                     # Have to add a very small "fire extinguisher" value to all
                     # likelihoods and priors, to avoid ever having exactly zero
