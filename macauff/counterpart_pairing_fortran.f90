@@ -341,6 +341,15 @@ subroutine find_single_island_prob(a_astro, a_photo, b_astro, b_photo, c_array, 
             ! G would be in units of per square arcseconds, but we need it
             ! in units of per square degree to compare to Nf.
             G = Gcc * 3600.0_dp**2
+            ! If G is negative something has gone wrong with the fourier transform integral, so just set to
+            ! a very low but crucially positive value in all cases.
+            if (G < 0) then
+                G = 1e-30_dp
+                Gcc = 1e-30_dp
+                Gcn = 1e-30_dp
+                Gnc = 1e-30_dp
+                Gnn = 1e-30_dp
+            end if
 
             do ff = 1, n_fracs
                 pr = aF(ff)*bF(ff)*Gcc + aF(ff)*(1-bF(ff))*Gcn + (1-aF(ff))*bF(ff)*Gnc + (1-aF(ff))*(1-bF(ff))*Gnn
