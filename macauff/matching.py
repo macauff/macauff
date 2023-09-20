@@ -189,7 +189,7 @@ class CrossMatch():
                 self.a_filt_names, self.a_best_mag_index, self.a_auf_region_frame,
                 pregenerate_cutouts=True, chunks=[self.chunk_id])
             ac(self.a_ref_csv_cat_file_string, self.a_csv_cat_file_string,
-               tri_download=self.a_download_tri, make_plots=True)
+               tri_download=self.a_download_tri, make_plots=True, overwrite_all_sightlines=True)
 
             # Having corrected the astrometry, we have to call csv_to_npy
             # now, rather than pre-generating our binary input catalogues.
@@ -210,7 +210,7 @@ class CrossMatch():
                 a_coord_or_chunk, self.a_pos_and_err_indices, self.a_mag_indices,
                 self.a_mag_unc_indices, self.a_filt_names, self.a_auf_region_frame,
                 chunks=[self.chunk_id])
-            smr(self.a_csv_cat_file_string, make_plots=True)
+            smr(self.a_csv_cat_file_string, make_plots=True, overwrite_all_sightlines=True)
         if self.a_correct_astrometry or self.a_compute_snr_mag_relation:
             # If we re-made either side's astrometry then we need to load its
             # SNR-mag relation now.
@@ -256,7 +256,7 @@ class CrossMatch():
                 self.b_filt_names, self.b_best_mag_index, self.b_auf_region_frame,
                 pregenerate_cutouts=True, chunks=[self.chunk_id])
             ac(self.b_ref_csv_cat_file_string, self.b_csv_cat_file_string,
-               tri_download=self.b_download_tri, make_plots=True)
+               tri_download=self.b_download_tri, make_plots=True, overwrite_all_sightlines=True)
 
             csv_folder, csv_filename = os.path.split(
                 self.b_csv_cat_file_string.format(self.chunk_id))
@@ -275,7 +275,7 @@ class CrossMatch():
                 b_coord_or_chunk, self.b_pos_and_err_indices, self.b_mag_indices,
                 self.b_mag_unc_indices, self.b_filt_names, self.b_auf_region_frame,
                 chunks=[self.chunk_id])
-            smr(self.b_csv_cat_file_string, make_plots=True)
+            smr(self.b_csv_cat_file_string, make_plots=True, overwrite_all_sightlines=True)
         if self.b_correct_astrometry or self.b_compute_snr_mag_relation:
             os.system('cp {}/npy/snr_mag_params.npy {}'.format(self.b_correct_astro_save_folder,
                       self.b_snr_mag_params_path))
