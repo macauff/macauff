@@ -61,13 +61,15 @@ class TestAstroCorrection:
         mag_uncert[50:100] = mag_uncert[:50] + self.rng.uniform(-0.001, 0.001, size=50)
         astro_uncert = np.empty(self.N, float)
         astro_uncert[:100] = 0.01
-        # Divide the N-100 objects at the 0/21/44/70/100 interval, for a
-        # 21/23/26/31 split.
-        i_list = [100, int((self.N-100)*0.21 + 100),
-                  int((self.N-100)*0.44 + 100), int((self.N-100)*0.7 + 100)]
-        j_list = [i_list[1], i_list[2], i_list[3], self.N]
+        # Divide the N-100 objects at the 0/16/33/52/75/100 interval, for a
+        # 16/17/19/23/25 split.
+        i_list = [100, int((self.N-100)*0.16 + 100),
+                  int((self.N-100)*0.33 + 100), int((self.N-100)*0.52 + 100),
+                  int((self.N-100)*0.75 + 100)]
+        j_list = [i_list[1], i_list[2], i_list[3], i_list[4], self.N]
         for i, j, mag_mid, sig_mid in zip(i_list, j_list,
-                                          [14.07, 14.17, 14.27, 14.37], [0.05, 0.075, 0.1, 0.12]):
+                                          [14.07, 14.17, 14.27, 14.37, 14.47],
+                                          [0.01, 0.02, 0.06, 0.12, 0.4]):
             mag[i:j] = self.rng.uniform(mag_mid-0.05, mag_mid+0.05, size=j-i)
             snr_mag = mag_mid / np.sqrt(3.5e-16 * mag_mid + 8e-17 + (1.2e-2 * mag_mid)**2)
             dm_mag = 2.5 * np.log10(1 + 1/snr_mag)
@@ -91,9 +93,9 @@ class TestAstroCorrection:
         dd_params = np.load(os.path.join(os.path.dirname(__file__), 'data/dd_params.npy'))
         l_cut = np.load(os.path.join(os.path.dirname(__file__), 'data/l_cut.npy'))
         ax1_mids, ax2_mids = np.array([105], dtype=float), np.array([0], dtype=float)
-        magarray = np.array([14.07, 14.17, 14.27, 14.37])
-        magslice = np.array([0.05, 0.05, 0.05, 0.05])
-        sigslice = np.array([0.1, 0.1, 0.1, 0.1])
+        magarray = np.array([14.07, 14.17, 14.27, 14.37, 14.47])
+        magslice = np.array([0.05, 0.05, 0.05, 0.05, 0.05])
+        sigslice = np.array([0.01, 0.01, 0.01, 0.01, 0.01])
 
         _kwargs = {
             'psf_fwhm': 6.1, 'numtrials': 10000, 'nn_radius': 30, 'dens_search_radius': 0.25,
@@ -158,6 +160,11 @@ class TestAstroCorrection:
             AstrometricCorrections(
                 **_kwargs, ax_dimension=1, npy_or_csv='csv', pregenerate_cutouts=False,
                 coord_or_chunk='coord', coord_system='equatorial')
+        with pytest.raises(ValueError, match="use_photometric_uncertainties must either be True "):
+            ac = AstrometricCorrections(
+                **_kwargs, ax_dimension=1, npy_or_csv='csv', pregenerate_cutouts=False,
+                coord_or_chunk='coord', coord_system='equatorial', cutout_area=60, cutout_height=6,
+                use_photometric_uncertainties='yes')
         ac = AstrometricCorrections(
             **_kwargs, ax_dimension=1, npy_or_csv='csv', pregenerate_cutouts=False,
             coord_or_chunk='coord', coord_system='equatorial', cutout_area=60, cutout_height=6)
@@ -172,9 +179,9 @@ class TestAstroCorrection:
         dd_params = np.load(os.path.join(os.path.dirname(__file__), 'data/dd_params.npy'))
         l_cut = np.load(os.path.join(os.path.dirname(__file__), 'data/l_cut.npy'))
         ax1_mids, ax2_mids = np.array([105], dtype=float), np.array([0], dtype=float)
-        magarray = np.array([14.07, 14.17, 14.27, 14.37])
-        magslice = np.array([0.05, 0.05, 0.05, 0.05])
-        sigslice = np.array([0.1, 0.1, 0.1, 0.1])
+        magarray = np.array([14.07, 14.17, 14.27, 14.37, 14.47])
+        magslice = np.array([0.05, 0.05, 0.05, 0.05, 0.05])
+        sigslice = np.array([0.01, 0.01, 0.01, 0.01, 0.01])
         chunks = None
         ax_dimension = 1
         ac = AstrometricCorrections(
@@ -225,9 +232,9 @@ class TestAstroCorrection:
             ax1_mids, ax2_mids = np.array([105, 120], dtype=float), np.array([0, 10], dtype=float)
         else:
             ax1_mids, ax2_mids = np.array([105], dtype=float), np.array([0], dtype=float)
-        magarray = np.array([14.07, 14.17, 14.27, 14.37])
-        magslice = np.array([0.05, 0.05, 0.05, 0.05])
-        sigslice = np.array([0.1, 0.1, 0.1, 0.1])
+        magarray = np.array([14.07, 14.17, 14.27, 14.37, 14.47])
+        magslice = np.array([0.05, 0.05, 0.05, 0.05, 0.05])
+        sigslice = np.array([0.01, 0.01, 0.01, 0.01, 0.01])
         if coord_or_chunk == 'coord':
             chunks = None
             ax_dimension = 1
@@ -283,12 +290,10 @@ class TestAstroCorrection:
             assert os.path.isfile('ac_save_folder/pdf/auf_fits_105.0_0.0.pdf')
             assert os.path.isfile('ac_save_folder/pdf/counts_comparison_105.0_0.0.pdf')
             assert os.path.isfile('ac_save_folder/pdf/s_vs_snr_105.0_0.0.pdf')
-            assert os.path.isfile('ac_save_folder/pdf/sig_fit_comparisons_105.0_0.0.pdf')
         else:
             assert os.path.isfile('ac_save_folder/pdf/auf_fits_2017.pdf')
             assert os.path.isfile('ac_save_folder/pdf/counts_comparison_2017.pdf')
             assert os.path.isfile('ac_save_folder/pdf/s_vs_snr_2017.pdf')
-            assert os.path.isfile('ac_save_folder/pdf/sig_fit_comparisons_2017.pdf')
 
         assert os.path.isfile('ac_save_folder/pdf/sig_h_stats.pdf')
 

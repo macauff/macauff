@@ -1442,12 +1442,13 @@ class TestInputs:
                  'correct_mag_array = 14.07 14.17 14.27 14.37\n',
                  'correct_mag_slice = 0.05 0.05 0.05 0.05\n',
                  'correct_sig_slice = 0.1 0.1 0.1 0.1\n', 'chunk_overlap_col = None\n',
-                 'best_mag_index_col = 8\n']
+                 'best_mag_index_col = 8\n', 'use_photometric_uncertainties = no\n']
         for i, key in enumerate(['correct_astro_save_folder', 'csv_cat_file_string',
                                  'pos_and_err_indices', 'mag_indices', 'mag_unc_indices',
                                  'best_mag_index', 'nn_radius', 'ref_csv_cat_file_string',
                                  'correct_mag_array', 'correct_mag_slice', 'correct_sig_slice',
-                                 'chunk_overlap_col', 'best_mag_index_col']):
+                                 'chunk_overlap_col', 'best_mag_index_col',
+                                 'use_photometric_uncertainties']):
             new_line = ''
             for j in range(i+1):
                 new_line = new_line + lines[j]
@@ -1462,6 +1463,30 @@ class TestInputs:
                                      'data/cat_a_params_2.txt'),
                                      os.path.join(os.path.dirname(__file__),
                                      'data/cat_b_params.txt'))
+        # Test use_photometric_uncertainties for failure.
+        new_line = ''
+        for j in range(len(lines)):
+            new_line = new_line + lines[j]
+        _replace_line(os.path.join(os.path.dirname(__file__),
+                      'data/cat_a_params_.txt'), idx, new_line,
+                      out_file=os.path.join(os.path.dirname(__file__),
+                                            'data/cat_a_params_2.txt'))
+        old_line = 'use_photometric_uncertainties = no'
+        new_line = 'use_photometric_uncertainties = something else\n'
+        f = open(os.path.join(os.path.dirname(__file__),
+                              'data/cat_a_params_2.txt')).readlines()
+        idx = np.where([old_line in line for line in f])[0][0]
+        _replace_line(os.path.join(os.path.dirname(__file__),
+                      'data/cat_a_params_2.txt'), idx, new_line,
+                      out_file=os.path.join(os.path.dirname(__file__),
+                                            'data/cat_a_params_2c.txt'))
+        with pytest.raises(ValueError, match='Boolean flag key not set to allowed'):
+            cm._initialise_chunk(os.path.join(os.path.dirname(__file__),
+                                 'data/crossmatch_params.txt'),
+                                 os.path.join(os.path.dirname(__file__),
+                                 'data/cat_a_params_2c.txt'),
+                                 os.path.join(os.path.dirname(__file__),
+                                 'data/cat_b_params.txt'))
         # Set up a completely valid test of cat_a_params and cat_b_params
         for x in ['a', 'b']:
             old_line = 'correct_astrometry = yes\n'
