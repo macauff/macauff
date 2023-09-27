@@ -187,6 +187,7 @@ class CrossMatch():
                 self.a_correct_sig_slice, self.n_pool, a_npy_or_csv, a_coord_or_chunk,
                 self.a_pos_and_err_indices, self.a_mag_indices, self.a_mag_unc_indices,
                 self.a_filt_names, self.a_best_mag_index, self.a_auf_region_frame,
+                use_photometric_uncertainties=self.a_use_photometric_uncertainties,
                 pregenerate_cutouts=True, chunks=[self.chunk_id])
             ac(self.a_ref_csv_cat_file_string, self.a_csv_cat_file_string,
                tri_download=self.a_download_tri, make_plots=True, overwrite_all_sightlines=True)
@@ -254,6 +255,7 @@ class CrossMatch():
                 self.b_correct_sig_slice, self.n_pool, b_npy_or_csv, b_coord_or_chunk,
                 self.b_pos_and_err_indices, self.b_mag_indices, self.b_mag_unc_indices,
                 self.b_filt_names, self.b_best_mag_index, self.b_auf_region_frame,
+                use_photometric_uncertainties=self.b_use_photometric_uncertainties,
                 pregenerate_cutouts=True, chunks=[self.chunk_id])
             ac(self.b_ref_csv_cat_file_string, self.b_csv_cat_file_string,
                tri_download=self.b_download_tri, make_plots=True, overwrite_all_sightlines=True)
@@ -1381,10 +1383,14 @@ class CrossMatch():
                 # for just the SNR-mag case.
                 for check_flag in ['best_mag_index', 'nn_radius', 'ref_csv_cat_file_string',
                                    'correct_mag_array', 'correct_mag_slice', 'correct_sig_slice',
-                                   'chunk_overlap_col', 'best_mag_index_col']:
+                                   'chunk_overlap_col', 'best_mag_index_col',
+                                   'use_photometric_uncertainties']:
                     if check_flag not in config:
                         raise ValueError("Missing key {} from catalogue {} metadata file.".format(
                                          check_flag, catname))
+
+                setattr(self, '{}use_photometric_uncertainties'.format(flag),
+                        self._str2bool(config['use_photometric_uncertainties']))
 
                 a = config['best_mag_index']
                 try:
