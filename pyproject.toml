@@ -32,5 +32,6 @@ docs = [
 build-frontend = "build"
 config-settings = { "build-args" = "--full-build" }
 skip = [
-    "pp*"  # we don't support PyPy
+    "*musl*",  # we don't support MUSL Linux
+    "pp*",  # we don't support PyPy
 ]
