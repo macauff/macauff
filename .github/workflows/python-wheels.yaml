@@ -16,7 +16,9 @@ jobs:
           # Numpy provides wheels for x86_64 and aarch64 only, we do the same
           - os: ubuntu-latest
             archs: x86_64 aarch64
-          # macOS and Windows are not supported yet
+          - os: macos-latest
+            archs: x86_64
+          # Windows is not supported yet
     steps:
     - uses: actions/checkout@v3
     - name: Set up QEMU
@@ -24,6 +26,9 @@ jobs:
       uses: docker/setup-qemu-action@v2
       with:
         platforms: all
+    # Doesn't really install anything - just links gfortran to the right path
+    - name: Setup GNU Fortran
+      uses: modflowpy/install-gfortran-action@v1
     - name: Build wheels
       uses: pypa/cibuildwheel@v2.16.2
       env:
