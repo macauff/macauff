@@ -24,6 +24,11 @@ jobs:
             python-version: 3.9
             toxenv: py39-test
             gfortran-version: 11
+          - name: Linux, Python 3.11
+            os: ubuntu-22.04
+            python-version: "3.11"
+            toxenv: py311-test
+            gfortran-version: 11
           - name: macOS, Python 3.8
             os: macOS-11
             python-version: 3.8
