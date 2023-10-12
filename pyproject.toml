@@ -1,3 +1,28 @@
 [build-system]
-requires = [ "setuptools >= 35.0.2, < 60.0", "wheel >= 0.29.0", "numpy"]
+requires = [ "setuptools", "wheel", "oldest-supported-numpy"]
 build-backend = "setuptools.build_meta"
+
+[project]
+name = "macauff"
+version = "0.1.0"
+readme = "README.md"
+requires-python = ">=3.8"
+dependencies = [
+    "astropy",
+    "matplotlib",
+    "numpy",
+    "pandas",
+    "skypy",
+    "speclite",
+]
+
+[project.optional-dependencies]
+test = [
+    "pytest-astropy",
+    "scipy",
+]
+docs = [
+    "sphinx-astropy",
+    "sphinx-fortran",
+    "six",
+]
