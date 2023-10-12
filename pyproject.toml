@@ -6,7 +6,8 @@ build-backend = "setuptools.build_meta"
 name = "macauff"
 version = "0.1.0"
 readme = "README.md"
-requires-python = ">=3.8"
+# 3.12 has removed distutils
+requires-python = ">=3.8,<3.12"
 dependencies = [
     "astropy",
     "matplotlib",
@@ -25,4 +26,12 @@ docs = [
     "sphinx-astropy",
     "sphinx-fortran",
     "six",
+]
+
+[tool.cibuildwheel]
+build-frontend = "build"
+config-settings = { "build-args" = "--full-build" }
+skip = [
+    "*musl*",  # we don't support MUSL Linux
+    "pp*",  # we don't support PyPy
 ]

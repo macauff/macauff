@@ -1,0 +1,59 @@
+name: Build and publish wheels
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build_wheels:
+    name: Wheels on ${{ matrix.os }} with CIBW_ARCHS=${{ matrix.archs }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Numpy provides wheels for x86_64 and aarch64 only, we do the same
+          - os: ubuntu-latest
+            archs: x86_64 aarch64
+          # macOS and Windows are not supported yet
+    steps:
+    - uses: actions/checkout@v3
+    - name: Set up QEMU
+      if: ${{ runner.os == 'Linux' }}
+      uses: docker/setup-qemu-action@v2
+      with:
+        platforms: all
+    - name: Build wheels
+      uses: pypa/cibuildwheel@v2.16.2
+      env:
+        CIBW_ARCHS: ${{ matrix.archs }}
+    - uses: actions/upload-artifact@v3
+      with:
+        path: wheelhouse/*.whl
+
+  make_sdist:
+    name: Make SDist
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+    - name: Build SDist
+      run: pipx run build --sdist
+    - uses: actions/upload-artifact@v3
+      with:
+        path: dist/*.tar.gz
+
+  publish:
+    needs: [ build_wheels, make_sdist ]
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/download-artifact@v3
+      with:
+        name: artifact
+        path: dist
+    # Publish only on new "v*" tags
+    - uses: pypa/gh-action-pypi-publish@release/v1
+      if: startsWith(github.ref, 'refs/tags/v')
+      with:
+        user: __token__
+        password: ${{ secrets.PYPI_API_TOKEN }}
