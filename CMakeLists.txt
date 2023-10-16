@@ -8,6 +8,11 @@ find_package(
   COMPONENTS Interpreter Development.Module NumPy
   REQUIRED)
 
+if(CMAKE_BUILD_TYPE MATCHES Debug)
+  set(CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} -Wall -Wextra -Werror -pedantic -fbacktrace -O0 -g -fcheck=all")
+endif()
+
+
 # F2PY headers
 execute_process(
   COMMAND "${PYTHON_EXECUTABLE}" -c
