@@ -8,6 +8,7 @@ import pandas as pd
 import numpy as np
 import pytest
 from numpy.testing import assert_allclose
+from astropy.coordinates import SkyCoord
 
 from ..parse_catalogue import csv_to_npy, npy_to_csv, rect_slice_npy, rect_slice_csv
 
@@ -35,7 +36,7 @@ class TestParseCatalogue:
         for header_text, header in zip(['', '# a, b, c, d, e, f, g, h'], [False, True]):
             np.savetxt('test_data.csv', data1, delimiter=',', fmt='%s', header=header_text)
 
-            csv_to_npy('.', 'test_data', '.', [0, 1, 2], [4, 5], 6, None, header=header)
+            csv_to_npy('.', 'test_data.csv', '.', [0, 1, 2], [4, 5], 6, None, header=header)
 
             astro = np.load('con_cat_astro.npy')
             photo = np.load('con_cat_photo.npy')
@@ -59,7 +60,7 @@ class TestParseCatalogue:
         for header_text, header in zip(['', '# a, b, c, d, e, f, g, h'], [False, True]):
             np.savetxt('test_data.csv', data1, delimiter=',', fmt='%s', header=header_text)
 
-            csv_to_npy('.', 'test_data', '.', [0, 1, 2], [4, 5], 6, 7, header=header)
+            csv_to_npy('.', 'test_data.csv', '.', [0, 1, 2], [4, 5], 6, 7, header=header)
 
             astro = np.load('con_cat_astro.npy')
             photo = np.load('con_cat_photo.npy')
@@ -84,36 +85,64 @@ class TestParseCatalogue:
         np.savetxt('test_data.csv', data1, delimiter=',', fmt='%s', header=header_text)
 
         with pytest.raises(ValueError, match='process_uncerts must either be True or'):
-            csv_to_npy('.', 'test_data', '.', [0, 1, 2], [4, 5], 6, None, header=header,
+            csv_to_npy('.', 'test_data.csv', '.', [0, 1, 2], [4, 5], 6, None, header=header,
                        process_uncerts=None)
         with pytest.raises(ValueError, match='astro_sig_fits_filepath must given if process'):
-            csv_to_npy('.', 'test_data', '.', [0, 1, 2], [4, 5], 6, None, header=header,
+            csv_to_npy('.', 'test_data.csv', '.', [0, 1, 2], [4, 5], 6, None, header=header,
                        process_uncerts=True)
         with pytest.raises(ValueError, match='cat_in_radec must given if process_uncerts is '):
-            csv_to_npy('.', 'test_data', '.', [0, 1, 2], [4, 5], 6, None, header=header,
+            csv_to_npy('.', 'test_data.csv', '.', [0, 1, 2], [4, 5], 6, None, header=header,
                        process_uncerts=True, astro_sig_fits_filepath='test_sig_folder')
-        with pytest.raises(ValueError, match='If process_uncerts is True, cat_in_radec must '):
-            csv_to_npy('.', 'test_data', '.', [0, 1, 2], [4, 5], 6, None, header=header,
+        with pytest.raises(ValueError, match='mn_in_radec must given if process_uncerts is '):
+            csv_to_npy('.', 'test_data.csv', '.', [0, 1, 2], [4, 5], 6, None, header=header,
                        process_uncerts=True, astro_sig_fits_filepath='test_sig_folder',
                        cat_in_radec='something else')
+        with pytest.raises(ValueError, match='If process_uncerts is True, cat_in_radec must '):
+            csv_to_npy('.', 'test_data.csv', '.', [0, 1, 2], [4, 5], 6, None, header=header,
+                       process_uncerts=True, astro_sig_fits_filepath='test_sig_folder',
+                       cat_in_radec='something else', mn_in_radec='something else')
+        with pytest.raises(ValueError, match='If process_uncerts is True, mn_in_radec must '):
+            csv_to_npy('.', 'test_data.csv', '.', [0, 1, 2], [4, 5], 6, None, header=header,
+                       process_uncerts=True, astro_sig_fits_filepath='test_sig_folder',
+                       cat_in_radec=False, mn_in_radec='something else')
 
         if os.path.exists('test_sig_folder'):
             os.system('rm -rf ./test_sig_folder')
 
         with pytest.raises(ValueError, match='astro_sig_fits_filepath does not exist.'):
-            csv_to_npy('.', 'test_data', '.', [0, 1, 2], [4, 5], 6, None, header=header,
+            csv_to_npy('.', 'test_data.csv', '.', [0, 1, 2], [4, 5], 6, None, header=header,
                        process_uncerts=True, astro_sig_fits_filepath='test_sig_folder',
-                       cat_in_radec=False)
+                       cat_in_radec=False, mn_in_radec=False)
 
         os.makedirs('test_sig_folder')
         np.save('test_sig_folder/m_sigs_array.npy', np.array([2]))
         np.save('test_sig_folder/n_sigs_array.npy', np.array([0.01]))
-        np.save('test_sig_folder/lmids.npy', np.array([10.0]))
-        np.save('test_sig_folder/bmids.npy', np.array([0.0]))
+        np.save('test_sig_folder/ax1_mids.npy', np.array([10.0]))
+        np.save('test_sig_folder/ax2_mids.npy', np.array([0.0]))
 
-        csv_to_npy('.', 'test_data', '.', [0, 1, 2], [4, 5], 6, None, header=header,
+        csv_to_npy('.', 'test_data.csv', '.', [0, 1, 2], [4, 5], 6, None, header=header,
                    process_uncerts=True, astro_sig_fits_filepath='test_sig_folder',
-                   cat_in_radec=False)
+                   cat_in_radec=False, mn_in_radec=False)
+
+        astro = np.load('con_cat_astro.npy')
+        photo = np.load('con_cat_photo.npy')
+        best_index = np.load('magref.npy')
+
+        assert np.all(astro.shape == (self.N, 3))
+        assert np.all(photo.shape == (self.N, 2))
+        assert np.all(best_index.shape == (self.N,))
+        assert_allclose(astro[:, [0, 1]], self.data[:, [0, 1]])
+        assert_allclose(astro[:, 2], np.sqrt((2*self.data[:, 2])**2 + 0.01**2))
+        assert_allclose(photo, self.data[:, [4, 5]])
+        assert_allclose(best_index, self.data[:, 6])
+
+        a = SkyCoord(ra=[10.0], dec=[0.0], unit='deg', frame='icrs')
+        np.save('test_sig_folder/ax1_mids.npy', np.array([a.galactic.l.degree]))
+        np.save('test_sig_folder/ax2_mids.npy', np.array([a.galactic.b.degree]))
+
+        csv_to_npy('.', 'test_data.csv', '.', [0, 1, 2], [4, 5], 6, None, header=header,
+                   process_uncerts=True, astro_sig_fits_filepath='test_sig_folder',
+                   cat_in_radec=False, mn_in_radec=False)
 
         astro = np.load('con_cat_astro.npy')
         photo = np.load('con_cat_photo.npy')
@@ -177,8 +206,8 @@ class TestParseCatalogue:
             np.savetxt('test_data.csv', data1, delimiter=',', fmt='%s', header=header_text)
 
             for pad in [0.03, 0]:
-                rect_slice_csv('.', '.', 'test_data', 'test_data_small', rc, pad, [1, 2], 20,
-                               header=header)
+                rect_slice_csv('.', '.', 'test_data.csv', 'test_data_small.csv', rc, pad, [1, 2],
+                               20, header=header)
                 df = pd.read_csv('test_data_small.csv', header=None, names=col_names)
                 cosd = np.cos(np.radians(self.data[:, 2]))
                 qa = (self.data[:, 1] >= rc[0]-pad/cosd) & (self.data[:, 1] <= rc[1]+pad/cosd)
@@ -292,8 +321,8 @@ class TestParseCatalogueNpyToCsv:
         extra_cols = ['MATCH_P', 'SEPARATION', 'ETA', 'XI', 'A_AVG_CONT', 'B_AVG_CONT',
                       'A_CONT_F1', 'A_CONT_F10', 'B_CONT_F1', 'B_CONT_F10']
 
-        npy_to_csv(['.', '.'], 'test_folder', '.', ['test_a_data', 'test_b_data'],
-                   ['match_csv', 'a_nonmatch_csv', 'b_nonmatch_csv'], [a_cols, b_cols],
+        npy_to_csv(['.', '.'], 'test_folder', '.', ['test_a_data.csv', 'test_b_data.csv'],
+                   ['match_csv.csv', 'a_nonmatch_csv.csv', 'b_nonmatch_csv.csv'], [a_cols, b_cols],
                    [[0, 1, 2, 4, 5], [0, 1, 2, 4, 5, 6]], ['A', 'B'], 20,
                    headers=[False, False], input_npy_folders=[None, None])
 
@@ -354,8 +383,8 @@ class TestParseCatalogueNpyToCsv:
         os.makedirs('test_b_out', exist_ok=True)
         np.save('test_b_out/con_cat_astro.npy', self.datab[:, [1, 2, 3]])
 
-        npy_to_csv(['.', '.'], 'test_folder', '.', ['test_a_data', 'test_b_data'],
-                   ['match_csv', 'a_nonmatch_csv', 'b_nonmatch_csv'], [a_cols, b_cols],
+        npy_to_csv(['.', '.'], 'test_folder', '.', ['test_a_data.csv', 'test_b_data.csv'],
+                   ['match_csv.csv', 'a_nonmatch_csv.csv', 'b_nonmatch_csv.csv'], [a_cols, b_cols],
                    [[0, 1, 2, 4, 5], [0, 1, 2, 4, 5, 6]], ['A', 'B'], 20,
                    headers=[False, False], input_npy_folders=['test_a_out', 'test_b_out'])
 
@@ -405,8 +434,8 @@ class TestParseCatalogueNpyToCsv:
         extra_cols = ['MATCH_P', 'SEPARATION', 'ETA', 'XI', 'A_AVG_CONT', 'B_AVG_CONT',
                       'A_CONT_F1', 'A_CONT_F10', 'B_CONT_F1', 'B_CONT_F10']
 
-        npy_to_csv(['.', '.'], 'test_folder', '.', ['test_a_data', 'test_b_data'],
-                   ['match_csv', 'a_nonmatch_csv', 'b_nonmatch_csv'], [a_cols, b_cols],
+        npy_to_csv(['.', '.'], 'test_folder', '.', ['test_a_data.csv', 'test_b_data.csv'],
+                   ['match_csv.csv', 'a_nonmatch_csv.csv', 'b_nonmatch_csv.csv'], [a_cols, b_cols],
                    [[1, 2, 0, 4, 5], [4, 5, 6, 0, 1, 2]], ['A', 'B'], 20,
                    headers=[False, False], input_npy_folders=[None, None])
 
@@ -460,9 +489,9 @@ class TestParseCatalogueNpyToCsv:
         b_cols = ['B_Designation', 'B_RA', 'B_Dec', 'W1', 'W2', 'W3']
 
         with pytest.raises(UserWarning, match="either both need to be None, or both"):
-            npy_to_csv(['.', '.'], 'test_folder', '.', ['test_a_data', 'test_b_data'],
-                       ['match_csv', 'a_nonmatch_csv', 'b_nonmatch_csv'], [a_cols, b_cols],
-                       [[0, 1, 2, 4, 5], [0, 1, 2, 4, 5, 6]], ['A', 'B'], 20,
+            npy_to_csv(['.', '.'], 'test_folder', '.', ['test_a_data.csv', 'test_b_data.csv'],
+                       ['match_csv.csv', 'a_nonmatch_csv.csv', 'b_nonmatch_csv.csv'],
+                       [a_cols, b_cols], [[0, 1, 2, 4, 5], [0, 1, 2, 4, 5, 6]], ['A', 'B'], 20,
                        headers=[False, False], extra_col_name_lists=[[1], [2]],
                        input_npy_folders=[None, None])
 
@@ -477,10 +506,10 @@ class TestParseCatalogueNpyToCsv:
         add_a_nums = [3]
         add_b_nums = [3]
 
-        npy_to_csv(['.', '.'], 'test_folder', '.', ['test_a_data', 'test_b_data'],
-                               ['match_csv', 'a_nonmatch_csv', 'b_nonmatch_csv'], [a_cols, b_cols],
-                               [[0, 1, 2, 4, 5], [0, 1, 2, 4, 5, 6]], ['A', 'B'], 20,
-                               headers=[False, False],
+        npy_to_csv(['.', '.'], 'test_folder', '.', ['test_a_data.csv', 'test_b_data.csv'],
+                               ['match_csv.csv', 'a_nonmatch_csv.csv', 'b_nonmatch_csv.csv'],
+                               [a_cols, b_cols], [[0, 1, 2, 4, 5], [0, 1, 2, 4, 5, 6]], ['A', 'B'],
+                               20, headers=[False, False],
                                extra_col_name_lists=[add_a_cols, add_b_cols],
                                extra_col_num_lists=[add_a_nums, add_b_nums],
                                input_npy_folders=[None, None])
@@ -552,10 +581,10 @@ class TestParseCatalogueNpyToCsv:
         add_a_nums = [3]
         add_b_nums = []
 
-        npy_to_csv(['.', '.'], 'test_folder', '.', ['test_a_data', 'test_b_data'],
-                               ['match_csv', 'a_nonmatch_csv', 'b_nonmatch_csv'], [a_cols, b_cols],
-                               [[0, 1, 2, 4, 5], [0, 1, 2, 4, 5, 6]], ['A', 'B'], 20,
-                               headers=[False, False],
+        npy_to_csv(['.', '.'], 'test_folder', '.', ['test_a_data.csv', 'test_b_data.csv'],
+                               ['match_csv.csv', 'a_nonmatch_csv.csv', 'b_nonmatch_csv.csv'],
+                               [a_cols, b_cols], [[0, 1, 2, 4, 5], [0, 1, 2, 4, 5, 6]], ['A', 'B'],
+                               20, headers=[False, False],
                                extra_col_name_lists=[add_a_cols, add_b_cols],
                                extra_col_num_lists=[add_a_nums, add_b_nums],
                                input_npy_folders=[None, None])

@@ -453,6 +453,7 @@ class TestMakeIslandGroupings():
         # For the first, full runthrough call the CrossMatch function instead of
         # directly calling make_island_groupings to test group_sources as well.
         self.cm.run_group = True
+        self.cm.chunk_id = 1
         self.cm.group_sources(self.files_per_island_sim)
 
         alist, blist = np.load('joint/group/alist.npy'), np.load('joint/group/blist.npy')
@@ -569,6 +570,7 @@ class TestMakeIslandGroupings():
         np.save('{}/con_cat_astro.npy'.format(self.a_cat_folder_path), self.a_coords)
         np.save('{}/con_cat_astro.npy'.format(self.b_cat_folder_path), self.b_coords)
         self.cm.run_group = False
+        self.cm.chunk_id = 1
         # Dummy variables to represent the incorrect number of outputs
         for i in range(9):
             np.save('{}/group/{}.npy'.format(self.joint_folder_path, i), np.array([i]))
@@ -583,6 +585,7 @@ class TestMakeIslandGroupings():
         np.save('{}/con_cat_astro.npy'.format(self.a_cat_folder_path), self.a_coords)
         np.save('{}/con_cat_astro.npy'.format(self.b_cat_folder_path), self.b_coords)
         self.cm.run_group = False
+        self.cm.chunk_id = 1
         # Dummy variables to represent the correct number of outputs
         for i in range(8):
             np.save('{}/group/{}.npy'.format(self.joint_folder_path, i), np.array([i]))

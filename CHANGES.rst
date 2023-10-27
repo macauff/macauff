@@ -1,4 +1,4 @@
-0.1.2 (unreleased)
+0.1.3 (unreleased)
 ------------------
 
 General
@@ -6,6 +6,38 @@ General
 
 New Features
 ^^^^^^^^^^^^
+
+Bug Fixes
+^^^^^^^^^
+
+API Changes
+^^^^^^^^^^^
+
+Other Changes
+^^^^^^^^^^^^^
+
+
+0.1.2 (2023-10-27)
+------------------
+
+General
+^^^^^^^
+
+New Features
+^^^^^^^^^^^^
+
+- ``AstrometricCorrections`` implemented a simultaneous fit for ``m`` and ``n``
+  within the uncertainty correction routine, instead of fitting for each
+  uncertaintiy separately and fitting for m and n after the fact. [#67]
+
+- Added ``SNRMagnitudeRelationship`` as a subclass of ``AstrometricCorrections``
+  to run solely the SNR-magnitude derivation part of the larger astrometric
+  solutions pipeline, in cases where the astrometry of a catalogue is trustworthy
+  but we still require the signal-to-noise ratio of sources at a given
+  brightness. [#67]
+
+- B-V reddening calculator added directly through ``SFDEBV``, using Schlegel,
+  Finkbeiner & Davis (1998), replacing the original NED website lookup call. [#67]
 
 - Added chunk post-processing, removing duplicate sources where in the "halo" of
   a particular region, if desired. [#58]
@@ -65,6 +97,54 @@ New Features
 
 Bug Fixes
 ^^^^^^^^^
+
+- In rare cases ``G`` can be incorrectly negative calculated from
+  ``find_single_island_prob``, and now gets a threshold low-but-positive value
+  set in these instances. [#67]
+
+- Fixed issue reading ``local_N`` when ``compute_local_density`` is used in
+  combination with no memmapping. [#67]
+
+- Fixed "fire extinguisher" priors and likelihoods, used in cases where both c
+  and f are zero, not cancelling to one in the likelihood ratio. [#67]
+
+- Fixed cases where wavelength range of filter response can cause a non-shifted
+  spectrum to fail due to non-padding in ``create_galaxy_counts``. [#67]
+
+- ``create_single_perturb_auf`` raises an error if the number of simulated
+  sources in a given sightline is insufficient to draw reliable number density
+  measurements from. [#67]
+
+- ``make_perturb_aufs`` checks for ``compute_local_density`` and
+  ``use_memmap_files`` before loading local normalising density binary
+  files, and otherwise uses pre-computed in-memory array values. [#67]
+
+- ``input_npy_folder`` correctly set as ``None`` if passed as such through
+  the input parameter file. [#67]
+
+- If ``use_memmap_files`` is ``False`` but any of the flags for running steps
+  of the cross-match process are also ``False`` a warning will be raised and
+  the run flags set to ``True``, since there are no fallback files to load. [#67]
+
+- Calls to ``make_tri_counts`` and ``create_galaxy_counts`` changed to use a
+  grid of extinction vectors within the chosen field of regard to better
+  handle differential reddening instead of relying on a single Av at a
+  particular precise set of coordinates. [#67]
+
+- ``make_tri_counts`` gains ``brightest_source_mag`` and ``density_mag``
+  keywords, returning ``num_bright_obj``. [#67]
+
+- Convenience function ``min_max_lon`` added, to account for issues where
+  the minimum and maximum longitude in a given region of space could sit either
+  side of the 0-360 boundary, and hence the usual x < l < y conditions would
+  fail. [#67]
+
+- ``counterpart_pairing_fortran``'s ``factorial`` function changed from
+  calculating N! to directly calculating N! / (N-M)! as the previous function
+  had the potential to overflow unnecessarily. [#67]
+
+- Added ``outfolder`` to ``trilegal_webcall`` to avoid a parallelisation race
+  condition with saving outputs. [#67]
 
 - ``mag_h_params`` renamed to ``snr_mag_params`` to ensure commonality of the
   reference and parameter without the codebase. [#62]
@@ -140,6 +220,79 @@ Bug Fixes
 
 API Changes
 ^^^^^^^^^^^
+
+- ``use_photometric_uncertainties`` added as an optional keyword to
+  ``AstrometricCorrections``, allowing for the use of photometric instead of
+  astrometric uncertainties as a slicing to determine best-fit astrometric
+  uncertainties. [#67]
+
+- ``csv_to_npy``, ``npy_to_csv``, and ``rect_slice_csv`` now expect filenames to
+  include their extensions. [#67]
+
+- ``mn_to_radec`` added to ``csv_to_npy``, to convert any astrometric correction
+  array coordinates to match catalogue coordinates, with analogous variable
+  ``cat_in_radec``, which now controls the coordinate system of the data. [#67]
+
+- Explicitly load save-state data into ``CrossMatch`` and/or ``StageData`` as
+  appropriate to match ``use_memmap_files`` boolean in both configurations. [#67]
+
+- Added ``compute_snr_mag_relation`` as expected keyword into ``CrossMatch``
+  for each catalogue, calling ``SNRMagnitudeRelationship`` if ``True``. [#67]
+
+- Added checks for ``correct_astro_save_folder``, ``csv_cat_file_string``,
+  ``pos_and_err_indices``, ``mag_indices``, and ``mag_unc_indices`` in the case
+  of ``compute_snr_mag_relation`` as well as ``correct_astrometry``. [#67]
+
+- Changed dependencies of ``snr_mag_params_path`` to include the requirement
+  for just calculating SNR-mag relationships. [#67]
+
+- ``csv_cat_file_string``, ``match_out_csv_name``, and ``nonmatch_out_csv_name``
+  now all explicitly require file extensions, generally ``.csv``. [#67]
+
+- Removed ``dens_mag`` as input into ``CrossMatch``, and ``density_mags`` from
+  ``make_perturb_aufs``. [#67]
+
+- Changed the requirements of ``al_avs`` in ``make_perturb_aufs`` to not require
+  ``fit_gal_flags``. [#67]
+
+- ``gal_al_avs`` is now required if ``include_perturb_auf`` or
+  ``correct_astrometry`` is ``True``, instead of being tied to
+  ``fit_gal_flag``, as all other galaxy-related inputs are. [#67]
+
+- ``create_galaxy_counts`` takes ``al_grid`` rather than ``al_inf``, which is
+  now a list of floats rather than a singular float value, using an average
+  galaxy count distribution across all extinctions in ``al_grid``. [#67]
+
+- ``AstrometricCorrections``'s ``create_densities`` and ``create_distances``
+  always save binary files instead of checking for their non-existence, due to
+  the re-structuring of the looping of sightlines and pipeline steps. [#67]
+
+- ``check_b_only`` flag added to ``make_ax_coords`` function within
+  ``AstrometricCorrections`` for cases where we only need to run a sub-set
+  of functions on one catalogue, instead of the two-sided approach for the full
+  suite of astrometric correction tools. [#67]
+
+- ``dens_search_radius`` changed to degrees, instead of arcseconds, in
+  ``AstrometricCorrections``, to match ``CrossMatch`` requirements. [#67]
+
+- Removed ``bright_mag`` from input to ``AstrometricCorrections``. [#67]
+
+- Added ``AV`` and ``sigma_AV`` as input keywords to
+  ``download_trilegal_simulation`` and ``get_trilegal`` to allow for the manual
+  passing of specific V-band extinctions to API call. If not passed to it, a
+  value is still calculated in ``get_trilegal``, and ``AV`` is returned by the
+  function. [#67]
+
+- Added expected area of TRILEGAL simulation as keyword to
+  ``download_trilegal_simulation``. [#67]
+
+- ``download_trilegal_simulation`` and ``get_trilegal`` have been re-arranged to
+  move the try-except loop out of the API call function and into the larger
+  function. ``get_trilegal`` will therefore either return an API call or fail,
+  without trying to fetch. [#67]
+
+- ``trilegall_webcall`` returns either ``timeout`` or ``good``, allowing for the
+  re-starting of failed API calls due to e.g. the remote server being busy. [#67]
 
 - In ``AstrometricCorrections``, ``triname`` now requires either one or two
   ``{}`` Python string formats, depending on ``coord_or_chunk``. [#62]

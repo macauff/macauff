@@ -361,8 +361,8 @@ def source_pairing(joint_folder_path, a_cat_folder_path, b_cat_folder_path, a_au
             np.all(acontamprob[:, lowind:highind] >= 0, axis=0) &
             np.all(bcontamprob[:, lowind:highind] >= 0, axis=0) &
             (acontamflux[lowind:highind] >= 0) & (bcontamflux[lowind:highind] >= 0) &
-            (probcarray[lowind:highind] >= 0) & (etaarray[lowind:highind] >= -10) &
-            (xiarray[lowind:highind] >= -10))
+            (probcarray[lowind:highind] >= 0) & (etaarray[lowind:highind] >= -30) &
+            (xiarray[lowind:highind] >= -30))
 
         lowind = np.floor(len_a*cnum/mem_chunk_num).astype(int)
         highind = np.floor(len_a*(cnum+1)/mem_chunk_num).astype(int)

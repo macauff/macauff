@@ -31,6 +31,8 @@ tri_num_faint = 1500000
 # Galaxy Perturbation AUF parameters
 fit_gal_flag = no
 
+gal_al_avs = 0.039 0.026 0.015 0.005
+
 # AUF region definition - either "rectangle" for NxM evenly spaced grid points, or "points" to define a list of two-point tuple coordinates, separated by a comma
 auf_region_type = rectangle
 # Frame of the coordinates must be specified -- either "equatorial" or "galactic"
@@ -41,8 +43,7 @@ auf_region_points = 131 134 4 -1 1 4
 
 # Local density calculation radius, in degrees
 dens_dist = 0.25
-# Magnitudes, in each bandpass, down to which to count nearby local sources when calculating local density
-dens_mags = 20 20 20 20
 
 # Test for whether we need to correct astrometry of catalogue for systematic biases before performing matches
 correct_astrometry = no
+compute_snr_mag_relation = no

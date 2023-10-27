@@ -808,8 +808,13 @@ def _distance_check(iterable):
     # of sources from consideration, with the 0->360 wraparound of
     # coordinates. In either case if there is a small slice of sky not
     # considered, however, we must remove sources near the "empty" strip.
-    if ax_lims[0] > 0 or ax_lims[1] < 360:
+    # Likely redundant, explicitly check for either limits being inside of
+    # 0-360 exactly by the top edge being <360 but also the bottom edge
+    # being positive or negative -- i.e., not exactly zero.
+    if ax_lims[0] > 0 or ax_lims[0] < 0 or ax_lims[1] < 360:
         for lon in ax_lims[:2]:
+            # The Haversine formula doesn't care if lon < 0 or if lon ~ 360,
+            # so no need to consider ax_lims that straddle 0 longitude here.
             is_within_dist_of_lon = (
                 hav_dist_constant_lat(a[:, 0], a[:, 1], lon) <= max_sep)
             # Progressively update the boolean for each source in the group
@@ -827,7 +832,7 @@ def _distance_check(iterable):
 
     # Because all sources in BOTH catalogues must pass, we continue
     # to update meets_min_distance for catalogue "b" as well.
-    if ax_lims[0] > 0 or ax_lims[1] < 360:
+    if ax_lims[0] > 0 or ax_lims[0] < 0 or ax_lims[1] < 360:
         for lon in ax_lims[:2]:
             is_within_dist_of_lon = (
                 hav_dist_constant_lat(b[:, 0], b[:, 1], lon) <= max_sep)

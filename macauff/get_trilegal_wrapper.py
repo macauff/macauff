@@ -26,6 +26,9 @@ import time
 
 from astropy.units import UnitsError
 from astropy.coordinates import SkyCoord
+from astropy.io import fits
+from scipy.interpolate import RegularGridInterpolator
+import numpy as np
 
 
 __all__ = []
@@ -33,7 +36,7 @@ __all__ = []
 
 def get_trilegal(filename, ra, dec, folder='.', galactic=False,
                  filterset='kepler_2mass', area=1, magnum=1, maglim=27, binaries=False,
-                 trilegal_version='1.7', sigma_AV=0.1):
+                 trilegal_version='1.7', AV=None, sigma_AV=0.1):
     """
     Calls the TRILEGAL web form simulation and downloads the file.
 
@@ -59,35 +62,50 @@ def get_trilegal(filename, ra, dec, folder='.', galactic=False,
         Whether to have TRILEGAL include binary stars. Default ``False``.
     trilegal_version : float, optional
         Version of the TRILEGAL API to call. Default ``'1.7'``.
+    AV : float, optional
+        Extinction at infinity in the V band. If not provided, defaults to
+        ``None``, in which case it is calculated from the coordinates given.
     sigma_AV : float, optional
         Fractional spread in A_V along the line of sight.
+
+    Returns
+    -------
+    AV : float
+        The extinction at infinity of the particular TRILEGAL call, if
+        ``AV`` as passed into the function is ``None``, otherwise just
+        returns the input value.
+    result : string
+        ``timeout`` or ``good`` depending on whether the run was successful
+        or not.
     """
-    if galactic:
-        l, b = ra, dec
-    else:
-        try:
-            c = SkyCoord(ra, dec)
-        except UnitsError:
-            c = SkyCoord(ra, dec, unit='deg')
-        l, b = (c.galactic.l.value, c.galactic.b.value)
+    frame = 'galactic' if galactic else 'icrs'
+    try:
+        c = SkyCoord(ra, dec, frame=frame)
+    except UnitsError:
+        c = SkyCoord(ra, dec, unit='deg', frame=frame)
+    l, b = (c.galactic.l.value, c.galactic.b.value)
 
     if os.path.isabs(filename):
         folder = ''
+        outfolder = os.path.dirname(filename)
+    else:
+        outfolder = folder
 
     if not re.search(r'\.dat$', filename):
         outfile = '{}/{}.dat'.format(folder, filename)
     else:
         outfile = '{}/{}'.format(folder, filename)
-    AV = get_AV_infinity(l, b, frame='galactic')
+    if AV is None:
+        AV = get_AV_infinity(l, b, frame='galactic')[0]
 
-    trilegal_webcall(trilegal_version, l, b, area, binaries, AV, sigma_AV, filterset, magnum,
-                     maglim, outfile)
+    result = trilegal_webcall(trilegal_version, l, b, area, binaries, AV, sigma_AV, filterset,
+                              magnum, maglim, outfile, outfolder)
 
-    return AV
+    return AV, result
 
 
 def trilegal_webcall(trilegal_version, l, b, area, binaries, AV, sigma_AV, filterset, magnum,
-                     maglim, outfile):
+                     maglim, outfile, outfolder):
     """
     Calls TRILEGAL webserver and downloads results file.
 
@@ -113,8 +131,16 @@ def trilegal_webcall(trilegal_version, l, b, area, binaries, AV, sigma_AV, filte
         Number of filter in given filterset to limit magnitudes to.
     maglim : float
         Limiting magnitude down to which to simulate sources.
-    :outfile : string
+    outfile : string
         Output filename.
+    outfolder : string
+        Output filename's containing folder.
+
+    Returns
+    -------
+    string
+        ``timeout`` or ``good`` depending on whether the run was successful
+        or not.
     """
     webserver = 'http://stev.oapd.inaf.it'
     args = [l, b, area, AV, sigma_AV, filterset, maglim, magnum, binaries]
@@ -137,9 +163,9 @@ def trilegal_webcall(trilegal_version, l, b, area, binaries, AV, sigma_AV, filte
                   'object_av=1.504&object_avkind=1&object_cutoffmass=0.8&'
                   'object_file=tab_sfr%2Ffile_sfr_m4.dat&object_a=1&object_b=0&'
                   'output_kind=1').format(AV, sigma_AV)
-    cmdargs = [trilegal_version, l, b, area, filterset, magnum, maglim, binaries, mainparams,
-               webserver, trilegal_version]
-    cmd = ("wget -o lixo -Otmpfile --post-data='submit_form=Submit&trilegal_version={}"
+    cmdargs = [outfolder, outfolder, trilegal_version, l, b, area, filterset, magnum, maglim,
+               binaries, mainparams, webserver, trilegal_version]
+    cmd = ("wget -o {}/lixo -O {}/tmpfile --post-data='submit_form=Submit&trilegal_version={}"
            "&gal_coord=1&gc_l={}&gc_b={}&eq_alpha=0&eq_delta=0&field={}&photsys_file="
            "tab_mag_odfnew%2Ftab_mag_{}.dat&icm_lim={}&mag_lim={}&mag_res=0.1&"
            "binary_kind={}&{}' {}/cgi-bin/trilegal_{}").format(*cmdargs)
@@ -151,19 +177,21 @@ def trilegal_webcall(trilegal_version, l, b, area, binaries, AV, sigma_AV, filte
               "Av={} with {} fractional r.m.s. spread \n in the {} system, complete down to "
               "mag={} in its {}th filter, use_binaries set to {}.".format(*args))
         sp.Popen(cmd, shell=True).wait()
-        if os.path.exists('tmpfile') and os.path.getsize('tmpfile') > 0:
+        if (os.path.exists('{}/tmpfile'.format(outfolder)) and
+                os.path.getsize('{}/tmpfile'.format(outfolder)) > 0):
             notconnected = False
         else:
             print("No communication with {}, will retry in 2 min".format(webserver))
             time.sleep(120)
+            return "timeout"
         if not notconnected:
-            with open('tmpfile', 'r') as f:
+            with open('{}/tmpfile'.format(outfolder), 'r') as f:
                 lines = f.readlines()
             for line in lines:
                 if 'The results will be available after about 2 minutes' in line:
                     busy = False
                     break
-            sp.Popen('rm -f lixo tmpfile', shell=True)
+            sp.Popen('rm -f {}/lixo {}/tmpfile'.format(outfolder, outfolder), shell=True)
             if not busy:
                 filenameidx = line.find('<a href=../tmp/') + 15
                 fileendidx = line[filenameidx:].find('.dat')
@@ -171,10 +199,11 @@ def trilegal_webcall(trilegal_version, l, b, area, binaries, AV, sigma_AV, filte
                 print("retrieving data from {} ...".format(filename))
                 while not complete:
                     time.sleep(40)
-                    modcmd = 'wget -o lixo -O{} {}/tmp/{}'.format(filename, webserver, filename)
+                    modcmd = 'wget -o {}/lixo -O {}/{} {}/tmp/{}'.format(
+                        outfolder, outfolder, filename, webserver, filename)
                     sp.Popen(modcmd, shell=True).wait()
-                    if os.path.getsize(filename) > 0:
-                        with open(filename, 'r') as f:
+                    if os.path.getsize('{}/{}'.format(outfolder, filename)) > 0:
+                        with open('{}/{}'.format(outfolder, filename), 'r') as f:
                             lastline = f.readlines()[-1]
                         if 'normally' in lastline:
                             complete = True
@@ -184,14 +213,20 @@ def trilegal_webcall(trilegal_version, l, b, area, binaries, AV, sigma_AV, filte
             else:
                 print('Server busy, trying again in 2 minutes')
                 time.sleep(120)
-    sp.Popen('mv {} {}'.format(filename, outfile), shell=True).wait()
+                # The way the "breakout" return calls work now we don't loop
+                # within trilegal_webcall any more, but the loops and if
+                # statements are left in for backwards compatibility.
+                return "timeout"
+    sp.Popen('mv {}/{} {}'.format(outfolder, filename, outfile), shell=True).wait()
     print('results copied to {}'.format(outfile))
+
+    return "good"
 
 
 def get_AV_infinity(ra, dec, frame='icrs'):
     """
-    Gets the A_V exctinction at infinity for a given line of sight.
-    Queries the NED database using ``curl``.
+    Gets the A_V exctinction at infinity for a given line of sight, using the
+    updated parameters from Schlafly & Finkbeiner 2011 (ApJ 737, 103), table 6.
 
     Parameters
     ----------
@@ -201,36 +236,72 @@ def get_AV_infinity(ra, dec, frame='icrs'):
         Sky coordinate.
     frame : string, optional
         Frame of input coordinates (e.g., ``'icrs', 'galactic'``)
+
+    Returns
+    -------
+    AV : float
+        Extinction at infinity as given by the SFD dust maps for the chosen sky
+        coordinates.
     """
-    coords = SkyCoord(ra, dec, unit='deg', frame=frame).transform_to('icrs')
+    coords = SkyCoord(ra, dec, unit='deg', frame=frame).transform_to('galactic')
 
-    rah, ram, ras = coords.ra.hms
-    decd, decm, decs = coords.dec.dms
-    if decd > 0:
-        decsign = '%2B'
-    else:
-        decsign = '%2D'
-    url = (
-        'http://ned.ipac.caltech.edu/cgi-bin/nph-calc?'
-        'in_csys=Equatorial&in_equinox=J2000.0&obs_epoch=2010&lon='+'%i' % rah +
-        '%3A'+'%i' % ram + '%3A' + '%05.2f' % ras + '&lat=%s' % decsign + '%i' % abs(decd) +
-        '%3A' + '%i' % abs(decm) + '%3A' + '%05.2f' % abs(decs) +
-        '&pa=0.0&out_csys=Equatorial&out_equinox=J2000.0')
+    l = coords.l.degree
+    b = coords.b.degree
 
-    tmpfile = '/tmp/nedsearch%s%s.html' % (ra, dec)
-    cmd = 'curl -s \'%s\' -o %s' % (url, tmpfile)
-    sp.Popen(cmd, shell=True).wait()
-    AV = None
-    with open(tmpfile, 'r') as f:
-        for line in f:
-            m = re.search(r'V \(0.54\)\s+(\S+)', line)
-            if m:
-                AV = float(m.group(1))
-    if AV is None:
-        print('Error accessing NED, url={}'.format(url))
-        with open(tmpfile) as f:
-            for line in f:
-                print(line)
+    ebv = sfd_ebv.get_sfd_ebv(l, b)
+    AV = 2.742 * ebv
 
-    os.remove(tmpfile)
     return AV
+
+
+class SFDEBV:
+    def __init__(self):
+        """
+        Load the necessary dust maps from Schlegel, Finkbeiner & Davis 1998
+        (ApJ, 500, 525) to extract E(B-V) at infinity.
+        """
+        data_ngp = fits.open(os.path.join(os.path.dirname(__file__),
+                                          'tests/data/SFD_dust_4096_ngp.fits'))[0].data
+        data_sgp = fits.open(os.path.join(os.path.dirname(__file__),
+                                          'tests/data/SFD_dust_4096_sgp.fits'))[0].data
+
+        xs, ys = np.meshgrid(np.arange(4096), np.arange(4096), indexing='ij', sparse=True)
+        self.f_interp_ngp = RegularGridInterpolator((np.arange(4096), np.arange(4096)), data_ngp,
+                                                    bounds_error=False, fill_value=None)
+        self.f_interp_sgp = RegularGridInterpolator((np.arange(4096), np.arange(4096)), data_sgp,
+                                                    bounds_error=False, fill_value=None)
+        self.n_ngp = 1
+        self.n_sgp = -1
+
+    def get_sfd_ebv(self, l, b):
+        """
+        Interpolate the grid of SFD dust maps to the desired coordinates.
+
+        Parameters
+        ----------
+        l : float or list or numpy.ndarray of floats
+            The Galactic longitudes of the places to evaluate extinction.
+        b : float or list or numpy.ndarray of floats
+            Galatic latitudes to evaluate E(B-V) at.
+
+        Returns
+        ebv : numpy.ndarray of floats
+            E(B-V) at each ``l``-``b`` pair.
+        """
+        l, b = np.atleast_1d(l), np.atleast_1d(b)
+        if np.all(l.shape == b.shape) and len(l.shape) > 1:
+            l, b = l.flatten(), b.flatten()
+        ebv = np.empty(len(l), float)
+        for q, n, f in zip([b >= 0, b < 0], [self.n_ngp, self.n_sgp],
+                           [self.f_interp_ngp, self.f_interp_sgp]):
+            if np.sum(q) > 0:
+                x = (2048 * np.sqrt(1 - n * np.sin(np.radians(b[q]))) *
+                     np.cos(np.radians(l[q])) + 2047.5)
+                y = (-2048 * n * np.sqrt(1 - n * np.sin(np.radians(b[q]))) *
+                     np.sin(np.radians(l[q])) + 2047.5)
+
+                ebv[q] = f(np.array([y, x]).T)
+        return ebv
+
+
+sfd_ebv = SFDEBV()

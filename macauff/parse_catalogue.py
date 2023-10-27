@@ -17,7 +17,7 @@ __all__ = ['csv_to_npy', 'rect_slice_npy', 'npy_to_csv', 'rect_slice_csv']
 
 def csv_to_npy(input_folder, input_filename, output_folder, astro_cols, photo_cols, bestindex_col,
                chunk_overlap_col, header=False, process_uncerts=False, astro_sig_fits_filepath=None,
-               cat_in_radec=None):
+               cat_in_radec=None, mn_in_radec=None):
     '''
     Convert a .csv file representation of a photometric catalogue into the
     appropriate .npy binary files used in the cross-matching process.
@@ -27,7 +27,7 @@ def csv_to_npy(input_folder, input_filename, output_folder, astro_cols, photo_co
     input_folder : string
         Folder on disk where the catalogue .csv file is stored.
     input_filename : string
-        Name of the .csv file, without the extension, to convert to binary files.
+        Name of the CSV file, including extension, to convert to binary files.
     output_folder : string
         Folder on disk of where to save the .npy versions of the catalogue.
     astro_cols : list or numpy.array of integers
@@ -66,8 +66,15 @@ def csv_to_npy(input_folder, input_filename, output_folder, astro_cols, photo_co
         ``True`` or ``False``, indicating whether the catalogue being processed
         is in RA-Dec coordinates or not. If ``True``, coordinates of mid-points
         for derivations of ``m`` and ``n`` for quoted-fit uncertainty relations
-        will be converted from Right Ascension and Declination to Galactic
-        Longitude and Latitude for the purposes of nearest-neighbour use.
+        will be converted from Galactic Longitude and Latitude to Right Ascension
+        and Declination for the purposes of nearest-neighbour use, if
+        ``mn_in_radec`` is ``False`` (and m-n coordinates are in l/b).
+    mn_in_radec : boolean, optional
+        If ``process_uncerts`` is ``True``, must be provided, and similar to
+        ``cat_in_radec`` is a flag indcating whether the coordinates used to
+        compute m-n scaling relations are in RA/Dec or not. If ``mn_in_radec``
+        disagrees with ``cat_in_radec`` then m-n coordinates will be converted
+        to the coordinate system of the catalogue.
     '''
     if not (process_uncerts is True or process_uncerts is False):
         raise ValueError("process_uncerts must either be True or False.")
@@ -75,13 +82,17 @@ def csv_to_npy(input_folder, input_filename, output_folder, astro_cols, photo_co
         raise ValueError("astro_sig_fits_filepath must given if process_uncerts is True.")
     if process_uncerts and cat_in_radec is None:
         raise ValueError("cat_in_radec must given if process_uncerts is True.")
+    if process_uncerts and mn_in_radec is None:
+        raise ValueError("mn_in_radec must given if process_uncerts is True.")
     if process_uncerts and not (cat_in_radec is True or cat_in_radec is False):
         raise ValueError("If process_uncerts is True, cat_in_radec must either be True or False.")
+    if process_uncerts and not (mn_in_radec is True or mn_in_radec is False):
+        raise ValueError("If process_uncerts is True, mn_in_radec must either be True or False.")
     if process_uncerts and not os.path.exists(astro_sig_fits_filepath):
         raise ValueError("process_uncerts is True but astro_sig_fits_filepath does not exist. "
                          "Please ensure file path is correct.")
     astro_cols, photo_cols = np.array(astro_cols), np.array(photo_cols)
-    with open('{}/{}.csv'.format(input_folder, input_filename)) as fp:
+    with open('{}/{}'.format(input_folder, input_filename)) as fp:
         n_rows = 0 if not header else -1
         for _ in fp:
             n_rows += 1
@@ -99,14 +110,20 @@ def csv_to_npy(input_folder, input_filename, output_folder, astro_cols, photo_co
         m_sigs = np.load('{}/m_sigs_array.npy'.format(astro_sig_fits_filepath))
         n_sigs = np.load('{}/n_sigs_array.npy'.format(astro_sig_fits_filepath))
         mn_coords = np.empty((len(m_sigs), 2), float)
-        mn_coords[:, 0] = np.load('{}/lmids.npy'.format(astro_sig_fits_filepath))
-        mn_coords[:, 1] = np.load('{}/bmids.npy'.format(astro_sig_fits_filepath))
-        if cat_in_radec:
+        mn_coords[:, 0] = np.load('{}/ax1_mids.npy'.format(astro_sig_fits_filepath))
+        mn_coords[:, 1] = np.load('{}/ax2_mids.npy'.format(astro_sig_fits_filepath))
+        if cat_in_radec and not mn_in_radec:
             # Convert mn_coords to RA/Dec if catalogue is in Equatorial coords.
             from astropy.coordinates import SkyCoord
             a = SkyCoord(l=mn_coords[:, 0], b=mn_coords[:, 1], unit='deg', frame='galactic')
             mn_coords[:, 0] = a.icrs.ra.degree
             mn_coords[:, 1] = a.icrs.dec.degree
+        if not cat_in_radec and mn_in_radec:
+            # Convert mn_coords to l/b if catalogue is in Galactic coords.
+            from astropy.coordinates import SkyCoord
+            a = SkyCoord(ra=mn_coords[:, 0], dec=mn_coords[:, 1], unit='deg', frame='icrs')
+            mn_coords[:, 0] = a.galactic.l.degree
+            mn_coords[:, 1] = a.galactic.b.degree
 
     used_cols = np.concatenate((astro_cols, photo_cols, [bestindex_col]))
     if chunk_overlap_col is not None:
@@ -117,7 +134,7 @@ def csv_to_npy(input_folder, input_filename, output_folder, astro_cols, photo_co
     if chunk_overlap_col is not None:
         new_chunk_overlap_col = np.where(used_cols == chunk_overlap_col)[0][0]
     n = 0
-    for chunk in pd.read_csv('{}/{}.csv'.format(input_folder, input_filename), chunksize=100000,
+    for chunk in pd.read_csv('{}/{}'.format(input_folder, input_filename), chunksize=100000,
                              usecols=used_cols, header=None if not header else 0):
         if not process_uncerts:
             astro[n:n+chunk.shape[0]] = chunk.values[:, new_astro_cols]
@@ -161,9 +178,9 @@ def npy_to_csv(input_csv_folders, input_match_folder, output_folder, csv_filenam
     output_folder : string
         Folder into which to save the resulting .csv output files.
     csv_filenames : list of strings
-        List of names, minus extensions, of the two catalogues that were matched.
+        List of names, including extensions, of the two catalogues that were matched.
     output_filenames : list of strings
-        List of the names, minus extensions, out to which to save merged
+        List of the names, including extensions, out to which to save merged
         datasets.
     column_name_lists : list of list or array of strings
         List containing two lists of strings, one per catalogue. Each inner list
@@ -263,10 +280,10 @@ def npy_to_csv(input_csv_folders, input_match_folder, output_folder, csv_filenam
         b_names = np.append(column_name_lists[1], extra_col_name_lists[1])
     a_names, b_names = np.array(a_names)[np.argsort(a_cols)], np.array(b_names)[np.argsort(b_cols)]
 
-    cat_a = pd.read_csv('{}/{}.csv'.format(input_csv_folders[0], csv_filenames[0]),
+    cat_a = pd.read_csv('{}/{}'.format(input_csv_folders[0], csv_filenames[0]),
                         memory_map=True, header=None if not headers[0] else 0,
                         usecols=a_cols, names=a_names)
-    cat_b = pd.read_csv('{}/{}.csv'.format(input_csv_folders[1], csv_filenames[1]),
+    cat_b = pd.read_csv('{}/{}'.format(input_csv_folders[1], csv_filenames[1]),
                         memory_map=True, header=None if not headers[1] else 0,
                         usecols=b_cols, names=b_names)
     n_matches = len(ac)
@@ -312,7 +329,7 @@ def npy_to_csv(input_csv_folders, input_match_folder, output_folder, csv_filenam
                    (len(extra_col_name_lists[1]) if extra_col_name_lists[1] is not None else 0)) + _dx
             match_df.iloc[lowind:highind, ind] = b_concatastro[bc[lowind:highind], 2]
 
-    match_df.to_csv('{}/{}.csv'.format(output_folder, output_filenames[0]), encoding='utf-8',
+    match_df.to_csv('{}/{}'.format(output_folder, output_filenames[0]), encoding='utf-8',
                     index=False, header=False)
 
     # For non-match, ID/coordinates/mags, then island probability + average
@@ -352,7 +369,7 @@ def npy_to_csv(input_csv_folders, input_match_folder, output_folder, csv_filenam
                    (len(extra_col_name_lists[0]) if extra_col_name_lists[0] is not None else 0))
             a_nonmatch_df.iloc[lowind:highind, ind] = a_concatastro[af[lowind:highind], 2]
 
-    a_nonmatch_df.to_csv('{}/{}.csv'.format(output_folder, output_filenames[1]), encoding='utf-8',
+    a_nonmatch_df.to_csv('{}/{}'.format(output_folder, output_filenames[1]), encoding='utf-8',
                          index=False, header=False)
 
     bf = np.load('{}/pairing/bf.npy'.format(input_match_folder), mmap_mode='r')
@@ -390,7 +407,7 @@ def npy_to_csv(input_csv_folders, input_match_folder, output_folder, csv_filenam
                    (len(extra_col_name_lists[1]) if extra_col_name_lists[1] is not None else 0))
             b_nonmatch_df.iloc[lowind:highind, ind] = b_concatastro[bf[lowind:highind], 2]
 
-    b_nonmatch_df.to_csv('{}/{}.csv'.format(output_folder, output_filenames[2]), encoding='utf-8',
+    b_nonmatch_df.to_csv('{}/{}'.format(output_folder, output_filenames[2]), encoding='utf-8',
                          index=False, header=False)
 
     return
@@ -409,9 +426,9 @@ def rect_slice_csv(input_folder, output_folder, input_filename, output_filename,
     output_folder : string
         Folder into which to save the cutout catalogue.
     input_filename : string
-        Name, minus .csv extension, of the larger catalogue file.
+        Name, including extension, of the larger catalogue file.
     output_filename : string
-        Name, minus .csv extension, of the cutout catalogue.
+        Name, including extension, of the cutout catalogue.
     rect_coords : list or array of floats
         List of coordinates inside which to take the subset catalogue. Should
         be of the kind [lower_ax1, upper_ax1, lower_ax2, upper_ax2], where ax1
@@ -432,7 +449,7 @@ def rect_slice_csv(input_folder, output_folder, input_filename, output_filename,
         each column, or if the first line of the file is the first line of the
         dataset.
     '''
-    with open('{}/{}.csv'.format(input_folder, input_filename)) as fp:
+    with open('{}/{}'.format(input_folder, input_filename)) as fp:
         n_rows = 0 if not header else -1
         for _ in fp:
             n_rows += 1
@@ -440,7 +457,7 @@ def rect_slice_csv(input_folder, output_folder, input_filename, output_filename,
                               shape=(n_rows, 2))
 
     n = 0
-    for chunk in pd.read_csv('{}/{}.csv'.format(input_folder, input_filename), chunksize=100000,
+    for chunk in pd.read_csv('{}/{}'.format(input_folder, input_filename), chunksize=100000,
                              usecols=astro_cols, header=None if not header else 0):
         small_astro[n:n+chunk.shape[0]] = chunk.values
         n += chunk.shape[0]
@@ -459,14 +476,14 @@ def rect_slice_csv(input_folder, output_folder, input_filename, output_filename,
         lowind = np.floor(n_rows*cnum/mem_chunk_num).astype(int)
         highind = np.floor(n_rows*(cnum+1)/mem_chunk_num).astype(int)
         n_inside_rows += np.sum(combined_memmap[lowind:highind])
-    df_orig = pd.read_csv('{}/{}.csv'.format(input_folder, input_filename), nrows=1,
+    df_orig = pd.read_csv('{}/{}'.format(input_folder, input_filename), nrows=1,
                           header=None if not header else 0)
     df = pd.DataFrame(columns=df_orig.columns, index=np.arange(0, n_inside_rows))
 
     counter = 0
     outer_counter = 0
     chunksize = 100000
-    for chunk in pd.read_csv('{}/{}.csv'.format(input_folder, input_filename), chunksize=chunksize,
+    for chunk in pd.read_csv('{}/{}'.format(input_folder, input_filename), chunksize=chunksize,
                              header=None if not header else 0):
         inside_n = np.sum(combined_memmap[outer_counter:outer_counter+chunksize])
         df.iloc[counter:counter+inside_n] = chunk.values[
@@ -474,7 +491,7 @@ def rect_slice_csv(input_folder, output_folder, input_filename, output_filename,
         counter += inside_n
         outer_counter += chunksize
 
-    df.to_csv('{}/{}.csv'.format(output_folder, output_filename), encoding='utf-8', index=False,
+    df.to_csv('{}/{}'.format(output_folder, output_filename), encoding='utf-8', index=False,
               header=False)
 
     for n in ['1', '2', '3', '4', 'combined']:

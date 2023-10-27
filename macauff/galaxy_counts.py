@@ -14,7 +14,7 @@ __all__ = ['create_galaxy_counts', 'generate_speclite_filters']
 
 
 def create_galaxy_counts(cmau_array, mag_bins, z_array, wav, alpha0, alpha1, weight,
-                         ab_offset, filter_name, al_inf):
+                         ab_offset, filter_name, al_grid):
     r'''
     Create a simulated distribution of galaxy magnitudes for a particular
     bandpass by consideration of double Schechter functions (for blue and
@@ -56,8 +56,9 @@ def create_galaxy_counts(cmau_array, mag_bins, z_array, wav, alpha0, alpha1, wei
         of the particular observations. If observations are in a filter system
         not provided by ``speclite``, response curve can be generated using
         ``generate_speclite_filters``.
-    al_inf : float
-        The reddening at infinity by which to extinct all galaxy magnitudes.
+    al_grid : list or numpy.ndarray of floats
+        The reddenings at infinity by which to extinct all galaxy magnitudes,
+        for various different potential sub-sightlines within a field of view.
 
     Returns
     -------
@@ -117,7 +118,13 @@ def create_galaxy_counts(cmau_array, mag_bins, z_array, wav, alpha0, alpha1, wei
                 fs = f.create_shifted(_z)
                 non_shift_ab_maggy, shift_ab_maggy = 0, 0
                 for k in range(len(t)):
-                    non_shift_ab_maggy += spectral_coefficients[j, k] * f.get_ab_maggies(t[k], w)
+                    try:
+                        non_shift_ab_maggy += spectral_coefficients[j, k] * f.get_ab_maggies(t[k],
+                                                                                             w)
+                    except ValueError:
+                        _t, _w = fs.pad_spectrum(t[k], w, method='edge')
+                        non_shift_ab_maggy += spectral_coefficients[j, k] * fs.get_ab_maggies(_t,
+                                                                                              _w)
                     try:
                         shift_ab_maggy += spectral_coefficients[j, k] * fs.get_ab_maggies(t[k], w)
                     except ValueError:
@@ -126,9 +133,12 @@ def create_galaxy_counts(cmau_array, mag_bins, z_array, wav, alpha0, alpha1, wei
                 # Backwards to Hogg+ astro-ph/0210394, our "shifted" bandpass is the rest-frame
                 # as opposed to the observer frame.
                 kcorr[j] = -2.5 * np.log10(1/(1+_z) * shift_ab_maggy / non_shift_ab_maggy)
-            # e.g. Loveday+2015 for absolute -> apparent magnitude conversion
-            gal_dens += np.interp(mag_bins, abs_mag_bins + cosmology.distmod(z).value +
-                                  np.percentile(kcorr, 50) - ab_offset + al_inf, model_density)
+            # Take the average of the NxM AVs that went into al_grid.
+            for al in al_grid:
+                # e.g. Loveday+2015 for absolute -> apparent magnitude conversion
+                gal_dens += np.interp(mag_bins, abs_mag_bins + cosmology.distmod(z).value +
+                                      np.percentile(kcorr, 50) - ab_offset + al,
+                                      model_density) / len(al_grid)
 
     return gal_dens
 

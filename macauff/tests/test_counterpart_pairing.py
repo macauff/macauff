@@ -600,6 +600,7 @@ class TestCounterpartPairing:
         self.cm.group_sources_data = None
         self.cm.phot_like_data = None
         self.files_per_pairing = 13
+        self.cm.chunk_id = 1
         self.cm._initialise_chunk(os.path.join(os.path.dirname(__file__), 'data/chunk0/crossmatch_params_.txt'),
                                   os.path.join(os.path.dirname(__file__), 'data/chunk0/cat_a_params_.txt'),
                                   os.path.join(os.path.dirname(__file__), 'data/chunk0/cat_b_params_.txt'))
@@ -680,6 +681,7 @@ class TestCounterpartPairing:
         self.cm.group_sources_data = None
         self.cm.phot_like_data = None
         self.files_per_pairing = 13
+        self.cm.chunk_id = 1
         self.cm._initialise_chunk(os.path.join(os.path.dirname(__file__), 'data/chunk0/crossmatch_params_.txt'),
                                   os.path.join(os.path.dirname(__file__), 'data/chunk0/cat_a_params_.txt'),
                                   os.path.join(os.path.dirname(__file__), 'data/chunk0/cat_b_params_.txt'))
@@ -709,6 +711,7 @@ class TestCounterpartPairing:
         self.cm.b_modelrefinds = None
         self.cm.group_sources_data = None
         self.cm.phot_like_data = None
+        self.cm.chunk_id = 1
         self.cm._initialise_chunk(os.path.join(os.path.dirname(__file__), 'data/chunk0/crossmatch_params_.txt'),
                                   os.path.join(os.path.dirname(__file__), 'data/chunk0/cat_a_params_.txt'),
                                   os.path.join(os.path.dirname(__file__), 'data/chunk0/cat_b_params_.txt'))
@@ -747,4 +750,12 @@ def test_f90_perm_comb():
 
 def test_factorial():
     for k in range(21):
-        assert np.math.factorial(k) == cpf.factorial(k)
+        assert np.math.factorial(k) == cpf.factorial(k, k-1)
+        assert np.math.factorial(k) == cpf.factorial(k, k)
+
+    for k in range(21):
+        assert cpf.factorial(k, 1) == k
+
+    for k in range(21):
+        for l in range(1, k+1):
+            assert cpf.factorial(k, l) == np.math.factorial(k) / np.math.factorial(k - l)

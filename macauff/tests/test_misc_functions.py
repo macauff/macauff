@@ -11,7 +11,7 @@ import scipy.special
 from ..misc_functions import (create_auf_params_grid, load_small_ref_auf_grid,
                               hav_dist_constant_lat, map_large_index_to_small_index,
                               _load_rectangular_slice, _load_single_sky_slice,
-                              _create_rectangular_slice_arrays)
+                              _create_rectangular_slice_arrays, min_max_lon)
 from ..misc_functions_fortran import misc_functions_fortran as mff
 
 
@@ -107,27 +107,64 @@ def test_large_small_index():
 
 def test_load_rectangular_slice():
     rng = np.random.default_rng(4324324432)
-    a = rng.uniform(2, 3, size=(5000, 2))
-    lon1, lon2, lat1, lat2 = 2.2, 2.4, 2.1, 2.3
-    padding = 0.05
-    _create_rectangular_slice_arrays('.', '', len(a))
-    memmap_arrays = []
-    for n in ['1', '2', '3', '4', 'combined']:
-        memmap_arrays.append(np.lib.format.open_memmap('{}/{}_temporary_sky_slice_{}.npy'.format(
-                             '.', '', n), mode='r+', dtype=bool, shape=(len(a),)))
-    sky_cut = _load_rectangular_slice('.', '', a, lon1, lon2, lat1, lat2, padding, memmap_arrays)
-    for i in range(len(a)):
-        within_range = np.empty(4, bool)
-        within_range[0] = ((hav_dist_constant_lat(a[i, 0], a[i, 1], lon1) <= padding) |
-                           (a[i, 0] > lon1))
-        within_range[1] = ((hav_dist_constant_lat(a[i, 0], a[i, 1], lon2) <= padding) |
-                           (a[i, 0] < lon2))
-        within_range[2] = (a[i, 1] >= lat1-padding)
-        within_range[3] = (a[i, 1] <= lat2+padding)
-        if sky_cut[i]:
-            assert np.all(within_range)
+    for x, y, padding in zip([2, -1, -1, 45], [3, 1, 1, 46], [0.05, 0, 0.02, 0.1]):
+        a = rng.uniform(x, y, size=(5000, 2))
+        if x < 0:
+            a[a[:, 0] < 0, 0] = a[a[:, 0] < 0, 0] + 360
+        lon1, lon2, lat1, lat2 = x+0.2, x+0.4, x+0.1, x+0.3
+        _create_rectangular_slice_arrays('.', '', len(a))
+        memmap_arrays = []
+        for n in ['1', '2', '3', '4', 'combined']:
+            memmap_arrays.append(np.lib.format.open_memmap('{}/{}_temporary_sky_slice_{}.npy'
+                                 .format('.', '', n), mode='r+', dtype=bool, shape=(len(a),)))
+        sky_cut = _load_rectangular_slice('.', '', a, lon1, lon2, lat1, lat2,
+                                          padding, memmap_arrays)
+        for i in range(len(a)):
+            within_range = np.empty(4, bool)
+            if x > 0:
+                within_range[0] = (a[i, 0] >= lon1) | (
+                    np.degrees(2 * np.arcsin(np.abs(np.cos(np.radians(a[i, 1])) *
+                                             np.sin(np.radians(a[i, 0] - lon1)/2)))) <= padding)
+                within_range[1] = (a[i, 0] <= lon2) | (
+                    np.degrees(2 * np.arcsin(np.abs(np.cos(np.radians(a[i, 1])) *
+                                             np.sin(np.radians(a[i, 0] - lon2)/2)))) <= padding)
+            else:
+                if a[i, 0] < 180:
+                    within_range[0] = (a[i, 0] >= lon1) | (
+                        np.degrees(2 * np.arcsin(np.abs(np.cos(np.radians(a[i, 1])) *
+                                                 np.sin(np.radians(a[i, 0] - lon1)/2)))) <= padding)
+                else:
+                    within_range[0] = (a[i, 0] - 360 >= lon1) | (
+                        np.degrees(2 * np.arcsin(np.abs(np.cos(np.radians(a[i, 1])) *
+                                                 np.sin(np.radians(a[i, 0] - lon1)/2)))) <= padding)
+                if a[i, 0] < 180:
+                    within_range[1] = (a[i, 0] <= lon2) | (
+                        np.degrees(2 * np.arcsin(np.abs(np.cos(np.radians(a[i, 1])) *
+                                                 np.sin(np.radians(a[i, 0] - lon2)/2)))) <= padding)
+                else:
+                    within_range[1] = (a[i, 0] - 360 <= lon2) | (
+                        np.degrees(2 * np.arcsin(np.abs(np.cos(np.radians(a[i, 1])) *
+                                                 np.sin(np.radians(a[i, 0] - lon2)/2)))) <= padding)
+            within_range[2] = a[i, 1] >= lat1-padding
+            within_range[3] = a[i, 1] <= lat2+padding
+            if sky_cut[i]:
+                assert np.all(within_range)
+            else:
+                assert not np.all(within_range)
+
+
+def test_min_max_lon():
+    rng = np.random.default_rng(seed=435834534)
+    for min_lon, max_lon in zip([0, 10, 90, 340, 355], [360, 20, 350, 20, 5]):
+        if min_lon < max_lon:
+            a = rng.uniform(min_lon, max_lon, size=50000)
+            min_n, max_n = min_lon, max_lon
         else:
-            assert not np.all(within_range)
+            a = rng.uniform(min_lon-360, max_lon, size=50000)
+            a[a < 0] = a[a < 0] + 360
+            min_n, max_n = min_lon - 360, max_lon
+        new_min_lon, new_max_lon = min_max_lon(a)
+        assert_allclose([new_min_lon, new_max_lon], [min_n, max_n], rtol=0.01)
 
 
 def test_load_single_sky_slice():

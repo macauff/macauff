@@ -285,12 +285,12 @@ subroutine find_single_island_prob(a_astro, a_photo, b_astro, b_photo, c_array, 
     ! set of all a-b matches and non-matches.
     integer, allocatable :: a_combinations(:, :), b_permutations(:, :)
     ! Temporary storage of 64-bit integer factorial numbers.
-    integer(int64) :: fac1, fac2, fac3
+    integer(int64) :: fac1, fac2
 
     nan = IEEE_VALUE(nan, IEEE_QUIET_NAN)
 
     do j = 1, size(aperm)
-        bina(j) = maxloc(a_photo(aperm(j), aused(j)) - abinsarray(:abinlengths(aused(j), qa(j)), aused(j), qa(j)), &
+        bina(j) = minloc(a_photo(aperm(j), aused(j)) - abinsarray(:abinlengths(aused(j), qa(j)), aused(j), qa(j)), &
                          mask=(a_photo(aperm(j), aused(j)) - abinsarray(:abinlengths(aused(j), qa(j)), aused(j), qa(j)) >= 0), &
                          dim=1)
         ! For the field sources we don't know which other filter to use, so we
@@ -302,7 +302,7 @@ subroutine find_single_island_prob(a_astro, a_photo, b_astro, b_photo, c_array, 
     end do
 
     do j = 1, size(bperm)
-        binb(j) = maxloc(b_photo(bperm(j), bused(j)) - bbinsarray(:bbinlengths(bused(j), qb(j)), bused(j), qb(j)), &
+        binb(j) = minloc(b_photo(bperm(j), bused(j)) - bbinsarray(:bbinlengths(bused(j), qb(j)), bused(j), qb(j)), &
                          mask=(b_photo(bperm(j), bused(j)) - bbinsarray(:bbinlengths(bused(j), qb(j)), bused(j), qb(j)) >= 0), &
                          dim=1)
         Nfb(j) = fb_priors(bused(j), 1, qb(j))
@@ -341,6 +341,15 @@ subroutine find_single_island_prob(a_astro, a_photo, b_astro, b_photo, c_array, 
             ! G would be in units of per square arcseconds, but we need it
             ! in units of per square degree to compare to Nf.
             G = Gcc * 3600.0_dp**2
+            ! If G is negative something has gone wrong with the fourier transform integral, so just set to
+            ! a very low but crucially positive value in all cases.
+            if (G < 0) then
+                G = 1e-30_dp
+                Gcc = 1e-30_dp
+                Gcn = 1e-30_dp
+                Gnc = 1e-30_dp
+                Gnn = 1e-30_dp
+            end if
 
             do ff = 1, n_fracs
                 pr = aF(ff)*bF(ff)*Gcc + aF(ff)*(1-bF(ff))*Gcn + (1-aF(ff))*bF(ff)*Gnc + (1-aF(ff))*(1-bF(ff))*Gnn
@@ -353,18 +362,18 @@ subroutine find_single_island_prob(a_astro, a_photo, b_astro, b_photo, c_array, 
             cdmdm = c_array(binb(k), bina(j), bused(k), aused(j), qb(k))
             counterpartgrid(j, k) = Nc * G * cdmdm
 
-            if (abs(fa(j) * fb(k)) < 1e-7_dp) then
-                etagrid(j, k) = 10.0_dp
-            else if (abs(cdmdm) < 1e-7_dp) then
-                etagrid(j, k) = -10.0_dp
+            if (abs(fa(j) * fb(k)) < 1e-30_dp) then
+                etagrid(j, k) = 30.0_dp
+            else if (abs(cdmdm) < 1e-30_dp) then
+                etagrid(j, k) = -30.0_dp
             else
                 etagrid(j, k) = log10(cdmdm / (fa(j) * fb(k)))
             end if
 
-            if (abs(Nfa(j) * Nfb(k)) < 1e-7_dp) then
-                xigrid(j, k) = 10.0_dp
-            else if (abs(Nc * G) < 1e-7_dp) then
-                xigrid(j, k) = -10.0_dp
+            if (abs(Nfa(j) * Nfb(k)) < 1e-30_dp) then
+                xigrid(j, k) = 30.0_dp
+            else if (abs(Nc * G) < 1e-30_dp) then
+                xigrid(j, k) = -30.0_dp
             else
                 xigrid(j, k) = log10(Nc * G / (Nfa(j) * Nfb(k)))
             end if
@@ -422,16 +431,15 @@ subroutine find_single_island_prob(a_astro, a_photo, b_astro, b_photo, c_array, 
 
     do N = 1, min(size(aperm), size(bperm))
         ! Combinations of m-pick-n are m! / n! / (m - n)!
-        call factorial(int(size(aperm), int64), fac1)
-        call factorial(int(N, int64), fac2)
-        call factorial(int(size(aperm)-N, int64), fac3)
-        a_n_combs = int(fac1 / fac2 / fac3)
-        call factorial(int(size(bperm), int64), fac1)
-        call factorial(int(N, int64), fac2)
-        call factorial(int(size(bperm)-N, int64), fac3)
-        b_n_combs = int(fac1 / fac2 / fac3)
+        call factorial(int(size(aperm), int64), int(N, int64), fac1)
+        ! fac1 = m! / (m - n)!, fac2 = n! / (n - n)! = n!
+        call factorial(int(N, int64), int(N, int64), fac2)
+        a_n_combs = int(fac1 / fac2)
+        call factorial(int(size(bperm), int64), int(N, int64), fac1)
+        call factorial(int(N, int64), int(N-1, int64), fac2)
+        b_n_combs = int(fac1 / fac2)
         ! Permutations of an n-sized array (n-pick-n) are n!
-        call factorial(int(N, int64), fac1)
+        call factorial(int(N, int64), int(N-1, int64), fac1)
         b_n_perms_per_comb = int(fac1)
         allocate(a_combinations(N, a_n_combs), b_permutations(N, b_n_combs*b_n_perms_per_comb))
         call calc_combs(size(aperm), a_n_combs, N, a_combinations)
@@ -559,18 +567,19 @@ subroutine find_single_island_prob(a_astro, a_photo, b_astro, b_photo, c_array, 
 
 end subroutine find_single_island_prob
 
-subroutine factorial(N, g)
-    ! Calculates N! = N * (N-1) * (N-2) * ... * 1, the factorial of N.
+subroutine factorial(N, M, g)
+    ! Calculates N * (N-1) * (N-2) * ... * (N-M+1), equivalent to N! / (N-M)!.
+    ! If M = N or M = N - 1 this is the same as N! and if M = 1 it is equal to N.
     integer, parameter :: int64 = selected_int_kind(15)  ! 64-bit integer
     ! The number to calculate the factorial of.
-    integer(int64), intent(in) :: N
-    ! The returned value g = N!.
+    integer(int64), intent(in) :: N, M
+    ! The returned value g = N! / (N-M)!.
     integer(int64), intent(out) :: g
     ! Loop counter.
     integer(int64) :: k
 
     g = 1
-    do k = 1, N
+    do k = N-M+1, N
         g = g * k
     end do
 

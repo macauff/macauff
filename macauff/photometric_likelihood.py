@@ -244,7 +244,7 @@ def compute_photometric_likelihoods(joint_folder_path, a_cat_folder_path, b_cat_
                         fb_prior = Nb - c_prior
                         # To fake no photometric likelihoods, simply set all
                         # values to one, to cancel in the ratio later.
-                        c_like, fa_like, fb_like = 1-1e-10, 1-1e-10, 1-1e-10
+                        c_like, fa_like, fb_like = (1-1e-10)**2, 1-1e-10, 1-1e-10
                     else:
                         b_bins = bbinsarray[:bbinlengths[j, m], j, m]
                         b_mag = b_photo_cut[:, j]
@@ -260,17 +260,19 @@ def compute_photometric_likelihoods(joint_folder_path, a_cat_folder_path, b_cat_
                     if use_phot_priors and not include_phot_like:
                         # If we only used the create_c_and_f routine to derive
                         # priors, then quickly update likelihoods here.
-                        c_like, fa_like, fb_like = 1-1e-10, 1-1e-10, 1-1e-10
+                        c_like, fa_like, fb_like = (1-1e-10)**2, 1-1e-10, 1-1e-10
 
                     # Have to add a very small "fire extinguisher" value to all
                     # likelihoods and priors, to avoid ever having exactly zero
                     # value in either, which would mean all island permutations
                     # were rejected.
-                    c_priors[j, i, m] = c_prior + 1e-10
+                    c_priors[j, i, m] = c_prior + 1e-100
                     fa_priors[j, i, m] = fa_prior + 1e-10
                     fb_priors[j, i, m] = fb_prior + 1e-10
+                    # c should be equal to f^2 in the limit of indifference, so
+                    # add 1e-10 and (1e-10)^2 to f and c respectively.
                     c_array[:bbinlengths[j, m]-1,
-                            :abinlengths[i, m]-1, j, i, m] = c_like + 1e-10
+                            :abinlengths[i, m]-1, j, i, m] = c_like + 1e-100
                     fa_array[:abinlengths[i, m]-1, j, i, m] = fa_like + 1e-10
                     fb_array[:bbinlengths[j, m]-1, j, i, m] = fb_like + 1e-10
 
@@ -340,6 +342,8 @@ def distribute_sky_indices(joint_folder_path, cat_folder, name, mem_chunk_num, c
         lowind = np.floor(n_sources*cnum/mem_chunk_num).astype(int)
         highind = np.floor(n_sources*(cnum+1)/mem_chunk_num).astype(int)
         a = np.load('{}/con_cat_astro.npy'.format(cat_folder), mmap_mode='r')[lowind:highind]
+        # Haversine doesn't mind 0-360 wraparound so a can be in [0, 360] range
+        # but cf_points in the negative-to-positive cutout.
         sky_inds[lowind:highind] = mff.find_nearest_point(a[:, 0], a[:, 1],
                                                           cf_points[:, 0], cf_points[:, 1])
 

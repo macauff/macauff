@@ -16,6 +16,8 @@ The current package requirements are:
 * ``skypy``
 * ``speclite``
 * ``pandas``
+* ``scikit-build-core``
+* ``cmake``
 
 with an optional dependency of
 
@@ -42,7 +44,7 @@ As of now, the only way to install this package is by downloading it from the `G
 
 Once you have installed your choice of conda, then you can create an initial conda environment::
 
-    conda create -n your_environment_name -c conda-forge python=3.9 numpy scipy astropy matplotlib skypy speclite pandas
+    conda create -n your_environment_name -c conda-forge python=3.9 numpy scipy astropy matplotlib skypy speclite pandas scikit-build-core cmake
 
 although you can drop the ``=3.9``, or chose another (later) Python version -- remembering the minimum version is 3.8 -- if you desire to do so. Then activate this as our Python environment::
 
@@ -65,7 +67,7 @@ which will place the repository in the folder from which you invoked the ``git``
 
 or::
 
-    pip install . --install-option="--full-build"
+    pip install . --config-settings=cmake.build-type="Debug"
 
 which will install ``macauff`` such that you can ``import macauff`` from other folders on your computer. However, if this is to develop the software, your changes will not be reflected in the installed version of the code (and you must re-install using the above command); if you wish to have ``Python`` code changes immediately reflected in your ``pip``-installed version of the software, you can install ``macauff`` using::
 
@@ -73,9 +75,9 @@ which will install ``macauff`` such that you can ``import macauff`` from other f
 
 or::
 
-    pip install -e . --install-option="--full-build"
+    pip install -e . --config-settings=cmake.build-type="Debug"
 
-where ``-e`` is the "editable" flag. Note that the ``install-option`` parameter passed through ``pip`` controls the optimisation flag for the compilation of Fortran code. Without ``--full-build``, ``macauff`` will install with ``-O0`` optimisation and numerous additional check/debug flags, while using ``--install-option="--full-build"`` will set ``-O3`` optimisation.
+where ``-e`` is the "editable" flag. Note that the ``config-settings`` parameter passed through ``pip`` controls the optimisation flag for the compilation of Fortran code. With ``debug`` set, ``macauff`` will install with ``-O0`` optimisation and numerous additional check/debug flags, while by default the software will be installed with compiler optimisation.
 
 To confirm your installation was successful, you can ``import macauff`` in a Python terminal.
 
