@@ -11,13 +11,13 @@ build-backend = "scikit_build_core.build"
 
 [project]
 name = "macauff"
-version = "0.1.0"
+version = "0.1.2"
 readme = "README.md"
 requires-python = ">=3.8"
 dependencies = [
     "astropy",
     "matplotlib",
-    # We binary compatibible with numpy 1.21
+    # We need to build a binary compatible with numpy 1.21
     "numpy>=1.21",
     "pandas",
     "skypy",
