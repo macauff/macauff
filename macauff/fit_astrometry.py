@@ -353,7 +353,7 @@ class AstrometricCorrections:
         tri_download : boolean, optional
             Flag determining if TRILEGAL simulations should be re-downloaded
             if they already exist on disk.
-        overwrite_all_sightlines : boolean
+        overwrite_all_sightlines : boolean, optional
             Flag for whether to create a totally fresh run of astrometric
             corrections, regardless of whether ``abc_array`` or ``m_sigs_array``
             are saved on disk. Defaults to ``False``.
@@ -1962,7 +1962,7 @@ class SNRMagnitudeRelationship(AstrometricCorrections):
             or two formats via Python string formatting (e.g. ``'a_string_{}'``)
             that represent ``chunk``, or ``ax1_mid`` and ``ax2_mid``, depending
             on ``coord_or_chunk``.
-        overwrite_all_sightlines : boolean
+        overwrite_all_sightlines : boolean, optional
             Flag for whether to create a totally fresh run of astrometric
             corrections, regardless of whether ``abc_array`` is saved on disk.
             Defaults to ``False``.
