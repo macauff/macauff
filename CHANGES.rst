@@ -1,4 +1,23 @@
-0.1.2 (unreleased)
+0.1.3 (unreleased)
+------------------
+
+General
+^^^^^^^
+
+New Features
+^^^^^^^^^^^^
+
+Bug Fixes
+^^^^^^^^^
+
+API Changes
+^^^^^^^^^^^
+
+Other Changes
+^^^^^^^^^^^^^
+
+
+0.1.2 (2023-10-27)
 ------------------
 
 General
