@@ -1,17 +1,24 @@
 [build-system]
-requires = [ "setuptools", "wheel", "oldest-supported-numpy"]
-build-backend = "setuptools.build_meta"
+requires = [
+    "scikit-build-core",
+    # We need as old numpy as possible for binary compatibility,
+    # but we also need some f2py features intrdocued in 1.21.
+    # The oldest-supported-numpy for Py3.10 is 1.21.
+    "numpy==1.21.6; python_version<'3.10'",
+    "oldest-supported-numpy; python_version>='3.10'",
+]
+build-backend = "scikit_build_core.build"
 
 [project]
 name = "macauff"
 version = "0.1.0"
 readme = "README.md"
-# 3.12 has removed distutils
-requires-python = ">=3.8,<3.12"
+requires-python = ">=3.8"
 dependencies = [
     "astropy",
     "matplotlib",
-    "numpy",
+    # We binary compatibible with numpy 1.21
+    "numpy>=1.21",
     "pandas",
     "skypy",
     "speclite",
@@ -30,7 +37,6 @@ docs = [
 
 [tool.cibuildwheel]
 build-frontend = "build"
-config-settings = { "build-args" = "--full-build" }
 skip = [
     "*musl*",  # we don't support MUSL Linux
     "pp*",  # we don't support PyPy
