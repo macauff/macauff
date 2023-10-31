@@ -16,6 +16,7 @@ The current package requirements are:
 * ``skypy``
 * ``speclite``
 * ``pandas``
+* ``dustmaps``
 * ``scikit-build-core``
 * ``cmake``
 
@@ -44,7 +45,7 @@ As of now, the only way to install this package is by downloading it from the `G
 
 Once you have installed your choice of conda, then you can create an initial conda environment::
 
-    conda create -n your_environment_name -c conda-forge python=3.9 numpy scipy astropy matplotlib skypy speclite pandas scikit-build-core cmake
+    conda create -n your_environment_name -c conda-forge python=3.9 numpy scipy astropy matplotlib skypy speclite pandas dustmaps scikit-build-core cmake
 
 although you can drop the ``=3.9``, or chose another (later) Python version -- remembering the minimum version is 3.8 -- if you desire to do so. Then activate this as our Python environment::
 
