@@ -184,7 +184,7 @@ def trilegal_webcall(trilegal_version, l, b, area, binaries, AV, sigma_AV, filte
         else:
             print("No communication with {}, will retry in 2 min".format(webserver))
             time.sleep(120)
-            return "timeout"
+            return "nocomm"
         if not notconnected:
             with open('{}/tmpfile'.format(outfolder), 'r') as f:
                 lines = f.readlines()
@@ -231,19 +231,21 @@ def get_AV_infinity(ra, dec, frame='icrs'):
 
     Parameters
     ----------
-    ra : float
+    ra : float, list, or numpy.ndarray
         Sky coordinate.
-    dec : float
+    dec : float, list, or numpy.ndarray
         Sky coordinate.
     frame : string, optional
         Frame of input coordinates (e.g., ``'icrs', 'galactic'``)
 
     Returns
     -------
-    AV : float
+    AV : numpy.ndarray
         Extinction at infinity as given by the SFD dust maps for the chosen sky
         coordinates.
     """
+    ra = np.atleast_1d(ra)
+    dec = np.atleast_1d(dec)
     coords = SkyCoord(ra, dec, unit='deg', frame=frame).transform_to('galactic')
 
     # Load the necessary dust maps from Schlegel, Finkbeiner & Davis 1998
