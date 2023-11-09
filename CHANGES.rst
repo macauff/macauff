@@ -13,8 +13,13 @@ Bug Fixes
 API Changes
 ^^^^^^^^^^^
 
+- Removed hard-coded SFD dustmaps, using the ``dustmaps`` package to manage the
+  dataset instead. [#69]
+
 Other Changes
 ^^^^^^^^^^^^^
+
+- Added ``dustmaps`` as a dependency. [#69]
 
 
 0.1.2 (2023-10-27)
