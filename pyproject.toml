@@ -29,7 +29,6 @@ dependencies = [
 [project.optional-dependencies]
 test = [
     "pytest-astropy",
-    "pytest-timeout",
 ]
 docs = [
     "sphinx-astropy",
@@ -43,6 +42,3 @@ skip = [
     "*musl*",  # we don't support MUSL Linux
     "pp*",  # we don't support PyPy
 ]
-
-[tool.pytest.ini_options]
-markers = ["trilegal_download"]

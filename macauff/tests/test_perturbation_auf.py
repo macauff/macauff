@@ -1437,7 +1437,6 @@ def test_make_tri_counts(run_type):
                 use_bright=True, use_faint=False, al_av=0.9, av_grid=np.array([2, 2, 2, 2]))
 
 
-@pytest.mark.trilegal_download
 @pytest.mark.remote_data
 def test_trilegal_download():
     tri_folder = '.'
