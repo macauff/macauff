@@ -43,3 +43,6 @@ skip = [
     "*musl*",  # we don't support MUSL Linux
     "pp*",  # we don't support PyPy
 ]
+
+[tool.pytest.ini_options]
+markers = ["trilegal_download"]

@@ -1313,6 +1313,7 @@ class TestInputs:
                     os.path.join(os.path.dirname(__file__), 'data/cat_a_params_2.txt'),
                     os.path.join(os.path.dirname(__file__), 'data/cat_b_params_.txt'))
 
+    @pytest.mark.remote_data
     def test_crossmatch_correct_astrometry_inputs(self):
         cm = CrossMatch(os.path.join(os.path.dirname(__file__), 'data'), use_memmap_files=True)
         cm._initialise_chunk(os.path.join(os.path.dirname(__file__), 'data/crossmatch_params.txt'),

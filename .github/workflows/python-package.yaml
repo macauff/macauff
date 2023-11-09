@@ -63,11 +63,11 @@ jobs:
         run: |
           pip install numpy
           pip install tox
-      - name: Run tests with remote
+      - name: Run tests with TRILEGAL download
         run: |
           mkdir ./.tmp
           mkdir ./.tmp/${{ matrix. toxenv }}
-          tox -e ${{ matrix.toxenv }} -- --remote-data
+          tox -e ${{ matrix.toxenv }} -- --trilegal_download
       - name: Run documentation
         run: tox -e build_docs
       - name: Upload coverage to codecov

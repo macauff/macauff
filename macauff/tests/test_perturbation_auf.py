@@ -653,6 +653,7 @@ class TestMakePerturbAUFs():
                               z_maxs=1, nzs=1, ab_offsets=1, filter_names=1, al_avs=1, alpha0=1,
                               alpha1=1, run_fw=1, run_psf=1, dd_params=1, l_cut=1, snr_mag_params=1)
 
+    @pytest.mark.remote_data
     def test_without_compute_local_density(self):
         # Number of sources per PSF circle, on average, solved backwards to ensure
         # that local density ends up exactly in the middle of a count_array bin.
@@ -771,6 +772,7 @@ class TestMakePerturbAUFs():
 
         assert_allclose(fake_fourier, track_fourier, rtol=0.05)
 
+    @pytest.mark.remote_data
     def test_create_single_low_numbers(self):
         # Number of sources per PSF circle, on average, solved backwards to ensure
         # that local density ends up exactly in the middle of a count_array bin.
@@ -828,6 +830,7 @@ class TestMakePerturbAUFs():
                 compute_local_density=False, fit_gal_flag=False, run_fw=True, run_psf=False,
                 snr_mag_params=snr_mag_params, al_avs=[0])
 
+    @pytest.mark.remote_data
     def test_psf_algorithm_without_compute_local_density(self):
         # Number of sources per PSF circle, on average, solved backwards to ensure
         # that local density ends up exactly in the middle of a count_array bin.
@@ -951,6 +954,7 @@ class TestMakePerturbAUFs():
                 assert_allclose(keep_flux[0], (prob_0_draw*0 + prob_1_draw*df +
                                 prob_2_draw*2*df), rtol=0.1, atol=0.005)
 
+    @pytest.mark.remote_data
     def test_with_compute_local_density(self):
         # Number of sources per PSF circle, on average, solved backwards to ensure
         # that local density ends up exactly in the middle of a count_array bin.
@@ -1129,6 +1133,7 @@ class TestMakePerturbAUFs():
 
         assert_allclose(fake_fourier, fourier[:, 0], rtol=0.05)
 
+    @pytest.mark.remote_data
     def test_with_galaxy_counts(self):
         # Number of sources per PSF circle, on average, solved backwards to ensure
         # that local density ends up exactly in the middle of a count_array bin.
@@ -1432,6 +1437,7 @@ def test_make_tri_counts(run_type):
                 use_bright=True, use_faint=False, al_av=0.9, av_grid=np.array([2, 2, 2, 2]))
 
 
+@pytest.mark.trilegal_download
 @pytest.mark.remote_data
 def test_trilegal_download():
     tri_folder = '.'
