@@ -26,8 +26,6 @@ import time
 
 from astropy.units import UnitsError
 from astropy.coordinates import SkyCoord
-from astropy.io import fits
-from scipy.interpolate import RegularGridInterpolator
 import numpy as np
 import dustmaps.sfd
 
@@ -226,8 +224,9 @@ def trilegal_webcall(trilegal_version, l, b, area, binaries, AV, sigma_AV, filte
 
 def get_AV_infinity(ra, dec, frame='icrs'):
     """
-    Gets the A_V exctinction at infinity for a given line of sight, using the
-    updated parameters from Schlafly & Finkbeiner 2011 (ApJ 737, 103), table 6.
+    Gets the Schlegel, Finkbeiner & Davis 1998 (ApJ, 500, 525) A_V extinction
+    at infinity for a given line of sight, using the updated parameters from
+    Schlafly & Finkbeiner 2011 (ApJ 737, 103), table 6.
 
     Parameters
     ----------
@@ -248,9 +247,6 @@ def get_AV_infinity(ra, dec, frame='icrs'):
     dec = np.atleast_1d(dec)
     coords = SkyCoord(ra, dec, unit='deg', frame=frame).transform_to('galactic')
 
-    # Load the necessary dust maps from Schlegel, Finkbeiner & Davis 1998
-    # (ApJ, 500, 525) to extract E(B-V) at infinity.
-    dustmaps.sfd.fetch()
     sfd_ebv = dustmaps.sfd.SFDQuery()
     AV = 2.742 * sfd_ebv(coords)
 
