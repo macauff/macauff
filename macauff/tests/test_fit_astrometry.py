@@ -216,6 +216,7 @@ class TestAstroCorrection:
             ac(self.a_cat_name, self.b_cat_name, a_cat_func, b_cat_func,
                tri_download=False, make_plots=True, make_summary_plot=True)
 
+    @pytest.mark.remote_data
     @pytest.mark.parametrize("npy_or_csv,coord_or_chunk,coord_system,pregenerate_cutouts",
                              [("csv", "chunk", "equatorial", True),
                               ("npy", "coord", "galactic", False),

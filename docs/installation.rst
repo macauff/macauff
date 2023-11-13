@@ -7,21 +7,22 @@ Package Requirements
 
 Currently there are no strict criteria for installation; it is suggested that you use the most up-to-date package versions available. The one exception there is that the minimum version of Python is set to 3.8, and development is currently focused on Python 3.9+.
 
-The current package requirements are:
+The current package requirements, and citations to give for use of ``macauff`` in your work where available, are:
 
-* ``numpy``
-* ``scipy``
-* ``astropy``
-* ``matplotlib``
-* ``skypy``
-* ``speclite``
-* ``pandas``
-* ``scikit-build-core``
+* ``numpy`` -- Harris et al. 2020 (Nature, 585, 357)
+* ``scipy`` -- Virtanen et al. 2020 (Nature Methods, 17, 261)
+* ``astropy`` -- Astropy Collaboration et al. 2013 (A&A, 558, 33); Astropy Collaboration et al. 2018 (ApJ, 156, 123); Astropy Collaboration et al. 2022 (ApJ, 935, 167)
+* ``matplotlib`` -- Hunter 2007 (Computing in Science & Engineering, 9, 90)
+* ``skypy`` -- Amara et al. 2021 (JOSS, 6, 3056)
+* ``speclite`` -- Kirkby et al. 2023 (doi.org/10.5281/zenodo.7734526)
+* ``pandas`` -- The pandas development team 2020 (doi.org/10.5281/zenodo.3509134)
+* ``dustmaps`` -- Schlafly & Finkbeiner 2011 (ApJ, 737, 103); Schlegel, Finkbeiner & Davis 1998 (ApJ, 500, 525; doi 10.7910/DVN/EWCNL5); Green 2018 (JOSS, 3, 695)
+* ``scikit-build-core`` -- Schreiner et al. 2022 (doi.org/10.25080/majora-212e5952-033)
 * ``cmake``
 
 with an optional dependency of
 
-* ``mpi4py``.
+* ``mpi4py`` -- Dalcin, Paz, & Storti 2005 (Journal of Parallel and Distributed Computing, 65, 1108); Dalcin & Fang 2021 (Computing in Science & Engineering, 23, 47).
 
 For running the test suite the requirements are:
 
@@ -44,7 +45,7 @@ As of now, the only way to install this package is by downloading it from the `G
 
 Once you have installed your choice of conda, then you can create an initial conda environment::
 
-    conda create -n your_environment_name -c conda-forge python=3.9 numpy scipy astropy matplotlib skypy speclite pandas scikit-build-core cmake
+    conda create -n your_environment_name -c conda-forge python=3.9 numpy scipy astropy matplotlib skypy speclite pandas dustmaps scikit-build-core cmake
 
 although you can drop the ``=3.9``, or chose another (later) Python version -- remembering the minimum version is 3.8 -- if you desire to do so. Then activate this as our Python environment::
 

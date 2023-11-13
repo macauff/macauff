@@ -26,9 +26,8 @@ import time
 
 from astropy.units import UnitsError
 from astropy.coordinates import SkyCoord
-from astropy.io import fits
-from scipy.interpolate import RegularGridInterpolator
 import numpy as np
+import dustmaps.sfd
 
 
 __all__ = []
@@ -183,7 +182,7 @@ def trilegal_webcall(trilegal_version, l, b, area, binaries, AV, sigma_AV, filte
         else:
             print("No communication with {}, will retry in 2 min".format(webserver))
             time.sleep(120)
-            return "timeout"
+            return "nocomm"
         if not notconnected:
             with open('{}/tmpfile'.format(outfolder), 'r') as f:
                 lines = f.readlines()
@@ -225,83 +224,30 @@ def trilegal_webcall(trilegal_version, l, b, area, binaries, AV, sigma_AV, filte
 
 def get_AV_infinity(ra, dec, frame='icrs'):
     """
-    Gets the A_V exctinction at infinity for a given line of sight, using the
-    updated parameters from Schlafly & Finkbeiner 2011 (ApJ 737, 103), table 6.
+    Gets the Schlegel, Finkbeiner & Davis 1998 (ApJ, 500, 525) A_V extinction
+    at infinity for a given line of sight, using the updated parameters from
+    Schlafly & Finkbeiner 2011 (ApJ 737, 103), table 6.
 
     Parameters
     ----------
-    ra : float
+    ra : float, list, or numpy.ndarray
         Sky coordinate.
-    dec : float
+    dec : float, list, or numpy.ndarray
         Sky coordinate.
     frame : string, optional
         Frame of input coordinates (e.g., ``'icrs', 'galactic'``)
 
     Returns
     -------
-    AV : float
+    AV : numpy.ndarray
         Extinction at infinity as given by the SFD dust maps for the chosen sky
         coordinates.
     """
+    ra = np.atleast_1d(ra)
+    dec = np.atleast_1d(dec)
     coords = SkyCoord(ra, dec, unit='deg', frame=frame).transform_to('galactic')
 
-    l = coords.l.degree
-    b = coords.b.degree
-
-    ebv = sfd_ebv.get_sfd_ebv(l, b)
-    AV = 2.742 * ebv
+    sfd_ebv = dustmaps.sfd.SFDQuery()
+    AV = 2.742 * sfd_ebv(coords)
 
     return AV
-
-
-class SFDEBV:
-    def __init__(self):
-        """
-        Load the necessary dust maps from Schlegel, Finkbeiner & Davis 1998
-        (ApJ, 500, 525) to extract E(B-V) at infinity.
-        """
-        data_ngp = fits.open(os.path.join(os.path.dirname(__file__),
-                                          'tests/data/SFD_dust_4096_ngp.fits'))[0].data
-        data_sgp = fits.open(os.path.join(os.path.dirname(__file__),
-                                          'tests/data/SFD_dust_4096_sgp.fits'))[0].data
-
-        xs, ys = np.meshgrid(np.arange(4096), np.arange(4096), indexing='ij', sparse=True)
-        self.f_interp_ngp = RegularGridInterpolator((np.arange(4096), np.arange(4096)), data_ngp,
-                                                    bounds_error=False, fill_value=None)
-        self.f_interp_sgp = RegularGridInterpolator((np.arange(4096), np.arange(4096)), data_sgp,
-                                                    bounds_error=False, fill_value=None)
-        self.n_ngp = 1
-        self.n_sgp = -1
-
-    def get_sfd_ebv(self, l, b):
-        """
-        Interpolate the grid of SFD dust maps to the desired coordinates.
-
-        Parameters
-        ----------
-        l : float or list or numpy.ndarray of floats
-            The Galactic longitudes of the places to evaluate extinction.
-        b : float or list or numpy.ndarray of floats
-            Galatic latitudes to evaluate E(B-V) at.
-
-        Returns
-        ebv : numpy.ndarray of floats
-            E(B-V) at each ``l``-``b`` pair.
-        """
-        l, b = np.atleast_1d(l), np.atleast_1d(b)
-        if np.all(l.shape == b.shape) and len(l.shape) > 1:
-            l, b = l.flatten(), b.flatten()
-        ebv = np.empty(len(l), float)
-        for q, n, f in zip([b >= 0, b < 0], [self.n_ngp, self.n_sgp],
-                           [self.f_interp_ngp, self.f_interp_sgp]):
-            if np.sum(q) > 0:
-                x = (2048 * np.sqrt(1 - n * np.sin(np.radians(b[q]))) *
-                     np.cos(np.radians(l[q])) + 2047.5)
-                y = (-2048 * n * np.sqrt(1 - n * np.sin(np.radians(b[q]))) *
-                     np.sin(np.radians(l[q])) + 2047.5)
-
-                ebv[q] = f(np.array([y, x]).T)
-        return ebv
-
-
-sfd_ebv = SFDEBV()

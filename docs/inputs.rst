@@ -96,6 +96,9 @@ Boolean determining whether to run the final stage of the cross-match process, i
 
 Flag for whether to include the simulated effects of blended sources on the measured astrometry in the two catalogues or not.
 
+.. note::
+    If ``include_perturb_auf`` is ``True`` then ``dustmaps`` will be called to obtain line-of-sight extinction values. You will need the SFD dustmaps to be pre-downloaded; to do so before you call the cross-match procedure you must run ``dustmaps.sfd.fetch()``; see the ``dustmaps`` documentation for more details on how to specific a particular download location.
+
 ``include_phot_like``
 
 Flag for the inclusion of the likelihood of match or non-match based on the photometric information in the two catalogues.
@@ -186,7 +189,7 @@ These parameters are required in two separate files, one per catalogue to be cro
 
 These can be divided into those inputs that are always required:
 
-``cat_folder_path``, ``cat_name``, ``filt_names``, ``auf_folder_path``, ``auf_region_type``, ``auf_region_frame``, ``auf_region_points``, and ``correct_astrometry``;
+``cat_folder_path``, ``cat_name``, ``filt_names``, ``auf_folder_path``, ``auf_region_type``, ``auf_region_frame``, ``auf_region_points``, ``correct_astrometry``, and ``compute_snr_mag_relation``;
 
 those that are only required if the `Joint Parameters`_ option ``include_perturb_auf`` is ``True``:
 
@@ -260,6 +263,13 @@ Based on ``auf_region_type``, this must either by six space-separated floats, co
 ``correct_astrometry``
 
 In cases where catalogues have unreliable *centroid* uncertainties, before catalogue matching occurs the dataset can be fit for systematic corrections to its quoted astrometric precisions through ensemble match separation distance distributions to a higher-precision dataset (see the :doc:`Processing<pre_post_process>` section). This flag controls whether this is performed on a chunk-by-chunk basis during the initialisation step of ``CrossMatch``.
+
+.. note::
+    If ``correct_astrometry`` is ``True`` then ``dustmaps`` will be called to obtain line-of-sight extinction values. You will need the SFD dustmaps to be pre-downloaded; to do so before you call the cross-match procedure you must run ``dustmaps.sfd.fetch()``; see the ``dustmaps`` documentation for more details on how to specific a particular download location.
+
+``compute_snr_mag_relation``
+
+This flag can be ``False`` if the relationship between signal-to-noise ratio and magnitude is pre-computed; otherwise it indicates that the functional form of SNR vs brightness should be derived for the particular catalogue in question.
 
 ``fit_gal_flag``
 

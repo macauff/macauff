@@ -19,15 +19,16 @@ dependencies = [
     "matplotlib",
     # We need to build a binary compatible with numpy 1.21
     "numpy>=1.21",
+    "scipy",
     "pandas",
     "skypy",
     "speclite",
+    "dustmaps",
 ]
 
 [project.optional-dependencies]
 test = [
     "pytest-astropy",
-    "scipy",
 ]
 docs = [
     "sphinx-astropy",

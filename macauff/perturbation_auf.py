@@ -4,6 +4,7 @@ This module provides the framework to handle the creation of the perturbation
 component of the astrometric uncertainty function.
 '''
 
+import requests
 import os
 import sys
 import signal
@@ -662,18 +663,26 @@ def download_trilegal_simulation(tri_folder, tri_filter_set, ax1, ax2, mag_num, 
         start = timeit.default_timer()
         result = "timeout"
         try:
-            while result == "timeout":
+            nocomm_count = 0
+            while result == "timeout" or result == "nocomm":
                 signal.signal(signal.SIGALRM, timeout_handler)
-                # Set a 10 minute "timer" to raise an error if get_trilegal takes
+                # Set a 11 minute "timer" to raise an error if get_trilegal takes
                 # longer than, as this indicates the API call has run out of CPU
                 # time on the other end. As get_trilegal has an internal "busy"
                 # tone, we need to reset this alarm for each call, if we don't
                 # get a "good" result from the function call.
-                signal.alarm(10*60)
+                signal.alarm(11*60)
                 av_inf, result = get_trilegal(
                     tri_name, ax1, ax2, folder=tri_folder, galactic=galactic_flag,
                     filterset=tri_filter_set, area=triarea, maglim=mag_lim, magnum=mag_num, AV=AV,
                     sigma_AV=sigma_AV)
+                if result == "nocomm":
+                    nocomm_count += 1
+                # 11 minute timer allows for 5 loops of two-minute waits for
+                # a response from the server.
+                if nocomm_count >= 5:
+                    raise requests.exceptions.HTTPError("TRILEGAL server has not communicated "
+                                                        "in {} attempts.".format(nocomm_count))
         except TimeoutException:
             triarea /= 2
             area_halved = True
