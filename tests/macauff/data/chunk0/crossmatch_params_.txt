@@ -1,0 +1,54 @@
+# High level match type
+include_perturb_auf = no
+include_phot_like = no
+use_phot_priors = no
+
+# File paths
+# Top-level folder for all temporary cross-match files to be created in. Should be absolute path, or relative to folder script called in
+joint_folder_path = new_test_path
+
+make_output_csv = no
+
+# Flags for each stage of the match process - must be "yes"/"no", "true"/"false", "t"/"f", or "1"/"0"
+run_auf = yes
+run_group = yes
+run_cf = yes
+run_source = yes
+
+# c/f region definition for photometric likelihood - either "rectangle" for NxM evenly spaced grid points, or "points" to define a list of two-point tuple coordinates, separated by a comma
+cf_region_type = rectangle
+# Frame of the coordinates must be specified -- either "equatorial" or "galactic"
+cf_region_frame = equatorial
+# For "points" this should be individually specified (ra, dec) or (l, b) coordinates [as "(a, b), (c, d)"]
+# For "rectangle" this should be 6 numbers: start coordinate, end coordinate, integer number of data points from start to end (inclusive of both start and end), first for ra/l, then for dec/b (depending on cf_region_type), all separated by spaces
+cf_region_points = 0 0 1 0 0 1
+
+# Maximum separation, in arcseconds, between two sources for them to be deemed positionally correlated
+pos_corr_dist = 2.92
+
+# Convolution (fourier transform) parameters
+# Integer number of real space grid points, for Hankel transformations
+real_hankel_points = 10000
+# Integer number of fourier space grid points
+four_hankel_points = 10000
+# Maximum fourier space "rho" parameter considered (typically larger than the inverse of the smallest Gaussian sigma)
+four_max_rho = 100
+
+# Maximum extent of cross-match, used in non-all-sky cases to remove sources suffering potential edge effects -- min/max first axis coordinates (ra/l) then min/max second axis coordinates (dec/b)
+cross_match_extent = -0.006 0.006 -0.006 0.006
+
+# Number of chunks to break each catalogue into when splitting larger catalogues up for memory reasons
+mem_chunk_num = 10
+
+# Integral fractions for various error circle cutouts used during the cross-match process. Should be space-separated floats, in the order of <bright error circle fraction>, <field error circle fraction>, <potential counterpart integral limit>
+int_fracs = 0.63 0.9 0.99
+
+# Number of PSF realisations to draw when simulating perturbation component of AUF
+num_trials = 10000
+# Bin size of magnitudes for number density distributions for perturbation AUF considersation
+d_mag = 0.1
+# Flag to indicate whether to use pre-computed local normalising densities for simulating PSFs
+compute_local_density = no
+
+# Multiprocessing CPU count
+n_pool = 2

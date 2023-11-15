@@ -28,16 +28,16 @@ set_property(TARGET fortranobject PROPERTY POSITION_INDEPENDENT_CODE ON)
 function(add_f2py_module module_name)
   add_custom_command(
     OUTPUT "${module_name}module.c" "${module_name}-f2pywrappers2.f90"
-    DEPENDS "macauff/${module_name}.f90" "macauff/shared_library.f90"
+    DEPENDS "src/macauff/${module_name}.f90" "src/macauff/shared_library.f90"
     VERBATIM
     COMMAND "${Python_EXECUTABLE}" -m numpy.f2py
-            "${CMAKE_CURRENT_SOURCE_DIR}/macauff/${module_name}.f90" -m "${module_name}")
+            "${CMAKE_CURRENT_SOURCE_DIR}/src/macauff/${module_name}.f90" -m "${module_name}")
 
   python_add_library("${module_name}" MODULE
                      "${CMAKE_CURRENT_BINARY_DIR}/${module_name}module.c"
                      "${CMAKE_CURRENT_BINARY_DIR}/${module_name}-f2pywrappers2.f90"
-                     "${CMAKE_CURRENT_SOURCE_DIR}/macauff/${module_name}.f90"
-                     "${CMAKE_CURRENT_SOURCE_DIR}/macauff/shared_library.f90"
+                     "${CMAKE_CURRENT_SOURCE_DIR}/src/macauff/${module_name}.f90"
+                     "${CMAKE_CURRENT_SOURCE_DIR}/src/macauff/shared_library.f90"
                      WITH_SOABI)
   target_link_libraries("${module_name}" PRIVATE fortranobject)
   if(OpenMP_Fortran_FOUND)
