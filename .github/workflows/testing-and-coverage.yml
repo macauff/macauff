@@ -29,3 +29,5 @@ jobs:
       run: tox -e test-cov
     - name: Upload coverage report to codecov
       uses: codecov/codecov-action@v3
+      with:
+        files: .tox/coverage.xml
