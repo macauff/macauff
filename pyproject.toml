@@ -33,8 +33,6 @@ dev = [
     "tox", # Used for unit-testing and coverage
     "pre-commit", # Used to run checks before finalizing a git commit
     "pylint", # Used for static linting of files
-    "nbconvert", # Needed for pre-commit check to clear output from Python notebooks
-    "nbsphinx", # Used to integrate Python notebooks into Sphinx documentation
     "ipython", # Also used in building notebooks into Sphinx
     "asv==0.6.1", # Used to compute performance benchmarks
 ]
@@ -42,6 +40,8 @@ test = [
     "pytest-astropy",
 ]
 docs = [
+    "nbconvert", # Needed for pre-commit check to clear output from Python notebooks
+    "nbsphinx", # Used to integrate Python notebooks into Sphinx documentation
     "sphinx-astropy",
     "sphinx-fortran",
     "six",

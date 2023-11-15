@@ -1,50 +1,99 @@
-.. macauff documentation main file.
+.. macauff documentation master file, created by
+   sphinx-quickstart on Tue Jun 23 14:13:11 2020.
    You can adapt this file completely to your liking, but it should at least
    contain the root `toctree` directive.
 
-Welcome to macauff's documentation!
-========================================================================================
+#######
+macauff
+#######
+**The Python package for Matching Across Catalogues using the Astrometric Uncertainty Function and Flux**
 
-Dev Guide - Getting Started
----------------------------
+``macauff`` is a package for cross-matching photometric catalogues. Using the positions, uncertainties, and flux measurements of sources, as well as modelling of the level to which objects are affected by hidden, blended contaminants, ``macauff`` provides posterior probabilities of "many-to-many" matches and non-matches between the two catalogues being counterparts to one another. It also provides numerous secondary parameters, such as the level to which sources are flux contaminated, and the probability of their suffering blended by a source of a given flux ratio.
 
-Before installing any dependencies or writing code, it's a great idea to create a
-virtual environment. LINCC-Frameworks engineers primarily use `conda` to manage virtual
-environments. If you have conda installed locally, you can run the following to
-create and activate a new environment.
+.. _getting-started:
 
-.. code-block:: bash
+************
+Installation
+************
 
-   >> conda create env -n <env_name> python=3.10
-   >> conda activate <env_name>
+The instructions for installing ``macauff`` can be found :doc:`here<installation>`.
 
+.. _quick-start:
 
-Once you have created a new environment, you can install this project for local
-development using the following commands:
+***********
+Quick Start
+***********
 
-.. code-block:: bash
+A quick-start guide is available :doc:`here<quickstart>`.
 
-   >> pip install -e .'[dev]'
-   >> pre-commit install
-   >> conda install pandoc
+****************
+Input Parameters
+****************
 
+Input parameters are detailed on :doc:`this<inputs>` page.
 
-Notes:
+..
+   *********************
+   Real-World Match Case
+   *********************
 
-1) The single quotes around ``'[dev]'`` may not be required for your operating system.
-2) ``pre-commit install`` will initialize pre-commit for this local repository, so
-   that a set of tests will be run prior to completing a local commit. For more
-   information, see the Python Project Template documentation on
-   `pre-commit <https://lincc-ppt.readthedocs.io/en/latest/practices/precommit.html>`_.
-3) Installing ``pandoc`` allows you to verify that automatic rendering of Jupyter notebooks
-   into documentation for ReadTheDocs works as expected. For more information, see
-   the Python Project Template documentation on
-   `Sphinx and Python Notebooks <https://lincc-ppt.readthedocs.io/en/latest/practices/sphinx.html#python-notebooks>`_.
+   A more complex match case, using pre-existing photometric catalogues, is described :doc:`here<real_world_matches>`.
 
+******************
+User Documentation
+******************
+
+.. toctree::
+   :maxdepth: 1
+
+   macauff
+
+************************
+Pre- and Post-Processing
+************************
+
+How to prepare a particular dataset for cross-matching, initialise certain algorithmic aspects, and create final composite catalogues after matching check the :doc:`Processing<pre_post_process>` section.
+
+..
+   ********************************
+   Interpreting Cross-Match Results
+   ********************************
+
+*******************
+Algorithmic Details
+*******************
+
+For specific implementation details and the mathematics used in macauff, see the :doc:`algorithms<algorithms>` page.
+
+..
+   **************************
+   Starting a New Cross-Match
+   **************************
+
+*********
+Notebooks
+*********
+
+For specific use cases, see the :doc:`notebooks<notebooks>` page.
+
+******
+Search
+******
+
+* :ref:`search`
 
 .. toctree::
    :hidden:
 
-   Home page <self>
-   API Reference <autoapi/index>
-   Notebooks <notebooks>
+   installation
+   quickstart
+   inputs
+   pre_post_process
+   algorithms
+   f90_docs/perturb_auf_docs
+   f90_docs/group_sources_docs
+   f90_docs/phot_like_docs
+   f90_docs/pairing_docs
+   f90_docs/misc_func_docs
+   f90_docs/shared_library_docs
+   notebooks

@@ -1,47 +1,112 @@
 # Configuration file for the Sphinx documentation builder.
 #
-# For the full list of built-in configuration values, see the documentation:
+# This file only contains a selection of the most common options. For a full
+# list see the documentation:
 # https://www.sphinx-doc.org/en/master/usage/configuration.html
 
+# -- Path setup --------------------------------------------------------------
 
-import os
-import sys
+# If extensions (or modules to document with autodoc) are in another directory,
+# add these directories to sys.path here. If the directory is relative to the
+# documentation root, use os.path.abspath to make it absolute, like shown here.
+#
+# import os
+# import sys
+# sys.path.insert(0, os.path.abspath('../macauff'))
 
-import autoapi
-from importlib.metadata import version
-
-# Define path to the code to be documented **relative to where conf.py (this file) is kept**
-sys.path.insert(0, os.path.abspath('../src/'))
+# from sphinx_astropy.conf.v1 import *
 
 # -- Project information -----------------------------------------------------
-# https://www.sphinx-doc.org/en/master/usage/configuration.html#project-information
 
-project = "macauff"
-copyright = "2023, Tom J Wilson"
-author = "Tom J Wilson"
-release = version("macauff")
-# for example take major/minor
-version = ".".join(release.split(".")[:2])
+project = 'macauff'
+copyright = '2022, Tom J Wilson'
+author = 'Tom J Wilson'
+
+# Parts of this conf.py use settings from sphinx-astropy's v1.py,
+# Copyright (c) 2014-2020, Astropy Developers,
+# and astropy-sphinx-theme's bootstrap-astropy.css,
+# Copyright (c) 2014-2019, Astropy Developers
 
 # -- General configuration ---------------------------------------------------
-# https://www.sphinx-doc.org/en/master/usage/configuration.html#general-configuration
 
-extensions = ["sphinx.ext.mathjax", "sphinx.ext.napoleon", "sphinx.ext.viewcode"]
+# Add any Sphinx extension module names here, as strings. They can be
+# extensions coming with Sphinx (named 'sphinx.ext.*') or your custom
+# ones.
+extensions = [
+    'sphinx_astropy.ext.intersphinx_toggle',
+    'sphinx.ext.autodoc',
+    'sphinx.ext.intersphinx',
+    'sphinx.ext.todo',
+    'sphinx.ext.coverage',
+    'sphinx.ext.inheritance_diagram',
+    'sphinx.ext.viewcode',
+    'numpydoc',
+    'sphinx_automodapi.automodapi',
+    'sphinx_automodapi.smart_resolver',
+    'pytest_doctestplus.sphinx.doctestplus',
+    'sphinx_astropy.ext.changelog_links',
+    'sphinx_astropy.ext.missing_static',
+    'sphinx.ext.mathjax',
+    'sphinxfortran.fortran_domain',
+    'sphinxfortran.fortran_autodoc',
+    'nbsphinx']
 
-extensions.append("autoapi.extension")
-extensions.append("nbsphinx")
+fortran_src = ['../src/macauff/*.f90']
 
-templates_path = []
-exclude_patterns = ['_build', '**.ipynb_checkpoints']
+# The suffix of source filenames.
+source_suffix = '.rst'
 
-master_doc = "index"  # This assumes that sphinx-build is called from the root directory
-html_show_sourcelink = False  # Remove 'view source code' from top of page (for html, not python)
-add_module_names = False # Remove namespaces from class/method signatures
+# The master toctree document.
+master_doc = 'index'
 
-autoapi_type = "python"
-autoapi_dirs = ["../src"]
-autoapi_ignore = ["*/__main__.py", "*/_version.py"]
-autoapi_add_toc_tree_entry = False
-autoapi_member_order = "bysource"
+# The reST default role (used for this markup: `text`) to use for all
+# documents. Set to the "smart" one.
+default_role = 'obj'
 
-html_theme = "sphinx_rtd_theme"
+# Add any paths that contain templates here, relative to this directory.
+templates_path = ['_templates']
+
+# List of patterns, relative to source directory, that match files and
+# directories to ignore when looking for source files.
+# This pattern also affects html_static_path and html_extra_path.
+exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store', '**.ipynb_checkpoints']
+
+# Custom sidebar templates, maps document names to template names.
+html_sidebars = {
+    '**': ['localtoc.html'],
+    'search': [],
+    'genindex': [],
+    'py-modindex': [],
+}
+
+# Don't show summaries of the members in each class along with the
+# class' docstring
+numpydoc_show_class_members = False
+
+autosummary_generate = True
+
+automodapi_toctreedirnm = 'api'
+
+# Class documentation should contain *both* the class docstring and
+# the __init__ docstring
+autoclass_content = "both"
+
+toc_object_entries = False
+
+# -- Options for HTML output -------------------------------------------------
+
+# The theme to use for HTML and HTML Help pages.  See the documentation for
+# a list of builtin themes.
+#
+html_theme = 'pyramid'
+
+html_title = 'macauff'
+
+html_domain_indices = True
+html_show_sourcelink = False
+
+# Add any paths that contain custom static files (such as style sheets) here,
+# relative to this directory. They are copied after the builtin static files,
+# so a file named "default.css" will overwrite the builtin "default.css".
+# html_static_path = ['_static']
+# html_style = 'macauff.css'
