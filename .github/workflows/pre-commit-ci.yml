@@ -1,7 +1,6 @@
 # This workflow runs pre-commit hooks on pull requests to enforce coding style.
 # To ensure correct configuration, please refer to:
 #   https://lincc-ppt.readthedocs.io/en/latest/practices/ci_precommit.html
-
 name: Run pre-commit hooks
 
 on:
@@ -11,7 +10,7 @@ jobs:
   pre-commit-ci:
     runs-on: ubuntu-latest
     env: 
-      SKIP: "check-lincc-frameworks-template-version,pytest-check,no-commit-to-branch,validate-pyproject,check-added-large-files,sphinx-build"
+      SKIP: "check-lincc-frameworks-template-version,no-commit-to-branch,check-added-large-files,pytest-check,sphinx-build"
     steps:
     - uses: actions/checkout@v3
       with:
@@ -24,9 +23,7 @@ jobs:
       run: |
         sudo apt-get update
         python -m pip install --upgrade pip
-        pip install .
         pip install .[dev]
-        if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
     - uses: pre-commit/action@v3.0.0
       with:
         extra_args: --from-ref ${{ github.event.pull_request.base.sha }} --to-ref ${{ github.event.pull_request.head.sha }}
