@@ -139,7 +139,7 @@ dask-worker-space/
 # temp dir and files
 tmp/
 .tmp
-**/chunk0/*
+**/data/*
 
 # Mac OS
 **.DS_Store
