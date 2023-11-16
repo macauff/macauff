@@ -1,0 +1,77 @@
+name: Python package
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build_docs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: 3.9
+      - name: Install Tox and any other packages
+        run: |
+          sudo ln -sf /usr/bin/gfortran-9 /usr/bin/gfortran
+          pip install numpy tox
+      - name: Build documentation
+        run: tox -e build_docs
+      - name: Execute script to build our documentation and update pages
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+
+          cd docs
+          #######################
+          # Update GitHub Pages #
+          #######################
+           
+          git config --global user.name "${GITHUB_ACTOR}"
+          git config --global user.email "${GITHUB_ACTOR}@users.noreply.github.com"
+           
+          docroot=`mktemp -d`
+          rsync -av "_build/html/" "${docroot}/"
+           
+          pushd "${docroot}"
+           
+          # don't bother maintaining history; just generate fresh
+          git init
+          git remote add deploy "https://token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          git checkout -b gh-pages
+           
+          # add .nojekyll to the root so that github won't 404 on content added to dirs
+          # that start with an underscore (_), such as our "_content" dir..
+          touch .nojekyll
+           
+          # Add README
+          cat > README.md <<EOF
+          # GitHub Pages Cache
+           
+          Nothing to see here. The contents of this branch are essentially a cache that's not intended to be viewed on github.com.
+           
+           
+          If you're looking to update our documentation, check the relevant development branch's 'docs/' dir.
+          EOF
+           
+          # copy the resulting html pages built from sphinx above to our new git repo
+          git add .
+           
+          # commit all the new files
+          msg="Updating github pages documentation"
+          git commit -am "${msg}"
+           
+          # overwrite the contents of the gh-pages branch on our github.com repo
+          git push deploy gh-pages --force
+           
+          popd # return to main repo sandbox root
+           
+          # exit cleanly
+          exit 0
+        shell: bash

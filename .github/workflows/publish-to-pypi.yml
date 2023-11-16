@@ -1,9 +1,13 @@
+# This workflow will upload a Python Package when a release is created
+# For more information see: https://github.com/pypa/gh-action-pypi-publish#trusted-publishing
 name: Build and publish wheels
 
 on:
-  push:
-  pull_request:
-  workflow_dispatch:
+  release:
+    types: [published]
+
+permissions:
+  contents: read
 
 jobs:
   build_wheels:
@@ -59,9 +63,5 @@ jobs:
       with:
         name: artifact
         path: dist
-    # Publish only on new "v*" tags
-    - uses: pypa/gh-action-pypi-publish@release/v1
-      if: startsWith(github.ref, 'refs/tags/v')
-      with:
-        user: __token__
-        password: ${{ secrets.PYPI_API_TOKEN }}
+    - name: Publish package
+      uses: pypa/gh-action-pypi-publish@release/v1

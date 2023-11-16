@@ -11,7 +11,7 @@ on:
   workflow_dispatch:
 
 jobs:
-  build:
+  build-and-test:
     name: ${{ matrix.name }}
     runs-on: ${{ matrix.os }}
     strategy:
@@ -61,10 +61,7 @@ jobs:
     - name: Check gfortran version
       run: gfortran --version
     - name: Install dependencies
-      run: |
-        sudo apt-get update
-        python -m pip install --upgrade pip
-        pip install tox
+      run: pip install numpy tox
     - name: Run unit tests with pytest
       run: |
         mkdir ./.tmp
