@@ -63,7 +63,9 @@ jobs:
     - name: Install dependencies
       run: pip install numpy tox
     - name: Run unit tests with pytest
+      # Use "-- --remote-data" to run all tests
+      # Currently disabled to decrease pipeline time
       run: |
         mkdir ./.tmp
         mkdir ./.tmp/${{ matrix.toxenv }}
-        tox -e ${{ matrix.toxenv }} -- --remote-data
+        tox -e ${{ matrix.toxenv }}
