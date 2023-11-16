@@ -1,7 +1,6 @@
 # This workflow will run daily at 06:45.
 # It will run benchmarks with airspeed velocity (asv)
 # and compare performance with the previous nightly build.
-
 name: Run benchmarks nightly job
 
 on:
@@ -15,45 +14,36 @@ env:
   NIGHTLY_HASH_FILE: nightly-hash
 
 jobs:
-
   asv-nightly:
     runs-on: ubuntu-latest
-
     defaults:
       run:
         working-directory: ${{ env.WORKING_DIR }}
-
     steps:
       - name: Checkout main branch of the repository
         uses: actions/checkout@v3
         with:
           fetch-depth: 0
-
       - name: Cache Python ${{ env.PYTHON_VERSION }}
         uses: actions/cache@v3
         with:
           path: ~/.cache/pip
           key: python-${{ env.PYTHON_VERSION }}
-
       - name: Set up Python ${{ env.PYTHON_VERSION }}
         uses: actions/setup-python@v4
         with:
           python-version: "${{ env.PYTHON_VERSION }}"
-
       - name: Install dependencies
         run: |
           sudo apt-get update
           python -m pip install --upgrade pip
           pip install asv==0.6.1 virtualenv
-
       - name: Configure git
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-
       - name: Create ASV machine config file
         run: asv machine --machine gh-runner --yes
-
       - name: Fetch previous results from the "benchmarks" branch
         run: |
           if git ls-remote --exit-code origin benchmarks > /dev/null 2>&1; then
@@ -62,19 +52,16 @@ jobs:
               --no-commit
             mv ../_results .
           fi
-
       - name: Get nightly dates under comparison
         id: nightly-dates
         run: |
           echo "yesterday=$(date -d yesterday +'%Y-%m-%d')" >> $GITHUB_OUTPUT
           echo "today=$(date +'%Y-%m-%d')" >> $GITHUB_OUTPUT
-
       - name: Use last nightly commit hash from cache
         uses: actions/cache@v3
         with:
           path: ${{ env.WORKING_DIR }}
           key: nightly-results-${{ steps.nightly-dates.outputs.yesterday }}
-
       - name: Run comparison of main against last nightly build
         run: |
           HASH_FILE=${{ env.NIGHTLY_HASH_FILE }}
@@ -85,7 +72,6 @@ jobs:
             asv compare $PREV_HASH $CURRENT_HASH --sort ratio --verbose
           fi
           echo $CURRENT_HASH > $HASH_FILE
-
       - name: Update last nightly hash in cache
         uses: actions/cache@v3
         with:

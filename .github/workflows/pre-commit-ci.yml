@@ -1,7 +1,7 @@
 # This workflow runs pre-commit hooks on pull requests to enforce coding style.
 # To ensure correct configuration, please refer to:
 #   https://lincc-ppt.readthedocs.io/en/latest/practices/ci_precommit.html
-name: Pre-commit hooks
+name: Run pre-commit hooks
 
 on:
   pull_request:

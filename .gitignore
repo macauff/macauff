@@ -144,6 +144,10 @@ tmp/
 # Mac OS
 **.DS_Store
 
+# asv benchmarking
+_results/
+_html/
+
 # Other
 **._*
 .idea/*
