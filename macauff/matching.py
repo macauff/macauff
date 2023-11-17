@@ -5,7 +5,6 @@ This module provides the high-level framework for performing catalogue-catalogue
 
 import os
 import sys
-import warnings
 import datetime
 from configparser import ConfigParser
 from time import sleep
@@ -19,7 +18,6 @@ except:
 from .perturbation_auf import make_perturb_aufs
 from .group_sources import make_island_groupings
 from .group_sources_fortran import group_sources_fortran as gsf
-from .misc_functions import StageData
 from .misc_functions_fortran import misc_functions_fortran as mff
 from .photometric_likelihood import compute_photometric_likelihoods
 from .counterpart_pairing import source_pairing

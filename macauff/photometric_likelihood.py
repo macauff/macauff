@@ -4,7 +4,6 @@ This module provides the framework for the creation of the photometric likelihoo
 used in the cross-matching of the two catalogues.
 '''
 
-import os
 import sys
 import numpy as np
 

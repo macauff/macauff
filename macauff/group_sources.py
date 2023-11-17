@@ -13,7 +13,7 @@ import numpy as np
 
 from .misc_functions import (load_small_ref_auf_grid, hav_dist_constant_lat,
                              map_large_index_to_small_index, _load_rectangular_slice,
-                             _create_rectangular_slice_arrays, StageData)
+                             StageData)
 from .group_sources_fortran import group_sources_fortran as gsf
 from .make_set_list import set_list
 

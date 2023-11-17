@@ -4,7 +4,6 @@ This module provides the functionality for the final cross-match process, the
 act of actually pairing sources across the two catalogues as counterparts.
 '''
 
-import os
 import sys
 import numpy as np
 import warnings

@@ -4,7 +4,6 @@ This module provides miscellaneous scripts, called in other parts of the cross-m
 framework.
 '''
 
-import os
 import numpy as np
 
 __all__ = []

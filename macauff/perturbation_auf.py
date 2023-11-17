@@ -12,7 +12,7 @@ import numpy as np
 from astropy.coordinates import SkyCoord
 
 from .misc_functions import (create_auf_params_grid, _load_single_sky_slice,
-                             _load_rectangular_slice, _create_rectangular_slice_arrays, min_max_lon)
+                             _load_rectangular_slice, min_max_lon)
 from .misc_functions_fortran import misc_functions_fortran as mff
 from .get_trilegal_wrapper import get_trilegal, get_AV_infinity
 from .perturbation_auf_fortran import perturbation_auf_fortran as paf

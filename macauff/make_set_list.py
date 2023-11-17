@@ -6,7 +6,6 @@ their respective uncertainties across two catalogues.
 '''
 
 import sys
-import os
 import warnings
 import multiprocessing
 import itertools
