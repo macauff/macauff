@@ -144,31 +144,8 @@ class TestCounterpartPairing:
         np.save('{}/magref.npy'.format(self.a_cat_folder_path), self.amagref)
         np.save('{}/magref.npy'.format(self.b_cat_folder_path), self.bmagref)
 
-        np.save('{}/group/alist.npy'.format(self.joint_folder_path), self.alist)
-        np.save('{}/group/blist.npy'.format(self.joint_folder_path), self.blist)
-        np.save('{}/group/agrplen.npy'.format(self.joint_folder_path), self.agrplen)
-        np.save('{}/group/bgrplen.npy'.format(self.joint_folder_path), self.bgrplen)
-
-        np.save('{}/phot_like/abinsarray.npy'.format(self.joint_folder_path), self.abinsarray)
-        np.save('{}/phot_like/bbinsarray.npy'.format(self.joint_folder_path), self.bbinsarray)
-        np.save('{}/phot_like/abinlengths.npy'.format(self.joint_folder_path), self.abinlengths)
-        np.save('{}/phot_like/bbinlengths.npy'.format(self.joint_folder_path), self.bbinlengths)
-
-        np.save('{}/phot_like/c_priors.npy'.format(self.joint_folder_path), self.c_priors)
-        np.save('{}/phot_like/c_array.npy'.format(self.joint_folder_path), self.c_array)
-        np.save('{}/phot_like/fa_priors.npy'.format(self.joint_folder_path), self.fa_priors)
-        np.save('{}/phot_like/fa_array.npy'.format(self.joint_folder_path), self.fa_array)
-        np.save('{}/phot_like/fb_priors.npy'.format(self.joint_folder_path), self.fb_priors)
-        np.save('{}/phot_like/fb_array.npy'.format(self.joint_folder_path), self.fb_array)
-
-        np.save('{}/phot_like/a_sky_inds.npy'.format(self.joint_folder_path), self.a_sky_inds)
-        np.save('{}/phot_like/b_sky_inds.npy'.format(self.joint_folder_path), self.b_sky_inds)
-
         np.save('{}/modelrefinds.npy'.format(self.a_auf_folder_path), self.amodelrefinds)
         np.save('{}/modelrefinds.npy'.format(self.b_auf_folder_path), self.bmodelrefinds)
-
-        np.save('{}/arraylengths.npy'.format(self.a_auf_folder_path), np.ones((3, 1), int))
-        np.save('{}/arraylengths.npy'.format(self.b_auf_folder_path), np.ones((4, 1), int))
 
         # We should have already made fourier_grid, frac_grid, and flux_grid
         # for each catalogue.
@@ -397,13 +374,6 @@ class TestCounterpartPairing:
 
         os.system('rm -r {}/reject'.format(self.joint_folder_path))
         os.makedirs('{}/reject'.format(self.joint_folder_path), exist_ok=True)
-        np.save('{}/reject/reject_a.npy'.format(self.joint_folder_path), a_reject)
-        np.save('{}/reject/reject_b.npy'.format(self.joint_folder_path), b_reject)
-
-        np.save('{}/group/alist.npy'.format(self.joint_folder_path), alist)
-        np.save('{}/group/blist.npy'.format(self.joint_folder_path), blist)
-        np.save('{}/group/agrplen.npy'.format(self.joint_folder_path), agrplen)
-        np.save('{}/group/bgrplen.npy'.format(self.joint_folder_path), bgrplen)
 
         mem_chunk_num = 2
         source_pairing(
@@ -475,14 +445,6 @@ class TestCounterpartPairing:
             alist=alist, blist=blist, agrplen=agrplen, bgrplen=bgrplen,
             lenrejecta=len(a_reject), lenrejectb=0)
 
-        np.save('{}/reject/reject_a.npy'.format(self.joint_folder_path), a_reject)
-        os.system('rm {}/reject/reject_b.npy'.format(self.joint_folder_path))
-
-        np.save('{}/group/alist.npy'.format(self.joint_folder_path), alist)
-        np.save('{}/group/blist.npy'.format(self.joint_folder_path), blist)
-        np.save('{}/group/agrplen.npy'.format(self.joint_folder_path), agrplen)
-        np.save('{}/group/bgrplen.npy'.format(self.joint_folder_path), bgrplen)
-
         mem_chunk_num = 2
         with pytest.warns(UserWarning) as record:
             source_pairing(
@@ -505,10 +467,6 @@ class TestCounterpartPairing:
         a_field = np.load('{}/pairing/af.npy'.format(self.joint_folder_path))
         assert np.all([q in a_field for q in [3, 4]])
         assert np.all([q not in a_field for q in [0, 1, 2, 5, 6]])
-
-        a_reject = np.load('{}/reject/reject_a.npy'.format(self.joint_folder_path))
-        assert np.all([q in a_reject for q in [6]])
-        assert np.all([q not in a_reject for q in [0, 1, 2, 3, 4, 5]])
 
         b_matches = np.load('{}/pairing/bc.npy'.format(self.joint_folder_path))
         assert np.all([q in b_matches for q in [0, 1]])
@@ -538,14 +496,6 @@ class TestCounterpartPairing:
             alist=alist, blist=blist, agrplen=agrplen, bgrplen=bgrplen,
             lenrejecta=len(a_reject), lenrejectb=len(b_reject))
 
-        np.save('{}/reject/reject_a.npy'.format(self.joint_folder_path), a_reject)
-        np.save('{}/reject/reject_b.npy'.format(self.joint_folder_path), b_reject)
-
-        np.save('{}/group/alist.npy'.format(self.joint_folder_path), alist)
-        np.save('{}/group/blist.npy'.format(self.joint_folder_path), blist)
-        np.save('{}/group/agrplen.npy'.format(self.joint_folder_path), agrplen)
-        np.save('{}/group/bgrplen.npy'.format(self.joint_folder_path), bgrplen)
-
         mem_chunk_num = 2
         with pytest.warns(UserWarning) as record:
             source_pairing(
@@ -568,10 +518,6 @@ class TestCounterpartPairing:
         a_field = np.load('{}/pairing/af.npy'.format(self.joint_folder_path))
         assert np.all([q in a_field for q in [3, 4]])
         assert np.all([q not in a_field for q in [0, 1, 2, 5, 6]])
-
-        a_reject = np.load('{}/reject/reject_a.npy'.format(self.joint_folder_path))
-        assert np.all([q in a_reject for q in [2, 3, 4, 5, 6]])
-        assert np.all([q not in a_reject for q in [0, 1]])
 
         b_matches = np.load('{}/pairing/bc.npy'.format(self.joint_folder_path))
         assert np.all([q in b_matches for q in [0, 1]])
@@ -608,10 +554,6 @@ class TestCounterpartPairing:
         os.system('rm -r {}/pairing'.format(self.joint_folder_path))
         os.makedirs('{}/pairing'.format(self.joint_folder_path), exist_ok=True)
         os.system('rm -r {}/reject/*'.format(self.joint_folder_path))
-        np.save('{}/group/alist.npy'.format(self.joint_folder_path), self.alist)
-        np.save('{}/group/blist.npy'.format(self.joint_folder_path), self.blist)
-        np.save('{}/group/agrplen.npy'.format(self.joint_folder_path), self.agrplen)
-        np.save('{}/group/bgrplen.npy'.format(self.joint_folder_path), self.bgrplen)
         # Same run as test_source_pairing, but called from CrossMatch rather than
         # directly this time.
         self._setup_cross_match_parameters()

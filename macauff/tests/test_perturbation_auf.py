@@ -581,16 +581,6 @@ class TestMakePerturbAUFs():
 
     @pytest.mark.remote_data
     def test_create_single_low_numbers(self):
-        # Number of sources per PSF circle, on average, solved backwards to ensure
-        # that local density ends up exactly in the middle of a count_array bin.
-        # This should be approximately 0.076 sources per PSF circle.
-        psf_mean = np.exp(8.7) * np.pi * (1.185 * self.psf_fwhms[0] / 3600)**2
-        # Local density is the controllable variable to ensure that we get
-        # the expected sources per PSF circle, with most variables cancelling
-        # mean divided by circle area sets the density needed.
-        local_dens = psf_mean / (np.pi * (1.185 * self.psf_fwhms[0] / 3600)**2)
-        np.save('{}/local_N.npy'.format(self.auf_folder), np.array([[local_dens]] * 101))
-
         density_radius = np.sqrt(1 / np.pi / np.exp(8.7))
 
         np.save('{}/con_cat_astro.npy'.format(self.cat_folder), np.array([[0.3, 0.3, 0.1]] * 101))
@@ -645,11 +635,6 @@ class TestMakePerturbAUFs():
         # that local density ends up exactly in the middle of a count_array bin.
         # This should be approximately 0.15 sources per PSF circle.
         psf_mean = np.exp(9.38) * np.pi * (1.185 * self.psf_fwhms[0] / 3600)**2
-        # Local density is the controllable variable to ensure that we get
-        # the expected sources per PSF circle, with most variables cancelling
-        # mean divided by circle area sets the density needed.
-        local_dens = psf_mean / (np.pi * (1.185 * self.psf_fwhms[0] / 3600)**2)
-        np.save('{}/local_N.npy'.format(self.auf_folder), np.array([[local_dens]] * 101))
 
         density_radius = np.sqrt(1 / np.pi / np.exp(9.38))
 
@@ -779,8 +764,7 @@ class TestMakePerturbAUFs():
         # that local density ends up exactly in the middle of a count_array bin.
         # This should be approximately 0.076 sources per PSF circle.
         psf_mean = np.exp(8.7) * np.pi * (1.185 * self.psf_fwhms[0] / 3600)**2
-        # This time we want to calculate the local density on the fly, but still
-        # get the same value we did in the without compute local density test. We
+        # We want to calculate the local density on the fly. We
         # therefore have to choose our "density radius" to set the appropriate
         # local density for our single source.
         density_radius = np.sqrt(1 / np.pi / np.exp(8.7))
@@ -953,11 +937,6 @@ class TestMakePerturbAUFs():
         # that local density ends up exactly in the middle of a count_array bin.
         # This should be approximately 0.076 sources per PSF circle.
         psf_mean = np.exp(8.7) * np.pi * (1.185 * self.psf_fwhms[0] / 3600)**2
-        # Local density is the controllable variable to ensure that we get
-        # the expected sources per PSF circle, with most variables cancelling
-        # mean divided by circle area sets the density needed.
-        local_dens = psf_mean / (np.pi * (1.185 * self.psf_fwhms[0] / 3600)**2)
-        np.save('{}/local_N.npy'.format(self.auf_folder), np.array([[local_dens]] * 101))
 
         density_radius = np.sqrt(1 / np.pi / np.exp(8.7))
 

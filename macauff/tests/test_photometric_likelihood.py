@@ -422,10 +422,6 @@ class TestFullPhotometricLikelihood:
         binds = -1*np.ones((1, self.Ntot), int, order='F')
         binds[0, :] = np.arange(0, self.Ntot)
         binds[0, ~b_cut] = -1
-        np.save('{}/group/ainds.npy'.format(self.joint_folder_path), ainds)
-        np.save('{}/group/asize.npy'.format(self.joint_folder_path), asize)
-        np.save('{}/group/binds.npy'.format(self.joint_folder_path), binds)
-        np.save('{}/group/bsize.npy'.format(self.joint_folder_path), bsize)
 
         # Integrate 2-D Gaussian to N*sigma radius gives probability Y of
         # 1 - exp(-0.5 N^2 sigma^2 / sigma^2) = 1 - exp(-0.5 N^2).
@@ -441,10 +437,6 @@ class TestFullPhotometricLikelihood:
         bblen[~b_cut] = 0
         bflen = N_f * np.sqrt(asig**2 + bsig**2) * np.ones(self.Ntot, float) / 3600
         bflen[~b_cut] = 0
-        np.save('{}/group/ablen.npy'.format(self.joint_folder_path), ablen)
-        np.save('{}/group/aflen.npy'.format(self.joint_folder_path), aflen)
-        np.save('{}/group/bblen.npy'.format(self.joint_folder_path), bblen)
-        np.save('{}/group/bflen.npy'.format(self.joint_folder_path), bflen)
 
         self.group_sources_data = StageData(ablen=ablen, aflen=aflen, ainds=ainds, asize=asize,
                                             bblen=bblen, bflen=bflen, binds=binds, bsize=bsize)

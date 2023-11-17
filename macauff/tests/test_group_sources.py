@@ -325,8 +325,6 @@ class TestMakeIslandGroupings():
                 [self.a_auf_pointings, self.b_auf_pointings],
                 [self.a_filt_names, self.b_filt_names], [self.N_a, self.N_b]):
             np.save('{}/modelrefinds.npy'.format(auf_folder), np.zeros((3, N), int))
-            np.save('{}/arraylengths.npy'.format(auf_folder),
-                    np.ones((len(filters), len(auf_points)), int))
             if 'gaia' in auf_folder:
                 self.a_modelrefinds = np.zeros((3, N), int)
             else:
