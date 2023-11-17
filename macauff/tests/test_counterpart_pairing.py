@@ -10,6 +10,7 @@ import numpy as np
 import pytest
 
 from ..matching import CrossMatch
+from ..misc_functions import StageData
 from ..counterpart_pairing import source_pairing
 from ..counterpart_pairing_fortran import counterpart_pairing_fortran as cpf
 from .test_matching import _replace_line
@@ -116,6 +117,20 @@ class TestCounterpartPairing:
         self.b_cat_folder_path = 'wise_folder'
         self.a_auf_folder_path = 'gaia_auf_folder'
         self.b_auf_folder_path = 'wise_auf_folder'
+
+        self.group_sources_data = StageData(
+            alist=self.alist, blist=self.blist,
+            agrplen=self.agrplen, bgrplen=self.bgrplen,
+            lenrejecta=0, lenrejectb=0)
+
+        self.phot_like_data = StageData(
+            abinsarray=self.abinsarray, abinlengths=self.abinlengths,
+            bbinsarray=self.bbinsarray, bbinlengths=self.bbinlengths,
+            a_sky_inds=self.a_sky_inds, b_sky_inds=self.b_sky_inds,
+            c_priors=self.c_priors, c_array=self.c_array,
+            fa_priors=self.fa_priors, fa_array=self.fa_array,
+            fb_priors=self.fb_priors, fb_array=self.fb_array)
+
         os.system('rm -r {}'.format(self.joint_folder_path))
         for f in ['pairing', 'phot_like', 'group']:
             os.makedirs('{}/{}'.format(self.joint_folder_path, f), exist_ok=True)
@@ -292,14 +307,12 @@ class TestCounterpartPairing:
         os.system('rm -r {}/pairing'.format(self.joint_folder_path))
         os.makedirs('{}/pairing'.format(self.joint_folder_path), exist_ok=True)
         mem_chunk_num = 2
-        a_modelrefinds = None
-        b_moderefinds = None
         source_pairing(
             self.joint_folder_path, self.a_cat_folder_path, self.b_cat_folder_path,
             self.a_auf_folder_path, self.b_auf_folder_path, self.a_filt_names, self.b_filt_names,
-            self.a_auf_pointings, self.b_auf_pointings, a_modelrefinds, b_moderefinds,
-            self.rho, self.drho, self.n_fracs, mem_chunk_num, group_sources_data=None,
-            phot_like_data=None, use_memmap_files=True)
+            self.a_auf_pointings, self.b_auf_pointings, self.amodelrefinds, self.bmodelrefinds,
+            self.rho, self.drho, self.n_fracs, mem_chunk_num,
+            group_sources_data=self.group_sources_data, phot_like_data=self.phot_like_data)
 
         bflux = np.load('{}/pairing/bcontamflux.npy'.format(self.joint_folder_path))
         assert np.all(bflux == np.zeros((2), float))
@@ -377,6 +390,11 @@ class TestCounterpartPairing:
 
         a_reject = np.array([2, 5])
         b_reject = np.array([3])
+
+        group_sources_data = StageData(
+            alist=alist, blist=blist, agrplen=agrplen, bgrplen=bgrplen,
+            lenrejecta=len(a_reject), lenrejectb=len(b_reject))
+
         os.system('rm -r {}/reject'.format(self.joint_folder_path))
         os.makedirs('{}/reject'.format(self.joint_folder_path), exist_ok=True)
         np.save('{}/reject/reject_a.npy'.format(self.joint_folder_path), a_reject)
@@ -388,14 +406,12 @@ class TestCounterpartPairing:
         np.save('{}/group/bgrplen.npy'.format(self.joint_folder_path), bgrplen)
 
         mem_chunk_num = 2
-        a_modelrefinds = None
-        b_moderefinds = None
         source_pairing(
             self.joint_folder_path, self.a_cat_folder_path, self.b_cat_folder_path,
             self.a_auf_folder_path, self.b_auf_folder_path, self.a_filt_names,
-            self.b_filt_names, self.a_auf_pointings, self.b_auf_pointings, a_modelrefinds, b_moderefinds,
-            self.rho, self.drho, self.n_fracs, mem_chunk_num, group_sources_data=None, phot_like_data=None,
-            use_memmap_files=True)
+            self.b_filt_names, self.a_auf_pointings, self.b_auf_pointings, self.amodelrefinds,
+            self.bmodelrefinds, self.rho, self.drho, self.n_fracs, mem_chunk_num,
+            group_sources_data=group_sources_data, phot_like_data=self.phot_like_data)
 
         bflux = np.load('{}/pairing/bcontamflux.npy'.format(self.joint_folder_path))
         assert np.all(bflux == np.zeros((2), float))
@@ -454,6 +470,11 @@ class TestCounterpartPairing:
         # Force catalogue a to have the wrong length by simply leaving a group
         # out of alist.
         a_reject = np.array([6])
+
+        group_sources_data = StageData(
+            alist=alist, blist=blist, agrplen=agrplen, bgrplen=bgrplen,
+            lenrejecta=len(a_reject), lenrejectb=0)
+
         np.save('{}/reject/reject_a.npy'.format(self.joint_folder_path), a_reject)
         os.system('rm {}/reject/reject_b.npy'.format(self.joint_folder_path))
 
@@ -463,15 +484,13 @@ class TestCounterpartPairing:
         np.save('{}/group/bgrplen.npy'.format(self.joint_folder_path), bgrplen)
 
         mem_chunk_num = 2
-        a_modelrefinds = None
-        b_moderefinds = None
         with pytest.warns(UserWarning) as record:
             source_pairing(
                 self.joint_folder_path, self.a_cat_folder_path, self.b_cat_folder_path,
                 self.a_auf_folder_path, self.b_auf_folder_path, self.a_filt_names,
-                self.b_filt_names, self.a_auf_pointings, self.b_auf_pointings, a_modelrefinds, b_moderefinds,
-                self.rho, self.drho, self.n_fracs, mem_chunk_num, group_sources_data=None, phot_like_data=None,
-                use_memmap_files=True)
+                self.b_filt_names, self.a_auf_pointings, self.b_auf_pointings, self.amodelrefinds,
+                self.bmodelrefinds, self.rho, self.drho, self.n_fracs, mem_chunk_num,
+                group_sources_data=group_sources_data, phot_like_data=self.phot_like_data)
         assert len(record) == 2
         assert '2 catalogue a sources not in either counterpart, f' in record[0].message.args[0]
         assert '1 catalogue b source not in either counterpart, f' in record[1].message.args[0]
@@ -514,6 +533,11 @@ class TestCounterpartPairing:
 
         a_reject = np.array([2, 3, 4, 5, 6])
         b_reject = np.array([1, 3])
+
+        group_sources_data = StageData(
+            alist=alist, blist=blist, agrplen=agrplen, bgrplen=bgrplen,
+            lenrejecta=len(a_reject), lenrejectb=len(b_reject))
+
         np.save('{}/reject/reject_a.npy'.format(self.joint_folder_path), a_reject)
         np.save('{}/reject/reject_b.npy'.format(self.joint_folder_path), b_reject)
 
@@ -523,15 +547,13 @@ class TestCounterpartPairing:
         np.save('{}/group/bgrplen.npy'.format(self.joint_folder_path), bgrplen)
 
         mem_chunk_num = 2
-        a_modelrefinds = None
-        b_moderefinds = None
         with pytest.warns(UserWarning) as record:
             source_pairing(
                 self.joint_folder_path, self.a_cat_folder_path, self.b_cat_folder_path,
                 self.a_auf_folder_path, self.b_auf_folder_path, self.a_filt_names,
-                self.b_filt_names, self.a_auf_pointings, self.b_auf_pointings, a_modelrefinds, b_moderefinds,
-                self.rho, self.drho, self.n_fracs, mem_chunk_num, group_sources_data=None, phot_like_data=None,
-                use_memmap_files=True)
+                self.b_filt_names, self.a_auf_pointings, self.b_auf_pointings, self.amodelrefinds,
+                self.bmodelrefinds, self.rho, self.drho, self.n_fracs, mem_chunk_num,
+                group_sources_data=group_sources_data, phot_like_data=self.phot_like_data)
         assert len(record) == 2
         assert '2 additional catalogue a indices recorded' in record[0].message.args[0]
         assert '1 additional catalogue b index recorded' in record[1].message.args[0]
@@ -593,12 +615,12 @@ class TestCounterpartPairing:
         # Same run as test_source_pairing, but called from CrossMatch rather than
         # directly this time.
         self._setup_cross_match_parameters()
-        self.cm = CrossMatch(os.path.join(os.path.dirname(__file__), 'data'), use_memmap_files=True)
+        self.cm = CrossMatch(os.path.join(os.path.dirname(__file__), 'data'))
         self.cm.delta_mag_cuts = np.array([2.5, 5])
-        self.cm.a_modelrefinds = None
-        self.cm.b_modelrefinds = None
-        self.cm.group_sources_data = None
-        self.cm.phot_like_data = None
+        self.cm.a_modelrefinds = self.amodelrefinds
+        self.cm.b_modelrefinds = self.bmodelrefinds
+        self.cm.group_sources_data = self.group_sources_data
+        self.cm.phot_like_data = self.phot_like_data
         self.files_per_pairing = 13
         self.cm.chunk_id = 1
         self.cm._initialise_chunk(os.path.join(os.path.dirname(__file__), 'data/chunk0/crossmatch_params_.txt'),
@@ -662,63 +684,6 @@ class TestCounterpartPairing:
         assert_allclose(afxi[q], np.log10(fake_field_G / self.Nfa), rtol=0.01, atol=0.01)
         # Ignoring photometry here, so this should be equal probability.
         assert_allclose(afeta[q], np.log10(1.0))
-
-    def test_pair_sources_incorrect_warning(self):
-        os.system('rm -r {}/pairing'.format(self.joint_folder_path))
-        os.makedirs('{}/pairing'.format(self.joint_folder_path), exist_ok=True)
-        self._setup_cross_match_parameters()
-        for kind in ['cf', 'source']:
-            ol, nl = 'run_{} = yes'.format(kind), 'run_{} = no\n'.format(kind)
-            f = open(os.path.join(os.path.dirname(__file__),
-                                  'data/crossmatch_params.txt')).readlines()
-            idx = np.where([ol in line for line in f])[0][0]
-            _replace_line(os.path.join(os.path.dirname(__file__),
-                          'data/chunk0/crossmatch_params_.txt'), idx, nl)
-        self.cm = CrossMatch(os.path.join(os.path.dirname(__file__), 'data'), use_memmap_files=True)
-        self.cm.delta_mag_cuts = np.array([2.5, 5])
-        self.cm.a_modelrefinds = None
-        self.cm.b_modelrefinds = None
-        self.cm.group_sources_data = None
-        self.cm.phot_like_data = None
-        self.files_per_pairing = 13
-        self.cm.chunk_id = 1
-        self.cm._initialise_chunk(os.path.join(os.path.dirname(__file__), 'data/chunk0/crossmatch_params_.txt'),
-                                  os.path.join(os.path.dirname(__file__), 'data/chunk0/cat_a_params_.txt'),
-                                  os.path.join(os.path.dirname(__file__), 'data/chunk0/cat_b_params_.txt'))
-        with pytest.warns(UserWarning, match="Incorrect number of counterpart pairing files."):
-            self.cm.pair_sources(self.files_per_pairing)
-
-    def test_pair_sources_load_existing(self, capsys):
-        os.system('rm -r {}/pairing'.format(self.joint_folder_path))
-        os.makedirs('{}/pairing'.format(self.joint_folder_path), exist_ok=True)
-        # Fake files_per_pairing sources at random.
-        self.files_per_pairing = 13
-        for i in range(0, self.files_per_pairing):
-            np.save('{}/pairing/array_{}.npy'.format(self.joint_folder_path, i+1),
-                    np.zeros((4, 3), float))
-
-        self._setup_cross_match_parameters()
-        for kind in ['cf', 'source']:
-            ol, nl = 'run_{} = yes'.format(kind), 'run_{} = no\n'.format(kind)
-            f = open(os.path.join(os.path.dirname(__file__),
-                                  'data/crossmatch_params.txt')).readlines()
-            idx = np.where([ol in line for line in f])[0][0]
-            _replace_line(os.path.join(os.path.dirname(__file__),
-                          'data/chunk0/crossmatch_params_.txt'), idx, nl)
-        self.cm = CrossMatch(os.path.join(os.path.dirname(__file__), 'data'), use_memmap_files=True)
-        self.cm.delta_mag_cuts = np.array([2.5, 5])
-        self.cm.a_modelrefinds = None
-        self.cm.b_modelrefinds = None
-        self.cm.group_sources_data = None
-        self.cm.phot_like_data = None
-        self.cm.chunk_id = 1
-        self.cm._initialise_chunk(os.path.join(os.path.dirname(__file__), 'data/chunk0/crossmatch_params_.txt'),
-                                  os.path.join(os.path.dirname(__file__), 'data/chunk0/cat_a_params_.txt'),
-                                  os.path.join(os.path.dirname(__file__), 'data/chunk0/cat_b_params_.txt'))
-        capsys.readouterr()
-        self.cm.pair_sources(self.files_per_pairing)
-        output = capsys.readouterr().out
-        assert 'Loading pre-assigned counterparts' in output
 
 
 def test_f90_comb():

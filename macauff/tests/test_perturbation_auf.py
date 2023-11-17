@@ -30,7 +30,7 @@ class TestCreatePerturbAUF:
             np.save('{}/con_cat_astro.npy'.format(path), np.array([[1, 1, 1]]))
             np.save('{}/con_cat_photo.npy'.format(path), np.array([[1] * N]))
             np.save('{}/magref.npy'.format(path), np.array([1]))
-        self.cm = CrossMatch(os.path.join(os.path.dirname(__file__), 'data'), use_memmap_files=True)
+        self.cm = CrossMatch(os.path.join(os.path.dirname(__file__), 'data'))
         self.cm._initialise_chunk(os.path.join(os.path.dirname(__file__), 'data/crossmatch_params.txt'),
                                   os.path.join(os.path.dirname(__file__), 'data/cat_a_params.txt'),
                                   os.path.join(os.path.dirname(__file__), 'data/cat_b_params.txt'))
@@ -59,7 +59,6 @@ class TestCreatePerturbAUF:
             np.save('{}/magref.npy'.format(path), cat)
 
         self.cm.include_perturb_auf = False
-        self.cm.run_auf = True
         self.cm.chunk_id = 1
         self.cm.create_perturb_auf(self.files_per_auf_sim)
         lenr = len(self.cm.r)
@@ -82,7 +81,7 @@ class TestCreatePerturbAUF:
                 assert np.all(file[1:] == 0)
                 assert file[0] == 1/(2 * np.pi * (self.cm.r[0] + self.cm.dr[0]/2) * self.cm.dr[0])
 
-        file = np.load('{}/modelrefinds.npy'.format(self.cm.a_auf_folder_path))
+        file = self.cm.a_modelrefinds
         assert np.all(file[0, :] == 0)
         assert np.all(file[1, :] == np.load('{}/magref.npy'.format(self.cm.a_cat_folder_path)))
 
@@ -91,72 +90,6 @@ class TestCreatePerturbAUF:
         inds = np.ones(file.shape[1], int)
         inds[np.where(cat[:, 0] < 1)[0]] = 0
         assert np.all(file[2, :] == inds)
-
-    def test_run_auf_file_number(self):
-        # Reset any saved files from the above tests
-        os.system("rm -rf {}/*".format(self.cm.a_auf_folder_path))
-        os.system("rm -rf {}/*".format(self.cm.b_auf_folder_path))
-        self.cm.run_auf = False
-        self.cm.chunk_id = 1
-
-        with pytest.warns(UserWarning, match='Incorrect number of files in catalogue "a"'):
-            self.cm.create_perturb_auf(self.files_per_auf_sim)
-        # Delete reference to modelrefinds as passed back to self.cm to
-        # allow for its deallocation and deletion below.
-        del self.cm.a_modelrefinds
-        del self.cm.b_modelrefinds
-
-        # Now create fake files to simulate catalogue "a" having the right files.
-        # For 2 AUF pointings this comes to 8 + 2*N_filt*files_per_auf_sim files.
-        os.system("rm -rf {}/*".format(self.cm.a_auf_folder_path))
-        for i in range(5 + 2 + 2 * 3 * self.files_per_auf_sim):
-            np.save('{}/random_file_{}.npy'.format(self.cm.a_auf_folder_path, i), np.zeros(1))
-        # For the other files we don't care what the name is, but modelrefinds
-        # is loaded by name when skipping a catalogue in create_perturb_auf.
-        np.save('{}/modelrefinds.npy'.format(self.cm.a_auf_folder_path), np.array([1]))
-
-        # This should still return the same warning, just for catalogue "b" now.
-        with pytest.warns(UserWarning) as record:
-            self.cm.create_perturb_auf(self.files_per_auf_sim)
-        del self.cm.b_modelrefinds
-        assert len(record) == 1
-        assert 'Incorrect number of files in catalogue "b"' in record[0].message.args[0]
-
-    @pytest.mark.filterwarnings("ignore:.*Incorrect number of files in")
-    def test_load_auf_print(self, capsys):
-        # Reset any saved files from the above tests
-        os.system("rm -rf {}/*".format(self.cm.a_auf_folder_path))
-        os.system("rm -rf {}/*".format(self.cm.b_auf_folder_path))
-
-        # Generate new dummy data for catalogue "b"'s AUF folder.
-        for i in range(5 + 2 + 2 * 4 * self.files_per_auf_sim):
-            np.save('{}/random_file_{}.npy'.format(self.cm.b_auf_folder_path, i), np.zeros(1))
-            # Similar to above, modelrefinds needs to not just have a
-            # random filename.
-        np.save('{}/modelrefinds.npy'.format(self.cm.b_auf_folder_path), np.array([1]))
-        capsys.readouterr()
-        # This test will create catalogue "a" files because of the wrong
-        # number of files (zero) in the folder.
-        self.cm.chunk_id = 1
-        self.cm.create_perturb_auf(self.files_per_auf_sim)
-        del self.cm.a_modelrefinds
-        del self.cm.b_modelrefinds
-        output = capsys.readouterr().out
-        assert 'Loading empirical perturbation AUFs for catalogue "a"' not in output
-        assert 'Loading empirical perturbation AUFs for catalogue "b"' in output
-
-        os.system("rm -rf {}/*".format(self.cm.a_auf_folder_path))
-        os.system("rm -rf {}/*".format(self.cm.b_auf_folder_path))
-        # Generate new dummy data for each catalogue's AUF folder.
-        for path, fn in zip([self.cm.a_auf_folder_path, self.cm.b_auf_folder_path], [3, 4]):
-            for i in range(5 + 2 + 2 * fn * self.files_per_auf_sim):
-                np.save('{}/random_file_{}.npy'.format(path, i), np.zeros(1))
-            np.save('{}/modelrefinds.npy'.format(path), np.array([1]))
-        capsys.readouterr()
-        self.cm.create_perturb_auf(self.files_per_auf_sim)
-        output = capsys.readouterr().out
-        assert 'Loading empirical perturbation AUFs for catalogue "a"' in output
-        assert 'Loading empirical perturbation AUFs for catalogue "b"' in output
 
 
 def test_perturb_aufs():
@@ -491,7 +424,7 @@ class TestMakePerturbAUFs():
 
         self.args = [self.auf_folder, self.cat_folder, self.filters, self.auf_points,
                      self.r, self.dr, self.rho, self.drho, self.which_cat,
-                     self.include_perturb_auf, self.mem_chunk_num, True]
+                     self.include_perturb_auf, self.mem_chunk_num]
 
         self.files_per_auf_sim = 7
 
@@ -654,125 +587,6 @@ class TestMakePerturbAUFs():
                               alpha1=1, run_fw=1, run_psf=1, dd_params=1, l_cut=1, snr_mag_params=1)
 
     @pytest.mark.remote_data
-    def test_without_compute_local_density(self):
-        # Number of sources per PSF circle, on average, solved backwards to ensure
-        # that local density ends up exactly in the middle of a count_array bin.
-        # This should be approximately 0.076 sources per PSF circle.
-        psf_mean = np.exp(8.7) * np.pi * (1.185 * self.psf_fwhms[0] / 3600)**2
-        # Local density is the controllable variable to ensure that we get
-        # the expected sources per PSF circle, with most variables cancelling
-        # mean divided by circle area sets the density needed.
-        local_dens = psf_mean / (np.pi * (1.185 * self.psf_fwhms[0] / 3600)**2)
-        np.save('{}/local_N.npy'.format(self.auf_folder), np.array([[local_dens]] * 101))
-
-        np.save('{}/con_cat_astro.npy'.format(self.cat_folder), np.array([[0.3, 0.3, 0.1]] * 101))
-        np.save('{}/con_cat_photo.npy'.format(self.cat_folder),
-                np.array([np.concatenate(([14.99], [100]*100))]).T)
-        np.save('{}/magref.npy'.format(self.cat_folder), np.array([0] * 101))
-
-        d_mag = 0.1
-
-        # Fake up a TRILEGAL simulation data file.
-        text = ('#area = 140.0 sq deg\n#Av at infinity = 1\n'
-                'Gc logAge [M/H] m_ini   logL   logTe logg  m-M0   Av    '
-                'm2/m1 mbol   J      H      Ks     IRAC_3.6 IRAC_4.5 IRAC_5.8 IRAC_8.0 MIPS_24 '
-                'MIPS_70 MIPS_160 W1     W2     W3     W4       Mact\n')
-        for _ in range(35):
-            text = text + (
-                '1   6.65 -0.39  0.02415 -2.701 3.397  4.057 14.00  8.354 0.00 25.523 25.839 '
-                '24.409 23.524 22.583 22.387 22.292 22.015 21.144 19.380 20.878 15.001 22.391 '
-                '21.637 21.342  0.024\n1   6.65 -0.39  0.02415 -2.701 3.397  4.057 14.00 8.354 '
-                '0.00 25.523 25.839 24.409 23.524 22.583 22.387 22.292 22.015 21.144 19.380 20.878 '
-                '15.002 22.391 21.637 21.342  0.024\n 1   6.65 -0.39  0.02415 -2.701 3.397  4.057 '
-                '14.00 8.354 0.00 25.523 25.839 24.409 23.524 22.583 22.387 22.292 22.015 21.144 '
-                '19.380 20.878 15.003 22.391 21.637 21.342  0.024\n 1   6.65 -0.39  0.02415 -2.701 '
-                '3.397  4.057 14.00  8.354 0.00 25.523 25.839 24.409 23.524 22.583 22.387 22.292 '
-                '22.015 21.144 19.380 20.878 15.004 22.391 21.637 21.342  0.024\n\n 1   6.65 -0.39 '
-                ' 0.02415 -2.701 3.397  4.057 14.00  8.354 0.00 25.523 25.839 24.409 23.524 22.583 '
-                '22.387 22.292 22.015 21.144 19.380 20.878 100.99 22.391 21.637 21.342  0.024\n')
-
-        os.makedirs('{}/{}/{}'.format(
-            self.auf_folder, self.auf_points[0][0], self.auf_points[0][1]), exist_ok=True)
-        with open('{}/{}/{}/trilegal_auf_simulation_faint.dat'.format(
-                  self.auf_folder, self.auf_points[0][0], self.auf_points[0][1]), "w") as f:
-            f.write(text)
-
-        prob_0_draw = psf_mean**0 * np.exp(-psf_mean) / np.math.factorial(0)
-        prob_1_draw = psf_mean**1 * np.exp(-psf_mean) / np.math.factorial(1)
-        prob_2_draw = psf_mean**2 * np.exp(-psf_mean) / np.math.factorial(2)
-
-        ax1, ax2 = self.auf_points[0]
-
-        keep_frac = np.zeros((len(self.delta_mag_cuts), 2), float)
-        keep_flux = np.zeros((2,), float)
-        track_fourier = np.zeros(len(self.rho)-1, float)
-
-        # Catalogue bins for the source:
-        a_photo = np.load('{}/con_cat_photo.npy'.format(self.cat_folder))
-        dmag = 0.25
-        # Force only the first source to get bins made of it.
-        mag_min = dmag * np.floor(np.amin(a_photo[0])/dmag)
-        mag_max = dmag * np.ceil(np.amax(a_photo[0])/dmag)
-        mag_bins = np.arange(mag_min, mag_max+1e-10, dmag)
-        mag_bin = 0.5 * (mag_bins[1:]+mag_bins[:-1])
-        # Model magnitude bins:
-        tri_mags = np.array([15.001, 15.002, 15.003, 15.004])
-        minmag = d_mag * np.floor(np.amin(tri_mags)/d_mag)
-        maxmag = d_mag * np.ceil(np.amax(tri_mags)/d_mag)
-        mod_bins = np.arange(minmag, maxmag+1e-10, d_mag)
-        mod_bin = mod_bins[:-1] + np.diff(mod_bins)/2
-        mag_offset = mod_bin - mag_bin
-        rel_flux = 10**(-1/2.5 * mag_offset)
-        snr_mag_params = np.array([[[0.0109, 46.08, 0.119, 130, 0]]])
-
-        N = 15
-        for i in range(N):
-            make_perturb_aufs(
-                *self.args, tri_set_name='WISE', tri_filt_num=11,
-                tri_filt_names=self.tri_filt_names, tri_maglim_faint=32, tri_num_faint=1000000,
-                auf_region_frame='galactic', psf_fwhms=self.psf_fwhms, num_trials=self.num_trials,
-                j0s=self.j0s, d_mag=d_mag, delta_mag_cuts=self.delta_mag_cuts,
-                compute_local_density=False, fit_gal_flag=False, run_fw=True, run_psf=False,
-                snr_mag_params=snr_mag_params, al_avs=[0])
-
-            if i == 0:
-                for name, size in zip(
-                        ['frac', 'flux', 'offset', 'cumulative', 'fourier', 'N', 'mag'],
-                        [(len(self.delta_mag_cuts), 2), (2,), (len(self.r)-1, 2),
-                         (len(self.r)-1, 2), (len(self.rho)-1, 2), (2,), (2,)]):
-                    var = np.load('{}/{}/{}/{}/{}.npy'.format(
-                                  self.auf_folder, ax1, ax2, self.filters[0], name))
-                    assert np.all(var.shape == size)
-
-            fracs = np.load('{}/{}/{}/{}/frac.npy'.format(
-                self.auf_folder, ax1, ax2, self.filters[0]))
-            fluxs = np.load('{}/{}/{}/{}/flux.npy'.format(
-                self.auf_folder, ax1, ax2, self.filters[0]))
-            fourier = np.load('{}/{}/{}/{}/fourier.npy'.format(
-                self.auf_folder, ax1, ax2, self.filters[0]))
-
-            keep_frac += fracs / N
-            keep_flux += fluxs / N
-            track_fourier += fourier[:, 0] / N
-
-        # Have more relaxed conditions on assertion than in test_perturb_aufs
-        # above, as we can't arbitrarily force the magnitude bin widths to be
-        # very small, and hence have a blur on relative fluxes allowed.
-        assert_allclose(keep_frac[0, 0], 1-prob_0_draw, rtol=0.1)
-        assert_allclose(keep_flux[0], (prob_0_draw*0 + prob_1_draw*rel_flux +
-                        prob_2_draw*2*rel_flux), rtol=0.1)
-
-        R = 1.185 * self.psf_fwhms[0]
-        small_R = R * rel_flux / (1 + rel_flux)
-
-        fake_fourier = (1-prob_0_draw) / (np.pi * small_R * (self.rho[:-1]+self.drho/2)) * j1(
-            2 * np.pi * small_R * (self.rho[:-1]+self.drho/2))
-        fake_fourier += prob_0_draw * j0(2 * np.pi * (self.r[0]+self.dr[0]/2) *
-                                         (self.rho[:-1]+self.drho/2))
-
-        assert_allclose(fake_fourier, track_fourier, rtol=0.05)
-
-    @pytest.mark.remote_data
     def test_create_single_low_numbers(self):
         # Number of sources per PSF circle, on average, solved backwards to ensure
         # that local density ends up exactly in the middle of a count_array bin.
@@ -783,6 +597,8 @@ class TestMakePerturbAUFs():
         # mean divided by circle area sets the density needed.
         local_dens = psf_mean / (np.pi * (1.185 * self.psf_fwhms[0] / 3600)**2)
         np.save('{}/local_N.npy'.format(self.auf_folder), np.array([[local_dens]] * 101))
+
+        density_radius = np.sqrt(1 / np.pi / np.exp(8.7))
 
         np.save('{}/con_cat_astro.npy'.format(self.cat_folder), np.array([[0.3, 0.3, 0.1]] * 101))
         np.save('{}/con_cat_photo.npy'.format(self.cat_folder),
@@ -827,11 +643,11 @@ class TestMakePerturbAUFs():
                 tri_filt_names=self.tri_filt_names, tri_maglim_faint=32, tri_num_faint=1000000,
                 auf_region_frame='galactic', psf_fwhms=self.psf_fwhms, num_trials=self.num_trials,
                 j0s=self.j0s, d_mag=d_mag, delta_mag_cuts=self.delta_mag_cuts,
-                compute_local_density=False, fit_gal_flag=False, run_fw=True, run_psf=False,
-                snr_mag_params=snr_mag_params, al_avs=[0])
+                compute_local_density=False, fit_gal_flag=False, density_radius=density_radius,
+                run_fw=True, run_psf=False, snr_mag_params=snr_mag_params, al_avs=[0])
 
     @pytest.mark.remote_data
-    def test_psf_algorithm_without_compute_local_density(self):
+    def test_psf_algorithm(self):
         # Number of sources per PSF circle, on average, solved backwards to ensure
         # that local density ends up exactly in the middle of a count_array bin.
         # This should be approximately 0.15 sources per PSF circle.
@@ -842,10 +658,18 @@ class TestMakePerturbAUFs():
         local_dens = psf_mean / (np.pi * (1.185 * self.psf_fwhms[0] / 3600)**2)
         np.save('{}/local_N.npy'.format(self.auf_folder), np.array([[local_dens]] * 101))
 
-        np.save('{}/con_cat_astro.npy'.format(self.cat_folder), np.array([[0.3, 0.3, 0.1]] * 101))
+        density_radius = np.sqrt(1 / np.pi / np.exp(9.38))
+
+        new_auf_points = np.vstack((self.auf_points, np.array([[10, 10]])))
+
+        # Have to fudge extra sources to keep our 15th mag source in the local
+        # density cutout.
+        np.save('{}/con_cat_astro.npy'.format(self.cat_folder),
+                np.concatenate(([0.3, 0.3, 0.1] * 101, [0.1, 0.1, 0.1],
+                                [0.9, 0.9, 0.1])).reshape(-1, 3))
         np.save('{}/con_cat_photo.npy'.format(self.cat_folder),
-                np.array([np.concatenate(([14.99], [100]*100))]).T)
-        np.save('{}/magref.npy'.format(self.cat_folder), np.array([0] * 101))
+                np.array([np.concatenate(([14.99], [100]*100, [10], [10]))]).T)
+        np.save('{}/magref.npy'.format(self.cat_folder), np.array([0] * 103))
 
         d_mag = 0.1
 
@@ -872,11 +696,12 @@ class TestMakePerturbAUFs():
                     '8.354 0.00 25.523 25.839 24.409 23.524 22.583 22.387 22.292 22.015 21.144 '
                     '19.380 20.878 100.99 22.391 21.637 21.342  0.024\n'.format(
                         mag, mag+0.001, mag+0.002, mag+0.003))
-            os.makedirs('{}/{}/{}'.format(
-                self.auf_folder, self.auf_points[0][0], self.auf_points[0][1]), exist_ok=True)
-            with open('{}/{}/{}/trilegal_auf_simulation_faint.dat'.format(
-                      self.auf_folder, self.auf_points[0][0], self.auf_points[0][1]), "w") as f:
-                f.write(text)
+            for i in range(len(new_auf_points)):
+                os.makedirs('{}/{}/{}'.format(
+                    self.auf_folder, new_auf_points[i][0], new_auf_points[i][1]), exist_ok=True)
+                with open('{}/{}/{}/trilegal_auf_simulation_faint.dat'.format(
+                          self.auf_folder, new_auf_points[i][0], new_auf_points[i][1]), "w") as f:
+                    f.write(text)
 
             prob_0_draw = psf_mean**0 * np.exp(-psf_mean) / np.math.factorial(0)
             prob_1_draw = psf_mean**1 * np.exp(-psf_mean) / np.math.factorial(1)
@@ -889,7 +714,7 @@ class TestMakePerturbAUFs():
                 keep_flux = np.zeros((1,), float)
 
             # Catalogue bins for the source:
-            a_photo = np.load('{}/con_cat_photo.npy'.format(self.cat_folder))
+            a_photo = np.load('{}/con_cat_photo.npy'.format(self.cat_folder))[0, :]
             dmag = 0.25
             mag_min = dmag * np.floor(np.amin(a_photo[0])/dmag)
             mag_max = dmag * np.ceil(np.amax(a_photo[0])/dmag)
@@ -911,17 +736,18 @@ class TestMakePerturbAUFs():
             dd_params = np.load(os.path.join(os.path.dirname(__file__), 'data/dd_params.npy'))
             run_fw = False if mag < 19 else True
             make_perturb_aufs(
-                *self.args, tri_set_name='WISE', tri_filt_num=11,
-                tri_filt_names=self.tri_filt_names, tri_maglim_faint=32, tri_num_faint=1000000,
-                auf_region_frame='galactic', psf_fwhms=self.psf_fwhms, num_trials=self.num_trials,
-                j0s=self.j0s, d_mag=d_mag, delta_mag_cuts=self.delta_mag_cuts,
-                compute_local_density=False, fit_gal_flag=False, run_fw=run_fw, run_psf=True,
+                *self.args[:3], new_auf_points, *self.args[4:], tri_set_name='WISE',
+                tri_filt_num=11, tri_filt_names=self.tri_filt_names, tri_maglim_faint=32,
+                tri_num_faint=1000000, auf_region_frame='galactic', psf_fwhms=self.psf_fwhms,
+                num_trials=self.num_trials, j0s=self.j0s, d_mag=d_mag,
+                delta_mag_cuts=self.delta_mag_cuts, compute_local_density=False, fit_gal_flag=False,
+                density_radius=density_radius, run_fw=run_fw, run_psf=True,
                 snr_mag_params=snr_mag_params, dd_params=dd_params, l_cut=l_cut, al_avs=[0])
 
             for name, size in zip(
                     ['frac', 'flux', 'offset', 'cumulative', 'fourier', 'N', 'mag'],
-                    [(len(self.delta_mag_cuts), 2), (2,), (len(self.r)-1, 2),
-                     (len(self.r)-1, 2), (len(self.rho)-1, 2), (2,), (2,)]):
+                    [(len(self.delta_mag_cuts), 3), (3,), (len(self.r)-1, 3),
+                     (len(self.r)-1, 3), (len(self.rho)-1, 3), (3,), (3,)]):
                 var = np.load('{}/{}/{}/{}/{}.npy'.format(
                               self.auf_folder, ax1, ax2, self.filters[0], name))
                 assert np.all(var.shape == size)
@@ -1078,7 +904,7 @@ class TestMakePerturbAUFs():
         np.save('a_snr_mag/snr_mag_params.npy', np.array([[[0.0109, 46.08, 0.119, 130, 0]]]))
         np.save('b_snr_mag/snr_mag_params.npy', np.array([[[0.0109, 46.08, 0.119, 130, 0]]]))
 
-        cm = CrossMatch(os.path.join(os.path.dirname(__file__), 'data'), use_memmap_files=False)
+        cm = CrossMatch(os.path.join(os.path.dirname(__file__), 'data'))
         cm._initialise_chunk(os.path.join(os.path.dirname(__file__),
                                           'data/crossmatch_params_.txt'),
                              os.path.join(os.path.dirname(__file__), 'data/cat_a_params_.txt'),
@@ -1095,10 +921,6 @@ class TestMakePerturbAUFs():
         cm.rho = self.rho
         cm.drho = self.drho
         cm.j0s = self.j0s
-        cm.run_auf = True
-        cm.run_group = True
-        cm.run_cf = True
-        cm.run_source = True
         cm.num_trials = self.num_trials
         cm.a_fit_gal_flag = False
         cm.b_fit_gal_flag = False
@@ -1145,10 +967,16 @@ class TestMakePerturbAUFs():
         local_dens = psf_mean / (np.pi * (1.185 * self.psf_fwhms[0] / 3600)**2)
         np.save('{}/local_N.npy'.format(self.auf_folder), np.array([[local_dens]] * 101))
 
-        np.save('{}/con_cat_astro.npy'.format(self.cat_folder), np.array([[0.3, 0.3, 0.1]] * 101))
+        density_radius = np.sqrt(1 / np.pi / np.exp(8.7))
+
+        new_auf_points = np.vstack((self.auf_points, np.array([[10, 10]])))
+
+        np.save('{}/con_cat_astro.npy'.format(self.cat_folder),
+                np.concatenate(([0.3, 0.3, 0.1] * 101, [0.1, 0.1, 0.1],
+                                [0.9, 0.9, 0.1])).reshape(-1, 3))
         np.save('{}/con_cat_photo.npy'.format(self.cat_folder),
-                np.array([np.concatenate(([14.99], [25]*100))]).T)
-        np.save('{}/magref.npy'.format(self.cat_folder), np.array([0] * 101))
+                np.array([np.concatenate(([14.99], [25]*100, [10], [10]))]).T)
+        np.save('{}/magref.npy'.format(self.cat_folder), np.array([0] * 103))
 
         # Fake up a TRILEGAL simulation data file.
         text = ('#area = 140.0 sq deg\n#Av at infinity = 1\n'
@@ -1168,11 +996,12 @@ class TestMakePerturbAUFs():
                 '22.015 21.144 19.380 20.878 15.004 22.391 21.637 21.342  0.024\n\n 1   6.65 -0.39 '
                 ' 0.02415 -2.701 3.397  4.057 14.00  8.354 0.00 25.523 25.839 24.409 23.524 22.583 '
                 '22.387 22.292 22.015 21.144 19.380 20.878 25.99 22.391 21.637 21.342  0.024\n')
-        os.makedirs('{}/{}/{}'.format(
-            self.auf_folder, self.auf_points[0][0], self.auf_points[0][1]), exist_ok=True)
-        with open('{}/{}/{}/trilegal_auf_simulation_faint.dat'.format(
-                  self.auf_folder, self.auf_points[0][0], self.auf_points[0][1]), "w") as f:
-            f.write(text)
+        for i in range(len(new_auf_points)):
+            os.makedirs('{}/{}/{}'.format(
+                self.auf_folder, new_auf_points[i][0], new_auf_points[i][1]), exist_ok=True)
+            with open('{}/{}/{}/trilegal_auf_simulation_faint.dat'.format(
+                      self.auf_folder, new_auf_points[i][0], new_auf_points[i][1]), "w") as f:
+                f.write(text)
 
         prob_0_draw = psf_mean**0 * np.exp(-psf_mean) / np.math.factorial(0)
         prob_1_draw = psf_mean**1 * np.exp(-psf_mean) / np.math.factorial(1)
@@ -1181,7 +1010,7 @@ class TestMakePerturbAUFs():
         ax1, ax2 = self.auf_points[0]
 
         # Catalogue bins for the source:
-        a_photo = np.load('{}/con_cat_photo.npy'.format(self.cat_folder))
+        a_photo = np.load('{}/con_cat_photo.npy'.format(self.cat_folder))[0, :]
         dmag = 0.25
         mag_min = dmag * np.floor(np.amin(a_photo[0])/dmag)
         mag_max = dmag * np.ceil(np.amax(a_photo[0])/dmag)
@@ -1248,24 +1077,21 @@ class TestMakePerturbAUFs():
         np.save('a_snr_mag/snr_mag_params.npy', np.array([[[0.0109, 46.08, 0.119, 130, 0]]]))
         np.save('b_snr_mag/snr_mag_params.npy', np.array([[[0.0109, 46.08, 0.119, 130, 0]]]))
 
-        cm = CrossMatch(os.path.join(os.path.dirname(__file__), 'data'), use_memmap_files=True)
+        cm = CrossMatch(os.path.join(os.path.dirname(__file__), 'data'))
         cm._initialise_chunk(os.path.join(os.path.dirname(__file__),
                                           'data/crossmatch_params_.txt'),
                              os.path.join(os.path.dirname(__file__), 'data/cat_a_params_.txt'),
                              os.path.join(os.path.dirname(__file__), 'data/cat_b_params_.txt'))
 
-        cm.a_auf_region_points = self.auf_points
-        cm.b_auf_region_points = self.auf_points
+        cm.a_auf_region_points = new_auf_points
+        cm.b_auf_region_points = new_auf_points
+        cm.cross_match_extent = self.ax_lims
         cm.r = self.r
         cm.dr = self.dr
         cm.rho = self.rho
         cm.drho = self.drho
         cm.j0s = self.j0s
         cm.cross_match_extent = self.ax_lims
-        cm.run_auf = True
-        cm.run_group = True
-        cm.run_cf = True
-        cm.run_source = True
         cm.num_trials = self.num_trials
         cm.a_fit_gal_flag = True
         cm.b_fit_gal_flag = True
@@ -1290,6 +1116,11 @@ class TestMakePerturbAUFs():
         cm.b_run_psf = False
 
         cm.chunk_id = 1
+
+        # Removing use_memmap_files means compute_local_density has to be True
+        cm.compute_local_density = True
+        cm.a_dens_dist = density_radius
+        cm.b_dens_dist = density_radius
 
         cm.create_perturb_auf(self.files_per_auf_sim)
 

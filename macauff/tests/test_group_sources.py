@@ -48,7 +48,7 @@ def test_load_fourier_grid_cutouts():
     # However, above we also get in our four-source slice the extra two combinations of:
     # 0, 1, 1 -> 0 + 2 + 6 = 9; and 0, 2, 0 -> 0 + 4 + 0 = 4. This comes from our total combination
     # of indices of 0, 1/2, and 0/1
-    del grid, m
+    del grid
 
     a = np.lib.format.open_memmap('con_cat_astro.npy', mode='r', dtype=float, shape=(lena, 3))
     rect = np.array([40, 60, 40, 60])
@@ -61,7 +61,7 @@ def test_load_fourier_grid_cutouts():
                              '.', 'check', n), mode='r+', dtype=bool, shape=(len(a),)))
     _a, _b, _c, _ = _load_fourier_grid_cutouts(a, rect, '.', '.', '.', padding, 'check',
                                                memmap_arrays, np.array([True]*lena),
-                                               modelrefinds=None, use_memmap_files=True)
+                                               modelrefinds=m)
     assert np.all(_a.shape == (4, 3))
     assert np.all(_a ==
                   np.array([[50, 50, 0.1], [48, 60.02, 0.5], [39.98, 43, 0.2], [45, 45, 0.2]]))
@@ -85,7 +85,7 @@ def test_load_fourier_grid_cutouts():
     padding = 0
     _a, _b, _c, _ = _load_fourier_grid_cutouts(a, rect, '.', '.', '.', padding, 'check',
                                                memmap_arrays, np.array([True]*lena),
-                                               modelrefinds=None, use_memmap_files=True)
+                                               modelrefinds=m)
     assert np.all(_a.shape == (2, 3))
     assert np.all(_a == np.array([[50, 50, 0.1], [45, 45, 0.2]]))
     assert np.all(_b.shape == (100, 1, 1, 1))
@@ -272,7 +272,7 @@ def test_clean_overlaps():
         inds[:, 8+10*i] = [2, 2, 2, 2, 2]
         inds[:, 9+10*i] = [1, 1, 2, 3, -1]
 
-    inds2, size2 = _clean_overlaps(inds, size, joint_folder_path, filename, 2, use_memmap_files=True)
+    inds2, size2 = _clean_overlaps(inds, size, joint_folder_path, filename, 2)
     compare_inds2 = np.empty((4, 30), int)
     for i in range(0, 3):
         compare_inds2[:, 0+10*i] = [0, 1, -1, -1]
@@ -295,7 +295,6 @@ class TestMakeIslandGroupings():
         self.max_sep, self.int_fracs = 11, [0.63, 0.9, 0.99]  # max_sep in arcseconds
         self.a_filt_names, self.b_filt_names = ['G', 'RP'], ['W1', 'W2', 'W3']
         self.a_title, self.b_title = 'gaia', 'wise'
-        self.a_modelrefinds = self.b_modelrefinds = None
         self.a_cat_folder_path, self.b_cat_folder_path = 'gaia_cat', 'wise_cat'
         self.a_auf_folder_path, self.b_auf_folder_path = 'gaia_auf', 'wise_auf'
         self.joint_folder_path = 'joint'
@@ -328,6 +327,10 @@ class TestMakeIslandGroupings():
             np.save('{}/modelrefinds.npy'.format(auf_folder), np.zeros((3, N), int))
             np.save('{}/arraylengths.npy'.format(auf_folder),
                     np.ones((len(filters), len(auf_points)), int))
+            if 'gaia' in auf_folder:
+                self.a_modelrefinds = np.zeros((3, N), int)
+            else:
+                self.b_modelrefinds = np.zeros((3, N), int)
             for i in range(len(auf_points)):
                 ax1, ax2 = auf_points[i]
                 ax_folder = '{}/{}/{}'.format(auf_folder, ax1, ax2)
@@ -337,7 +340,8 @@ class TestMakeIslandGroupings():
                     os.makedirs(filt_folder, exist_ok=True)
                     fourieroffset = np.ones((len(self.rho) - 1, 1), float, order='F')
                     np.save('{}/fourier.npy'.format(filt_folder), fourieroffset)
-            create_auf_params_grid(auf_folder, auf_points, filters, 'fourier', True, len(self.rho)-1)
+            create_auf_params_grid(auf_folder, auf_points, filters, 'fourier',
+                                   np.ones((len(filters), len(auf_points)), int), len(self.rho)-1)
         # 99% is slightly more than 3-sigma of a 2-D Gaussian integral, for
         # int_frac[2] = 0.99
         self.sigma = 0.1
@@ -389,7 +393,7 @@ class TestMakeIslandGroupings():
             np.save('{}/magref.npy'.format(folder), np.zeros((10,), int))
 
         # Also set up an instance of CrossMatch at the same time.
-        self.cm = CrossMatch(os.path.join(os.path.dirname(__file__), 'data'), use_memmap_files=True)
+        self.cm = CrossMatch(os.path.join(os.path.dirname(__file__), 'data'))
         self.cm._initialise_chunk(os.path.join(os.path.dirname(__file__), 'data/crossmatch_params.txt'),
                                   os.path.join(os.path.dirname(__file__), 'data/cat_a_params_.txt'),
                                   os.path.join(os.path.dirname(__file__), 'data/cat_b_params_.txt'))
@@ -416,7 +420,6 @@ class TestMakeIslandGroupings():
         self.cm.j1s = self.j1s
 
         self.n_pool = 5
-        self.use_memmap_files = True
 
     def _comparisons_in_islands(self, alist, blist, agrplen, bgrplen, N_a, N_b, N_c):
         # Given, say, 25 common sources from 30 'a' and 45 'b' objects, we'd
@@ -452,16 +455,12 @@ class TestMakeIslandGroupings():
         np.save('{}/con_cat_astro.npy'.format(self.b_cat_folder_path), self.b_coords)
         # For the first, full runthrough call the CrossMatch function instead of
         # directly calling make_island_groupings to test group_sources as well.
-        self.cm.run_group = True
         self.cm.chunk_id = 1
         self.cm.group_sources(self.files_per_island_sim)
 
-        alist, blist = np.load('joint/group/alist.npy'), np.load('joint/group/blist.npy')
-        agrplen, bgrplen = np.load('joint/group/agrplen.npy'), np.load('joint/group/bgrplen.npy')
+        alist, blist = self.cm.group_sources_data.alist, self.cm.group_sources_data.blist
+        agrplen, bgrplen = self.cm.group_sources_data.agrplen, self.cm.group_sources_data.bgrplen
         self._comparisons_in_islands(alist, blist, agrplen, bgrplen, N_a, N_b, N_c)
-        # Should correctly save 4 files per catalogue in 'group', not saving any
-        # rejection arrays.
-        assert len(os.listdir('{}/group'.format(self.joint_folder_path))) == 8
         assert len(os.listdir('{}/reject'.format(self.joint_folder_path))) == 0
 
     def test_mig_extra_reject(self):
@@ -482,16 +481,16 @@ class TestMakeIslandGroupings():
         np.save('{}/con_cat_astro.npy'.format(self.a_cat_folder_path), a_coords)
         np.save('{}/con_cat_astro.npy'.format(self.b_cat_folder_path), b_coords)
 
-        make_island_groupings(
+        gsd = make_island_groupings(
             self.joint_folder_path, self.a_cat_folder_path, self.b_cat_folder_path,
             self.a_auf_folder_path, self.b_auf_folder_path, self.a_auf_pointings,
             self.b_auf_pointings, self.a_filt_names, self.b_filt_names, self.a_title, self.b_title,
             self.a_modelrefinds, self.b_modelrefinds, self.r, self.dr, self.rho, self.drho, self.j1s,
             self.max_sep, ax_lims, self.int_fracs, self.mem_chunk_num, self.include_phot_like,
-            self.use_phot_prior, self.n_pool, self.use_memmap_files)
+            self.use_phot_prior, self.n_pool)
 
-        alist, blist = np.load('joint/group/alist.npy'), np.load('joint/group/blist.npy')
-        agrplen, bgrplen = np.load('joint/group/agrplen.npy'), np.load('joint/group/bgrplen.npy')
+        alist, blist = gsd.alist, gsd.blist
+        agrplen, bgrplen = gsd.agrplen, gsd.bgrplen
         # We removed 3 extra sources this time around, which should all be 1:1 islands.
         assert np.all(alist.shape == (2, N_a - 4 + N_b - N_c))
         assert np.all(blist.shape == (1, N_a - 4 + N_b - N_c))
@@ -518,8 +517,7 @@ class TestMakeIslandGroupings():
         assert np.all(breject.shape == (4+3,))
         assert np.all(areject == np.array([3, 4, 5, N_a, N_a+1, N_a+2, N_a+3, N_a+4]))
         assert np.all(breject == np.array([3, 4, 5, N_b, N_b+1, N_b+2, N_b+3]))
-        # This time with rejection arrays we need to look for 10 files instead of 8.
-        assert len(os.listdir('{}/group'.format(self.joint_folder_path))) == 8
+
         assert len(os.listdir('{}/reject'.format(self.joint_folder_path))) == 2
 
     def test_mig_no_reject_ax_lims(self):
@@ -543,16 +541,16 @@ class TestMakeIslandGroupings():
         np.save('joint/reject/areject.npy', np.arange(N_a, N_a+5))
         np.save('joint/reject/breject.npy', np.arange(N_b, N_b+4))
 
-        make_island_groupings(
+        gsd = make_island_groupings(
             self.joint_folder_path, self.a_cat_folder_path, self.b_cat_folder_path,
             self.a_auf_folder_path, self.b_auf_folder_path, self.a_auf_pointings,
             self.b_auf_pointings, self.a_filt_names, self.b_filt_names, self.a_title, self.b_title,
             self.a_modelrefinds, self.b_modelrefinds, self.r, self.dr, self.rho, self.drho,
             self.j1s, self.max_sep, ax_lims, self.int_fracs, self.mem_chunk_num, self.include_phot_like,
-            self.use_phot_prior, self.n_pool, self.use_memmap_files)
+            self.use_phot_prior, self.n_pool)
 
-        alist, blist = np.load('joint/group/alist.npy'), np.load('joint/group/blist.npy')
-        agrplen, bgrplen = np.load('joint/group/agrplen.npy'), np.load('joint/group/bgrplen.npy')
+        alist, blist = gsd.alist, gsd.blist
+        agrplen, bgrplen = gsd.agrplen, gsd.bgrplen
         # The same tests that were ran in make_island_groupings should pass here.
         self._comparisons_in_islands(alist, blist, agrplen, bgrplen, N_a, N_b, N_c)
         areject = np.load('joint/reject/reject_a.npy')
@@ -561,41 +559,6 @@ class TestMakeIslandGroupings():
         assert np.all(breject.shape == (4,))
         assert np.all(areject == np.array([N_a, N_a+1, N_a+2, N_a+3, N_a+4]))
         assert np.all(breject == np.array([N_b, N_b+1, N_b+2, N_b+3]))
-        assert len(os.listdir('{}/group'.format(self.joint_folder_path))) == 8
-        assert len(os.listdir('{}/reject'.format(self.joint_folder_path))) == 2
-
-    def test_correct_file_number(self):
-        os.system('rm -rf {}/group/*'.format(self.joint_folder_path))
-        os.system('rm -rf {}/reject/*'.format(self.joint_folder_path))
-        np.save('{}/con_cat_astro.npy'.format(self.a_cat_folder_path), self.a_coords)
-        np.save('{}/con_cat_astro.npy'.format(self.b_cat_folder_path), self.b_coords)
-        self.cm.run_group = False
-        self.cm.chunk_id = 1
-        # Dummy variables to represent the incorrect number of outputs
-        for i in range(9):
-            np.save('{}/group/{}.npy'.format(self.joint_folder_path, i), np.array([i]))
-        with pytest.warns(UserWarning, match='Incorrect number of grouping files.'):
-            self.cm.group_sources(self.files_per_island_sim)
-        assert len(os.listdir('{}/group'.format(self.joint_folder_path))) == 8
-        assert len(os.listdir('{}/reject'.format(self.joint_folder_path))) == 0
-
-    def test_load_group_sources_files(self, capsys):
-        os.system('rm -rf {}/group/*'.format(self.joint_folder_path))
-        os.system('rm -rf {}/reject/*'.format(self.joint_folder_path))
-        np.save('{}/con_cat_astro.npy'.format(self.a_cat_folder_path), self.a_coords)
-        np.save('{}/con_cat_astro.npy'.format(self.b_cat_folder_path), self.b_coords)
-        self.cm.run_group = False
-        self.cm.chunk_id = 1
-        # Dummy variables to represent the correct number of outputs
-        for i in range(8):
-            np.save('{}/group/{}.npy'.format(self.joint_folder_path, i), np.array([i]))
-        np.save('{}/reject/reject_a.npy'.format(self.joint_folder_path), np.array([8]))
-        np.save('{}/reject/reject_b.npy'.format(self.joint_folder_path), np.array([9]))
-        capsys.readouterr()
-        self.cm.group_sources(self.files_per_island_sim)
-        output = capsys.readouterr().out
-        assert 'Loading catalogue islands and' in output
-        assert len(os.listdir('{}/group'.format(self.joint_folder_path))) == 8
         assert len(os.listdir('{}/reject'.format(self.joint_folder_path))) == 2
 
     def test_make_island_groupings_include_phot_like(self):
@@ -604,37 +567,35 @@ class TestMakeIslandGroupings():
         np.save('{}/con_cat_astro.npy'.format(self.a_cat_folder_path), self.a_coords)
         np.save('{}/con_cat_astro.npy'.format(self.b_cat_folder_path), self.b_coords)
         include_phot_like = True
-        make_island_groupings(
+        gsd = make_island_groupings(
             self.joint_folder_path, self.a_cat_folder_path, self.b_cat_folder_path,
             self.a_auf_folder_path, self.b_auf_folder_path, self.a_auf_pointings,
             self.b_auf_pointings, self.a_filt_names, self.b_filt_names, self.a_title, self.b_title,
             self.a_modelrefinds, self.b_modelrefinds,  self.r, self.dr, self.rho, self.drho, self.j1s,
             self.max_sep, self.ax_lims, self.int_fracs, self.mem_chunk_num, include_phot_like,
-            self.use_phot_prior, self.n_pool, self.use_memmap_files)
+            self.use_phot_prior, self.n_pool)
 
         # Verify that make_island_groupings doesn't change when the extra arrays
         # are calculated, as an initial test.
-        alist, blist = np.load('joint/group/alist.npy'), np.load('joint/group/blist.npy')
-        agrplen, bgrplen = np.load('joint/group/agrplen.npy'), np.load('joint/group/bgrplen.npy')
+        alist, blist = gsd.alist, gsd.blist
+        agrplen, bgrplen = gsd.agrplen, gsd.bgrplen
         self._comparisons_in_islands(alist, blist, agrplen, bgrplen, self.N_a, self.N_b,
                                      self.N_com)
-        # This time we have an extra four files, the [ab][bf]len arrays, so it's
-        # not quite the same comparison as we made in make_island_grouping.
-        assert len(os.listdir('{}/group'.format(self.joint_folder_path))) == 12
+
         assert len(os.listdir('{}/reject'.format(self.joint_folder_path))) == 0
 
         aerr = np.load('{}/con_cat_astro.npy'.format(self.a_cat_folder_path))[:, 2]
         berr = np.load('{}/con_cat_astro.npy'.format(self.b_cat_folder_path))[:, 2]
 
-        ablen = np.load('{}/group/ablen.npy'.format(self.joint_folder_path))
-        aflen = np.load('{}/group/aflen.npy'.format(self.joint_folder_path))
-        bblen = np.load('{}/group/bblen.npy'.format(self.joint_folder_path))
-        bflen = np.load('{}/group/bflen.npy'.format(self.joint_folder_path))
+        ablen = gsd.ablen
+        aflen = gsd.aflen
+        bblen = gsd.bblen
+        bflen = gsd.bflen
 
-        asize = np.load('{}/group/asize.npy'.format(self.joint_folder_path))
-        ainds = np.load('{}/group/ainds.npy'.format(self.joint_folder_path))
-        bsize = np.load('{}/group/bsize.npy'.format(self.joint_folder_path))
-        binds = np.load('{}/group/binds.npy'.format(self.joint_folder_path))
+        asize = gsd.asize
+        ainds = gsd.ainds
+        bsize = gsd.bsize
+        binds = gsd.binds
 
         for i in range(len(ablen)):
             d = ablen[i]*3600

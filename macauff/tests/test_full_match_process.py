@@ -116,11 +116,8 @@ def generate_random_data(N_a, N_b, N_c, extent, n_a_filts, n_b_filts, a_astro_si
     np.save('{}/test_match_indices.npy'.format(b_cat), b_pair_indices)
 
 
-@pytest.mark.parametrize("use_memmap_files,x,y",
-                         [(True, 131, 0),
-                          (False, 131, 0),
-                          (False, 0, 0)])
-def test_naive_bayes_match(use_memmap_files, x, y):
+@pytest.mark.parametrize("x,y", [(131, 0), (0, 0)])
+def test_naive_bayes_match(x, y):
     # Generate a small number of sources randomly, then run through the
     # cross-match process.
     N_a, N_b, N_c = 40, 50, 35
@@ -138,7 +135,7 @@ def test_naive_bayes_match(use_memmap_files, x, y):
     # Ensure output chunk directory exists
     os.makedirs(os.path.join(os.path.dirname(__file__), "data/chunk0"), exist_ok=True)
 
-    ol, nl = 'run_auf = no', 'run_auf = yes\n'
+    ol, nl = 'pos_corr_dist = 11', 'pos_corr_dist = {:.2f}\n'.format(r)
     f = open(os.path.join(os.path.dirname(__file__),
                           'data/crossmatch_params.txt')).readlines()
     idx = np.where([ol in line for line in f])[0][0]
@@ -150,11 +147,9 @@ def test_naive_bayes_match(use_memmap_files, x, y):
 
     new_ext = [extent[0] - r/3600 - 0.1/3600, extent[1] + r/3600 + 0.1/3600,
                extent[2] - r/3600 - 0.1/3600, extent[3] + r/3600 + 0.1/3600]
-    for ol, nl in zip(['run_group = no', 'pos_corr_dist = 11',
-                       'cross_match_extent = 131 138 -3 3', 'joint_folder_path = test_path',
+    for ol, nl in zip(['cross_match_extent = 131 138 -3 3', 'joint_folder_path = test_path',
                        'cf_region_points = 131 134 4 -1 1 3'],
-                      ['run_group = yes\n', 'pos_corr_dist = {:.2f}\n'.format(r),
-                       'cross_match_extent = {:.3f} {:.3f} {:.3f} {:.3f}\n'.format(*new_ext),
+                      ['cross_match_extent = {:.3f} {:.3f} {:.3f} {:.3f}\n'.format(*new_ext),
                        'joint_folder_path = new_test_path\n',
                        'cf_region_points = {}\n'.format(new_region_points)]):
         f = open(os.path.join(os.path.dirname(__file__),
@@ -183,7 +178,7 @@ def test_naive_bayes_match(use_memmap_files, x, y):
         _replace_line(os.path.join(os.path.dirname(__file__), 'data/chunk0/{}_.txt'.format(cat)),
                       idx, nl)
 
-    cm = CrossMatch(os.path.join(os.path.dirname(__file__), 'data'), use_memmap_files)
+    cm = CrossMatch(os.path.join(os.path.dirname(__file__), 'data'))
     cm()
 
     ac = np.load('{}/pairing/ac.npy'.format(cm.joint_folder_path))
