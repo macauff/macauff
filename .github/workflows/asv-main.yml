@@ -6,10 +6,15 @@ name: Run benchmarks for main
 on:
   push:
     branches: [ main ]
+  workflow_dispatch:
 
 env:
   PYTHON_VERSION: "3.10"
   WORKING_DIR: ${{ github.workspace }}/benchmarks
+
+concurrency:
+   group: ${{ github.workflow }}-${{ github.ref }}
+   cancel-in-progress: true
 
 jobs:
   setup-python:
@@ -70,3 +75,12 @@ jobs:
           branch: benchmarks
           folder: ${{ env.WORKING_DIR }}/_results
           target-folder: _results
+      - name: Generate dashboard HTML
+        run: |
+          asv show
+          asv publish
+      - name: Deploy to Github pages
+        uses: JamesIves/github-pages-deploy-action@v4
+        with:
+          branch: gh-pages
+          folder: ${{ env.WORKING_DIR }}/_html
