@@ -16,7 +16,7 @@ import scipy.special
 __all__ = ['set_list']
 
 
-def set_list(aindices, bindices, aoverlap, boverlap, joint_folder_path, n_pool, use_memmap_files):
+def set_list(aindices, bindices, aoverlap, boverlap, joint_folder_path, n_pool):
     '''
     Creates the inter-catalogue groupings between catalogues "a" and "b", based
     on previously determined individual source "overlaps" in astrometry.
@@ -39,10 +39,6 @@ def set_list(aindices, bindices, aoverlap, boverlap, joint_folder_path, n_pool, 
         index and overlap arrays are stored.
     n_pool : integer
         Number of multiprocessing pools to use when parallelising.
-    use_memmap_files : boolean
-        When set to True, memory mapped files are used for several internal
-        arrays. Reduces memory consumption at the cost of increased I/O
-        contention.
 
     Returns
     -------
@@ -59,19 +55,11 @@ def set_list(aindices, bindices, aoverlap, boverlap, joint_folder_path, n_pool, 
         The number of catalogue "b" sources in each island grouping.
     '''
     agroup, bgroup = _initial_group_numbering(aindices, bindices, aoverlap, boverlap,
-                                              joint_folder_path, use_memmap_files)
+                                              joint_folder_path)
     groupmax = max(np.amax(agroup), np.amax(bgroup))
 
-    if use_memmap_files:
-        agrouplengths = np.lib.format.open_memmap('{}/group/agrplen.npy'.format(joint_folder_path),
-                                                mode='w+', dtype=int, shape=(groupmax,))
-        agrouplengths[:] = 0
-        bgrouplengths = np.lib.format.open_memmap('{}/group/bgrplen.npy'.format(joint_folder_path),
-                                                mode='w+', dtype=int, shape=(groupmax,))
-        bgrouplengths[:] = 0
-    else:
-        agrouplengths = np.zeros(dtype=int, shape=(groupmax,))
-        bgrouplengths = np.zeros(dtype=int, shape=(groupmax,))
+    agrouplengths = np.zeros(dtype=int, shape=(groupmax,))
+    bgrouplengths = np.zeros(dtype=int, shape=(groupmax,))
 
     for i in range(0, len(agroup)):
         agrouplengths[agroup[i]-1] += 1
@@ -93,11 +81,7 @@ def set_list(aindices, bindices, aoverlap, boverlap, joint_folder_path, n_pool, 
     # islands with more than 20 objects in both catalogues within
     # _calc_group_length_exceeded.
     maxiters = 5000000
-    if use_memmap_files:
-        grouplengthexceeded = np.lib.format.open_memmap('{}/group/grplenexceed.npy'.format(
-            joint_folder_path), mode='w+', dtype=bool, shape=(len(agrouplengths),))
-    else:
-        grouplengthexceeded = np.zeros(dtype=bool, shape=(len(agrouplengths),))
+    grouplengthexceeded = np.zeros(dtype=bool, shape=(len(agrouplengths),))
     pool = multiprocessing.Pool(n_pool)
     counter = np.arange(0, len(agrouplengths))
     iter_group = zip(counter, agrouplengths, bgrouplengths, itertools.repeat(maxiters))
@@ -129,24 +113,12 @@ def set_list(aindices, bindices, aoverlap, boverlap, joint_folder_path, n_pool, 
 
     # Keep track of which sources have "good" group sizes, and the size of each
     # group in the two catalogues (e.g., group 1 has 2 "a" and 3 "b" sources).
-    if use_memmap_files:
-        goodlength = np.lib.format.open_memmap('{}/group/goodlen.npy'.format(
-            joint_folder_path), mode='w+', dtype=bool, shape=(len(agrouplengths),))
-    else:
-        goodlength = np.zeros(dtype=bool, shape=(len(agrouplengths),))
+    goodlength = np.zeros(dtype=bool, shape=(len(agrouplengths),))
     di = max(1, len(agrouplengths) // 20)
     for i in range(0, len(agrouplengths), di):
         goodlength[i:i+di] = np.logical_not(grouplengthexceeded[i:i+di])
-    if use_memmap_files:
-        acounters = np.lib.format.open_memmap('{}/group/acount.npy'.format(joint_folder_path),
-                                            mode='w+', dtype=int, shape=(groupmax,))
-        acounters[:] = 0
-        bcounters = np.lib.format.open_memmap('{}/group/bcount.npy'.format(joint_folder_path),
-                                            mode='w+', dtype=int, shape=(groupmax,))
-        bcounters[:] = 0
-    else:
-        acounters = np.zeros(dtype=int, shape=(groupmax,))
-        bcounters = np.zeros(dtype=int, shape=(groupmax,))
+    acounters = np.zeros(dtype=int, shape=(groupmax,))
+    bcounters = np.zeros(dtype=int, shape=(groupmax,))
     # open_memmap requires tuples of ints and np.amax doesn't play nicely with
     # memmapped arrays, making (memmap(result)) variables, so we force the
     # number to a simple int here.
@@ -155,16 +127,8 @@ def set_list(aindices, bindices, aoverlap, boverlap, joint_folder_path, n_pool, 
         if np.sum(goodlength[i:i+di]) > 0:
             amaxlen = max(amaxlen, int(np.amax(agrouplengths[i:i+di][goodlength[i:i+di]])))
             bmaxlen = max(bmaxlen, int(np.amax(bgrouplengths[i:i+di][goodlength[i:i+di]])))
-    if use_memmap_files:
-        alist = np.lib.format.open_memmap('{}/group/alist.npy'.format(joint_folder_path), mode='w+',
-                                        dtype=int, shape=(amaxlen, groupmax), fortran_order=True)
-        alist[:, :] = -1
-        blist = np.lib.format.open_memmap('{}/group/blist.npy'.format(joint_folder_path), mode='w+',
-                                        dtype=int, shape=(bmaxlen, groupmax), fortran_order=True)
-        blist[:, :] = -1
-    else:
-        alist = np.full(dtype=int, shape=(amaxlen, groupmax), fill_value=-1, order='F')
-        blist = np.full(dtype=int, shape=(bmaxlen, groupmax), fill_value=-1, order='F')
+    alist = np.full(dtype=int, shape=(amaxlen, groupmax), fill_value=-1, order='F')
+    blist = np.full(dtype=int, shape=(bmaxlen, groupmax), fill_value=-1, order='F')
     # Remember that we started groups from one, so convert to zero-indexing.
     # Loop over each source in turn, skipping any which belong to an island
     # too large to run, updating alist or blist with the corresponding island
@@ -187,25 +151,16 @@ def set_list(aindices, bindices, aoverlap, boverlap, joint_folder_path, n_pool, 
 
     di = max(1, newsecondlen // 20)
 
-    # If not storing arrays on the file system, we need a way to keep track of a/blist and
+    # Not storing arrays on the file system, we need a way to keep track of a/blist and
     # a/bgrouplengths. Use a dictionary.
-    if not use_memmap_files:
-        setdict = {}
+    setdict = {}
 
     # Essentially do a = a[q], or a = a[:, q], but via memmap.
     for cat_kind, list_array, maxlen, len_array in zip(
             ['a', 'b'], [alist, blist], [amaxlen, bmaxlen], [agrouplengths, bgrouplengths]):
 
-        if use_memmap_files:
-            new_list_array = np.lib.format.open_memmap(
-                '{}/group/{}list2.npy'.format(joint_folder_path, cat_kind), mode='w+', dtype=int,
-                shape=(maxlen, newsecondlen), fortran_order=True)
-            new_grouplengths = np.lib.format.open_memmap(
-                '{}/group/{}grplen2.npy'.format(joint_folder_path, cat_kind), mode='w+', dtype=int,
-                shape=(newsecondlen,))
-        else:
-            new_list_array = np.zeros(dtype=int, shape=(maxlen, newsecondlen), order='F')
-            new_grouplengths = np.zeros(dtype=int, shape=(newsecondlen,), order='F')
+        new_list_array = np.zeros(dtype=int, shape=(maxlen, newsecondlen), order='F')
+        new_grouplengths = np.zeros(dtype=int, shape=(newsecondlen,), order='F')
 
         tick = 0
         for i in range(0, len(len_array), di):
@@ -215,34 +170,18 @@ def set_list(aindices, bindices, aoverlap, boverlap, joint_folder_path, n_pool, 
                 goodlength[i:i+di]]
             tick += np.sum(goodlength[i:i+di])
 
-        if use_memmap_files:
-            os.system('mv {}/group/{}list2.npy {}/group/{}list.npy'.format(
-                joint_folder_path, cat_kind, joint_folder_path, cat_kind))
-            os.system('mv {}/group/{}grplen2.npy {}/group/{}grplen.npy'.format(
-                joint_folder_path, cat_kind, joint_folder_path, cat_kind))
-        else:
-            setdict["{}list".format(cat_kind)] = new_list_array
-            setdict["{}grouplengths".format(cat_kind)] = new_grouplengths
+        setdict["{}list".format(cat_kind)] = new_list_array
+        setdict["{}grouplengths".format(cat_kind)] = new_grouplengths
 
-    if use_memmap_files:
-        # Tidy up temporary memmap arrays.
-        for name in ['agroup', 'bgroup', 'grplenexceed', 'goodlen', 'acount', 'bcount']:
-            os.remove('{}/group/{}.npy'.format(joint_folder_path, name))
-
-        alist = np.load('{}/group/alist.npy'.format(joint_folder_path), mmap_mode='r+')
-        blist = np.load('{}/group/blist.npy'.format(joint_folder_path), mmap_mode='r+')
-        agrouplengths = np.load('{}/group/agrplen.npy'.format(joint_folder_path), mmap_mode='r+')
-        bgrouplengths = np.load('{}/group/bgrplen.npy'.format(joint_folder_path), mmap_mode='r+')
-    else:
-        alist = setdict["alist"]
-        blist = setdict["blist"]
-        agrouplengths = setdict["agrouplengths"]
-        bgrouplengths = setdict["bgrouplengths"]
+    alist = setdict["alist"]
+    blist = setdict["blist"]
+    agrouplengths = setdict["agrouplengths"]
+    bgrouplengths = setdict["bgrouplengths"]
 
     return alist, blist, agrouplengths, bgrouplengths
 
 
-def _initial_group_numbering(aindices, bindices, aoverlap, boverlap, joint_folder_path, use_memmap_files):
+def _initial_group_numbering(aindices, bindices, aoverlap, boverlap, joint_folder_path):
     '''
     Iterates over the indices mapping overlaps between the two catalogues,
     assigning initial group numbers to sources to be placed in "islands".
@@ -267,10 +206,6 @@ def _initial_group_numbering(aindices, bindices, aoverlap, boverlap, joint_folde
     joint_folder_path : string
         Location of top-level folder containing the "group" folder in which
         index and overlap arrays are stored.
-    use_memmap_files : boolean
-        When set to True, memory mapped files are used for several internal
-        arrays. Reduces memory consumption at the cost of increased I/O
-        contention.
 
     Returns
     -------
@@ -279,16 +214,8 @@ def _initial_group_numbering(aindices, bindices, aoverlap, boverlap, joint_folde
     bgroup : numpy.ndarray
         Array detailing the group number of each catalogue "b" source.
     '''
-    if use_memmap_files:
-        agroup = np.lib.format.open_memmap('{}/group/agroup.npy'.format(joint_folder_path), mode='w+',
-                                        dtype=int, shape=(len(aoverlap),))
-        bgroup = np.lib.format.open_memmap('{}/group/bgroup.npy'.format(joint_folder_path), mode='w+',
-                                        dtype=int, shape=(len(boverlap),))
-        agroup[:] = 0
-        bgroup[:] = 0
-    else:
-        agroup = np.zeros(dtype=int, shape=(len(aoverlap),))
-        bgroup = np.zeros(dtype=int, shape=(len(boverlap),))
+    agroup = np.zeros(dtype=int, shape=(len(aoverlap),))
+    bgroup = np.zeros(dtype=int, shape=(len(boverlap),))
 
     group_num = 0
     # First search for catalogue "a" sources that are either lonely, with no
