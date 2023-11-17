@@ -26,11 +26,11 @@ def make_perturb_aufs(auf_folder, cat_folder, filters, auf_points, r, dr, rho,
                       tri_download_flag=False, delta_mag_cuts=None, psf_fwhms=None,
                       tri_set_name=None, tri_filt_num=None, tri_filt_names=None,
                       tri_maglim_faint=None, tri_num_faint=None, auf_region_frame=None,
-                      num_trials=None, j0s=None, d_mag=None, compute_local_density=None,
-                      density_radius=None, run_fw=None, run_psf=None, dd_params=None, l_cut=None,
-                      snr_mag_params=None, al_avs=None, fit_gal_flag=None, cmau_array=None,
-                      wavs=None, z_maxs=None, nzs=None, ab_offsets=None, filter_names=None,
-                      alpha0=None, alpha1=None, alpha_weight=None):
+                      num_trials=None, j0s=None, d_mag=None, density_radius=None, run_fw=None,
+                      run_psf=None, dd_params=None, l_cut=None, snr_mag_params=None, al_avs=None,
+                      fit_gal_flag=None, cmau_array=None, wavs=None, z_maxs=None, nzs=None,
+                      ab_offsets=None, filter_names=None, alpha0=None, alpha1=None,
+                      alpha_weight=None):
     r"""
     Function to perform the creation of the blended object perturbation component
     of the AUF.
@@ -114,15 +114,10 @@ def make_perturb_aufs(auf_folder, cat_folder, filters, auf_points, r, dr, rho,
     d_mag : float, optional
         The resolution at which to create the TRILEGAL source density distribution.
         Must be provided if ``include_perturb_auf`` is ``True``.
-    compute_local_density : boolean, optional
-        Flag to indicate whether to calculate local source densities during
-        the cross-match process, or whether to use pre-calculated values. Must
-        be provided if ``include_perturb_auf`` is ``True``.
     density_radius : float, optional
         The astrometric distance, in degrees, within which to consider numbers
         of internal catalogue sources, from which to calculate local density.
-        Must be given if both ``include_perturb_auf`` and
-        ``compute_local_density`` are both ``True``.
+        Must be given if ``include_perturb_auf`` is ``True``.
     run_fw : bool, optional
         Flag indicating whether to run the "flux-weighted" version of the
         perturbation algorithm. Must be given if ``include_perturb_auf`` is
@@ -238,11 +233,8 @@ def make_perturb_aufs(auf_folder, cat_folder, filters, auf_points, r, dr, rho,
         raise ValueError("snr_mag_params must be given if include_perturb_auf is True.")
     if include_perturb_auf and al_avs is None:
         raise ValueError("al_avs must be given if include_perturb_auf is True.")
-    if include_perturb_auf and compute_local_density is None:
-        raise ValueError("compute_local_density must be given if include_perturb_auf is True.")
-    if include_perturb_auf and compute_local_density and density_radius is None:
-        raise ValueError("density_radius must be given if include_perturb_auf and "
-                         "compute_local_density are both True.")
+    if include_perturb_auf and density_radius is None:
+        raise ValueError("density_radius must be given if include_perturb_auf is True.")
 
     if include_perturb_auf and fit_gal_flag is None:
         raise ValueError("fit_gal_flag must not be None if include_perturb_auf is True.")
@@ -293,19 +285,16 @@ def make_perturb_aufs(auf_folder, cat_folder, filters, auf_points, r, dr, rho,
     # combination for future loading purposes.
     arraylengths = np.zeros(dtype=int, shape=(len(filters), len(auf_points)), order='f')
 
-    compute_local_density = True
-
     if include_perturb_auf:
         a_tot_photo = np.load('{}/con_cat_photo.npy'.format(cat_folder), mmap_mode='r')
         a_tot_astro = np.load('{}/con_cat_astro.npy'.format(cat_folder), mmap_mode='r')
-        if compute_local_density:
-            # Set up the temporary sky slice memmap arrays quickly, as they will
-            # be needed in calculate_local_density later.
-            memmap_slice_arrays = []
-            for _ in range(5):
-                memmap_slice_arrays.append(np.zeros(dtype=bool, shape=(len(a_tot_astro),)))
+        # Set up the temporary sky slice memmap arrays quickly, as they will
+        # be needed in calculate_local_density later.
+        memmap_slice_arrays = []
+        for _ in range(5):
+            memmap_slice_arrays.append(np.zeros(dtype=bool, shape=(len(a_tot_astro),)))
 
-    if compute_local_density and include_perturb_auf:
+    if include_perturb_auf:
         local_N = np.zeros(dtype=float, shape=(len(a_tot_astro), len(filters)))
 
     for i in range(len(auf_points)):
@@ -316,11 +305,10 @@ def make_perturb_aufs(auf_folder, cat_folder, filters, auf_points, r, dr, rho,
 
         if include_perturb_auf:
             sky_cut = _load_single_sky_slice(auf_folder, '', i, modelrefinds[2, :])
-            if compute_local_density:
-                # TODO: avoid np.arange by first iterating an np.sum(sky_cut)
-                # and pre-generating a memmapped sub-array, and looping over
-                # putting the correct indices into place.
-                med_index_slice = np.arange(0, len(local_N))[sky_cut]
+            # TODO: avoid np.arange by first iterating an np.sum(sky_cut)
+            # and pre-generating a memmapped sub-array, and looping over
+            # putting the correct indices into place.
+            med_index_slice = np.arange(0, len(local_N))[sky_cut]
             a_photo_cut = a_tot_photo[sky_cut]
             a_astro_cut = a_tot_astro[sky_cut]
 
@@ -396,21 +384,17 @@ def make_perturb_aufs(auf_folder, cat_folder, filters, auf_points, r, dr, rho,
                     magarray = np.array([[1]], float)
                     np.save('{}/mag.npy'.format(filt_folder), magarray)
                     continue
-                if compute_local_density:
-                    localN = calculate_local_density(
-                        a_astro_cut[good_mag_slice], a_tot_astro, a_tot_photo[:, j],
-                        auf_folder, cat_folder, density_radius, dens_mags[j],
-                        memmap_slice_arrays)
-                    # Because we always calculate the density from the full
-                    # catalogue, using just the astrometry, we should be able
-                    # to just over-write this N times if there happen to be N
-                    # good detections of a source.
-                    index_slice = med_index_slice[good_mag_slice]
-                    for ii in range(len(index_slice)):
-                        local_N[index_slice[ii], j] = localN[ii]
-                else:
-                    localN = np.load('{}/local_N.npy'.format(auf_folder),
-                                     mmap_mode='r')[sky_cut][good_mag_slice, j]
+                localN = calculate_local_density(
+                    a_astro_cut[good_mag_slice], a_tot_astro, a_tot_photo[:, j],
+                    auf_folder, cat_folder, density_radius, dens_mags[j],
+                    memmap_slice_arrays)
+                # Because we always calculate the density from the full
+                # catalogue, using just the astrometry, we should be able
+                # to just over-write this N times if there happen to be N
+                # good detections of a source.
+                index_slice = med_index_slice[good_mag_slice]
+                for ii in range(len(index_slice)):
+                    local_N[index_slice[ii], j] = localN[ii]
                 ax1_list = np.linspace(ax1_min, ax1_max, 7)
                 ax2_list = np.linspace(ax2_min, ax2_max, 7)
                 if fit_gal_flag:

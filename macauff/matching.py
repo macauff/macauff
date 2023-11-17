@@ -832,13 +832,7 @@ class CrossMatch():
         # However, calling AstrometricCorrections in its current form confuses
         # this, since it always uses the perturbation AUF component. We therefore
         # split out the items that are NOT required for AstrometricCorrections
-        # first.
-        if self.include_perturb_auf:
-            for check_flag in ['compute_local_density']:
-                if check_flag not in joint_config:
-                    raise ValueError("Missing key {} from joint metadata file.".format(check_flag))
-
-            self.compute_local_density = self._str2bool(joint_config['compute_local_density'])
+        # first, if there are any.
 
         self.a_correct_astrometry = self._str2bool(cat_a_config['correct_astrometry'])
         self.b_correct_astrometry = self._str2bool(cat_b_config['correct_astrometry'])
@@ -882,7 +876,7 @@ class CrossMatch():
                 [self.a_correct_astrometry, self.b_correct_astrometry],
                 [self.a_compute_snr_mag_relation, self.b_compute_snr_mag_relation],
                 [cat_a_config, cat_b_config], ['"a"', '"b"'], ['a_', 'b_']):
-            if (self.include_perturb_auf and self.compute_local_density) or correct_astro:
+            if self.include_perturb_auf or correct_astro:
                 for check_flag in ['dens_dist']:
                     if check_flag not in config:
                         raise ValueError("Missing key {} from catalogue {} metadata file."
@@ -1500,8 +1494,8 @@ class CrossMatch():
             _kwargs = {'psf_fwhms': self.a_psf_fwhms, 'tri_download_flag': self.a_download_tri,
                        'delta_mag_cuts': self.delta_mag_cuts, 'num_trials': self.num_trials,
                        'j0s': self.j0s, 'd_mag': self.d_mag,
+                       'density_radius': self.a_dens_dist,
                        'tri_filt_names': self.a_tri_filt_names,
-                       'compute_local_density': self.compute_local_density,
                        'run_fw': self.a_run_fw_auf, 'run_psf': self.a_run_psf_auf,
                        'snr_mag_params': self.a_snr_mag_params,
                        'tri_maglim_faint': self.a_tri_maglim_faint,
@@ -1534,8 +1528,6 @@ class CrossMatch():
                     os.system("rm -rf {}/*".format(ax_folder))
                     os.system('mv {}/../trilegal_auf_simulation_faint.dat {}'.format(
                               ax_folder, ax_folder))
-            if self.compute_local_density:
-                _kwargs = dict(_kwargs, **{'density_radius': self.a_dens_dist})
         else:
             os.system("rm -rf {}/*".format(self.a_auf_folder_path))
             _kwargs = {}
@@ -1554,8 +1546,8 @@ class CrossMatch():
             _kwargs = {'psf_fwhms': self.b_psf_fwhms, 'tri_download_flag': self.b_download_tri,
                        'delta_mag_cuts': self.delta_mag_cuts, 'num_trials': self.num_trials,
                        'j0s': self.j0s, 'd_mag': self.d_mag,
+                       'density_radius': self.b_dens_dist,
                        'tri_filt_names': self.b_tri_filt_names,
-                       'compute_local_density': self.compute_local_density,
                        'run_fw': self.b_run_fw_auf, 'run_psf': self.b_run_psf_auf,
                        'snr_mag_params': self.b_snr_mag_params,
                        'tri_maglim_faint': self.b_tri_maglim_faint,
@@ -1589,8 +1581,6 @@ class CrossMatch():
                     os.system("rm -rf {}/*".format(ax_folder))
                     os.system('mv {}/../trilegal_auf_simulation_faint.dat {}'.format(
                               ax_folder, ax_folder))
-            if self.compute_local_density:
-                _kwargs = dict(_kwargs, **{'density_radius': self.b_dens_dist})
         else:
             os.system("rm -rf {}/*".format(self.b_auf_folder_path))
             _kwargs = {}

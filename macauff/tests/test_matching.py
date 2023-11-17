@@ -468,20 +468,6 @@ class TestInputs:
                              os.path.join(os.path.dirname(__file__), 'data/cat_a_params.txt'),
                              os.path.join(os.path.dirname(__file__), 'data/cat_b_params.txt'))
         assert np.all(cm.a_psf_fwhms == np.array([0.12, 0.12, 0.12]))
-        assert not hasattr(cm, 'b_dens_dist')
-
-        f = open(os.path.join(os.path.dirname(__file__), 'data/crossmatch_params.txt')).readlines()
-        old_line = 'compute_local_density = no'
-        new_line = 'compute_local_density = yes\n'
-        idx = np.where([old_line in line for line in f])[0][0]
-        _replace_line(os.path.join(os.path.dirname(__file__),
-                      'data/crossmatch_params_.txt'), idx, new_line, out_file=os.path.join(
-                      os.path.dirname(__file__), 'data/crossmatch_params_2.txt'))
-        cm._initialise_chunk(os.path.join(os.path.dirname(__file__),
-                                          'data/crossmatch_params_2.txt'),
-                             os.path.join(os.path.dirname(__file__), 'data/cat_a_params.txt'),
-                             os.path.join(os.path.dirname(__file__), 'data/cat_b_params.txt'))
-        assert np.all(cm.a_psf_fwhms == np.array([0.12, 0.12, 0.12]))
         assert cm.b_dens_dist == 0.25
 
         # List of simple one line config file replacements for error message checking
@@ -496,14 +482,13 @@ class TestInputs:
                                   'data/{}.txt'.format(in_file))).readlines()
             idx = np.where([old_line in line for line in f])[0][0]
             _replace_line(os.path.join(os.path.dirname(__file__),
-                          'data/{}{}.txt'.format(in_file, '_2' if 'h_p' in in_file else '')), idx,
+                          'data/{}{}.txt'.format(in_file, '_' if 'h_p' in in_file else '')), idx,
                           new_line, out_file=os.path.join(os.path.dirname(__file__),
-                          'data/{}_{}.txt'.format(in_file, '3' if 'h_p' in in_file else '')))
-
+                          'data/{}_{}.txt'.format(in_file, '2' if 'h_p' in in_file else '')))
             with pytest.raises(ValueError, match=match_text):
                 cm._initialise_chunk(os.path.join(os.path.dirname(__file__),
                                      'data/crossmatch_params{}.txt'.format(
-                                     '_3' if 'h_p' in in_file else '_2')),
+                                     '_2' if 'h_p' in in_file else '_')),
                                      os.path.join(os.path.dirname(__file__),
                                      'data/cat_a_params{}.txt'
                                                   .format('_' if '_a_' in in_file else '')),
@@ -525,19 +510,15 @@ class TestInputs:
                              os.path.join(os.path.dirname(__file__), 'data/cat_a_params.txt'),
                              os.path.join(os.path.dirname(__file__), 'data/cat_b_params.txt'))
         assert cm.num_trials == 10000
-        assert not cm.compute_local_density
         assert cm.d_mag == 0.1
 
         for old_line, new_line, match_text in zip(
                 ['num_trials = 10000', 'num_trials = 10000', 'num_trials = 10000',
-                 'd_mag = 0.1', 'd_mag = 0.1', 'compute_local_density = no',
-                 'compute_local_density = no', 'compute_local_density = no'],
-                ['', 'num_trials = word\n', 'num_trials = 10000.1\n', '', 'd_mag = word\n', '',
-                 'compute_local_density = word\n', 'compute_local_density = 10\n'],
+                 'd_mag = 0.1', 'd_mag = 0.1'],
+                ['', 'num_trials = word\n', 'num_trials = 10000.1\n', '', 'd_mag = word\n'],
                 ['Missing key num_trials from joint', 'num_trials should be an integer',
                  'num_trials should be an integer', 'Missing key d_mag from joint',
-                 'd_mag must be a float', 'Missing key compute_local_density from joint',
-                 'Boolean flag key not set to allowed', 'Boolean flag key not set to allowed']):
+                 'd_mag must be a float']):
             # Make sure to keep the first edit of crossmatch_params, adding each
             # second change in turn.
             f = open(os.path.join(os.path.dirname(__file__),
