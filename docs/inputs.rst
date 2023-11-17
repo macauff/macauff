@@ -32,8 +32,6 @@ As well as the parameters required that are ingested through the input parameter
 
 - ``chunks_folder_path``: the directory in which the folders containing parameters files are stored
 
-- ``use_memmap_files``: a boolean flag indicating whether or not to save temporary, intermediate arrays to disk and load variables through memmapping. Should be used if the catalogue regions being matched are sufficiently large that they cannot be stored in memory at once. Alternatively, consider smaller chunks. Optional, defaulting to ``False``.
-
 - ``use_mpi``: boolean flag for whether to parallelise distribution of chunks using MPI. If ``False`` chunks will be run in serial; defaults to ``True``, but with a fallback for if the appropriate module is not available.
 
 If you do not want to (or cannot) use MPI to distribute larger cross-match runs, with numerous chunks that will take significant compute time to run, then the first two inputs, combined with with ``use_mpi=False``, are all you need to consider. However, if you wish to use MPI then the remaining keyword arguments control its use:
@@ -53,7 +51,7 @@ These parameters are only provided in the single, common-parameter input file, a
 
 There are some parameters that must be given in all runs:
 
-``joint_folder_path``, ``run_auf``, ``run_group``, ``run_cf``, ``run_source``, ``include_perturb_auf``, ``include_phot_like``, ``use_phot_priors``, ``cross_match_extent``, ``mem_chunk_num``, ``pos_corr_dist``, ``cf_region_type``, ``cf_region_frame``, ``cf_region_points``, ``real_hankel_points``, ``four_hankel_points``, ``four_max_rho``, ``int_fracs``, ``make_output_csv``, and ``n_pool``;
+``joint_folder_path``, ``include_perturb_auf``, ``include_phot_like``, ``use_phot_priors``, ``cross_match_extent``, ``mem_chunk_num``, ``pos_corr_dist``, ``cf_region_type``, ``cf_region_frame``, ``cf_region_points``, ``real_hankel_points``, ``four_hankel_points``, ``four_max_rho``, ``int_fracs``, ``make_output_csv``, and ``n_pool``;
 
 options which need to be supplied if ``make_output_csv`` is ``True``:
 
@@ -72,25 +70,6 @@ Common Parameter Description
 ``joint_folder_path``
 
 The top-level folder location, into which all intermediate files and folders are placed, when created during the cross-match process. This can either be an absolute file path, or relative to the folder from which your script that called `CrossMatch()` is based.
-
-.. note::
-    The four ``run_`` parameters below are called in order. If an earlier stage flag is set to ``True``, an error will be raised in a subsequent flag is set to ``False``.
-
-``run_auf``
-
-Flag to determine if the AUF simulation stage of the cross-match process should be run, or if previously generated files should be used when present.
-
-``run_group``
-
-Flag dictating whether the source grouping -- and island creation -- stage of the process is run, or if previously created islands of sources should be used for this match.
-
-``run_cf``
-
-Flag controlling whether or not to calculate the photometric likelihood information, as determined by ``include_phot_like`` and ``use_phot_priors``, for this cross-match.
-
-``run_source``
-
-Boolean determining whether to run the final stage of the cross-match process, in which posterior probabilities of matches and non-matches for each island of sources are calculated.
 
 ``include_perturb_auf``
 

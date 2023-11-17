@@ -59,12 +59,6 @@ crossmatch_params.txt::
     # Check for whether we want to generate the csv file at the end of the run.
     make_output_csv = no
 
-    # Flags for each stage of the match process - must be "yes"/"no", "true"/"false", "t"/"f", or "1"/"0"
-    run_auf = yes
-    run_group = yes
-    run_cf = yes
-    run_source = yes
-
     # c/f region definition for photometric likelihood - either "rectangle" for NxM evenly spaced grid points, or "points" to define a list of two-point tuple coordinates, separated by a comma
     cf_region_type = rectangle
     # Frame of the coordinates must be specified -- either "equatorial" or "galactic"
