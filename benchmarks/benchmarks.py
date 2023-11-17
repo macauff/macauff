@@ -26,4 +26,4 @@ def time_computation():
 
 def peakmem_list():
     """Memory computations are prefixed with 'mem' or 'peakmem'."""
-    test_calculate_contamination_probabilities
+    test_calculate_contamination_probabilities()
