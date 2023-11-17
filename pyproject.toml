@@ -1,6 +1,5 @@
 [project]
 name = "macauff"
-version = "0.1.2"
 license = {file = "LICENSE"}
 readme = "README.md"
 authors = [
@@ -14,6 +13,7 @@ classifiers = [
     "Programming Language :: Python",
 ]
 requires-python = ">=3.8"
+dynamic = ["version"]
 dependencies = [
     "astropy",
     "matplotlib",
@@ -68,3 +68,10 @@ skip = [
     "*musl*",  # we don't support MUSL Linux
     "pp*",  # we don't support PyPy
 ]
+
+[tool.scikit-build]
+metadata.version.provider = "scikit_build_core.metadata.setuptools_scm"
+sdist.include = ["src/macauff/_version.py"]
+
+[tool.setuptools_scm]
+write_to = "src/macauff/_version.py"
