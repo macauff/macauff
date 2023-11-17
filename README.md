@@ -7,7 +7,7 @@ macauff, the python package for Matching Across Catalogues using the Astrometric
 
 ## Installation
 
-For installation instructions, check the [documentation](https://onoddil.github.io/macauff/).
+For installation instructions, check the [documentation](https://macauff.readthedocs.io/en/latest/).
 
 ## Citations
 
