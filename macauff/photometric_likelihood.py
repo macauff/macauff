@@ -164,10 +164,8 @@ def compute_photometric_likelihoods(joint_folder_path, a_cat_folder_path, b_cat_
                 # opposing view slices into the other catalogue, for each
                 # catalogue. Note that the lengths are swapped in the two calls,
                 # as the a_inds map into length of catalogue "b" and vice versa.
-                a_inds_map, a_inds_cut_unique = map_large_index_to_small_index(
-                    a_inds_cut, len_b, '{}/phot_like'.format(joint_folder_path))
-                b_inds_map, b_inds_cut_unique = map_large_index_to_small_index(
-                    b_inds_cut, len_a, '{}/phot_like'.format(joint_folder_path))
+                a_inds_map, a_inds_cut_unique = map_large_index_to_small_index(a_inds_cut, len_b)
+                b_inds_map, b_inds_cut_unique = map_large_index_to_small_index(b_inds_cut, len_a)
 
                 # Combined with b_inds_map, this subarray of the catalogue gives
                 # an array that has every "a" source that overlaps the "b"

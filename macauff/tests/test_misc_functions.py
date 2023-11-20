@@ -97,7 +97,7 @@ def test_hav_dist_constant_lat():
 
 def test_large_small_index():
     inds = np.array([0, 10, 15, 10, 35])
-    a, b = map_large_index_to_small_index(inds, 40, '.')
+    a, b = map_large_index_to_small_index(inds, 40)
     assert np.all(a == np.array([0, 1, 2, 1, 3]))
     assert np.all(b == np.array([0, 10, 15, 35]))
 

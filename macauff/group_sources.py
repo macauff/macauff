@@ -273,8 +273,8 @@ def make_island_groupings(joint_folder_path, a_cat_folder_path, b_cat_folder_pat
     print("Cleaning overlaps...")
     sys.stdout.flush()
 
-    ainds, asize = _clean_overlaps(ainds, asize, joint_folder_path, 'ainds', n_pool)
-    binds, bsize = _clean_overlaps(binds, bsize, joint_folder_path, 'binds', n_pool)
+    ainds, asize = _clean_overlaps(ainds, asize, n_pool)
+    binds, bsize = _clean_overlaps(binds, bsize, n_pool)
 
     print("Calculating integral lengths...")
     sys.stdout.flush()
@@ -294,8 +294,7 @@ def make_island_groupings(joint_folder_path, a_cat_folder_path, b_cat_folder_pat
             a_size_small = asize[lowind:highind]
             a_inds_small = np.asfortranarray(a_inds_small[:np.amax(a_size_small), :])
 
-            a_inds_map, a_inds_unique = map_large_index_to_small_index(
-                a_inds_small, len(b_full), '{}/group'.format(joint_folder_path))
+            a_inds_map, a_inds_unique = map_large_index_to_small_index(a_inds_small, len(b_full))
 
             b = b_full[a_inds_unique, 2]
 
@@ -322,8 +321,7 @@ def make_island_groupings(joint_folder_path, a_cat_folder_path, b_cat_folder_pat
             b_size_small = bsize[lowind:highind]
             b_inds_small = np.asfortranarray(b_inds_small[:np.amax(b_size_small), :])
 
-            b_inds_map, b_inds_unique = map_large_index_to_small_index(
-                b_inds_small, len(a_full), '{}/group'.format(joint_folder_path))
+            b_inds_map, b_inds_unique = map_large_index_to_small_index(b_inds_small, len(a_full))
 
             a = a_full[b_inds_unique, 2]
 
@@ -563,7 +561,7 @@ def _load_fourier_grid_cutouts(a, sky_rect_coords, joint_folder_path, cat_folder
     return a_cutout, fouriergrid, modrefindsmall, sky_cut
 
 
-def _clean_overlaps(inds, size, joint_folder_path, filename, n_pool):
+def _clean_overlaps(inds, size, n_pool):
     '''
     Convenience function to parse either catalogue's indices array for
     duplicate references to the opposing array on a per-source basis,
@@ -577,11 +575,6 @@ def _clean_overlaps(inds, size, joint_folder_path, filename, n_pool):
     size : numpy.ndarray
         Array containing the number of overlaps between this catalogue and the
         opposing catalogue prior to duplication removal.
-    joint_folder_path : string
-        The top-level folder containing the "group" folder into which the
-        index arrays are saved.
-    filename : string
-        The name of the ``inds`` array saved to disk.
     n_pool : integer
         Number of multiprocessing threads to use.
 

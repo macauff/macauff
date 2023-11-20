@@ -251,12 +251,8 @@ class TestOverlap():
 
 
 def test_clean_overlaps():
-    joint_folder_path, filename = '.', 'list'
-    os.makedirs('group', exist_ok=True)
     maxsize, size = 5, np.array([3, 5, 3, 4, 4, 5, 4, 2, 5, 4]*3)
-    inds = np.lib.format.open_memmap('{}/group/{}.npy'.format(joint_folder_path, filename),
-                                     mode='w+', dtype=int, shape=(maxsize, len(size)),
-                                     fortran_order=True)
+    inds = np.empty(dtype=int, shape=(maxsize, len(size)), order='F')
     for i in range(0, 3):
         inds[:, 0+10*i] = [0, 1, 0, -1, -1]
         inds[:, 1+10*i] = [3, 4, 1, 1, 4]
@@ -269,7 +265,7 @@ def test_clean_overlaps():
         inds[:, 8+10*i] = [2, 2, 2, 2, 2]
         inds[:, 9+10*i] = [1, 1, 2, 3, -1]
 
-    inds2, size2 = _clean_overlaps(inds, size, joint_folder_path, filename, 2)
+    inds2, size2 = _clean_overlaps(inds, size, 2)
     compare_inds2 = np.empty((4, 30), int)
     for i in range(0, 3):
         compare_inds2[:, 0+10*i] = [0, 1, -1, -1]
@@ -298,8 +294,7 @@ class TestMakeIslandGroupings():
         for folder in [self.a_cat_folder_path, self.b_cat_folder_path, self.joint_folder_path,
                        self.a_auf_folder_path, self.b_auf_folder_path]:
             os.makedirs(folder, exist_ok=True)
-        for folder in ['group', 'reject']:
-            os.makedirs('{}/{}'.format(self.joint_folder_path, folder), exist_ok=True)
+        os.makedirs('{}/reject'.format(self.joint_folder_path), exist_ok=True)
         self.r = np.linspace(0, self.max_sep, 10000)
         self.dr = np.diff(self.r)
         self.rho = np.linspace(0, 100, 9900)
@@ -446,7 +441,6 @@ class TestMakeIslandGroupings():
                                                    *np.arange(N_c, N_b), 0]))).reshape(1, -1)
 
     def test_make_island_groupings(self):
-        os.system('rm -rf {}/group/*'.format(self.joint_folder_path))
         os.system('rm -rf {}/reject/*'.format(self.joint_folder_path))
         N_a, N_b, N_c = self.N_a, self.N_b, self.N_com
         np.save('{}/con_cat_astro.npy'.format(self.a_cat_folder_path), self.a_coords)
@@ -464,7 +458,6 @@ class TestMakeIslandGroupings():
         assert len(os.listdir('{}/reject'.format(self.joint_folder_path))) == 0
 
     def test_mig_extra_reject(self):
-        os.system('rm -rf {}/group/*'.format(self.joint_folder_path))
         os.system('rm -rf {}/reject/*'.format(self.joint_folder_path))
         N_a, N_b, N_c = self.N_a, self.N_b, self.N_com
         ax_lims = self.ax_lims
@@ -521,7 +514,6 @@ class TestMakeIslandGroupings():
         assert len(os.listdir('{}/reject'.format(self.joint_folder_path))) == 2
 
     def test_mig_no_reject_ax_lims(self):
-        os.system('rm -rf {}/group/*'.format(self.joint_folder_path))
         os.system('rm -rf {}/reject/*'.format(self.joint_folder_path))
         N_a, N_b, N_c = self.N_a, self.N_b, self.N_com
         ax_lims = np.array([0, 360, -90, -88])
@@ -562,7 +554,6 @@ class TestMakeIslandGroupings():
         assert len(os.listdir('{}/reject'.format(self.joint_folder_path))) == 2
 
     def test_make_island_groupings_include_phot_like(self):
-        os.system('rm -rf {}/group/*'.format(self.joint_folder_path))
         os.system('rm -rf {}/reject/*'.format(self.joint_folder_path))
         np.save('{}/con_cat_astro.npy'.format(self.a_cat_folder_path), self.a_coords)
         np.save('{}/con_cat_astro.npy'.format(self.b_cat_folder_path), self.b_coords)

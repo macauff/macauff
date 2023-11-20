@@ -132,8 +132,7 @@ class TestCounterpartPairing:
             fb_priors=self.fb_priors, fb_array=self.fb_array)
 
         os.system('rm -r {}'.format(self.joint_folder_path))
-        for f in ['pairing', 'phot_like', 'group']:
-            os.makedirs('{}/{}'.format(self.joint_folder_path, f), exist_ok=True)
+        os.makedirs('{}/pairing'.format(self.joint_folder_path), exist_ok=True)
         for f in [self.a_cat_folder_path, self.b_cat_folder_path,
                   self.a_auf_folder_path, self.b_auf_folder_path]:
             os.makedirs(f, exist_ok=True)

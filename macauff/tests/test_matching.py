@@ -433,7 +433,6 @@ class TestInputs:
                              os.path.join(os.path.dirname(__file__), 'data/cat_a_params.txt'),
                              os.path.join(os.path.dirname(__file__), 'data/cat_b_params.txt'))
         assert cm.b_cat_name == 'WISE'
-        assert os.path.exists('{}/test_path/WISE'.format(os.getcwd()))
 
         f = open(os.path.join(os.path.dirname(__file__), 'data/cat_a_params.txt')).readlines()
         old_line = 'cat_name = Gaia'

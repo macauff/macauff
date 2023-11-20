@@ -144,7 +144,7 @@ def hav_dist_constant_lat(x_lon, x_lat, lon):
     return dist
 
 
-def map_large_index_to_small_index(inds, length, folder):
+def map_large_index_to_small_index(inds, length):
     inds_unique_flat = np.unique(inds[inds > -1])
     map_array = np.zeros(dtype=int, shape=(length,))
     map_array[:] = -1

@@ -32,7 +32,6 @@ class TestOneSidedPhotometricLikelihood:
         self.mem_chunk_num = 2
         self.include_phot_like, self.use_phot_priors = False, False
 
-        os.makedirs('{}/phot_like'.format(self.joint_folder_path), exist_ok=True)
         os.makedirs(self.a_cat_folder_path, exist_ok=True)
         os.makedirs(self.b_cat_folder_path, exist_ok=True)
 
@@ -82,7 +81,6 @@ class TestOneSidedPhotometricLikelihood:
                       idx, new_line)
 
     def test_compute_photometric_likelihoods(self):
-        os.system('rm -r {}/phot_like/*'.format(self.joint_folder_path))
         Na, Nb, area = self.Na, self.Nb, self.area
         for folder, name in zip([self.a_cat_folder_path, self.b_cat_folder_path], ['a', 'b']):
             np.save('{}/con_cat_astro.npy'.format(folder), getattr(self, '{}_astro'.format(name)))
@@ -127,7 +125,6 @@ class TestOneSidedPhotometricLikelihood:
                     assert np.all(hist >= 250)
 
     def test_empty_filter(self):
-        os.system('rm -r {}/phot_like/*'.format(self.joint_folder_path))
         # This test simply removes all "good" flags from a single pointing-filter
         # combination, to check the robustness of empty bin derivations.
         a = np.copy(self.b_photo)
@@ -160,7 +157,6 @@ class TestOneSidedPhotometricLikelihood:
         assert_allclose(c_array, c_check, atol=1e-30)
 
     def test_small_number_bins(self):
-        os.system('rm -r {}/phot_like/*'.format(self.joint_folder_path))
         # This test checks if there are <N sources in a single pointing-filter
         # combination, then everything is simply lumped into one big bin.
         a = np.copy(self.b_photo)
@@ -196,7 +192,6 @@ class TestOneSidedPhotometricLikelihood:
         assert_allclose(c_array, c_check, atol=1e-30)
 
     def test_calculate_phot_like_input(self):
-        os.system('rm -r {}/phot_like/*'.format(self.joint_folder_path))
         # Here we also have to dump a random "magref" file to placate the
         # checks on CrossMatch.
         for folder, name in zip([self.a_cat_folder_path, self.b_cat_folder_path], ['a', 'b']):
@@ -367,7 +362,6 @@ class TestFullPhotometricLikelihood:
         self.mem_chunk_num = 2
         self.include_phot_like, self.use_phot_priors = True, True
 
-        os.makedirs('{}/phot_like'.format(self.joint_folder_path), exist_ok=True)
         os.makedirs(self.a_cat_folder_path, exist_ok=True)
         os.makedirs(self.b_cat_folder_path, exist_ok=True)
 
@@ -410,7 +404,6 @@ class TestFullPhotometricLikelihood:
         self.a_photo = ap
         self.b_photo = bp
 
-        os.system('rm -r {}/group/*'.format(self.joint_folder_path))
         # Have to pre-create the various overlap arrays, and integral lengths:
         asize = np.ones(self.Ntot, int)
         asize[~a_cut] = 0
@@ -442,7 +435,6 @@ class TestFullPhotometricLikelihood:
                                             bblen=bblen, bflen=bflen, binds=binds, bsize=bsize)
 
     def test_phot_like_prior_frac_inclusion(self):
-        os.system('rm -r {}/phot_like/*'.format(self.joint_folder_path))
         for ipl, upp in zip([False, True, True], [True, False, True]):
             for bf, ff in zip([None, 0.5, None], [0.5, None, None]):
                 msg = 'bright_frac' if bf is None else 'field_frac'
@@ -454,7 +446,6 @@ class TestFullPhotometricLikelihood:
                         bright_frac=bf, field_frac=ff)
 
     def test_compute_phot_like(self):
-        os.system('rm -r {}/phot_like/*'.format(self.joint_folder_path))
         for folder, name in zip([self.a_cat_folder_path, self.b_cat_folder_path], ['a', 'b']):
             np.save('{}/con_cat_astro.npy'.format(folder), getattr(self, '{}_astro'.format(name)))
             np.save('{}/con_cat_photo.npy'.format(folder), getattr(self, '{}_photo'.format(name)))
@@ -507,7 +498,6 @@ class TestFullPhotometricLikelihood:
         assert_allclose(c_l, fake_c_l, rtol=0.1, atol=0.05)
 
     def test_compute_phot_like_use_priors_only(self):
-        os.system('rm -r {}/phot_like/*'.format(self.joint_folder_path))
         for folder, name in zip([self.a_cat_folder_path, self.b_cat_folder_path], ['a', 'b']):
             np.save('{}/con_cat_astro.npy'.format(folder), getattr(self, '{}_astro'.format(name)))
             np.save('{}/con_cat_photo.npy'.format(folder), getattr(self, '{}_photo'.format(name)))

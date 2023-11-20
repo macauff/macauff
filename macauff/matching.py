@@ -286,7 +286,7 @@ class CrossMatch():
             self.b_snr_mag_params = a
 
         # Ensure that we can create the folders for outputs.
-        for path in ['group', 'reject', 'phot_like', 'pairing']:
+        for path in ['reject', 'pairing']:
             try:
                 os.makedirs('{}/{}'.format(self.joint_folder_path, path), exist_ok=True)
             except OSError:
@@ -339,13 +339,6 @@ class CrossMatch():
                 if fn_m.shape[0] != fn_a.shape[0] or fn_p.shape[0] != fn_a.shape[0]:
                     raise ValueError("Consolidated catalogue arrays for catalogue {} should "
                                      "all be consistent lengths.".format(catname))
-
-        for folder in [self.a_cat_name, self.b_cat_name]:
-            try:
-                os.makedirs('{}/{}'.format(self.joint_folder_path, folder), exist_ok=True)
-            except OSError:
-                raise OSError("Error when trying to create temporary folder for catalogue-level "
-                              "outputs. Please ensure that catalogue folder names are correct.")
 
         self.make_shared_data()
 
@@ -1609,7 +1602,6 @@ class CrossMatch():
         sys.stdout.flush()
         if self.j1s is None:
             self.j1s = gsf.calc_j1s(self.rho[:-1]+self.drho/2, self.r[:-1]+self.dr/2)
-        os.system('rm -rf {}/group/*'.format(self.joint_folder_path))
         os.system('rm -rf {}/reject/*'.format(self.joint_folder_path))
         self.group_sources_data = \
             group_func(self.joint_folder_path, self.a_cat_folder_path, self.b_cat_folder_path,
@@ -1639,7 +1631,6 @@ class CrossMatch():
         print('{} Rank {}, chunk {}: Creating photometric priors and likelihoods...'
               .format(t, self.rank, self.chunk_id))
         sys.stdout.flush()
-        os.system('rm -r {}/phot_like/*'.format(self.joint_folder_path))
         self._calculate_cf_areas()
         if self.use_phot_priors or self.include_phot_like:
             bright_frac = self.int_fracs[0]
