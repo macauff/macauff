@@ -9,8 +9,7 @@ import scipy.special
 
 from ..misc_functions import (create_auf_params_grid, load_small_ref_auf_grid,
                               hav_dist_constant_lat, map_large_index_to_small_index,
-                              _load_rectangular_slice, _load_single_sky_slice,
-                              _create_rectangular_slice_arrays, min_max_lon)
+                              _load_rectangular_slice, _load_single_sky_slice, min_max_lon)
 from ..misc_functions_fortran import misc_functions_fortran as mff
 
 
@@ -109,13 +108,7 @@ def test_load_rectangular_slice():
         if x < 0:
             a[a[:, 0] < 0, 0] = a[a[:, 0] < 0, 0] + 360
         lon1, lon2, lat1, lat2 = x+0.2, x+0.4, x+0.1, x+0.3
-        _create_rectangular_slice_arrays('.', '', len(a))
-        memmap_arrays = []
-        for n in ['1', '2', '3', '4', 'combined']:
-            memmap_arrays.append(np.lib.format.open_memmap('{}/{}_temporary_sky_slice_{}.npy'
-                                 .format('.', '', n), mode='r+', dtype=bool, shape=(len(a),)))
-        sky_cut = _load_rectangular_slice('.', '', a, lon1, lon2, lat1, lat2,
-                                          padding, memmap_arrays)
+        sky_cut = _load_rectangular_slice('.', '', a, lon1, lon2, lat1, lat2, padding)
         for i in range(len(a)):
             within_range = np.empty(4, bool)
             if x > 0:

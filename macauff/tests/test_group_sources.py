@@ -11,7 +11,7 @@ from scipy.special import j1
 from ..matching import CrossMatch
 from ..group_sources import make_island_groupings, _load_fourier_grid_cutouts, _clean_overlaps
 from ..group_sources_fortran import group_sources_fortran as gsf
-from ..misc_functions import _create_rectangular_slice_arrays, create_auf_params_grid
+from ..misc_functions import create_auf_params_grid
 from .test_matching import _replace_line
 
 
@@ -50,15 +50,9 @@ def test_load_fourier_grid_cutouts():
     rect = np.array([40, 60, 40, 60])
 
     padding = 0.1
-    _create_rectangular_slice_arrays('.', 'check', len(a))
-    memmap_arrays = []
-    for n in ['1', '2', '3', '4', 'combined']:
-        memmap_arrays.append(np.lib.format.open_memmap('{}/{}_temporary_sky_slice_{}.npy'.format(
-                             '.', 'check', n), mode='r+', dtype=bool, shape=(len(a),)))
     p_a_o = {'fourier_grid': grid}
     _a, _b, _c, _ = _load_fourier_grid_cutouts(a, rect, '.', '.', p_a_o, padding, 'check',
-                                               memmap_arrays, np.array([True]*lena),
-                                               modelrefinds=m)
+                                               np.array([True]*lena), modelrefinds=m)
     assert np.all(_a.shape == (4, 3))
     assert np.all(_a ==
                   np.array([[50, 50, 0.1], [48, 60.02, 0.5], [39.98, 43, 0.2], [45, 45, 0.2]]))
@@ -81,8 +75,7 @@ def test_load_fourier_grid_cutouts():
     # reference index. Hence we only have one unique grid reference now.
     padding = 0
     _a, _b, _c, _ = _load_fourier_grid_cutouts(a, rect, '.', '.', p_a_o, padding, 'check',
-                                               memmap_arrays, np.array([True]*lena),
-                                               modelrefinds=m)
+                                               np.array([True]*lena), modelrefinds=m)
     assert np.all(_a.shape == (2, 3))
     assert np.all(_a == np.array([[50, 50, 0.1], [45, 45, 0.2]]))
     assert np.all(_b.shape == (100, 1, 1, 1))

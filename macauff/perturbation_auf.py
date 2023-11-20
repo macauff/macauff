@@ -288,11 +288,6 @@ def make_perturb_aufs(auf_folder, cat_folder, filters, auf_points, r, dr, rho,
     if include_perturb_auf:
         a_tot_photo = np.load('{}/con_cat_photo.npy'.format(cat_folder), mmap_mode='r')
         a_tot_astro = np.load('{}/con_cat_astro.npy'.format(cat_folder), mmap_mode='r')
-        # Set up the temporary sky slice memmap arrays quickly, as they will
-        # be needed in calculate_local_density later.
-        memmap_slice_arrays = []
-        for _ in range(5):
-            memmap_slice_arrays.append(np.zeros(dtype=bool, shape=(len(a_tot_astro),)))
 
     if include_perturb_auf:
         local_N = np.zeros(dtype=float, shape=(len(a_tot_astro), len(filters)))
@@ -383,8 +378,7 @@ def make_perturb_aufs(auf_folder, cat_folder, filters, auf_points, r, dr, rho,
                     continue
                 localN = calculate_local_density(
                     a_astro_cut[good_mag_slice], a_tot_astro, a_tot_photo[:, j],
-                    auf_folder, cat_folder, density_radius, dens_mags[j],
-                    memmap_slice_arrays)
+                    auf_folder, cat_folder, density_radius, dens_mags[j])
                 # Because we always calculate the density from the full
                 # catalogue, using just the astrometry, we should be able
                 # to just over-write this N times if there happen to be N
@@ -670,7 +664,7 @@ def download_trilegal_simulation(tri_folder, tri_filter_set, ax1, ax2, mag_num, 
 
 
 def calculate_local_density(a_astro, a_tot_astro, a_tot_photo, auf_folder, cat_folder,
-                            density_radius, density_mag, memmap_slice_arrays):
+                            density_radius, density_mag):
     '''
     Calculates the number of sources above a given brightness within a specified
     radius of each source in a catalogue, to provide a local density for
@@ -697,9 +691,6 @@ def calculate_local_density(a_astro, a_tot_astro, a_tot_photo, auf_folder, cat_f
     density_mag : float
         The brightness, in magnitudes, above which to count sources for density
         purposes.
-    memmap_slice_arrays : list of numpy.ndarray
-        List of the memmap sky slice arrays, to be used in the loading of the
-        rectangular sky patch.
 
     Returns
     -------
@@ -711,23 +702,14 @@ def calculate_local_density(a_astro, a_tot_astro, a_tot_photo, auf_folder, cat_f
     min_lon, max_lon = min_max_lon(a_astro[:, 0])
     min_lat, max_lat = np.amin(a_astro[:, 1]), np.amax(a_astro[:, 1])
 
-    memmap_slice_arrays_2 = []
-    for _ in range(5):
-        memmap_slice_arrays_2.append(np.zeros(dtype=bool, shape=(len(a_astro),)))
-
     overlap_sky_cut = _load_rectangular_slice(auf_folder, '', a_tot_astro, min_lon,
-                                              max_lon, min_lat, max_lat, density_radius,
-                                              memmap_slice_arrays)
+                                              max_lon, min_lat, max_lat, density_radius)
     cut = np.zeros(dtype=bool, shape=(len(a_tot_astro),))
     di = max(1, len(cut) // 20)
     for i in range(0, len(a_tot_astro), di):
         cut[i:i+di] = overlap_sky_cut[i:i+di] & (a_tot_photo[i:i+di] <= density_mag)
     a_astro_overlap_cut = a_tot_astro[cut]
     a_photo_overlap_cut = a_tot_photo[cut]
-
-    memmap_slice_arrays_3 = []
-    for _ in range(5):
-        memmap_slice_arrays_3.append(np.zeros(dtype=bool, shape=(len(a_astro_overlap_cut),)))
 
     ax1_loops = np.linspace(min_lon, max_lon, 11)
     # Force the sub-division of the sky area in question to be 100 chunks, or
@@ -743,15 +725,14 @@ def calculate_local_density(a_astro, a_tot_astro, a_tot_photo, auf_folder, cat_f
     for ax1_start, ax1_end in zip(ax1_loops[:-1], ax1_loops[1:]):
         for ax2_start, ax2_end in zip(ax2_loops[:-1], ax2_loops[1:]):
             small_sky_cut = _load_rectangular_slice(auf_folder, 'small_', a_astro, ax1_start,
-                                                    ax1_end, ax2_start, ax2_end, 0,
-                                                    memmap_slice_arrays_2)
+                                                    ax1_end, ax2_start, ax2_end, 0)
             a_astro_small = a_astro[small_sky_cut]
             if len(a_astro_small) == 0:
                 continue
 
             overlap_sky_cut = _load_rectangular_slice(auf_folder, '', a_astro_overlap_cut,
                                                       ax1_start, ax1_end, ax2_start, ax2_end,
-                                                      density_radius, memmap_slice_arrays_3)
+                                                      density_radius)
             cut = np.zeros(dtype=bool, shape=(len(a_astro_overlap_cut),))
             di = max(1, len(cut) // 20)
             for i in range(0, len(a_astro_overlap_cut), di):

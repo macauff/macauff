@@ -9,7 +9,7 @@ import numpy as np
 from numpy.lib.format import open_memmap
 import pandas as pd
 
-from .misc_functions import _load_rectangular_slice, _create_rectangular_slice_arrays
+from .misc_functions import _load_rectangular_slice
 from .misc_functions_fortran import misc_functions_fortran as mff
 
 __all__ = ['csv_to_npy', 'rect_slice_npy', 'npy_to_csv', 'rect_slice_csv']
@@ -462,20 +462,14 @@ def rect_slice_csv(input_folder, output_folder, input_filename, output_filename,
         small_astro[n:n+chunk.shape[0]] = chunk.values
         n += chunk.shape[0]
 
-    _create_rectangular_slice_arrays(input_folder, '', n_rows)
-    memmap_arrays = []
-    for n in ['1', '2', '3', '4', 'combined']:
-        memmap_arrays.append(np.lib.format.open_memmap('{}/{}_temporary_sky_slice_{}.npy'.format(
-                             input_folder, '', n), mode='r+', dtype=bool, shape=(n_rows,)))
-    _load_rectangular_slice(input_folder, '', small_astro, rect_coords[0], rect_coords[1],
-                            rect_coords[2], rect_coords[3], padding, memmap_arrays)
+    sky_cut = _load_rectangular_slice(input_folder, '', small_astro, rect_coords[0], rect_coords[1],
+                                      rect_coords[2], rect_coords[3], padding)
 
     n_inside_rows = 0
-    combined_memmap = memmap_arrays[4]
     for cnum in range(0, mem_chunk_num):
         lowind = np.floor(n_rows*cnum/mem_chunk_num).astype(int)
         highind = np.floor(n_rows*(cnum+1)/mem_chunk_num).astype(int)
-        n_inside_rows += np.sum(combined_memmap[lowind:highind])
+        n_inside_rows += np.sum(sky_cut[lowind:highind])
     df_orig = pd.read_csv('{}/{}'.format(input_folder, input_filename), nrows=1,
                           header=None if not header else 0)
     df = pd.DataFrame(columns=df_orig.columns, index=np.arange(0, n_inside_rows))
@@ -485,17 +479,15 @@ def rect_slice_csv(input_folder, output_folder, input_filename, output_filename,
     chunksize = 100000
     for chunk in pd.read_csv('{}/{}'.format(input_folder, input_filename), chunksize=chunksize,
                              header=None if not header else 0):
-        inside_n = np.sum(combined_memmap[outer_counter:outer_counter+chunksize])
+        inside_n = np.sum(sky_cut[outer_counter:outer_counter+chunksize])
         df.iloc[counter:counter+inside_n] = chunk.values[
-            combined_memmap[outer_counter:outer_counter+chunksize]]
+            sky_cut[outer_counter:outer_counter+chunksize]]
         counter += inside_n
         outer_counter += chunksize
 
     df.to_csv('{}/{}'.format(output_folder, output_filename), encoding='utf-8', index=False,
               header=False)
 
-    for n in ['1', '2', '3', '4', 'combined']:
-        os.remove('{}/{}_temporary_sky_slice_{}.npy'.format(input_folder, '', n))
     os.remove('{}/temp_astro.npy'.format(input_folder))
 
     return
@@ -534,20 +526,14 @@ def rect_slice_npy(input_folder, output_folder, rect_coords, padding, mem_chunk_
     photo = np.load('{}/con_cat_photo.npy'.format(input_folder), mmap_mode='r')
     best_index = np.load('{}/magref.npy'.format(input_folder), mmap_mode='r')
     n_rows = len(astro)
-    _create_rectangular_slice_arrays(input_folder, '', n_rows)
-    memmap_arrays = []
-    for n in ['1', '2', '3', '4', 'combined']:
-        memmap_arrays.append(np.lib.format.open_memmap('{}/{}_temporary_sky_slice_{}.npy'.format(
-                             input_folder, '', n), mode='r+', dtype=bool, shape=(n_rows,)))
-    _load_rectangular_slice(input_folder, '', astro, rect_coords[0], rect_coords[1],
-                            rect_coords[2], rect_coords[3], padding, memmap_arrays)
+    sky_cut = _load_rectangular_slice(input_folder, '', astro, rect_coords[0], rect_coords[1],
+                                      rect_coords[2], rect_coords[3], padding)
 
     n_inside_rows = 0
-    combined_memmap = memmap_arrays[4]
     for cnum in range(0, mem_chunk_num):
         lowind = np.floor(n_rows*cnum/mem_chunk_num).astype(int)
         highind = np.floor(n_rows*(cnum+1)/mem_chunk_num).astype(int)
-        n_inside_rows += np.sum(combined_memmap[lowind:highind])
+        n_inside_rows += np.sum(sky_cut[lowind:highind])
 
     small_astro = open_memmap('{}/con_cat_astro.npy'.format(output_folder), mode='w+', dtype=float,
                               shape=(n_inside_rows, 3))
@@ -562,18 +548,15 @@ def rect_slice_npy(input_folder, output_folder, rect_coords, padding, mem_chunk_
     for cnum in range(0, mem_chunk_num):
         lowind = np.floor(n_rows*cnum/mem_chunk_num).astype(int)
         highind = np.floor(n_rows*(cnum+1)/mem_chunk_num).astype(int)
-        inside_n = np.sum(combined_memmap[lowind:highind])
+        inside_n = np.sum(sky_cut[lowind:highind])
         small_astro[counter:counter+inside_n] = astro[lowind:highind][
-            combined_memmap[lowind:highind]]
+            sky_cut[lowind:highind]]
         small_photo[counter:counter+inside_n] = photo[lowind:highind][
-            combined_memmap[lowind:highind]]
+            sky_cut[lowind:highind]]
         small_best_index[counter:counter+inside_n] = best_index[lowind:highind][
-            combined_memmap[lowind:highind]]
+            sky_cut[lowind:highind]]
         # Always assume that a cutout is a single "visit" with no chunk "halo".
         small_chunk_overlap[counter:counter:inside_n] = False
         counter += inside_n
-
-    for n in ['1', '2', '3', '4', 'combined']:
-        os.remove('{}/{}_temporary_sky_slice_{}.npy'.format(input_folder, '', n))
 
     return
