@@ -3,7 +3,6 @@
 Tests for the "group_sources" module.
 '''
 
-import pytest
 import os
 from numpy.testing import assert_allclose
 import numpy as np

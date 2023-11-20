@@ -3,7 +3,6 @@
 Tests for the "misc_functions" module.
 '''
 
-import os
 import numpy as np
 from numpy.testing import assert_allclose
 import scipy.special
