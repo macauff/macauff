@@ -297,6 +297,8 @@ def make_perturb_aufs(auf_folder, cat_folder, filters, auf_points, r, dr, rho,
     if include_perturb_auf:
         local_N = np.zeros(dtype=float, shape=(len(a_tot_astro), len(filters)))
 
+    perturb_auf_outputs = {}
+
     for i in range(len(auf_points)):
         ax1, ax2 = auf_points[i]
         ax_folder = '{}/{}/{}'.format(auf_folder, ax1, ax2)
@@ -343,9 +345,6 @@ def make_perturb_aufs(auf_folder, cat_folder, filters, auf_points, r, dr, rho,
             # TODO: un-hardcode min_bright_tri_number
             min_bright_tri_number = 1000
             min_area = max(min_bright_tri_number / data_bright_dens)
-            print(include_perturb_auf, len(a_astro_cut) > 0, tri_download_flag,
-                  os.path.isfile('{}/trilegal_auf_simulation_faint.dat'.format(ax_folder)),
-                  ax_folder)
             # Hard-coding the AV=1 trick to allow for using av_grid later.
             download_trilegal_simulation(ax_folder, tri_set_name, ax1, ax2, tri_filt_num,
                                          auf_region_frame, tri_maglim_faint, min_area,
@@ -353,11 +352,7 @@ def make_perturb_aufs(auf_folder, cat_folder, filters, auf_points, r, dr, rho,
             os.system('mv {}/trilegal_auf_simulation.dat {}/trilegal_auf_simulation_faint.dat'
                       .format(ax_folder, ax_folder))
         for j in range(len(filters)):
-            filt = filters[j]
-
-            filt_folder = '{}/{}'.format(ax_folder, filt)
-            if not os.path.exists(filt_folder):
-                os.makedirs(filt_folder, exist_ok=True)
+            perturb_auf_combo = '{}-{}-{}'.format(ax1, ax2, filters[j])
 
             if include_perturb_auf:
                 good_mag_slice = ~np.isnan(a_photo_cut[:, j])
@@ -369,20 +364,22 @@ def make_perturb_aufs(auf_folder, cat_folder, filters, auf_points, r, dr, rho,
                     # See below, in include_perturb_auf is False, for meanings.
                     num_N_mag = 1
                     Frac = np.zeros((1, num_N_mag), float, order='F')
-                    np.save('{}/frac.npy'.format(filt_folder), Frac)
                     Flux = np.zeros(num_N_mag, float, order='F')
-                    np.save('{}/flux.npy'.format(filt_folder), Flux)
                     offset = np.zeros((len(r)-1, num_N_mag), float, order='F')
                     offset[0, :] = 1 / (2 * np.pi * (r[0] + dr[0]/2) * dr[0])
-                    np.save('{}/offset.npy'.format(filt_folder), offset)
                     cumulative = np.ones((len(r)-1, num_N_mag), float, order='F')
-                    np.save('{}/cumulative.npy'.format(filt_folder), cumulative)
                     fourieroffset = np.ones((len(rho)-1, num_N_mag), float, order='F')
-                    np.save('{}/fourier.npy'.format(filt_folder), fourieroffset)
                     Narray = np.array([[1]], float)
-                    np.save('{}/N.npy'.format(filt_folder), Narray)
                     magarray = np.array([[1]], float)
-                    np.save('{}/mag.npy'.format(filt_folder), magarray)
+                    # Make a second dictionary with the single pointing-filter
+                    # combination in it.
+                    single_perturb_auf_output = {}
+                    for name, entry in zip(
+                            ['frac', 'flux', 'offset', 'cumulative', 'fourier', 'Narray',
+                             'magarray'], [Frac, Flux, offset, cumulative, fourieroffset, Narray,
+                                           magarray]):
+                        single_perturb_auf_output[name] = entry
+                    perturb_auf_outputs[perturb_auf_combo] = single_perturb_auf_output
                     continue
                 localN = calculate_local_density(
                     a_astro_cut[good_mag_slice], a_tot_astro, a_tot_photo[:, j],
@@ -398,7 +395,7 @@ def make_perturb_aufs(auf_folder, cat_folder, filters, auf_points, r, dr, rho,
                 ax1_list = np.linspace(ax1_min, ax1_max, 7)
                 ax2_list = np.linspace(ax2_min, ax2_max, 7)
                 if fit_gal_flag:
-                    Narray = create_single_perturb_auf(
+                    single_perturb_auf_output = create_single_perturb_auf(
                         ax_folder, auf_points[i], filters[j], r, dr, rho, drho, j0s, num_trials,
                         psf_fwhms[j], tri_filt_names[j], dens_mags[j], a_photo, localN, d_mag,
                         delta_mag_cuts, dd_params, l_cut, run_fw, run_psf, snr_mag_params[j],
@@ -406,11 +403,12 @@ def make_perturb_aufs(auf_folder, cat_folder, filters, auf_points, r, dr, rho,
                         wavs[j], z_maxs[j], nzs[j], alpha0, alpha1, alpha_weight, ab_offsets[j],
                         filter_names[j])
                 else:
-                    Narray = create_single_perturb_auf(
+                    single_perturb_auf_output = create_single_perturb_auf(
                         ax_folder, auf_points[i], filters[j], r, dr, rho, drho, j0s, num_trials,
                         psf_fwhms[j], tri_filt_names[j], dens_mags[j], a_photo, localN, d_mag,
                         delta_mag_cuts, dd_params, l_cut, run_fw, run_psf, snr_mag_params[j],
                         al_avs[j], auf_region_frame, ax1_list, ax2_list, fit_gal_flag)
+                perturb_auf_outputs[perturb_auf_combo] = single_perturb_auf_output
             else:
                 # Without the simulations to force local normalising density N or
                 # individual source brightness magnitudes, we can simply combine
@@ -423,9 +421,7 @@ def make_perturb_aufs(auf_folder, cat_folder, filters, auf_points, r, dr, rho,
                 # subroutines to create the perturbation simulations, so we make
                 # f-ordered dummy parameters.
                 Frac = np.zeros((1, num_N_mag), float, order='F')
-                np.save('{}/frac.npy'.format(filt_folder), Frac)
                 Flux = np.zeros(num_N_mag, float, order='F')
-                np.save('{}/flux.npy'.format(filt_folder), Flux)
                 # Remember that r is bins, so the evaluations at bin middle are one
                 # shorter in length.
                 offset = np.zeros((len(r)-1, num_N_mag), float, order='F')
@@ -433,23 +429,24 @@ def make_perturb_aufs(auf_folder, cat_folder, filters, auf_points, r, dr, rho,
                 # a delta function, such that a two-dimensional circular coordinate
                 # integral would evaluate to one at every point, cf. ``cumulative``.
                 offset[0, :] = 1 / (2 * np.pi * (r[0] + dr[0]/2) * dr[0])
-                np.save('{}/offset.npy'.format(filt_folder), offset)
                 # The cumulative integral of a delta function is always unity.
                 cumulative = np.ones((len(r)-1, num_N_mag), float, order='F')
-                np.save('{}/cumulative.npy'.format(filt_folder), cumulative)
                 # The Hankel transform of a delta function is a flat line; this
                 # then preserves the convolution being multiplication in fourier
                 # space, as F(x) x 1 = F(x), similar to how f(x) * d(0) = f(x).
                 fourieroffset = np.ones((len(rho)-1, num_N_mag), float, order='F')
-                np.save('{}/fourier.npy'.format(filt_folder), fourieroffset)
                 # Both normalising density and magnitude arrays can be proxied
                 # with a dummy parameter, as any minimisation of N-m distance
                 # must pick the single value anyway.
                 Narray = np.array([[1]], float)
-                np.save('{}/N.npy'.format(filt_folder), Narray)
                 magarray = np.array([[1]], float)
-                np.save('{}/mag.npy'.format(filt_folder), magarray)
-            arraylengths[j, i] = len(Narray)
+                single_perturb_auf_output = {}
+                for name, entry in zip(
+                        ['frac', 'flux', 'offset', 'cumulative', 'fourier', 'Narray', 'magarray'],
+                        [Frac, Flux, offset, cumulative, fourieroffset, Narray, magarray]):
+                    single_perturb_auf_output[name] = entry
+                perturb_auf_outputs[perturb_auf_combo] = single_perturb_auf_output
+            arraylengths[j, i] = len(perturb_auf_outputs[perturb_auf_combo]['Narray'])
 
     if include_perturb_auf:
         longestNm = np.amax(arraylengths)
@@ -462,14 +459,12 @@ def make_perturb_aufs(auf_folder, cat_folder, filters, auf_points, r, dr, rho,
 
         for i in range(len(auf_points)):
             ax1, ax2 = auf_points[i]
-            ax_folder = '{}/{}/{}'.format(auf_folder, ax1, ax2)
             for j in range(len(filters)):
                 if arraylengths[j, i] == 0:
                     continue
-                filt = filters[j]
-                filt_folder = '{}/{}'.format(ax_folder, filt)
-                Narray = np.load('{}/N.npy'.format(filt_folder))
-                magarray = np.load('{}/mag.npy'.format(filt_folder))
+                perturb_auf_combo = '{}-{}-{}'.format(ax1, ax2, filters[j])
+                Narray = perturb_auf_outputs[perturb_auf_combo]['Narray']
+                magarray = perturb_auf_outputs[perturb_auf_combo]['magarray']
                 Narrays[:arraylengths[j, i], j, i] = Narray
                 magarrays[:arraylengths[j, i], j, i] = magarray
 
@@ -516,16 +511,19 @@ def make_perturb_aufs(auf_folder, cat_folder, filters, auf_points, r, dr, rho,
         n_fracs = len(delta_mag_cuts)
     # Create the 4-D grids that house the perturbation AUF fourier-space
     # representation.
-    create_auf_params_grid(auf_folder, auf_points, filters, 'fourier', arraylengths, len(rho)-1)
+    perturb_auf_outputs['fourier_grid'] = create_auf_params_grid(
+        perturb_auf_outputs, auf_points, filters, 'fourier', arraylengths, len(rho)-1)
     # Create the estimated levels of flux contamination and fraction of
     # contaminated source grids.
-    create_auf_params_grid(auf_folder, auf_points, filters, 'frac', arraylengths, n_fracs)
-    create_auf_params_grid(auf_folder, auf_points, filters, 'flux', arraylengths)
+    perturb_auf_outputs['frac_grid'] = create_auf_params_grid(
+        perturb_auf_outputs, auf_points, filters, 'frac', arraylengths, n_fracs)
+    perturb_auf_outputs['flux_grid'] = create_auf_params_grid(
+        perturb_auf_outputs, auf_points, filters, 'flux', arraylengths)
 
     if include_perturb_auf:
         del Narrays, magarrays
 
-    return modelrefinds
+    return modelrefinds, perturb_auf_outputs
 
 
 def download_trilegal_simulation(tri_folder, tri_filter_set, ax1, ax2, mag_num, region_frame,
@@ -1052,15 +1050,13 @@ def create_single_perturb_auf(tri_folder, auf_point, filt, r, dr, rho, drho, j0s
         cumulative = cumulative_psf
         fourieroffset = fourieroffset_psf
 
-    np.save('{}/{}/frac.npy'.format(tri_folder, filt), Frac)
-    np.save('{}/{}/flux.npy'.format(tri_folder, filt), Flux)
-    np.save('{}/{}/offset.npy'.format(tri_folder, filt), offset)
-    np.save('{}/{}/cumulative.npy'.format(tri_folder, filt), cumulative)
-    np.save('{}/{}/fourier.npy'.format(tri_folder, filt), fourieroffset)
-    np.save('{}/{}/N.npy'.format(tri_folder, filt), count_array)
-    np.save('{}/{}/mag.npy'.format(tri_folder, filt), mag_array)
+    single_perturb_auf_output = {}
+    for name, entry in zip(
+            ['frac', 'flux', 'offset', 'cumulative', 'fourier', 'Narray', 'magarray'],
+            [Frac, Flux, offset, cumulative, fourieroffset, count_array, mag_array]):
+        single_perturb_auf_output[name] = entry
 
-    return count_array
+    return single_perturb_auf_output
 
 
 def make_tri_counts(trifolder, trifilename, trifiltname, dm, brightest_source_mag,

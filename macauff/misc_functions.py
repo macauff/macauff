@@ -16,7 +16,7 @@ class StageData:
         self.__dict__.update(kwargs)
 
 
-def create_auf_params_grid(auf_folder_path, auf_pointings, filt_names, array_name,
+def create_auf_params_grid(perturb_auf_outputs, auf_pointings, filt_names, array_name,
                            arraylengths, len_first_axis=None):
     '''
     Minor function to offload the creation of a 3-D or 4-D array from a series
@@ -24,8 +24,8 @@ def create_auf_params_grid(auf_folder_path, auf_pointings, filt_names, array_nam
 
     Parameters
     ----------
-    auf_folder_path : string
-        Location of the top-level folder in which all fourier grids are saved.
+    perturb_auf_outputs : dictionary
+        Dictionary of outputs from series of pointing-filter AUF simulations.
     auf_pointings : numpy.ndarray
         Two-dimensional array with the sky coordinates of each pointing used
         in the perturbation AUF component creation.
@@ -40,33 +40,33 @@ def create_auf_params_grid(auf_folder_path, auf_pointings, filt_names, array_nam
     len_first_axis : integer, optional
         Length of the initial axis of the 4-D array. If not provided or is
         ``None``, final array is assumed to be 3-D instead.
+
+    Returns
+    -------
+    grid : numpy.ndarray
+        The populated grid of ``array_name`` individual 1-D arrays.
     '''
     longestNm = np.amax(arraylengths)
     if len_first_axis is None:
-        grid = np.lib.format.open_memmap('{}/{}_grid.npy'.format(
-            auf_folder_path, array_name), mode='w+', dtype=float, shape=(
-            longestNm, len(filt_names), len(auf_pointings)), fortran_order=True)
-        grid[:, :, :] = -1
+        grid = np.full(fill_value=-1, dtype=float, order='F',
+                       shape=(longestNm, len(filt_names), len(auf_pointings)))
     else:
-        grid = np.lib.format.open_memmap('{}/{}_grid.npy'.format(
-            auf_folder_path, array_name), mode='w+', dtype=float, shape=(
-            len_first_axis, longestNm, len(filt_names), len(auf_pointings)), fortran_order=True)
-        grid[:, :, :, :] = -1
+        grid = np.full(fill_value=-1, dtype=float, order='F',
+                       shape=(len_first_axis, longestNm, len(filt_names), len(auf_pointings)))
     for j in range(0, len(auf_pointings)):
         ax1, ax2 = auf_pointings[j]
         for i in range(0, len(filt_names)):
-            filt = filt_names[i]
-            single_array = np.load('{}/{}/{}/{}/{}.npy'.format(auf_folder_path,
-                                   ax1, ax2, filt, array_name))
+            perturb_auf_combo = '{}-{}-{}'.format(ax1, ax2, filt_names[i])
+            single_array = perturb_auf_outputs[perturb_auf_combo][array_name]
             if len_first_axis is None:
                 grid[:arraylengths[i, j], i, j] = single_array
             else:
                 grid[:, :arraylengths[i, j], i, j] = single_array
 
-    del longestNm, grid
+    return grid
 
 
-def load_small_ref_auf_grid(modrefind, auf_folder_path, file_name_prefixes):
+def load_small_ref_auf_grid(modrefind, perturb_auf_outputs, file_name_prefixes):
     '''
     Function to create reference index arrays out of larger arrays, based on
     the mappings from the original reference index array into a larger grid,
@@ -78,8 +78,8 @@ def load_small_ref_auf_grid(modrefind, auf_folder_path, file_name_prefixes):
     modrefind : numpy.ndarray
         The reference index array that maps into saved array ``fourier_grid``
         for each source in the given catalogue.
-    auf_folder_path : string
-        Location of the folder in which ``fourier_grid`` is stored.
+    perturb_auf_outputs : dictionary
+        Saved results from the cross-matches' extra AUF component simulations.
     file_name_prefixes : list
         Prefixes of the files stored in ``auf_folder_path`` -- the parts before
         "_grid" -- to be loaded as sub-arrays and returned.
@@ -102,12 +102,12 @@ def load_small_ref_auf_grid(modrefind, auf_folder_path, file_name_prefixes):
 
     small_grids = []
     for name in file_name_prefixes:
-        if len(np.load('{}/{}_grid.npy'.format(auf_folder_path, name), mmap_mode='r').shape) == 4:
-            small_grids.append(np.asfortranarray(np.load('{}/{}_grid.npy'.format(
-                auf_folder_path, name), mmap_mode='r')[:, x, y, z]))
+        if len(perturb_auf_outputs['{}_grid'.format(name)].shape) == 4:
+            small_grids.append(np.asfortranarray(
+                perturb_auf_outputs['{}_grid'.format(name)][:, x, y, z]))
         else:
-            small_grids.append(np.asfortranarray(np.load('{}/{}_grid.npy'.format(
-                auf_folder_path, name), mmap_mode='r')[x, y, z]))
+            small_grids.append(np.asfortranarray(
+                perturb_auf_outputs['{}_grid'.format(name)][x, y, z]))
     modrefindsmall = np.empty((3, modrefind.shape[1]), int, order='F')
     del modrefind
     modrefindsmall[0, :] = nmnewind

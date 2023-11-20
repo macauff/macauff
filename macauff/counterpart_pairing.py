@@ -14,10 +14,10 @@ from .counterpart_pairing_fortran import counterpart_pairing_fortran as cpf
 __all__ = ['source_pairing']
 
 
-def source_pairing(joint_folder_path, a_cat_folder_path, b_cat_folder_path, a_auf_folder_path,
-                   b_auf_folder_path, a_filt_names, b_filt_names, a_auf_pointings, b_auf_pointings,
-                   a_modelrefinds, b_modelrefinds, rho, drho, n_fracs, mem_chunk_num,
-                   group_sources_data, phot_like_data):
+def source_pairing(joint_folder_path, a_cat_folder_path, b_cat_folder_path, a_filt_names,
+                   b_filt_names, a_auf_pointings, b_auf_pointings, a_modelrefinds, b_modelrefinds,
+                   rho, drho, n_fracs, mem_chunk_num, group_sources_data, phot_like_data,
+                   a_perturb_auf_outputs, b_perturb_auf_outputs):
     '''
     Function to iterate over all grouped islands of sources, calculating the
     probabilities of all permutations of matches and deriving the most likely
@@ -31,11 +31,6 @@ def source_pairing(joint_folder_path, a_cat_folder_path, b_cat_folder_path, a_au
         Folder in which the "a" catalogue input catalogues are stored.
     b_cat_folder_path : string
         Folder where catalogue "b" files are located.
-    a_auf_folder_path : string
-        Folder where catalogue "a" perturbation AUF component files were saved
-        previously.
-    b_auf_folder_path : string
-        Folder containing catalogue "b" perturbation AUF component files.
     a_filt_names : numpy.ndarray or list of strings
         Array or list containing names of the filters used in catalogue "a".
     b_filt_names : numpy.ndarray or list of strings
@@ -69,6 +64,12 @@ def source_pairing(joint_folder_path, a_cat_folder_path, b_cat_folder_path, a_au
     phot_like_data : class.StageData
         Object containing all outputs from ``compute_photometric_likelihoods``
         TODO Improve description
+    a_perturb_auf_outputs : dictionary
+        Dict containing the results from the previous step of the cross-match,
+        the simulations of the perturbation component of catalogue a's AUF.
+    b_perturb_auf_outputs : dictionary
+        Dict containing the results from the previous step of the cross-match,
+        the simulations of the perturbation component of catalogue b's AUF.
     '''
     print("Creating catalogue matches...")
     sys.stdout.flush()
@@ -189,9 +190,9 @@ def source_pairing(joint_folder_path, a_cat_folder_path, b_cat_folder_path, a_au
         bmodrefind = b_modelrefinds[:, blistunique_flat]
 
         [afourier_grids, afrac_grids, aflux_grids], amodrefind = load_small_ref_auf_grid(
-            amodrefind, a_auf_folder_path, ['fourier', 'frac', 'flux'])
+            amodrefind, a_perturb_auf_outputs, ['fourier', 'frac', 'flux'])
         [bfourier_grids, bfrac_grids, bflux_grids], bmodrefind = load_small_ref_auf_grid(
-            bmodrefind, b_auf_folder_path, ['fourier', 'frac', 'flux'])
+            bmodrefind, b_perturb_auf_outputs, ['fourier', 'frac', 'flux'])
 
 
         # Similar to crpts_max_len, mini_crpts_len is the maximum number of

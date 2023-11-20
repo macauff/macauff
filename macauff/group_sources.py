@@ -21,10 +21,10 @@ __all__ = ['make_island_groupings']
 
 
 def make_island_groupings(joint_folder_path, a_cat_folder_path, b_cat_folder_path,
-                          a_auf_folder_path, b_auf_folder_path, a_auf_pointings, b_auf_pointings,
-                          a_filt_names, b_filt_names, a_title, b_title, a_modelrefinds, b_modelrefinds,
-                          r, dr, rho, drho, j1s, max_sep, ax_lims, int_fracs, mem_chunk_num,
-                          include_phot_like, use_phot_priors, n_pool):
+                          a_auf_pointings, b_auf_pointings, a_filt_names, b_filt_names, a_title,
+                          b_title, a_modelrefinds, b_modelrefinds, r, dr, rho, drho, j1s, max_sep,
+                          ax_lims, int_fracs, mem_chunk_num, include_phot_like, use_phot_priors,
+                          n_pool, a_perturb_auf_outputs, b_perturb_auf_outputs):
     '''
     Function to handle the creation of "islands" of astrometrically coeval
     sources, and identify which overlap to some probability based on their
@@ -39,12 +39,6 @@ def make_island_groupings(joint_folder_path, a_cat_folder_path, b_cat_folder_pat
         Folder on disk where catalogue "a" files have been stored.
     b_cat_folder_path : string
         Folder on disk where catalogue "b" files are saved.
-    a_auf_folder_path : string
-        Folder on disk where perturbation AUF component files for catalogue "a"
-        are located.
-    b_auf_folder_path : string
-        Folder on disk where perturbation AUF component files for catalogue "b"
-        are located.
     a_auf_pointings : 2-D numpy.ndarray
         Array containing the listings of longitude, latitude pointings at which
         the perturbation AUF components were computed for catalogue "a".
@@ -101,6 +95,12 @@ def make_island_groupings(joint_folder_path, a_cat_folder_path, b_cat_folder_pat
         calculate photometric-information dependent priors for cross-matching.
     n_pool : integer
         Number of multiprocessing pools to use when parallelising.
+    a_perturb_auf_outputs : dictionary
+        Dict containing the results from the previous step of the cross-match,
+        the simulations of the perturbation component of catalogue a's AUF.
+    b_perturb_auf_outputs : dictionary
+        Dict containing the results from the previous step of the cross-match,
+        the simulations of the perturbation component of catalogue b's AUF.
     '''
 
     # Convert from arcseconds to degrees internally.
@@ -179,11 +179,11 @@ def make_island_groupings(joint_folder_path, a_cat_folder_path, b_cat_folder_pat
                     ax_cutout = [ax1_start, ax1_end, ax2_start, ax2_end]
                     a, afouriergrid, amodrefindsmall, a_cut = _load_fourier_grid_cutouts(
                         a_cutout, ax_cutout, joint_folder_path, a_cat_folder_path,
-                        a_auf_folder_path, 0, 'a', small_memmap_slice_arrays_a, a_big_sky_cut,
+                        a_perturb_auf_outputs, 0, 'a', small_memmap_slice_arrays_a, a_big_sky_cut,
                         a_modelrefinds)
                     b, bfouriergrid, bmodrefindsmall, b_cut = _load_fourier_grid_cutouts(
                         b_cutout, ax_cutout, joint_folder_path, b_cat_folder_path,
-                        b_auf_folder_path, max_sep, 'b', small_memmap_slice_arrays_b,
+                        b_perturb_auf_outputs, max_sep, 'b', small_memmap_slice_arrays_b,
                         b_big_sky_cut, b_modelrefinds)
 
                     if len(a) > 0 and len(b) > 0:
@@ -241,11 +241,11 @@ def make_island_groupings(joint_folder_path, a_cat_folder_path, b_cat_folder_pat
                     ax_cutout = [ax1_start, ax1_end, ax2_start, ax2_end]
                     a, afouriergrid, amodrefindsmall, a_cut = _load_fourier_grid_cutouts(
                         a_cutout, ax_cutout, joint_folder_path, a_cat_folder_path,
-                        a_auf_folder_path, 0, 'a', small_memmap_slice_arrays_a, a_big_sky_cut,
+                        a_perturb_auf_outputs, 0, 'a', small_memmap_slice_arrays_a, a_big_sky_cut,
                         a_modelrefinds)
                     b, bfouriergrid, bmodrefindsmall, b_cut = _load_fourier_grid_cutouts(
                         b_cutout, ax_cutout, joint_folder_path, b_cat_folder_path,
-                        b_auf_folder_path, max_sep, 'b', small_memmap_slice_arrays_b,
+                        b_perturb_auf_outputs, max_sep, 'b', small_memmap_slice_arrays_b,
                         b_big_sky_cut, b_modelrefinds)
 
                     if len(a) > 0 and len(b) > 0:
@@ -301,11 +301,11 @@ def make_island_groupings(joint_folder_path, a_cat_folder_path, b_cat_folder_pat
 
             modrefind = a_modelrefinds[:, lowind:highind]
             [a_fouriergrid], a_modrefindsmall = load_small_ref_auf_grid(
-                modrefind, a_auf_folder_path, ['fourier'])
+                modrefind, a_perturb_auf_outputs, ['fourier'])
 
             modrefind = b_modelrefinds[:, a_inds_unique]
             [b_fouriergrid], b_modrefindsmall = load_small_ref_auf_grid(
-                modrefind, b_auf_folder_path, ['fourier'])
+                modrefind, b_perturb_auf_outputs, ['fourier'])
 
             a_int_lens = gsf.get_integral_length(
                 a, b, r[:-1]+dr/2, rho[:-1], drho, j1s, a_fouriergrid, b_fouriergrid,
@@ -329,11 +329,11 @@ def make_island_groupings(joint_folder_path, a_cat_folder_path, b_cat_folder_pat
 
             modrefind = b_modelrefinds[:, lowind:highind]
             [b_fouriergrid], b_modrefindsmall = load_small_ref_auf_grid(
-                modrefind, b_auf_folder_path, ['fourier'])
+                modrefind, b_perturb_auf_outputs, ['fourier'])
 
             modrefind = a_modelrefinds[:, b_inds_unique]
             [a_fouriergrid], a_modrefindsmall = load_small_ref_auf_grid(
-                modrefind, a_auf_folder_path, ['fourier'])
+                modrefind, a_perturb_auf_outputs, ['fourier'])
 
             b_int_lens = gsf.get_integral_length(
                 b, a, r[:-1]+dr/2, rho[:-1], drho, j1s, b_fouriergrid, a_fouriergrid,
@@ -506,7 +506,7 @@ def make_island_groupings(joint_folder_path, a_cat_folder_path, b_cat_folder_pat
 
 
 def _load_fourier_grid_cutouts(a, sky_rect_coords, joint_folder_path, cat_folder_path,
-                               auf_folder_path, padding, cat_name, memmap_slice_arrays,
+                               perturb_auf_outputs, padding, cat_name, memmap_slice_arrays,
                                large_sky_slice, modelrefinds):
     '''
     Function to load a sub-set of a given catalogue's astrometry, slicing it
@@ -527,9 +527,8 @@ def _load_fourier_grid_cutouts(a, sky_rect_coords, joint_folder_path, cat_folder
     cat_folder_path : string
         Location on disk where catalogues for the same dataset given in ``a``
         are stored.
-    auf_folder_path : string
-        Folder on disk for where catalogue ``a``'s perturbation AUF components
-        are saved.
+    perturb_auf_outputs : dictionary
+        Results from the simulations of catalogue ``a``'s AUF extensions.
     padding : float
         Maximum allowed sky separation the "wrong" side of ``sky_rect_coords``,
         allowing for an increase in sky box size which ensures that all overlaps
@@ -558,7 +557,7 @@ def _load_fourier_grid_cutouts(a, sky_rect_coords, joint_folder_path, cat_folder
 
     modrefind = modelrefinds[:, large_sky_slice][:, sky_cut]
 
-    [fouriergrid], modrefindsmall = load_small_ref_auf_grid(modrefind, auf_folder_path,
+    [fouriergrid], modrefindsmall = load_small_ref_auf_grid(modrefind, perturb_auf_outputs,
                                                             ['fourier'])
 
     return a_cutout, fouriergrid, modrefindsmall, sky_cut

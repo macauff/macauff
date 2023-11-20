@@ -144,17 +144,16 @@ class TestCounterpartPairing:
         np.save('{}/magref.npy'.format(self.a_cat_folder_path), self.amagref)
         np.save('{}/magref.npy'.format(self.b_cat_folder_path), self.bmagref)
 
-        np.save('{}/modelrefinds.npy'.format(self.a_auf_folder_path), self.amodelrefinds)
-        np.save('{}/modelrefinds.npy'.format(self.b_auf_folder_path), self.bmodelrefinds)
-
         # We should have already made fourier_grid, frac_grid, and flux_grid
         # for each catalogue.
-        np.save('{}/fourier_grid.npy'.format(self.a_auf_folder_path), self.afourier_grids)
-        np.save('{}/fourier_grid.npy'.format(self.b_auf_folder_path), self.bfourier_grids)
-        np.save('{}/frac_grid.npy'.format(self.a_auf_folder_path), self.afrac_grids)
-        np.save('{}/frac_grid.npy'.format(self.b_auf_folder_path), self.bfrac_grids)
-        np.save('{}/flux_grid.npy'.format(self.a_auf_folder_path), self.aflux_grids)
-        np.save('{}/flux_grid.npy'.format(self.b_auf_folder_path), self.bflux_grids)
+        self.a_perturb_auf_outputs = {}
+        self.b_perturb_auf_outputs = {}
+        self.a_perturb_auf_outputs['fourier_grid'] = self.afourier_grids
+        self.b_perturb_auf_outputs['fourier_grid'] = self.bfourier_grids
+        self.a_perturb_auf_outputs['frac_grid'] = self.afrac_grids
+        self.b_perturb_auf_outputs['frac_grid'] = self.bfrac_grids
+        self.a_perturb_auf_outputs['flux_grid'] = self.aflux_grids
+        self.b_perturb_auf_outputs['flux_grid'] = self.bflux_grids
 
         self.a_auf_pointings = np.array([[0.0, 0.0]])
         self.b_auf_pointings = np.array([[0.0, 0.0]])
@@ -286,10 +285,11 @@ class TestCounterpartPairing:
         mem_chunk_num = 2
         source_pairing(
             self.joint_folder_path, self.a_cat_folder_path, self.b_cat_folder_path,
-            self.a_auf_folder_path, self.b_auf_folder_path, self.a_filt_names, self.b_filt_names,
-            self.a_auf_pointings, self.b_auf_pointings, self.amodelrefinds, self.bmodelrefinds,
-            self.rho, self.drho, self.n_fracs, mem_chunk_num,
-            group_sources_data=self.group_sources_data, phot_like_data=self.phot_like_data)
+            self.a_filt_names, self.b_filt_names, self.a_auf_pointings, self.b_auf_pointings,
+            self.amodelrefinds, self.bmodelrefinds, self.rho, self.drho, self.n_fracs,
+            mem_chunk_num, group_sources_data=self.group_sources_data,
+            phot_like_data=self.phot_like_data, a_perturb_auf_outputs=self.a_perturb_auf_outputs,
+            b_perturb_auf_outputs=self.b_perturb_auf_outputs)
 
         bflux = np.load('{}/pairing/bcontamflux.npy'.format(self.joint_folder_path))
         assert np.all(bflux == np.zeros((2), float))
@@ -378,10 +378,11 @@ class TestCounterpartPairing:
         mem_chunk_num = 2
         source_pairing(
             self.joint_folder_path, self.a_cat_folder_path, self.b_cat_folder_path,
-            self.a_auf_folder_path, self.b_auf_folder_path, self.a_filt_names,
-            self.b_filt_names, self.a_auf_pointings, self.b_auf_pointings, self.amodelrefinds,
-            self.bmodelrefinds, self.rho, self.drho, self.n_fracs, mem_chunk_num,
-            group_sources_data=group_sources_data, phot_like_data=self.phot_like_data)
+            self.a_filt_names, self.b_filt_names, self.a_auf_pointings, self.b_auf_pointings,
+            self.amodelrefinds, self.bmodelrefinds, self.rho, self.drho, self.n_fracs,
+            mem_chunk_num, group_sources_data=group_sources_data,
+            phot_like_data=self.phot_like_data, a_perturb_auf_outputs=self.a_perturb_auf_outputs,
+            b_perturb_auf_outputs=self.b_perturb_auf_outputs)
 
         bflux = np.load('{}/pairing/bcontamflux.npy'.format(self.joint_folder_path))
         assert np.all(bflux == np.zeros((2), float))
@@ -449,10 +450,12 @@ class TestCounterpartPairing:
         with pytest.warns(UserWarning) as record:
             source_pairing(
                 self.joint_folder_path, self.a_cat_folder_path, self.b_cat_folder_path,
-                self.a_auf_folder_path, self.b_auf_folder_path, self.a_filt_names,
-                self.b_filt_names, self.a_auf_pointings, self.b_auf_pointings, self.amodelrefinds,
-                self.bmodelrefinds, self.rho, self.drho, self.n_fracs, mem_chunk_num,
-                group_sources_data=group_sources_data, phot_like_data=self.phot_like_data)
+                self.a_filt_names, self.b_filt_names, self.a_auf_pointings, self.b_auf_pointings,
+                self.amodelrefinds, self.bmodelrefinds, self.rho, self.drho, self.n_fracs,
+                mem_chunk_num, group_sources_data=group_sources_data,
+                phot_like_data=self.phot_like_data,
+                a_perturb_auf_outputs=self.a_perturb_auf_outputs,
+                b_perturb_auf_outputs=self.b_perturb_auf_outputs)
         assert len(record) == 2
         assert '2 catalogue a sources not in either counterpart, f' in record[0].message.args[0]
         assert '1 catalogue b source not in either counterpart, f' in record[1].message.args[0]
@@ -500,10 +503,12 @@ class TestCounterpartPairing:
         with pytest.warns(UserWarning) as record:
             source_pairing(
                 self.joint_folder_path, self.a_cat_folder_path, self.b_cat_folder_path,
-                self.a_auf_folder_path, self.b_auf_folder_path, self.a_filt_names,
-                self.b_filt_names, self.a_auf_pointings, self.b_auf_pointings, self.amodelrefinds,
-                self.bmodelrefinds, self.rho, self.drho, self.n_fracs, mem_chunk_num,
-                group_sources_data=group_sources_data, phot_like_data=self.phot_like_data)
+                self.a_filt_names, self.b_filt_names, self.a_auf_pointings, self.b_auf_pointings,
+                self.amodelrefinds, self.bmodelrefinds, self.rho, self.drho, self.n_fracs,
+                mem_chunk_num, group_sources_data=group_sources_data,
+                phot_like_data=self.phot_like_data,
+                a_perturb_auf_outputs=self.a_perturb_auf_outputs,
+                b_perturb_auf_outputs=self.b_perturb_auf_outputs)
         assert len(record) == 2
         assert '2 additional catalogue a indices recorded' in record[0].message.args[0]
         assert '1 additional catalogue b index recorded' in record[1].message.args[0]
@@ -565,6 +570,8 @@ class TestCounterpartPairing:
         self.cm.phot_like_data = self.phot_like_data
         self.files_per_pairing = 13
         self.cm.chunk_id = 1
+        self.cm.a_perturb_auf_outputs = self.a_perturb_auf_outputs
+        self.cm.b_perturb_auf_outputs = self.b_perturb_auf_outputs
         self.cm._initialise_chunk(os.path.join(os.path.dirname(__file__), 'data/chunk0/crossmatch_params_.txt'),
                                   os.path.join(os.path.dirname(__file__), 'data/chunk0/cat_a_params_.txt'),
                                   os.path.join(os.path.dirname(__file__), 'data/chunk0/cat_b_params_.txt'))

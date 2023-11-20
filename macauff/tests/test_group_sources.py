@@ -28,9 +28,7 @@ def test_load_fourier_grid_cutouts():
 
     del a
 
-    grid = np.lib.format.open_memmap('fourier_grid.npy', mode='w+', dtype=float,
-                                     shape=(100, 2, 3, 2),
-                                     fortran_order=True)
+    grid = np.empty(dtype=float, shape=(100, 2, 3, 2), order='F')
 
     for k in range(2):
         for j in range(3):
@@ -48,7 +46,6 @@ def test_load_fourier_grid_cutouts():
     # However, above we also get in our four-source slice the extra two combinations of:
     # 0, 1, 1 -> 0 + 2 + 6 = 9; and 0, 2, 0 -> 0 + 4 + 0 = 4. This comes from our total combination
     # of indices of 0, 1/2, and 0/1
-    del grid
 
     a = np.lib.format.open_memmap('con_cat_astro.npy', mode='r', dtype=float, shape=(lena, 3))
     rect = np.array([40, 60, 40, 60])
@@ -59,7 +56,8 @@ def test_load_fourier_grid_cutouts():
     for n in ['1', '2', '3', '4', 'combined']:
         memmap_arrays.append(np.lib.format.open_memmap('{}/{}_temporary_sky_slice_{}.npy'.format(
                              '.', 'check', n), mode='r+', dtype=bool, shape=(len(a),)))
-    _a, _b, _c, _ = _load_fourier_grid_cutouts(a, rect, '.', '.', '.', padding, 'check',
+    p_a_o = {'fourier_grid': grid}
+    _a, _b, _c, _ = _load_fourier_grid_cutouts(a, rect, '.', '.', p_a_o, padding, 'check',
                                                memmap_arrays, np.array([True]*lena),
                                                modelrefinds=m)
     assert np.all(_a.shape == (4, 3))
@@ -83,7 +81,7 @@ def test_load_fourier_grid_cutouts():
     # This should not return sources 123 and 555 above, removing a potential
     # reference index. Hence we only have one unique grid reference now.
     padding = 0
-    _a, _b, _c, _ = _load_fourier_grid_cutouts(a, rect, '.', '.', '.', padding, 'check',
+    _a, _b, _c, _ = _load_fourier_grid_cutouts(a, rect, '.', '.', p_a_o, padding, 'check',
                                                memmap_arrays, np.array([True]*lena),
                                                modelrefinds=m)
     assert np.all(_a.shape == (2, 3))
@@ -320,6 +318,7 @@ class TestMakeIslandGroupings():
 
         # Fake fourier grid, in this case under the assumption that there
         # is no extra AUF component:
+        fourier_grids = []
         for auf_folder, auf_points, filters, N in zip(
                 [self.a_auf_folder_path, self.b_auf_folder_path],
                 [self.a_auf_pointings, self.b_auf_pointings],
@@ -329,17 +328,19 @@ class TestMakeIslandGroupings():
                 self.a_modelrefinds = np.zeros((3, N), int)
             else:
                 self.b_modelrefinds = np.zeros((3, N), int)
+            perturb_auf = {}
             for i in range(len(auf_points)):
                 ax1, ax2 = auf_points[i]
-                ax_folder = '{}/{}/{}'.format(auf_folder, ax1, ax2)
                 for j in range(len(filters)):
-                    filt = filters[j]
-                    filt_folder = '{}/{}'.format(ax_folder, filt)
-                    os.makedirs(filt_folder, exist_ok=True)
+                    name = '{}-{}-{}'.format(ax1, ax2, filters[j])
                     fourieroffset = np.ones((len(self.rho) - 1, 1), float, order='F')
-                    np.save('{}/fourier.npy'.format(filt_folder), fourieroffset)
-            create_auf_params_grid(auf_folder, auf_points, filters, 'fourier',
-                                   np.ones((len(filters), len(auf_points)), int), len(self.rho)-1)
+                    perturb_auf[name] = {'fourier': fourieroffset}
+            fourier_grids.append(create_auf_params_grid(perturb_auf, auf_points, filters, 'fourier',
+                                 np.ones((len(filters), len(auf_points)), int), len(self.rho)-1))
+        self.a_perturb_auf_outputs = {}
+        self.b_perturb_auf_outputs = {}
+        self.a_perturb_auf_outputs['fourier_grid'] = fourier_grids[0]
+        self.b_perturb_auf_outputs['fourier_grid'] = fourier_grids[1]
         # 99% is slightly more than 3-sigma of a 2-D Gaussian integral, for
         # int_frac[2] = 0.99
         self.sigma = 0.1
@@ -454,6 +455,8 @@ class TestMakeIslandGroupings():
         # For the first, full runthrough call the CrossMatch function instead of
         # directly calling make_island_groupings to test group_sources as well.
         self.cm.chunk_id = 1
+        self.cm.a_perturb_auf_outputs = self.a_perturb_auf_outputs
+        self.cm.b_perturb_auf_outputs = self.b_perturb_auf_outputs
         self.cm.group_sources(self.files_per_island_sim)
 
         alist, blist = self.cm.group_sources_data.alist, self.cm.group_sources_data.blist
@@ -481,11 +484,11 @@ class TestMakeIslandGroupings():
 
         gsd = make_island_groupings(
             self.joint_folder_path, self.a_cat_folder_path, self.b_cat_folder_path,
-            self.a_auf_folder_path, self.b_auf_folder_path, self.a_auf_pointings,
-            self.b_auf_pointings, self.a_filt_names, self.b_filt_names, self.a_title, self.b_title,
-            self.a_modelrefinds, self.b_modelrefinds, self.r, self.dr, self.rho, self.drho, self.j1s,
-            self.max_sep, ax_lims, self.int_fracs, self.mem_chunk_num, self.include_phot_like,
-            self.use_phot_prior, self.n_pool)
+            self.a_auf_pointings, self.b_auf_pointings, self.a_filt_names, self.b_filt_names,
+            self.a_title, self.b_title, self.a_modelrefinds, self.b_modelrefinds, self.r, self.dr,
+            self.rho, self.drho, self.j1s, self.max_sep, ax_lims, self.int_fracs,
+            self.mem_chunk_num, self.include_phot_like, self.use_phot_prior, self.n_pool,
+            self.a_perturb_auf_outputs, self.b_perturb_auf_outputs)
 
         alist, blist = gsd.alist, gsd.blist
         agrplen, bgrplen = gsd.agrplen, gsd.bgrplen
@@ -541,11 +544,11 @@ class TestMakeIslandGroupings():
 
         gsd = make_island_groupings(
             self.joint_folder_path, self.a_cat_folder_path, self.b_cat_folder_path,
-            self.a_auf_folder_path, self.b_auf_folder_path, self.a_auf_pointings,
-            self.b_auf_pointings, self.a_filt_names, self.b_filt_names, self.a_title, self.b_title,
-            self.a_modelrefinds, self.b_modelrefinds, self.r, self.dr, self.rho, self.drho,
-            self.j1s, self.max_sep, ax_lims, self.int_fracs, self.mem_chunk_num, self.include_phot_like,
-            self.use_phot_prior, self.n_pool)
+            self.a_auf_pointings, self.b_auf_pointings, self.a_filt_names, self.b_filt_names,
+            self.a_title, self.b_title, self.a_modelrefinds, self.b_modelrefinds, self.r, self.dr,
+            self.rho, self.drho, self.j1s, self.max_sep, ax_lims, self.int_fracs,
+            self.mem_chunk_num, self.include_phot_like, self.use_phot_prior, self.n_pool,
+            self.a_perturb_auf_outputs, self.b_perturb_auf_outputs)
 
         alist, blist = gsd.alist, gsd.blist
         agrplen, bgrplen = gsd.agrplen, gsd.bgrplen
@@ -567,11 +570,11 @@ class TestMakeIslandGroupings():
         include_phot_like = True
         gsd = make_island_groupings(
             self.joint_folder_path, self.a_cat_folder_path, self.b_cat_folder_path,
-            self.a_auf_folder_path, self.b_auf_folder_path, self.a_auf_pointings,
-            self.b_auf_pointings, self.a_filt_names, self.b_filt_names, self.a_title, self.b_title,
-            self.a_modelrefinds, self.b_modelrefinds,  self.r, self.dr, self.rho, self.drho, self.j1s,
-            self.max_sep, self.ax_lims, self.int_fracs, self.mem_chunk_num, include_phot_like,
-            self.use_phot_prior, self.n_pool)
+            self.a_auf_pointings, self.b_auf_pointings, self.a_filt_names, self.b_filt_names,
+            self.a_title, self.b_title, self.a_modelrefinds, self.b_modelrefinds,  self.r, self.dr,
+            self.rho, self.drho, self.j1s, self.max_sep, self.ax_lims, self.int_fracs,
+            self.mem_chunk_num, include_phot_like, self.use_phot_prior, self.n_pool,
+            self.a_perturb_auf_outputs, self.b_perturb_auf_outputs)
 
         # Verify that make_island_groupings doesn't change when the extra arrays
         # are calculated, as an initial test.

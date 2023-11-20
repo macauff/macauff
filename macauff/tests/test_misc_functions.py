@@ -33,22 +33,20 @@ def test_calc_j0():
 
 def test_create_fourier_offsets_grid():
     a_len = np.array([[5, 10, 5], [15, 4, 8]], order='F')
-    np.save('arraylengths.npy', a_len)
     auf_pointings = np.array([[10, 20], [50, 50], [100, -40]])
     filt_names = ['W1', 'W2']
     r = np.linspace(0, 5, 10)
+    p_a_o = {}
     for j in range(0, len(auf_pointings)):
         ax1, ax2 = auf_pointings[j]
         for i in range(0, len(filt_names)):
-            filt = filt_names[i]
-            os.makedirs('{}/{}/{}'.format(ax1, ax2, filt), exist_ok=True)
-            np.save('{}/{}/{}/fourier.npy'.format(ax1, ax2, filt),
-                    (i + len(filt_names)*j)*np.ones((len(r[:-1]), a_len[i, j]), float))
+            perturb_auf_combo = '{}-{}-{}'.format(ax1, ax2, filt_names[i])
+            s_p_a_o = {}
+            s_p_a_o['fourier'] = (i + len(filt_names)*j)*np.ones((len(r[:-1]), a_len[i, j]), float)
+            p_a_o[perturb_auf_combo] = s_p_a_o
 
-    create_auf_params_grid('.', auf_pointings, filt_names, 'fourier', a_len,
-                           len_first_axis=len(r)-1)
-    a = np.lib.format.open_memmap('{}/fourier_grid.npy'.format(
-        '.'), mode='r', dtype=float, shape=(9, 15, 2, 3), fortran_order=True)
+    a = create_auf_params_grid(p_a_o, auf_pointings, filt_names, 'fourier', a_len,
+                               len_first_axis=len(r)-1)
     assert np.all(a.shape == (9, 15, 2, 3))
     a_manual = -1*np.ones((9, 15, 2, 3), float, order='F')
     for j in range(0, len(auf_pointings)):
@@ -61,17 +59,17 @@ def test_load_small_ref_ind_fourier_grid():
     a_len = np.array([[6, 10, 7], [15, 9, 8], [7, 10, 12], [8, 8, 11]], order='F')
     auf_pointings = np.array([[10, 20], [50, 50], [100, -40]])
     filt_names = ['W1', 'W2', 'W3', 'W4']
-    a = np.lib.format.open_memmap('{}/fourier_grid.npy'.format(
-        '.'), mode='w+', dtype=float, shape=(9, 15, 4, 3), fortran_order=True)
+    a = np.empty(dtype=float, shape=(9, 15, 4, 3), order='F')
     for j in range(0, len(auf_pointings)):
         for i in range(0, len(filt_names)):
             a[:, :a_len[i, j], i, j] = (i*a_len[i, j] + a_len[i, j]*len(filt_names)*j +
                                         np.arange(a_len[i, j]).reshape(1, -1))
-    del a
+    p_a_o = {}
+    p_a_o['fourier_grid'] = a
     # Unique indices: 0, 1, 2, 5; 0, 3; 0, 1, 2
     # These map to 0, 1, 2, 3; 0, 1; 0, 1, 2
     modrefind = np.array([[0, 2, 0, 2, 1, 5], [0, 3, 3, 3, 3, 0], [0, 1, 2, 1, 2, 1]])
-    [a], b = load_small_ref_auf_grid(modrefind, '.', ['fourier'])
+    [a], b = load_small_ref_auf_grid(modrefind, p_a_o, ['fourier'])
 
     new_small_modrefind = np.array([[0, 2, 0, 2, 1, 3], [0, 1, 1, 1, 1, 0], [0, 1, 2, 1, 2, 1]])
     new_small_fouriergrid = np.empty((9, 4, 2, 3), float, order='F')

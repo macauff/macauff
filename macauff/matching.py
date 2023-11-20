@@ -1529,10 +1529,10 @@ class CrossMatch():
         else:
             os.system("rm -rf {}/*".format(self.a_auf_folder_path))
             _kwargs = {}
-        self.a_modelrefinds = perturb_auf_func(self.a_auf_folder_path, self.a_cat_folder_path, self.a_filt_names,
-                                               self.a_auf_region_points, self.r, self.dr,
-                                               self.rho, self.drho, 'a', self.include_perturb_auf,
-                                               self.mem_chunk_num, **_kwargs)
+        self.a_modelrefinds, self.a_perturb_auf_outputs = perturb_auf_func(
+            self.a_auf_folder_path, self.a_cat_folder_path, self.a_filt_names,
+            self.a_auf_region_points, self.r, self.dr, self.rho, self.drho, 'a',
+            self.include_perturb_auf, self.mem_chunk_num, **_kwargs)
 
         t = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         print('{} Rank {}, chunk {}: Creating empirical perturbation AUFs for catalogue "b"...'
@@ -1582,11 +1582,10 @@ class CrossMatch():
         else:
             os.system("rm -rf {}/*".format(self.b_auf_folder_path))
             _kwargs = {}
-        self.b_modelrefinds = perturb_auf_func(self.b_auf_folder_path, self.b_cat_folder_path,
-                                               self.b_filt_names, self.b_auf_region_points, self.r,
-                                               self.dr, self.rho, self.drho, 'b',
-                                               self.include_perturb_auf, self.mem_chunk_num,
-                                               **_kwargs)
+        self.b_modelrefinds, self.b_perturb_auf_outputs = perturb_auf_func(
+            self.b_auf_folder_path, self.b_cat_folder_path, self.b_filt_names,
+            self.b_auf_region_points, self.r, self.dr, self.rho, self.drho, 'b',
+            self.include_perturb_auf, self.mem_chunk_num, **_kwargs)
 
     def group_sources(self, files_per_grouping, group_func=make_island_groupings):
         '''
@@ -1614,13 +1613,12 @@ class CrossMatch():
         os.system('rm -rf {}/reject/*'.format(self.joint_folder_path))
         self.group_sources_data = \
             group_func(self.joint_folder_path, self.a_cat_folder_path, self.b_cat_folder_path,
-                       self.a_auf_folder_path, self.b_auf_folder_path, self.a_auf_region_points,
-                       self.b_auf_region_points, self.a_filt_names, self.b_filt_names,
-                       self.a_cat_name, self.b_cat_name, self.a_modelrefinds, self.b_modelrefinds,
-                       self.r, self.dr, self.rho, self.drho,
+                       self.a_auf_region_points, self.b_auf_region_points, self.a_filt_names,
+                       self.b_filt_names, self.a_cat_name, self.b_cat_name, self.a_modelrefinds,
+                       self.b_modelrefinds, self.r, self.dr, self.rho, self.drho,
                        self.j1s, self.pos_corr_dist, self.cross_match_extent, self.int_fracs,
                        self.mem_chunk_num, self.include_phot_like, self.use_phot_priors,
-                       self.n_pool)
+                       self.n_pool, self.a_perturb_auf_outputs, self.b_perturb_auf_outputs)
 
     def calculate_phot_like(self, files_per_phot, phot_like_func=compute_photometric_likelihoods):
         '''
@@ -1709,7 +1707,7 @@ class CrossMatch():
         os.system('rm -r {}/pairing/*'.format(self.joint_folder_path))
         count_pair_func(
             self.joint_folder_path, self.a_cat_folder_path, self.b_cat_folder_path,
-            self.a_auf_folder_path, self.b_auf_folder_path, self.a_filt_names,
-            self.b_filt_names, self.a_auf_region_points, self.b_auf_region_points,
-            self.a_modelrefinds, self.b_modelrefinds, self.rho, self.drho, len(self.delta_mag_cuts),
-            self.mem_chunk_num, self.group_sources_data, self.phot_like_data)
+            self.a_filt_names, self.b_filt_names, self.a_auf_region_points,
+            self.b_auf_region_points, self.a_modelrefinds, self.b_modelrefinds, self.rho, self.drho,
+            len(self.delta_mag_cuts), self.mem_chunk_num, self.group_sources_data,
+            self.phot_like_data, self.a_perturb_auf_outputs, self.b_perturb_auf_outputs)

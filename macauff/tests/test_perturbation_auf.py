@@ -61,23 +61,23 @@ class TestCreatePerturbAUF:
         self.cm.include_perturb_auf = False
         self.cm.chunk_id = 1
         self.cm.create_perturb_auf(self.files_per_auf_sim)
+        p_a_o = self.cm.b_perturb_auf_outputs
         lenr = len(self.cm.r)
         lenrho = len(self.cm.rho)
         for coord in ['0.0', '50.0']:
             for filt in ['W1', 'W2', 'W3', 'W4']:
-                path = '{}/{}/{}/{}'.format(self.cm.b_auf_folder_path, coord, coord, filt)
+                perturb_auf_combo = '{}-{}-{}'.format(coord, coord, filt)
                 for filename, shape in zip(['frac', 'flux', 'offset', 'cumulative', 'fourier',
-                                            'N', 'mag'],
+                                            'Narray', 'magarray'],
                                            [(1, 1), (1,), (lenr-1, 1), (lenr-1, 1), (lenrho-1, 1),
                                             (1, 1), (1, 1)]):
-                    assert os.path.isfile('{}/{}.npy'.format(path, filename))
-                    file = np.load('{}/{}.npy'.format(path, filename))
+                    file = p_a_o[perturb_auf_combo][filename]
                     assert np.all(file.shape == shape)
-                assert np.all(np.load('{}/frac.npy'.format(path)) == 0)
-                assert np.all(np.load('{}/cumulative.npy'.format(path)) == 1)
-                assert np.all(np.load('{}/fourier.npy'.format(path)) == 1)
-                assert np.all(np.load('{}/mag.npy'.format(path)) == 1)
-                file = np.load('{}/offset.npy'.format(path))
+                assert np.all(p_a_o[perturb_auf_combo]['frac'] == 0)
+                assert np.all(p_a_o[perturb_auf_combo]['cumulative'] == 1)
+                assert np.all(p_a_o[perturb_auf_combo]['fourier'] == 1)
+                assert np.all(p_a_o[perturb_auf_combo]['magarray'] == 1)
+                file = p_a_o[perturb_auf_combo]['offset']
                 assert np.all(file[1:] == 0)
                 assert file[0] == 1/(2 * np.pi * (self.cm.r[0] + self.cm.dr[0]/2) * self.cm.dr[0])
 
@@ -713,7 +713,7 @@ class TestMakePerturbAUFs():
             l_cut = np.load(os.path.join(os.path.dirname(__file__), 'data/l_cut.npy'))
             dd_params = np.load(os.path.join(os.path.dirname(__file__), 'data/dd_params.npy'))
             run_fw = False if mag < 19 else True
-            make_perturb_aufs(
+            _, p_a_o = make_perturb_aufs(
                 *self.args[:3], new_auf_points, *self.args[4:], tri_set_name='WISE',
                 tri_filt_num=11, tri_filt_names=self.tri_filt_names, tri_maglim_faint=32,
                 tri_num_faint=1000000, auf_region_frame='galactic', psf_fwhms=self.psf_fwhms,
@@ -722,19 +722,17 @@ class TestMakePerturbAUFs():
                 density_radius=density_radius, run_fw=run_fw, run_psf=True,
                 snr_mag_params=snr_mag_params, dd_params=dd_params, l_cut=l_cut, al_avs=[0])
 
+            perturb_auf_combo = '{}-{}-{}'.format(ax1, ax2, self.filters[0])
             for name, size in zip(
-                    ['frac', 'flux', 'offset', 'cumulative', 'fourier', 'N', 'mag'],
+                    ['frac', 'flux', 'offset', 'cumulative', 'fourier', 'Narray', 'magarray'],
                     [(len(self.delta_mag_cuts), 3), (3,), (len(self.r)-1, 3),
                      (len(self.r)-1, 3), (len(self.rho)-1, 3), (3,), (3,)]):
-                var = np.load('{}/{}/{}/{}/{}.npy'.format(
-                              self.auf_folder, ax1, ax2, self.filters[0], name))
+                var = p_a_o[perturb_auf_combo][name]
                 assert np.all(var.shape == size)
 
-            keep_frac = np.load('{}/{}/{}/{}/frac.npy'.format(
-                self.auf_folder, ax1, ax2, self.filters[0]))
+            keep_frac = var = p_a_o[perturb_auf_combo]['frac']
             if mag > 17:
-                keep_flux = np.load('{}/{}/{}/{}/flux.npy'.format(
-                    self.auf_folder, ax1, ax2, self.filters[0]))
+                keep_flux = var = p_a_o[perturb_auf_combo]['flux']
 
             # Have more relaxed conditions on assertion than in test_perturb_aufs
             # above, as we can't arbitrarily force the magnitude bin widths to be
@@ -910,12 +908,10 @@ class TestMakePerturbAUFs():
 
         cm.create_perturb_auf(self.files_per_auf_sim)
 
-        fracs = np.load('{}/{}/{}/{}/frac.npy'.format(
-            self.auf_folder, ax1, ax2, self.filters[0]))
-        fluxs = np.load('{}/{}/{}/{}/flux.npy'.format(
-            self.auf_folder, ax1, ax2, self.filters[0]))
-        fourier = np.load('{}/{}/{}/{}/fourier.npy'.format(
-            self.auf_folder, ax1, ax2, self.filters[0]))
+        perturb_auf_combo = '{}-{}-{}'.format(ax1, ax2, self.filters[0])
+        fracs = cm.b_perturb_auf_outputs[perturb_auf_combo]['frac']
+        fluxs = cm.b_perturb_auf_outputs[perturb_auf_combo]['flux']
+        fourier = cm.b_perturb_auf_outputs[perturb_auf_combo]['fourier']
 
         assert_allclose(fracs[0, 0], 1-prob_0_draw, rtol=0.1)
         assert_allclose(fluxs[0], (prob_0_draw*0 + prob_1_draw*rel_flux +
@@ -1093,12 +1089,10 @@ class TestMakePerturbAUFs():
 
         cm.create_perturb_auf(self.files_per_auf_sim)
 
-        fracs = np.load('{}/{}/{}/{}/frac.npy'.format(
-            self.auf_folder, ax1, ax2, self.filters[0]))
-        fluxs = np.load('{}/{}/{}/{}/flux.npy'.format(
-            self.auf_folder, ax1, ax2, self.filters[0]))
-        fourier = np.load('{}/{}/{}/{}/fourier.npy'.format(
-            self.auf_folder, ax1, ax2, self.filters[0]))
+        perturb_auf_combo = '{}-{}-{}'.format(ax1, ax2, self.filters[0])
+        fracs = cm.b_perturb_auf_outputs[perturb_auf_combo]['frac']
+        fluxs = cm.b_perturb_auf_outputs[perturb_auf_combo]['flux']
+        fourier = cm.b_perturb_auf_outputs[perturb_auf_combo]['fourier']
 
         assert_allclose(fracs[0, 0], 1-prob_0_draw, rtol=0.1)
         assert_allclose(fluxs[0], (prob_0_draw*0 + prob_1_draw*rel_flux +
