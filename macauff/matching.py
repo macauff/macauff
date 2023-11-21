@@ -1505,19 +1505,7 @@ class CrossMatch():
                                   'alpha_weight': self.gal_alphaweight})
             else:
                 _kwargs = dict(_kwargs, **{'fit_gal_flag': self.a_fit_gal_flag})
-            if self.a_download_tri:
-                os.system("rm -rf {}/*".format(self.a_auf_folder_path))
-            else:
-                for i in range(len(self.a_auf_region_points)):
-                    ax1, ax2 = self.a_auf_region_points[i]
-                    ax_folder = '{}/{}/{}'.format(self.a_auf_folder_path, ax1, ax2)
-                    os.system('mv {}/trilegal_auf_simulation_faint.dat {}/..'.format(
-                              ax_folder, ax_folder))
-                    os.system("rm -rf {}/*".format(ax_folder))
-                    os.system('mv {}/../trilegal_auf_simulation_faint.dat {}'.format(
-                              ax_folder, ax_folder))
         else:
-            os.system("rm -rf {}/*".format(self.a_auf_folder_path))
             _kwargs = {}
         self.a_modelrefinds, self.a_perturb_auf_outputs = perturb_auf_func(
             self.a_auf_folder_path, self.a_cat_folder_path, self.a_filt_names,
@@ -1558,19 +1546,7 @@ class CrossMatch():
                                   'alpha_weight': self.gal_alphaweight})
             else:
                 _kwargs = dict(_kwargs, **{'fit_gal_flag': self.b_fit_gal_flag})
-            if self.b_download_tri:
-                os.system("rm -rf {}/*".format(self.b_auf_folder_path))
-            else:
-                for i in range(len(self.b_auf_region_points)):
-                    ax1, ax2 = self.b_auf_region_points[i]
-                    ax_folder = '{}/{}/{}'.format(self.b_auf_folder_path, ax1, ax2)
-                    os.system('mv {}/trilegal_auf_simulation_faint.dat {}/..'.format(
-                              ax_folder, ax_folder))
-                    os.system("rm -rf {}/*".format(ax_folder))
-                    os.system('mv {}/../trilegal_auf_simulation_faint.dat {}'.format(
-                              ax_folder, ax_folder))
         else:
-            os.system("rm -rf {}/*".format(self.b_auf_folder_path))
             _kwargs = {}
         self.b_modelrefinds, self.b_perturb_auf_outputs = perturb_auf_func(
             self.b_auf_folder_path, self.b_cat_folder_path, self.b_filt_names,
