@@ -567,14 +567,13 @@ class TestCounterpartPairing:
         self.cm.b_modelrefinds = self.bmodelrefinds
         self.cm.group_sources_data = self.group_sources_data
         self.cm.phot_like_data = self.phot_like_data
-        self.files_per_pairing = 13
         self.cm.chunk_id = 1
         self.cm.a_perturb_auf_outputs = self.a_perturb_auf_outputs
         self.cm.b_perturb_auf_outputs = self.b_perturb_auf_outputs
         self.cm._initialise_chunk(os.path.join(os.path.dirname(__file__), 'data/chunk0/crossmatch_params_.txt'),
                                   os.path.join(os.path.dirname(__file__), 'data/chunk0/cat_a_params_.txt'),
                                   os.path.join(os.path.dirname(__file__), 'data/chunk0/cat_b_params_.txt'))
-        self.cm.pair_sources(self.files_per_pairing)
+        self.cm.pair_sources()
 
         bflux = np.load('{}/pairing/bcontamflux.npy'.format(self.joint_folder_path))
         assert np.all(bflux == np.zeros((2), float))

@@ -207,8 +207,7 @@ class TestOneSidedPhotometricLikelihood:
                                   os.path.join(os.path.dirname(__file__), 'data/cat_b_params.txt'))
         self.cm.group_sources_data = self.group_sources_data
         self.cm.chunk_id = 1
-        files_per_phot = 6
-        self.cm.calculate_phot_like(files_per_phot)
+        self.cm.calculate_phot_like()
 
         abinlen = self.cm.phot_like_data.abinlengths
         bbinlen = self.cm.phot_like_data.bbinlengths

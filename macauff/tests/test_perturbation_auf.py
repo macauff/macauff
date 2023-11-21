@@ -37,7 +37,6 @@ class TestCreatePerturbAUF:
         self.cm.a_auf_region_points = np.array([[0, 0], [50, 50]], dtype=float)
         self.cm.b_auf_region_points = np.array([[0, 0], [50, 50]], dtype=float)
         self.cm.mem_chunk_num = 4
-        self.files_per_auf_sim = 7
 
     def test_no_perturb_outputs(self):
         # Randomly generate two catalogues (x3 files) between coordinates
@@ -60,7 +59,7 @@ class TestCreatePerturbAUF:
 
         self.cm.include_perturb_auf = False
         self.cm.chunk_id = 1
-        self.cm.create_perturb_auf(self.files_per_auf_sim)
+        self.cm.create_perturb_auf()
         p_a_o = self.cm.b_perturb_auf_outputs
         lenr = len(self.cm.r)
         lenrho = len(self.cm.rho)
@@ -906,7 +905,7 @@ class TestMakePerturbAUFs():
 
         cm.chunk_id = 1
 
-        cm.create_perturb_auf(self.files_per_auf_sim)
+        cm.create_perturb_auf()
 
         perturb_auf_combo = '{}-{}-{}'.format(ax1, ax2, self.filters[0])
         fracs = cm.b_perturb_auf_outputs[perturb_auf_combo]['frac']
@@ -1087,7 +1086,7 @@ class TestMakePerturbAUFs():
         cm.a_dens_dist = density_radius
         cm.b_dens_dist = density_radius
 
-        cm.create_perturb_auf(self.files_per_auf_sim)
+        cm.create_perturb_auf()
 
         perturb_auf_combo = '{}-{}-{}'.format(ax1, ax2, self.filters[0])
         fracs = cm.b_perturb_auf_outputs[perturb_auf_combo]['frac']
