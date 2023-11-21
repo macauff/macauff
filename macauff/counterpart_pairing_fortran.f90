@@ -13,10 +13,10 @@ real(dp), parameter :: pi = 4.0_dp*atan(1.0_dp)
 
 contains
 
-subroutine find_island_probabilities(a_astro, a_photo, b_astro, b_photo, alist, alist_, blist, blist_, agrplen, bgrplen, c_array, &
+subroutine find_island_probabilities(a_astro, a_photo, b_astro, b_photo, alist, blist, agrplen, bgrplen, c_array, &
     fa_array, fb_array, c_priors, fa_priors, fb_priors, amagref, bmagref, amodrefind, bmodrefind, abinsarray, abinlengths, &
     bbinsarray, bbinlengths, afrac_grids, aflux_grids, bfrac_grids, bflux_grids, afourier_grids, bfourier_grids, a_sky_inds, &
-    b_sky_inds, rho, drho, n_fracs, large_len, mini_crpts_len, acountinds, bcountinds, afieldinds, bfieldinds, acontamprob, &
+    b_sky_inds, rho, drho, n_fracs, large_len, cprt_max_len, acountinds, bcountinds, afieldinds, bfieldinds, acontamprob, &
     bcontamprob, etaarray, xiarray, acontamflux, bcontamflux, probcarray, crptseps, probfaarray, afieldfluxs, afieldseps, &
     afieldetas, afieldxis, probfbarray, bfieldfluxs, bfieldseps, bfieldetas, bfieldxis)
     ! Calculate the final cross-matches. For each island, unique permutations of match and non-match are
@@ -24,15 +24,15 @@ subroutine find_island_probabilities(a_astro, a_photo, b_astro, b_photo, alist, 
     ! various secondary parameters, such as log-likelihood-ratio of match or their contamination probability
     ! derived and returned.
     integer, parameter :: dp = kind(0.0d0)  ! double precision
-    ! Small and full-index versions of the island group numbers, and their lengths in the two catalogues.
-    integer, intent(in) :: alist(:, :), alist_(:, :), blist(:, :), blist_(:, :), agrplen(:), bgrplen(:)
+    ! Island group numbers, and their lengths in the two catalogues.
+    integer, intent(in) :: alist(:, :), blist(:, :), agrplen(:), bgrplen(:)
     ! Magnitude bin lengths for filters in the two catalogues.
     integer, intent(in) :: abinlengths(:, :), bbinlengths(:, :)
     ! Indices into filter, specific perturbation AUF model, and sky slice, for the respective catalogues.
     integer, intent(in) :: amagref(:), bmagref(:), amodrefind(:, :), bmodrefind(:, :), a_sky_inds(:), b_sky_inds(:)
     ! Number of contaminant fractions simulated in the perturbation AUF, and total lengths of small and
     ! large catalogues.
-    integer, intent(in) :: n_fracs, large_len, mini_crpts_len
+    integer, intent(in) :: n_fracs, large_len, cprt_max_len
     ! Astrometry and photometry for the two respective catalogues.
     real(dp), intent(in) :: a_astro(:, :), a_photo(:, :), b_astro(:, :), b_photo(:, :)
     ! Photometric "counterpart" and "field" likelihood and prior arrays.
@@ -47,21 +47,21 @@ subroutine find_island_probabilities(a_astro, a_photo, b_astro, b_photo, alist, 
     ! Fourier-space grids for perturbation AUF.
     real(dp), intent(in) :: rho(:), drho(:)
     ! Indices of matches and non-matches in the two catalogues.
-    integer, intent(out) :: acountinds(mini_crpts_len), bcountinds(mini_crpts_len), &
+    integer, intent(out) :: acountinds(cprt_max_len), bcountinds(cprt_max_len), &
     afieldinds(size(a_astro, 1)), bfieldinds(size(b_astro, 1))
     ! Contamination probabilities of each source in the pairs of matches.
-    real(dp), intent(out) :: acontamprob(n_fracs, mini_crpts_len), bcontamprob(n_fracs, mini_crpts_len)
+    real(dp), intent(out) :: acontamprob(n_fracs, cprt_max_len), bcontamprob(n_fracs, cprt_max_len)
     ! Eta and Xi -- log-likelihood-ratios in astrometry/photometry -- of each match, based on a one-to-one match.
     ! In the non-match case, nearest opposing island object's position and brightness are used.
-    real(dp), intent(out) :: etaarray(mini_crpts_len), xiarray(mini_crpts_len), afieldetas(size(a_astro, 1)), &
+    real(dp), intent(out) :: etaarray(cprt_max_len), xiarray(cprt_max_len), afieldetas(size(a_astro, 1)), &
     afieldxis(size(a_astro, 1)), bfieldetas(size(b_astro, 1)), bfieldxis(size(b_astro, 1))
     ! Average simulated contaminating flux for each match or non-match.
-    real(dp), intent(out) :: acontamflux(mini_crpts_len), bcontamflux(mini_crpts_len), afieldfluxs(size(a_astro, 1)), &
+    real(dp), intent(out) :: acontamflux(cprt_max_len), bcontamflux(cprt_max_len), afieldfluxs(size(a_astro, 1)), &
     bfieldfluxs(size(b_astro, 1))
     ! Probability of (non-)match.
-    real(dp), intent(out) :: probcarray(mini_crpts_len), probfaarray(size(a_astro, 1)), probfbarray(size(b_astro, 1))
+    real(dp), intent(out) :: probcarray(cprt_max_len), probfaarray(size(a_astro, 1)), probfbarray(size(b_astro, 1))
     ! Separations between pair of matches, or of nearest opposing island object if a non-match.
-    real(dp), intent(out) :: crptseps(mini_crpts_len), afieldseps(size(a_astro, 1)), bfieldseps(size(b_astro, 1))
+    real(dp), intent(out) :: crptseps(cprt_max_len), afieldseps(size(a_astro, 1)), bfieldseps(size(b_astro, 1))
     ! Indices into islands, or to map each island to a unique part of the larger array to avoid index clashes.
     integer :: i, j, match_cumulat_ind(size(alist, 2)), afield_cumulat_ind(size(alist, 2)), bfield_cumulat_ind(size(alist, 2))
     ! NaN, and temporary non-normalised posterior, and evidence, holders.
@@ -114,14 +114,14 @@ subroutine find_island_probabilities(a_astro, a_photo, b_astro, b_photo, alist, 
 !$OMP& crptsep, afield, bfield, afieldflux, bfieldflux, afieldsep, afieldeta, afieldxi, bfieldsep, bfieldeta, bfieldxi, prob, &
 !$OMP& integral) SHARED(a_astro, a_photo, b_astro, b_photo, c_array, fa_array, fb_array, c_priors, fa_priors, fb_priors, &
 !$OMP& abinsarray, bbinsarray, abinlengths, bbinlengths, afrac_grids, aflux_grids, afourier_grids, bfrac_grids, bflux_grids, &
-!$OMP& bfourier_grids, rho, drho, n_fracs, large_len, alist, blist, alist_, blist_, amagref, a_sky_inds, bmagref, b_sky_inds, &
+!$OMP& bfourier_grids, rho, drho, n_fracs, large_len, alist, blist, amagref, a_sky_inds, bmagref, b_sky_inds, &
 !$OMP& amodrefind, bmodrefind, acountinds, bcountinds, afieldinds, bfieldinds, acontamprob, bcontamprob, etaarray, xiarray, &
 !$OMP& acontamflux, bcontamflux, probcarray, crptseps, probfaarray, afieldfluxs, afieldseps, afieldetas, afieldxis, probfbarray, &
 !$OMP& bfieldfluxs, bfieldseps, bfieldetas, bfieldxis, agrplen, bgrplen, match_cumulat_ind, afield_cumulat_ind, &
 !$OMP& bfield_cumulat_ind, nan)
     do i = 1, size(alist, 2)
         if (agrplen(i) == 0) then
-            bfieldinds(bfield_cumulat_ind(i):bfield_cumulat_ind(i)+bgrplen(i)-1) = blist_(:bgrplen(i), i)
+            bfieldinds(bfield_cumulat_ind(i):bfield_cumulat_ind(i)+bgrplen(i)-1) = blist(:bgrplen(i), i)
             probfbarray(bfield_cumulat_ind(i):bfield_cumulat_ind(i)+bgrplen(i)-1) = 1
             do j = 1, bgrplen(i)
                 bfieldfluxs(bfield_cumulat_ind(i)+j-1) = bflux_grids( &
@@ -131,7 +131,7 @@ subroutine find_island_probabilities(a_astro, a_photo, b_astro, b_photo, alist, 
             bfieldetas(bfield_cumulat_ind(i):bfield_cumulat_ind(i)+bgrplen(i)-1) = nan
             bfieldxis(bfield_cumulat_ind(i):bfield_cumulat_ind(i)+bgrplen(i)-1) = nan
         else if (bgrplen(i) == 0) then
-            afieldinds(afield_cumulat_ind(i):afield_cumulat_ind(i)+agrplen(i)-1) = alist_(:agrplen(i), i)
+            afieldinds(afield_cumulat_ind(i):afield_cumulat_ind(i)+agrplen(i)-1) = alist(:agrplen(i), i)
             probfaarray(afield_cumulat_ind(i):afield_cumulat_ind(i)+agrplen(i)-1) = 1
             do j = 1, agrplen(i)
                 afieldfluxs(afield_cumulat_ind(i)+j-1) = aflux_grids( &
@@ -150,14 +150,12 @@ subroutine find_island_probabilities(a_astro, a_photo, b_astro, b_photo, alist, 
                 crptsep(min(agrplen(i), bgrplen(i))), afield(agrplen(i)), bfield(bgrplen(i)), afieldflux(agrplen(i)), &
                 bfieldflux(bgrplen(i)), afieldsep(agrplen(i)), afieldeta(agrplen(i)), afieldxi(agrplen(i)), &
                 bfieldsep(bgrplen(i)), bfieldeta(bgrplen(i)), bfieldxi(bgrplen(i)))
-            ! Lots of +1 indexing here as the pointers were all generated in Python. Note that *list_ does NOT
-            ! get +1 indexed because it's never used and only ends up documenting the full-scale indexes of
-            ! (non-)matches, and might as well stay in Python-indexing throughout.
+            ! Lots of +1 indexing here as the pointers were all generated in Python.
             call find_single_island_prob(a_astro, a_photo, b_astro, b_photo, c_array, fa_array, fb_array, c_priors, fa_priors, &
                 fb_priors, abinsarray, bbinsarray, abinlengths, bbinlengths, afrac_grids, aflux_grids, afourier_grids, &
                 bfrac_grids, bflux_grids, bfourier_grids, rho, drho, n_fracs, large_len, alist(:agrplen(i), i)+1, &
-                blist(:bgrplen(i), i)+1, alist_(:agrplen(i), i), blist_(:bgrplen(i), i), amagref(alist(:agrplen(i), i)+1)+1, &
-                a_sky_inds(alist(:agrplen(i), i)+1)+1, bmagref(blist(:bgrplen(i), i)+1)+1, b_sky_inds(blist(:bgrplen(i), i)+1)+1, &
+                blist(:bgrplen(i), i)+1, amagref(alist(:agrplen(i), i)+1)+1,  a_sky_inds(alist(:agrplen(i), i)+1)+1,&
+                bmagref(blist(:bgrplen(i), i)+1)+1, b_sky_inds(blist(:bgrplen(i), i)+1)+1, &
                 amodrefind(:, alist(:agrplen(i), i)+1)+1, bmodrefind(:, blist(:bgrplen(i), i)+1)+1, acrpts, bcrpts, acrptscontp, &
                 bcrptscontp, etacrpts, xicrpts, acrptflux, bcrptflux, crptsep, afield, bfield, &
                 afieldflux, bfieldflux, afieldsep, afieldeta, afieldxi, bfieldsep, bfieldeta, bfieldxi, prob, integral)
@@ -200,7 +198,7 @@ end subroutine find_island_probabilities
 
 subroutine find_single_island_prob(a_astro, a_photo, b_astro, b_photo, c_array, fa_array, fb_array, c_priors, fa_priors, &
     fb_priors, abinsarray, bbinsarray, abinlengths, bbinlengths, afrac_grids, aflux_grids, afourier_grids, bfrac_grids, &
-    bflux_grids, bfourier_grids, rho, drho, n_fracs, large_len, aperm, bperm, aperm_, bperm_, aused, qa, bused, qb, arefinds, &
+    bflux_grids, bfourier_grids, rho, drho, n_fracs, large_len, aperm, bperm, aused, qa, bused, qb, arefinds, &
     brefinds, acrpts, bcrpts, acrptscontp, bcrptscontp, etacrpts, xicrpts, acrptflux, bcrptflux, crptseps, afield, bfield, &
     afieldflux, bfieldflux, afieldseps, afieldeta, afieldxi, bfieldseps, bfieldeta, bfieldxi, prob, integral)
     ! Calculate a single island match and non-match permutation. For each combination of N catalogue "a"
@@ -209,8 +207,8 @@ subroutine find_single_island_prob(a_astro, a_photo, b_astro, b_photo, c_array, 
     ! contamination probabilities for matches.
     integer, parameter :: dp = kind(0.0d0)  ! double precision
     integer, parameter :: int64 = selected_int_kind(15)  ! 64-bit integer
-    ! Small- and large-index versions of the indices of the objects in each catalogue in this island.
-    integer, intent(in) :: aperm(:), bperm(:), aperm_(:), bperm_(:)
+    ! Indices of the objects in each catalogue in this island.
+    integer, intent(in) :: aperm(:), bperm(:)
     ! Magnitude and sky filter indices for catalogues 'a' and 'b'.
     integer, intent(in) :: aused(:), qa(:), bused(:), qb(:)
     ! Perturbation AUF grid indices for each source in the two catalogues.
@@ -398,8 +396,9 @@ subroutine find_single_island_prob(a_astro, a_photo, b_astro, b_photo, c_array, 
     bcrptflux(:) = -100.0_dp
     crptseps(:) = -100.0_dp
 
-    afield(:) = aperm_(:)
-    bfield(:) = bperm_(:)
+    ! We fortran-indexed the permutation arrays coming into the function.
+    afield(:) = aperm(:) - 1
+    bfield(:) = bperm(:) - 1
     afieldflux(:) = acontamfluxgrid(:)
     bfieldflux(:) = bcontamfluxgrid(:)
 
@@ -509,9 +508,9 @@ subroutine find_single_island_prob(a_astro, a_photo, b_astro, b_photo, c_array, 
                     afieldflux(:) = -100.0_dp
                     bfieldflux(:) = -100.0_dp
                     do k = 1, size(ya)
-                        acrpts(k) = aperm_(ya(k))
+                        acrpts(k) = aperm(ya(k)) - 1
                         acrptflux(k) = acontamfluxgrid(ya(k))
-                        bcrpts(k) = bperm_(yb(k))
+                        bcrpts(k) = bperm(yb(k)) - 1
                         bcrptflux(k) = bcontamfluxgrid(yb(k))
                         acrptscontp(:, k) = acontamprobgrid(:, ya(k), yb(k))
                         bcrptscontp(:, k) = bcontamprobgrid(:, ya(k), yb(k))
@@ -520,11 +519,11 @@ subroutine find_single_island_prob(a_astro, a_photo, b_astro, b_photo, c_array, 
                         crptseps(k) = seps(ya(k), yb(k))
                     end do
                     do k = 1, size(ta)
-                        afield(k) = aperm_(ta(k))
+                        afield(k) = aperm(ta(k)) - 1
                         afieldflux(k) = acontamfluxgrid(ta(k))
                     end do
                     do k = 1, size(tb)
-                        bfield(k) = bperm_(tb(k))
+                        bfield(k) = bperm(tb(k)) - 1
                         bfieldflux(k) = bcontamfluxgrid(tb(k))
                     end do
                     afieldseps(:) = nan

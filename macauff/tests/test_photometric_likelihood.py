@@ -29,7 +29,6 @@ class TestOneSidedPhotometricLikelihood:
 
         self.afilts, self.bfilts = np.array(['G', 'BP', 'RP']), np.array(['W1', 'W2', 'W3', 'W4'])
 
-        self.mem_chunk_num = 2
         self.include_phot_like, self.use_phot_priors = False, False
 
         os.makedirs(self.a_cat_folder_path, exist_ok=True)
@@ -58,20 +57,13 @@ class TestOneSidedPhotometricLikelihood:
 
             setattr(self, '{}_photo'.format(name), a)
 
-        old_line = 'mem_chunk_num = 10'
-        new_line = 'mem_chunk_num = 2\n'
+        old_line = 'cf_region_points = 131 134 4 -1 1 3'
+        new_line = 'cf_region_points = 131.5 133.5 3 -0.5 0.5 2\n'
         f = open(os.path.join(os.path.dirname(__file__), 'data/crossmatch_params.txt')).readlines()
         idx = np.where([old_line in line for line in f])[0][0]
         _replace_line(os.path.join(os.path.dirname(__file__), 'data/crossmatch_params.txt'),
                       idx, new_line, out_file=os.path.join(os.path.dirname(__file__),
                       'data/crossmatch_params_.txt'))
-        old_line = 'cf_region_points = 131 134 4 -1 1 3'
-        new_line = 'cf_region_points = 131.5 133.5 3 -0.5 0.5 2\n'
-        f = open(os.path.join(os.path.dirname(__file__),
-                 'data/crossmatch_params_.txt')).readlines()
-        idx = np.where([old_line in line for line in f])[0][0]
-        _replace_line(os.path.join(os.path.dirname(__file__), 'data/crossmatch_params_.txt'),
-                      idx, new_line)
         old_line = 'cross_match_extent = 131 138 -3 3'
         new_line = 'cross_match_extent = 131 134 -3 3\n'
         f = open(os.path.join(os.path.dirname(__file__),
@@ -87,7 +79,7 @@ class TestOneSidedPhotometricLikelihood:
             np.save('{}/con_cat_photo.npy'.format(folder), getattr(self, '{}_photo'.format(name)))
         pld = compute_photometric_likelihoods(
             self.joint_folder_path, self.a_cat_folder_path, self.b_cat_folder_path, self.afilts,
-            self.bfilts, self.mem_chunk_num, self.cf_points, self.cf_areas, self.include_phot_like,
+            self.bfilts, self.cf_points, self.cf_areas, self.include_phot_like,
             self.use_phot_priors, self.group_sources_data)
 
         for a, shape, value in zip([pld.c_priors, pld.fa_priors, pld.fb_priors],
@@ -140,7 +132,7 @@ class TestOneSidedPhotometricLikelihood:
 
         pld = compute_photometric_likelihoods(
             self.joint_folder_path, self.a_cat_folder_path, self.b_cat_folder_path, self.afilts,
-            self.bfilts, self.mem_chunk_num, self.cf_points, self.cf_areas, self.include_phot_like,
+            self.bfilts, self.cf_points, self.cf_areas, self.include_phot_like,
             self.use_phot_priors, self.group_sources_data)
 
         abinlen = pld.abinlengths
@@ -175,7 +167,7 @@ class TestOneSidedPhotometricLikelihood:
 
         pld = compute_photometric_likelihoods(
             self.joint_folder_path, self.a_cat_folder_path, self.b_cat_folder_path, self.afilts,
-            self.bfilts, self.mem_chunk_num, self.cf_points, self.cf_areas, self.include_phot_like,
+            self.bfilts, self.cf_points, self.cf_areas, self.include_phot_like,
             self.use_phot_priors, self.group_sources_data)
 
         abinlen = pld.abinlengths
@@ -358,7 +350,6 @@ class TestFullPhotometricLikelihood:
 
         self.afilts, self.bfilts = np.array(['G']), np.array(['G'])
 
-        self.mem_chunk_num = 2
         self.include_phot_like, self.use_phot_priors = True, True
 
         os.makedirs(self.a_cat_folder_path, exist_ok=True)
@@ -440,9 +431,8 @@ class TestFullPhotometricLikelihood:
                 with pytest.raises(ValueError, match='{} must be supplied if '.format(msg)):
                     compute_photometric_likelihoods(
                         self.joint_folder_path, self.a_cat_folder_path, self.b_cat_folder_path,
-                        self.afilts, self.bfilts, self.mem_chunk_num, self.cf_points,
-                        self.cf_areas, ipl, upp, self.group_sources_data,
-                        bright_frac=bf, field_frac=ff)
+                        self.afilts, self.bfilts, self.cf_points, self.cf_areas, ipl, upp,
+                        self.group_sources_data, bright_frac=bf, field_frac=ff)
 
     def test_compute_phot_like(self):
         for folder, name in zip([self.a_cat_folder_path, self.b_cat_folder_path], ['a', 'b']):
@@ -450,9 +440,9 @@ class TestFullPhotometricLikelihood:
             np.save('{}/con_cat_photo.npy'.format(folder), getattr(self, '{}_photo'.format(name)))
         pld = compute_photometric_likelihoods(
             self.joint_folder_path, self.a_cat_folder_path, self.b_cat_folder_path,
-            self.afilts, self.bfilts, self.mem_chunk_num, self.cf_points,
-            self.cf_areas, self.include_phot_like, self.use_phot_priors, self.group_sources_data,
-            bright_frac=self.Y_b, field_frac=self.Y_f)
+            self.afilts, self.bfilts, self.cf_points, self.cf_areas, self.include_phot_like,
+            self.use_phot_priors, self.group_sources_data, bright_frac=self.Y_b,
+            field_frac=self.Y_f)
 
         c_p = pld.c_priors
         c_l = pld.c_array
@@ -503,9 +493,9 @@ class TestFullPhotometricLikelihood:
         include_phot_like = False
         pld = compute_photometric_likelihoods(
             self.joint_folder_path, self.a_cat_folder_path, self.b_cat_folder_path,
-            self.afilts, self.bfilts, self.mem_chunk_num, self.cf_points,
-            self.cf_areas, include_phot_like, self.use_phot_priors, self.group_sources_data,
-            bright_frac=self.Y_b, field_frac=self.Y_f)
+            self.afilts, self.bfilts, self.cf_points, self.cf_areas, include_phot_like,
+            self.use_phot_priors, self.group_sources_data, bright_frac=self.Y_b,
+            field_frac=self.Y_f)
 
         c_p = pld.c_priors
         c_l = pld.c_array

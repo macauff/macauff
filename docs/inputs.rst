@@ -51,7 +51,7 @@ These parameters are only provided in the single, common-parameter input file, a
 
 There are some parameters that must be given in all runs:
 
-``joint_folder_path``, ``include_perturb_auf``, ``include_phot_like``, ``use_phot_priors``, ``cross_match_extent``, ``mem_chunk_num``, ``pos_corr_dist``, ``cf_region_type``, ``cf_region_frame``, ``cf_region_points``, ``real_hankel_points``, ``four_hankel_points``, ``four_max_rho``, ``int_fracs``, ``make_output_csv``, and ``n_pool``;
+``joint_folder_path``, ``include_perturb_auf``, ``include_phot_like``, ``use_phot_priors``, ``cross_match_extent``, ``pos_corr_dist``, ``cf_region_type``, ``cf_region_frame``, ``cf_region_points``, ``real_hankel_points``, ``four_hankel_points``, ``four_max_rho``, ``int_fracs``, ``make_output_csv``, and ``n_pool``;
 
 options which need to be supplied if ``make_output_csv`` is ``True``:
 
@@ -92,10 +92,6 @@ The maximum extent of the matching process. When not matching all-sky catalogues
 
 .. note::
     In cases where the boundary defining the cross-match overlaps the 0-360 boundary of the given coordinate system, the longitudes should be given relative to 0 degrees. For example, if we had a boundary that ran from 350 degrees up to 360 (0) degrees, and on to 10 degrees, ``cross_match_extent`` would have for its input longitudes ``-10 10``. Internally the software is able to handle the boundary for source coordinates, but requires the extents to be correctly input for these regions.
-
-``mem_chunk_num``
-
-The number of smaller subsets into which to break various loops throughout the cross-match process. Used to reduce the memory usage of the process at any given time, in case of catalogues too large to fit into memory at once.
 
 ``pos_corr_dist``
 

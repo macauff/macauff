@@ -155,39 +155,6 @@ def map_large_index_to_small_index(inds, length):
     return inds_map, inds_unique_flat
 
 
-def _load_single_sky_slice(cat_name, ind, sky_inds):
-    '''
-    Function to return a sub-set of the nearest sky indices of a given catalogue.
-
-    Parameters
-    ----------
-    cat_name : string
-        String defining whether this function was called on catalogue "a" or "b".
-    ind : float
-        The value of the sky indices, as defined in ``distribute_sky_indices``,
-        to return a sub-set of the larger catalogue. This value represents
-        the index of a given on-sky position, used to construct the "counterpart"
-        and "field" likelihoods.
-    sky_inds : numpy.ndarray
-        The given catalogue's ``distribute_sky_indices`` values, to compare
-        with ``ind``.
-
-    Returns
-    -------
-    sky_cut : numpy.ndarray
-        A boolean array, indicating whether each element in ``sky_inds`` matches
-        ``ind`` or not.
-    '''
-    sky_cut = np.zeros(dtype=bool, shape=(len(sky_inds),))
-
-    di = max(1, len(sky_inds) // 20)
-
-    for i in range(0, len(sky_inds), di):
-        sky_cut[i:i+di] = sky_inds[i:i+di] == ind
-
-    return sky_cut
-
-
 def _load_rectangular_slice(cat_name, a, lon1, lon2, lat1, lat2, padding):
     '''
     Loads all sources in a catalogue within a given separation of a rectangle
@@ -220,63 +187,43 @@ def _load_rectangular_slice(cat_name, a, lon1, lon2, lat1, lat2, padding):
         Boolean array, indicating whether each source in ``a`` is within ``padding``
         of the rectangle defined by ``lon1``, ``lon2``, ``lat1``, and ``lat2``.
     '''
-
-    sky_cut_1 = np.empty(len(a), bool)
-    sky_cut_2 = np.empty(len(a), bool)
-    sky_cut_3 = np.empty(len(a), bool)
-    sky_cut_4 = np.empty(len(a), bool)
-    sky_cut = np.empty(len(a), bool)
-
-    di = max(1, len(a) // 20)
-    # Iterate over each small slice of the larger array, checking for upper
-    # and lower longitude, then latitude, criterion matching.
     lon_shift = 180 - (lon2 + lon1)/2
-    for i in range(0, len(a), di):
-        _lon_cut(i, a, di, lon1, padding, sky_cut_1, 'greater', lon_shift)
-    for i in range(0, len(a), di):
-        _lon_cut(i, a, di, lon2, padding, sky_cut_2, 'lesser', lon_shift)
 
-    for i in range(0, len(a), di):
-        _lat_cut(i, a, di, lat1, padding, sky_cut_3, 'greater')
-    for i in range(0, len(a), di):
-        _lat_cut(i, a, di, lat2, padding, sky_cut_4, 'lesser')
-
-    for i in range(0, len(a), di):
-        sky_cut[i:i+di] = (sky_cut_1[i:i+di] & sky_cut_2[i:i+di] &
-                           sky_cut_3[i:i+di] & sky_cut_4[i:i+di])
+    sky_cut = (_lon_cut(a, lon1, padding, 'greater', lon_shift) &
+               _lon_cut(a, lon2, padding, 'lesser', lon_shift) &
+               _lat_cut(a, lat1, padding, 'greater') & _lat_cut(a, lat2, padding, 'lesser'))
 
     return sky_cut
 
 
-def _lon_cut(i, a, di, lon, padding, sky_cut, inequality, lon_shift):
+def _lon_cut(a, lon, padding, inequality, lon_shift):
     '''
     Function to calculate the longitude inequality criterion for astrometric
     sources relative to a rectangle defining boundary limits.
 
     Parameters
     ----------
-    i : integer
-        Index into ``sky_cut`` for slicing.
     a : numpy.ndarray
         The main astrometric catalogue to be sliced.
-    di : integer
-        Index stride value, for slicing.
     lon : float
         Longitude at which to cut sources, either above or below, in degrees.
     padding : float
         Maximum allowed sky separation the "wrong" side of ``lon``, to allow
         for an increase in sky box size to ensure all overlaps are caught in
         ``get_max_overlap`` or ``get_max_indices``.
-    sky_cut : numpy.ndarray
-        Array into which to store boolean flags for whether source meets the
-        sky position criterion.
     inequality : string, ``greater`` or ``lesser``
         Flag to determine whether a source is either above or below the
         given ``lon`` value.
     lon_shift : float
         Value by which to "move" longitudes to avoid meridian overflow issues.
+
+    Returns
+    -------
+    sky_cut : numpy.ndarray
+        Boolean array indicating whether the objects in ``a`` are left or right
+        of the given ``lon`` value.
     '''
-    b = a[i:i+di, 0] + lon_shift
+    b = a[:, 0] + lon_shift
     b[b > 360] = b[b > 360] - 360
     b[b < 0] = b[b < 0] + 360
     # While longitudes in the data are 358, 359, 0/360, 1, 2, longitude
@@ -294,39 +241,39 @@ def _lon_cut(i, a, di, lon, padding, sky_cut, inequality, lon_shift):
     # constant latitude this reduces to
     # r = 2 arcsin(|cos(lat) * sin(delta-lon/2)|).
     if padding > 0:
-        sky_cut[i:i+di] = (hav_dist_constant_lat(a[i:i+di, 0], a[i:i+di, 1], lon) <=
-                           padding) | inequal_lon_cut
+        sky_cut = (hav_dist_constant_lat(a[:, 0], a[:, 1], lon) <= padding) | inequal_lon_cut
     # However, in both zero and non-zero padding factor cases, we always require
     # the source to be above or below the longitude for sky_cut_1 and sky_cut_2
     # in load_fourier_grid_cutouts, respectively.
     else:
-        sky_cut[i:i+di] = inequal_lon_cut
+        sky_cut = inequal_lon_cut
+
+    return sky_cut
 
 
-def _lat_cut(i, a, di, lat, padding, sky_cut, inequality):
+def _lat_cut(a, lat, padding, inequality):
     '''
     Function to calculate the latitude inequality criterion for astrometric
     sources relative to a rectangle defining boundary limits.
 
     Parameters
     ----------
-    i : integer
-        Index into ``sky_cut`` for slicing.
     a : numpy.ndarray
         The main astrometric catalogue to be sliced.
-    di : integer
-        Index stride value, for slicing.
     lat : float
         Latitude at which to cut sources, either above or below, in degrees.
     padding : float
         Maximum allowed sky separation the "wrong" side of ``lat``, to allow
         for an increase in sky box size to ensure all overlaps are caught in
         ``get_max_overlap`` or ``get_max_indices``.
-    sky_cut : numpy.ndarray
-        Array into which to store boolean flags for whether source meets the
-        sky position criterion.
     inequality : string, ``greater`` or ``lesser``
         Flag to determine whether a source is either above or below the
+        given ``lat`` value.
+
+    Returns
+    -------
+    sky_cut : numpy.ndarray
+        Boolean array indicating whether ``a`` sources are above or below the
         given ``lat`` value.
     '''
 
@@ -337,14 +284,16 @@ def _lat_cut(i, a, di, lat, padding, sky_cut, inequality):
     if padding > 0:
         if inequality == 'lesser':
             # Allow for small floating point rounding errors in comparison.
-            sky_cut[i:i+di] = a[i:i+di, 1] <= lat + padding + 1e-6
+            sky_cut = a[:, 1] <= lat + padding + 1e-6
         else:
-            sky_cut[i:i+di] = a[i:i+di, 1] >= lat - padding - 1e-6
+            sky_cut = a[:, 1] >= lat - padding - 1e-6
     else:
         if inequality == 'lesser':
-            sky_cut[i:i+di] = a[i:i+di, 1] <= lat + 1e-6
+            sky_cut = a[:, 1] <= lat + 1e-6
         else:
-            sky_cut[i:i+di] = a[i:i+di, 1] >= lat - 1e-6
+            sky_cut = a[:, 1] >= lat - 1e-6
+
+    return sky_cut
 
 
 def min_max_lon(a):

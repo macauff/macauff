@@ -36,7 +36,6 @@ class TestCreatePerturbAUF:
                                   os.path.join(os.path.dirname(__file__), 'data/cat_b_params.txt'))
         self.cm.a_auf_region_points = np.array([[0, 0], [50, 50]], dtype=float)
         self.cm.b_auf_region_points = np.array([[0, 0], [50, 50]], dtype=float)
-        self.cm.mem_chunk_num = 4
 
     def test_no_perturb_outputs(self):
         # Randomly generate two catalogues (x3 files) between coordinates
@@ -418,14 +417,11 @@ class TestMakePerturbAUFs():
         self.num_trials = 50000
         self.j0s = mff.calc_j0(self.rho[:-1]+self.drho/2, self.r[:-1]+self.dr/2)
 
-        self.mem_chunk_num = 1
         self.delta_mag_cuts = np.array([10])
 
         self.args = [self.auf_folder, self.cat_folder, self.filters, self.auf_points,
                      self.r, self.dr, self.rho, self.drho, self.which_cat,
-                     self.include_perturb_auf, self.mem_chunk_num]
-
-        self.files_per_auf_sim = 7
+                     self.include_perturb_auf]
 
     def test_raise_value_errors(self):
         with pytest.raises(ValueError, match='tri_set_name must be given if include_perturb_auf ' +

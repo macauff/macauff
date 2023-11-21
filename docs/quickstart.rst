@@ -81,9 +81,6 @@ crossmatch_params.txt::
     # Maximum extent of cross-match, used in non-all-sky cases to remove sources suffering potential edge effects -- min/max first axis coordinates (ra/l) then min/max second axis coordinates (dec/b)
     cross_match_extent = 0 0.25 50 50.3
 
-    # Number of chunks to break each catalogue into when splitting larger catalogues up for memory reasons
-    mem_chunk_num = 2
-
     # Integral fractions for various error circle cutouts used during the cross-match process. Should be space-separated floats, in the order of <bright error circle fraction>, <field error circle fraction>, <potential counterpart integral limit>
     int_fracs = 0.63 0.9 0.999
 

@@ -9,7 +9,7 @@ import scipy.special
 
 from ..misc_functions import (create_auf_params_grid, load_small_ref_auf_grid,
                               hav_dist_constant_lat, map_large_index_to_small_index,
-                              _load_rectangular_slice, _load_single_sky_slice, min_max_lon)
+                              _load_rectangular_slice, min_max_lon)
 from ..misc_functions_fortran import misc_functions_fortran as mff
 
 
@@ -155,13 +155,3 @@ def test_min_max_lon():
             min_n, max_n = min_lon - 360, max_lon
         new_min_lon, new_max_lon = min_max_lon(a)
         assert_allclose([new_min_lon, new_max_lon], [min_n, max_n], rtol=0.01)
-
-
-def test_load_single_sky_slice():
-    cat_name = ''
-    ind = 3
-
-    rng = np.random.default_rng(6123123)
-    sky_inds = rng.choice(5, size=5000)
-    sky_cut = _load_single_sky_slice(cat_name, ind, sky_inds)
-    assert np.all(sky_cut == (sky_inds == ind))

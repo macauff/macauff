@@ -323,9 +323,9 @@ class CrossMatch():
                 # Shape, mapped to each of astro/photo/magref respectively,
                 # should map to 3, number of magnitudes, and 1, where magref is
                 # a 1-D array but the other two are 2-D.
-                fn_a = np.load('{}/con_cat_astro.npy'.format(path), mmap_mode='r')
-                fn_p = np.load('{}/con_cat_photo.npy'.format(path), mmap_mode='r')
-                fn_m = np.load('{}/magref.npy'.format(path), mmap_mode='r')
+                fn_a = np.load('{}/con_cat_astro.npy'.format(path))
+                fn_p = np.load('{}/con_cat_photo.npy'.format(path))
+                fn_m = np.load('{}/magref.npy'.format(path))
                 if len(fn_a.shape) != 2 or len(fn_p.shape) != 2 or len(fn_m.shape) != 1:
                     raise ValueError("Incorrect number of dimensions in consolidated "
                                      "catalogue {} files.".format(catname))
@@ -564,7 +564,7 @@ class CrossMatch():
                 [self.match_out_csv_name, self.a_nonmatch_out_csv_name,
                  self.b_nonmatch_out_csv_name], [self.a_cat_col_names, self.b_cat_col_names],
                 [self.a_cat_col_nums, self.b_cat_col_nums], [self.a_cat_name, self.b_cat_name],
-                self.mem_chunk_num, [self.a_input_npy_folder, self.b_input_npy_folder],
+                [self.a_input_npy_folder, self.b_input_npy_folder],
                 headers=[self.a_csv_has_header, self.b_csv_has_header],
                 extra_col_name_lists=[self.a_extra_col_names, self.b_extra_col_names],
                 extra_col_num_lists=[self.a_extra_col_nums, self.b_extra_col_nums])
@@ -774,7 +774,7 @@ class CrossMatch():
                            'cf_region_type', 'cf_region_frame', 'cf_region_points',
                            'joint_folder_path', 'pos_corr_dist', 'real_hankel_points',
                            'four_hankel_points', 'four_max_rho', 'cross_match_extent',
-                           'mem_chunk_num', 'int_fracs', 'make_output_csv', 'n_pool']:
+                           'int_fracs', 'make_output_csv', 'n_pool']:
             if check_flag not in joint_config:
                 raise ValueError("Missing key {} from joint metadata file.".format(check_flag))
 
@@ -1092,15 +1092,6 @@ class CrossMatch():
         if len(b) != 4:
             raise ValueError("cross_match_extent should contain four elements.")
         self.cross_match_extent = b
-
-        try:
-            a = joint_config['mem_chunk_num']
-            if float(a).is_integer():
-                self.mem_chunk_num = int(a)
-            else:
-                raise ValueError("mem_chunk_num should be a single integer number.")
-        except ValueError:
-            raise ValueError("mem_chunk_num should be a single integer number.")
 
         a = joint_config['int_fracs'].split()
         try:
@@ -1510,7 +1501,7 @@ class CrossMatch():
         self.a_modelrefinds, self.a_perturb_auf_outputs = perturb_auf_func(
             self.a_auf_folder_path, self.a_cat_folder_path, self.a_filt_names,
             self.a_auf_region_points, self.r, self.dr, self.rho, self.drho, 'a',
-            self.include_perturb_auf, self.mem_chunk_num, **_kwargs)
+            self.include_perturb_auf, **_kwargs)
 
         t = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         print('{} Rank {}, chunk {}: Creating empirical perturbation AUFs for catalogue "b"...'
@@ -1551,7 +1542,7 @@ class CrossMatch():
         self.b_modelrefinds, self.b_perturb_auf_outputs = perturb_auf_func(
             self.b_auf_folder_path, self.b_cat_folder_path, self.b_filt_names,
             self.b_auf_region_points, self.r, self.dr, self.rho, self.drho, 'b',
-            self.include_perturb_auf, self.mem_chunk_num, **_kwargs)
+            self.include_perturb_auf, **_kwargs)
 
     def group_sources(self, group_func=make_island_groupings):
         '''
@@ -1579,7 +1570,7 @@ class CrossMatch():
                        self.b_filt_names, self.a_cat_name, self.b_cat_name, self.a_modelrefinds,
                        self.b_modelrefinds, self.r, self.dr, self.rho, self.drho,
                        self.j1s, self.pos_corr_dist, self.cross_match_extent, self.int_fracs,
-                       self.mem_chunk_num, self.include_phot_like, self.use_phot_priors,
+                       self.include_phot_like, self.use_phot_priors,
                        self.n_pool, self.a_perturb_auf_outputs, self.b_perturb_auf_outputs)
 
     def calculate_phot_like(self, phot_like_func=compute_photometric_likelihoods):
@@ -1607,9 +1598,9 @@ class CrossMatch():
             field_frac = None
         self.phot_like_data = phot_like_func(
             self.joint_folder_path, self.a_cat_folder_path, self.b_cat_folder_path,
-            self.a_filt_names, self.b_filt_names, self.mem_chunk_num, self.cf_region_points,
-            self.cf_areas, self.include_phot_like, self.use_phot_priors, self.group_sources_data,
-            bright_frac, field_frac)
+            self.a_filt_names, self.b_filt_names, self.cf_region_points, self.cf_areas,
+            self.include_phot_like, self.use_phot_priors, self.group_sources_data, bright_frac,
+            field_frac)
 
     def _calculate_cf_areas(self):
         '''
@@ -1665,5 +1656,5 @@ class CrossMatch():
             self.joint_folder_path, self.a_cat_folder_path, self.b_cat_folder_path,
             self.a_filt_names, self.b_filt_names, self.a_auf_region_points,
             self.b_auf_region_points, self.a_modelrefinds, self.b_modelrefinds, self.rho, self.drho,
-            len(self.delta_mag_cuts), self.mem_chunk_num, self.group_sources_data,
+            len(self.delta_mag_cuts), self.group_sources_data,
             self.phot_like_data, self.a_perturb_auf_outputs, self.b_perturb_auf_outputs)

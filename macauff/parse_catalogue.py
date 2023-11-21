@@ -161,8 +161,8 @@ def csv_to_npy(input_folder, input_filename, output_folder, astro_cols, photo_co
 
 def npy_to_csv(input_csv_folders, input_match_folder, output_folder, csv_filenames,
                output_filenames, column_name_lists, column_num_lists, extra_col_cat_names,
-               mem_chunk_num, input_npy_folders, headers=[False, False],
-               extra_col_name_lists=[None, None], extra_col_num_lists=[None, None]):
+               input_npy_folders, headers=[False, False], extra_col_name_lists=[None, None],
+               extra_col_num_lists=[None, None]):
     '''
     Function to convert output .npy files, as created during the cross-match
     process, and create a .csv file of matches and non-matches, combining columns
@@ -196,9 +196,6 @@ def npy_to_csv(input_csv_folders, input_match_folder, output_folder, csv_filenam
         List of two strings, one per catalogue, indicating the names of the two
         catalogues, to append to the front of the derived contamination-based
         values included in the output datasets.
-    mem_chunk_num : integer
-        Indicator of how many subsets of the catalogue to load each catalogue in,
-        for memory related issues.
     input_npy_folders : list of strings
         List of folders in which the respective catalogues' .npy files were
         saved to, as part of ``csv_to_npy``, in the same order as
@@ -247,23 +244,23 @@ def npy_to_csv(input_csv_folders, input_match_folder, output_folder, csv_filenam
                               "catalogue.".format(entry))
         if extra_col_num_lists[i] is not None:
             cols = np.append(cols, extra_col_name_lists[i])
-    ac = np.load('{}/pairing/ac.npy'.format(input_match_folder), mmap_mode='r')
-    bc = np.load('{}/pairing/bc.npy'.format(input_match_folder), mmap_mode='r')
-    p = np.load('{}/pairing/pc.npy'.format(input_match_folder), mmap_mode='r')
-    eta = np.load('{}/pairing/eta.npy'.format(input_match_folder), mmap_mode='r')
-    xi = np.load('{}/pairing/xi.npy'.format(input_match_folder), mmap_mode='r')
-    a_avg_cont = np.load('{}/pairing/acontamflux.npy'.format(input_match_folder), mmap_mode='r')
-    b_avg_cont = np.load('{}/pairing/bcontamflux.npy'.format(input_match_folder), mmap_mode='r')
-    acontprob = np.load('{}/pairing/pacontam.npy'.format(input_match_folder), mmap_mode='r')
-    bcontprob = np.load('{}/pairing/pbcontam.npy'.format(input_match_folder), mmap_mode='r')
-    seps = np.load('{}/pairing/crptseps.npy'.format(input_match_folder), mmap_mode='r')
+    ac = np.load('{}/pairing/ac.npy'.format(input_match_folder))
+    bc = np.load('{}/pairing/bc.npy'.format(input_match_folder))
+    p = np.load('{}/pairing/pc.npy'.format(input_match_folder))
+    eta = np.load('{}/pairing/eta.npy'.format(input_match_folder))
+    xi = np.load('{}/pairing/xi.npy'.format(input_match_folder))
+    a_avg_cont = np.load('{}/pairing/acontamflux.npy'.format(input_match_folder))
+    b_avg_cont = np.load('{}/pairing/bcontamflux.npy'.format(input_match_folder))
+    acontprob = np.load('{}/pairing/pacontam.npy'.format(input_match_folder))
+    bcontprob = np.load('{}/pairing/pbcontam.npy'.format(input_match_folder))
+    seps = np.load('{}/pairing/crptseps.npy'.format(input_match_folder))
 
     if input_npy_folders[0] is not None:
         cols = np.append(cols, ['{}_FIT_SIG'.format(extra_col_cat_names[0])])
-        a_concatastro = np.load('{}/con_cat_astro.npy'.format(input_npy_folders[0]), mmap_mode='r')
+        a_concatastro = np.load('{}/con_cat_astro.npy'.format(input_npy_folders[0]))
     if input_npy_folders[1] is not None:
         cols = np.append(cols, ['{}_FIT_SIG'.format(extra_col_cat_names[1])])
-        b_concatastro = np.load('{}/con_cat_astro.npy'.format(input_npy_folders[1]), mmap_mode='r')
+        b_concatastro = np.load('{}/con_cat_astro.npy'.format(input_npy_folders[1]))
 
     n_amags, n_bmags = len(column_name_lists[0]) - 3, len(column_name_lists[1]) - 3
     if extra_col_num_lists[0] is None:
@@ -289,57 +286,53 @@ def npy_to_csv(input_csv_folders, input_match_folder, output_folder, csv_filenam
     n_matches = len(ac)
     match_df = pd.DataFrame(columns=cols, index=np.arange(0, n_matches))
 
-    for cnum in range(0, mem_chunk_num):
-        lowind = np.floor(n_matches*cnum/mem_chunk_num).astype(int)
-        highind = np.floor(n_matches*(cnum+1)/mem_chunk_num).astype(int)
-        for i in column_name_lists[0]:
-            match_df[i].iloc[lowind:highind] = cat_a[i].iloc[ac[lowind:highind]].values
-        for i in column_name_lists[1]:
-            match_df[i].iloc[lowind:highind] = cat_b[i].iloc[bc[lowind:highind]].values
-        match_df.iloc[lowind:highind, 6+n_amags+n_bmags] = p[lowind:highind]
-        match_df.iloc[lowind:highind, 6+n_amags+n_bmags+1] = seps[lowind:highind]
-        match_df.iloc[lowind:highind, 6+n_amags+n_bmags+2] = eta[lowind:highind]
-        match_df.iloc[lowind:highind, 6+n_amags+n_bmags+3] = xi[lowind:highind]
-        match_df.iloc[lowind:highind, 6+n_amags+n_bmags+4] = a_avg_cont[lowind:highind]
-        match_df.iloc[lowind:highind, 6+n_amags+n_bmags+5] = b_avg_cont[lowind:highind]
-        for i in range(acontprob.shape[0]):
-            match_df.iloc[lowind:highind, 6+n_amags+n_bmags+6+i] = acontprob[i, lowind:highind]
-        for i in range(bcontprob.shape[0]):
-            match_df.iloc[lowind:highind, 6+n_amags+n_bmags+6+acontprob.shape[0]+i] = bcontprob[
-                i, lowind:highind]
-        if extra_col_name_lists[0] is not None:
-            for i in extra_col_name_lists[0]:
-                match_df[i].iloc[lowind:highind] = cat_a[i].iloc[ac[lowind:highind]].values
-        if extra_col_name_lists[1] is not None:
-            for i in extra_col_name_lists[1]:
-                match_df[i].iloc[lowind:highind] = cat_b[i].iloc[bc[lowind:highind]].values
+    for i in column_name_lists[0]:
+        match_df[i].iloc[:] = cat_a[i].iloc[ac].values
+    for i in column_name_lists[1]:
+        match_df[i].iloc[:] = cat_b[i].iloc[bc].values
+    match_df.iloc[:, 6+n_amags+n_bmags] = p
+    match_df.iloc[:, 6+n_amags+n_bmags+1] = seps
+    match_df.iloc[:, 6+n_amags+n_bmags+2] = eta
+    match_df.iloc[:, 6+n_amags+n_bmags+3] = xi
+    match_df.iloc[:, 6+n_amags+n_bmags+4] = a_avg_cont
+    match_df.iloc[:, 6+n_amags+n_bmags+5] = b_avg_cont
+    for i in range(acontprob.shape[0]):
+        match_df.iloc[:, 6+n_amags+n_bmags+6+i] = acontprob[i, :]
+    for i in range(bcontprob.shape[0]):
+        match_df.iloc[:, 6+n_amags+n_bmags+6+acontprob.shape[0]+i] = bcontprob[i, :]
+    if extra_col_name_lists[0] is not None:
+        for i in extra_col_name_lists[0]:
+            match_df[i].iloc[:] = cat_a[i].iloc[ac].values
+    if extra_col_name_lists[1] is not None:
+        for i in extra_col_name_lists[1]:
+            match_df[i].iloc[:] = cat_b[i].iloc[bc].values
 
-        # FIT_SIG are the last 0-2 columns, after [ID+coords(x2)+mag(xN)]x2 +
-        # Q match-made columns, plus len(extra_col_name_lists)x2.
-        if input_npy_folders[0] is not None:
-            ind = (len(column_name_lists[0]) + len(column_name_lists[1]) + len(our_columns) +
-                   (len(extra_col_name_lists[0]) if extra_col_name_lists[0] is not None else 0) +
-                   (len(extra_col_name_lists[1]) if extra_col_name_lists[1] is not None else 0))
-            match_df.iloc[lowind:highind, ind] = a_concatastro[ac[lowind:highind], 2]
-        if input_npy_folders[1] is not None:
-            # Here we also need to check if catalogue "a" has processed uncertainties too.
-            _dx = 1 if input_npy_folders[0] is not None else 0
-            ind = (len(column_name_lists[0]) + len(column_name_lists[1]) + len(our_columns) +
-                   (len(extra_col_name_lists[0]) if extra_col_name_lists[0] is not None else 0) +
-                   (len(extra_col_name_lists[1]) if extra_col_name_lists[1] is not None else 0)) + _dx
-            match_df.iloc[lowind:highind, ind] = b_concatastro[bc[lowind:highind], 2]
+    # FIT_SIG are the last 0-2 columns, after [ID+coords(x2)+mag(xN)]x2 +
+    # Q match-made columns, plus len(extra_col_name_lists)x2.
+    if input_npy_folders[0] is not None:
+        ind = (len(column_name_lists[0]) + len(column_name_lists[1]) + len(our_columns) +
+               (len(extra_col_name_lists[0]) if extra_col_name_lists[0] is not None else 0) +
+               (len(extra_col_name_lists[1]) if extra_col_name_lists[1] is not None else 0))
+        match_df.iloc[:, ind] = a_concatastro[ac, 2]
+    if input_npy_folders[1] is not None:
+        # Here we also need to check if catalogue "a" has processed uncertainties too.
+        _dx = 1 if input_npy_folders[0] is not None else 0
+        ind = (len(column_name_lists[0]) + len(column_name_lists[1]) + len(our_columns) +
+               (len(extra_col_name_lists[0]) if extra_col_name_lists[0] is not None else 0) +
+               (len(extra_col_name_lists[1]) if extra_col_name_lists[1] is not None else 0)) + _dx
+        match_df.iloc[:, ind] = b_concatastro[bc, 2]
 
     match_df.to_csv('{}/{}'.format(output_folder, output_filenames[0]), encoding='utf-8',
                     index=False, header=False)
 
     # For non-match, ID/coordinates/mags, then island probability + average
     # contamination.
-    af = np.load('{}/pairing/af.npy'.format(input_match_folder), mmap_mode='r')
-    a_avg_cont = np.load('{}/pairing/afieldflux.npy'.format(input_match_folder), mmap_mode='r')
-    p = np.load('{}/pairing/pfa.npy'.format(input_match_folder), mmap_mode='r')
-    seps = np.load('{}/pairing/afieldseps.npy'.format(input_match_folder), mmap_mode='r')
-    afeta = np.load('{}/pairing/afieldeta.npy'.format(input_match_folder), mmap_mode='r')
-    afxi = np.load('{}/pairing/afieldxi.npy'.format(input_match_folder), mmap_mode='r')
+    af = np.load('{}/pairing/af.npy'.format(input_match_folder))
+    a_avg_cont = np.load('{}/pairing/afieldflux.npy'.format(input_match_folder))
+    p = np.load('{}/pairing/pfa.npy'.format(input_match_folder))
+    seps = np.load('{}/pairing/afieldseps.npy'.format(input_match_folder))
+    afeta = np.load('{}/pairing/afieldeta.npy'.format(input_match_folder))
+    afxi = np.load('{}/pairing/afieldxi.npy'.format(input_match_folder))
     our_columns = ['MATCH_P', 'NNM_SEPARATION', 'NNM_ETA', 'NNM_XI',
                    '{}_AVG_CONT'.format(extra_col_cat_names[0])]
     cols = np.append(column_name_lists[0], our_columns)
@@ -347,37 +340,34 @@ def npy_to_csv(input_csv_folders, input_match_folder, output_folder, csv_filenam
         cols = np.append(cols, extra_col_name_lists[0])
     if input_npy_folders[0] is not None:
         cols = np.append(cols, ['{}_FIT_SIG'.format(extra_col_cat_names[0])])
-        a_concatastro = np.load('{}/con_cat_astro.npy'.format(input_npy_folders[0]), mmap_mode='r')
+        a_concatastro = np.load('{}/con_cat_astro.npy'.format(input_npy_folders[0]))
     n_anonmatches = len(af)
     a_nonmatch_df = pd.DataFrame(columns=cols, index=np.arange(0, n_anonmatches))
-    for cnum in range(0, mem_chunk_num):
-        lowind = np.floor(n_anonmatches*cnum/mem_chunk_num).astype(int)
-        highind = np.floor(n_anonmatches*(cnum+1)/mem_chunk_num).astype(int)
-        for i in column_name_lists[0]:
-            a_nonmatch_df[i].iloc[lowind:highind] = cat_a[i].iloc[af[lowind:highind]].values
-        a_nonmatch_df.iloc[lowind:highind, 3+n_amags] = p[lowind:highind]
-        a_nonmatch_df.iloc[lowind:highind, 3+n_amags+1] = seps[lowind:highind]
-        a_nonmatch_df.iloc[lowind:highind, 3+n_amags+2] = afeta[lowind:highind]
-        a_nonmatch_df.iloc[lowind:highind, 3+n_amags+3] = afxi[lowind:highind]
-        a_nonmatch_df.iloc[lowind:highind, 3+n_amags+4] = a_avg_cont[lowind:highind]
-        if extra_col_name_lists[0] is not None:
-            for i in extra_col_name_lists[0]:
-                a_nonmatch_df[i].iloc[lowind:highind] = cat_a[i].iloc[af[lowind:highind]].values
+    for i in column_name_lists[0]:
+        a_nonmatch_df[i].iloc[:] = cat_a[i].iloc[af].values
+    a_nonmatch_df.iloc[:, 3+n_amags] = p
+    a_nonmatch_df.iloc[:, 3+n_amags+1] = seps
+    a_nonmatch_df.iloc[:, 3+n_amags+2] = afeta
+    a_nonmatch_df.iloc[:, 3+n_amags+3] = afxi
+    a_nonmatch_df.iloc[:, 3+n_amags+4] = a_avg_cont
+    if extra_col_name_lists[0] is not None:
+        for i in extra_col_name_lists[0]:
+            a_nonmatch_df[i].iloc[:] = cat_a[i].iloc[af].values
 
-        if input_npy_folders[0] is not None:
-            ind = (len(column_name_lists[0]) + len(our_columns) +
-                   (len(extra_col_name_lists[0]) if extra_col_name_lists[0] is not None else 0))
-            a_nonmatch_df.iloc[lowind:highind, ind] = a_concatastro[af[lowind:highind], 2]
+    if input_npy_folders[0] is not None:
+        ind = (len(column_name_lists[0]) + len(our_columns) +
+               (len(extra_col_name_lists[0]) if extra_col_name_lists[0] is not None else 0))
+        a_nonmatch_df.iloc[:, ind] = a_concatastro[af, 2]
 
     a_nonmatch_df.to_csv('{}/{}'.format(output_folder, output_filenames[1]), encoding='utf-8',
                          index=False, header=False)
 
-    bf = np.load('{}/pairing/bf.npy'.format(input_match_folder), mmap_mode='r')
-    b_avg_cont = np.load('{}/pairing/bfieldflux.npy'.format(input_match_folder), mmap_mode='r')
-    p = np.load('{}/pairing/pfb.npy'.format(input_match_folder), mmap_mode='r')
-    seps = np.load('{}/pairing/bfieldseps.npy'.format(input_match_folder), mmap_mode='r')
-    bfeta = np.load('{}/pairing/bfieldeta.npy'.format(input_match_folder), mmap_mode='r')
-    bfxi = np.load('{}/pairing/bfieldxi.npy'.format(input_match_folder), mmap_mode='r')
+    bf = np.load('{}/pairing/bf.npy'.format(input_match_folder))
+    b_avg_cont = np.load('{}/pairing/bfieldflux.npy'.format(input_match_folder))
+    p = np.load('{}/pairing/pfb.npy'.format(input_match_folder))
+    seps = np.load('{}/pairing/bfieldseps.npy'.format(input_match_folder))
+    bfeta = np.load('{}/pairing/bfieldeta.npy'.format(input_match_folder))
+    bfxi = np.load('{}/pairing/bfieldxi.npy'.format(input_match_folder))
     our_columns = ['MATCH_P', 'NNM_SEPARATION', 'NNM_ETA', 'NNM_XI',
                    '{}_AVG_CONT'.format(extra_col_cat_names[1])]
     cols = np.append(column_name_lists[1], our_columns)
@@ -385,27 +375,24 @@ def npy_to_csv(input_csv_folders, input_match_folder, output_folder, csv_filenam
         cols = np.append(cols, extra_col_name_lists[1])
     if input_npy_folders[1] is not None:
         cols = np.append(cols, ['{}_FIT_SIG'.format(extra_col_cat_names[1])])
-        b_concatastro = np.load('{}/con_cat_astro.npy'.format(input_npy_folders[1]), mmap_mode='r')
+        b_concatastro = np.load('{}/con_cat_astro.npy'.format(input_npy_folders[1]))
     n_bnonmatches = len(bf)
     b_nonmatch_df = pd.DataFrame(columns=cols, index=np.arange(0, n_bnonmatches))
-    for cnum in range(0, mem_chunk_num):
-        lowind = np.floor(n_bnonmatches*cnum/mem_chunk_num).astype(int)
-        highind = np.floor(n_bnonmatches*(cnum+1)/mem_chunk_num).astype(int)
-        for i in column_name_lists[1]:
-            b_nonmatch_df[i].iloc[lowind:highind] = cat_b[i].iloc[bf[lowind:highind]].values
-        b_nonmatch_df.iloc[lowind:highind, 3+n_bmags] = p[lowind:highind]
-        b_nonmatch_df.iloc[lowind:highind, 3+n_bmags+1] = seps[lowind:highind]
-        b_nonmatch_df.iloc[lowind:highind, 3+n_bmags+2] = bfeta[lowind:highind]
-        b_nonmatch_df.iloc[lowind:highind, 3+n_bmags+3] = bfxi[lowind:highind]
-        b_nonmatch_df.iloc[lowind:highind, 3+n_bmags+4] = b_avg_cont[lowind:highind]
-        if extra_col_name_lists[1] is not None:
-            for i in extra_col_name_lists[1]:
-                b_nonmatch_df[i].iloc[lowind:highind] = cat_b[i].iloc[bf[lowind:highind]].values
+    for i in column_name_lists[1]:
+        b_nonmatch_df[i].iloc[:] = cat_b[i].iloc[bf].values
+    b_nonmatch_df.iloc[:, 3+n_bmags] = p
+    b_nonmatch_df.iloc[:, 3+n_bmags+1] = seps
+    b_nonmatch_df.iloc[:, 3+n_bmags+2] = bfeta
+    b_nonmatch_df.iloc[:, 3+n_bmags+3] = bfxi
+    b_nonmatch_df.iloc[:, 3+n_bmags+4] = b_avg_cont
+    if extra_col_name_lists[1] is not None:
+        for i in extra_col_name_lists[1]:
+            b_nonmatch_df[i].iloc[:] = cat_b[i].iloc[bf].values
 
-        if input_npy_folders[1] is not None:
-            ind = (len(column_name_lists[1]) + len(our_columns) +
-                   (len(extra_col_name_lists[1]) if extra_col_name_lists[1] is not None else 0))
-            b_nonmatch_df.iloc[lowind:highind, ind] = b_concatastro[bf[lowind:highind], 2]
+    if input_npy_folders[1] is not None:
+        ind = (len(column_name_lists[1]) + len(our_columns) +
+               (len(extra_col_name_lists[1]) if extra_col_name_lists[1] is not None else 0))
+        b_nonmatch_df.iloc[:, ind] = b_concatastro[bf, 2]
 
     b_nonmatch_df.to_csv('{}/{}'.format(output_folder, output_filenames[2]), encoding='utf-8',
                          index=False, header=False)

@@ -11,8 +11,7 @@ import itertools
 import numpy as np
 
 from .misc_functions import (load_small_ref_auf_grid, hav_dist_constant_lat,
-                             map_large_index_to_small_index, _load_rectangular_slice,
-                             StageData)
+                             _load_rectangular_slice, StageData)
 from .group_sources_fortran import group_sources_fortran as gsf
 from .make_set_list import set_list
 
@@ -22,7 +21,7 @@ __all__ = ['make_island_groupings']
 def make_island_groupings(joint_folder_path, a_cat_folder_path, b_cat_folder_path,
                           a_auf_pointings, b_auf_pointings, a_filt_names, b_filt_names, a_title,
                           b_title, a_modelrefinds, b_modelrefinds, r, dr, rho, drho, j1s, max_sep,
-                          ax_lims, int_fracs, mem_chunk_num, include_phot_like, use_phot_priors,
+                          ax_lims, int_fracs, include_phot_like, use_phot_priors,
                           n_pool, a_perturb_auf_outputs, b_perturb_auf_outputs):
     '''
     Function to handle the creation of "islands" of astrometrically coeval
@@ -83,9 +82,6 @@ def make_island_groupings(joint_folder_path, a_cat_folder_path, b_cat_folder_pat
     int_fracs : list of floats, or numpy.ndarray
         List of integral limits used in evaluating probability of match based on
         separation distance.
-    mem_chunk_num : integer
-        Number of sub-arrays to break larger array computations into for memory
-        limiting purposes.
     include_phot_like : boolean
         Flag indicating whether to perform additional computations required for
         the future calculation of photometric likelihoods.
@@ -135,8 +131,8 @@ def make_island_groupings(joint_folder_path, a_cat_folder_path, b_cat_folder_pat
         ax2_sparse_loops = np.append(ax2_sparse_loops, ax2_loops[-1])
 
     # Load the astrometry of each catalogue for slicing.
-    a_full = np.load('{}/con_cat_astro.npy'.format(a_cat_folder_path), mmap_mode='r')
-    b_full = np.load('{}/con_cat_astro.npy'.format(b_cat_folder_path), mmap_mode='r')
+    a_full = np.load('{}/con_cat_astro.npy'.format(a_cat_folder_path))
+    b_full = np.load('{}/con_cat_astro.npy'.format(b_cat_folder_path))
 
     asize = np.zeros(dtype=int, shape=(len(a_full),))
     bsize = np.zeros(dtype=int, shape=(len(b_full),))
@@ -250,64 +246,24 @@ def make_island_groupings(joint_folder_path, a_cat_folder_path, b_cat_folder_pat
     sys.stdout.flush()
 
     if include_phot_like or use_phot_priors:
-        ablen = np.zeros(dtype=float, shape=(len(a_full),))
-        aflen = np.zeros(dtype=float, shape=(len(a_full),))
-        bblen = np.zeros(dtype=float, shape=(len(b_full),))
-        bflen = np.zeros(dtype=float, shape=(len(b_full),))
+        a_err = a_full[:, 2]
 
-        for cnum in range(0, mem_chunk_num):
-            lowind = np.floor(len(a_full)*cnum/mem_chunk_num).astype(int)
-            highind = np.floor(len(a_full)*(cnum+1)/mem_chunk_num).astype(int)
-            a = a_full[lowind:highind, 2]
+        b_err = b_full[:, 2]
 
-            a_inds_small = ainds[:, lowind:highind]
-            a_size_small = asize[lowind:highind]
-            a_inds_small = np.asfortranarray(a_inds_small[:np.amax(a_size_small), :])
+        a_fouriergrid = a_perturb_auf_outputs['fourier_grid']
+        b_fouriergrid = b_perturb_auf_outputs['fourier_grid']
 
-            a_inds_map, a_inds_unique = map_large_index_to_small_index(a_inds_small, len(b_full))
+        a_int_lens = gsf.get_integral_length(
+            a_err, b_err, r[:-1]+dr/2, rho[:-1], drho, j1s, a_fouriergrid, b_fouriergrid,
+            a_modelrefinds, b_modelrefinds, ainds, asize, int_fracs[0:2])
+        ablen = a_int_lens[:, 0]
+        aflen = a_int_lens[:, 1]
 
-            b = b_full[a_inds_unique, 2]
-
-            modrefind = a_modelrefinds[:, lowind:highind]
-            [a_fouriergrid], a_modrefindsmall = load_small_ref_auf_grid(
-                modrefind, a_perturb_auf_outputs, ['fourier'])
-
-            modrefind = b_modelrefinds[:, a_inds_unique]
-            [b_fouriergrid], b_modrefindsmall = load_small_ref_auf_grid(
-                modrefind, b_perturb_auf_outputs, ['fourier'])
-
-            a_int_lens = gsf.get_integral_length(
-                a, b, r[:-1]+dr/2, rho[:-1], drho, j1s, a_fouriergrid, b_fouriergrid,
-                a_modrefindsmall, b_modrefindsmall, a_inds_map, a_size_small, int_fracs[0:2])
-            ablen[lowind:highind] = a_int_lens[:, 0]
-            aflen[lowind:highind] = a_int_lens[:, 1]
-
-        for cnum in range(0, mem_chunk_num):
-            lowind = np.floor(len(b_full)*cnum/mem_chunk_num).astype(int)
-            highind = np.floor(len(b_full)*(cnum+1)/mem_chunk_num).astype(int)
-            b = b_full[lowind:highind, 2]
-
-            b_inds_small = binds[:, lowind:highind]
-            b_size_small = bsize[lowind:highind]
-            b_inds_small = np.asfortranarray(b_inds_small[:np.amax(b_size_small), :])
-
-            b_inds_map, b_inds_unique = map_large_index_to_small_index(b_inds_small, len(a_full))
-
-            a = a_full[b_inds_unique, 2]
-
-            modrefind = b_modelrefinds[:, lowind:highind]
-            [b_fouriergrid], b_modrefindsmall = load_small_ref_auf_grid(
-                modrefind, b_perturb_auf_outputs, ['fourier'])
-
-            modrefind = a_modelrefinds[:, b_inds_unique]
-            [a_fouriergrid], a_modrefindsmall = load_small_ref_auf_grid(
-                modrefind, a_perturb_auf_outputs, ['fourier'])
-
-            b_int_lens = gsf.get_integral_length(
-                b, a, r[:-1]+dr/2, rho[:-1], drho, j1s, b_fouriergrid, a_fouriergrid,
-                b_modrefindsmall, a_modrefindsmall, b_inds_map, b_size_small, int_fracs[0:2])
-            bblen[lowind:highind] = b_int_lens[:, 0]
-            bflen[lowind:highind] = b_int_lens[:, 1]
+        b_int_lens = gsf.get_integral_length(
+            b_err, a_err, r[:-1]+dr/2, rho[:-1], drho, j1s, b_fouriergrid, a_fouriergrid,
+            b_modelrefinds, a_modelrefinds, binds, bsize, int_fracs[0:2])
+        bblen = b_int_lens[:, 0]
+        bflen = b_int_lens[:, 1]
 
     print("Maximum overlaps are:", amaxsize, bmaxsize)
     sys.stdout.flush()
@@ -331,59 +287,33 @@ def make_island_groupings(joint_folder_path, a_cat_folder_path, b_cat_folder_pat
     passed_check = np.zeros(dtype=bool, shape=(alist.shape[1],))
     failed_check = np.ones(dtype=bool, shape=(alist.shape[1],))
 
-    islelen = alist.shape[1]
-    num_good_checks = 0
     num_a_failed_checks = 0
     num_b_failed_checks = 0
-    for cnum in range(0, mem_chunk_num):
-        lowind = np.floor(islelen*cnum/mem_chunk_num).astype(int)
-        highind = np.floor(islelen*(cnum+1)/mem_chunk_num).astype(int)
-        indexmap = np.arange(lowind, highind, 1)
-        alist_small = alist[:, lowind:highind]
-        agrplen_small = agrplen[lowind:highind]
-        alist_small = np.asfortranarray(alist_small[:np.amax(agrplen_small), :])
-        alistunique_flat = np.unique(alist_small[alist_small > -1])
-        a_ = np.load('{}/con_cat_astro.npy'.format(a_cat_folder_path), mmap_mode='r')[
-            alistunique_flat]
-        maparray = -1*np.ones(len(a_full)+1).astype(int)
-        maparray[alistunique_flat] = np.arange(0, len(a_), dtype=int)
-        alist_1 = np.asfortranarray(maparray[alist_small.flatten()].reshape(alist_small.shape))
 
-        blist_small = blist[:, lowind:highind]
-        bgrplen_small = bgrplen[lowind:highind]
-        blist_small = np.asfortranarray(blist_small[:np.amax(bgrplen_small), :])
-        blistunique_flat = np.unique(blist_small[blist_small > -1])
-        b_ = np.load('{}/con_cat_astro.npy'.format(b_cat_folder_path), mmap_mode='r')[
-            blistunique_flat]
-        maparray = -1*np.ones(len(b_full)+1).astype(int)
-        maparray[blistunique_flat] = np.arange(0, len(b_), dtype=int)
-        blist_1 = np.asfortranarray(maparray[blist_small.flatten()].reshape(blist_small.shape))
+    # Here, since we know no source can be outside of extent, we can simply
+    # look at whether any source has a sky separation of less than max_sep
+    # from any of the four lines defining extent in orthogonal sky axes.
+    counter = np.arange(0, alist.shape[1])
+    expand_constants = [itertools.repeat(item) for item in [
+        a_full, b_full, alist, blist, agrplen, bgrplen, ax_lims, max_sep]]
+    iter_group = zip(counter, *expand_constants)
+    # Initialise the multiprocessing loop setup:
+    pool = multiprocessing.Pool(n_pool)
+    for return_items in pool.imap_unordered(_distance_check, iter_group,
+                                            chunksize=max(1, len(counter) // n_pool)):
+        i, dist_check, a, b = return_items
+        if dist_check:
+            passed_check[i] = 1
+            failed_check[i] = 0
+        else:
+            # While "good" islands just need their total number incrementing
+            # for the group, "failed" islands we need to track the number of
+            # sources in each catalogue for.
+            num_a_failed_checks += len(a)
+            num_b_failed_checks += len(b)
 
-        # Here, since we know no source can be outside of extent, we can simply
-        # look at whether any source has a sky separation of less than max_sep
-        # from any of the four lines defining extent in orthogonal sky axes.
-        counter = np.arange(0, alist_small.shape[1])
-        expand_constants = [itertools.repeat(item) for item in [
-            a_, b_, alist_1, blist_1, agrplen_small, bgrplen_small, ax_lims, max_sep]]
-        iter_group = zip(counter, *expand_constants)
-        # Initialise the multiprocessing loop setup:
-        pool = multiprocessing.Pool(n_pool)
-        for return_items in pool.imap_unordered(_distance_check, iter_group,
-                                                chunksize=max(1, len(counter) // n_pool)):
-            i, dist_check, a, b = return_items
-            if dist_check:
-                passed_check[indexmap[i]] = 1
-                failed_check[indexmap[i]] = 0
-                num_good_checks += 1
-            else:
-                # While "good" islands just need their total number incrementing
-                # for the group, "failed" islands we need to track the number of
-                # sources in each catalogue for.
-                num_a_failed_checks += len(a)
-                num_b_failed_checks += len(b)
-
-        pool.close()
-        pool.join()
+    pool.close()
+    pool.join()
 
     # If set_list returned any rejected sources, then add any sources too close
     # to match extent to those now. Ensure that we only reject the unique source IDs
@@ -404,47 +334,25 @@ def make_island_groupings(joint_folder_path, a_cat_folder_path, b_cat_folder_pat
         reject_b = np.zeros(dtype=int, shape=(num_b_failed_checks+b_first_rejected_len,))
     if reject_flag:
         reject_b[num_b_failed_checks:] = breject
-    di = max(1, len(agrplen) // 20)
-    amaxlen, bmaxlen = 0, 0
-    for i in range(0, len(agrplen), di):
-        if np.sum(passed_check[i:i+di]) > 0:
-            amaxlen = max(amaxlen, int(np.amax(agrplen[i:i+di][passed_check[i:i+di]])))
-            bmaxlen = max(bmaxlen, int(np.amax(bgrplen[i:i+di][passed_check[i:i+di]])))
 
-    new_alist = np.zeros(dtype=int, shape=(amaxlen, num_good_checks), order='F')
-    new_blist = np.zeros(dtype=int, shape=(bmaxlen, num_good_checks), order='F')
-    new_agrplen = np.zeros(dtype=int, shape=(num_good_checks,))
-    new_bgrplen = np.zeros(dtype=int, shape=(num_good_checks,))
+    if reject_flag:
+        alist_reject = alist[:, failed_check]
+        reject_a[:num_a_failed_checks] = alist_reject[alist_reject > -1]
+        blist_reject = blist[:, failed_check]
+        reject_b[:num_b_failed_checks] = blist_reject[blist_reject > -1]
+    else:
+        reject_a = alist[:, failed_check]
+        reject_a = reject_a[reject_a > -1]
+        reject_b = blist[:, failed_check]
+        reject_b = reject_b[reject_b > -1]
 
-    a_fail_count, b_fail_count, pass_count = 0, 0, 0
-    di = max(1, alist.shape[1] // 20)
-    for i in range(0, alist.shape[1], di):
-        # This should, in a memory-friendly way, basically boil down to being
-        # reject_a = alist[:, failed_check]; reject_a = reject_a[reject_a > -1].
-        failed_check_cut = failed_check[i:i+di]
-        alist_cut = alist[:, i:i+di][:, failed_check_cut]
-        alist_cut = alist_cut[alist_cut > -1]
-        blist_cut = blist[:, i:i+di][:, failed_check_cut]
-        blist_cut = blist_cut[blist_cut > -1]
-        if len(alist_cut) > 0:
-            reject_a[a_fail_count:a_fail_count+len(alist_cut)] = alist_cut
-            a_fail_count += len(alist_cut)
-        if len(blist_cut) > 0:
-            reject_b[b_fail_count:b_fail_count+len(blist_cut)] = blist_cut
-            b_fail_count += len(blist_cut)
-
-        # This should basically be alist = alist[:, passed_check] and
-        # agrplen = agrplen[passed_check], simply removing those above failed
-        # islands from the list, analagous to the same functionality in set_list.
-        n_extra = int(np.sum(passed_check[i:i+di]))
-        new_alist[:, pass_count:pass_count+n_extra] = alist[:, i:i+di][:amaxlen,
-                                                                       passed_check[i:i+di]]
-        new_blist[:, pass_count:pass_count+n_extra] = blist[:, i:i+di][:bmaxlen,
-                                                                       passed_check[i:i+di]]
-        new_agrplen[pass_count:pass_count+n_extra] = agrplen[i:i+di][passed_check[i:i+di]]
-        new_bgrplen[pass_count:pass_count+n_extra] = bgrplen[i:i+di][passed_check[i:i+di]]
-        pass_count += n_extra
-
+    # This should basically be alist = alist[:, passed_check] and
+    # agrplen = agrplen[passed_check], simply removing those above failed
+    # islands from the list, analagous to the same functionality in set_list.
+    alist = alist[:, passed_check]
+    agrplen = agrplen[passed_check]
+    blist = blist[:, passed_check]
+    bgrplen = bgrplen[passed_check]
     # Only return aflen and bflen if they were created
     if not (include_phot_like or use_phot_priors):
         ablen = bblen = None
@@ -462,12 +370,9 @@ def make_island_groupings(joint_folder_path, a_cat_folder_path, b_cat_folder_pat
     else:
         lenrejectb = 0
 
-    group_sources_data = StageData(ablen=ablen, bblen=bblen,
-                                   ainds=ainds, binds=binds,
-                                   asize=asize, bsize=bsize,
-                                   aflen=aflen, bflen=bflen,
-                                   alist=new_alist, blist=new_blist,
-                                   agrplen=new_agrplen, bgrplen=new_bgrplen,
+    group_sources_data = StageData(ablen=ablen, bblen=bblen, ainds=ainds, binds=binds,
+                                   asize=asize, bsize=bsize, aflen=aflen, bflen=bflen,
+                                   alist=alist, blist=blist, agrplen=agrplen, bgrplen=bgrplen,
                                    lenrejecta=lenrejecta, lenrejectb=lenrejectb)
     return group_sources_data
 
@@ -515,8 +420,7 @@ def _load_fourier_grid_cutouts(a, sky_rect_coords, joint_folder_path, cat_folder
 
     sky_cut = _load_rectangular_slice(cat_name, a, lon1, lon2, lat1, lat2, padding)
 
-    a_cutout = np.load('{}/con_cat_astro.npy'.format(cat_folder_path),
-                       mmap_mode='r')[large_sky_slice][sky_cut]
+    a_cutout = np.load('{}/con_cat_astro.npy'.format(cat_folder_path))[large_sky_slice][sky_cut]
 
     modrefind = modelrefinds[:, large_sky_slice][:, sky_cut]
 
@@ -570,15 +474,7 @@ def _clean_overlaps(inds, size, n_pool):
     pool.close()
     pool.join()
 
-    # We ideally want to basically do np.asfortranarray(inds[:maxsize, :]), but
-    # this would involve a copy instead of a read so we have to loop.
-    inds2 = np.zeros(dtype=int, shape=(maxsize, len(size)), order='F')
-
-    di = max(1, len(size) // 20)
-    for i in range(0, len(size), di):
-        inds2[:, i:i+di] = inds[:maxsize, i:i+di]
-
-    inds = inds2
+    inds = np.asfortranarray(inds[:maxsize, :])
 
     return inds, size
 

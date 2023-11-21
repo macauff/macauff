@@ -7,7 +7,7 @@ used in the cross-matching of the two catalogues.
 import sys
 import numpy as np
 
-from .misc_functions import map_large_index_to_small_index, _load_single_sky_slice, StageData
+from .misc_functions import map_large_index_to_small_index, StageData
 from .misc_functions_fortran import misc_functions_fortran as mff
 from .photometric_likelihood_fortran import photometric_likelihood_fortran as plf
 
@@ -15,9 +15,9 @@ __all__ = ['compute_photometric_likelihoods']
 
 
 def compute_photometric_likelihoods(joint_folder_path, a_cat_folder_path, b_cat_folder_path,
-                                    afilts, bfilts, mem_chunk_num, cf_points, cf_areas,
-                                    include_phot_like, use_phot_priors, group_sources_data,
-                                    bright_frac=None, field_frac=None):
+                                    afilts, bfilts, cf_points, cf_areas, include_phot_like,
+                                    use_phot_priors, group_sources_data, bright_frac=None,
+                                    field_frac=None):
     '''
     Derives the photometric likelihoods and priors for use in the catalogue
     cross-match process.
@@ -35,9 +35,6 @@ def compute_photometric_likelihoods(joint_folder_path, a_cat_folder_path, b_cat_
         A list of the filters in catalogue "a"'s photometric data file.
     bfilts : list of string
         List of catalogue "b"'s filters.
-    mem_chunk_num : integer
-        Fraction of input datasets to load at once, in the case of data larger
-        than the memory of the system.
     cf_points : numpy.ndarray
         The on-sky coordinates that define the locations of each small
         set of sources to be used to derive the relative match and non-match
@@ -76,26 +73,31 @@ def compute_photometric_likelihoods(joint_folder_path, a_cat_folder_path, b_cat_
 
     print("Creating c(m, m) and f(m)...")
 
-    len_a = len(np.load('{}/con_cat_astro.npy'.format(a_cat_folder_path), mmap_mode='r'))
-    len_b = len(np.load('{}/con_cat_astro.npy'.format(b_cat_folder_path), mmap_mode='r'))
+    len_a = len(np.load('{}/con_cat_astro.npy'.format(a_cat_folder_path)))
+    len_b = len(np.load('{}/con_cat_astro.npy'.format(b_cat_folder_path)))
 
     print("Distributing sources into sky slices...")
     sys.stdout.flush()
 
-    a_sky_inds = distribute_sky_indices(joint_folder_path, a_cat_folder_path, 'a', mem_chunk_num,
-                                        cf_points)
-    b_sky_inds = distribute_sky_indices(joint_folder_path, b_cat_folder_path, 'b', mem_chunk_num,
-                                        cf_points)
+    a_astro = np.load('{}/con_cat_astro.npy'.format(a_cat_folder_path))
+    b_astro = np.load('{}/con_cat_astro.npy'.format(b_cat_folder_path))
+    a_photo = np.load('{}/con_cat_photo.npy'.format(a_cat_folder_path))
+    b_photo = np.load('{}/con_cat_photo.npy'.format(b_cat_folder_path))
+
+    a_sky_inds = mff.find_nearest_point(a_astro[:, 0], a_astro[:, 1], cf_points[:, 0],
+                                        cf_points[:, 1])
+    b_sky_inds = mff.find_nearest_point(b_astro[:, 0], b_astro[:, 1], cf_points[:, 0],
+                                        cf_points[:, 1])
 
     print("Making bins...")
     sys.stdout.flush()
 
     abinlengths, abinsarray, longabinlen = create_magnitude_bins(
-        cf_points, afilts, mem_chunk_num, joint_folder_path, a_cat_folder_path, 'a', a_sky_inds,
+        cf_points, afilts, a_photo, joint_folder_path, a_cat_folder_path, 'a', a_sky_inds,
         include_phot_like or use_phot_priors, group_sources_data.ablen,
         group_sources_data.ainds, group_sources_data.asize)
     bbinlengths, bbinsarray, longbbinlen = create_magnitude_bins(
-        cf_points, bfilts, mem_chunk_num, joint_folder_path, b_cat_folder_path, 'b', b_sky_inds,
+        cf_points, bfilts, b_photo, joint_folder_path, b_cat_folder_path, 'b', b_sky_inds,
         include_phot_like or use_phot_priors, group_sources_data.bblen,
         group_sources_data.binds, group_sources_data.bsize)
 
@@ -112,130 +114,103 @@ def compute_photometric_likelihoods(joint_folder_path, a_cat_folder_path, b_cat_
     fb_array = np.zeros(dtype=float, shape=(longbbinlen-1, len(bfilts), len(afilts),
                                             len(cf_points)), order='F')
 
-    # Within each loop, since we've already assigned all sources to have a closest
-    # c/f sky position pointing to be assigned to, we simply slice within the _load
-    # functions on ID, and for the initial mem_chunk_num stepping load in the range
-    # [m_, m_+mem_chunk_num).
-    for m_ in range(0, len(cf_points), mem_chunk_num):
-        a_multi_return = _load_multiple_sky_slice('a', m_, m_+mem_chunk_num, a_cat_folder_path,
-                                                  a_sky_inds, include_phot_like or use_phot_priors,
-                                                  group_sources_data.ablen,
-                                                  group_sources_data.ainds, group_sources_data.asize)
+    ablen = group_sources_data.ablen
+    ainds = group_sources_data.ainds
+    binds = group_sources_data.binds
+    asize = group_sources_data.asize
+    bsize = group_sources_data.bsize
+
+    for m in range(0, len(cf_points)):
+        area = cf_areas[m]
+        a_sky_cut = a_sky_inds == m
+        a_photo_cut = a_photo[a_sky_cut]
         if include_phot_like or use_phot_priors:
-            (a_small_photo, a_sky_ind_small, a_small_astro, a_blen_small, a_inds_small,
-             a_size_small) = a_multi_return
-        else:
-            a_small_photo, a_sky_ind_small = a_multi_return
-        del a_multi_return
+            a_astro_cut, a_blen_cut, a_inds_cut, a_size_cut = (
+                a_astro[a_sky_cut], ablen[a_sky_cut], ainds[:, a_sky_cut], asize[a_sky_cut])
 
-        b_multi_return = _load_multiple_sky_slice('b', m_, m_+mem_chunk_num, b_cat_folder_path,
-                                                  b_sky_inds, include_phot_like or use_phot_priors,
-                                                  group_sources_data.bblen,
-                                                  group_sources_data.binds, group_sources_data.bsize)
+        b_sky_cut = b_sky_inds == m
+        b_photo_cut = b_photo[b_sky_cut]
         if include_phot_like or use_phot_priors:
-            (b_small_photo, b_sky_ind_small, b_small_astro, b_blen_small, b_inds_small,
-             b_size_small) = b_multi_return
-            del b_blen_small
-        else:
-            b_small_photo, b_sky_ind_small = b_multi_return
-        del b_multi_return
+            b_astro_cut, b_inds_cut, b_size_cut = (
+                b_astro[b_sky_cut], binds[:, b_sky_cut], bsize[b_sky_cut])
 
-        for m in range(m_, min(len(cf_points), m_+mem_chunk_num)):
-            area = cf_areas[m]
-            a_sky_cut = _load_single_sky_slice('a', m, a_sky_ind_small)
-            a_photo_cut = a_small_photo[a_sky_cut]
-            if include_phot_like or use_phot_priors:
-                a_astro_cut, a_blen_cut, a_inds_cut, a_size_cut = (
-                    a_small_astro[a_sky_cut], a_blen_small[a_sky_cut], a_inds_small[:, a_sky_cut],
-                    a_size_small[a_sky_cut])
+            # Return the overall to subarray mapping of *_inds_cut, as well
+            # as the unique values of *_inds_cut, for use in creating the
+            # opposing view slices into the other catalogue, for each
+            # catalogue. Note that the lengths are swapped in the two calls,
+            # as the a_inds map into length of catalogue "b" and vice versa.
+            a_inds_map, a_inds_cut_unique = map_large_index_to_small_index(a_inds_cut, len_b)
+            b_inds_map, b_inds_cut_unique = map_large_index_to_small_index(b_inds_cut, len_a)
 
-            b_sky_cut = _load_single_sky_slice('b', m, b_sky_ind_small)
-            b_photo_cut = b_small_photo[b_sky_cut]
-            if include_phot_like or use_phot_priors:
-                b_astro_cut, b_inds_cut, b_size_cut = (
-                    b_small_astro[b_sky_cut], b_inds_small[:, b_sky_cut], b_size_small[b_sky_cut])
+            # Combined with b_inds_map, this subarray of the catalogue gives
+            # an array that has every "a" source that overlaps the "b"
+            # subarray objects. Note we use b_inds_cut_unique for catalogue
+            # "a" sources.
+            a_astro_ind = a_astro[b_inds_cut_unique]
+            b_astro_ind = b_astro[a_inds_cut_unique]
+            a_photo_ind = a_photo[b_inds_cut_unique]
+            b_photo_ind = b_photo[a_inds_cut_unique]
 
-                # Return the overall to subarray mapping of *_inds_cut, as well
-                # as the unique values of *_inds_cut, for use in creating the
-                # opposing view slices into the other catalogue, for each
-                # catalogue. Note that the lengths are swapped in the two calls,
-                # as the a_inds map into length of catalogue "b" and vice versa.
-                a_inds_map, a_inds_cut_unique = map_large_index_to_small_index(a_inds_cut, len_b)
-                b_inds_map, b_inds_cut_unique = map_large_index_to_small_index(b_inds_cut, len_a)
+            a_flen_ind = group_sources_data.aflen[b_inds_cut_unique]
+            b_flen_ind = group_sources_data.bflen[a_inds_cut_unique]
 
-                # Combined with b_inds_map, this subarray of the catalogue gives
-                # an array that has every "a" source that overlaps the "b"
-                # subarray objects. Note we use b_inds_cut_unique for catalogue
-                # "a" sources.
-                a_astro_ind = np.load('{}/con_cat_astro.npy'.format(a_cat_folder_path),
-                                      mmap_mode='r')[b_inds_cut_unique]
-                b_astro_ind = np.load('{}/con_cat_astro.npy'.format(b_cat_folder_path),
-                                      mmap_mode='r')[a_inds_cut_unique]
-                a_photo_ind = np.load('{}/con_cat_photo.npy'.format(a_cat_folder_path),
-                                      mmap_mode='r')[b_inds_cut_unique]
-                b_photo_ind = np.load('{}/con_cat_photo.npy'.format(b_cat_folder_path),
-                                      mmap_mode='r')[a_inds_cut_unique]
-
-                a_flen_ind = group_sources_data.aflen[b_inds_cut_unique]
-                b_flen_ind = group_sources_data.bflen[a_inds_cut_unique]
-
-            for i in range(0, len(afilts)):
+        for i in range(0, len(afilts)):
+            if not include_phot_like and not use_phot_priors:
+                a_num_photo_cut = np.sum(~np.isnan(a_photo_cut[:, i]))
+                Na = a_num_photo_cut / area
+            else:
+                a_bins = abinsarray[:abinlengths[i, m], i, m]
+                a_mag = a_photo_cut[:, i]
+                a_flags = ~np.isnan(a_mag)
+                a_flags_ind = ~np.isnan(a_photo_ind[:, i])
+            for j in range(0, len(bfilts)):
                 if not include_phot_like and not use_phot_priors:
-                    a_num_photo_cut = np.sum(~np.isnan(a_photo_cut[:, i]))
-                    Na = a_num_photo_cut / area
+                    b_num_photo_cut = np.sum(~np.isnan(b_photo_cut[:, j]))
+                    Nb = b_num_photo_cut / area
+                    # Without using photometric-based priors, all we can
+                    # do is set the prior on one catalogue to 0.5 -- that
+                    # is, equal chance of match or non-match; for this we
+                    # use the less dense of the two catalogues as our
+                    # "one-sided" match. Then, accordingly, we update the
+                    # "field" source density of the more dense catalogue
+                    # with its corresponding density, based on the input
+                    # density and the counterpart density calculated.
+                    c_prior = min(Na, Nb) / 2
+                    fa_prior = Na - c_prior
+                    fb_prior = Nb - c_prior
+                    # To fake no photometric likelihoods, simply set all
+                    # values to one, to cancel in the ratio later.
+                    c_like, fa_like, fb_like = (1-1e-10)**2, 1-1e-10, 1-1e-10
                 else:
-                    a_bins = abinsarray[:abinlengths[i, m], i, m]
-                    a_mag = a_photo_cut[:, i]
-                    a_flags = ~np.isnan(a_mag)
-                    a_flags_ind = ~np.isnan(a_photo_ind[:, i])
-                for j in range(0, len(bfilts)):
-                    if not include_phot_like and not use_phot_priors:
-                        b_num_photo_cut = np.sum(~np.isnan(b_photo_cut[:, j]))
-                        Nb = b_num_photo_cut / area
-                        # Without using photometric-based priors, all we can
-                        # do is set the prior on one catalogue to 0.5 -- that
-                        # is, equal chance of match or non-match; for this we
-                        # use the less dense of the two catalogues as our
-                        # "one-sided" match. Then, accordingly, we update the
-                        # "field" source density of the more dense catalogue
-                        # with its corresponding density, based on the input
-                        # density and the counterpart density calculated.
-                        c_prior = min(Na, Nb) / 2
-                        fa_prior = Na - c_prior
-                        fb_prior = Nb - c_prior
-                        # To fake no photometric likelihoods, simply set all
-                        # values to one, to cancel in the ratio later.
-                        c_like, fa_like, fb_like = (1-1e-10)**2, 1-1e-10, 1-1e-10
-                    else:
-                        b_bins = bbinsarray[:bbinlengths[j, m], j, m]
-                        b_mag = b_photo_cut[:, j]
-                        b_flags = ~np.isnan(b_mag)
-                        b_mag_ind = b_photo_ind[:, j]
-                        b_flags_ind = ~np.isnan(b_mag_ind)
+                    b_bins = bbinsarray[:bbinlengths[j, m], j, m]
+                    b_mag = b_photo_cut[:, j]
+                    b_flags = ~np.isnan(b_mag)
+                    b_mag_ind = b_photo_ind[:, j]
+                    b_flags_ind = ~np.isnan(b_mag_ind)
 
-                        c_prior, c_like, fa_prior, fa_like, fb_prior, fb_like = create_c_and_f(
-                            a_astro_cut, b_astro_cut, a_mag, b_mag, a_inds_map, a_size_cut,
-                            b_inds_map, b_size_cut, a_blen_cut, a_bins, b_bins, bright_frac,
-                            field_frac, a_flags, b_flags, a_astro_ind, b_astro_ind, a_flen_ind,
-                            b_flen_ind, a_flags_ind, b_flags_ind, b_mag_ind, area)
-                    if use_phot_priors and not include_phot_like:
-                        # If we only used the create_c_and_f routine to derive
-                        # priors, then quickly update likelihoods here.
-                        c_like, fa_like, fb_like = (1-1e-10)**2, 1-1e-10, 1-1e-10
+                    c_prior, c_like, fa_prior, fa_like, fb_prior, fb_like = create_c_and_f(
+                        a_astro_cut, b_astro_cut, a_mag, b_mag, a_inds_map, a_size_cut,
+                        b_inds_map, b_size_cut, a_blen_cut, a_bins, b_bins, bright_frac,
+                        field_frac, a_flags, b_flags, a_astro_ind, b_astro_ind, a_flen_ind,
+                        b_flen_ind, a_flags_ind, b_flags_ind, b_mag_ind, area)
+                if use_phot_priors and not include_phot_like:
+                    # If we only used the create_c_and_f routine to derive
+                    # priors, then quickly update likelihoods here.
+                    c_like, fa_like, fb_like = (1-1e-10)**2, 1-1e-10, 1-1e-10
 
-                    # Have to add a very small "fire extinguisher" value to all
-                    # likelihoods and priors, to avoid ever having exactly zero
-                    # value in either, which would mean all island permutations
-                    # were rejected.
-                    c_priors[j, i, m] = c_prior + 1e-100
-                    fa_priors[j, i, m] = fa_prior + 1e-10
-                    fb_priors[j, i, m] = fb_prior + 1e-10
-                    # c should be equal to f^2 in the limit of indifference, so
-                    # add 1e-10 and (1e-10)^2 to f and c respectively.
-                    c_array[:bbinlengths[j, m]-1,
-                            :abinlengths[i, m]-1, j, i, m] = c_like + 1e-100
-                    fa_array[:abinlengths[i, m]-1, j, i, m] = fa_like + 1e-10
-                    fb_array[:bbinlengths[j, m]-1, j, i, m] = fb_like + 1e-10
+                # Have to add a very small "fire extinguisher" value to all
+                # likelihoods and priors, to avoid ever having exactly zero
+                # value in either, which would mean all island permutations
+                # were rejected.
+                c_priors[j, i, m] = c_prior + 1e-100
+                fa_priors[j, i, m] = fa_prior + 1e-10
+                fb_priors[j, i, m] = fb_prior + 1e-10
+                # c should be equal to f^2 in the limit of indifference, so
+                # add 1e-10 and (1e-10)^2 to f and c respectively.
+                c_array[:bbinlengths[j, m]-1,
+                        :abinlengths[i, m]-1, j, i, m] = c_like + 1e-100
+                fa_array[:abinlengths[i, m]-1, j, i, m] = fa_like + 1e-10
+                fb_array[:bbinlengths[j, m]-1, j, i, m] = fb_like + 1e-10
 
     phot_like_data = StageData(abinsarray=abinsarray, abinlengths=abinlengths,
                                bbinsarray=bbinsarray, bbinlengths=bbinlengths,
@@ -246,49 +221,7 @@ def compute_photometric_likelihoods(joint_folder_path, a_cat_folder_path, b_cat_
     return phot_like_data
 
 
-def distribute_sky_indices(joint_folder_path, cat_folder, name, mem_chunk_num, cf_points):
-    '''
-    Function to calculate the nearest on-sky photometric likelihood point for
-    each catalogue source.
-
-    Parameters
-    ----------
-    joint_folder_path : string
-        Top-level folder path for the common files created during the cross-match
-        process.
-    cat_folder : string
-        The location of a given catalogue's input data files.
-    name : string
-        Representation of whether we are calculating sky indices for catalogue
-        "a", or catalogue "b".
-    mem_chunk_num : integer
-        Number of sub-sets to break larger data files down to, to preserve memory.
-    cf_points : numpy.ndarray
-        The two-point sky coordinates for each point to be used as a central
-        point of a small sky area, for calculating "counterpart" and "field"
-        photometric likelihoods.
-
-    Returns
-    -------
-    sky_inds : numpy.ndarray
-        The indices, matching ``cf_points``, of the closest sky position for each
-        source in this catalogue.
-    '''
-    n_sources = len(np.load('{}/con_cat_astro.npy'.format(cat_folder), mmap_mode='r'))
-    sky_inds = np.zeros(dtype=int, shape=(n_sources,), order='F')
-    for cnum in range(0, mem_chunk_num):
-        lowind = np.floor(n_sources*cnum/mem_chunk_num).astype(int)
-        highind = np.floor(n_sources*(cnum+1)/mem_chunk_num).astype(int)
-        a = np.load('{}/con_cat_astro.npy'.format(cat_folder), mmap_mode='r')[lowind:highind]
-        # Haversine doesn't mind 0-360 wraparound so a can be in [0, 360] range
-        # but cf_points in the negative-to-positive cutout.
-        sky_inds[lowind:highind] = mff.find_nearest_point(a[:, 0], a[:, 1],
-                                                          cf_points[:, 0], cf_points[:, 1])
-
-    return sky_inds
-
-
-def create_magnitude_bins(cf_points, filts, mem_chunk_num, joint_folder_path,
+def create_magnitude_bins(cf_points, filts, a_photo, joint_folder_path,
                           cat_folder_path, cat_type, sky_inds, load_extra_arrays,
                           blen_cutout, inds_cutout, size_cutout):
     '''
@@ -303,9 +236,8 @@ def create_magnitude_bins(cf_points, filts, mem_chunk_num, joint_folder_path,
         calculated.
     filts : list of strings
         List of the filters to create magnitude bins for in this catalogue.
-    mem_chunk_num : integer
-        Number of sub-sets to break larger catalogues down into, for memory
-        saving purposes.
+    a_photo : numpy.ndarray
+        Photometric detections from which to create magnitude bins.
     joint_folder_path : string
         Location of top-level folder into which all intermediate files are
         saved for the cross-match process.
@@ -340,47 +272,30 @@ def create_magnitude_bins(cf_points, filts, mem_chunk_num, joint_folder_path,
     '''
     binlengths = np.empty((len(filts), len(cf_points)), int)
 
-    for m_ in range(0, len(cf_points), mem_chunk_num):
-        a_multi_return = _load_multiple_sky_slice(cat_type, m_, m_+mem_chunk_num, cat_folder_path,
-                                                  sky_inds, load_extra_arrays, blen_cutout,
-                                                  inds_cutout, size_cutout)
-        if load_extra_arrays:
-            (a_phot_, sky_inds_, _, _, _, _) = a_multi_return
-        else:
-            a_phot_, sky_inds_ = a_multi_return
-        del a_multi_return
-        for m in range(m_, min(len(cf_points), m_+mem_chunk_num)):
-            sky_cut = _load_single_sky_slice(cat_type, m, sky_inds_)
-            for i in range(0, len(filts)):
-                a = a_phot_[sky_cut, i]
-                if np.sum(~np.isnan(a)) > 0:
-                    f = make_bins(a[~np.isnan(a)])
-                else:
-                    f = np.array([0])
-                del a
-                binlengths[i, m] = len(f)
+    for m in range(0, len(cf_points)):
+        sky_cut = sky_inds == m
+        for i in range(0, len(filts)):
+            a = a_photo[sky_cut, i]
+            if np.sum(~np.isnan(a)) > 0:
+                f = make_bins(a[~np.isnan(a)])
+            else:
+                f = np.array([0])
+            del a
+            binlengths[i, m] = len(f)
 
     longbinlen = np.amax(binlengths)
 
     binsarray = np.full(dtype=float, shape=(longbinlen, len(filts), len(cf_points)), fill_value=-1, order='F')
-    for m_ in range(0, len(cf_points), mem_chunk_num):
-        a_multi_return = _load_multiple_sky_slice(cat_type, m_, m_+mem_chunk_num, cat_folder_path,
-                                                  sky_inds, load_extra_arrays, blen_cutout,
-                                                  inds_cutout, size_cutout)
-        if load_extra_arrays:
-            (a_phot_, sky_inds_, _, _, _, _) = a_multi_return
-        else:
-            a_phot_, sky_inds_ = a_multi_return
-        for m in range(m_, min(len(cf_points), m_+mem_chunk_num)):
-            sky_cut = _load_single_sky_slice(cat_type, m, sky_inds_)
-            for i in range(0, len(filts)):
-                a = a_phot_[sky_cut, i]
-                if np.sum(~np.isnan(a)) > 0:
-                    f = make_bins(a[~np.isnan(a)])
-                else:
-                    f = np.array([0])
-                del a
-                binsarray[:binlengths[i, m], i, m] = f
+    for m in range(0, len(cf_points)):
+        sky_cut = sky_inds == m
+        for i in range(0, len(filts)):
+            a = a_photo[sky_cut, i]
+            if np.sum(~np.isnan(a)) > 0:
+                f = make_bins(a[~np.isnan(a)])
+            else:
+                f = np.array([0])
+            del a
+            binsarray[:binlengths[i, m], i, m] = f
 
     return binlengths, binsarray, longbinlen
 
@@ -440,83 +355,6 @@ def make_bins(input_mags):
     output_bins = np.delete(output_bins, dellist)
 
     return output_bins
-
-
-def _load_multiple_sky_slice(cat_name, ind1, ind2, cat_folder_path, sky_inds, load_extra_arrays,
-                             blen_tocut, inds_tocut, size_tocut):
-    '''
-    Function to return a sub-set of the photometry
-    of a given catalogue.
-
-    Parameters
-    ----------
-    cat_name : string
-        String defining whether this function was called on catalogue "a" or "b".
-    ind1 : float
-        The lower of the two sky indices, as defined in ``distribute_sky_indices``,
-        to return a sub-set of the larger catalogue between. This value represents
-        the index of a given on-sky position, used to construct the "counterpart"
-        and "field" likelihoods.
-    ind2 : float
-        The upper of the sky indices, defining the sub-set of the photometric
-        array to return.
-    cat_folder_path : string
-        The folder defining where this particular catalogue is stored.
-    sky_inds : numpy.ndarray
-        The given catalogue's ``distribute_sky_indices`` values, to compare
-        with ``ind1`` and ``ind2``.
-    load_extra_arrays : boolean
-        Flag to indicate whether the photometric information is being used in
-        the cross-match process, and whether to load additional arrays accordingly.
-    blen_tocut : numpy.ndarray
-        Output from ``group_sources``. Used only when ``load_extra_arrays`` is True.
-    inds_tocut : numpy.ndarray
-        Output from ``group_sources``. Used only when ``load_extra_arrays`` is True.
-    size_tocut : numpy.ndarray
-        Output from ``group_sources``. Used only when ``load_extra_arrays`` is True.
-
-    Returns
-    -------
-    photo_cutout : numpy.ndarray
-        A sub-set of the photometry of the given catalogue, those points which are
-        astrometrically closest to the sky indices between ``ind1`` and ``ind2``.
-    sky_ind_cutout : numpy.ndarray
-        The reduced ``sky_inds`` array, containing only those between ``ind1`` and
-        ``ind2``.
-    list_of_arrays : list of numpy.ndarrays
-        Depending on whether ``load_extra_arrays`` is ``True`` or not, this list
-        contains either just a cutout of the photometric data for this catalogue
-        and the corresponding subset of the sky index array, or it also contains
-        subsets of the astrometry array, and "bright" source error circle length,
-        and overlap index and size arrays.
-    '''
-    sky_cut = np.zeros(dtype=bool, shape=(len(sky_inds),))
-
-    di = max(1, len(sky_inds) // 20)
-
-    for i in range(0, len(sky_inds), di):
-        sky_cut[i:i+di] = (sky_inds[i:i+di] >= ind1) & (sky_inds[i:i+di] < ind2)
-
-    if load_extra_arrays:
-        astro_cutout = np.load('{}/con_cat_astro.npy'.format(cat_folder_path),
-                               mmap_mode='r')[sky_cut]
-
-        a_blen_cutout = blen_tocut[sky_cut]
-        a_inds_cutout = inds_tocut[:, sky_cut]
-        a_size_cutout = size_tocut[sky_cut]
-
-    photo_cutout = np.load('{}/con_cat_photo.npy'.format(cat_folder_path), mmap_mode='r')[sky_cut]
-    sky_ind_cutout = sky_inds[sky_cut]
-
-    if load_extra_arrays:
-        list_of_arrays = (photo_cutout, sky_ind_cutout, astro_cutout, a_blen_cutout, a_inds_cutout,
-                          a_size_cutout)
-    else:
-        list_of_arrays = (photo_cutout, sky_ind_cutout)
-
-    del sky_cut
-
-    return list_of_arrays
 
 
 def create_c_and_f(a_astro, b_astro, a_mag, b_mag, a_inds, a_size, b_inds, b_size, a_blen,

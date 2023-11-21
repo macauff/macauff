@@ -3,6 +3,7 @@
 Tests for the "group_sources" module.
 '''
 
+import pytest
 import os
 from numpy.testing import assert_allclose
 import numpy as np
@@ -277,7 +278,7 @@ def test_clean_overlaps():
 
 class TestMakeIslandGroupings():
     def setup_class(self):
-        self.mem_chunk_num, self.include_phot_like, self.use_phot_prior = 2, False, False
+        self.include_phot_like, self.use_phot_prior = False, False
         self.max_sep, self.int_fracs = 11, [0.63, 0.9, 0.99]  # max_sep in arcseconds
         self.a_filt_names, self.b_filt_names = ['G', 'RP'], ['W1', 'W2', 'W3']
         self.a_title, self.b_title = 'gaia', 'wise'
@@ -372,7 +373,6 @@ class TestMakeIslandGroupings():
         self.cm.a_cat_folder_path = self.a_cat_folder_path
         self.cm.b_cat_folder_path = self.b_cat_folder_path
         self.cm.joint_folder_path = self.joint_folder_path
-        self.cm.mem_chunk_num = self.mem_chunk_num
         self.cm.include_phot_like = self.include_phot_like
         self.cm.use_phot_prior = self.use_phot_prior
         self.cm.j1s = self.j1s
@@ -452,6 +452,7 @@ class TestMakeIslandGroupings():
         self._comparisons_in_islands(alist, blist, agrplen, bgrplen, N_a, N_b, N_c)
         assert len(os.listdir('{}/reject'.format(self.joint_folder_path))) == 0
 
+    @pytest.mark.filterwarnings("ignore:.*island, containing.*")
     def test_mig_extra_reject(self):
         os.system('rm -rf {}/reject/*'.format(self.joint_folder_path))
         self._fake_fourier_grid(self.N_a+10, self.N_b+11)
@@ -486,8 +487,8 @@ class TestMakeIslandGroupings():
             self.a_auf_pointings, self.b_auf_pointings, self.a_filt_names, self.b_filt_names,
             self.a_title, self.b_title, self.a_modelrefinds, self.b_modelrefinds, self.r, self.dr,
             self.rho, self.drho, self.j1s, self.max_sep, ax_lims, self.int_fracs,
-            self.mem_chunk_num, self.include_phot_like, self.use_phot_prior, self.n_pool,
-            self.a_perturb_auf_outputs, self.b_perturb_auf_outputs)
+            self.include_phot_like, self.use_phot_prior, self.n_pool, self.a_perturb_auf_outputs,
+            self.b_perturb_auf_outputs)
 
         alist, blist = gsd.alist, gsd.blist
         agrplen, bgrplen = gsd.agrplen, gsd.bgrplen
@@ -520,6 +521,7 @@ class TestMakeIslandGroupings():
 
         assert len(os.listdir('{}/reject'.format(self.joint_folder_path))) == 2
 
+    @pytest.mark.filterwarnings("ignore:.*island, containing.*")
     def test_mig_no_reject_ax_lims(self):
         os.system('rm -rf {}/reject/*'.format(self.joint_folder_path))
         self._fake_fourier_grid(self.N_a+10, self.N_b+11)
@@ -558,8 +560,8 @@ class TestMakeIslandGroupings():
             self.a_auf_pointings, self.b_auf_pointings, self.a_filt_names, self.b_filt_names,
             self.a_title, self.b_title, self.a_modelrefinds, self.b_modelrefinds, self.r, self.dr,
             self.rho, self.drho, self.j1s, self.max_sep, ax_lims, self.int_fracs,
-            self.mem_chunk_num, self.include_phot_like, self.use_phot_prior, self.n_pool,
-            self.a_perturb_auf_outputs, self.b_perturb_auf_outputs)
+            self.include_phot_like, self.use_phot_prior, self.n_pool, self.a_perturb_auf_outputs,
+            self.b_perturb_auf_outputs)
 
         alist, blist = gsd.alist, gsd.blist
         agrplen, bgrplen = gsd.agrplen, gsd.bgrplen
@@ -584,8 +586,8 @@ class TestMakeIslandGroupings():
             self.a_auf_pointings, self.b_auf_pointings, self.a_filt_names, self.b_filt_names,
             self.a_title, self.b_title, self.a_modelrefinds, self.b_modelrefinds,  self.r, self.dr,
             self.rho, self.drho, self.j1s, self.max_sep, self.ax_lims, self.int_fracs,
-            self.mem_chunk_num, include_phot_like, self.use_phot_prior, self.n_pool,
-            self.a_perturb_auf_outputs, self.b_perturb_auf_outputs)
+            include_phot_like, self.use_phot_prior, self.n_pool, self.a_perturb_auf_outputs,
+            self.b_perturb_auf_outputs)
 
         # Verify that make_island_groupings doesn't change when the extra arrays
         # are calculated, as an initial test.

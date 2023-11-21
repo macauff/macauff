@@ -112,17 +112,12 @@ def set_list(aindices, bindices, aoverlap, boverlap, joint_folder_path, n_pool):
 
     # Keep track of which sources have "good" group sizes, and the size of each
     # group in the two catalogues (e.g., group 1 has 2 "a" and 3 "b" sources).
-    goodlength = np.zeros(dtype=bool, shape=(len(agrouplengths),))
-    di = max(1, len(agrouplengths) // 20)
-    for i in range(0, len(agrouplengths), di):
-        goodlength[i:i+di] = np.logical_not(grouplengthexceeded[i:i+di])
+    goodlength = np.logical_not(grouplengthexceeded)
     acounters = np.zeros(dtype=int, shape=(groupmax,))
     bcounters = np.zeros(dtype=int, shape=(groupmax,))
-    amaxlen, bmaxlen = 0, 0
-    for i in range(0, len(agrouplengths), di):
-        if np.sum(goodlength[i:i+di]) > 0:
-            amaxlen = max(amaxlen, int(np.amax(agrouplengths[i:i+di][goodlength[i:i+di]])))
-            bmaxlen = max(bmaxlen, int(np.amax(bgrouplengths[i:i+di][goodlength[i:i+di]])))
+
+    amaxlen = int(np.amax(agrouplengths[goodlength]))
+    bmaxlen = int(np.amax(bgrouplengths[goodlength]))
     alist = np.full(dtype=int, shape=(amaxlen, groupmax), fill_value=-1, order='F')
     blist = np.full(dtype=int, shape=(bmaxlen, groupmax), fill_value=-1, order='F')
     # Remember that we started groups from one, so convert to zero-indexing.
@@ -138,40 +133,12 @@ def set_list(aindices, bindices, aoverlap, boverlap, joint_folder_path, n_pool):
             blist[bcounters[bgroup[i]-1], bgroup[i]-1] = i
             bcounters[bgroup[i]-1] += 1
 
-    # Now, slightly convolutedly, we simply want to remove any sources from the
-    # list with islands too large to run.
-    newsecondlen = 0
-    for i in range(0, len(agrouplengths), di):
-        newsecondlen += int(np.sum(goodlength[i:i+di]))
-
-    di = max(1, newsecondlen // 20)
-
-    # Not storing arrays on the file system, we need a way to keep track of a/blist and
-    # a/bgrouplengths. Use a dictionary.
-    setdict = {}
-
-    # Essentially do a = a[q], or a = a[:, q], but via memmap.
-    for cat_kind, list_array, maxlen, len_array in zip(
-            ['a', 'b'], [alist, blist], [amaxlen, bmaxlen], [agrouplengths, bgrouplengths]):
-
-        new_list_array = np.zeros(dtype=int, shape=(maxlen, newsecondlen), order='F')
-        new_grouplengths = np.zeros(dtype=int, shape=(newsecondlen,), order='F')
-
-        tick = 0
-        for i in range(0, len(len_array), di):
-            new_list_array[:, tick:tick+np.sum(goodlength[i:i+di])] = list_array[:, i:i+di][
-                :, goodlength[i:i+di]]
-            new_grouplengths[tick:tick+np.sum(goodlength[i:i+di])] = len_array[i:i+di][
-                goodlength[i:i+di]]
-            tick += np.sum(goodlength[i:i+di])
-
-        setdict["{}list".format(cat_kind)] = new_list_array
-        setdict["{}grouplengths".format(cat_kind)] = new_grouplengths
-
-    alist = setdict["alist"]
-    blist = setdict["blist"]
-    agrouplengths = setdict["agrouplengths"]
-    bgrouplengths = setdict["bgrouplengths"]
+    # Now, we simply want to remove any sources from the list with islands too
+    # large to run.
+    alist = alist[:, goodlength]
+    blist = blist[:, goodlength]
+    agrouplengths = agrouplengths[goodlength]
+    bgrouplengths = bgrouplengths[goodlength]
 
     if reject_flag:
         return alist, blist, agrouplengths, bgrouplengths, areject, breject

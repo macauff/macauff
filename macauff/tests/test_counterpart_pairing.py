@@ -72,9 +72,7 @@ class TestCounterpartPairing:
         self.b_photo = np.ones((4, 4), float)
 
         self.alist = np.array([[0, 3], [1, 4], [2, 5], [6, -1], [-1, -1]]).T
-        self.alist_ = self.alist
         self.blist = np.array([[1], [0], [3], [-1], [2]]).T
-        self.blist_ = self.blist
         self.agrplen = np.array([2, 2, 2, 1, 0])
         self.bgrplen = np.array([1, 1, 1, 0, 1])
 
@@ -185,7 +183,6 @@ class TestCounterpartPairing:
             self.aflux_grids, self.afourier_grids, self.bfrac_grids, self.bflux_grids,
             self.bfourier_grids, self.rho, self.drho, self.n_fracs, self.large_len,
             self.alist[:self.agrplen[i], i]+1, self.blist[:self.bgrplen[i], i]+1,
-            self.alist_[:self.agrplen[i], i], self.blist_[:self.bgrplen[i], i],
             self.amagref[self.alist[:self.agrplen[i], i]]+1,
             self.a_sky_inds[self.alist[:self.agrplen[i], i]]+1,
             self.bmagref[self.blist[:self.bgrplen[i], i]]+1,
@@ -236,7 +233,6 @@ class TestCounterpartPairing:
             self.aflux_grids, self.afourier_grids, self.bfrac_grids, self.bflux_grids,
             self.bfourier_grids, self.rho, self.drho, self.n_fracs, self.large_len,
             self.alist[:self.agrplen[i], i]+1, self.blist[:self.bgrplen[i], i]+1,
-            self.alist_[:self.agrplen[i], i], self.blist_[:self.bgrplen[i], i],
             self.amagref[self.alist[:self.agrplen[i], i]]+1,
             self.a_sky_inds[self.alist[:self.agrplen[i], i]]+1,
             self.bmagref[self.blist[:self.bgrplen[i], i]]+1,
@@ -260,7 +256,6 @@ class TestCounterpartPairing:
             self.aflux_grids, self.afourier_grids, self.bfrac_grids, self.bflux_grids,
             self.bfourier_grids, self.rho, self.drho, self.n_fracs, self.large_len,
             self.alist[:self.agrplen[i], i]+1, self.blist[:self.bgrplen[i], i]+1,
-            self.alist_[:self.agrplen[i], i], self.blist_[:self.bgrplen[i], i],
             self.amagref[self.alist[:self.agrplen[i], i]]+1,
             self.a_sky_inds[self.alist[:self.agrplen[i], i]]+1,
             self.bmagref[self.blist[:self.bgrplen[i], i]]+1,
@@ -281,12 +276,11 @@ class TestCounterpartPairing:
     def test_source_pairing(self):
         os.system('rm -r {}/pairing'.format(self.joint_folder_path))
         os.makedirs('{}/pairing'.format(self.joint_folder_path), exist_ok=True)
-        mem_chunk_num = 2
         source_pairing(
             self.joint_folder_path, self.a_cat_folder_path, self.b_cat_folder_path,
             self.a_filt_names, self.b_filt_names, self.a_auf_pointings, self.b_auf_pointings,
             self.amodelrefinds, self.bmodelrefinds, self.rho, self.drho, self.n_fracs,
-            mem_chunk_num, group_sources_data=self.group_sources_data,
+            group_sources_data=self.group_sources_data,
             phot_like_data=self.phot_like_data, a_perturb_auf_outputs=self.a_perturb_auf_outputs,
             b_perturb_auf_outputs=self.b_perturb_auf_outputs)
 
@@ -374,12 +368,11 @@ class TestCounterpartPairing:
         os.system('rm -r {}/reject'.format(self.joint_folder_path))
         os.makedirs('{}/reject'.format(self.joint_folder_path), exist_ok=True)
 
-        mem_chunk_num = 2
         source_pairing(
             self.joint_folder_path, self.a_cat_folder_path, self.b_cat_folder_path,
             self.a_filt_names, self.b_filt_names, self.a_auf_pointings, self.b_auf_pointings,
             self.amodelrefinds, self.bmodelrefinds, self.rho, self.drho, self.n_fracs,
-            mem_chunk_num, group_sources_data=group_sources_data,
+            group_sources_data=group_sources_data,
             phot_like_data=self.phot_like_data, a_perturb_auf_outputs=self.a_perturb_auf_outputs,
             b_perturb_auf_outputs=self.b_perturb_auf_outputs)
 
@@ -445,13 +438,12 @@ class TestCounterpartPairing:
             alist=alist, blist=blist, agrplen=agrplen, bgrplen=bgrplen,
             lenrejecta=len(a_reject), lenrejectb=0)
 
-        mem_chunk_num = 2
         with pytest.warns(UserWarning) as record:
             source_pairing(
                 self.joint_folder_path, self.a_cat_folder_path, self.b_cat_folder_path,
                 self.a_filt_names, self.b_filt_names, self.a_auf_pointings, self.b_auf_pointings,
                 self.amodelrefinds, self.bmodelrefinds, self.rho, self.drho, self.n_fracs,
-                mem_chunk_num, group_sources_data=group_sources_data,
+                group_sources_data=group_sources_data,
                 phot_like_data=self.phot_like_data,
                 a_perturb_auf_outputs=self.a_perturb_auf_outputs,
                 b_perturb_auf_outputs=self.b_perturb_auf_outputs)
@@ -498,13 +490,12 @@ class TestCounterpartPairing:
             alist=alist, blist=blist, agrplen=agrplen, bgrplen=bgrplen,
             lenrejecta=len(a_reject), lenrejectb=len(b_reject))
 
-        mem_chunk_num = 2
         with pytest.warns(UserWarning) as record:
             source_pairing(
                 self.joint_folder_path, self.a_cat_folder_path, self.b_cat_folder_path,
                 self.a_filt_names, self.b_filt_names, self.a_auf_pointings, self.b_auf_pointings,
                 self.amodelrefinds, self.bmodelrefinds, self.rho, self.drho, self.n_fracs,
-                mem_chunk_num, group_sources_data=group_sources_data,
+                group_sources_data=group_sources_data,
                 phot_like_data=self.phot_like_data,
                 a_perturb_auf_outputs=self.a_perturb_auf_outputs,
                 b_perturb_auf_outputs=self.b_perturb_auf_outputs)
@@ -535,8 +526,8 @@ class TestCounterpartPairing:
         # Ensure output chunk directory exists
         os.makedirs(os.path.join(os.path.dirname(__file__), "data/chunk0"), exist_ok=True)
 
-        for ol, nl in zip(['cf_region_points = 131 134 4 -1 1 3', 'mem_chunk_num = 10'],
-                          ['cf_region_points = 131 131 1 0 0 1\n', 'mem_chunk_num = 2\n']):
+        for ol, nl in zip(['cf_region_points = 131 134 4 -1 1 3'],
+                          ['cf_region_points = 131 131 1 0 0 1\n']):
             f = open(os.path.join(os.path.dirname(__file__),
                                   'data/crossmatch_params.txt')).readlines()
             idx = np.where([ol in line for line in f])[0][0]
