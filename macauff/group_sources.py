@@ -6,7 +6,6 @@ various photometric integral purposes.
 '''
 
 import sys
-import os
 import multiprocessing
 import itertools
 import numpy as np
@@ -335,8 +334,13 @@ def make_island_groupings(joint_folder_path, a_cat_folder_path, b_cat_folder_pat
     print("Finding unique sets...")
     sys.stdout.flush()
 
-    alist, blist, agrplen, bgrplen = set_list(ainds, binds, asize, bsize, joint_folder_path,
-                                              n_pool)
+    set_list_items = set_list(ainds, binds, asize, bsize, joint_folder_path, n_pool)
+    if len(set_list_items) == 6:
+        alist, blist, agrplen, bgrplen, areject, breject = set_list_items
+        reject_flag = True
+    else:
+        alist, blist, agrplen, bgrplen = set_list_items
+        reject_flag = False
 
     # The final act of creating island groups is to clear out any sources too
     # close to the edge of the catalogue -- defined by its rectangular extend.
@@ -403,28 +407,22 @@ def make_island_groupings(joint_folder_path, a_cat_folder_path, b_cat_folder_pat
     # If set_list returned any rejected sources, then add any sources too close
     # to match extent to those now. Ensure that we only reject the unique source IDs
     # across each island group, ignoring the "default" -1 index.
-    if os.path.isfile('{}/reject/areject.npy'.format(joint_folder_path)):
-        a_first_rejected_len = len(np.load('{}/reject/areject.npy'.format(joint_folder_path),
-                                           mmap_mode='r'))
+    if reject_flag:
+        a_first_rejected_len = len(areject)
     else:
         a_first_rejected_len = 0
     if num_a_failed_checks + a_first_rejected_len > 0:
         reject_a = np.zeros(dtype=int, shape=(num_a_failed_checks+a_first_rejected_len,))
-    if os.path.isfile('{}/reject/areject.npy'.format(joint_folder_path)):
-        reject_a[num_a_failed_checks:] = np.load('{}/reject/areject.npy'.format(joint_folder_path),
-                                                 mmap_mode='r')
-        os.remove('{}/reject/areject.npy'.format(joint_folder_path))
-    if os.path.isfile('{}/reject/breject.npy'.format(joint_folder_path)):
-        b_first_rejected_len = len(np.load('{}/reject/breject.npy'.format(joint_folder_path),
-                                           mmap_mode='r'))
+    if reject_flag:
+        reject_a[num_a_failed_checks:] = areject
+    if reject_flag:
+        b_first_rejected_len = len(breject)
     else:
         b_first_rejected_len = 0
     if num_b_failed_checks + b_first_rejected_len > 0:
         reject_b = np.zeros(dtype=int, shape=(num_b_failed_checks+b_first_rejected_len,))
-    if os.path.isfile('{}/reject/breject.npy'.format(joint_folder_path)):
-        reject_b[num_b_failed_checks:] = np.load('{}/reject/breject.npy'.format(joint_folder_path),
-                                                 mmap_mode='r')
-        os.remove('{}/reject/breject.npy'.format(joint_folder_path))
+    if reject_flag:
+        reject_b[num_b_failed_checks:] = breject
     di = max(1, len(agrplen) // 20)
     amaxlen, bmaxlen = 0, 0
     for i in range(0, len(agrplen), di):

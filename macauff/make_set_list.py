@@ -104,11 +104,11 @@ def set_list(aindices, bindices, aoverlap, boverlap, joint_folder_path, n_pool):
                                                   'were', maxiters))
         sys.stdout.flush()
         rejectgroupnum = np.arange(1, groupmax+1)[grouplengthexceeded]
-        reject_a = np.arange(0, len(aoverlap))[np.in1d(agroup, rejectgroupnum)]
-        reject_b = np.arange(0, len(boverlap))[np.in1d(bgroup, rejectgroupnum)]
-        np.save('{}/reject/areject.npy'.format(joint_folder_path), reject_a)
-        np.save('{}/reject/breject.npy'.format(joint_folder_path), reject_b)
-        del reject_a, reject_b, rejectgroupnum
+        areject = np.arange(0, len(aoverlap))[np.in1d(agroup, rejectgroupnum)]
+        breject = np.arange(0, len(boverlap))[np.in1d(bgroup, rejectgroupnum)]
+        reject_flag = True
+    else:
+        reject_flag = False
 
     # Keep track of which sources have "good" group sizes, and the size of each
     # group in the two catalogues (e.g., group 1 has 2 "a" and 3 "b" sources).
@@ -177,7 +177,10 @@ def set_list(aindices, bindices, aoverlap, boverlap, joint_folder_path, n_pool):
     agrouplengths = setdict["agrouplengths"]
     bgrouplengths = setdict["bgrouplengths"]
 
-    return alist, blist, agrouplengths, bgrouplengths
+    if reject_flag:
+        return alist, blist, agrouplengths, bgrouplengths, areject, breject
+    else:
+        return alist, blist, agrouplengths, bgrouplengths
 
 
 def _initial_group_numbering(aindices, bindices, aoverlap, boverlap, joint_folder_path):

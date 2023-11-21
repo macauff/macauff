@@ -303,31 +303,6 @@ class TestMakeIslandGroupings():
 
         self.ax_lims = np.array([10, 12, -26, -24])
 
-        # Fake fourier grid, in this case under the assumption that there
-        # is no extra AUF component:
-        fourier_grids = []
-        for auf_folder, auf_points, filters, N in zip(
-                [self.a_auf_folder_path, self.b_auf_folder_path],
-                [self.a_auf_pointings, self.b_auf_pointings],
-                [self.a_filt_names, self.b_filt_names], [self.N_a, self.N_b]):
-            np.save('{}/modelrefinds.npy'.format(auf_folder), np.zeros((3, N), int))
-            if 'gaia' in auf_folder:
-                self.a_modelrefinds = np.zeros((3, N), int)
-            else:
-                self.b_modelrefinds = np.zeros((3, N), int)
-            perturb_auf = {}
-            for i in range(len(auf_points)):
-                ax1, ax2 = auf_points[i]
-                for j in range(len(filters)):
-                    name = '{}-{}-{}'.format(ax1, ax2, filters[j])
-                    fourieroffset = np.ones((len(self.rho) - 1, 1), float, order='F')
-                    perturb_auf[name] = {'fourier': fourieroffset}
-            fourier_grids.append(create_auf_params_grid(perturb_auf, auf_points, filters, 'fourier',
-                                 np.ones((len(filters), len(auf_points)), int), len(self.rho)-1))
-        self.a_perturb_auf_outputs = {}
-        self.b_perturb_auf_outputs = {}
-        self.a_perturb_auf_outputs['fourier_grid'] = fourier_grids[0]
-        self.b_perturb_auf_outputs['fourier_grid'] = fourier_grids[1]
         # 99% is slightly more than 3-sigma of a 2-D Gaussian integral, for
         # int_frac[2] = 0.99
         self.sigma = 0.1
@@ -383,15 +358,12 @@ class TestMakeIslandGroupings():
         self.cm._initialise_chunk(os.path.join(os.path.dirname(__file__), 'data/crossmatch_params.txt'),
                                   os.path.join(os.path.dirname(__file__), 'data/cat_a_params_.txt'),
                                   os.path.join(os.path.dirname(__file__), 'data/cat_b_params_.txt'))
-        self.files_per_island_sim = 5
         self.cm.pos_corr_dist = self.max_sep
         self.cm.cross_match_extent = self.ax_lims
         self.cm.a_filt_names = self.a_filt_names
         self.cm.b_filt_names = self.b_filt_names
         self.cm.a_cat_name = self.a_title
         self.cm.b_cat_name = self.b_title
-        self.cm.a_modelrefinds = self.a_modelrefinds
-        self.cm.b_modelrefinds = self.b_modelrefinds
         self.cm.r, self.cm.dr, self.cm.rho, self.cm.drho = self.r, self.dr, self.rho, self.drho
         self.cm.a_auf_folder_path = self.a_auf_folder_path
         self.cm.b_auf_folder_path = self.b_auf_folder_path
@@ -406,6 +378,33 @@ class TestMakeIslandGroupings():
         self.cm.j1s = self.j1s
 
         self.n_pool = 5
+
+    def _fake_fourier_grid(self, N_a, N_b):
+        # Fake fourier grid, in this case under the assumption that there
+        # is no extra AUF component:
+        fourier_grids = []
+        for auf_folder, auf_points, filters, N in zip(
+                [self.a_auf_folder_path, self.b_auf_folder_path],
+                [self.a_auf_pointings, self.b_auf_pointings],
+                [self.a_filt_names, self.b_filt_names], [N_a, N_b]):
+            np.save('{}/modelrefinds.npy'.format(auf_folder), np.zeros((3, N), int))
+            if 'gaia' in auf_folder:
+                self.a_modelrefinds = np.zeros((3, N), int)
+            else:
+                self.b_modelrefinds = np.zeros((3, N), int)
+            perturb_auf = {}
+            for i in range(len(auf_points)):
+                ax1, ax2 = auf_points[i]
+                for j in range(len(filters)):
+                    name = '{}-{}-{}'.format(ax1, ax2, filters[j])
+                    fourieroffset = np.ones((len(self.rho) - 1, 1), float, order='F')
+                    perturb_auf[name] = {'fourier': fourieroffset}
+            fourier_grids.append(create_auf_params_grid(perturb_auf, auf_points, filters, 'fourier',
+                                 np.ones((len(filters), len(auf_points)), int), len(self.rho)-1))
+        self.a_perturb_auf_outputs = {}
+        self.b_perturb_auf_outputs = {}
+        self.a_perturb_auf_outputs['fourier_grid'] = fourier_grids[0]
+        self.b_perturb_auf_outputs['fourier_grid'] = fourier_grids[1]
 
     def _comparisons_in_islands(self, alist, blist, agrplen, bgrplen, N_a, N_b, N_c):
         # Given, say, 25 common sources from 30 'a' and 45 'b' objects, we'd
@@ -435,6 +434,7 @@ class TestMakeIslandGroupings():
 
     def test_make_island_groupings(self):
         os.system('rm -rf {}/reject/*'.format(self.joint_folder_path))
+        self._fake_fourier_grid(self.N_a, self.N_b)
         N_a, N_b, N_c = self.N_a, self.N_b, self.N_com
         np.save('{}/con_cat_astro.npy'.format(self.a_cat_folder_path), self.a_coords)
         np.save('{}/con_cat_astro.npy'.format(self.b_cat_folder_path), self.b_coords)
@@ -443,7 +443,9 @@ class TestMakeIslandGroupings():
         self.cm.chunk_id = 1
         self.cm.a_perturb_auf_outputs = self.a_perturb_auf_outputs
         self.cm.b_perturb_auf_outputs = self.b_perturb_auf_outputs
-        self.cm.group_sources(self.files_per_island_sim)
+        self.cm.a_modelrefinds = self.a_modelrefinds
+        self.cm.b_modelrefinds = self.b_modelrefinds
+        self.cm.group_sources()
 
         alist, blist = self.cm.group_sources_data.alist, self.cm.group_sources_data.blist
         agrplen, bgrplen = self.cm.group_sources_data.agrplen, self.cm.group_sources_data.bgrplen
@@ -452,18 +454,30 @@ class TestMakeIslandGroupings():
 
     def test_mig_extra_reject(self):
         os.system('rm -rf {}/reject/*'.format(self.joint_folder_path))
+        self._fake_fourier_grid(self.N_a+10, self.N_b+11)
         N_a, N_b, N_c = self.N_a, self.N_b, self.N_com
         ax_lims = self.ax_lims
-        # Pretend like there's already removed objects due to group length being
-        # exceeded during make_set_list even though there won't be.
-        np.save('joint/reject/areject.npy', np.arange(N_a, N_a+5))
-        np.save('joint/reject/breject.npy', np.arange(N_b, N_b+4))
         # Fake moving some sources to within max_sep of the axlims edges, to
         # test the removal of these objects -- combined with the above sources.
-        a_coords, b_coords = np.copy(self.a_coords), np.copy(self.b_coords)
+        a_coords = np.empty((self.N_a+10, 3), float)
+        a_coords[:self.N_a, 0] = self.a_coords[:, 0]
+        a_coords[:self.N_a, 1] = self.a_coords[:, 1]
+        a_coords[:self.N_a, 2] = self.a_coords[:, 2]
+        b_coords = np.empty((self.N_b+11, 3), float)
+        b_coords[:self.N_b, 0] = self.b_coords[:, 0]
+        b_coords[:self.N_b, 1] = self.b_coords[:, 1]
+        b_coords[:self.N_b, 2] = self.b_coords[:, 2]
         a_c_diff = a_coords[3:6, 0] - (ax_lims[0] + self.max_sep/3600 - 1/3600)
         a_coords[3:6, 0] = ax_lims[0] + self.max_sep/3600 - 1/3600
         b_coords[3:6, 0] -= a_c_diff
+        # Add extra objects to be removed due to group length being
+        # exceeded during make_set_list.
+        a_coords[self.N_a:, 0] = 0.5*(ax_lims[0]+ax_lims[1])
+        b_coords[self.N_b:, 0] = 0.5*(ax_lims[0]+ax_lims[1])
+        a_coords[self.N_a:, 1] = 0.5*(ax_lims[2]+ax_lims[3])
+        b_coords[self.N_b:, 1] = 0.5*(ax_lims[2]+ax_lims[3])
+        a_coords[self.N_a:, 2] = 0.5
+        b_coords[self.N_b:, 2] = 0.5
         np.save('{}/con_cat_astro.npy'.format(self.a_cat_folder_path), a_coords)
         np.save('{}/con_cat_astro.npy'.format(self.b_cat_folder_path), b_coords)
 
@@ -499,32 +513,45 @@ class TestMakeIslandGroupings():
 
         areject = np.load('joint/reject/reject_a.npy')
         breject = np.load('joint/reject/reject_b.npy')
-        assert np.all(areject.shape == (5+3,))
-        assert np.all(breject.shape == (4+3,))
-        assert np.all(areject == np.array([3, 4, 5, N_a, N_a+1, N_a+2, N_a+3, N_a+4]))
-        assert np.all(breject == np.array([3, 4, 5, N_b, N_b+1, N_b+2, N_b+3]))
+        assert np.all(areject.shape == (10+3,))
+        assert np.all(breject.shape == (11+3,))
+        assert np.all(areject == np.concatenate(([3, 4, 5], np.arange(N_a, N_a+10))))
+        assert np.all(breject == np.concatenate(([3, 4, 5], np.arange(N_b, N_b+11))))
 
         assert len(os.listdir('{}/reject'.format(self.joint_folder_path))) == 2
 
     def test_mig_no_reject_ax_lims(self):
         os.system('rm -rf {}/reject/*'.format(self.joint_folder_path))
+        self._fake_fourier_grid(self.N_a+10, self.N_b+11)
         N_a, N_b, N_c = self.N_a, self.N_b, self.N_com
         ax_lims = np.array([0, 360, -90, -88])
         # Check if axlims are changed to include wrap-around 0/360, or +-90 latitude,
         # then we don't reject any sources.
-        a_coords, b_coords = np.copy(self.a_coords), np.copy(self.b_coords)
+        a_coords = np.empty((self.N_a+10, 3), float)
+        a_coords[:self.N_a, 0] = self.a_coords[:, 0]
         # Set up -26 to -24, and we now want them -90 to -88:
-        a_coords[:, 1] -= 64
-        b_coords[:, 1] -= 64
+        a_coords[:self.N_a, 1] = self.a_coords[:, 1] - 64
+        a_coords[:self.N_a, 2] = self.a_coords[:, 2]
+        b_coords = np.empty((self.N_b+11, 3), float)
+        b_coords[:self.N_b, 0] = self.b_coords[:, 0]
+        b_coords[:self.N_b, 1] = self.b_coords[:, 1] - 64
+        b_coords[:self.N_b, 2] = self.b_coords[:, 2]
         a_c_diff = a_coords[3:6, 0] - (ax_lims[0] + self.max_sep/3600 - 1/3600)
         a_coords[3:6, 0] = ax_lims[0] + self.max_sep/3600 - 1/3600
         b_coords[3:6, 0] -= a_c_diff
         a_coords[7, :2] = [15, -90+(self.max_sep-3)/3600]
         b_coords[7, :2] = a_coords[7, :2] + [0.2*self.sigma/3600, -0.15*self.sigma/3600]
+        # Add extra objects to be removed due to group length being
+        # exceeded during make_set_list.
+        a_coords[self.N_a:, 0] = 0.5*(ax_lims[0]+ax_lims[1])
+        b_coords[self.N_b:, 0] = 0.5*(ax_lims[0]+ax_lims[1])
+        a_coords[self.N_a:, 1] = 0.5*(ax_lims[2]+ax_lims[3])
+        b_coords[self.N_b:, 1] = 0.5*(ax_lims[2]+ax_lims[3])
+        a_coords[self.N_a:, 2] = 0.5
+        b_coords[self.N_b:, 2] = 0.5
+
         np.save('{}/con_cat_astro.npy'.format(self.a_cat_folder_path), a_coords)
         np.save('{}/con_cat_astro.npy'.format(self.b_cat_folder_path), b_coords)
-        np.save('joint/reject/areject.npy', np.arange(N_a, N_a+5))
-        np.save('joint/reject/breject.npy', np.arange(N_b, N_b+4))
 
         gsd = make_island_groupings(
             self.joint_folder_path, self.a_cat_folder_path, self.b_cat_folder_path,
@@ -540,14 +567,15 @@ class TestMakeIslandGroupings():
         self._comparisons_in_islands(alist, blist, agrplen, bgrplen, N_a, N_b, N_c)
         areject = np.load('joint/reject/reject_a.npy')
         breject = np.load('joint/reject/reject_b.npy')
-        assert np.all(areject.shape == (5,))
-        assert np.all(breject.shape == (4,))
-        assert np.all(areject == np.array([N_a, N_a+1, N_a+2, N_a+3, N_a+4]))
-        assert np.all(breject == np.array([N_b, N_b+1, N_b+2, N_b+3]))
+        assert np.all(areject.shape == (10,))
+        assert np.all(breject.shape == (11,))
+        assert np.all(areject == np.arange(N_a, N_a+10))
+        assert np.all(breject == np.arange(N_b, N_b+11))
         assert len(os.listdir('{}/reject'.format(self.joint_folder_path))) == 2
 
     def test_make_island_groupings_include_phot_like(self):
         os.system('rm -rf {}/reject/*'.format(self.joint_folder_path))
+        self._fake_fourier_grid(self.N_a, self.N_b)
         np.save('{}/con_cat_astro.npy'.format(self.a_cat_folder_path), self.a_coords)
         np.save('{}/con_cat_astro.npy'.format(self.b_cat_folder_path), self.b_coords)
         include_phot_like = True
