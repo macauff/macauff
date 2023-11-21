@@ -493,21 +493,20 @@ class CrossMatch():
         self._initialise_chunk(joint_file_path, cat_a_file_path, cat_b_file_path)
 
         # The first step is to create the perturbation AUF components, if needed.
-        # TODO: generalise the number of files per AUF simulation as input arg.
-        self.create_perturb_auf(7)
+        self.create_perturb_auf()
 
         # Once AUF components are assembled, we now group sources based on
         # convolved AUF integration lengths, to get "common overlap" sources
         # and merge such overlaps into distinct "islands" of sources to match.
-        self.group_sources(7)
+        self.group_sources()
 
         # The third step in this process is to, to some level, calculate the
         # photometry-related information necessary for the cross-match.
-        self.calculate_phot_like(5)
+        self.calculate_phot_like()
 
         # The final stage of the cross-match process is that of putting together
         # the previous stages, and calculating the cross-match probabilities.
-        self.pair_sources(13)
+        self.pair_sources()
 
         # Following cross-match completion, perform post-processing
         self._postprocess_chunk()
@@ -1435,14 +1434,12 @@ class CrossMatch():
         self.j0s = None
         self.j1s = None
 
-    def create_perturb_auf(self, files_per_auf_sim, perturb_auf_func=make_perturb_aufs):
+    def create_perturb_auf(self, perturb_auf_func=make_perturb_aufs):
         '''
         Function wrapping the main perturbation AUF component creation routines.
 
         Parameters
         ----------
-        files_per_auf_sim : integer
-            The number of output files for each individual perturbation simulation.
         perturb_auf_func : callable, optional
             ``perturb_auf_func`` should create the perturbation AUF output files
             for each filter-pointing combination.
@@ -1580,16 +1577,13 @@ class CrossMatch():
             self.b_auf_region_points, self.r, self.dr, self.rho, self.drho, 'b',
             self.include_perturb_auf, self.mem_chunk_num, **_kwargs)
 
-    def group_sources(self, files_per_grouping, group_func=make_island_groupings):
+    def group_sources(self, group_func=make_island_groupings):
         '''
         Function to handle the creation of catalogue "islands" and potential
         astrometrically related sources across the two catalogues.
 
         Parameters
         ----------
-        files_per_grouping : integer
-            The number of output files from each catalogue, made during the
-            island and overlap creation process.
         group_func : callable, optional
             ``group_func`` should create the various island- and overlap-related
             files by which objects across the two catalogues are assigned as
@@ -1612,16 +1606,13 @@ class CrossMatch():
                        self.mem_chunk_num, self.include_phot_like, self.use_phot_priors,
                        self.n_pool, self.a_perturb_auf_outputs, self.b_perturb_auf_outputs)
 
-    def calculate_phot_like(self, files_per_phot, phot_like_func=compute_photometric_likelihoods):
+    def calculate_phot_like(self, phot_like_func=compute_photometric_likelihoods):
         '''
         Create the photometric likelihood information used in the cross-match
         process.
 
         Parameters
         ----------
-        files_per_phot : integer
-            The number of files created during the cross-match process for each
-            individual photometric sky position pointing.
         phot_like_func : callable, optional
             The function that calls the overall computation of the counterpart
             and "field" star photometric likelihood-related information.
@@ -1678,15 +1669,13 @@ class CrossMatch():
 
         return
 
-    def pair_sources(self, files_per_pairing, count_pair_func=source_pairing):
+    def pair_sources(self, count_pair_func=source_pairing):
         '''
         Assign sources in the two catalogues as either counterparts to one another
         or singly detected "field" sources.
 
         Parameters
         ----------
-        files_per_pairing : integer
-            The number of saved files expected in the pairing folder.
         count_pair_func : callable, optional
             The function that calls the counterpart determination routine.
         '''
