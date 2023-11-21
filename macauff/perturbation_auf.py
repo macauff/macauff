@@ -301,10 +301,7 @@ def make_perturb_aufs(auf_folder, cat_folder, filters, auf_points, r, dr, rho,
             os.makedirs(ax_folder, exist_ok=True)
 
         if include_perturb_auf:
-            sky_cut = _load_single_sky_slice(auf_folder, '', i, modelrefinds[2, :])
-            # TODO: avoid np.arange by first iterating an np.sum(sky_cut)
-            # and pre-generating a memmapped sub-array, and looping over
-            # putting the correct indices into place.
+            sky_cut = _load_single_sky_slice('', i, modelrefinds[2, :])
             med_index_slice = np.arange(0, len(local_N))[sky_cut]
             a_photo_cut = a_tot_photo[sky_cut]
             a_astro_cut = a_tot_astro[sky_cut]
@@ -702,8 +699,8 @@ def calculate_local_density(a_astro, a_tot_astro, a_tot_photo, auf_folder, cat_f
     min_lon, max_lon = min_max_lon(a_astro[:, 0])
     min_lat, max_lat = np.amin(a_astro[:, 1]), np.amax(a_astro[:, 1])
 
-    overlap_sky_cut = _load_rectangular_slice(auf_folder, '', a_tot_astro, min_lon,
-                                              max_lon, min_lat, max_lat, density_radius)
+    overlap_sky_cut = _load_rectangular_slice('', a_tot_astro, min_lon, max_lon, min_lat, max_lat,
+                                              density_radius)
     cut = np.zeros(dtype=bool, shape=(len(a_tot_astro),))
     di = max(1, len(cut) // 20)
     for i in range(0, len(a_tot_astro), di):
@@ -724,15 +721,14 @@ def calculate_local_density(a_astro, a_tot_astro, a_tot_photo, auf_folder, cat_f
     full_counts = np.empty(len(a_astro), float)
     for ax1_start, ax1_end in zip(ax1_loops[:-1], ax1_loops[1:]):
         for ax2_start, ax2_end in zip(ax2_loops[:-1], ax2_loops[1:]):
-            small_sky_cut = _load_rectangular_slice(auf_folder, 'small_', a_astro, ax1_start,
-                                                    ax1_end, ax2_start, ax2_end, 0)
+            small_sky_cut = _load_rectangular_slice('small_', a_astro, ax1_start, ax1_end,
+                                                    ax2_start, ax2_end, 0)
             a_astro_small = a_astro[small_sky_cut]
             if len(a_astro_small) == 0:
                 continue
 
-            overlap_sky_cut = _load_rectangular_slice(auf_folder, '', a_astro_overlap_cut,
-                                                      ax1_start, ax1_end, ax2_start, ax2_end,
-                                                      density_radius)
+            overlap_sky_cut = _load_rectangular_slice('', a_astro_overlap_cut, ax1_start, ax1_end,
+                                                      ax2_start, ax2_end, density_radius)
             cut = np.zeros(dtype=bool, shape=(len(a_astro_overlap_cut),))
             di = max(1, len(cut) // 20)
             for i in range(0, len(a_astro_overlap_cut), di):

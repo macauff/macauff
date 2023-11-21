@@ -145,24 +145,13 @@ def make_island_groupings(joint_folder_path, a_cat_folder_path, b_cat_folder_pat
                                                                ax1_sparse_loops[1:])):
         for j, (ax2_sparse_start, ax2_sparse_end) in enumerate(zip(ax2_sparse_loops[:-1],
                                                                    ax2_sparse_loops[1:])):
-            a_big_sky_cut = _load_rectangular_slice(
-                joint_folder_path, '', a_full, ax1_sparse_start, ax1_sparse_end, ax2_sparse_start,
-                ax2_sparse_end, 0)
-            b_big_sky_cut = _load_rectangular_slice(
-                joint_folder_path, '', b_full, ax1_sparse_start, ax1_sparse_end, ax2_sparse_start,
-                ax2_sparse_end, max_sep)
+            a_big_sky_cut = _load_rectangular_slice('', a_full, ax1_sparse_start, ax1_sparse_end,
+                                                    ax2_sparse_start, ax2_sparse_end, 0)
+            b_big_sky_cut = _load_rectangular_slice('', b_full, ax1_sparse_start, ax1_sparse_end,
+                                                    ax2_sparse_start, ax2_sparse_end, max_sep)
             a_cutout = a_full[a_big_sky_cut]
             b_cutout = b_full[b_big_sky_cut]
 
-            small_memmap_slice_arrays_a = []
-            small_memmap_slice_arrays_b = []
-            for _ in range(5):
-                small_memmap_slice_arrays_a.append(np.zeros(dtype=bool, shape=(len(a_cutout),)))
-                small_memmap_slice_arrays_b.append(np.zeros(dtype=bool, shape=(len(b_cutout),)))
-
-            # TODO: avoid np.arange by first iterating an np.sum(big_sky_cut)
-            # and pre-generating a memmapped sub-array, and looping over
-            # putting the correct indices into place.
             a_sky_inds = np.arange(0, len(a_full))[a_big_sky_cut]
             b_sky_inds = np.arange(0, len(b_full))[b_big_sky_cut]
             for ax1_start, ax1_end in zip(ax1_loops[i*ax1_skip:(i+1)*ax1_skip],
@@ -208,20 +197,12 @@ def make_island_groupings(joint_folder_path, a_cat_folder_path, b_cat_folder_pat
                                                                ax1_sparse_loops[1:])):
         for j, (ax2_sparse_start, ax2_sparse_end) in enumerate(zip(ax2_sparse_loops[:-1],
                                                                    ax2_sparse_loops[1:])):
-            a_big_sky_cut = _load_rectangular_slice(
-                joint_folder_path, '', a_full, ax1_sparse_start, ax1_sparse_end, ax2_sparse_start,
-                ax2_sparse_end, 0)
-            b_big_sky_cut = _load_rectangular_slice(
-                joint_folder_path, '', b_full, ax1_sparse_start, ax1_sparse_end, ax2_sparse_start,
-                ax2_sparse_end, max_sep)
+            a_big_sky_cut = _load_rectangular_slice('', a_full, ax1_sparse_start, ax1_sparse_end,
+                                                    ax2_sparse_start, ax2_sparse_end, 0)
+            b_big_sky_cut = _load_rectangular_slice('', b_full, ax1_sparse_start, ax1_sparse_end,
+                                                    ax2_sparse_start, ax2_sparse_end, max_sep)
             a_cutout = a_full[a_big_sky_cut]
             b_cutout = b_full[b_big_sky_cut]
-
-            small_memmap_slice_arrays_a = []
-            small_memmap_slice_arrays_b = []
-            for _ in range(5):
-                small_memmap_slice_arrays_a.append(np.zeros(dtype=bool, shape=(len(a_cutout),)))
-                small_memmap_slice_arrays_b.append(np.zeros(dtype=bool, shape=(len(b_cutout),)))
 
             a_sky_inds = np.arange(0, len(a_full))[a_big_sky_cut]
             b_sky_inds = np.arange(0, len(b_full))[b_big_sky_cut]
@@ -532,8 +513,7 @@ def _load_fourier_grid_cutouts(a, sky_rect_coords, joint_folder_path, cat_folder
 
     lon1, lon2, lat1, lat2 = sky_rect_coords
 
-    sky_cut = _load_rectangular_slice(joint_folder_path, cat_name, a, lon1, lon2,
-                                      lat1, lat2, padding)
+    sky_cut = _load_rectangular_slice(cat_name, a, lon1, lon2, lat1, lat2, padding)
 
     a_cutout = np.load('{}/con_cat_astro.npy'.format(cat_folder_path),
                        mmap_mode='r')[large_sky_slice][sky_cut]
@@ -550,7 +530,7 @@ def _clean_overlaps(inds, size, n_pool):
     '''
     Convenience function to parse either catalogue's indices array for
     duplicate references to the opposing array on a per-source basis,
-    and filter duplications in the memmapped file.
+    and filter duplications.
 
     Parameters
     ----------

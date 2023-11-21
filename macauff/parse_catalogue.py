@@ -462,7 +462,7 @@ def rect_slice_csv(input_folder, output_folder, input_filename, output_filename,
         small_astro[n:n+chunk.shape[0]] = chunk.values
         n += chunk.shape[0]
 
-    sky_cut = _load_rectangular_slice(input_folder, '', small_astro, rect_coords[0], rect_coords[1],
+    sky_cut = _load_rectangular_slice('', small_astro, rect_coords[0], rect_coords[1],
                                       rect_coords[2], rect_coords[3], padding)
 
     n_inside_rows = 0
@@ -526,8 +526,8 @@ def rect_slice_npy(input_folder, output_folder, rect_coords, padding, mem_chunk_
     photo = np.load('{}/con_cat_photo.npy'.format(input_folder), mmap_mode='r')
     best_index = np.load('{}/magref.npy'.format(input_folder), mmap_mode='r')
     n_rows = len(astro)
-    sky_cut = _load_rectangular_slice(input_folder, '', astro, rect_coords[0], rect_coords[1],
-                                      rect_coords[2], rect_coords[3], padding)
+    sky_cut = _load_rectangular_slice('', astro, rect_coords[0], rect_coords[1], rect_coords[2],
+                                      rect_coords[3], padding)
 
     n_inside_rows = 0
     for cnum in range(0, mem_chunk_num):

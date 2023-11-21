@@ -108,7 +108,7 @@ def test_load_rectangular_slice():
         if x < 0:
             a[a[:, 0] < 0, 0] = a[a[:, 0] < 0, 0] + 360
         lon1, lon2, lat1, lat2 = x+0.2, x+0.4, x+0.1, x+0.3
-        sky_cut = _load_rectangular_slice('.', '', a, lon1, lon2, lat1, lat2, padding)
+        sky_cut = _load_rectangular_slice('', a, lon1, lon2, lat1, lat2, padding)
         for i in range(len(a)):
             within_range = np.empty(4, bool)
             if x > 0:
@@ -158,11 +158,10 @@ def test_min_max_lon():
 
 
 def test_load_single_sky_slice():
-    folder_path = '.'
     cat_name = ''
     ind = 3
 
     rng = np.random.default_rng(6123123)
     sky_inds = rng.choice(5, size=5000)
-    sky_cut = _load_single_sky_slice(folder_path, cat_name, ind, sky_inds)
+    sky_cut = _load_single_sky_slice(cat_name, ind, sky_inds)
     assert np.all(sky_cut == (sky_inds == ind))

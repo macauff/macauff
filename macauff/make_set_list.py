@@ -118,9 +118,6 @@ def set_list(aindices, bindices, aoverlap, boverlap, joint_folder_path, n_pool):
         goodlength[i:i+di] = np.logical_not(grouplengthexceeded[i:i+di])
     acounters = np.zeros(dtype=int, shape=(groupmax,))
     bcounters = np.zeros(dtype=int, shape=(groupmax,))
-    # open_memmap requires tuples of ints and np.amax doesn't play nicely with
-    # memmapped arrays, making (memmap(result)) variables, so we force the
-    # number to a simple int here.
     amaxlen, bmaxlen = 0, 0
     for i in range(0, len(agrouplengths), di):
         if np.sum(goodlength[i:i+di]) > 0:
@@ -145,7 +142,6 @@ def set_list(aindices, bindices, aoverlap, boverlap, joint_folder_path, n_pool):
     # list with islands too large to run.
     newsecondlen = 0
     for i in range(0, len(agrouplengths), di):
-        # Require the manual conversion to integer due to memmap issues again.
         newsecondlen += int(np.sum(goodlength[i:i+di]))
 
     di = max(1, newsecondlen // 20)

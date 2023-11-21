@@ -33,8 +33,6 @@ subroutine find_island_probabilities(a_astro, a_photo, b_astro, b_photo, alist, 
     ! Number of contaminant fractions simulated in the perturbation AUF, and total lengths of small and
     ! large catalogues.
     integer, intent(in) :: n_fracs, large_len, mini_crpts_len
-    ! TODO: *binsarray, *binslength, *_priors and *_array are all memmapped. Does this matter in practice?
-    ! Should be able to take unique-sky-slice cutouts, but this'll need convenience functions for the slicing.
     ! Astrometry and photometry for the two respective catalogues.
     real(dp), intent(in) :: a_astro(:, :), a_photo(:, :), b_astro(:, :), b_photo(:, :)
     ! Photometric "counterpart" and "field" likelihood and prior arrays.

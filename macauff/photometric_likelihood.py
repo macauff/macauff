@@ -117,9 +117,8 @@ def compute_photometric_likelihoods(joint_folder_path, a_cat_folder_path, b_cat_
     # functions on ID, and for the initial mem_chunk_num stepping load in the range
     # [m_, m_+mem_chunk_num).
     for m_ in range(0, len(cf_points), mem_chunk_num):
-        a_multi_return = _load_multiple_sky_slice(joint_folder_path, 'a', m_, m_+mem_chunk_num,
-                                                  a_cat_folder_path, a_sky_inds,
-                                                  include_phot_like or use_phot_priors,
+        a_multi_return = _load_multiple_sky_slice('a', m_, m_+mem_chunk_num, a_cat_folder_path,
+                                                  a_sky_inds, include_phot_like or use_phot_priors,
                                                   group_sources_data.ablen,
                                                   group_sources_data.ainds, group_sources_data.asize)
         if include_phot_like or use_phot_priors:
@@ -129,9 +128,8 @@ def compute_photometric_likelihoods(joint_folder_path, a_cat_folder_path, b_cat_
             a_small_photo, a_sky_ind_small = a_multi_return
         del a_multi_return
 
-        b_multi_return = _load_multiple_sky_slice(joint_folder_path, 'b', m_, m_+mem_chunk_num,
-                                                  b_cat_folder_path, b_sky_inds,
-                                                  include_phot_like or use_phot_priors,
+        b_multi_return = _load_multiple_sky_slice('b', m_, m_+mem_chunk_num, b_cat_folder_path,
+                                                  b_sky_inds, include_phot_like or use_phot_priors,
                                                   group_sources_data.bblen,
                                                   group_sources_data.binds, group_sources_data.bsize)
         if include_phot_like or use_phot_priors:
@@ -144,16 +142,14 @@ def compute_photometric_likelihoods(joint_folder_path, a_cat_folder_path, b_cat_
 
         for m in range(m_, min(len(cf_points), m_+mem_chunk_num)):
             area = cf_areas[m]
-            a_sky_cut = _load_single_sky_slice(
-                joint_folder_path, 'a', m, a_sky_ind_small)
+            a_sky_cut = _load_single_sky_slice('a', m, a_sky_ind_small)
             a_photo_cut = a_small_photo[a_sky_cut]
             if include_phot_like or use_phot_priors:
                 a_astro_cut, a_blen_cut, a_inds_cut, a_size_cut = (
                     a_small_astro[a_sky_cut], a_blen_small[a_sky_cut], a_inds_small[:, a_sky_cut],
                     a_size_small[a_sky_cut])
 
-            b_sky_cut = _load_single_sky_slice(
-                joint_folder_path, 'b', m, b_sky_ind_small)
+            b_sky_cut = _load_single_sky_slice('b', m, b_sky_ind_small)
             b_photo_cut = b_small_photo[b_sky_cut]
             if include_phot_like or use_phot_priors:
                 b_astro_cut, b_inds_cut, b_size_cut = (
@@ -345,17 +341,16 @@ def create_magnitude_bins(cf_points, filts, mem_chunk_num, joint_folder_path,
     binlengths = np.empty((len(filts), len(cf_points)), int)
 
     for m_ in range(0, len(cf_points), mem_chunk_num):
-        a_multi_return = _load_multiple_sky_slice(
-            joint_folder_path, cat_type, m_, m_+mem_chunk_num, cat_folder_path, sky_inds,
-            load_extra_arrays, blen_cutout, inds_cutout, size_cutout)
+        a_multi_return = _load_multiple_sky_slice(cat_type, m_, m_+mem_chunk_num, cat_folder_path,
+                                                  sky_inds, load_extra_arrays, blen_cutout,
+                                                  inds_cutout, size_cutout)
         if load_extra_arrays:
             (a_phot_, sky_inds_, _, _, _, _) = a_multi_return
         else:
             a_phot_, sky_inds_ = a_multi_return
         del a_multi_return
         for m in range(m_, min(len(cf_points), m_+mem_chunk_num)):
-            sky_cut = _load_single_sky_slice(
-                joint_folder_path, cat_type, m, sky_inds_)
+            sky_cut = _load_single_sky_slice(cat_type, m, sky_inds_)
             for i in range(0, len(filts)):
                 a = a_phot_[sky_cut, i]
                 if np.sum(~np.isnan(a)) > 0:
@@ -369,16 +364,15 @@ def create_magnitude_bins(cf_points, filts, mem_chunk_num, joint_folder_path,
 
     binsarray = np.full(dtype=float, shape=(longbinlen, len(filts), len(cf_points)), fill_value=-1, order='F')
     for m_ in range(0, len(cf_points), mem_chunk_num):
-        a_multi_return = _load_multiple_sky_slice(
-            joint_folder_path, cat_type, m_, m_+mem_chunk_num, cat_folder_path, sky_inds,
-            load_extra_arrays, blen_cutout, inds_cutout, size_cutout)
+        a_multi_return = _load_multiple_sky_slice(cat_type, m_, m_+mem_chunk_num, cat_folder_path,
+                                                  sky_inds, load_extra_arrays, blen_cutout,
+                                                  inds_cutout, size_cutout)
         if load_extra_arrays:
             (a_phot_, sky_inds_, _, _, _, _) = a_multi_return
         else:
             a_phot_, sky_inds_ = a_multi_return
         for m in range(m_, min(len(cf_points), m_+mem_chunk_num)):
-            sky_cut = _load_single_sky_slice(
-                joint_folder_path, cat_type, m, sky_inds_)
+            sky_cut = _load_single_sky_slice(cat_type, m, sky_inds_)
             for i in range(0, len(filts)):
                 a = a_phot_[sky_cut, i]
                 if np.sum(~np.isnan(a)) > 0:
@@ -448,17 +442,14 @@ def make_bins(input_mags):
     return output_bins
 
 
-def _load_multiple_sky_slice(joint_folder_path, cat_name, ind1, ind2, cat_folder_path, sky_inds,
-                             load_extra_arrays, blen_tocut, inds_tocut,
-                             size_tocut):
+def _load_multiple_sky_slice(cat_name, ind1, ind2, cat_folder_path, sky_inds, load_extra_arrays,
+                             blen_tocut, inds_tocut, size_tocut):
     '''
-    Function to, in a memmap-friendly way, return a sub-set of the photometry
+    Function to return a sub-set of the photometry
     of a given catalogue.
 
     Parameters
     ----------
-    joint_folder_path : string
-        Folder in which common cross-match intermediate data files are stored.
     cat_name : string
         String defining whether this function was called on catalogue "a" or "b".
     ind1 : float

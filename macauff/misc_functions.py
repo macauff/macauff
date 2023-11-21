@@ -155,15 +155,12 @@ def map_large_index_to_small_index(inds, length):
     return inds_map, inds_unique_flat
 
 
-def _load_single_sky_slice(folder_path, cat_name, ind, sky_inds):
+def _load_single_sky_slice(cat_name, ind, sky_inds):
     '''
-    Function to, in a memmap-friendly way, return a sub-set of the nearest sky
-    indices of a given catalogue.
+    Function to return a sub-set of the nearest sky indices of a given catalogue.
 
     Parameters
     ----------
-    folder_path : string
-        Folder in which to store the temporary memmap file.
     cat_name : string
         String defining whether this function was called on catalogue "a" or "b".
     ind : float
@@ -191,7 +188,7 @@ def _load_single_sky_slice(folder_path, cat_name, ind, sky_inds):
     return sky_cut
 
 
-def _load_rectangular_slice(folder_path, cat_name, a, lon1, lon2, lat1, lat2, padding):
+def _load_rectangular_slice(cat_name, a, lon1, lon2, lat1, lat2, padding):
     '''
     Loads all sources in a catalogue within a given separation of a rectangle
     in sky coordinates, allowing for the search for all sources within a given
@@ -199,9 +196,6 @@ def _load_rectangular_slice(folder_path, cat_name, a, lon1, lon2, lat1, lat2, pa
 
     Parameters
     ----------
-    folder_path : string
-        Location of where the memmap files used in the slicing of the
-        catalogue are stored.
     cat_name : string
         Indication of whether we are loading catalogue "a" or catalogue "b",
         for separation within a given folder.
@@ -264,7 +258,7 @@ def _lon_cut(i, a, di, lon, padding, sky_cut, inequality, lon_shift):
     i : integer
         Index into ``sky_cut`` for slicing.
     a : numpy.ndarray
-        The main astrometric catalogue to be sliced, loaded into memmap.
+        The main astrometric catalogue to be sliced.
     di : integer
         Index stride value, for slicing.
     lon : float
@@ -319,7 +313,7 @@ def _lat_cut(i, a, di, lat, padding, sky_cut, inequality):
     i : integer
         Index into ``sky_cut`` for slicing.
     a : numpy.ndarray
-        The main astrometric catalogue to be sliced, loaded into memmap.
+        The main astrometric catalogue to be sliced.
     di : integer
         Index stride value, for slicing.
     lat : float
