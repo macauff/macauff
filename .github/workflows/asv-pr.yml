@@ -36,6 +36,7 @@ jobs:
     permissions:
       actions: read
       pull-requests: write
+      issues: write
     defaults:
       run:
         working-directory: ${{ env.WORKING_DIR }}
