@@ -32,8 +32,6 @@ As well as the parameters required that are ingested through the input parameter
 
 - ``chunks_folder_path``: the directory in which the folders containing parameters files are stored
 
-- ``use_memmap_files``: a boolean flag indicating whether or not to save temporary, intermediate arrays to disk and load variables through memmapping. Should be used if the catalogue regions being matched are sufficiently large that they cannot be stored in memory at once. Alternatively, consider smaller chunks. Optional, defaulting to ``False``.
-
 - ``use_mpi``: boolean flag for whether to parallelise distribution of chunks using MPI. If ``False`` chunks will be run in serial; defaults to ``True``, but with a fallback for if the appropriate module is not available.
 
 If you do not want to (or cannot) use MPI to distribute larger cross-match runs, with numerous chunks that will take significant compute time to run, then the first two inputs, combined with with ``use_mpi=False``, are all you need to consider. However, if you wish to use MPI then the remaining keyword arguments control its use:
@@ -53,7 +51,7 @@ These parameters are only provided in the single, common-parameter input file, a
 
 There are some parameters that must be given in all runs:
 
-``joint_folder_path``, ``run_auf``, ``run_group``, ``run_cf``, ``run_source``, ``include_perturb_auf``, ``include_phot_like``, ``use_phot_priors``, ``cross_match_extent``, ``mem_chunk_num``, ``pos_corr_dist``, ``cf_region_type``, ``cf_region_frame``, ``cf_region_points``, ``real_hankel_points``, ``four_hankel_points``, ``four_max_rho``, ``int_fracs``, ``make_output_csv``, and ``n_pool``;
+``joint_folder_path``, ``include_perturb_auf``, ``include_phot_like``, ``use_phot_priors``, ``cross_match_extent``, ``pos_corr_dist``, ``cf_region_type``, ``cf_region_frame``, ``cf_region_points``, ``real_hankel_points``, ``four_hankel_points``, ``four_max_rho``, ``int_fracs``, ``make_output_csv``, and ``n_pool``;
 
 options which need to be supplied if ``make_output_csv`` is ``True``:
 
@@ -61,7 +59,7 @@ options which need to be supplied if ``make_output_csv`` is ``True``:
 
 and those options which only need to be supplied if ``include_perturb_auf`` is ``True``:
 
-``num_trials``, ``compute_local_density``, and ``d_mag``.
+``num_trials``, and ``d_mag``.
 
 .. note::
     ``num_trials`` and ``d_mag`` currently need to be supplied if either ``correct_astrometry`` option in the two `Catalogue-specific Parameters`_ config files is ``True`` as well.
@@ -72,25 +70,6 @@ Common Parameter Description
 ``joint_folder_path``
 
 The top-level folder location, into which all intermediate files and folders are placed, when created during the cross-match process. This can either be an absolute file path, or relative to the folder from which your script that called `CrossMatch()` is based.
-
-.. note::
-    The four ``run_`` parameters below are called in order. If an earlier stage flag is set to ``True``, an error will be raised in a subsequent flag is set to ``False``.
-
-``run_auf``
-
-Flag to determine if the AUF simulation stage of the cross-match process should be run, or if previously generated files should be used when present.
-
-``run_group``
-
-Flag dictating whether the source grouping -- and island creation -- stage of the process is run, or if previously created islands of sources should be used for this match.
-
-``run_cf``
-
-Flag controlling whether or not to calculate the photometric likelihood information, as determined by ``include_phot_like`` and ``use_phot_priors``, for this cross-match.
-
-``run_source``
-
-Boolean determining whether to run the final stage of the cross-match process, in which posterior probabilities of matches and non-matches for each island of sources are calculated.
 
 ``include_perturb_auf``
 
@@ -113,10 +92,6 @@ The maximum extent of the matching process. When not matching all-sky catalogues
 
 .. note::
     In cases where the boundary defining the cross-match overlaps the 0-360 boundary of the given coordinate system, the longitudes should be given relative to 0 degrees. For example, if we had a boundary that ran from 350 degrees up to 360 (0) degrees, and on to 10 degrees, ``cross_match_extent`` would have for its input longitudes ``-10 10``. Internally the software is able to handle the boundary for source coordinates, but requires the extents to be correctly input for these regions.
-
-``mem_chunk_num``
-
-The number of smaller subsets into which to break various loops throughout the cross-match process. Used to reduce the memory usage of the process at any given time, in case of catalogues too large to fit into memory at once.
 
 ``pos_corr_dist``
 
@@ -173,10 +148,6 @@ Filename to save out the respective non-match catalogue objects and metadata to.
 
 The number of PSF realisations to draw when simulating the perturbation component of the AUF. Should be an integer. Only required if ``include_perturb_auf`` is ``True``.
 
-``compute_local_density``
-
-Boolean flag, ``yes`` or ``no``, to indicate whether to on-the-fly compute the local densities of sources in each catalogue for use in its perturbation AUF component, or to use pre-computed values. ``yes`` indicates values will be computed during the cross-match process. Only required if ``include_perturb_auf`` is ``True``.
-
 ``d_mag``
 
 Bin sizes for magnitudes used to represent the source number density used in the random drawing of perturbation AUF component PSFs. Should be a single float. Only required if ``include_perturb_auf`` is ``True``.
@@ -193,15 +164,11 @@ These can be divided into those inputs that are always required:
 
 those that are only required if the `Joint Parameters`_ option ``include_perturb_auf`` is ``True``:
 
-``fit_gal_flag``, ``run_fw_auf``, ``run_psf_auf``, ``psf_fwhms``, ``snr_mag_params_path``, ``download_tri``, ``tri_set_name``, ``tri_filt_names``, ``tri_filt_num``, ``tri_maglim_faint``, ``tri_num_faint``, and ``gal_al_avs``;
+``fit_gal_flag``, ``run_fw_auf``, ``run_psf_auf``, ``psf_fwhms``, ``snr_mag_params_path``, ``download_tri``, ``tri_set_name``, ``tri_filt_names``, ``tri_filt_num``, ``tri_maglim_faint``, ``tri_num_faint``, ``gal_al_avs``, and ``dens_dist``;
 
 parameters required if ``run_psf_auf`` is ``True``:
 
 ``dd_params_path`` and ``l_cut_path``;
-
-the parameter needed if `Joint Parameters`_ option ``compute_local_density`` is ``True`` (and hence ``include_perturb_auf`` is ``True``):
-
-``dens_dist``;
 
 the inputs required in each catalogue parameters file if ``fit_gal_flag`` is ``True`` (and hence ``include_perturb_auf`` is ``True``):
 
@@ -220,7 +187,7 @@ and the inputs required if ``correct_astrometry`` is ``True``:
 ``best_mag_index``, ``nn_radius``, ``ref_csv_cat_file_string``, ``correct_mag_array``, ``correct_mag_slice``, ``correct_sig_slice``, ``chunk_overlap_col``, and ``best_mag_index_col``.
 
 .. note::
-    ``run_fw_auf``, ``run_psf_auf``, ``psf_fwhms``, ``snr_mag_params_path``, ``download_tri``, ``tri_set_name``, ``tri_filt_names``, ``tri_filt_num``, ``tri_maglim_faint``, ``tri_num_faint``, ``dens_dist``, ``dd_params_path``, ``l_cut_path``, ``gal_wavs``, ``gal_zmax``, ``gal_nzs``, ``gal_aboffsets``, ``gal_filternames``, and ``gal_al_avs`` are all currently required if ``correct_astrometry`` is ``True``, bypassing the nested flags above. For example, ``dens_dist`` is required as an input if ``compute_local_density`` and ``include_perturb_auf`` are both ``True``, or if ``correct_astrometry`` is set. This means that ``AstrometricCorrections`` implicitly always runs and fits for a full Astrometric Uncertainty Function.
+    ``run_fw_auf``, ``run_psf_auf``, ``psf_fwhms``, ``snr_mag_params_path``, ``download_tri``, ``tri_set_name``, ``tri_filt_names``, ``tri_filt_num``, ``tri_maglim_faint``, ``tri_num_faint``, ``dens_dist``, ``dd_params_path``, ``l_cut_path``, ``gal_wavs``, ``gal_zmax``, ``gal_nzs``, ``gal_aboffsets``, ``gal_filternames``, and ``gal_al_avs`` are all currently required if ``correct_astrometry`` is ``True``, bypassing the nested flags above. For example, ``dens_dist`` is required as an input if ``include_perturb_auf`` is ``True``, or if ``correct_astrometry`` is set. This means that ``AstrometricCorrections`` implicitly always runs and fits for a full Astrometric Uncertainty Function.
 
 .. note::
     ``snr_mag_params_path`` is currently also required if ``compute_snr_mag_relation`` is ``True``, bypassing the above flags. It is therefore currently a required input if any one of ``include_perturb_auf``, ``correct_astrometry``, or ``compute_snr_mag_relation`` are set to ``True``.
@@ -325,7 +292,7 @@ Alongside ``dd_params_path``, path to the ``.npy`` file containing the limiting 
 
 ``dens_dist``
 
-The radius, in arcseconds, within which to count internal catalogue sources for each object, to calculate the local source density. Used to scale TRILEGAL simulated source counts to match smaller scale density fluctuations. Only required if ``compute_local_density`` is ``True`` (and hence ``include_perturb_auf`` is also ``True``).
+The radius, in arcseconds, within which to count internal catalogue sources for each object, to calculate the local source density. Used to scale TRILEGAL simulated source counts to match smaller scale density fluctuations. Only required if ``include_perturb_auf`` is ``True``.
 
 ``gal_wavs``
 

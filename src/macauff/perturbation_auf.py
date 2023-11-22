@@ -11,8 +11,7 @@ import signal
 import numpy as np
 from astropy.coordinates import SkyCoord
 
-from macauff.misc_functions import (create_auf_params_grid, _load_single_sky_slice,
-                             _load_rectangular_slice, _create_rectangular_slice_arrays, min_max_lon)
+from macauff.misc_functions import (create_auf_params_grid, _load_rectangular_slice, min_max_lon)
 from macauff.misc_functions_fortran import misc_functions_fortran as mff
 from macauff.get_trilegal_wrapper import get_trilegal, get_AV_infinity
 from macauff.perturbation_auf_fortran import perturbation_auf_fortran as paf
@@ -22,11 +21,10 @@ __all__ = ['make_perturb_aufs', 'create_single_perturb_auf']
 
 
 def make_perturb_aufs(auf_folder, cat_folder, filters, auf_points, r, dr, rho,
-                      drho, which_cat, include_perturb_auf, mem_chunk_num, use_memmap_files,
-                      tri_download_flag=False, delta_mag_cuts=None, psf_fwhms=None,
-                      tri_set_name=None, tri_filt_num=None, tri_filt_names=None,
-                      tri_maglim_faint=None, tri_num_faint=None, auf_region_frame=None,
-                      num_trials=None, j0s=None, d_mag=None, compute_local_density=None,
+                      drho, which_cat, include_perturb_auf, tri_download_flag=False,
+                      delta_mag_cuts=None, psf_fwhms=None, tri_set_name=None, tri_filt_num=None,
+                      tri_filt_names=None, tri_maglim_faint=None, tri_num_faint=None,
+                      auf_region_frame=None, num_trials=None, j0s=None, d_mag=None,
                       density_radius=None, run_fw=None, run_psf=None, dd_params=None, l_cut=None,
                       snr_mag_params=None, al_avs=None, fit_gal_flag=None, cmau_array=None,
                       wavs=None, z_maxs=None, nzs=None, ab_offsets=None, filter_names=None,
@@ -64,13 +62,6 @@ def make_perturb_aufs(auf_folder, cat_folder, filters, auf_points, r, dr, rho,
     include_perturb_auf : boolean
         ``True`` or ``False`` flag indicating whether perturbation component of the
         AUF should be used or not within the cross-match process.
-    mem_chunk_num : int
-        Number of individual sub-sections to break catalogue into for memory
-        saving purposes.
-    use_memmap_files : boolean
-        When set to True, memory mapped files are used for several internal
-        arrays. Reduces memory consumption at the cost of increased I/O
-        contention.
     tri_download_flag : boolean, optional
         A ``True``/``False`` flag, whether to re-download TRILEGAL simulated star
         counts or not if a simulation already exists in a given folder. Only
@@ -118,15 +109,10 @@ def make_perturb_aufs(auf_folder, cat_folder, filters, auf_points, r, dr, rho,
     d_mag : float, optional
         The resolution at which to create the TRILEGAL source density distribution.
         Must be provided if ``include_perturb_auf`` is ``True``.
-    compute_local_density : boolean, optional
-        Flag to indicate whether to calculate local source densities during
-        the cross-match process, or whether to use pre-calculated values. Must
-        be provided if ``include_perturb_auf`` is ``True``.
     density_radius : float, optional
         The astrometric distance, in degrees, within which to consider numbers
         of internal catalogue sources, from which to calculate local density.
-        Must be given if both ``include_perturb_auf`` and
-        ``compute_local_density`` are both ``True``.
+        Must be given if ``include_perturb_auf`` is ``True``.
     run_fw : bool, optional
         Flag indicating whether to run the "flux-weighted" version of the
         perturbation algorithm. Must be given if ``include_perturb_auf`` is
@@ -242,11 +228,8 @@ def make_perturb_aufs(auf_folder, cat_folder, filters, auf_points, r, dr, rho,
         raise ValueError("snr_mag_params must be given if include_perturb_auf is True.")
     if include_perturb_auf and al_avs is None:
         raise ValueError("al_avs must be given if include_perturb_auf is True.")
-    if include_perturb_auf and compute_local_density is None:
-        raise ValueError("compute_local_density must be given if include_perturb_auf is True.")
-    if include_perturb_auf and compute_local_density and density_radius is None:
-        raise ValueError("density_radius must be given if include_perturb_auf and "
-                         "compute_local_density are both True.")
+    if include_perturb_auf and density_radius is None:
+        raise ValueError("density_radius must be given if include_perturb_auf is True.")
 
     if include_perturb_auf and fit_gal_flag is None:
         raise ValueError("fit_gal_flag must not be None if include_perturb_auf is True.")
@@ -272,72 +255,31 @@ def make_perturb_aufs(auf_folder, cat_folder, filters, auf_points, r, dr, rho,
     print('Creating perturbation AUFs sky indices for catalogue "{}"...'.format(which_cat))
     sys.stdout.flush()
 
-    n_sources = len(np.load('{}/con_cat_astro.npy'.format(cat_folder), mmap_mode='r'))
+    a_tot_astro = np.load('{}/con_cat_astro.npy'.format(cat_folder))
+    if include_perturb_auf:
+        a_tot_photo = np.load('{}/con_cat_photo.npy'.format(cat_folder))
 
-    if use_memmap_files:
-        modelrefinds = np.lib.format.open_memmap('{}/modelrefinds.npy'.format(auf_folder),
-                                                 mode='w+', dtype=int, shape=(3, n_sources),
-                                                 fortran_order=True)
-    else:
-        modelrefinds = np.zeros(dtype=int, shape=(3, n_sources), order='f')
+    n_sources = len(a_tot_astro)
 
-    for cnum in range(0, mem_chunk_num):
-        lowind = np.floor(n_sources*cnum/mem_chunk_num).astype(int)
-        highind = np.floor(n_sources*(cnum+1)/mem_chunk_num).astype(int)
-        a = np.load('{}/con_cat_astro.npy'.format(cat_folder), mmap_mode='r')[lowind:highind]
-        # As we chunk in even steps through the files this is simple for now,
-        # but could be replaced with a more complex mapping in the future.
-        indexmap = np.arange(lowind, highind, 1)
+    modelrefinds = np.zeros(dtype=int, shape=(3, n_sources), order='f')
 
-        # Which sky position to use is more complex; this involves determining
-        # the smallest great-circle distance to each auf_point AUF mapping for
-        # each source.
-        modelrefinds[2, indexmap] = mff.find_nearest_point(a[:, 0], a[:, 1],
-                                                           auf_points[:, 0], auf_points[:, 1])
+    # Which sky position to use is more complex; this involves determining
+    # the smallest great-circle distance to each auf_point AUF mapping for
+    # each source.
+    modelrefinds[2, :] = mff.find_nearest_point(a_tot_astro[:, 0], a_tot_astro[:, 1],
+                                                auf_points[:, 0], auf_points[:, 1])
 
     print('Creating empirical perturbation AUFs for catalogue "{}"...'.format(which_cat))
     sys.stdout.flush()
 
     # Store the length of the density-magnitude combinations in each sky/filter
     # combination for future loading purposes.
-    if use_memmap_files:
-        arraylengths = np.lib.format.open_memmap('{}/arraylengths.npy'.format(auf_folder), mode='w+',
-                                                 dtype=int, shape=(len(filters), len(auf_points)),
-                                                 fortran_order=True)
-    else:
-        arraylengths = np.zeros(dtype=int, shape=(len(filters), len(auf_points)), order='f')
-
-    if use_memmap_files:
-        # Overload compute_local_density if it is False but local_N does not exist.
-        if not compute_local_density and not os.path.isfile('{}/local_N.npy'.format(auf_folder)):
-            compute_local_density = True
-    # Always compute_local_density if not using memmapped files
-    else:
-        compute_local_density = True
+    arraylengths = np.zeros(dtype=int, shape=(len(filters), len(auf_points)), order='f')
 
     if include_perturb_auf:
-        a_tot_photo = np.load('{}/con_cat_photo.npy'.format(cat_folder), mmap_mode='r')
-        a_tot_astro = np.load('{}/con_cat_astro.npy'.format(cat_folder), mmap_mode='r')
-        if compute_local_density:
-            # Set up the temporary sky slice memmap arrays quickly, as they will
-            # be needed in calculate_local_density later.
-            memmap_slice_arrays = []
-            if use_memmap_files:
-                _create_rectangular_slice_arrays(auf_folder, '', len(a_tot_astro))
-                for n in ['1', '2', '3', '4', 'combined']:
-                    memmap_slice_arrays.append(np.lib.format.open_memmap(
-                        '{}/{}_temporary_sky_slice_{}.npy'.format(auf_folder, '', n), mode='r+',
-                        dtype=bool, shape=(len(a_tot_astro),)))
-            else:
-                for _ in range(5):
-                    memmap_slice_arrays.append(np.zeros(dtype=bool, shape=(len(a_tot_astro),)))
+        local_N = np.zeros(dtype=float, shape=(len(a_tot_astro), len(filters)))
 
-    if compute_local_density and include_perturb_auf:
-        if use_memmap_files:
-            local_N = np.lib.format.open_memmap('{}/local_N.npy'.format(auf_folder), mode='w+',
-                                                dtype=float, shape=(len(a_tot_astro), len(filters)))
-        else:
-            local_N = np.zeros(dtype=float, shape=(len(a_tot_astro), len(filters)))
+    perturb_auf_outputs = {}
 
     for i in range(len(auf_points)):
         ax1, ax2 = auf_points[i]
@@ -346,12 +288,8 @@ def make_perturb_aufs(auf_folder, cat_folder, filters, auf_points, r, dr, rho,
             os.makedirs(ax_folder, exist_ok=True)
 
         if include_perturb_auf:
-            sky_cut = _load_single_sky_slice(auf_folder, '', i, modelrefinds[2, :], use_memmap_files)
-            if compute_local_density:
-                # TODO: avoid np.arange by first iterating an np.sum(sky_cut)
-                # and pre-generating a memmapped sub-array, and looping over
-                # putting the correct indices into place.
-                med_index_slice = np.arange(0, len(local_N))[sky_cut]
+            sky_cut = modelrefinds[2, :] == i
+            med_index_slice = np.arange(0, len(local_N))[sky_cut]
             a_photo_cut = a_tot_photo[sky_cut]
             a_astro_cut = a_tot_astro[sky_cut]
 
@@ -386,7 +324,6 @@ def make_perturb_aufs(auf_folder, cat_folder, filters, auf_points, r, dr, rho,
             # TODO: un-hardcode min_bright_tri_number
             min_bright_tri_number = 1000
             min_area = max(min_bright_tri_number / data_bright_dens)
-
             # Hard-coding the AV=1 trick to allow for using av_grid later.
             download_trilegal_simulation(ax_folder, tri_set_name, ax1, ax2, tri_filt_num,
                                          auf_region_frame, tri_maglim_faint, min_area,
@@ -394,11 +331,7 @@ def make_perturb_aufs(auf_folder, cat_folder, filters, auf_points, r, dr, rho,
             os.system('mv {}/trilegal_auf_simulation.dat {}/trilegal_auf_simulation_faint.dat'
                       .format(ax_folder, ax_folder))
         for j in range(len(filters)):
-            filt = filters[j]
-
-            filt_folder = '{}/{}'.format(ax_folder, filt)
-            if not os.path.exists(filt_folder):
-                os.makedirs(filt_folder, exist_ok=True)
+            perturb_auf_combo = '{}-{}-{}'.format(ax1, ax2, filters[j])
 
             if include_perturb_auf:
                 good_mag_slice = ~np.isnan(a_photo_cut[:, j])
@@ -410,40 +343,37 @@ def make_perturb_aufs(auf_folder, cat_folder, filters, auf_points, r, dr, rho,
                     # See below, in include_perturb_auf is False, for meanings.
                     num_N_mag = 1
                     Frac = np.zeros((1, num_N_mag), float, order='F')
-                    np.save('{}/frac.npy'.format(filt_folder), Frac)
                     Flux = np.zeros(num_N_mag, float, order='F')
-                    np.save('{}/flux.npy'.format(filt_folder), Flux)
                     offset = np.zeros((len(r)-1, num_N_mag), float, order='F')
                     offset[0, :] = 1 / (2 * np.pi * (r[0] + dr[0]/2) * dr[0])
-                    np.save('{}/offset.npy'.format(filt_folder), offset)
                     cumulative = np.ones((len(r)-1, num_N_mag), float, order='F')
-                    np.save('{}/cumulative.npy'.format(filt_folder), cumulative)
                     fourieroffset = np.ones((len(rho)-1, num_N_mag), float, order='F')
-                    np.save('{}/fourier.npy'.format(filt_folder), fourieroffset)
                     Narray = np.array([[1]], float)
-                    np.save('{}/N.npy'.format(filt_folder), Narray)
                     magarray = np.array([[1]], float)
-                    np.save('{}/mag.npy'.format(filt_folder), magarray)
+                    # Make a second dictionary with the single pointing-filter
+                    # combination in it.
+                    single_perturb_auf_output = {}
+                    for name, entry in zip(
+                            ['frac', 'flux', 'offset', 'cumulative', 'fourier', 'Narray',
+                             'magarray'], [Frac, Flux, offset, cumulative, fourieroffset, Narray,
+                                           magarray]):
+                        single_perturb_auf_output[name] = entry
+                    perturb_auf_outputs[perturb_auf_combo] = single_perturb_auf_output
                     continue
-                if compute_local_density:
-                    localN = calculate_local_density(
-                        a_astro_cut[good_mag_slice], a_tot_astro, a_tot_photo[:, j],
-                        auf_folder, cat_folder, density_radius, dens_mags[j],
-                        memmap_slice_arrays, use_memmap_files)
-                    # Because we always calculate the density from the full
-                    # catalogue, using just the astrometry, we should be able
-                    # to just over-write this N times if there happen to be N
-                    # good detections of a source.
-                    index_slice = med_index_slice[good_mag_slice]
-                    for ii in range(len(index_slice)):
-                        local_N[index_slice[ii], j] = localN[ii]
-                else:
-                    localN = np.load('{}/local_N.npy'.format(auf_folder),
-                                     mmap_mode='r')[sky_cut][good_mag_slice, j]
+                localN = calculate_local_density(
+                    a_astro_cut[good_mag_slice], a_tot_astro, a_tot_photo[:, j],
+                    auf_folder, cat_folder, density_radius, dens_mags[j])
+                # Because we always calculate the density from the full
+                # catalogue, using just the astrometry, we should be able
+                # to just over-write this N times if there happen to be N
+                # good detections of a source.
+                index_slice = med_index_slice[good_mag_slice]
+                for ii in range(len(index_slice)):
+                    local_N[index_slice[ii], j] = localN[ii]
                 ax1_list = np.linspace(ax1_min, ax1_max, 7)
                 ax2_list = np.linspace(ax2_min, ax2_max, 7)
                 if fit_gal_flag:
-                    Narray = create_single_perturb_auf(
+                    single_perturb_auf_output = create_single_perturb_auf(
                         ax_folder, auf_points[i], filters[j], r, dr, rho, drho, j0s, num_trials,
                         psf_fwhms[j], tri_filt_names[j], dens_mags[j], a_photo, localN, d_mag,
                         delta_mag_cuts, dd_params, l_cut, run_fw, run_psf, snr_mag_params[j],
@@ -451,11 +381,12 @@ def make_perturb_aufs(auf_folder, cat_folder, filters, auf_points, r, dr, rho,
                         wavs[j], z_maxs[j], nzs[j], alpha0, alpha1, alpha_weight, ab_offsets[j],
                         filter_names[j])
                 else:
-                    Narray = create_single_perturb_auf(
+                    single_perturb_auf_output = create_single_perturb_auf(
                         ax_folder, auf_points[i], filters[j], r, dr, rho, drho, j0s, num_trials,
                         psf_fwhms[j], tri_filt_names[j], dens_mags[j], a_photo, localN, d_mag,
                         delta_mag_cuts, dd_params, l_cut, run_fw, run_psf, snr_mag_params[j],
                         al_avs[j], auf_region_frame, ax1_list, ax2_list, fit_gal_flag)
+                perturb_auf_outputs[perturb_auf_combo] = single_perturb_auf_output
             else:
                 # Without the simulations to force local normalising density N or
                 # individual source brightness magnitudes, we can simply combine
@@ -468,9 +399,7 @@ def make_perturb_aufs(auf_folder, cat_folder, filters, auf_points, r, dr, rho,
                 # subroutines to create the perturbation simulations, so we make
                 # f-ordered dummy parameters.
                 Frac = np.zeros((1, num_N_mag), float, order='F')
-                np.save('{}/frac.npy'.format(filt_folder), Frac)
                 Flux = np.zeros(num_N_mag, float, order='F')
-                np.save('{}/flux.npy'.format(filt_folder), Flux)
                 # Remember that r is bins, so the evaluations at bin middle are one
                 # shorter in length.
                 offset = np.zeros((len(r)-1, num_N_mag), float, order='F')
@@ -478,55 +407,42 @@ def make_perturb_aufs(auf_folder, cat_folder, filters, auf_points, r, dr, rho,
                 # a delta function, such that a two-dimensional circular coordinate
                 # integral would evaluate to one at every point, cf. ``cumulative``.
                 offset[0, :] = 1 / (2 * np.pi * (r[0] + dr[0]/2) * dr[0])
-                np.save('{}/offset.npy'.format(filt_folder), offset)
                 # The cumulative integral of a delta function is always unity.
                 cumulative = np.ones((len(r)-1, num_N_mag), float, order='F')
-                np.save('{}/cumulative.npy'.format(filt_folder), cumulative)
                 # The Hankel transform of a delta function is a flat line; this
                 # then preserves the convolution being multiplication in fourier
                 # space, as F(x) x 1 = F(x), similar to how f(x) * d(0) = f(x).
                 fourieroffset = np.ones((len(rho)-1, num_N_mag), float, order='F')
-                np.save('{}/fourier.npy'.format(filt_folder), fourieroffset)
                 # Both normalising density and magnitude arrays can be proxied
                 # with a dummy parameter, as any minimisation of N-m distance
                 # must pick the single value anyway.
                 Narray = np.array([[1]], float)
-                np.save('{}/N.npy'.format(filt_folder), Narray)
                 magarray = np.array([[1]], float)
-                np.save('{}/mag.npy'.format(filt_folder), magarray)
-            arraylengths[j, i] = len(Narray)
+                single_perturb_auf_output = {}
+                for name, entry in zip(
+                        ['frac', 'flux', 'offset', 'cumulative', 'fourier', 'Narray', 'magarray'],
+                        [Frac, Flux, offset, cumulative, fourieroffset, Narray, magarray]):
+                    single_perturb_auf_output[name] = entry
+                perturb_auf_outputs[perturb_auf_combo] = single_perturb_auf_output
+            arraylengths[j, i] = len(perturb_auf_outputs[perturb_auf_combo]['Narray'])
 
     if include_perturb_auf:
         longestNm = np.amax(arraylengths)
 
-        if use_memmap_files:
-            Narrays = np.lib.format.open_memmap('{}/narrays.npy'.format(auf_folder), mode='w+',
-                                                dtype=float, shape=(longestNm, len(filters),
-                                                len(auf_points)), fortran_order=True)
-            Narrays[:, :, :] = -1
-        else:
-            Narrays = np.full(dtype=float, shape=(longestNm, len(filters), len(auf_points)),
-                              order='F', fill_value=-1)
+        Narrays = np.full(dtype=float, shape=(longestNm, len(filters), len(auf_points)),
+                          order='F', fill_value=-1)
 
-        if use_memmap_files:
-            magarrays = np.lib.format.open_memmap('{}/magarrays.npy'.format(auf_folder), mode='w+',
-                                                dtype=float, shape=(longestNm, len(filters),
-                                                len(auf_points)), fortran_order=True)
-            magarrays[:, :, :] = -1
-        else:
-            magarrays = np.full(dtype=float, shape=(longestNm, len(filters), len(auf_points)),
-                                order='F', fill_value=-1)
+        magarrays = np.full(dtype=float, shape=(longestNm, len(filters), len(auf_points)),
+                            order='F', fill_value=-1)
 
         for i in range(len(auf_points)):
             ax1, ax2 = auf_points[i]
-            ax_folder = '{}/{}/{}'.format(auf_folder, ax1, ax2)
             for j in range(len(filters)):
                 if arraylengths[j, i] == 0:
                     continue
-                filt = filters[j]
-                filt_folder = '{}/{}'.format(ax_folder, filt)
-                Narray = np.load('{}/N.npy'.format(filt_folder))
-                magarray = np.load('{}/mag.npy'.format(filt_folder))
+                perturb_auf_combo = '{}-{}-{}'.format(ax1, ax2, filters[j])
+                Narray = perturb_auf_outputs[perturb_auf_combo]['Narray']
+                magarray = perturb_auf_outputs[perturb_auf_combo]['magarray']
                 Narrays[:arraylengths[j, i], j, i] = Narray
                 magarrays[:arraylengths[j, i], j, i] = magarray
 
@@ -537,39 +453,29 @@ def make_perturb_aufs(auf_folder, cat_folder, filters, auf_points, r, dr, rho,
     print('Creating perturbation AUFs filter indices for catalogue "{}"...'.format(which_cat))
     sys.stdout.flush()
 
-    for cnum in range(0, mem_chunk_num):
-        lowind = np.floor(n_sources*cnum/mem_chunk_num).astype(int)
-        highind = np.floor(n_sources*(cnum+1)/mem_chunk_num).astype(int)
-        if include_perturb_auf:
-            a = np.load('{}/con_cat_photo.npy'.format(cat_folder), mmap_mode='r')[lowind:highind]
-            if (not compute_local_density) or use_memmap_files:
-                localN = np.load('{}/local_N.npy'.format(auf_folder),
-                                 mmap_mode='r')[lowind:highind]
-            else:
-                localN = local_N[lowind:highind]
-        magref = np.load('{}/magref.npy'.format(cat_folder), mmap_mode='r')[lowind:highind]
-        # As we chunk in even steps through the files this is simple for now,
-        # but could be replaced with a more complex mapping in the future.
-        indexmap = np.arange(lowind, highind, 1)
+    if include_perturb_auf:
+        a = np.load('{}/con_cat_photo.npy'.format(cat_folder))
+        localN = local_N
+    magref = np.load('{}/magref.npy'.format(cat_folder))
 
-        if include_perturb_auf:
-            for i in range(0, len(a)):
-                axind = modelrefinds[2, indexmap[i]]
-                filterind = magref[i]
-                Nmind = np.argmin((localN[i, filterind] - Narrays[:arraylengths[filterind, axind],
-                                                                  filterind, axind])**2 +
-                                  (a[i, filterind] - magarrays[:arraylengths[filterind, axind],
-                                                               filterind, axind])**2)
-                modelrefinds[0, indexmap[i]] = Nmind
-        else:
-            # For the case that we do not use the perturbation AUF component,
-            # our dummy N-m files are all one-length arrays, so we can
-            # trivially index them, regardless of specifics.
-            modelrefinds[0, indexmap] = 0
+    if include_perturb_auf:
+        for i in range(0, len(a)):
+            axind = modelrefinds[2, i]
+            filterind = magref[i]
+            Nmind = np.argmin((localN[i, filterind] - Narrays[:arraylengths[filterind, axind],
+                                                              filterind, axind])**2 +
+                              (a[i, filterind] - magarrays[:arraylengths[filterind, axind],
+                                                           filterind, axind])**2)
+            modelrefinds[0, i] = Nmind
+    else:
+        # For the case that we do not use the perturbation AUF component,
+        # our dummy N-m files are all one-length arrays, so we can
+        # trivially index them, regardless of specifics.
+        modelrefinds[0, :] = 0
 
-        # The mapping of which filter to use is straightforward: simply pick
-        # the filter index of the "best" filter for each source, from magref.
-        modelrefinds[1, indexmap] = magref
+    # The mapping of which filter to use is straightforward: simply pick
+    # the filter index of the "best" filter for each source, from magref.
+    modelrefinds[1, :] = magref
 
     if delta_mag_cuts is None:
         n_fracs = 2  # TODO: generalise once delta_mag_cuts is user-inputtable.
@@ -577,27 +483,19 @@ def make_perturb_aufs(auf_folder, cat_folder, filters, auf_points, r, dr, rho,
         n_fracs = len(delta_mag_cuts)
     # Create the 4-D grids that house the perturbation AUF fourier-space
     # representation.
-    create_auf_params_grid(auf_folder, auf_points, filters, 'fourier', use_memmap_files,
-                           len(rho)-1, arraylengths)
+    perturb_auf_outputs['fourier_grid'] = create_auf_params_grid(
+        perturb_auf_outputs, auf_points, filters, 'fourier', arraylengths, len(rho)-1)
     # Create the estimated levels of flux contamination and fraction of
     # contaminated source grids.
-    create_auf_params_grid(auf_folder, auf_points, filters, 'frac', use_memmap_files,
-                           n_fracs, arraylengths)
-    create_auf_params_grid(auf_folder, auf_points, filters, 'flux', use_memmap_files,
-                           arraylengths=arraylengths)
+    perturb_auf_outputs['frac_grid'] = create_auf_params_grid(
+        perturb_auf_outputs, auf_points, filters, 'frac', arraylengths, n_fracs)
+    perturb_auf_outputs['flux_grid'] = create_auf_params_grid(
+        perturb_auf_outputs, auf_points, filters, 'flux', arraylengths)
 
     if include_perturb_auf:
         del Narrays, magarrays
 
-        if use_memmap_files:
-          os.remove('{}/narrays.npy'.format(auf_folder))
-          os.remove('{}/magarrays.npy'.format(auf_folder))
-
-          # Delete sky slices used to make fourier cutouts.
-          os.system('rm {}/*temporary_sky_slice*.npy'.format(auf_folder))
-          os.system('rm {}/_small_sky_slice.npy'.format(auf_folder))
-
-    return modelrefinds
+    return modelrefinds, perturb_auf_outputs
 
 
 def download_trilegal_simulation(tri_folder, tri_filter_set, ax1, ax2, mag_num, region_frame,
@@ -744,8 +642,7 @@ def download_trilegal_simulation(tri_folder, tri_filter_set, ax1, ax2, mag_num, 
 
 
 def calculate_local_density(a_astro, a_tot_astro, a_tot_photo, auf_folder, cat_folder,
-                            density_radius, density_mag, memmap_slice_arrays,
-                            use_memmap_files):
+                            density_radius, density_mag):
     '''
     Calculates the number of sources above a given brightness within a specified
     radius of each source in a catalogue, to provide a local density for
@@ -772,13 +669,6 @@ def calculate_local_density(a_astro, a_tot_astro, a_tot_photo, auf_folder, cat_f
     density_mag : float
         The brightness, in magnitudes, above which to count sources for density
         purposes.
-    memmap_slice_arrays : list of numpy.ndarray
-        List of the memmap sky slice arrays, to be used in the loading of the
-        rectangular sky patch.
-    use_memmap_files : boolean
-        When set to True, memory mapped files are used for several internal
-        arrays. Reduces memory consumption at the cost of increased I/O
-        contention.
 
     Returns
     -------
@@ -790,39 +680,11 @@ def calculate_local_density(a_astro, a_tot_astro, a_tot_photo, auf_folder, cat_f
     min_lon, max_lon = min_max_lon(a_astro[:, 0])
     min_lat, max_lat = np.amin(a_astro[:, 1]), np.amax(a_astro[:, 1])
 
-    memmap_slice_arrays_2 = []
-    if use_memmap_files:
-        for n in ['1', '2', '3', '4', 'combined']:
-            memmap_slice_arrays_2.append(np.lib.format.open_memmap(
-                '{}/{}_temporary_sky_slice_{}.npy'.format(auf_folder, '2', n), mode='w+',
-                dtype=bool, shape=(len(a_astro),)))
-    else:
-        for _ in range(5):
-            memmap_slice_arrays_2.append(np.zeros(dtype=bool, shape=(len(a_astro),)))
-
-    overlap_sky_cut = _load_rectangular_slice(auf_folder, '', a_tot_astro, min_lon,
-                                              max_lon, min_lat, max_lat, density_radius,
-                                              memmap_slice_arrays)
-    if use_memmap_files:
-        cut = np.lib.format.open_memmap('{}/_temporary_slice.npy'.format(
-            auf_folder), mode='w+', dtype=bool, shape=(len(a_tot_astro),))
-    else:
-        cut = np.zeros(dtype=bool, shape=(len(a_tot_astro),))
-    di = max(1, len(cut) // 20)
-    for i in range(0, len(a_tot_astro), di):
-        cut[i:i+di] = overlap_sky_cut[i:i+di] & (a_tot_photo[i:i+di] <= density_mag)
+    overlap_sky_cut = _load_rectangular_slice('', a_tot_astro, min_lon, max_lon, min_lat, max_lat,
+                                              density_radius)
+    cut = overlap_sky_cut & (a_tot_photo <= density_mag)
     a_astro_overlap_cut = a_tot_astro[cut]
     a_photo_overlap_cut = a_tot_photo[cut]
-
-    memmap_slice_arrays_3 = []
-    if use_memmap_files:
-        for n in ['1', '2', '3', '4', 'combined']:
-            memmap_slice_arrays_3.append(np.lib.format.open_memmap(
-                '{}/{}_temporary_sky_slice_{}.npy'.format(auf_folder, '3', n), mode='w+',
-                dtype=bool, shape=(len(a_astro_overlap_cut),)))
-    else:
-        for _ in range(5):
-            memmap_slice_arrays_3.append(np.zeros(dtype=bool, shape=(len(a_astro_overlap_cut),)))
 
     ax1_loops = np.linspace(min_lon, max_lon, 11)
     # Force the sub-division of the sky area in question to be 100 chunks, or
@@ -837,25 +699,15 @@ def calculate_local_density(a_astro, a_tot_astro, a_tot_photo, auf_folder, cat_f
     full_counts = np.empty(len(a_astro), float)
     for ax1_start, ax1_end in zip(ax1_loops[:-1], ax1_loops[1:]):
         for ax2_start, ax2_end in zip(ax2_loops[:-1], ax2_loops[1:]):
-            small_sky_cut = _load_rectangular_slice(auf_folder, 'small_', a_astro, ax1_start,
-                                                    ax1_end, ax2_start, ax2_end, 0,
-                                                    memmap_slice_arrays_2)
+            small_sky_cut = _load_rectangular_slice('small_', a_astro, ax1_start, ax1_end,
+                                                    ax2_start, ax2_end, 0)
             a_astro_small = a_astro[small_sky_cut]
             if len(a_astro_small) == 0:
                 continue
 
-            overlap_sky_cut = _load_rectangular_slice(auf_folder, '', a_astro_overlap_cut,
-                                                      ax1_start, ax1_end, ax2_start, ax2_end,
-                                                      density_radius, memmap_slice_arrays_3)
-            if use_memmap_files:
-                cut = np.lib.format.open_memmap('{}/_temporary_slice.npy'.format(
-                    auf_folder), mode='w+', dtype=bool, shape=(len(a_astro_overlap_cut),))
-            else:
-                cut = np.zeros(dtype=bool, shape=(len(a_astro_overlap_cut),))
-            di = max(1, len(cut) // 20)
-            for i in range(0, len(a_astro_overlap_cut), di):
-                cut[i:i+di] = (overlap_sky_cut[i:i+di] &
-                               (a_photo_overlap_cut[i:i+di] <= density_mag))
+            overlap_sky_cut = _load_rectangular_slice('', a_astro_overlap_cut, ax1_start, ax1_end,
+                                                      ax2_start, ax2_end, density_radius)
+            cut = (overlap_sky_cut & (a_photo_overlap_cut <= density_mag))
             a_astro_overlap_cut_small = a_astro_overlap_cut[cut]
 
             if len(a_astro_overlap_cut_small) > 0:
@@ -882,10 +734,7 @@ def calculate_local_density(a_astro, a_tot_astro, a_tot_photo, auf_folder, cat_f
 
     count_density = full_counts / circle_overlap_area
 
-    if use_memmap_files:
-        os.system('rm {}/_temporary_slice.npy'.format(auf_folder))
-    else:
-        del cut
+    del cut
 
     return count_density
 
@@ -1075,8 +924,8 @@ def create_single_perturb_auf(tri_folder, auf_point, filt, r, dr, rho, drho, j0s
 
     if tot_n_bright_sources < 100:
         raise ValueError("The number of simulated objects in this sky patch is too low to "
-                         "reliably derive a model source density. Please either include "
-                         "more simulated objects or set run_auf to False.")
+                         "reliably derive a model source density. Please include "
+                         "more simulated objects.")
 
     log10y = np.log10(10**log10y_tri + 10**log10y_gal)
 
@@ -1152,15 +1001,13 @@ def create_single_perturb_auf(tri_folder, auf_point, filt, r, dr, rho, drho, j0s
         cumulative = cumulative_psf
         fourieroffset = fourieroffset_psf
 
-    np.save('{}/{}/frac.npy'.format(tri_folder, filt), Frac)
-    np.save('{}/{}/flux.npy'.format(tri_folder, filt), Flux)
-    np.save('{}/{}/offset.npy'.format(tri_folder, filt), offset)
-    np.save('{}/{}/cumulative.npy'.format(tri_folder, filt), cumulative)
-    np.save('{}/{}/fourier.npy'.format(tri_folder, filt), fourieroffset)
-    np.save('{}/{}/N.npy'.format(tri_folder, filt), count_array)
-    np.save('{}/{}/mag.npy'.format(tri_folder, filt), mag_array)
+    single_perturb_auf_output = {}
+    for name, entry in zip(
+            ['frac', 'flux', 'offset', 'cumulative', 'fourier', 'Narray', 'magarray'],
+            [Frac, Flux, offset, cumulative, fourieroffset, count_array, mag_array]):
+        single_perturb_auf_output[name] = entry
 
-    return count_array
+    return single_perturb_auf_output
 
 
 def make_tri_counts(trifolder, trifilename, trifiltname, dm, brightest_source_mag,

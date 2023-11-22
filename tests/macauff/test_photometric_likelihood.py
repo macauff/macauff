@@ -22,18 +22,15 @@ class TestOneSidedPhotometricLikelihood:
         self.joint_folder_path = 'test_path'
         self.a_cat_folder_path = 'gaia_folder'
         self.b_cat_folder_path = 'wise_folder'
-        self.group_sources_data = StageData(ablen=None, ainds=None, asize=None,
-                                            bblen=None, binds=None, bsize=None)
-        self.use_memmap_files = True
+        self.group_sources_data = StageData(ablen=None, aflen=None, ainds=None, asize=None,
+                                            bblen=None, bflen=None, binds=None, bsize=None)
 
         self.area = (134-131)*(1--1)
 
         self.afilts, self.bfilts = np.array(['G', 'BP', 'RP']), np.array(['W1', 'W2', 'W3', 'W4'])
 
-        self.mem_chunk_num = 2
         self.include_phot_like, self.use_phot_priors = False, False
 
-        os.makedirs('{}/phot_like'.format(self.joint_folder_path), exist_ok=True)
         os.makedirs(self.a_cat_folder_path, exist_ok=True)
         os.makedirs(self.b_cat_folder_path, exist_ok=True)
 
@@ -60,20 +57,13 @@ class TestOneSidedPhotometricLikelihood:
 
             setattr(self, '{}_photo'.format(name), a)
 
-        old_line = 'mem_chunk_num = 10'
-        new_line = 'mem_chunk_num = 2\n'
+        old_line = 'cf_region_points = 131 134 4 -1 1 3'
+        new_line = 'cf_region_points = 131.5 133.5 3 -0.5 0.5 2\n'
         f = open(os.path.join(os.path.dirname(__file__), 'data/crossmatch_params.txt')).readlines()
         idx = np.where([old_line in line for line in f])[0][0]
         _replace_line(os.path.join(os.path.dirname(__file__), 'data/crossmatch_params.txt'),
                       idx, new_line, out_file=os.path.join(os.path.dirname(__file__),
                       'data/crossmatch_params_.txt'))
-        old_line = 'cf_region_points = 131 134 4 -1 1 3'
-        new_line = 'cf_region_points = 131.5 133.5 3 -0.5 0.5 2\n'
-        f = open(os.path.join(os.path.dirname(__file__),
-                 'data/crossmatch_params_.txt')).readlines()
-        idx = np.where([old_line in line for line in f])[0][0]
-        _replace_line(os.path.join(os.path.dirname(__file__), 'data/crossmatch_params_.txt'),
-                      idx, new_line)
         old_line = 'cross_match_extent = 131 138 -3 3'
         new_line = 'cross_match_extent = 131 134 -3 3\n'
         f = open(os.path.join(os.path.dirname(__file__),
@@ -83,40 +73,37 @@ class TestOneSidedPhotometricLikelihood:
                       idx, new_line)
 
     def test_compute_photometric_likelihoods(self):
-        os.system('rm -r {}/phot_like/*'.format(self.joint_folder_path))
         Na, Nb, area = self.Na, self.Nb, self.area
         for folder, name in zip([self.a_cat_folder_path, self.b_cat_folder_path], ['a', 'b']):
             np.save('{}/con_cat_astro.npy'.format(folder), getattr(self, '{}_astro'.format(name)))
             np.save('{}/con_cat_photo.npy'.format(folder), getattr(self, '{}_photo'.format(name)))
-        compute_photometric_likelihoods(
+        pld = compute_photometric_likelihoods(
             self.joint_folder_path, self.a_cat_folder_path, self.b_cat_folder_path, self.afilts,
-            self.bfilts, self.mem_chunk_num, self.cf_points, self.cf_areas, self.include_phot_like,
-            self.use_phot_priors, self.group_sources_data, self.use_memmap_files)
+            self.bfilts, self.cf_points, self.cf_areas, self.include_phot_like,
+            self.use_phot_priors, self.group_sources_data)
 
-        for file, shape, value in zip(['c_priors', 'fa_priors', 'fb_priors'],
-                                      [(4, 3, 6), (4, 3, 6), (4, 3, 6)],
-                                      [0.75*Nb/area/2, 0.75/area*(Na-Nb/2), 0.75/area*(Nb-Nb/2)]):
-            a = np.load('{}/phot_like/{}.npy'.format(self.joint_folder_path, file))
+        for a, shape, value in zip([pld.c_priors, pld.fa_priors, pld.fb_priors],
+                                    [(4, 3, 6), (4, 3, 6), (4, 3, 6)],
+                                    [0.75*Nb/area/2, 0.75/area*(Na-Nb/2), 0.75/area*(Nb-Nb/2)]):
             assert np.all(a.shape == shape)
             # Allow 3% tolerance for counting statistics in the distribution above
             # caused by the rng.choice removal of objects in each filter.
             assert_allclose(a, value, rtol=0.03)
 
-        abinlen = np.load('{}/phot_like/abinlengths.npy'.format(self.joint_folder_path))
-        bbinlen = np.load('{}/phot_like/bbinlengths.npy'.format(self.joint_folder_path))
+        abinlen = pld.abinlengths
+        bbinlen = pld.bbinlengths
 
         assert np.all(abinlen == 51*np.ones((3, 6), int))
         assert np.all(bbinlen == 26*np.ones((4, 6), int))
 
-        for file, shape in zip(
-            ['c_array', 'fa_array', 'fb_array'], [(25, 50, 4, 3, 6), (50, 4, 3, 6),
-                                                  (25, 4, 3, 6)]):
-            a = np.load('{}/phot_like/{}.npy'.format(self.joint_folder_path, file))
+        for a, shape in zip(
+            [pld.c_array, pld.fa_array, pld.fb_array], [(25, 50, 4, 3, 6), (50, 4, 3, 6),
+                                                        (25, 4, 3, 6)]):
             assert np.all(a.shape == shape)
             assert_allclose(a, np.ones(shape, float), atol=1e-30)
 
-        abins = np.load('{}/phot_like/abinsarray.npy'.format(self.joint_folder_path))
-        bbins = np.load('{}/phot_like/bbinsarray.npy'.format(self.joint_folder_path))
+        abins = pld.abinsarray
+        bbins = pld.bbinsarray
         for folder, filts, _bins in zip([self.a_cat_folder_path, self.b_cat_folder_path],
                                         [self.afilts, self.bfilts], [abins, bbins]):
             a = np.load('{}/con_cat_astro.npy'.format(folder))
@@ -130,7 +117,6 @@ class TestOneSidedPhotometricLikelihood:
                     assert np.all(hist >= 250)
 
     def test_empty_filter(self):
-        os.system('rm -r {}/phot_like/*'.format(self.joint_folder_path))
         # This test simply removes all "good" flags from a single pointing-filter
         # combination, to check the robustness of empty bin derivations.
         a = np.copy(self.b_photo)
@@ -144,26 +130,25 @@ class TestOneSidedPhotometricLikelihood:
             np.save('{}/con_cat_astro.npy'.format(folder), obj[0])
             np.save('{}/con_cat_photo.npy'.format(folder), obj[1])
 
-        compute_photometric_likelihoods(
+        pld = compute_photometric_likelihoods(
             self.joint_folder_path, self.a_cat_folder_path, self.b_cat_folder_path, self.afilts,
-            self.bfilts, self.mem_chunk_num, self.cf_points, self.cf_areas, self.include_phot_like,
-            self.use_phot_priors, self.group_sources_data, self.use_memmap_files)
+            self.bfilts, self.cf_points, self.cf_areas, self.include_phot_like,
+            self.use_phot_priors, self.group_sources_data)
 
-        abinlen = np.load('{}/phot_like/abinlengths.npy'.format(self.joint_folder_path))
+        abinlen = pld.abinlengths
         assert np.all(abinlen == 51*np.ones((3, 6), int))
 
-        bbinlen = np.load('{}/phot_like/bbinlengths.npy'.format(self.joint_folder_path))
+        bbinlen = pld.bbinlengths
         b_check = 26*np.ones((4, 6), int)
         b_check[2, 2] = 1
         assert np.all(bbinlen == b_check)
 
-        c_array = np.load('{}/phot_like/c_array.npy'.format(self.joint_folder_path))
+        c_array = pld.c_array
         c_check = np.ones((25, 50, 4, 3, 6), float)
         c_check[:, :, 2, :, 2] = 0
         assert_allclose(c_array, c_check, atol=1e-30)
 
     def test_small_number_bins(self):
-        os.system('rm -r {}/phot_like/*'.format(self.joint_folder_path))
         # This test checks if there are <N sources in a single pointing-filter
         # combination, then everything is simply lumped into one big bin.
         a = np.copy(self.b_photo)
@@ -180,26 +165,25 @@ class TestOneSidedPhotometricLikelihood:
             np.save('{}/con_cat_astro.npy'.format(folder), obj[0])
             np.save('{}/con_cat_photo.npy'.format(folder), obj[1])
 
-        compute_photometric_likelihoods(
+        pld = compute_photometric_likelihoods(
             self.joint_folder_path, self.a_cat_folder_path, self.b_cat_folder_path, self.afilts,
-            self.bfilts, self.mem_chunk_num, self.cf_points, self.cf_areas, self.include_phot_like,
-            self.use_phot_priors, self.group_sources_data, self.use_memmap_files)
+            self.bfilts, self.cf_points, self.cf_areas, self.include_phot_like,
+            self.use_phot_priors, self.group_sources_data)
 
-        abinlen = np.load('{}/phot_like/abinlengths.npy'.format(self.joint_folder_path))
+        abinlen = pld.abinlengths
         assert np.all(abinlen == 51*np.ones((3, 6), int))
 
-        bbinlen = np.load('{}/phot_like/bbinlengths.npy'.format(self.joint_folder_path))
+        bbinlen = pld.bbinlengths
         b_check = 26*np.ones((4, 6), int)
         b_check[2, 2] = 2
         assert np.all(bbinlen == b_check)
 
-        c_array = np.load('{}/phot_like/c_array.npy'.format(self.joint_folder_path))
+        c_array = pld.c_array
         c_check = np.ones((25, 50, 4, 3, 6), float)
         c_check[1:, :, 2, :, 2] = 0
         assert_allclose(c_array, c_check, atol=1e-30)
 
     def test_calculate_phot_like_input(self):
-        os.system('rm -r {}/phot_like/*'.format(self.joint_folder_path))
         # Here we also have to dump a random "magref" file to placate the
         # checks on CrossMatch.
         for folder, name in zip([self.a_cat_folder_path, self.b_cat_folder_path], ['a', 'b']):
@@ -208,31 +192,30 @@ class TestOneSidedPhotometricLikelihood:
             np.save('{}/magref.npy'.format(folder),
                     np.zeros((len(getattr(self, '{}_astro'.format(name))))))
 
-        self.cm = CrossMatch(os.path.join(os.path.dirname(__file__), 'data'), use_memmap_files=True)
+        self.cm = CrossMatch(os.path.join(os.path.dirname(__file__), 'data'))
         self.cm._initialise_chunk(os.path.join(os.path.dirname(__file__),
                                                'data/crossmatch_params_.txt'),
                                   os.path.join(os.path.dirname(__file__), 'data/cat_a_params.txt'),
                                   os.path.join(os.path.dirname(__file__), 'data/cat_b_params.txt'))
         self.cm.group_sources_data = self.group_sources_data
         self.cm.chunk_id = 1
-        files_per_phot = 6
-        self.cm.calculate_phot_like(files_per_phot)
+        self.cm.calculate_phot_like()
 
-        abinlen = np.load('{}/phot_like/abinlengths.npy'.format(self.joint_folder_path))
-        bbinlen = np.load('{}/phot_like/bbinlengths.npy'.format(self.joint_folder_path))
+        abinlen = self.cm.phot_like_data.abinlengths
+        bbinlen = self.cm.phot_like_data.bbinlengths
 
         assert np.all(abinlen == 51*np.ones((3, 6), int))
         assert np.all(bbinlen == 26*np.ones((4, 6), int))
 
-        for file, shape in zip(
-            ['c_array', 'fa_array', 'fb_array'], [(25, 50, 4, 3, 6), (50, 4, 3, 6),
-                                                  (25, 4, 3, 6)]):
-            a = np.load('{}/phot_like/{}.npy'.format(self.joint_folder_path, file))
+        for a, shape in zip(
+            [self.cm.phot_like_data.c_array, self.cm.phot_like_data.fa_array,
+             self.cm.phot_like_data.fb_array], [(25, 50, 4, 3, 6), (50, 4, 3, 6),
+                                                (25, 4, 3, 6)]):
             assert np.all(a.shape == shape)
             assert_allclose(a, np.ones(shape, float), atol=1e-30)
 
-        abins = np.load('{}/phot_like/abinsarray.npy'.format(self.joint_folder_path))
-        bbins = np.load('{}/phot_like/bbinsarray.npy'.format(self.joint_folder_path))
+        abins = self.cm.phot_like_data.abinsarray
+        bbins = self.cm.phot_like_data.bbinsarray
         for folder, filts, _bins in zip([self.a_cat_folder_path, self.b_cat_folder_path],
                                         [self.afilts, self.bfilts], [abins, bbins]):
             a = np.load('{}/con_cat_astro.npy'.format(folder))
@@ -244,75 +227,6 @@ class TestOneSidedPhotometricLikelihood:
                     hist, bins = np.histogram(b[q & ~np.isnan(b[:, k]), k],
                                               bins=_bins[:, k, i])
                     assert np.all(hist >= 250)
-
-    def test_calculate_phot_like_incorrect_files(self):
-        os.system('rm -r {}/phot_like/*'.format(self.joint_folder_path))
-        self.cm = CrossMatch(os.path.join(os.path.dirname(__file__), 'data'), use_memmap_files=True)
-        self.cm._initialise_chunk(os.path.join(os.path.dirname(__file__),
-                                               'data/crossmatch_params_.txt'),
-                                  os.path.join(os.path.dirname(__file__), 'data/cat_a_params.txt'),
-                                  os.path.join(os.path.dirname(__file__), 'data/cat_b_params.txt'))
-        self.cm.group_sources_data = self.group_sources_data
-        self.cm.chunk_id = 1
-        self.cm.run_cf = False
-        files_per_phot = 6
-
-        # Dummy set up the incorrect number of files in phot_like:
-        for i in range(4):
-            np.save('{}/phot_like/array_{}.npy'.format(self.joint_folder_path, i),
-                    np.array([0]))
-
-        with pytest.warns(UserWarning, match='Incorrect number of photometric likelihood files.'):
-            self.cm.calculate_phot_like(files_per_phot)
-
-        abinlen = np.load('{}/phot_like/abinlengths.npy'.format(self.joint_folder_path))
-        bbinlen = np.load('{}/phot_like/bbinlengths.npy'.format(self.joint_folder_path))
-
-        assert np.all(abinlen == 51*np.ones((3, 6), int))
-        assert np.all(bbinlen == 26*np.ones((4, 6), int))
-
-        for file, shape in zip(
-            ['c_array', 'fa_array', 'fb_array'], [(25, 50, 4, 3, 6), (50, 4, 3, 6),
-                                                  (25, 4, 3, 6)]):
-            a = np.load('{}/phot_like/{}.npy'.format(self.joint_folder_path, file))
-            assert np.all(a.shape == shape)
-            assert_allclose(a, np.ones(shape, float), atol=1e-30)
-
-        abins = np.load('{}/phot_like/abinsarray.npy'.format(self.joint_folder_path))
-        bbins = np.load('{}/phot_like/bbinsarray.npy'.format(self.joint_folder_path))
-        for folder, filts, _bins in zip([self.a_cat_folder_path, self.b_cat_folder_path],
-                                        [self.afilts, self.bfilts], [abins, bbins]):
-            a = np.load('{}/con_cat_astro.npy'.format(folder))
-            b = np.load('{}/con_cat_photo.npy'.format(folder))
-            for i, (ax1, ax2) in enumerate(self.cf_points):
-                q = ((a[:, 0] >= ax1-0.5) & (a[:, 0] <= ax1+0.5) &
-                     (a[:, 1] >= ax2-0.5) & (a[:, 1] <= ax2+0.5))
-                for k in range(len(filts)):
-                    hist, bins = np.histogram(b[q & ~np.isnan(b[:, k]), k],
-                                              bins=_bins[:, k, i])
-                    assert np.all(hist >= 250)
-
-    def test_calculate_phot_like_load_files(self, capsys):
-        os.system('rm -r {}/phot_like/*'.format(self.joint_folder_path))
-        self.cm = CrossMatch(os.path.join(os.path.dirname(__file__), 'data'), use_memmap_files=True)
-        self.cm._initialise_chunk(os.path.join(os.path.dirname(__file__),
-                                               'data/crossmatch_params_.txt'),
-                                  os.path.join(os.path.dirname(__file__), 'data/cat_a_params.txt'),
-                                  os.path.join(os.path.dirname(__file__), 'data/cat_b_params.txt'))
-        self.cm.group_sources_data = self.group_sources_data
-        self.cm.chunk_id = 1
-        self.cm.run_cf = False
-        files_per_phot = 6
-
-        # Dummy set up the correct number of files in phot_like:
-        for i in range(2 + 2 * files_per_phot):
-            np.save('{}/phot_like/array_{}.npy'.format(self.joint_folder_path, i),
-                    np.array([0]))
-
-        capsys.readouterr()
-        self.cm.calculate_phot_like(files_per_phot)
-        output = capsys.readouterr().out
-        assert 'Loading photometric priors and likelihoods' in output
 
 
 def test_get_field_dists_fortran():
@@ -431,18 +345,13 @@ class TestFullPhotometricLikelihood:
         self.joint_folder_path = 'test_path'
         self.a_cat_folder_path = 'gaia_folder'
         self.b_cat_folder_path = 'wise_folder'
-        self.group_sources_data = StageData(ablen=None, ainds=None, asize=None,
-                                            bblen=None, binds=None, bsize=None)
-        self.use_memmap_files = True
 
         self.area = 0.25
 
         self.afilts, self.bfilts = np.array(['G']), np.array(['G'])
 
-        self.mem_chunk_num = 2
         self.include_phot_like, self.use_phot_priors = True, True
 
-        os.makedirs('{}/phot_like'.format(self.joint_folder_path), exist_ok=True)
         os.makedirs(self.a_cat_folder_path, exist_ok=True)
         os.makedirs(self.b_cat_folder_path, exist_ok=True)
 
@@ -485,7 +394,6 @@ class TestFullPhotometricLikelihood:
         self.a_photo = ap
         self.b_photo = bp
 
-        os.system('rm -r {}/group/*'.format(self.joint_folder_path))
         # Have to pre-create the various overlap arrays, and integral lengths:
         asize = np.ones(self.Ntot, int)
         asize[~a_cut] = 0
@@ -497,10 +405,6 @@ class TestFullPhotometricLikelihood:
         binds = -1*np.ones((1, self.Ntot), int, order='F')
         binds[0, :] = np.arange(0, self.Ntot)
         binds[0, ~b_cut] = -1
-        np.save('{}/group/ainds.npy'.format(self.joint_folder_path), ainds)
-        np.save('{}/group/asize.npy'.format(self.joint_folder_path), asize)
-        np.save('{}/group/binds.npy'.format(self.joint_folder_path), binds)
-        np.save('{}/group/bsize.npy'.format(self.joint_folder_path), bsize)
 
         # Integrate 2-D Gaussian to N*sigma radius gives probability Y of
         # 1 - exp(-0.5 N^2 sigma^2 / sigma^2) = 1 - exp(-0.5 N^2).
@@ -516,40 +420,36 @@ class TestFullPhotometricLikelihood:
         bblen[~b_cut] = 0
         bflen = N_f * np.sqrt(asig**2 + bsig**2) * np.ones(self.Ntot, float) / 3600
         bflen[~b_cut] = 0
-        np.save('{}/group/ablen.npy'.format(self.joint_folder_path), ablen)
-        np.save('{}/group/aflen.npy'.format(self.joint_folder_path), aflen)
-        np.save('{}/group/bblen.npy'.format(self.joint_folder_path), bblen)
-        np.save('{}/group/bflen.npy'.format(self.joint_folder_path), bflen)
+
+        self.group_sources_data = StageData(ablen=ablen, aflen=aflen, ainds=ainds, asize=asize,
+                                            bblen=bblen, bflen=bflen, binds=binds, bsize=bsize)
 
     def test_phot_like_prior_frac_inclusion(self):
-        os.system('rm -r {}/phot_like/*'.format(self.joint_folder_path))
         for ipl, upp in zip([False, True, True], [True, False, True]):
             for bf, ff in zip([None, 0.5, None], [0.5, None, None]):
                 msg = 'bright_frac' if bf is None else 'field_frac'
                 with pytest.raises(ValueError, match='{} must be supplied if '.format(msg)):
                     compute_photometric_likelihoods(
                         self.joint_folder_path, self.a_cat_folder_path, self.b_cat_folder_path,
-                        self.afilts, self.bfilts, self.mem_chunk_num, self.cf_points,
-                        self.cf_areas, ipl, upp, self.group_sources_data, self.use_memmap_files,
-                        bright_frac=bf, field_frac=ff)
+                        self.afilts, self.bfilts, self.cf_points, self.cf_areas, ipl, upp,
+                        self.group_sources_data, bright_frac=bf, field_frac=ff)
 
     def test_compute_phot_like(self):
-        os.system('rm -r {}/phot_like/*'.format(self.joint_folder_path))
         for folder, name in zip([self.a_cat_folder_path, self.b_cat_folder_path], ['a', 'b']):
             np.save('{}/con_cat_astro.npy'.format(folder), getattr(self, '{}_astro'.format(name)))
             np.save('{}/con_cat_photo.npy'.format(folder), getattr(self, '{}_photo'.format(name)))
-        compute_photometric_likelihoods(
+        pld = compute_photometric_likelihoods(
             self.joint_folder_path, self.a_cat_folder_path, self.b_cat_folder_path,
-            self.afilts, self.bfilts, self.mem_chunk_num, self.cf_points,
-            self.cf_areas, self.include_phot_like, self.use_phot_priors, self.group_sources_data,
-            self.use_memmap_files, bright_frac=self.Y_b, field_frac=self.Y_f)
+            self.afilts, self.bfilts, self.cf_points, self.cf_areas, self.include_phot_like,
+            self.use_phot_priors, self.group_sources_data, bright_frac=self.Y_b,
+            field_frac=self.Y_f)
 
-        c_p = np.load('{}/phot_like/c_priors.npy'.format(self.joint_folder_path))
-        c_l = np.load('{}/phot_like/c_array.npy'.format(self.joint_folder_path))
-        fa_p = np.load('{}/phot_like/fa_priors.npy'.format(self.joint_folder_path))
-        fa_l = np.load('{}/phot_like/fa_array.npy'.format(self.joint_folder_path))
-        fb_p = np.load('{}/phot_like/fb_priors.npy'.format(self.joint_folder_path))
-        fb_l = np.load('{}/phot_like/fb_array.npy'.format(self.joint_folder_path))
+        c_p = pld.c_priors
+        c_l = pld.c_array
+        fa_p = pld.fa_priors
+        fa_l = pld.fa_array
+        fb_p = pld.fb_priors
+        fb_l = pld.fb_array
 
         fake_c_p = self.Nc / self.area
         fake_fa_p = (self.Ntot - self.Nc) / self.area
@@ -567,7 +467,7 @@ class TestFullPhotometricLikelihood:
         fake_fa_l = np.zeros((len(abins) - 1, 1, 1, 1), float)
         h, _ = np.histogram(a[q], bins=abins, density=True)
         fake_fa_l[:, 0, 0, 0] = h
-        fake_abins = np.load('{}/phot_like/abinsarray.npy'.format(self.joint_folder_path))[:, 0, 0]
+        fake_abins = pld.abinsarray[:, 0, 0]
         assert np.all(abins == fake_abins)
         assert np.all(fake_fa_l.shape == fa_l.shape)
         assert_allclose(fa_l, fake_fa_l, atol=0.02)
@@ -575,7 +475,7 @@ class TestFullPhotometricLikelihood:
         fake_fb_l = np.zeros((len(bbins) - 1, 1, 1, 1), float)
         h, _ = np.histogram(b[q], bins=bbins, density=True)
         fake_fb_l[:, 0, 0, 0] = h
-        fake_bbins = np.load('{}/phot_like/bbinsarray.npy'.format(self.joint_folder_path))[:, 0, 0]
+        fake_bbins = pld.bbinsarray[:, 0, 0]
         assert np.all(bbins == fake_bbins)
         assert np.all(fake_fb_l.shape == fb_l.shape)
         assert_allclose(fb_l, fake_fb_l, atol=0.02)
@@ -587,23 +487,22 @@ class TestFullPhotometricLikelihood:
         assert_allclose(c_l, fake_c_l, rtol=0.1, atol=0.05)
 
     def test_compute_phot_like_use_priors_only(self):
-        os.system('rm -r {}/phot_like/*'.format(self.joint_folder_path))
         for folder, name in zip([self.a_cat_folder_path, self.b_cat_folder_path], ['a', 'b']):
             np.save('{}/con_cat_astro.npy'.format(folder), getattr(self, '{}_astro'.format(name)))
             np.save('{}/con_cat_photo.npy'.format(folder), getattr(self, '{}_photo'.format(name)))
         include_phot_like = False
-        compute_photometric_likelihoods(
+        pld = compute_photometric_likelihoods(
             self.joint_folder_path, self.a_cat_folder_path, self.b_cat_folder_path,
-            self.afilts, self.bfilts, self.mem_chunk_num, self.cf_points,
-            self.cf_areas, include_phot_like, self.use_phot_priors, self.group_sources_data,
-            self.use_memmap_files, bright_frac=self.Y_b, field_frac=self.Y_f)
+            self.afilts, self.bfilts, self.cf_points, self.cf_areas, include_phot_like,
+            self.use_phot_priors, self.group_sources_data, bright_frac=self.Y_b,
+            field_frac=self.Y_f)
 
-        c_p = np.load('{}/phot_like/c_priors.npy'.format(self.joint_folder_path))
-        c_l = np.load('{}/phot_like/c_array.npy'.format(self.joint_folder_path))
-        fa_p = np.load('{}/phot_like/fa_priors.npy'.format(self.joint_folder_path))
-        fa_l = np.load('{}/phot_like/fa_array.npy'.format(self.joint_folder_path))
-        fb_p = np.load('{}/phot_like/fb_priors.npy'.format(self.joint_folder_path))
-        fb_l = np.load('{}/phot_like/fb_array.npy'.format(self.joint_folder_path))
+        c_p = pld.c_priors
+        c_l = pld.c_array
+        fa_p = pld.fa_priors
+        fa_l = pld.fa_array
+        fb_p = pld.fb_priors
+        fb_l = pld.fb_array
 
         fake_c_p = self.Nc / self.area
         fake_fa_p = (self.Ntot - self.Nc) / self.area
@@ -616,13 +515,13 @@ class TestFullPhotometricLikelihood:
         bbins = make_bins(self.b_photo[~np.isnan(self.b_photo[:, 0]), 0])
 
         fake_fa_l = np.ones((len(abins) - 1, 1, 1, 1), float)
-        fake_abins = np.load('{}/phot_like/abinsarray.npy'.format(self.joint_folder_path))[:, 0, 0]
+        fake_abins = pld.abinsarray[:, 0, 0]
         assert np.all(abins == fake_abins)
         assert np.all(fake_fa_l.shape == fa_l.shape)
         assert_allclose(fa_l, fake_fa_l)
 
         fake_fb_l = np.ones((len(bbins) - 1, 1, 1, 1), float)
-        fake_bbins = np.load('{}/phot_like/bbinsarray.npy'.format(self.joint_folder_path))[:, 0, 0]
+        fake_bbins = pld.bbinsarray[:, 0, 0]
         assert np.all(bbins == fake_bbins)
         assert np.all(fake_fb_l.shape == fb_l.shape)
         assert_allclose(fb_l, fake_fb_l)
