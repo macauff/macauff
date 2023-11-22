@@ -4,7 +4,6 @@ This module provides miscellaneous scripts, called in other parts of the cross-m
 framework.
 '''
 
-import os
 import numpy as np
 
 __all__ = []
@@ -17,16 +16,16 @@ class StageData:
         self.__dict__.update(kwargs)
 
 
-def create_auf_params_grid(auf_folder_path, auf_pointings, filt_names, array_name,
-                           use_memmap_files, len_first_axis=None, arraylengths=None):
+def create_auf_params_grid(perturb_auf_outputs, auf_pointings, filt_names, array_name,
+                           arraylengths, len_first_axis=None):
     '''
     Minor function to offload the creation of a 3-D or 4-D array from a series
     of 2-D arrays.
 
     Parameters
     ----------
-    auf_folder_path : string
-        Location of the top-level folder in which all fourier grids are saved.
+    perturb_auf_outputs : dictionary
+        Dictionary of outputs from series of pointing-filter AUF simulations.
     auf_pointings : numpy.ndarray
         Two-dimensional array with the sky coordinates of each pointing used
         in the perturbation AUF component creation.
@@ -35,47 +34,39 @@ def create_auf_params_grid(auf_folder_path, auf_pointings, filt_names, array_nam
     array_name : string
         The name of the individually-saved arrays, one per sub-folder, to turn
         into a 3-D or 4-D array.
-    use_memmap_files : boolean
-        When set to True, memory mapped files are used for several internal
-        arrays. Reduces memory consumption at the cost of increased I/O
-        contention.
+    arraylengths : numpy.ndarray
+        Array containing length of the density-magnitude combinations in each
+        sky/filter combination.
     len_first_axis : integer, optional
         Length of the initial axis of the 4-D array. If not provided or is
         ``None``, final array is assumed to be 3-D instead.
-    arraylengths : numpy.ndarray, optional
-        Array containing length of the density-magnitude combinations in each
-        sky/filter combination. Used only when use_memmap_files is True.
-        Otherwise, is reloaded from disk.
+
+    Returns
+    -------
+    grid : numpy.ndarray
+        The populated grid of ``array_name`` individual 1-D arrays.
     '''
-    if use_memmap_files:
-        arraylengths = np.load('{}/arraylengths.npy'.format(auf_folder_path))
     longestNm = np.amax(arraylengths)
     if len_first_axis is None:
-        grid = np.lib.format.open_memmap('{}/{}_grid.npy'.format(
-            auf_folder_path, array_name), mode='w+', dtype=float, shape=(
-            longestNm, len(filt_names), len(auf_pointings)), fortran_order=True)
-        grid[:, :, :] = -1
+        grid = np.full(fill_value=-1, dtype=float, order='F',
+                       shape=(longestNm, len(filt_names), len(auf_pointings)))
     else:
-        grid = np.lib.format.open_memmap('{}/{}_grid.npy'.format(
-            auf_folder_path, array_name), mode='w+', dtype=float, shape=(
-            len_first_axis, longestNm, len(filt_names), len(auf_pointings)), fortran_order=True)
-        grid[:, :, :, :] = -1
+        grid = np.full(fill_value=-1, dtype=float, order='F',
+                       shape=(len_first_axis, longestNm, len(filt_names), len(auf_pointings)))
     for j in range(0, len(auf_pointings)):
         ax1, ax2 = auf_pointings[j]
         for i in range(0, len(filt_names)):
-            filt = filt_names[i]
-            single_array = np.load('{}/{}/{}/{}/{}.npy'.format(auf_folder_path,
-                                   ax1, ax2, filt, array_name))
+            perturb_auf_combo = '{}-{}-{}'.format(ax1, ax2, filt_names[i])
+            single_array = perturb_auf_outputs[perturb_auf_combo][array_name]
             if len_first_axis is None:
                 grid[:arraylengths[i, j], i, j] = single_array
             else:
                 grid[:, :arraylengths[i, j], i, j] = single_array
-    if use_memmap_files:
-        del arraylengths
-    del longestNm, grid
+
+    return grid
 
 
-def load_small_ref_auf_grid(modrefind, auf_folder_path, file_name_prefixes):
+def load_small_ref_auf_grid(modrefind, perturb_auf_outputs, file_name_prefixes):
     '''
     Function to create reference index arrays out of larger arrays, based on
     the mappings from the original reference index array into a larger grid,
@@ -87,8 +78,8 @@ def load_small_ref_auf_grid(modrefind, auf_folder_path, file_name_prefixes):
     modrefind : numpy.ndarray
         The reference index array that maps into saved array ``fourier_grid``
         for each source in the given catalogue.
-    auf_folder_path : string
-        Location of the folder in which ``fourier_grid`` is stored.
+    perturb_auf_outputs : dictionary
+        Saved results from the cross-matches' extra AUF component simulations.
     file_name_prefixes : list
         Prefixes of the files stored in ``auf_folder_path`` -- the parts before
         "_grid" -- to be loaded as sub-arrays and returned.
@@ -111,12 +102,12 @@ def load_small_ref_auf_grid(modrefind, auf_folder_path, file_name_prefixes):
 
     small_grids = []
     for name in file_name_prefixes:
-        if len(np.load('{}/{}_grid.npy'.format(auf_folder_path, name), mmap_mode='r').shape) == 4:
-            small_grids.append(np.asfortranarray(np.load('{}/{}_grid.npy'.format(
-                auf_folder_path, name), mmap_mode='r')[:, x, y, z]))
+        if len(perturb_auf_outputs['{}_grid'.format(name)].shape) == 4:
+            small_grids.append(np.asfortranarray(
+                perturb_auf_outputs['{}_grid'.format(name)][:, x, y, z]))
         else:
-            small_grids.append(np.asfortranarray(np.load('{}/{}_grid.npy'.format(
-                auf_folder_path, name), mmap_mode='r')[x, y, z]))
+            small_grids.append(np.asfortranarray(
+                perturb_auf_outputs['{}_grid'.format(name)][x, y, z]))
     modrefindsmall = np.empty((3, modrefind.shape[1]), int, order='F')
     del modrefind
     modrefindsmall[0, :] = nmnewind
@@ -153,99 +144,7 @@ def hav_dist_constant_lat(x_lon, x_lat, lon):
     return dist
 
 
-def map_large_index_to_small_index(inds, length, folder, use_memmap_files):
-    inds_unique_flat = np.unique(inds[inds > -1])
-    if use_memmap_files:
-        map_array = np.lib.format.open_memmap('{}/map_array.npy'.format(folder), mode='w+', dtype=int,
-                                            shape=(length,))
-    else:
-        map_array = np.zeros(dtype=int, shape=(length,))
-    map_array[:] = -1
-    map_array[inds_unique_flat] = np.arange(0, len(inds_unique_flat), dtype=int)
-    inds_map = np.asfortranarray(map_array[inds.flatten()].reshape(inds.shape))
-    if use_memmap_files:
-        os.system('rm {}/map_array.npy'.format(folder))
-    else:
-        del map_array
-
-    return inds_map, inds_unique_flat
-
-
-def _load_single_sky_slice(folder_path, cat_name, ind, sky_inds, use_memmap_files):
-    '''
-    Function to, in a memmap-friendly way, return a sub-set of the nearest sky
-    indices of a given catalogue.
-
-    Parameters
-    ----------
-    folder_path : string
-        Folder in which to store the temporary memmap file.
-    cat_name : string
-        String defining whether this function was called on catalogue "a" or "b".
-    ind : float
-        The value of the sky indices, as defined in ``distribute_sky_indices``,
-        to return a sub-set of the larger catalogue. This value represents
-        the index of a given on-sky position, used to construct the "counterpart"
-        and "field" likelihoods.
-    sky_inds : numpy.ndarray
-        The given catalogue's ``distribute_sky_indices`` values, to compare
-        with ``ind``.
-    use_memmap_files : boolean
-        When set to True, memory mapped files are used for several internal
-        arrays. Reduces memory consumption at the cost of increased I/O
-        contention.
-
-    Returns
-    -------
-    sky_cut : numpy.ndarray
-        A boolean array, indicating whether each element in ``sky_inds`` matches
-        ``ind`` or not.
-    '''
-    if use_memmap_files:
-        sky_cut = np.lib.format.open_memmap('{}/{}_small_sky_slice.npy'.format(
-            folder_path, cat_name), mode='w+', dtype=bool, shape=(len(sky_inds),))
-    else:
-        sky_cut = np.zeros(dtype=bool, shape=(len(sky_inds),))
-
-    di = max(1, len(sky_inds) // 20)
-
-    for i in range(0, len(sky_inds), di):
-        sky_cut[i:i+di] = sky_inds[i:i+di] == ind
-
-    return sky_cut
-
-
-def _create_rectangular_slice_arrays(folder_path, cat_name, len_a):
-    '''
-    Create temporary sky slice memmap arrays for parts of the cross-match
-    process to use.
-
-    Parameters
-    ----------
-    folder_path : string
-        Location of where to store memmap arrays.
-    cat_name : string
-        Unique indicator of which catalogue these arrays are for.
-    len_a : integer
-        The length of the catalogue in question, allowing for a one-to-one
-        mapping of sky slice per source.
-    '''
-    np.lib.format.open_memmap('{}/{}_temporary_sky_slice_1.npy'.format(
-        folder_path, cat_name), mode='w+', dtype=bool, shape=(len_a,))
-    np.lib.format.open_memmap('{}/{}_temporary_sky_slice_2.npy'.format(
-        folder_path, cat_name), mode='w+', dtype=bool, shape=(len_a,))
-    np.lib.format.open_memmap('{}/{}_temporary_sky_slice_3.npy'.format(
-        folder_path, cat_name), mode='w+', dtype=bool, shape=(len_a,))
-    np.lib.format.open_memmap('{}/{}_temporary_sky_slice_4.npy'.format(
-        folder_path, cat_name), mode='w+', dtype=bool, shape=(len_a,))
-    np.lib.format.open_memmap('{}/{}_temporary_sky_slice_combined.npy'.format(
-        folder_path, cat_name), mode='w+', dtype=bool, shape=(len_a,))
-
-    return
-
-
-def _load_rectangular_slice(folder_path, cat_name, a, lon1, lon2, lat1, lat2, padding,
-                            memmap_arrays):
+def _load_rectangular_slice(cat_name, a, lon1, lon2, lat1, lat2, padding):
     '''
     Loads all sources in a catalogue within a given separation of a rectangle
     in sky coordinates, allowing for the search for all sources within a given
@@ -253,9 +152,6 @@ def _load_rectangular_slice(folder_path, cat_name, a, lon1, lon2, lat1, lat2, pa
 
     Parameters
     ----------
-    folder_path : string
-        Location of where the memmap files used in the slicing of the
-        catalogue are stored.
     cat_name : string
         Indication of whether we are loading catalogue "a" or catalogue "b",
         for separation within a given folder.
@@ -273,9 +169,6 @@ def _load_rectangular_slice(folder_path, cat_name, a, lon1, lon2, lat1, lat2, pa
     padding : float
         The sky separation, in degrees, to find all sources within a distance
         of in ``a``.
-    memmap_arrays : list of numpy.ndarray
-        The list of temporary arrays to use for memory-friendly sky coordinate
-        slicing.
 
     Returns
     -------
@@ -283,61 +176,43 @@ def _load_rectangular_slice(folder_path, cat_name, a, lon1, lon2, lat1, lat2, pa
         Boolean array, indicating whether each source in ``a`` is within ``padding``
         of the rectangle defined by ``lon1``, ``lon2``, ``lat1``, and ``lat2``.
     '''
-
-    # Slice the memmapped catalogue, with a memmapped slicing array to
-    # preserve memory.
-    sky_cut_1, sky_cut_2, sky_cut_3, sky_cut_4, sky_cut = memmap_arrays
-
-    di = max(1, len(a) // 20)
-    # Iterate over each small slice of the larger array, checking for upper
-    # and lower longitude, then latitude, criterion matching.
     lon_shift = 180 - (lon2 + lon1)/2
-    for i in range(0, len(a), di):
-        _lon_cut(i, a, di, lon1, padding, sky_cut_1, 'greater', lon_shift)
-    for i in range(0, len(a), di):
-        _lon_cut(i, a, di, lon2, padding, sky_cut_2, 'lesser', lon_shift)
 
-    for i in range(0, len(a), di):
-        _lat_cut(i, a, di, lat1, padding, sky_cut_3, 'greater')
-    for i in range(0, len(a), di):
-        _lat_cut(i, a, di, lat2, padding, sky_cut_4, 'lesser')
-
-    for i in range(0, len(a), di):
-        sky_cut[i:i+di] = (sky_cut_1[i:i+di] & sky_cut_2[i:i+di] &
-                           sky_cut_3[i:i+di] & sky_cut_4[i:i+di])
+    sky_cut = (_lon_cut(a, lon1, padding, 'greater', lon_shift) &
+               _lon_cut(a, lon2, padding, 'lesser', lon_shift) &
+               _lat_cut(a, lat1, padding, 'greater') & _lat_cut(a, lat2, padding, 'lesser'))
 
     return sky_cut
 
 
-def _lon_cut(i, a, di, lon, padding, sky_cut, inequality, lon_shift):
+def _lon_cut(a, lon, padding, inequality, lon_shift):
     '''
     Function to calculate the longitude inequality criterion for astrometric
     sources relative to a rectangle defining boundary limits.
 
     Parameters
     ----------
-    i : integer
-        Index into ``sky_cut`` for slicing.
     a : numpy.ndarray
-        The main astrometric catalogue to be sliced, loaded into memmap.
-    di : integer
-        Index stride value, for slicing.
+        The main astrometric catalogue to be sliced.
     lon : float
         Longitude at which to cut sources, either above or below, in degrees.
     padding : float
         Maximum allowed sky separation the "wrong" side of ``lon``, to allow
         for an increase in sky box size to ensure all overlaps are caught in
         ``get_max_overlap`` or ``get_max_indices``.
-    sky_cut : numpy.ndarray
-        Array into which to store boolean flags for whether source meets the
-        sky position criterion.
     inequality : string, ``greater`` or ``lesser``
         Flag to determine whether a source is either above or below the
         given ``lon`` value.
     lon_shift : float
         Value by which to "move" longitudes to avoid meridian overflow issues.
+
+    Returns
+    -------
+    sky_cut : numpy.ndarray
+        Boolean array indicating whether the objects in ``a`` are left or right
+        of the given ``lon`` value.
     '''
-    b = a[i:i+di, 0] + lon_shift
+    b = a[:, 0] + lon_shift
     b[b > 360] = b[b > 360] - 360
     b[b < 0] = b[b < 0] + 360
     # While longitudes in the data are 358, 359, 0/360, 1, 2, longitude
@@ -355,39 +230,39 @@ def _lon_cut(i, a, di, lon, padding, sky_cut, inequality, lon_shift):
     # constant latitude this reduces to
     # r = 2 arcsin(|cos(lat) * sin(delta-lon/2)|).
     if padding > 0:
-        sky_cut[i:i+di] = (hav_dist_constant_lat(a[i:i+di, 0], a[i:i+di, 1], lon) <=
-                           padding) | inequal_lon_cut
+        sky_cut = (hav_dist_constant_lat(a[:, 0], a[:, 1], lon) <= padding) | inequal_lon_cut
     # However, in both zero and non-zero padding factor cases, we always require
     # the source to be above or below the longitude for sky_cut_1 and sky_cut_2
     # in load_fourier_grid_cutouts, respectively.
     else:
-        sky_cut[i:i+di] = inequal_lon_cut
+        sky_cut = inequal_lon_cut
+
+    return sky_cut
 
 
-def _lat_cut(i, a, di, lat, padding, sky_cut, inequality):
+def _lat_cut(a, lat, padding, inequality):
     '''
     Function to calculate the latitude inequality criterion for astrometric
     sources relative to a rectangle defining boundary limits.
 
     Parameters
     ----------
-    i : integer
-        Index into ``sky_cut`` for slicing.
     a : numpy.ndarray
-        The main astrometric catalogue to be sliced, loaded into memmap.
-    di : integer
-        Index stride value, for slicing.
+        The main astrometric catalogue to be sliced.
     lat : float
         Latitude at which to cut sources, either above or below, in degrees.
     padding : float
         Maximum allowed sky separation the "wrong" side of ``lat``, to allow
         for an increase in sky box size to ensure all overlaps are caught in
         ``get_max_overlap`` or ``get_max_indices``.
-    sky_cut : numpy.ndarray
-        Array into which to store boolean flags for whether source meets the
-        sky position criterion.
     inequality : string, ``greater`` or ``lesser``
         Flag to determine whether a source is either above or below the
+        given ``lat`` value.
+
+    Returns
+    -------
+    sky_cut : numpy.ndarray
+        Boolean array indicating whether ``a`` sources are above or below the
         given ``lat`` value.
     '''
 
@@ -398,14 +273,16 @@ def _lat_cut(i, a, di, lat, padding, sky_cut, inequality):
     if padding > 0:
         if inequality == 'lesser':
             # Allow for small floating point rounding errors in comparison.
-            sky_cut[i:i+di] = a[i:i+di, 1] <= lat + padding + 1e-6
+            sky_cut = a[:, 1] <= lat + padding + 1e-6
         else:
-            sky_cut[i:i+di] = a[i:i+di, 1] >= lat - padding - 1e-6
+            sky_cut = a[:, 1] >= lat - padding - 1e-6
     else:
         if inequality == 'lesser':
-            sky_cut[i:i+di] = a[i:i+di, 1] <= lat + 1e-6
+            sky_cut = a[:, 1] <= lat + 1e-6
         else:
-            sky_cut[i:i+di] = a[i:i+di, 1] >= lat - 1e-6
+            sky_cut = a[:, 1] >= lat - 1e-6
+
+    return sky_cut
 
 
 def min_max_lon(a):

@@ -5,7 +5,6 @@ This module provides the high-level framework for performing catalogue-catalogue
 
 import os
 import sys
-import warnings
 import datetime
 from configparser import ConfigParser
 from time import sleep
@@ -19,7 +18,6 @@ except:
 from .perturbation_auf import make_perturb_aufs
 from .group_sources import make_island_groupings
 from .group_sources_fortran import group_sources_fortran as gsf
-from .misc_functions import StageData
 from .misc_functions_fortran import misc_functions_fortran as mff
 from .photometric_likelihood import compute_photometric_likelihoods
 from .counterpart_pairing import source_pairing
@@ -38,10 +36,6 @@ class CrossMatch():
     ----------
     chunks_folder_path : string
         A path to the location of the folder containing one subfolder per chunk.
-    use_memmap_files : boolean
-        When set to True, memory mapped files are used for several internal
-        arrays. Reduces memory consumption bottlenecks at the cost of increased
-        I/O contention.
     resume_file_path : string, optional
         A path to the location of the file containing resume information for the
         cross match.
@@ -58,13 +52,12 @@ class CrossMatch():
         monitors walltime. Default is 1 second.
     '''
 
-    def __init__(self, chunks_folder_path, use_memmap_files=False, resume_file_path=None,
-                 use_mpi=True, walltime=None, end_within='00:10:00', polling_rate=1):
+    def __init__(self, chunks_folder_path, resume_file_path=None, use_mpi=True, walltime=None,
+                 end_within='00:10:00', polling_rate=1):
         '''
         Initialisation function for cross-match class.
         '''
         self.chunks_folder_path = chunks_folder_path
-        self.use_memmap_files = use_memmap_files
 
         # Initialise MPI if available and enabled
         if MPI != None and use_mpi:
@@ -292,25 +285,8 @@ class CrossMatch():
                 raise ValueError('b_snr_mag_params should be of shape (X, Y, 5)')
             self.b_snr_mag_params = a
 
-        # Important steps that can be save points in the match process are:
-        # AUF creation, island splitting, c/f creation, star pairing. We have
-        # to check if any later stages are flagged to not run (i.e., they are
-        # the starting point) than earlier stages, and raise an error.
-        flags = np.array([self.run_auf, self.run_group, self.run_cf, self.run_source])
-        for i in range(3):
-            if flags[i] and np.any(~flags[i+1:]):
-                raise ValueError("Inconsistency between run/no run flags; please ensure that "
-                                 "if a sub-process is set to run that all subsequent "
-                                 "processes are also set to run.")
-        if not self.use_memmap_files and np.any(~flags):
-            warnings.warn("use_memmap_files is False but one or more of run_auf, run_group, "
-                          "run_cf, or run_source were set to False. These must all be run if "
-                          "save states are not saved, please double check which is the preferred "
-                          "option. Setting run flags all to True.")
-            self.run_auf, self.run_group, self.run_cf, self.run_source = True, True, True, True
-
         # Ensure that we can create the folders for outputs.
-        for path in ['group', 'reject', 'phot_like', 'pairing']:
+        for path in ['reject', 'pairing']:
             try:
                 os.makedirs('{}/{}'.format(self.joint_folder_path, path), exist_ok=True)
             except OSError:
@@ -347,9 +323,9 @@ class CrossMatch():
                 # Shape, mapped to each of astro/photo/magref respectively,
                 # should map to 3, number of magnitudes, and 1, where magref is
                 # a 1-D array but the other two are 2-D.
-                fn_a = np.load('{}/con_cat_astro.npy'.format(path), mmap_mode='r')
-                fn_p = np.load('{}/con_cat_photo.npy'.format(path), mmap_mode='r')
-                fn_m = np.load('{}/magref.npy'.format(path), mmap_mode='r')
+                fn_a = np.load('{}/con_cat_astro.npy'.format(path))
+                fn_p = np.load('{}/con_cat_photo.npy'.format(path))
+                fn_m = np.load('{}/magref.npy'.format(path))
                 if len(fn_a.shape) != 2 or len(fn_p.shape) != 2 or len(fn_m.shape) != 1:
                     raise ValueError("Incorrect number of dimensions in consolidated "
                                      "catalogue {} files.".format(catname))
@@ -363,20 +339,6 @@ class CrossMatch():
                 if fn_m.shape[0] != fn_a.shape[0] or fn_p.shape[0] != fn_a.shape[0]:
                     raise ValueError("Consolidated catalogue arrays for catalogue {} should "
                                      "all be consistent lengths.".format(catname))
-
-        for folder in [self.a_cat_name, self.b_cat_name]:
-            try:
-                os.makedirs('{}/{}'.format(self.joint_folder_path, folder), exist_ok=True)
-            except OSError:
-                raise OSError("Error when trying to create temporary folder for catalogue-level "
-                              "outputs. Please ensure that catalogue folder names are correct.")
-
-        if self.include_perturb_auf:
-            for tri_flag, catname in zip([self.a_download_tri, self.b_download_tri], ['a_', 'b_']):
-                if tri_flag and not self.run_auf:
-                    raise ValueError("{}download_tri is True and run_auf is False. Please ensure "
-                                     "that run_auf is True if new TRILEGAL simulations are to be "
-                                     "downloaded.".format(catname))
 
         self.make_shared_data()
 
@@ -531,23 +493,20 @@ class CrossMatch():
         self._initialise_chunk(joint_file_path, cat_a_file_path, cat_b_file_path)
 
         # The first step is to create the perturbation AUF components, if needed.
-        # If run_auf is set to True or if there are not the appropriate number of
-        # pre-saved outputs from a previous run then run perturbation AUF creation.
-        # TODO: generalise the number of files per AUF simulation as input arg.
-        self.create_perturb_auf(7)
+        self.create_perturb_auf()
 
         # Once AUF components are assembled, we now group sources based on
         # convolved AUF integration lengths, to get "common overlap" sources
         # and merge such overlaps into distinct "islands" of sources to match.
-        self.group_sources(7)
+        self.group_sources()
 
         # The third step in this process is to, to some level, calculate the
         # photometry-related information necessary for the cross-match.
-        self.calculate_phot_like(5)
+        self.calculate_phot_like()
 
         # The final stage of the cross-match process is that of putting together
         # the previous stages, and calculating the cross-match probabilities.
-        self.pair_sources(13)
+        self.pair_sources()
 
         # Following cross-match completion, perform post-processing
         self._postprocess_chunk()
@@ -567,158 +526,36 @@ class CrossMatch():
         print("{} Rank {}, chunk {}: Removing halo matches and non-matches..."
               .format(t, self.rank, self.chunk_id))
 
-        if self.use_memmap_files:
-            _kwargs = {'mmap_mode': 'r'}
-        else:
-            _kwargs = {}
-        ac = np.load('{}/pairing/ac.npy'.format(self.joint_folder_path), **_kwargs)
-        bc = np.load('{}/pairing/bc.npy'.format(self.joint_folder_path), **_kwargs)
+        ac = np.load('{}/pairing/ac.npy'.format(self.joint_folder_path))
+        bc = np.load('{}/pairing/bc.npy'.format(self.joint_folder_path))
 
-        af = np.load('{}/pairing/af.npy'.format(self.joint_folder_path), **_kwargs)
-        bf = np.load('{}/pairing/bf.npy'.format(self.joint_folder_path), **_kwargs)
+        af = np.load('{}/pairing/af.npy'.format(self.joint_folder_path))
+        bf = np.load('{}/pairing/bf.npy'.format(self.joint_folder_path))
 
-        a_in_overlaps = np.load('{}/in_chunk_overlap.npy'.format(self.a_cat_folder_path), **_kwargs)
-        b_in_overlaps = np.load('{}/in_chunk_overlap.npy'.format(self.b_cat_folder_path), **_kwargs)
+        a_in_overlaps = np.load('{}/in_chunk_overlap.npy'.format(self.a_cat_folder_path))
+        b_in_overlaps = np.load('{}/in_chunk_overlap.npy'.format(self.b_cat_folder_path))
 
-        if self.use_memmap_files:
-            # Do core_matches = ~a_in_overlaps[ac] | ~b_in_overlaps[bc] but in memmap
-            core_matches = np.lib.format.open_memmap(
-                '{}/pairing/core_matches.npy'.format(self.joint_folder_path),
-                mode='w+', dtype=bool, shape=(len(ac),))
+        core_matches = ~a_in_overlaps[ac] | ~b_in_overlaps[bc]
+        np.save('{}/pairing/ac.npy'.format(self.joint_folder_path), ac[core_matches])
+        np.save('{}/pairing/bc.npy'.format(self.joint_folder_path), bc[core_matches])
+        for fname in ['pc', 'eta', 'xi', 'crptseps', 'acontamflux', 'bcontamflux']:
+            np.save('{}/pairing/{}.npy'.format(self.joint_folder_path, fname),
+                    np.load('{}/pairing/{}.npy'.format(self.joint_folder_path, fname))[
+                        core_matches])
+        for fname in ['pacontam', 'pbcontam']:
+            np.save('{}/pairing/{}.npy'.format(self.joint_folder_path, fname),
+                    np.load('{}/pairing/{}.npy'.format(self.joint_folder_path, fname))[
+                        :, core_matches])
 
-            di = max(1, len(ac) // 20)
-            for i in range(0, len(ac), di):
-                core_matches[i:i+di] = ~a_in_overlaps[ac[i:i+di]] | ~b_in_overlaps[bc[i:i+di]]
-
-            di = max(1, len(core_matches) // 20)
-            new_c_length = 0
-            for i in range(0, len(core_matches), di):
-                # Require the manual conversion to integer due to memmap issues.
-                new_c_length += int(np.sum(core_matches[i:i+di]))
-
-            for cat_kind, c in zip(['a', 'b'], [ac, bc]):
-                new_c = np.lib.format.open_memmap(
-                    '{}/pairing/{}c2.npy'.format(self.joint_folder_path, cat_kind),
-                    mode='w+', dtype=int, shape=(new_c_length,))
-                tick = 0
-                for i in range(0, len(c), di):
-                    new_c[tick:tick+np.sum(core_matches[i:i+di])] = c[i:i+di][core_matches[i:i+di]]
-                    tick += np.sum(core_matches[i:i+di])
-                os.system('mv {}/pairing/{}c2.npy {}/pairing/{}c.npy'.format(
-                          self.joint_folder_path, cat_kind, self.joint_folder_path, cat_kind))
-
-                # While within the a-b loop, also want to loop over the extra
-                # things that need updating: *confamflux, p*contam
-                for fname in ['{}contamflux', 'p{}contam']:
-                    new_name = fname.format(cat_kind)
-                    old_c = np.load('{}/pairing/{}.npy'.format(self.joint_folder_path, new_name),
-                                    **_kwargs)
-                    shape = (new_c_length,) if len(old_c.shape) == 1 else (
-                        old_c.shape[0], new_c_length)
-                    new_c = np.lib.format.open_memmap(
-                        '{}/pairing/{}2.npy'.format(self.joint_folder_path, new_name),
-                        mode='w+', dtype=float, shape=shape)
-                    tick = 0
-                    for i in range(0, len(c), di):
-                        if 'flux' in fname:
-                            new_c[tick:tick+np.sum(core_matches[i:i+di])] = old_c[i:i+di][
-                                core_matches[i:i+di]]
-                        else:
-                            new_c[:, tick:tick+np.sum(core_matches[i:i+di])] = old_c[:, i:i+di][
-                                :, core_matches[i:i+di]]
-                        tick += np.sum(core_matches[i:i+di])
-                    os.system('mv {}/pairing/{}2.npy {}/pairing/{}.npy'.format(
-                              self.joint_folder_path, new_name, self.joint_folder_path, new_name))
-            # Outside of the a-b loop, update shared common items: pc, eta,
-            # xi, sep.
-            for fname in ['pc', 'eta', 'xi', 'crptseps']:
-                old_c = np.load('{}/pairing/{}.npy'.format(self.joint_folder_path, fname),
-                                **_kwargs)
-                new_c = np.lib.format.open_memmap(
-                    '{}/pairing/{}2.npy'.format(self.joint_folder_path, fname),
-                    mode='w+', dtype=float, shape=(new_c_length,))
-                tick = 0
-                for i in range(0, len(c), di):
-                    new_c[tick:tick+np.sum(core_matches[i:i+di])] = old_c[i:i+di][
-                        core_matches[i:i+di]]
-                    tick += np.sum(core_matches[i:i+di])
-                os.system('mv {}/pairing/{}2.npy {}/pairing/{}.npy'.format(
-                          self.joint_folder_path, fname, self.joint_folder_path, fname))
-            os.remove('{}/pairing/core_matches.npy'.format(self.joint_folder_path))
-        else:
-            core_matches = ~a_in_overlaps[ac] | ~b_in_overlaps[bc]
-            np.save('{}/pairing/ac.npy'.format(self.joint_folder_path), ac[core_matches])
-            np.save('{}/pairing/bc.npy'.format(self.joint_folder_path), bc[core_matches])
-            for fname in ['pc', 'eta', 'xi', 'crptseps', 'acontamflux', 'bcontamflux']:
+        a_core_nonmatches = ~a_in_overlaps[af]
+        b_core_nonmatches = ~b_in_overlaps[bf]
+        np.save('{}/pairing/af.npy'.format(self.joint_folder_path), af[a_core_nonmatches])
+        np.save('{}/pairing/bf.npy'.format(self.joint_folder_path), bf[b_core_nonmatches])
+        for fnametype, cnm in zip(['a', 'b'], [a_core_nonmatches, b_core_nonmatches]):
+            for fname_ in ['{}fieldflux', 'pf{}', '{}fieldeta', '{}fieldxi', '{}fieldseps']:
+                fname = fname_.format(fnametype)
                 np.save('{}/pairing/{}.npy'.format(self.joint_folder_path, fname),
-                        np.load('{}/pairing/{}.npy'.format(self.joint_folder_path, fname))[
-                            core_matches])
-            for fname in ['pacontam', 'pbcontam']:
-                np.save('{}/pairing/{}.npy'.format(self.joint_folder_path, fname),
-                        np.load('{}/pairing/{}.npy'.format(self.joint_folder_path, fname))[
-                            :, core_matches])
-
-        if self.use_memmap_files:
-            # Do a_core_nonmatches = ~a_in_overlaps[af] but in memmap
-            a_core_nonmatches = np.lib.format.open_memmap(
-                '{}/pairing/a_core_nonmatches.npy'.format(self.joint_folder_path),
-                mode='w+', dtype=bool, shape=(len(af),))
-            b_core_nonmatches = np.lib.format.open_memmap(
-                '{}/pairing/b_core_nonmatches.npy'.format(self.joint_folder_path),
-                mode='w+', dtype=bool, shape=(len(bf),))
-
-            di = max(1, len(af) // 20)
-            for i in range(0, len(af), di):
-                a_core_nonmatches[i:i+di] = ~a_in_overlaps[af[i:i+di]]
-
-            di = max(1, len(bf) // 20)
-            for i in range(0, len(bf), di):
-                b_core_nonmatches[i:i+di] = ~b_in_overlaps[bf[i:i+di]]
-
-            for cat_kind, f, cnm in zip(['a', 'b'], [af, bf],
-                                        [a_core_nonmatches, b_core_nonmatches]):
-                di = max(1, len(cnm) // 20)
-                new_f_length = 0
-                for i in range(0, len(cnm), di):
-                    # Require the manual conversion to integer due to memmap issues.
-                    new_f_length += int(np.sum(cnm[i:i+di]))
-                new_f = np.lib.format.open_memmap(
-                    '{}/pairing/{}f2.npy'.format(self.joint_folder_path, cat_kind),
-                    mode='w+', dtype=int, shape=(new_f_length,))
-                tick = 0
-                for i in range(0, len(f), di):
-                    new_f[tick:tick+np.sum(cnm[i:i+di])] = f[i:i+di][cnm[i:i+di]]
-                    tick += np.sum(cnm[i:i+di])
-                os.system('mv {}/pairing/{}f2.npy {}/pairing/{}f.npy'.format(
-                          self.joint_folder_path, cat_kind, self.joint_folder_path, cat_kind))
-
-                # This time all "other" files are also a-b specific.
-                for fname in ['{}fieldflux', 'pf{}', '{}fieldeta', '{}fieldxi', '{}fieldseps']:
-                    new_name = fname.format(cat_kind)
-                    old_f = np.load('{}/pairing/{}.npy'.format(self.joint_folder_path, new_name),
-                                    **_kwargs)
-                    new_f = np.lib.format.open_memmap(
-                        '{}/pairing/{}2.npy'.format(self.joint_folder_path, new_name),
-                        mode='w+', dtype=float, shape=(new_f_length,))
-                    tick = 0
-                    for i in range(0, len(cnm), di):
-                        new_f[tick:tick+np.sum(cnm[i:i+di])] = old_f[i:i+di][cnm[i:i+di]]
-                        tick += np.sum(cnm[i:i+di])
-                    os.system('mv {}/pairing/{}2.npy {}/pairing/{}.npy'.format(
-                              self.joint_folder_path, new_name, self.joint_folder_path, new_name))
-
-            os.remove('{}/pairing/a_core_nonmatches.npy'.format(self.joint_folder_path))
-            os.remove('{}/pairing/b_core_nonmatches.npy'.format(self.joint_folder_path))
-        else:
-            a_core_nonmatches = ~a_in_overlaps[af]
-            b_core_nonmatches = ~b_in_overlaps[bf]
-            np.save('{}/pairing/af.npy'.format(self.joint_folder_path), af[a_core_nonmatches])
-            np.save('{}/pairing/bf.npy'.format(self.joint_folder_path), bf[b_core_nonmatches])
-            for fnametype, cnm in zip(['a', 'b'], [a_core_nonmatches, b_core_nonmatches]):
-                for fname_ in ['{}fieldflux', 'pf{}', '{}fieldeta', '{}fieldxi', '{}fieldseps']:
-                    fname = fname_.format(fnametype)
-                    np.save('{}/pairing/{}.npy'.format(self.joint_folder_path, fname),
-                            np.load('{}/pairing/{}.npy'.format(self.joint_folder_path, fname))[cnm])
+                        np.load('{}/pairing/{}.npy'.format(self.joint_folder_path, fname))[cnm])
 
         if self.make_output_csv:
             npy_to_csv(
@@ -727,7 +564,7 @@ class CrossMatch():
                 [self.match_out_csv_name, self.a_nonmatch_out_csv_name,
                  self.b_nonmatch_out_csv_name], [self.a_cat_col_names, self.b_cat_col_names],
                 [self.a_cat_col_nums, self.b_cat_col_nums], [self.a_cat_name, self.b_cat_name],
-                self.mem_chunk_num, [self.a_input_npy_folder, self.b_input_npy_folder],
+                [self.a_input_npy_folder, self.b_input_npy_folder],
                 headers=[self.a_csv_has_header, self.b_csv_has_header],
                 extra_col_name_lists=[self.a_extra_col_names, self.b_extra_col_names],
                 extra_col_num_lists=[self.a_extra_col_nums, self.b_extra_col_nums])
@@ -933,12 +770,11 @@ class CrossMatch():
             cat_b_config.read_string('[config]\n' + f.read())
         cat_b_config = cat_b_config['config']
 
-        for check_flag in ['include_perturb_auf', 'include_phot_like', 'run_auf', 'run_group',
-                           'run_cf', 'run_source', 'use_phot_priors', 'cf_region_type',
-                           'cf_region_frame', 'cf_region_points', 'joint_folder_path',
-                           'pos_corr_dist', 'real_hankel_points', 'four_hankel_points',
-                           'four_max_rho', 'cross_match_extent', 'mem_chunk_num', 'int_fracs',
-                           'make_output_csv', 'n_pool']:
+        for check_flag in ['include_perturb_auf', 'include_phot_like', 'use_phot_priors',
+                           'cf_region_type', 'cf_region_frame', 'cf_region_points',
+                           'joint_folder_path', 'pos_corr_dist', 'real_hankel_points',
+                           'four_hankel_points', 'four_max_rho', 'cross_match_extent',
+                           'int_fracs', 'make_output_csv', 'n_pool']:
             if check_flag not in joint_config:
                 raise ValueError("Missing key {} from joint metadata file.".format(check_flag))
 
@@ -950,8 +786,7 @@ class CrossMatch():
                     raise ValueError("Missing key {} from catalogue {} metadata file.".format(
                                      check_flag, catname))
 
-        for run_flag in ['include_perturb_auf', 'include_phot_like', 'run_auf', 'run_group',
-                         'run_cf', 'run_source', 'use_phot_priors']:
+        for run_flag in ['include_perturb_auf', 'include_phot_like', 'use_phot_priors']:
             setattr(self, run_flag, self._str2bool(joint_config[run_flag]))
 
         for config, catname in zip([cat_a_config, cat_b_config], ['a_', 'b_']):
@@ -987,13 +822,7 @@ class CrossMatch():
         # However, calling AstrometricCorrections in its current form confuses
         # this, since it always uses the perturbation AUF component. We therefore
         # split out the items that are NOT required for AstrometricCorrections
-        # first.
-        if self.include_perturb_auf:
-            for check_flag in ['compute_local_density']:
-                if check_flag not in joint_config:
-                    raise ValueError("Missing key {} from joint metadata file.".format(check_flag))
-
-            self.compute_local_density = self._str2bool(joint_config['compute_local_density'])
+        # first, if there are any.
 
         self.a_correct_astrometry = self._str2bool(cat_a_config['correct_astrometry'])
         self.b_correct_astrometry = self._str2bool(cat_b_config['correct_astrometry'])
@@ -1037,7 +866,7 @@ class CrossMatch():
                 [self.a_correct_astrometry, self.b_correct_astrometry],
                 [self.a_compute_snr_mag_relation, self.b_compute_snr_mag_relation],
                 [cat_a_config, cat_b_config], ['"a"', '"b"'], ['a_', 'b_']):
-            if (self.include_perturb_auf and self.compute_local_density) or correct_astro:
+            if self.include_perturb_auf or correct_astro:
                 for check_flag in ['dens_dist']:
                     if check_flag not in config:
                         raise ValueError("Missing key {} from catalogue {} metadata file."
@@ -1263,15 +1092,6 @@ class CrossMatch():
         if len(b) != 4:
             raise ValueError("cross_match_extent should contain four elements.")
         self.cross_match_extent = b
-
-        try:
-            a = joint_config['mem_chunk_num']
-            if float(a).is_integer():
-                self.mem_chunk_num = int(a)
-            else:
-                raise ValueError("mem_chunk_num should be a single integer number.")
-        except ValueError:
-            raise ValueError("mem_chunk_num should be a single integer number.")
 
         a = joint_config['int_fracs'].split()
         try:
@@ -1605,31 +1425,16 @@ class CrossMatch():
         self.j0s = None
         self.j1s = None
 
-    def create_perturb_auf(self, files_per_auf_sim, perturb_auf_func=make_perturb_aufs):
+    def create_perturb_auf(self, perturb_auf_func=make_perturb_aufs):
         '''
         Function wrapping the main perturbation AUF component creation routines.
 
         Parameters
         ----------
-        files_per_auf_sim : integer
-            The number of output files for each individual perturbation simulation.
         perturb_auf_func : callable, optional
             ``perturb_auf_func`` should create the perturbation AUF output files
             for each filter-pointing combination.
         '''
-        # Each catalogue has in its auf_folder_path a single file, a local
-        # normalising density, plus -- per AUF "pointing" -- a simulation file
-        # and N simulation files per filter. Additionally, it will contain a
-        # single file with each source's index reference into the cube of AUFs,
-        # and a convenience cube for each N-m combination array's length; it will
-        # also contain 3- and 4-D cubes of the fourier-space perturbation AUF
-        # component, and simulated flux contamination and fraction of contaminated
-        # sources, for all simulations.
-        a_expected_files = 6 + len(self.a_auf_region_points) + (
-            files_per_auf_sim * len(self.a_filt_names) * len(self.a_auf_region_points))
-        a_file_number = np.sum([len(files) for _, _, files in
-                                os.walk(self.a_auf_folder_path)])
-        a_correct_file_number = a_expected_files == a_file_number
 
         # Magnitude offsets corresponding to relative fluxes of perturbing sources; here
         # dm of 2.5 is 10% relative flux and dm = 5 corresponds to 1% relative flux. Used
@@ -1658,288 +1463,144 @@ class CrossMatch():
         self.gal_alphaweight = [[3.47e+09, 3.31e+06, 2.13e+09, 1.64e+10, 1.01e+09],
                                 [3.84e+09, 1.57e+06, 3.91e+08, 4.66e+10, 3.03e+07]]
 
-        if self.run_auf or not a_correct_file_number:
-            t = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            print('{} Rank {}, chunk {}: Creating empirical perturbation AUFs for catalogue "a"...'
-                  .format(t, self.rank, self.chunk_id))
-            sys.stdout.flush()
-            if self.j0s is None:
-                self.j0s = mff.calc_j0(self.rho[:-1]+self.drho/2, self.r[:-1]+self.dr/2)
-            # Only warn if we did NOT choose to run AUF, but DID hit wrong file
-            # number.
-            if not a_correct_file_number and not self.run_auf:
-                warnings.warn('Rank {}, chunk {}: Incorrect number of files in catalogue "a" '
-                              'perturbation AUF simulation folder. Deleting all files and '
-                              're-running cross-match process.'.format(self.rank, self.chunk_id))
-                # Once run AUF flag is updated, all other flags need to be set to run
-                self.run_group, self.run_cf, self.run_source = True, True, True
-            if self.include_perturb_auf:
-                _kwargs = {'psf_fwhms': self.a_psf_fwhms, 'tri_download_flag': self.a_download_tri,
-                           'delta_mag_cuts': self.delta_mag_cuts, 'num_trials': self.num_trials,
-                           'j0s': self.j0s, 'd_mag': self.d_mag,
-                           'tri_filt_names': self.a_tri_filt_names,
-                           'compute_local_density': self.compute_local_density,
-                           'run_fw': self.a_run_fw_auf, 'run_psf': self.a_run_psf_auf,
-                           'snr_mag_params': self.a_snr_mag_params,
-                           'tri_maglim_faint': self.a_tri_maglim_faint,
-                           'tri_num_faint': self.a_tri_num_faint,
-                           'tri_set_name': self.a_tri_set_name,
-                           'tri_filt_num': self.a_tri_filt_num,
-                           'auf_region_frame': self.a_auf_region_frame,
-                           'al_avs': self.a_gal_al_avs, 'fit_gal_flag': self.a_fit_gal_flag}
-                if self.a_run_psf_auf:
-                    _kwargs = dict(_kwargs, **{'dd_params': self.a_dd_params,
-                                               'l_cut': self.a_l_cut})
-                if self.a_fit_gal_flag:
-                    _kwargs = dict(_kwargs,
-                                   **{'cmau_array': self.gal_cmau_array, 'wavs': self.a_gal_wavs,
-                                      'z_maxs': self.a_gal_zmax, 'nzs': self.a_gal_nzs,
-                                      'ab_offsets': self.a_gal_aboffsets,
-                                      'filter_names': self.a_gal_filternames,
-                                      'alpha0': self.gal_alpha0, 'alpha1': self.gal_alpha1,
-                                      'alpha_weight': self.gal_alphaweight})
-                else:
-                    _kwargs = dict(_kwargs, **{'fit_gal_flag': self.a_fit_gal_flag})
-                if self.a_download_tri:
-                    os.system("rm -rf {}/*".format(self.a_auf_folder_path))
-                else:
-                    for i in range(len(self.a_auf_region_points)):
-                        ax1, ax2 = self.a_auf_region_points[i]
-                        ax_folder = '{}/{}/{}'.format(self.a_auf_folder_path, ax1, ax2)
-                        os.system('mv {}/trilegal_auf_simulation_faint.dat {}/..'.format(
-                                  ax_folder, ax_folder))
-                        os.system("rm -rf {}/*".format(ax_folder))
-                        os.system('mv {}/../trilegal_auf_simulation_faint.dat {}'.format(
-                                  ax_folder, ax_folder))
-                if self.compute_local_density:
-                    _kwargs = dict(_kwargs, **{'density_radius': self.a_dens_dist})
+        t = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        print('{} Rank {}, chunk {}: Creating empirical perturbation AUFs for catalogue "a"...'
+              .format(t, self.rank, self.chunk_id))
+        sys.stdout.flush()
+        if self.j0s is None:
+            self.j0s = mff.calc_j0(self.rho[:-1]+self.drho/2, self.r[:-1]+self.dr/2)
+        if self.include_perturb_auf:
+            _kwargs = {'psf_fwhms': self.a_psf_fwhms, 'tri_download_flag': self.a_download_tri,
+                       'delta_mag_cuts': self.delta_mag_cuts, 'num_trials': self.num_trials,
+                       'j0s': self.j0s, 'd_mag': self.d_mag,
+                       'density_radius': self.a_dens_dist,
+                       'tri_filt_names': self.a_tri_filt_names,
+                       'run_fw': self.a_run_fw_auf, 'run_psf': self.a_run_psf_auf,
+                       'snr_mag_params': self.a_snr_mag_params,
+                       'tri_maglim_faint': self.a_tri_maglim_faint,
+                       'tri_num_faint': self.a_tri_num_faint,
+                       'tri_set_name': self.a_tri_set_name,
+                       'tri_filt_num': self.a_tri_filt_num,
+                       'auf_region_frame': self.a_auf_region_frame,
+                       'al_avs': self.a_gal_al_avs, 'fit_gal_flag': self.a_fit_gal_flag}
+            if self.a_run_psf_auf:
+                _kwargs = dict(_kwargs, **{'dd_params': self.a_dd_params,
+                                           'l_cut': self.a_l_cut})
+            if self.a_fit_gal_flag:
+                _kwargs = dict(_kwargs,
+                               **{'cmau_array': self.gal_cmau_array, 'wavs': self.a_gal_wavs,
+                                  'z_maxs': self.a_gal_zmax, 'nzs': self.a_gal_nzs,
+                                  'ab_offsets': self.a_gal_aboffsets,
+                                  'filter_names': self.a_gal_filternames,
+                                  'alpha0': self.gal_alpha0, 'alpha1': self.gal_alpha1,
+                                  'alpha_weight': self.gal_alphaweight})
             else:
-                os.system("rm -rf {}/*".format(self.a_auf_folder_path))
-                _kwargs = {}
-            self.a_modelrefinds = perturb_auf_func(self.a_auf_folder_path, self.a_cat_folder_path, self.a_filt_names,
-                                                   self.a_auf_region_points, self.r, self.dr,
-                                                   self.rho, self.drho, 'a', self.include_perturb_auf,
-                                                   self.mem_chunk_num, self.use_memmap_files, **_kwargs)
+                _kwargs = dict(_kwargs, **{'fit_gal_flag': self.a_fit_gal_flag})
         else:
-            t = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            print('{} Rank {}, chunk {}: Loading empirical perturbation AUFs for catalogue "a"...'
-                  .format(t, self.rank, self.chunk_id))
-            sys.stdout.flush()
-            self.a_modelrefinds = np.load('{}/modelrefinds.npy'.format(self.a_auf_folder_path),
-                                          mmap_mode='r')
+            _kwargs = {}
+        self.a_modelrefinds, self.a_perturb_auf_outputs = perturb_auf_func(
+            self.a_auf_folder_path, self.a_cat_folder_path, self.a_filt_names,
+            self.a_auf_region_points, self.r, self.dr, self.rho, self.drho, 'a',
+            self.include_perturb_auf, **_kwargs)
 
-        b_expected_files = 6 + len(self.b_auf_region_points) + (
-            files_per_auf_sim * len(self.b_filt_names) * len(self.b_auf_region_points))
-        b_file_number = np.sum([len(files) for _, _, files in
-                                os.walk(self.b_auf_folder_path)])
-        b_correct_file_number = b_expected_files == b_file_number
+        t = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        print('{} Rank {}, chunk {}: Creating empirical perturbation AUFs for catalogue "b"...'
+              .format(t, self.rank, self.chunk_id))
+        sys.stdout.flush()
+        if self.j0s is None:
+            self.j0s = mff.calc_j0(self.rho[:-1]+self.drho/2, self.r[:-1]+self.dr/2)
+        if self.include_perturb_auf:
+            _kwargs = {'psf_fwhms': self.b_psf_fwhms, 'tri_download_flag': self.b_download_tri,
+                       'delta_mag_cuts': self.delta_mag_cuts, 'num_trials': self.num_trials,
+                       'j0s': self.j0s, 'd_mag': self.d_mag,
+                       'density_radius': self.b_dens_dist,
+                       'tri_filt_names': self.b_tri_filt_names,
+                       'run_fw': self.b_run_fw_auf, 'run_psf': self.b_run_psf_auf,
+                       'snr_mag_params': self.b_snr_mag_params,
+                       'tri_maglim_faint': self.b_tri_maglim_faint,
+                       'tri_num_faint': self.b_tri_num_faint,
+                       'tri_set_name': self.b_tri_set_name,
+                       'tri_filt_num': self.b_tri_filt_num,
+                       'auf_region_frame': self.b_auf_region_frame,
+                       'al_avs': self.b_gal_al_avs, 'fit_gal_flag': self.b_fit_gal_flag}
+            if self.b_run_psf_auf:
+                _kwargs = dict(_kwargs, **{'dd_params': self.b_dd_params,
+                                           'l_cut': self.b_l_cut})
 
-        if self.run_auf or not b_correct_file_number:
-            t = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            print('{} Rank {}, chunk {}: Creating empirical perturbation AUFs for catalogue "b"...'
-                  .format(t, self.rank, self.chunk_id))
-            sys.stdout.flush()
-            if self.j0s is None:
-                self.j0s = mff.calc_j0(self.rho[:-1]+self.drho/2, self.r[:-1]+self.dr/2)
-            if not b_correct_file_number and not self.run_auf:
-                warnings.warn('Rank {}, chunk {}: Incorrect number of files in catalogue "b" '
-                              'perturbation AUF simulation folder. Deleting all files and '
-                              're-running cross-match process.'.format(self.rank, self.chunk_id))
-                self.run_group, self.run_cf, self.run_source = True, True, True
-            if self.include_perturb_auf:
-                _kwargs = {'psf_fwhms': self.b_psf_fwhms, 'tri_download_flag': self.b_download_tri,
-                           'delta_mag_cuts': self.delta_mag_cuts, 'num_trials': self.num_trials,
-                           'j0s': self.j0s, 'd_mag': self.d_mag,
-                           'tri_filt_names': self.b_tri_filt_names,
-                           'compute_local_density': self.compute_local_density,
-                           'run_fw': self.b_run_fw_auf, 'run_psf': self.b_run_psf_auf,
-                           'snr_mag_params': self.b_snr_mag_params,
-                           'tri_maglim_faint': self.b_tri_maglim_faint,
-                           'tri_num_faint': self.b_tri_num_faint,
-                           'tri_set_name': self.b_tri_set_name,
-                           'tri_filt_num': self.b_tri_filt_num,
-                           'auf_region_frame': self.b_auf_region_frame,
-                           'al_avs': self.b_gal_al_avs, 'fit_gal_flag': self.b_fit_gal_flag}
-                if self.b_run_psf_auf:
-                    _kwargs = dict(_kwargs, **{'dd_params': self.b_dd_params,
-                                               'l_cut': self.b_l_cut})
-
-                if self.b_fit_gal_flag:
-                    _kwargs = dict(_kwargs,
-                                   **{'cmau_array': self.gal_cmau_array, 'wavs': self.b_gal_wavs,
-                                      'z_maxs': self.b_gal_zmax, 'nzs': self.b_gal_nzs,
-                                      'ab_offsets': self.b_gal_aboffsets,
-                                      'filter_names': self.b_gal_filternames,
-                                      'alpha0': self.gal_alpha0, 'alpha1': self.gal_alpha1,
-                                      'alpha_weight': self.gal_alphaweight})
-                else:
-                    _kwargs = dict(_kwargs, **{'fit_gal_flag': self.b_fit_gal_flag})
-                if self.b_download_tri:
-                    os.system("rm -rf {}/*".format(self.b_auf_folder_path))
-                else:
-                    for i in range(len(self.b_auf_region_points)):
-                        ax1, ax2 = self.b_auf_region_points[i]
-                        ax_folder = '{}/{}/{}'.format(self.b_auf_folder_path, ax1, ax2)
-                        os.system('mv {}/trilegal_auf_simulation_faint.dat {}/..'.format(
-                                  ax_folder, ax_folder))
-                        os.system("rm -rf {}/*".format(ax_folder))
-                        os.system('mv {}/../trilegal_auf_simulation_faint.dat {}'.format(
-                                  ax_folder, ax_folder))
-                if self.compute_local_density:
-                    _kwargs = dict(_kwargs, **{'density_radius': self.b_dens_dist})
+            if self.b_fit_gal_flag:
+                _kwargs = dict(_kwargs,
+                               **{'cmau_array': self.gal_cmau_array, 'wavs': self.b_gal_wavs,
+                                  'z_maxs': self.b_gal_zmax, 'nzs': self.b_gal_nzs,
+                                  'ab_offsets': self.b_gal_aboffsets,
+                                  'filter_names': self.b_gal_filternames,
+                                  'alpha0': self.gal_alpha0, 'alpha1': self.gal_alpha1,
+                                  'alpha_weight': self.gal_alphaweight})
             else:
-                os.system("rm -rf {}/*".format(self.b_auf_folder_path))
-                _kwargs = {}
-            self.b_modelrefinds = perturb_auf_func(self.b_auf_folder_path, self.b_cat_folder_path, self.b_filt_names,
-                                                   self.b_auf_region_points, self.r, self.dr,
-                                                   self.rho, self.drho, 'b', self.include_perturb_auf,
-                                                   self.mem_chunk_num, self.use_memmap_files, **_kwargs)
+                _kwargs = dict(_kwargs, **{'fit_gal_flag': self.b_fit_gal_flag})
         else:
-            t = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            print('{} Rank {}, chunk {}: Loading empirical perturbation AUFs for catalogue "b"...'
-                  .format(t, self.rank, self.chunk_id))
-            sys.stdout.flush()
-            self.b_modelrefinds = np.load('{}/modelrefinds.npy'.format(self.b_auf_folder_path),
-                                          mmap_mode='r')
+            _kwargs = {}
+        self.b_modelrefinds, self.b_perturb_auf_outputs = perturb_auf_func(
+            self.b_auf_folder_path, self.b_cat_folder_path, self.b_filt_names,
+            self.b_auf_region_points, self.r, self.dr, self.rho, self.drho, 'b',
+            self.include_perturb_auf, **_kwargs)
 
-    def group_sources(self, files_per_grouping, group_func=make_island_groupings):
+    def group_sources(self, group_func=make_island_groupings):
         '''
         Function to handle the creation of catalogue "islands" and potential
         astrometrically related sources across the two catalogues.
 
         Parameters
         ----------
-        files_per_grouping : integer
-            The number of output files from each catalogue, made during the
-            island and overlap creation process.
         group_func : callable, optional
             ``group_func`` should create the various island- and overlap-related
             files by which objects across the two catalogues are assigned as
             potentially counterparts to one another.
         '''
 
-        # Each catalogue should expect 7 files in "group/" or "reject/": island
-        # lengths, indices into the opposite catalogue for each source, the
-        # indices of sources in this catalogue in each island, the number of
-        # opposing catalogue overlaps for each source, "field" and "bright" error
-        # circle lengths, and the list of any "rejected" source indices. However,
-        # there may be no "reject" arrays, so we might expect two fewer files.
-        if (np.all(['reject_a' not in f for f in
-                    os.listdir('{}/reject'.format(self.joint_folder_path))]) and
-            np.all(['reject_b' not in f for f in
-                    os.listdir('{}/reject'.format(self.joint_folder_path))])):
-            expected_files = (files_per_grouping - 1) * 2
-        else:
-            expected_files = files_per_grouping * 2
-        file_number = np.sum([len(files) for _, _, files in
-                              os.walk('{}/group'.format(self.joint_folder_path))]) + np.sum(
-            [len(files) for _, _, files in os.walk('{}/reject'.format(self.joint_folder_path))])
-        correct_file_number = expected_files == file_number
+        t = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        print('{} Rank {}, chunk {}: Creating catalogue islands and overlaps...'
+              .format(t, self.rank, self.chunk_id))
+        sys.stdout.flush()
+        if self.j1s is None:
+            self.j1s = gsf.calc_j1s(self.rho[:-1]+self.drho/2, self.r[:-1]+self.dr/2)
+        os.system('rm -rf {}/reject/*'.format(self.joint_folder_path))
+        self.group_sources_data = \
+            group_func(self.joint_folder_path, self.a_cat_folder_path, self.b_cat_folder_path,
+                       self.a_auf_region_points, self.b_auf_region_points, self.a_filt_names,
+                       self.b_filt_names, self.a_cat_name, self.b_cat_name, self.a_modelrefinds,
+                       self.b_modelrefinds, self.r, self.dr, self.rho, self.drho,
+                       self.j1s, self.pos_corr_dist, self.cross_match_extent, self.int_fracs,
+                       self.include_phot_like, self.use_phot_priors,
+                       self.n_pool, self.a_perturb_auf_outputs, self.b_perturb_auf_outputs)
 
-        # First check whether we actually need to dip into the group sources
-        # routine or not.
-        if self.run_group or not correct_file_number:
-            t = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            print('{} Rank {}, chunk {}: Creating catalogue islands and overlaps...'
-                  .format(t, self.rank, self.chunk_id))
-            sys.stdout.flush()
-            if self.j1s is None:
-                self.j1s = gsf.calc_j1s(self.rho[:-1]+self.drho/2, self.r[:-1]+self.dr/2)
-            # Only worry about the warning if we didn't choose to run the grouping
-            # but hit incorrect file numbers.
-            if not correct_file_number and not self.run_group:
-                warnings.warn('Rank {}, chunk {}: Incorrect number of grouping files. Deleting all '
-                              'grouping files and re-running cross-match process.'
-                              .format(self.rank, self.chunk_id))
-                self.run_cf, self.run_source = True, True
-            os.system('rm -rf {}/group/*'.format(self.joint_folder_path))
-            os.system('rm -rf {}/reject/*'.format(self.joint_folder_path))
-            self.group_sources_data = \
-                group_func(self.joint_folder_path, self.a_cat_folder_path, self.b_cat_folder_path,
-                           self.a_auf_folder_path, self.b_auf_folder_path, self.a_auf_region_points,
-                           self.b_auf_region_points, self.a_filt_names, self.b_filt_names,
-                           self.a_cat_name, self.b_cat_name, self.a_modelrefinds, self.b_modelrefinds,
-                           self.r, self.dr, self.rho, self.drho,
-                           self.j1s, self.pos_corr_dist, self.cross_match_extent, self.int_fracs,
-                           self.mem_chunk_num, self.include_phot_like, self.use_phot_priors,
-                           self.n_pool, self.use_memmap_files)
-        else:
-            t = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            print('{} Rank {}, chunk {}: Loading catalogue islands and overlaps...'
-                  .format(t, self.rank, self.chunk_id))
-            sys.stdout.flush()
-            if os.path.isfile('{}/reject/reject_a.npy'.format(self.joint_folder_path)):
-                lenrejecta = len(np.load('{}/reject/reject_a.npy'.format(self.joint_folder_path),
-                                         mmap_mode='r'))
-            else:
-                lenrejecta = 0
-            if os.path.isfile('{}/reject/reject_b.npy'.format(self.joint_folder_path)):
-                lenrejectb = len(np.load('{}/reject/reject_b.npy'.format(self.joint_folder_path),
-                                         mmap_mode='r'))
-            else:
-                lenrejectb = 0
-            self.group_sources_data = StageData(
-                ablen=None, bblen=None, ainds=None, binds=None, asize=None, bsize=None, aflen=None,
-                bflen=None, alist=None, blist=None, agrplen=None, bgrplen=None,
-                lenrejecta=lenrejecta, lenrejectb=lenrejectb)
-
-    def calculate_phot_like(self, files_per_phot, phot_like_func=compute_photometric_likelihoods):
+    def calculate_phot_like(self, phot_like_func=compute_photometric_likelihoods):
         '''
         Create the photometric likelihood information used in the cross-match
         process.
 
         Parameters
         ----------
-        files_per_phot : integer
-            The number of files created during the cross-match process for each
-            individual photometric sky position pointing.
         phot_like_func : callable, optional
             The function that calls the overall computation of the counterpart
             and "field" star photometric likelihood-related information.
         '''
 
-        # Saved files per catalogue: magnitude bins and bin array lengths, "field"
-        # source priors/likelihoods, and the sky slice index of each source.
-        # Additionally, "counterpart" prior/likelihood functions are saved, for
-        # 2 + 2 * 5 files total.
-        file_number = np.sum([len(files) for _, _, files in
-                              os.walk('{}/phot_like'.format(self.joint_folder_path))])
-        expected_file_number = 2 + 2 * files_per_phot
-
-        correct_file_number = expected_file_number == file_number
-
-        if self.run_cf or not correct_file_number:
-            t = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            print('{} Rank {}, chunk {}: Creating photometric priors and likelihoods...'
-                  .format(t, self.rank, self.chunk_id))
-            sys.stdout.flush()
-            if not correct_file_number and not self.run_cf:
-                warnings.warn('Rank {}, chunk {}: Incorrect number of photometric likelihood '
-                              'files. Deleting all c/f files and re-running calculations.'
-                              .format(self.rank, self.chunk_id))
-                self.run_source = True
-            os.system('rm -r {}/phot_like/*'.format(self.joint_folder_path))
-            self._calculate_cf_areas()
-            if self.use_phot_priors or self.include_phot_like:
-                bright_frac = self.int_fracs[0]
-                field_frac = self.int_fracs[1]
-            else:
-                bright_frac = None
-                field_frac = None
-            self.phot_like_data = phot_like_func(
-                    self.joint_folder_path, self.a_cat_folder_path, self.b_cat_folder_path,
-                    self.a_filt_names, self.b_filt_names, self.mem_chunk_num, self.cf_region_points,
-                    self.cf_areas, self.include_phot_like, self.use_phot_priors, self.group_sources_data,
-                    self.use_memmap_files, bright_frac, field_frac)
+        t = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        print('{} Rank {}, chunk {}: Creating photometric priors and likelihoods...'
+              .format(t, self.rank, self.chunk_id))
+        sys.stdout.flush()
+        self._calculate_cf_areas()
+        if self.use_phot_priors or self.include_phot_like:
+            bright_frac = self.int_fracs[0]
+            field_frac = self.int_fracs[1]
         else:
-            t = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            print('{} Rank {}, chunk {}: Loading photometric priors and likelihoods...'
-                  .format(t, self.rank, self.chunk_id))
-            sys.stdout.flush()
-            self.phot_like_data = StageData(
-                abinsarray=None, abinlengths=None, bbinsarray=None, bbinlengths=None,
-                a_sky_inds=None, b_sky_inds=None, c_priors=None, c_array=None, fa_priors=None,
-                fa_array=None, fb_priors=None, fb_array=None)
+            bright_frac = None
+            field_frac = None
+        self.phot_like_data = phot_like_func(
+            self.joint_folder_path, self.a_cat_folder_path, self.b_cat_folder_path,
+            self.a_filt_names, self.b_filt_names, self.cf_region_points, self.cf_areas,
+            self.include_phot_like, self.use_phot_priors, self.group_sources_data, bright_frac,
+            field_frac)
 
     def _calculate_cf_areas(self):
         '''
@@ -1975,45 +1636,25 @@ class CrossMatch():
 
         return
 
-    def pair_sources(self, files_per_pairing, count_pair_func=source_pairing):
+    def pair_sources(self, count_pair_func=source_pairing):
         '''
         Assign sources in the two catalogues as either counterparts to one another
         or singly detected "field" sources.
 
         Parameters
         ----------
-        files_per_pairing : integer
-            The number of saved files expected in the pairing folder.
         count_pair_func : callable, optional
             The function that calls the counterpart determination routine.
         '''
 
-        file_number = np.sum([len(files) for _, _, files in
-                              os.walk('{}/pairing'.format(self.joint_folder_path))])
-        # No complicated maths here, since all files are common and in a single
-        # folder common to the pairing process.
-        expected_file_number = files_per_pairing
-
-        correct_file_number = expected_file_number == file_number
-
-        if self.run_source or not correct_file_number:
-            t = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            print('{} Rank {}, chunk {}: Determining counterparts...'
-                  .format(t, self.rank, self.chunk_id))
-            sys.stdout.flush()
-            if not correct_file_number and not self.run_source:
-                warnings.warn('Rank {}, chunk {}: Incorrect number of counterpart pairing files. '
-                              'Deleting all files and re-running calculations.'
-                              .format(self.rank, self.chunk_id))
-            os.system('rm -r {}/pairing/*'.format(self.joint_folder_path))
-            count_pair_func(
-                self.joint_folder_path, self.a_cat_folder_path, self.b_cat_folder_path,
-                self.a_auf_folder_path, self.b_auf_folder_path, self.a_filt_names,
-                self.b_filt_names, self.a_auf_region_points, self.b_auf_region_points,
-                self.a_modelrefinds, self.b_modelrefinds, self.rho, self.drho, len(self.delta_mag_cuts),
-                self.mem_chunk_num, self.group_sources_data, self.phot_like_data, self.use_memmap_files)
-        else:
-            t = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            print('{} Rank {}, chunk {}: Loading pre-assigned counterparts...'
-                  .format(t, self.rank, self.chunk_id))
-            sys.stdout.flush()
+        t = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        print('{} Rank {}, chunk {}: Determining counterparts...'
+              .format(t, self.rank, self.chunk_id))
+        sys.stdout.flush()
+        os.system('rm -r {}/pairing/*'.format(self.joint_folder_path))
+        count_pair_func(
+            self.joint_folder_path, self.a_cat_folder_path, self.b_cat_folder_path,
+            self.a_filt_names, self.b_filt_names, self.a_auf_region_points,
+            self.b_auf_region_points, self.a_modelrefinds, self.b_modelrefinds, self.rho, self.drho,
+            len(self.delta_mag_cuts), self.group_sources_data,
+            self.phot_like_data, self.a_perturb_auf_outputs, self.b_perturb_auf_outputs)

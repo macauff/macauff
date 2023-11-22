@@ -59,12 +59,6 @@ crossmatch_params.txt::
     # Check for whether we want to generate the csv file at the end of the run.
     make_output_csv = no
 
-    # Flags for each stage of the match process - must be "yes"/"no", "true"/"false", "t"/"f", or "1"/"0"
-    run_auf = yes
-    run_group = yes
-    run_cf = yes
-    run_source = yes
-
     # c/f region definition for photometric likelihood - either "rectangle" for NxM evenly spaced grid points, or "points" to define a list of two-point tuple coordinates, separated by a comma
     cf_region_type = rectangle
     # Frame of the coordinates must be specified -- either "equatorial" or "galactic"
@@ -86,9 +80,6 @@ crossmatch_params.txt::
 
     # Maximum extent of cross-match, used in non-all-sky cases to remove sources suffering potential edge effects -- min/max first axis coordinates (ra/l) then min/max second axis coordinates (dec/b)
     cross_match_extent = 0 0.25 50 50.3
-
-    # Number of chunks to break each catalogue into when splitting larger catalogues up for memory reasons
-    mem_chunk_num = 2
 
     # Integral fractions for various error circle cutouts used during the cross-match process. Should be space-separated floats, in the order of <bright error circle fraction>, <field error circle fraction>, <potential counterpart integral limit>
     int_fracs = 0.63 0.9 0.999

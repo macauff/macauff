@@ -323,8 +323,8 @@ class TestParseCatalogueNpyToCsv:
 
         npy_to_csv(['.', '.'], 'test_folder', '.', ['test_a_data.csv', 'test_b_data.csv'],
                    ['match_csv.csv', 'a_nonmatch_csv.csv', 'b_nonmatch_csv.csv'], [a_cols, b_cols],
-                   [[0, 1, 2, 4, 5], [0, 1, 2, 4, 5, 6]], ['A', 'B'], 20,
-                   headers=[False, False], input_npy_folders=[None, None])
+                   [[0, 1, 2, 4, 5], [0, 1, 2, 4, 5, 6]], ['A', 'B'], headers=[False, False],
+                   input_npy_folders=[None, None])
 
         assert os.path.isfile('match_csv.csv')
         assert os.path.isfile('a_nonmatch_csv.csv')
@@ -385,8 +385,8 @@ class TestParseCatalogueNpyToCsv:
 
         npy_to_csv(['.', '.'], 'test_folder', '.', ['test_a_data.csv', 'test_b_data.csv'],
                    ['match_csv.csv', 'a_nonmatch_csv.csv', 'b_nonmatch_csv.csv'], [a_cols, b_cols],
-                   [[0, 1, 2, 4, 5], [0, 1, 2, 4, 5, 6]], ['A', 'B'], 20,
-                   headers=[False, False], input_npy_folders=['test_a_out', 'test_b_out'])
+                   [[0, 1, 2, 4, 5], [0, 1, 2, 4, 5, 6]], ['A', 'B'], headers=[False, False],
+                   input_npy_folders=['test_a_out', 'test_b_out'])
 
         assert os.path.isfile('match_csv.csv')
         assert os.path.isfile('a_nonmatch_csv.csv')
@@ -436,8 +436,8 @@ class TestParseCatalogueNpyToCsv:
 
         npy_to_csv(['.', '.'], 'test_folder', '.', ['test_a_data.csv', 'test_b_data.csv'],
                    ['match_csv.csv', 'a_nonmatch_csv.csv', 'b_nonmatch_csv.csv'], [a_cols, b_cols],
-                   [[1, 2, 0, 4, 5], [4, 5, 6, 0, 1, 2]], ['A', 'B'], 20,
-                   headers=[False, False], input_npy_folders=[None, None])
+                   [[1, 2, 0, 4, 5], [4, 5, 6, 0, 1, 2]], ['A', 'B'], headers=[False, False],
+                   input_npy_folders=[None, None])
 
         assert os.path.isfile('match_csv.csv')
         assert os.path.isfile('a_nonmatch_csv.csv')
@@ -491,7 +491,7 @@ class TestParseCatalogueNpyToCsv:
         with pytest.raises(UserWarning, match="either both need to be None, or both"):
             npy_to_csv(['.', '.'], 'test_folder', '.', ['test_a_data.csv', 'test_b_data.csv'],
                        ['match_csv.csv', 'a_nonmatch_csv.csv', 'b_nonmatch_csv.csv'],
-                       [a_cols, b_cols], [[0, 1, 2, 4, 5], [0, 1, 2, 4, 5, 6]], ['A', 'B'], 20,
+                       [a_cols, b_cols], [[0, 1, 2, 4, 5], [0, 1, 2, 4, 5, 6]], ['A', 'B'],
                        headers=[False, False], extra_col_name_lists=[[1], [2]],
                        input_npy_folders=[None, None])
 
@@ -507,12 +507,10 @@ class TestParseCatalogueNpyToCsv:
         add_b_nums = [3]
 
         npy_to_csv(['.', '.'], 'test_folder', '.', ['test_a_data.csv', 'test_b_data.csv'],
-                               ['match_csv.csv', 'a_nonmatch_csv.csv', 'b_nonmatch_csv.csv'],
-                               [a_cols, b_cols], [[0, 1, 2, 4, 5], [0, 1, 2, 4, 5, 6]], ['A', 'B'],
-                               20, headers=[False, False],
-                               extra_col_name_lists=[add_a_cols, add_b_cols],
-                               extra_col_num_lists=[add_a_nums, add_b_nums],
-                               input_npy_folders=[None, None])
+                   ['match_csv.csv', 'a_nonmatch_csv.csv', 'b_nonmatch_csv.csv'], [a_cols, b_cols],
+                   [[0, 1, 2, 4, 5], [0, 1, 2, 4, 5, 6]], ['A', 'B'], headers=[False, False],
+                   extra_col_name_lists=[add_a_cols, add_b_cols],
+                   extra_col_num_lists=[add_a_nums, add_b_nums], input_npy_folders=[None, None])
 
         assert os.path.isfile('match_csv.csv')
         assert os.path.isfile('a_nonmatch_csv.csv')
@@ -582,12 +580,10 @@ class TestParseCatalogueNpyToCsv:
         add_b_nums = []
 
         npy_to_csv(['.', '.'], 'test_folder', '.', ['test_a_data.csv', 'test_b_data.csv'],
-                               ['match_csv.csv', 'a_nonmatch_csv.csv', 'b_nonmatch_csv.csv'],
-                               [a_cols, b_cols], [[0, 1, 2, 4, 5], [0, 1, 2, 4, 5, 6]], ['A', 'B'],
-                               20, headers=[False, False],
-                               extra_col_name_lists=[add_a_cols, add_b_cols],
-                               extra_col_num_lists=[add_a_nums, add_b_nums],
-                               input_npy_folders=[None, None])
+                   ['match_csv.csv', 'a_nonmatch_csv.csv', 'b_nonmatch_csv.csv'], [a_cols, b_cols],
+                   [[0, 1, 2, 4, 5], [0, 1, 2, 4, 5, 6]], ['A', 'B'], headers=[False, False],
+                   extra_col_name_lists=[add_a_cols, add_b_cols],
+                   extra_col_num_lists=[add_a_nums, add_b_nums], input_npy_folders=[None, None])
 
         assert os.path.isfile('match_csv.csv')
         assert os.path.isfile('a_nonmatch_csv.csv')

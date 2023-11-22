@@ -10,6 +10,7 @@ import numpy as np
 import pytest
 
 from ..matching import CrossMatch
+from ..misc_functions import StageData
 from ..counterpart_pairing import source_pairing
 from ..counterpart_pairing_fortran import counterpart_pairing_fortran as cpf
 from .test_matching import _replace_line
@@ -71,9 +72,7 @@ class TestCounterpartPairing:
         self.b_photo = np.ones((4, 4), float)
 
         self.alist = np.array([[0, 3], [1, 4], [2, 5], [6, -1], [-1, -1]]).T
-        self.alist_ = self.alist
         self.blist = np.array([[1], [0], [3], [-1], [2]]).T
-        self.blist_ = self.blist
         self.agrplen = np.array([2, 2, 2, 1, 0])
         self.bgrplen = np.array([1, 1, 1, 0, 1])
 
@@ -116,9 +115,22 @@ class TestCounterpartPairing:
         self.b_cat_folder_path = 'wise_folder'
         self.a_auf_folder_path = 'gaia_auf_folder'
         self.b_auf_folder_path = 'wise_auf_folder'
+
+        self.group_sources_data = StageData(
+            alist=self.alist, blist=self.blist,
+            agrplen=self.agrplen, bgrplen=self.bgrplen,
+            lenrejecta=0, lenrejectb=0)
+
+        self.phot_like_data = StageData(
+            abinsarray=self.abinsarray, abinlengths=self.abinlengths,
+            bbinsarray=self.bbinsarray, bbinlengths=self.bbinlengths,
+            a_sky_inds=self.a_sky_inds, b_sky_inds=self.b_sky_inds,
+            c_priors=self.c_priors, c_array=self.c_array,
+            fa_priors=self.fa_priors, fa_array=self.fa_array,
+            fb_priors=self.fb_priors, fb_array=self.fb_array)
+
         os.system('rm -r {}'.format(self.joint_folder_path))
-        for f in ['pairing', 'phot_like', 'group']:
-            os.makedirs('{}/{}'.format(self.joint_folder_path, f), exist_ok=True)
+        os.makedirs('{}/pairing'.format(self.joint_folder_path), exist_ok=True)
         for f in [self.a_cat_folder_path, self.b_cat_folder_path,
                   self.a_auf_folder_path, self.b_auf_folder_path]:
             os.makedirs(f, exist_ok=True)
@@ -129,40 +141,16 @@ class TestCounterpartPairing:
         np.save('{}/magref.npy'.format(self.a_cat_folder_path), self.amagref)
         np.save('{}/magref.npy'.format(self.b_cat_folder_path), self.bmagref)
 
-        np.save('{}/group/alist.npy'.format(self.joint_folder_path), self.alist)
-        np.save('{}/group/blist.npy'.format(self.joint_folder_path), self.blist)
-        np.save('{}/group/agrplen.npy'.format(self.joint_folder_path), self.agrplen)
-        np.save('{}/group/bgrplen.npy'.format(self.joint_folder_path), self.bgrplen)
-
-        np.save('{}/phot_like/abinsarray.npy'.format(self.joint_folder_path), self.abinsarray)
-        np.save('{}/phot_like/bbinsarray.npy'.format(self.joint_folder_path), self.bbinsarray)
-        np.save('{}/phot_like/abinlengths.npy'.format(self.joint_folder_path), self.abinlengths)
-        np.save('{}/phot_like/bbinlengths.npy'.format(self.joint_folder_path), self.bbinlengths)
-
-        np.save('{}/phot_like/c_priors.npy'.format(self.joint_folder_path), self.c_priors)
-        np.save('{}/phot_like/c_array.npy'.format(self.joint_folder_path), self.c_array)
-        np.save('{}/phot_like/fa_priors.npy'.format(self.joint_folder_path), self.fa_priors)
-        np.save('{}/phot_like/fa_array.npy'.format(self.joint_folder_path), self.fa_array)
-        np.save('{}/phot_like/fb_priors.npy'.format(self.joint_folder_path), self.fb_priors)
-        np.save('{}/phot_like/fb_array.npy'.format(self.joint_folder_path), self.fb_array)
-
-        np.save('{}/phot_like/a_sky_inds.npy'.format(self.joint_folder_path), self.a_sky_inds)
-        np.save('{}/phot_like/b_sky_inds.npy'.format(self.joint_folder_path), self.b_sky_inds)
-
-        np.save('{}/modelrefinds.npy'.format(self.a_auf_folder_path), self.amodelrefinds)
-        np.save('{}/modelrefinds.npy'.format(self.b_auf_folder_path), self.bmodelrefinds)
-
-        np.save('{}/arraylengths.npy'.format(self.a_auf_folder_path), np.ones((3, 1), int))
-        np.save('{}/arraylengths.npy'.format(self.b_auf_folder_path), np.ones((4, 1), int))
-
         # We should have already made fourier_grid, frac_grid, and flux_grid
         # for each catalogue.
-        np.save('{}/fourier_grid.npy'.format(self.a_auf_folder_path), self.afourier_grids)
-        np.save('{}/fourier_grid.npy'.format(self.b_auf_folder_path), self.bfourier_grids)
-        np.save('{}/frac_grid.npy'.format(self.a_auf_folder_path), self.afrac_grids)
-        np.save('{}/frac_grid.npy'.format(self.b_auf_folder_path), self.bfrac_grids)
-        np.save('{}/flux_grid.npy'.format(self.a_auf_folder_path), self.aflux_grids)
-        np.save('{}/flux_grid.npy'.format(self.b_auf_folder_path), self.bflux_grids)
+        self.a_perturb_auf_outputs = {}
+        self.b_perturb_auf_outputs = {}
+        self.a_perturb_auf_outputs['fourier_grid'] = self.afourier_grids
+        self.b_perturb_auf_outputs['fourier_grid'] = self.bfourier_grids
+        self.a_perturb_auf_outputs['frac_grid'] = self.afrac_grids
+        self.b_perturb_auf_outputs['frac_grid'] = self.bfrac_grids
+        self.a_perturb_auf_outputs['flux_grid'] = self.aflux_grids
+        self.b_perturb_auf_outputs['flux_grid'] = self.bflux_grids
 
         self.a_auf_pointings = np.array([[0.0, 0.0]])
         self.b_auf_pointings = np.array([[0.0, 0.0]])
@@ -195,7 +183,6 @@ class TestCounterpartPairing:
             self.aflux_grids, self.afourier_grids, self.bfrac_grids, self.bflux_grids,
             self.bfourier_grids, self.rho, self.drho, self.n_fracs, self.large_len,
             self.alist[:self.agrplen[i], i]+1, self.blist[:self.bgrplen[i], i]+1,
-            self.alist_[:self.agrplen[i], i], self.blist_[:self.bgrplen[i], i],
             self.amagref[self.alist[:self.agrplen[i], i]]+1,
             self.a_sky_inds[self.alist[:self.agrplen[i], i]]+1,
             self.bmagref[self.blist[:self.bgrplen[i], i]]+1,
@@ -246,7 +233,6 @@ class TestCounterpartPairing:
             self.aflux_grids, self.afourier_grids, self.bfrac_grids, self.bflux_grids,
             self.bfourier_grids, self.rho, self.drho, self.n_fracs, self.large_len,
             self.alist[:self.agrplen[i], i]+1, self.blist[:self.bgrplen[i], i]+1,
-            self.alist_[:self.agrplen[i], i], self.blist_[:self.bgrplen[i], i],
             self.amagref[self.alist[:self.agrplen[i], i]]+1,
             self.a_sky_inds[self.alist[:self.agrplen[i], i]]+1,
             self.bmagref[self.blist[:self.bgrplen[i], i]]+1,
@@ -270,7 +256,6 @@ class TestCounterpartPairing:
             self.aflux_grids, self.afourier_grids, self.bfrac_grids, self.bflux_grids,
             self.bfourier_grids, self.rho, self.drho, self.n_fracs, self.large_len,
             self.alist[:self.agrplen[i], i]+1, self.blist[:self.bgrplen[i], i]+1,
-            self.alist_[:self.agrplen[i], i], self.blist_[:self.bgrplen[i], i],
             self.amagref[self.alist[:self.agrplen[i], i]]+1,
             self.a_sky_inds[self.alist[:self.agrplen[i], i]]+1,
             self.bmagref[self.blist[:self.bgrplen[i], i]]+1,
@@ -291,15 +276,13 @@ class TestCounterpartPairing:
     def test_source_pairing(self):
         os.system('rm -r {}/pairing'.format(self.joint_folder_path))
         os.makedirs('{}/pairing'.format(self.joint_folder_path), exist_ok=True)
-        mem_chunk_num = 2
-        a_modelrefinds = None
-        b_moderefinds = None
         source_pairing(
             self.joint_folder_path, self.a_cat_folder_path, self.b_cat_folder_path,
-            self.a_auf_folder_path, self.b_auf_folder_path, self.a_filt_names, self.b_filt_names,
-            self.a_auf_pointings, self.b_auf_pointings, a_modelrefinds, b_moderefinds,
-            self.rho, self.drho, self.n_fracs, mem_chunk_num, group_sources_data=None,
-            phot_like_data=None, use_memmap_files=True)
+            self.a_filt_names, self.b_filt_names, self.a_auf_pointings, self.b_auf_pointings,
+            self.amodelrefinds, self.bmodelrefinds, self.rho, self.drho, self.n_fracs,
+            group_sources_data=self.group_sources_data,
+            phot_like_data=self.phot_like_data, a_perturb_auf_outputs=self.a_perturb_auf_outputs,
+            b_perturb_auf_outputs=self.b_perturb_auf_outputs)
 
         bflux = np.load('{}/pairing/bcontamflux.npy'.format(self.joint_folder_path))
         assert np.all(bflux == np.zeros((2), float))
@@ -377,25 +360,21 @@ class TestCounterpartPairing:
 
         a_reject = np.array([2, 5])
         b_reject = np.array([3])
+
+        group_sources_data = StageData(
+            alist=alist, blist=blist, agrplen=agrplen, bgrplen=bgrplen,
+            lenrejecta=len(a_reject), lenrejectb=len(b_reject))
+
         os.system('rm -r {}/reject'.format(self.joint_folder_path))
         os.makedirs('{}/reject'.format(self.joint_folder_path), exist_ok=True)
-        np.save('{}/reject/reject_a.npy'.format(self.joint_folder_path), a_reject)
-        np.save('{}/reject/reject_b.npy'.format(self.joint_folder_path), b_reject)
 
-        np.save('{}/group/alist.npy'.format(self.joint_folder_path), alist)
-        np.save('{}/group/blist.npy'.format(self.joint_folder_path), blist)
-        np.save('{}/group/agrplen.npy'.format(self.joint_folder_path), agrplen)
-        np.save('{}/group/bgrplen.npy'.format(self.joint_folder_path), bgrplen)
-
-        mem_chunk_num = 2
-        a_modelrefinds = None
-        b_moderefinds = None
         source_pairing(
             self.joint_folder_path, self.a_cat_folder_path, self.b_cat_folder_path,
-            self.a_auf_folder_path, self.b_auf_folder_path, self.a_filt_names,
-            self.b_filt_names, self.a_auf_pointings, self.b_auf_pointings, a_modelrefinds, b_moderefinds,
-            self.rho, self.drho, self.n_fracs, mem_chunk_num, group_sources_data=None, phot_like_data=None,
-            use_memmap_files=True)
+            self.a_filt_names, self.b_filt_names, self.a_auf_pointings, self.b_auf_pointings,
+            self.amodelrefinds, self.bmodelrefinds, self.rho, self.drho, self.n_fracs,
+            group_sources_data=group_sources_data,
+            phot_like_data=self.phot_like_data, a_perturb_auf_outputs=self.a_perturb_auf_outputs,
+            b_perturb_auf_outputs=self.b_perturb_auf_outputs)
 
         bflux = np.load('{}/pairing/bcontamflux.npy'.format(self.joint_folder_path))
         assert np.all(bflux == np.zeros((2), float))
@@ -454,24 +433,20 @@ class TestCounterpartPairing:
         # Force catalogue a to have the wrong length by simply leaving a group
         # out of alist.
         a_reject = np.array([6])
-        np.save('{}/reject/reject_a.npy'.format(self.joint_folder_path), a_reject)
-        os.system('rm {}/reject/reject_b.npy'.format(self.joint_folder_path))
 
-        np.save('{}/group/alist.npy'.format(self.joint_folder_path), alist)
-        np.save('{}/group/blist.npy'.format(self.joint_folder_path), blist)
-        np.save('{}/group/agrplen.npy'.format(self.joint_folder_path), agrplen)
-        np.save('{}/group/bgrplen.npy'.format(self.joint_folder_path), bgrplen)
+        group_sources_data = StageData(
+            alist=alist, blist=blist, agrplen=agrplen, bgrplen=bgrplen,
+            lenrejecta=len(a_reject), lenrejectb=0)
 
-        mem_chunk_num = 2
-        a_modelrefinds = None
-        b_moderefinds = None
         with pytest.warns(UserWarning) as record:
             source_pairing(
                 self.joint_folder_path, self.a_cat_folder_path, self.b_cat_folder_path,
-                self.a_auf_folder_path, self.b_auf_folder_path, self.a_filt_names,
-                self.b_filt_names, self.a_auf_pointings, self.b_auf_pointings, a_modelrefinds, b_moderefinds,
-                self.rho, self.drho, self.n_fracs, mem_chunk_num, group_sources_data=None, phot_like_data=None,
-                use_memmap_files=True)
+                self.a_filt_names, self.b_filt_names, self.a_auf_pointings, self.b_auf_pointings,
+                self.amodelrefinds, self.bmodelrefinds, self.rho, self.drho, self.n_fracs,
+                group_sources_data=group_sources_data,
+                phot_like_data=self.phot_like_data,
+                a_perturb_auf_outputs=self.a_perturb_auf_outputs,
+                b_perturb_auf_outputs=self.b_perturb_auf_outputs)
         assert len(record) == 2
         assert '2 catalogue a sources not in either counterpart, f' in record[0].message.args[0]
         assert '1 catalogue b source not in either counterpart, f' in record[1].message.args[0]
@@ -486,10 +461,6 @@ class TestCounterpartPairing:
         a_field = np.load('{}/pairing/af.npy'.format(self.joint_folder_path))
         assert np.all([q in a_field for q in [3, 4]])
         assert np.all([q not in a_field for q in [0, 1, 2, 5, 6]])
-
-        a_reject = np.load('{}/reject/reject_a.npy'.format(self.joint_folder_path))
-        assert np.all([q in a_reject for q in [6]])
-        assert np.all([q not in a_reject for q in [0, 1, 2, 3, 4, 5]])
 
         b_matches = np.load('{}/pairing/bc.npy'.format(self.joint_folder_path))
         assert np.all([q in b_matches for q in [0, 1]])
@@ -514,24 +485,20 @@ class TestCounterpartPairing:
 
         a_reject = np.array([2, 3, 4, 5, 6])
         b_reject = np.array([1, 3])
-        np.save('{}/reject/reject_a.npy'.format(self.joint_folder_path), a_reject)
-        np.save('{}/reject/reject_b.npy'.format(self.joint_folder_path), b_reject)
 
-        np.save('{}/group/alist.npy'.format(self.joint_folder_path), alist)
-        np.save('{}/group/blist.npy'.format(self.joint_folder_path), blist)
-        np.save('{}/group/agrplen.npy'.format(self.joint_folder_path), agrplen)
-        np.save('{}/group/bgrplen.npy'.format(self.joint_folder_path), bgrplen)
+        group_sources_data = StageData(
+            alist=alist, blist=blist, agrplen=agrplen, bgrplen=bgrplen,
+            lenrejecta=len(a_reject), lenrejectb=len(b_reject))
 
-        mem_chunk_num = 2
-        a_modelrefinds = None
-        b_moderefinds = None
         with pytest.warns(UserWarning) as record:
             source_pairing(
                 self.joint_folder_path, self.a_cat_folder_path, self.b_cat_folder_path,
-                self.a_auf_folder_path, self.b_auf_folder_path, self.a_filt_names,
-                self.b_filt_names, self.a_auf_pointings, self.b_auf_pointings, a_modelrefinds, b_moderefinds,
-                self.rho, self.drho, self.n_fracs, mem_chunk_num, group_sources_data=None, phot_like_data=None,
-                use_memmap_files=True)
+                self.a_filt_names, self.b_filt_names, self.a_auf_pointings, self.b_auf_pointings,
+                self.amodelrefinds, self.bmodelrefinds, self.rho, self.drho, self.n_fracs,
+                group_sources_data=group_sources_data,
+                phot_like_data=self.phot_like_data,
+                a_perturb_auf_outputs=self.a_perturb_auf_outputs,
+                b_perturb_auf_outputs=self.b_perturb_auf_outputs)
         assert len(record) == 2
         assert '2 additional catalogue a indices recorded' in record[0].message.args[0]
         assert '1 additional catalogue b index recorded' in record[1].message.args[0]
@@ -547,10 +514,6 @@ class TestCounterpartPairing:
         assert np.all([q in a_field for q in [3, 4]])
         assert np.all([q not in a_field for q in [0, 1, 2, 5, 6]])
 
-        a_reject = np.load('{}/reject/reject_a.npy'.format(self.joint_folder_path))
-        assert np.all([q in a_reject for q in [2, 3, 4, 5, 6]])
-        assert np.all([q not in a_reject for q in [0, 1]])
-
         b_matches = np.load('{}/pairing/bc.npy'.format(self.joint_folder_path))
         assert np.all([q in b_matches for q in [0, 1]])
         assert np.all([q not in b_matches for q in [2, 3]])
@@ -563,8 +526,8 @@ class TestCounterpartPairing:
         # Ensure output chunk directory exists
         os.makedirs(os.path.join(os.path.dirname(__file__), "data/chunk0"), exist_ok=True)
 
-        for ol, nl in zip(['cf_region_points = 131 134 4 -1 1 3', 'mem_chunk_num = 10'],
-                          ['cf_region_points = 131 131 1 0 0 1\n', 'mem_chunk_num = 2\n']):
+        for ol, nl in zip(['cf_region_points = 131 134 4 -1 1 3'],
+                          ['cf_region_points = 131 131 1 0 0 1\n']):
             f = open(os.path.join(os.path.dirname(__file__),
                                   'data/crossmatch_params.txt')).readlines()
             idx = np.where([ol in line for line in f])[0][0]
@@ -586,25 +549,22 @@ class TestCounterpartPairing:
         os.system('rm -r {}/pairing'.format(self.joint_folder_path))
         os.makedirs('{}/pairing'.format(self.joint_folder_path), exist_ok=True)
         os.system('rm -r {}/reject/*'.format(self.joint_folder_path))
-        np.save('{}/group/alist.npy'.format(self.joint_folder_path), self.alist)
-        np.save('{}/group/blist.npy'.format(self.joint_folder_path), self.blist)
-        np.save('{}/group/agrplen.npy'.format(self.joint_folder_path), self.agrplen)
-        np.save('{}/group/bgrplen.npy'.format(self.joint_folder_path), self.bgrplen)
         # Same run as test_source_pairing, but called from CrossMatch rather than
         # directly this time.
         self._setup_cross_match_parameters()
-        self.cm = CrossMatch(os.path.join(os.path.dirname(__file__), 'data'), use_memmap_files=True)
+        self.cm = CrossMatch(os.path.join(os.path.dirname(__file__), 'data'))
         self.cm.delta_mag_cuts = np.array([2.5, 5])
-        self.cm.a_modelrefinds = None
-        self.cm.b_modelrefinds = None
-        self.cm.group_sources_data = None
-        self.cm.phot_like_data = None
-        self.files_per_pairing = 13
+        self.cm.a_modelrefinds = self.amodelrefinds
+        self.cm.b_modelrefinds = self.bmodelrefinds
+        self.cm.group_sources_data = self.group_sources_data
+        self.cm.phot_like_data = self.phot_like_data
         self.cm.chunk_id = 1
+        self.cm.a_perturb_auf_outputs = self.a_perturb_auf_outputs
+        self.cm.b_perturb_auf_outputs = self.b_perturb_auf_outputs
         self.cm._initialise_chunk(os.path.join(os.path.dirname(__file__), 'data/chunk0/crossmatch_params_.txt'),
                                   os.path.join(os.path.dirname(__file__), 'data/chunk0/cat_a_params_.txt'),
                                   os.path.join(os.path.dirname(__file__), 'data/chunk0/cat_b_params_.txt'))
-        self.cm.pair_sources(self.files_per_pairing)
+        self.cm.pair_sources()
 
         bflux = np.load('{}/pairing/bcontamflux.npy'.format(self.joint_folder_path))
         assert np.all(bflux == np.zeros((2), float))
@@ -662,63 +622,6 @@ class TestCounterpartPairing:
         assert_allclose(afxi[q], np.log10(fake_field_G / self.Nfa), rtol=0.01, atol=0.01)
         # Ignoring photometry here, so this should be equal probability.
         assert_allclose(afeta[q], np.log10(1.0))
-
-    def test_pair_sources_incorrect_warning(self):
-        os.system('rm -r {}/pairing'.format(self.joint_folder_path))
-        os.makedirs('{}/pairing'.format(self.joint_folder_path), exist_ok=True)
-        self._setup_cross_match_parameters()
-        for kind in ['cf', 'source']:
-            ol, nl = 'run_{} = yes'.format(kind), 'run_{} = no\n'.format(kind)
-            f = open(os.path.join(os.path.dirname(__file__),
-                                  'data/crossmatch_params.txt')).readlines()
-            idx = np.where([ol in line for line in f])[0][0]
-            _replace_line(os.path.join(os.path.dirname(__file__),
-                          'data/chunk0/crossmatch_params_.txt'), idx, nl)
-        self.cm = CrossMatch(os.path.join(os.path.dirname(__file__), 'data'), use_memmap_files=True)
-        self.cm.delta_mag_cuts = np.array([2.5, 5])
-        self.cm.a_modelrefinds = None
-        self.cm.b_modelrefinds = None
-        self.cm.group_sources_data = None
-        self.cm.phot_like_data = None
-        self.files_per_pairing = 13
-        self.cm.chunk_id = 1
-        self.cm._initialise_chunk(os.path.join(os.path.dirname(__file__), 'data/chunk0/crossmatch_params_.txt'),
-                                  os.path.join(os.path.dirname(__file__), 'data/chunk0/cat_a_params_.txt'),
-                                  os.path.join(os.path.dirname(__file__), 'data/chunk0/cat_b_params_.txt'))
-        with pytest.warns(UserWarning, match="Incorrect number of counterpart pairing files."):
-            self.cm.pair_sources(self.files_per_pairing)
-
-    def test_pair_sources_load_existing(self, capsys):
-        os.system('rm -r {}/pairing'.format(self.joint_folder_path))
-        os.makedirs('{}/pairing'.format(self.joint_folder_path), exist_ok=True)
-        # Fake files_per_pairing sources at random.
-        self.files_per_pairing = 13
-        for i in range(0, self.files_per_pairing):
-            np.save('{}/pairing/array_{}.npy'.format(self.joint_folder_path, i+1),
-                    np.zeros((4, 3), float))
-
-        self._setup_cross_match_parameters()
-        for kind in ['cf', 'source']:
-            ol, nl = 'run_{} = yes'.format(kind), 'run_{} = no\n'.format(kind)
-            f = open(os.path.join(os.path.dirname(__file__),
-                                  'data/crossmatch_params.txt')).readlines()
-            idx = np.where([ol in line for line in f])[0][0]
-            _replace_line(os.path.join(os.path.dirname(__file__),
-                          'data/chunk0/crossmatch_params_.txt'), idx, nl)
-        self.cm = CrossMatch(os.path.join(os.path.dirname(__file__), 'data'), use_memmap_files=True)
-        self.cm.delta_mag_cuts = np.array([2.5, 5])
-        self.cm.a_modelrefinds = None
-        self.cm.b_modelrefinds = None
-        self.cm.group_sources_data = None
-        self.cm.phot_like_data = None
-        self.cm.chunk_id = 1
-        self.cm._initialise_chunk(os.path.join(os.path.dirname(__file__), 'data/chunk0/crossmatch_params_.txt'),
-                                  os.path.join(os.path.dirname(__file__), 'data/chunk0/cat_a_params_.txt'),
-                                  os.path.join(os.path.dirname(__file__), 'data/chunk0/cat_b_params_.txt'))
-        capsys.readouterr()
-        self.cm.pair_sources(self.files_per_pairing)
-        output = capsys.readouterr().out
-        assert 'Loading pre-assigned counterparts' in output
 
 
 def test_f90_comb():

@@ -13,6 +13,15 @@ Bug Fixes
 API Changes
 ^^^^^^^^^^^
 
+- Removed ``use_memmap_files`` as an input into ``CrossMatch``, along with
+  ``run_auf``, ``run_group``, ``run_cf``, and ``run_source`` from parameters
+  input into the cross-match process. This means that there is no option to
+  run larger matches by slicing one large input catalogue file, and runs should
+  be broken into smaller runs to be parallelised via chunking instead. [#71]
+
+- Removed ``mem_chunk_num`` as input configuration parameter, dealing with the
+  entire catalogue match in memory in one go. [#71]
+
 - Removed hard-coded SFD dustmaps, using the ``dustmaps`` package to manage the
   dataset instead. [#69]
 

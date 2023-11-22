@@ -25,8 +25,7 @@ def test_initial_group_numbering():
                                [11], [12, 19], [13], [14], [], [], [12], [3]]):
         b_overlaps[:len(_inds), _i] = np.array(_inds)
     os.makedirs('./group', exist_ok=True)
-    agroup, bgroup = _initial_group_numbering(a_overlaps, b_overlaps, a_num, b_num, '.',
-                                              use_memmap_files=True)
+    agroup, bgroup = _initial_group_numbering(a_overlaps, b_overlaps, a_num, b_num, '.')
 
     assert np.all(agroup == np.array(
         [18, 1, 2, 19, 3, 4, 5, 6, 7, 8, 9, 10, 20, 11, 12, 13, 14, 15, 18, 20]))
@@ -36,7 +35,6 @@ def test_initial_group_numbering():
 
 def test_set_list_maximum_exceeded():
     os.makedirs('./group', exist_ok=True)
-    os.makedirs('./reject', exist_ok=True)
     for i, (N_a, N_b) in enumerate(zip([21, 10, 7], [5, 10, 6])):
         a_overlaps = np.empty((N_b, N_a+2), int)
         a_overlaps[:, :-2] = np.arange(N_b).reshape(-1, 1)
@@ -53,12 +51,12 @@ def test_set_list_maximum_exceeded():
         if i != 2:
             with pytest.warns(UserWarning, match='1 island, containing {}/{} catalogue a and '
                               '{}/{} catalogue b stars'.format(N_a, N_a+2, N_b, N_b+2)):
-                alist, blist, agrplen, bgrplen = set_list(
-                    a_overlaps, b_overlaps, a_num, b_num, '.', 2, use_memmap_files=True)
+                alist, blist, agrplen, bgrplen, areject, breject = set_list(
+                    a_overlaps, b_overlaps, a_num, b_num, '.', 2)
         else:
             with pytest.warns(None) as record:
                 alist, blist, agrplen, bgrplen = set_list(
-                    a_overlaps, b_overlaps, a_num, b_num, '.', 2, use_memmap_files=True)
+                    a_overlaps, b_overlaps, a_num, b_num, '.', 2)
             # Should be empty if no warnings were raised.
             assert not record
         if i != 2:

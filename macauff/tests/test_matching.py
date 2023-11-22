@@ -74,7 +74,7 @@ class TestInputs:
         np.save('b_snr_mag/snr_mag_params.npy', np.ones((4, 3, 5), float))
 
     def test_crossmatch_run_input(self):
-        cm = CrossMatch(os.path.join(os.path.dirname(__file__), 'data'), use_memmap_files=True)
+        cm = CrossMatch(os.path.join(os.path.dirname(__file__), 'data'))
         with pytest.raises(FileNotFoundError):
             cm._initialise_chunk('./file.txt', './file2.txt', './file3.txt')
         with pytest.raises(FileNotFoundError):
@@ -86,36 +86,8 @@ class TestInputs:
                                  os.path.join(os.path.dirname(__file__), 'data/cat_a_params.txt'),
                                  './file3.txt')
 
-        cm._initialise_chunk(os.path.join(os.path.dirname(__file__), 'data/crossmatch_params.txt'),
-                             os.path.join(os.path.dirname(__file__), 'data/cat_a_params.txt'),
-                             os.path.join(os.path.dirname(__file__), 'data/cat_b_params.txt'))
-        assert cm.run_auf is False
-        assert cm.run_group is False
-        assert cm.run_cf is True
-        assert cm.run_source is True
-
-        # List of simple one line config file replacements for error message checking
-        f = open(os.path.join(os.path.dirname(__file__), 'data/crossmatch_params.txt')).readlines()
-        for old_line, new_line, match_text in zip(['run_cf = yes', 'run_auf = no', 'run_auf = no'],
-                                                  ['', 'run_auf = aye\n', 'run_auf = yes\n'],
-                                                  ['Missing key', 'Boolean flag key not set',
-                                                   'Inconsistency between run/no run']):
-            idx = np.where([old_line in line for line in f])[0][0]
-            _replace_line(os.path.join(os.path.dirname(__file__),
-                          'data/crossmatch_params.txt'), idx, new_line,
-                          out_file=os.path.join(os.path.dirname(__file__),
-                          'data/crossmatch_params_.txt'))
-
-            with pytest.raises(ValueError, match=match_text):
-                cm._initialise_chunk(os.path.join(os.path.dirname(__file__),
-                                     'data/crossmatch_params_.txt'),
-                                     os.path.join(os.path.dirname(__file__),
-                                     'data/cat_a_params.txt'),
-                                     os.path.join(os.path.dirname(__file__),
-                                     'data/cat_b_params.txt'))
-
     def test_crossmatch_auf_cf_input(self):
-        cm = CrossMatch(os.path.join(os.path.dirname(__file__), 'data'), use_memmap_files=True)
+        cm = CrossMatch(os.path.join(os.path.dirname(__file__), 'data'))
         cm._initialise_chunk(os.path.join(os.path.dirname(__file__), 'data/crossmatch_params.txt'),
                              os.path.join(os.path.dirname(__file__), 'data/cat_a_params.txt'),
                              os.path.join(os.path.dirname(__file__), 'data/cat_b_params.txt'))
@@ -298,7 +270,7 @@ class TestInputs:
                                       [131, 1], [132, 1], [133, 1], [134, 1]]))
 
     def test_crossmatch_folder_path_inputs(self):
-        cm = CrossMatch(os.path.join(os.path.dirname(__file__), 'data'), use_memmap_files=True)
+        cm = CrossMatch(os.path.join(os.path.dirname(__file__), 'data'))
         cm._initialise_chunk(os.path.join(os.path.dirname(__file__), 'data/crossmatch_params.txt'),
                              os.path.join(os.path.dirname(__file__), 'data/cat_a_params.txt'),
                              os.path.join(os.path.dirname(__file__), 'data/cat_b_params.txt'))
@@ -337,7 +309,7 @@ class TestInputs:
                                                   .format('_' if '_b_' in in_file else '')))
 
     def test_crossmatch_tri_inputs(self):
-        cm = CrossMatch(os.path.join(os.path.dirname(__file__), 'data'), use_memmap_files=True)
+        cm = CrossMatch(os.path.join(os.path.dirname(__file__), 'data'))
         cm._initialise_chunk(os.path.join(os.path.dirname(__file__), 'data/crossmatch_params.txt'),
                              os.path.join(os.path.dirname(__file__), 'data/cat_a_params.txt'),
                              os.path.join(os.path.dirname(__file__), 'data/cat_b_params.txt'))
@@ -362,24 +334,23 @@ class TestInputs:
         # List of simple one line config file replacements for error message checking
         for old_line, new_line, match_text, in_file in zip(
                 ['tri_set_name = gaiaDR2', 'tri_filt_num = 11', 'tri_filt_num = 11',
-                 'download_tri = no', 'download_tri = no', 'tri_maglim_faint = 32',
+                 'download_tri = no', 'tri_maglim_faint = 32',
                  'tri_maglim_faint = 32', 'tri_num_faint = 1500000', 'tri_num_faint = 1500000',
                  'tri_num_faint = 1500000'],
                 ['', 'tri_filt_num = a\n', 'tri_filt_num = 3.4\n', 'download_tri = aye\n',
-                 'download_tri = yes\n', 'tri_maglim_faint = 32 33.5\n',
-                 'tri_maglim_faint = a\n', 'tri_num_faint = 1500000.1\n', 'tri_num_faint = a\n',
+                 'tri_maglim_faint = 32 33.5\n', 'tri_maglim_faint = a\n',
+                 'tri_num_faint = 1500000.1\n', 'tri_num_faint = a\n',
                  'tri_num_faint = 1500000 15\n'],
                 ['Missing key tri_set_name from catalogue "a"',
                  'tri_filt_num should be a single integer number in catalogue "b"',
                  'tri_filt_num should be a single integer number in catalogue "b"',
-                 'Boolean flag key not set', 'a_download_tri is True and run_auf is False',
-                 'tri_maglim_faint in catalogue "a" must be a float.',
+                 'Boolean flag key not set', 'tri_maglim_faint in catalogue "a" must be a float.',
                  'tri_maglim_faint in catalogue "b" must be a float.',
                  'tri_num_faint should be a single integer number in catalogue "b"',
                  'tri_num_faint should be a single integer number in catalogue "a" metadata file',
                  'tri_num_faint should be a single integer number in catalogue "a"'],
                 ['cat_a_params', 'cat_b_params', 'cat_b_params', 'cat_a_params', 'cat_a_params',
-                 'cat_a_params', 'cat_b_params', 'cat_b_params', 'cat_a_params', 'cat_a_params']):
+                 'cat_b_params', 'cat_b_params', 'cat_a_params', 'cat_a_params']):
             f = open(os.path.join(os.path.dirname(__file__),
                                   'data/{}.txt'.format(in_file))).readlines()
             idx = np.where([old_line in line for line in f])[0][0]
@@ -398,7 +369,7 @@ class TestInputs:
                                                   .format('_' if '_b_' in in_file else '')))
 
     def test_crossmatch_psf_param_inputs(self):
-        cm = CrossMatch(os.path.join(os.path.dirname(__file__), 'data'), use_memmap_files=True)
+        cm = CrossMatch(os.path.join(os.path.dirname(__file__), 'data'))
         cm._initialise_chunk(os.path.join(os.path.dirname(__file__), 'data/crossmatch_params.txt'),
                              os.path.join(os.path.dirname(__file__), 'data/cat_a_params.txt'),
                              os.path.join(os.path.dirname(__file__), 'data/cat_b_params.txt'))
@@ -457,12 +428,11 @@ class TestInputs:
                 np.save('a_snr_mag/snr_mag_params.npy', np.ones((3, 1, 5), float))
 
     def test_crossmatch_cat_name_inputs(self):
-        cm = CrossMatch(os.path.join(os.path.dirname(__file__), 'data'), use_memmap_files=True)
+        cm = CrossMatch(os.path.join(os.path.dirname(__file__), 'data'))
         cm._initialise_chunk(os.path.join(os.path.dirname(__file__), 'data/crossmatch_params.txt'),
                              os.path.join(os.path.dirname(__file__), 'data/cat_a_params.txt'),
                              os.path.join(os.path.dirname(__file__), 'data/cat_b_params.txt'))
         assert cm.b_cat_name == 'WISE'
-        assert os.path.exists('{}/test_path/WISE'.format(os.getcwd()))
 
         f = open(os.path.join(os.path.dirname(__file__), 'data/cat_a_params.txt')).readlines()
         old_line = 'cat_name = Gaia'
@@ -480,7 +450,7 @@ class TestInputs:
                                  os.path.join(os.path.dirname(__file__), 'data/cat_b_params.txt'))
 
     def test_crossmatch_search_inputs(self):
-        cm = CrossMatch(os.path.join(os.path.dirname(__file__), 'data'), use_memmap_files=True)
+        cm = CrossMatch(os.path.join(os.path.dirname(__file__), 'data'))
         cm._initialise_chunk(os.path.join(os.path.dirname(__file__), 'data/crossmatch_params.txt'),
                              os.path.join(os.path.dirname(__file__), 'data/cat_a_params.txt'),
                              os.path.join(os.path.dirname(__file__), 'data/cat_b_params.txt'))
@@ -494,20 +464,6 @@ class TestInputs:
                       'data/crossmatch_params.txt'), idx, new_line, out_file=os.path.join(
                       os.path.dirname(__file__), 'data/crossmatch_params_.txt'))
         cm._initialise_chunk(os.path.join(os.path.dirname(__file__), 'data/crossmatch_params_.txt'),
-                             os.path.join(os.path.dirname(__file__), 'data/cat_a_params.txt'),
-                             os.path.join(os.path.dirname(__file__), 'data/cat_b_params.txt'))
-        assert np.all(cm.a_psf_fwhms == np.array([0.12, 0.12, 0.12]))
-        assert not hasattr(cm, 'b_dens_dist')
-
-        f = open(os.path.join(os.path.dirname(__file__), 'data/crossmatch_params.txt')).readlines()
-        old_line = 'compute_local_density = no'
-        new_line = 'compute_local_density = yes\n'
-        idx = np.where([old_line in line for line in f])[0][0]
-        _replace_line(os.path.join(os.path.dirname(__file__),
-                      'data/crossmatch_params_.txt'), idx, new_line, out_file=os.path.join(
-                      os.path.dirname(__file__), 'data/crossmatch_params_2.txt'))
-        cm._initialise_chunk(os.path.join(os.path.dirname(__file__),
-                                          'data/crossmatch_params_2.txt'),
                              os.path.join(os.path.dirname(__file__), 'data/cat_a_params.txt'),
                              os.path.join(os.path.dirname(__file__), 'data/cat_b_params.txt'))
         assert np.all(cm.a_psf_fwhms == np.array([0.12, 0.12, 0.12]))
@@ -525,14 +481,13 @@ class TestInputs:
                                   'data/{}.txt'.format(in_file))).readlines()
             idx = np.where([old_line in line for line in f])[0][0]
             _replace_line(os.path.join(os.path.dirname(__file__),
-                          'data/{}{}.txt'.format(in_file, '_2' if 'h_p' in in_file else '')), idx,
+                          'data/{}{}.txt'.format(in_file, '_' if 'h_p' in in_file else '')), idx,
                           new_line, out_file=os.path.join(os.path.dirname(__file__),
-                          'data/{}_{}.txt'.format(in_file, '3' if 'h_p' in in_file else '')))
-
+                          'data/{}_{}.txt'.format(in_file, '2' if 'h_p' in in_file else '')))
             with pytest.raises(ValueError, match=match_text):
                 cm._initialise_chunk(os.path.join(os.path.dirname(__file__),
                                      'data/crossmatch_params{}.txt'.format(
-                                     '_3' if 'h_p' in in_file else '_2')),
+                                     '_2' if 'h_p' in in_file else '_')),
                                      os.path.join(os.path.dirname(__file__),
                                      'data/cat_a_params{}.txt'
                                                   .format('_' if '_a_' in in_file else '')),
@@ -549,24 +504,20 @@ class TestInputs:
                       'data/crossmatch_params.txt'), idx, new_line, out_file=os.path.join(
                       os.path.dirname(__file__), 'data/crossmatch_params_.txt'))
 
-        cm = CrossMatch(os.path.join(os.path.dirname(__file__), 'data'), use_memmap_files=True)
+        cm = CrossMatch(os.path.join(os.path.dirname(__file__), 'data'))
         cm._initialise_chunk(os.path.join(os.path.dirname(__file__), 'data/crossmatch_params_.txt'),
                              os.path.join(os.path.dirname(__file__), 'data/cat_a_params.txt'),
                              os.path.join(os.path.dirname(__file__), 'data/cat_b_params.txt'))
         assert cm.num_trials == 10000
-        assert not cm.compute_local_density
         assert cm.d_mag == 0.1
 
         for old_line, new_line, match_text in zip(
                 ['num_trials = 10000', 'num_trials = 10000', 'num_trials = 10000',
-                 'd_mag = 0.1', 'd_mag = 0.1', 'compute_local_density = no',
-                 'compute_local_density = no', 'compute_local_density = no'],
-                ['', 'num_trials = word\n', 'num_trials = 10000.1\n', '', 'd_mag = word\n', '',
-                 'compute_local_density = word\n', 'compute_local_density = 10\n'],
+                 'd_mag = 0.1', 'd_mag = 0.1'],
+                ['', 'num_trials = word\n', 'num_trials = 10000.1\n', '', 'd_mag = word\n'],
                 ['Missing key num_trials from joint', 'num_trials should be an integer',
                  'num_trials should be an integer', 'Missing key d_mag from joint',
-                 'd_mag must be a float', 'Missing key compute_local_density from joint',
-                 'Boolean flag key not set to allowed', 'Boolean flag key not set to allowed']):
+                 'd_mag must be a float']):
             # Make sure to keep the first edit of crossmatch_params, adding each
             # second change in turn.
             f = open(os.path.join(os.path.dirname(__file__),
@@ -614,7 +565,7 @@ class TestInputs:
         np.save('a_snr_mag/snr_mag_params.npy', np.ones((3, 1, 5), float))
         np.save('b_snr_mag/snr_mag_params.npy', np.ones((4, 1, 5), float))
 
-        cm = CrossMatch(os.path.join(os.path.dirname(__file__), 'data'), use_memmap_files=True)
+        cm = CrossMatch(os.path.join(os.path.dirname(__file__), 'data'))
         cm._initialise_chunk(os.path.join(os.path.dirname(__file__),
                              'data/crossmatch_params_.txt'),
                              os.path.join(os.path.dirname(__file__),
@@ -824,7 +775,7 @@ class TestInputs:
                                                   .format('_' if '_a_' in file else '__')))
 
     def test_crossmatch_fourier_inputs(self):
-        cm = CrossMatch(os.path.join(os.path.dirname(__file__), 'data'), use_memmap_files=True)
+        cm = CrossMatch(os.path.join(os.path.dirname(__file__), 'data'))
         cm._initialise_chunk(os.path.join(os.path.dirname(__file__), 'data/crossmatch_params.txt'),
                              os.path.join(os.path.dirname(__file__), 'data/cat_a_params.txt'),
                              os.path.join(os.path.dirname(__file__), 'data/cat_b_params.txt'))
@@ -854,7 +805,7 @@ class TestInputs:
                                      'data/cat_b_params.txt'))
 
     def test_crossmatch_frame_equality(self):
-        cm = CrossMatch(os.path.join(os.path.dirname(__file__), 'data'), use_memmap_files=True)
+        cm = CrossMatch(os.path.join(os.path.dirname(__file__), 'data'))
         cm._initialise_chunk(os.path.join(os.path.dirname(__file__), 'data/crossmatch_params.txt'),
                              os.path.join(os.path.dirname(__file__), 'data/cat_a_params.txt'),
                              os.path.join(os.path.dirname(__file__), 'data/cat_b_params.txt'))
@@ -889,7 +840,7 @@ class TestInputs:
                                                   .format('_' if '_b_' in in_file else '')))
 
     def test_cross_match_extent(self):
-        cm = CrossMatch(os.path.join(os.path.dirname(__file__), 'data'), use_memmap_files=True)
+        cm = CrossMatch(os.path.join(os.path.dirname(__file__), 'data'))
         cm._initialise_chunk(os.path.join(os.path.dirname(__file__), 'data/crossmatch_params.txt'),
                              os.path.join(os.path.dirname(__file__), 'data/cat_a_params.txt'),
                              os.path.join(os.path.dirname(__file__), 'data/cat_b_params.txt'))
@@ -922,7 +873,7 @@ class TestInputs:
                                                   .format('_' if '_b_' in in_file else '')))
 
     def test_int_fracs(self):
-        cm = CrossMatch(os.path.join(os.path.dirname(__file__), 'data'), use_memmap_files=True)
+        cm = CrossMatch(os.path.join(os.path.dirname(__file__), 'data'))
         cm._initialise_chunk(os.path.join(os.path.dirname(__file__), 'data/crossmatch_params.txt'),
                              os.path.join(os.path.dirname(__file__), 'data/cat_a_params.txt'),
                              os.path.join(os.path.dirname(__file__), 'data/cat_b_params.txt'))
@@ -953,40 +904,8 @@ class TestInputs:
                                      'data/cat_b_params{}.txt'
                                                   .format('_' if '_b_' in in_file else '')))
 
-    def test_crossmatch_chunk_num(self):
-        cm = CrossMatch(os.path.join(os.path.dirname(__file__), 'data'), use_memmap_files=True)
-        cm._initialise_chunk(os.path.join(os.path.dirname(__file__), 'data/crossmatch_params.txt'),
-                             os.path.join(os.path.dirname(__file__), 'data/cat_a_params.txt'),
-                             os.path.join(os.path.dirname(__file__), 'data/cat_b_params.txt'))
-        assert np.all(cm.mem_chunk_num == 10)
-
-        # List of simple one line config file replacements for error message checking
-        in_file = 'crossmatch_params'
-        f = open(os.path.join(os.path.dirname(__file__),
-                              'data/{}.txt'.format(in_file))).readlines()
-        old_line = 'mem_chunk_num = 10'
-        for new_line, match_text in zip(
-                ['', 'mem_chunk_num = word\n', 'mem_chunk_num = 10.1\n'],
-                ['Missing key mem_chunk_num', 'mem_chunk_num should be a single integer',
-                 'mem_chunk_num should be a single integer']):
-            idx = np.where([old_line in line for line in f])[0][0]
-            _replace_line(os.path.join(os.path.dirname(__file__),
-                          'data/{}.txt'.format(in_file)), idx, new_line, out_file=os.path.join(
-                          os.path.dirname(__file__), 'data/{}_.txt'.format(in_file)))
-
-            with pytest.raises(ValueError, match=match_text):
-                cm._initialise_chunk(os.path.join(os.path.dirname(__file__),
-                                     'data/crossmatch_params{}.txt'.format(
-                                     '_' if 'h_p' in in_file else '')),
-                                     os.path.join(os.path.dirname(__file__),
-                                     'data/cat_a_params{}.txt'
-                                                  .format('_' if '_a_' in in_file else '')),
-                                     os.path.join(os.path.dirname(__file__),
-                                     'data/cat_b_params{}.txt'
-                                                  .format('_' if '_b_' in in_file else '')))
-
     def test_crossmatch_shared_data(self):
-        cm = CrossMatch(os.path.join(os.path.dirname(__file__), 'data'), use_memmap_files=True)
+        cm = CrossMatch(os.path.join(os.path.dirname(__file__), 'data'))
         cm._initialise_chunk(os.path.join(os.path.dirname(__file__), 'data/crossmatch_params.txt'),
                              os.path.join(os.path.dirname(__file__), 'data/cat_a_params.txt'),
                              os.path.join(os.path.dirname(__file__), 'data/cat_b_params.txt'))
@@ -996,7 +915,7 @@ class TestInputs:
         assert_allclose(cm.drho, np.ones(9999, float) * 100/9999)
 
     def test_cat_folder_path(self):
-        cm = CrossMatch(os.path.join(os.path.dirname(__file__), 'data'), use_memmap_files=True)
+        cm = CrossMatch(os.path.join(os.path.dirname(__file__), 'data'))
         cm._initialise_chunk(os.path.join(os.path.dirname(__file__), 'data/crossmatch_params.txt'),
                              os.path.join(os.path.dirname(__file__), 'data/cat_a_params.txt'),
                              os.path.join(os.path.dirname(__file__), 'data/cat_b_params.txt'))
@@ -1065,7 +984,7 @@ class TestInputs:
             self.setup_class()
 
     def test_calculate_cf_areas(self):
-        cm = CrossMatch(os.path.join(os.path.dirname(__file__), 'data'), use_memmap_files=True)
+        cm = CrossMatch(os.path.join(os.path.dirname(__file__), 'data'))
         cm._initialise_chunk(os.path.join(os.path.dirname(__file__), 'data/crossmatch_params.txt'),
                              os.path.join(os.path.dirname(__file__), 'data/cat_a_params.txt'),
                              os.path.join(os.path.dirname(__file__), 'data/cat_b_params.txt'))
@@ -1086,7 +1005,7 @@ class TestInputs:
         assert_allclose(cm.cf_areas, calculated_areas, rtol=0.025)
 
     def test_csv_inputs(self):
-        cm = CrossMatch(os.path.join(os.path.dirname(__file__), 'data'), use_memmap_files=True)
+        cm = CrossMatch(os.path.join(os.path.dirname(__file__), 'data'))
         f = open(os.path.join(os.path.dirname(__file__),
                               'data/crossmatch_params.txt')).readlines()
         old_line = 'make_output_csv = no'
@@ -1315,7 +1234,7 @@ class TestInputs:
 
     @pytest.mark.remote_data
     def test_crossmatch_correct_astrometry_inputs(self):
-        cm = CrossMatch(os.path.join(os.path.dirname(__file__), 'data'), use_memmap_files=True)
+        cm = CrossMatch(os.path.join(os.path.dirname(__file__), 'data'))
         cm._initialise_chunk(os.path.join(os.path.dirname(__file__), 'data/crossmatch_params.txt'),
                              os.path.join(os.path.dirname(__file__), 'data/cat_a_params.txt'),
                              os.path.join(os.path.dirname(__file__), 'data/cat_b_params.txt'))
@@ -1565,7 +1484,7 @@ class TestInputs:
             os.remove('ac_folder/npy/snr_mag_params.npy')
         # Using the ORIGINAL cat_a_params means we don't fit for corrections
         # to catalogue 'a'.
-        cm = CrossMatch(os.path.join(os.path.dirname(__file__), 'data'), use_memmap_files=True)
+        cm = CrossMatch(os.path.join(os.path.dirname(__file__), 'data'))
         cm.chunk_id = 1
         cm._initialise_chunk(os.path.join(os.path.dirname(__file__),
                              'data/crossmatch_params.txt'),
@@ -1601,7 +1520,7 @@ class TestInputs:
         if os.path.isfile('ac_folder/npy/snr_mag_params.npy'):
             os.remove('ac_folder/npy/snr_mag_params.npy')
         # Swapped a+b to test a_* versions of things
-        cm = CrossMatch(os.path.join(os.path.dirname(__file__), 'data'), use_memmap_files=True)
+        cm = CrossMatch(os.path.join(os.path.dirname(__file__), 'data'))
         cm.chunk_id = 1
         cm._initialise_chunk(os.path.join(os.path.dirname(__file__),
                              'data/crossmatch_params.txt'),
@@ -1651,7 +1570,7 @@ class TestInputs:
                                                 'data/cat_{}_params_2b.txt'.format(x)))
         if os.path.isfile('ac_folder/npy/snr_mag_params.npy'):
             os.remove('ac_folder/npy/snr_mag_params.npy')
-        cm = CrossMatch(os.path.join(os.path.dirname(__file__), 'data'), use_memmap_files=True)
+        cm = CrossMatch(os.path.join(os.path.dirname(__file__), 'data'))
         cm.chunk_id = 1
         cm._initialise_chunk(os.path.join(os.path.dirname(__file__),
                              'data/crossmatch_params.txt'),
@@ -1671,7 +1590,7 @@ class TestInputs:
         assert_allclose([marray[0], narray[0]], [2, 0], rtol=0.1, atol=0.01)
         if os.path.isfile('ac_folder/npy/snr_mag_params.npy'):
             os.remove('ac_folder/npy/snr_mag_params.npy')
-        cm = CrossMatch(os.path.join(os.path.dirname(__file__), 'data'), use_memmap_files=True)
+        cm = CrossMatch(os.path.join(os.path.dirname(__file__), 'data'))
         cm.chunk_id = 1
         cm._initialise_chunk(os.path.join(os.path.dirname(__file__),
                              'data/crossmatch_params.txt'),
@@ -1804,7 +1723,6 @@ class TestInputs:
                                               .format('_2' if x == 'a' else '_3')))
 
 
-@pytest.mark.parametrize('use_memmap', [True, False])
 class TestPostProcess:
     def setup_method(self):
         self.joint_folder_path = os.path.abspath('joint')
@@ -1880,9 +1798,8 @@ class TestPostProcess:
         data1[:, 0] = ['{}{}'.format(designation, i) for i in data1[:, 0]]
         return data, data1
 
-    def test_postprocess(self, use_memmap):
-        cm = CrossMatch(os.path.join(os.path.dirname(__file__), 'data'),
-                        use_memmap_files=use_memmap)
+    def test_postprocess(self):
+        cm = CrossMatch(os.path.join(os.path.dirname(__file__), 'data'))
         cm.joint_folder_path = self.joint_folder_path
         cm.a_cat_folder_path = self.a_cat_folder_path
         cm.b_cat_folder_path = self.b_cat_folder_path
@@ -1913,9 +1830,8 @@ class TestPostProcess:
         assert np.all(aino[deleted_af])
         assert np.all(bino[deleted_bf])
 
-    def test_postprocess_with_csv(self, use_memmap):
-        cm = CrossMatch(os.path.join(os.path.dirname(__file__), 'data'),
-                        use_memmap_files=use_memmap)
+    def test_postprocess_with_csv(self):
+        cm = CrossMatch(os.path.join(os.path.dirname(__file__), 'data'))
         cm.joint_folder_path = self.joint_folder_path
         cm.a_cat_folder_path = self.a_cat_folder_path
         cm.b_cat_folder_path = self.b_cat_folder_path
@@ -1953,7 +1869,6 @@ class TestPostProcess:
         cm.b_cat_col_nums = [0, 1, 2, 4, 5, 6, 7]
         cm.a_cat_name = 'Gaia'
         cm.b_cat_name = 'WISE'
-        cm.mem_chunk_num = 4
         cm.a_input_npy_folder = None
         cm.b_input_npy_folder = None
         cm.a_extra_col_names = None
