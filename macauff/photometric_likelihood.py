@@ -7,7 +7,7 @@ used in the cross-matching of the two catalogues.
 import sys
 import numpy as np
 
-from .misc_functions import map_large_index_to_small_index, StageData
+from .misc_functions import StageData
 from .misc_functions_fortran import misc_functions_fortran as mff
 from .photometric_likelihood_fortran import photometric_likelihood_fortran as plf
 
@@ -73,9 +73,6 @@ def compute_photometric_likelihoods(joint_folder_path, a_cat_folder_path, b_cat_
 
     print("Creating c(m, m) and f(m)...")
 
-    len_a = len(np.load('{}/con_cat_astro.npy'.format(a_cat_folder_path)))
-    len_b = len(np.load('{}/con_cat_astro.npy'.format(b_cat_folder_path)))
-
     print("Distributing sources into sky slices...")
     sys.stdout.flush()
 
@@ -115,6 +112,8 @@ def compute_photometric_likelihoods(joint_folder_path, a_cat_folder_path, b_cat_
                                             len(cf_points)), order='F')
 
     ablen = group_sources_data.ablen
+    aflen = group_sources_data.aflen
+    bflen = group_sources_data.bflen
     ainds = group_sources_data.ainds
     binds = group_sources_data.binds
     asize = group_sources_data.asize
@@ -125,34 +124,14 @@ def compute_photometric_likelihoods(joint_folder_path, a_cat_folder_path, b_cat_
         a_sky_cut = a_sky_inds == m
         a_photo_cut = a_photo[a_sky_cut]
         if include_phot_like or use_phot_priors:
-            a_astro_cut, a_blen_cut, a_inds_cut, a_size_cut = (
-                a_astro[a_sky_cut], ablen[a_sky_cut], ainds[:, a_sky_cut], asize[a_sky_cut])
+            a_blen_cut, a_flen_cut, a_inds_cut, a_size_cut = (
+                ablen[a_sky_cut], aflen[a_sky_cut], ainds[:, a_sky_cut], asize[a_sky_cut])
 
         b_sky_cut = b_sky_inds == m
         b_photo_cut = b_photo[b_sky_cut]
         if include_phot_like or use_phot_priors:
-            b_astro_cut, b_inds_cut, b_size_cut = (
-                b_astro[b_sky_cut], binds[:, b_sky_cut], bsize[b_sky_cut])
-
-            # Return the overall to subarray mapping of *_inds_cut, as well
-            # as the unique values of *_inds_cut, for use in creating the
-            # opposing view slices into the other catalogue, for each
-            # catalogue. Note that the lengths are swapped in the two calls,
-            # as the a_inds map into length of catalogue "b" and vice versa.
-            a_inds_map, a_inds_cut_unique = map_large_index_to_small_index(a_inds_cut, len_b)
-            b_inds_map, b_inds_cut_unique = map_large_index_to_small_index(b_inds_cut, len_a)
-
-            # Combined with b_inds_map, this subarray of the catalogue gives
-            # an array that has every "a" source that overlaps the "b"
-            # subarray objects. Note we use b_inds_cut_unique for catalogue
-            # "a" sources.
-            a_astro_ind = a_astro[b_inds_cut_unique]
-            b_astro_ind = b_astro[a_inds_cut_unique]
-            a_photo_ind = a_photo[b_inds_cut_unique]
-            b_photo_ind = b_photo[a_inds_cut_unique]
-
-            a_flen_ind = group_sources_data.aflen[b_inds_cut_unique]
-            b_flen_ind = group_sources_data.bflen[a_inds_cut_unique]
+            b_flen_cut, b_inds_cut, b_size_cut = (
+                bflen[b_sky_cut], binds[:, b_sky_cut], bsize[b_sky_cut])
 
         for i in range(0, len(afilts)):
             if not include_phot_like and not use_phot_priors:
@@ -160,9 +139,8 @@ def compute_photometric_likelihoods(joint_folder_path, a_cat_folder_path, b_cat_
                 Na = a_num_photo_cut / area
             else:
                 a_bins = abinsarray[:abinlengths[i, m], i, m]
-                a_mag = a_photo_cut[:, i]
+                a_mag = a_photo[:, i]
                 a_flags = ~np.isnan(a_mag)
-                a_flags_ind = ~np.isnan(a_photo_ind[:, i])
             for j in range(0, len(bfilts)):
                 if not include_phot_like and not use_phot_priors:
                     b_num_photo_cut = np.sum(~np.isnan(b_photo_cut[:, j]))
@@ -183,16 +161,13 @@ def compute_photometric_likelihoods(joint_folder_path, a_cat_folder_path, b_cat_
                     c_like, fa_like, fb_like = (1-1e-10)**2, 1-1e-10, 1-1e-10
                 else:
                     b_bins = bbinsarray[:bbinlengths[j, m], j, m]
-                    b_mag = b_photo_cut[:, j]
+                    b_mag = b_photo[:, j]
                     b_flags = ~np.isnan(b_mag)
-                    b_mag_ind = b_photo_ind[:, j]
-                    b_flags_ind = ~np.isnan(b_mag_ind)
 
                     c_prior, c_like, fa_prior, fa_like, fb_prior, fb_like = create_c_and_f(
-                        a_astro_cut, b_astro_cut, a_mag, b_mag, a_inds_map, a_size_cut,
-                        b_inds_map, b_size_cut, a_blen_cut, a_bins, b_bins, bright_frac,
-                        field_frac, a_flags, b_flags, a_astro_ind, b_astro_ind, a_flen_ind,
-                        b_flen_ind, a_flags_ind, b_flags_ind, b_mag_ind, area)
+                        a_astro, b_astro, a_mag, b_mag, a_inds_cut, a_size_cut,
+                        b_inds_cut, b_size_cut, a_blen_cut, a_flen_cut, b_flen_cut,
+                        a_bins, b_bins, bright_frac, field_frac, a_flags, b_flags, area)
                 if use_phot_priors and not include_phot_like:
                     # If we only used the create_c_and_f routine to derive
                     # priors, then quickly update likelihoods here.
@@ -358,8 +333,7 @@ def make_bins(input_mags):
 
 
 def create_c_and_f(a_astro, b_astro, a_mag, b_mag, a_inds, a_size, b_inds, b_size, a_blen,
-                   a_bins, b_bins, bright_frac, field_frac, a_flags, b_flags, a_astro_ind,
-                   b_astro_ind, a_flen_ind, b_flen_ind, a_flags_ind, b_flags_ind, b_mag_ind, area):
+                   a_flen, b_flen, a_bins, b_bins, bright_frac, field_frac, a_flags, b_flags, area):
     '''
     Functionality to create the photometric likelihood and priors from a set
     of photometric data in a given pair of filters.
@@ -389,6 +363,12 @@ def create_c_and_f(a_astro, b_astro, a_mag, b_mag, a_inds, a_size, b_inds, b_siz
         The "bright" error circle radius, integrating the joint AUF convolution
         out to ``expected_frac`` for largest "a"-"b" potential pairing, for each
         catalogue "a" object.
+    a_flen : numpy.ndarray
+        The "field" error circle radius, integrating the joint AUF convolution
+        out to ``expected_frac`` for largest "a"-"b" potential pairing, for each
+        catalogue "a" object.
+    b_flen : numpy.ndarray
+        Catalogue b's "field" error circle radii.
     a_bins : numpy.ndarray
         Array containing the magnitude bins into which to place catalogue "a"
         sources.
@@ -409,26 +389,6 @@ def create_c_and_f(a_astro, b_astro, a_mag, b_mag, a_inds, a_size, b_inds, b_siz
         magnitude in ``a_mag``.
     b_flags : numpy.ndarray
         Detection flags for catalogue "b" sources in ``b_mag``.
-    a_astro_ind : numpy.ndarray
-        Astrometric information for all catalogue "a" sources with at least one
-        overlap with catalogue "b" sources from ``b_astro``.
-    b_astro_ind : numpy.ndarray
-        Astrometric information for all catalogue "b" sources with an overlap
-        with at least one catalogue "a" source in ``a_astro``.
-    a_flen_ind : numpy.ndarray
-        Largest joint AUF integral error circle radius for the "field" source
-        integral fraction, for each catalogue "a" object in ``a_astro_ind``.
-    b_flen_ind : numpy.ndarray
-        Maximum AUF integral distance for each source in ``b_astro_ind``.
-    a_flags_ind : numpy.ndarray
-        Boolean flags for catalogue "a" sources which have an overlap with any
-        catalogue "b" objects that are in this sky region.
-    b_flags_ind : numpy.ndarray
-        Boolean detection flags for all catalogue "b" sources for which any
-        sources in catalogue "a" have a potential overlap in this sky region.
-    b_mag_ind : numpy.ndarray
-        All source magnitudes for which the catalogue "a" subset of sources
-        have an overlap in catalogue "b".
     area : float
         Area of sky region for which photometric likelihood and prior are
         being calculated, in square degrees.
@@ -456,12 +416,12 @@ def create_c_and_f(a_astro, b_astro, a_mag, b_mag, a_inds, a_size, b_inds, b_siz
 
     # get_field_dists allows for magnitude slicing, to get f(m | m) instead of f(m),
     # but when we do want f(m) we just pass two impossible magnitudes as the limits.
-    a_mask, a_area = plf.get_field_dists(a_astro[:, 0], a_astro[:, 1], b_astro_ind[:, 0],
-                                         b_astro_ind[:, 1], a_inds, a_size, b_flen_ind, a_flags,
-                                         b_flags_ind, b_mag, -999, 999)
-    b_mask, b_area = plf.get_field_dists(b_astro[:, 0], b_astro[:, 1], a_astro_ind[:, 0],
-                                         a_astro_ind[:, 1], b_inds, b_size, a_flen_ind, b_flags,
-                                         a_flags_ind, a_mag, -999, 999)
+    a_mask, a_area = plf.get_field_dists(a_astro[:, 0], a_astro[:, 1], b_astro[:, 0],
+                                         b_astro[:, 1], a_inds, a_size, b_flen, a_flags,
+                                         b_flags, b_mag, -999, 999)
+    b_mask, b_area = plf.get_field_dists(b_astro[:, 0], b_astro[:, 1], a_astro[:, 0],
+                                         a_astro[:, 1], b_inds, b_size, a_flen, b_flags,
+                                         a_flags, a_mag, -999, 999)
     a_mask = a_mask.astype(bool)
     b_mask = b_mask.astype(bool)
     a_left = a_mag[a_mask]
@@ -482,12 +442,12 @@ def create_c_and_f(a_astro, b_astro, a_mag, b_mag, a_inds, a_size, b_inds, b_siz
     bm = np.empty((len(b_bins)-1, len(a_bins)-1), float, order='F')
     z = np.empty(len(a_bins)-1, float)
 
-    mag_mask, aa = plf.brightest_mag(a_astro[:, 0], a_astro[:, 1], b_astro_ind[:, 0],
-                                     b_astro_ind[:, 1], a_mag, b_mag_ind, a_inds, a_size, a_blen,
-                                     a_flags, b_flags_ind, a_bins)
+    mag_mask, aa = plf.brightest_mag(a_astro[:, 0], a_astro[:, 1], b_astro[:, 0],
+                                     b_astro[:, 1], a_mag, b_mag, a_inds, a_size, a_blen,
+                                     a_flags, b_flags, a_bins)
     mag_mask = mag_mask.astype(bool)
     for i in range(0, len(a_bins)-1):
-        hist, b_bins = np.histogram(b_mag_ind[mag_mask[:, i]], bins=b_bins)
+        hist, b_bins = np.histogram(b_mag[mag_mask[:, i]], bins=b_bins)
         q = np.sum(mag_mask[:, i])
         if q > 0:
             bm[:, i] = hist/(np.diff(b_bins)*q)
@@ -497,8 +457,8 @@ def create_c_and_f(a_astro, b_astro, a_mag, b_mag, a_inds, a_size, b_inds, b_siz
     cdmdm = np.empty((len(b_bins)-1, len(a_bins)-1), float, order='F')
     for i in range(0, len(a_bins)-1):
         bmask, barea = plf.get_field_dists(
-            b_astro[:, 0], b_astro[:, 1], a_astro[:, 0], a_astro[:, 1], b_inds, b_size, a_flen_ind,
-            b_flags, a_flags_ind, a_mag, a_bins[i], a_bins[i+1])
+            b_astro[:, 0], b_astro[:, 1], a_astro[:, 0], a_astro[:, 1], b_inds, b_size, a_flen,
+            b_flags, a_flags, a_mag, a_bins[i], a_bins[i+1])
         bmask = bmask.astype(bool)
         b_left = b_mag[bmask]
         hist, b_bins = np.histogram(b_left, bins=b_bins)

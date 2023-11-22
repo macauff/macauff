@@ -22,8 +22,8 @@ class TestOneSidedPhotometricLikelihood:
         self.joint_folder_path = 'test_path'
         self.a_cat_folder_path = 'gaia_folder'
         self.b_cat_folder_path = 'wise_folder'
-        self.group_sources_data = StageData(ablen=None, ainds=None, asize=None,
-                                            bblen=None, binds=None, bsize=None)
+        self.group_sources_data = StageData(ablen=None, aflen=None, ainds=None, asize=None,
+                                            bblen=None, bflen=None, binds=None, bsize=None)
 
         self.area = (134-131)*(1--1)
 
