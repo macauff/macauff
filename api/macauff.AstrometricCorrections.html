@@ -1,0 +1,581 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>AstrometricCorrections &#8212; macauff</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=4848ba22" />
+    <link rel="stylesheet" type="text/css" href="../_static/pyramid.css?v=a5b9c134" />
+    <link rel="stylesheet" type="text/css" href="../_static/graphviz.css?v=eafc0fe6" />
+    <script src="../_static/documentation_options.js?v=5929fcd5"></script>
+    <script src="../_static/doctools.js?v=888ff710"></script>
+    <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script async="async" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="CrossMatch" href="macauff.CrossMatch.html" />
+    <link rel="prev" title="source_pairing" href="macauff.source_pairing.html" />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Neuton&amp;subset=latin" type="text/css" media="screen" charset="utf-8" />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Nobile:regular,italic,bold,bolditalic&amp;subset=latin" type="text/css" media="screen" charset="utf-8" />
+<!--[if lte IE 6]>
+<link rel="stylesheet" href="../_static/ie6.css" type="text/css" media="screen" charset="utf-8" />
+<![endif]-->
+
+  </head><body>
+
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="../f-modindex.html" title="Fortran Module Index"
+             >fortran modules</a> |</li>
+        <li class="right" >
+          <a href="../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="right" >
+          <a href="macauff.CrossMatch.html" title="CrossMatch"
+             accesskey="N">next</a> |</li>
+        <li class="right" >
+          <a href="macauff.source_pairing.html" title="source_pairing"
+             accesskey="P">previous</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../index.html">macauff</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../macauff.html" accesskey="U"><code class="docutils literal notranslate"><span class="pre">macauff</span></code> Documentation</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">AstrometricCorrections</a></li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <section id="astrometriccorrections">
+<h1>AstrometricCorrections<a class="headerlink" href="#astrometriccorrections" title="Link to this heading">¶</a></h1>
+<dl class="py class">
+<dt class="sig sig-object py" id="macauff.AstrometricCorrections">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">macauff.</span></span><span class="sig-name descname"><span class="pre">AstrometricCorrections</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">psf_fwhm</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">numtrials</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">nn_radius</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dens_search_radius</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">save_folder</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">trifolder</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">triname</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">maglim_f</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">magnum</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">tri_num_faint</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">trifilterset</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">trifiltname</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">gal_wav_micron</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">gal_ab_offset</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">gal_filtname</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">gal_alav</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dm</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dd_params</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">l_cut</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ax1_mids</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ax2_mids</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ax_dimension</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">mag_array</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">mag_slice</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">sig_slice</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">n_pool</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">npy_or_csv</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">coord_or_chunk</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">pos_and_err_indices</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">mag_indices</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">mag_unc_indices</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">mag_names</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">best_mag_index</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">coord_system</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">pregenerate_cutouts</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">use_photometric_uncertainties</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">cutout_area</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">cutout_height</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">single_sided_auf</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">chunks</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/macauff/fit_astrometry.html#AstrometricCorrections"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#macauff.AstrometricCorrections" title="Link to this definition">¶</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+<p>Class to calculate any potential corrections to quoted astrometric
+precisions in photometric catalogues, based on reliable cross-matching
+to a well-understood second dataset.</p>
+<p>Initialisation of AstrometricCorrections, accepting inputs required for
+the running of the optimisation and parameterisation of astrometry of
+a photometric catalogue, benchmarked against a catalogue of much higher
+astrometric resolution and precision, such as Gaia or the Hubble Source
+Catalog.</p>
+<dl class="field-list">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><dl>
+<dt><strong>psf_fwhm</strong><span class="classifier">float</span></dt><dd><p>The full-width at half-maximum of the Point Spread Function, used to
+determine the size of the PSF for perturber placement purposes.</p>
+</dd>
+<dt><strong>numtrials</strong><span class="classifier">integer</span></dt><dd><p>Number of simulations to run when deriving pertubation statistics.</p>
+</dd>
+<dt><strong>nn_radius</strong><span class="classifier">float</span></dt><dd><p>Size of nearest-neighbour search for construction of intermediate
+cross-match distributions, in arcseconds.</p>
+</dd>
+<dt><strong>dens_search_radius</strong><span class="classifier">float</span></dt><dd><p>Radius out to which to search around objects internal to a
+catalogue, to determine the local normalising density for each
+source, in degrees.</p>
+</dd>
+<dt><strong>save_folder</strong><span class="classifier">string</span></dt><dd><p>Absolute or relative filepath of folder into which to store
+temporary and generated outputs from the fitting process.</p>
+</dd>
+<dt><strong>trifolder</strong><span class="classifier">string</span></dt><dd><p>Filepath of the location into which to save TRILEGAL simulations.</p>
+</dd>
+<dt><strong>triname</strong><span class="classifier">string</span></dt><dd><p>Name to give TRILEGAL simulations when downloaded. Is required to have
+two format <code class="docutils literal notranslate"><span class="pre">{}</span></code> options in string, for unique ax1-ax2 sightline
+combination downloads. Should not contain any file types, just the
+name of the file up to, but not including, the final “.”.</p>
+</dd>
+<dt><strong>maglim_f</strong><span class="classifier">float</span></dt><dd><p>Magnitude in the <code class="docutils literal notranslate"><span class="pre">magnum</span></code> filter down to which sources should be
+drawn for the “faint” sample.</p>
+</dd>
+<dt><strong>magnum</strong><span class="classifier">float</span></dt><dd><p>Zero-indexed column number of the chosen filter limiting magnitude.</p>
+</dd>
+<dt><strong>tri_num_faint</strong><span class="classifier">integer</span></dt><dd><p>Approximate number of objects to simulate in the chosen filter for
+TRILEGAL simulations.</p>
+</dd>
+<dt><strong>trifilterset</strong><span class="classifier">string</span></dt><dd><p>Name of the TRILEGAL filter set for which to generate simulations.</p>
+</dd>
+<dt><strong>trifiltname</strong><span class="classifier">string</span></dt><dd><p>Name of the specific filter to generate perturbation AUF component in.</p>
+</dd>
+<dt><strong>gal_wav_micron</strong><span class="classifier">float</span></dt><dd><p>Wavelength, in microns, of the <code class="docutils literal notranslate"><span class="pre">trifiltname</span></code> filter, for use in
+simulating galaxy counts.</p>
+</dd>
+<dt><strong>gal_ab_offset</strong><span class="classifier">float</span></dt><dd><p>The offset between the <code class="docutils literal notranslate"><span class="pre">trifiltname</span></code> filter zero point and the
+AB magnitude offset.</p>
+</dd>
+<dt><strong>gal_filtname</strong><span class="classifier">string</span></dt><dd><p>Name of the filter in the <code class="docutils literal notranslate"><span class="pre">speclite</span></code> compound naming convention.</p>
+</dd>
+<dt><strong>gal_alav</strong><span class="classifier">float</span></dt><dd><p>Differential reddening vector of the given filter.</p>
+</dd>
+<dt><strong>dm</strong><span class="classifier">float</span></dt><dd><p>Bin spacing for magnitude histograms of TRILEGAL simulations.</p>
+</dd>
+<dt><strong>dd_params</strong><span class="classifier">numpy.ndarray</span></dt><dd><p>Array, of shape <code class="docutils literal notranslate"><span class="pre">(5,</span> <span class="pre">X,</span> <span class="pre">2)</span></code>, containing the parameterisation of
+the skew-normal used to construct background-dominated PSF
+perturbations.</p>
+</dd>
+<dt><strong>l_cut</strong><span class="classifier">numpy.ndarray</span></dt><dd><p>Array of shape <code class="docutils literal notranslate"><span class="pre">(3,)</span></code> containing the cuts between the different
+regimes of background-dominated PSF perturbation.</p>
+</dd>
+<dt><strong>ax1_mids</strong><span class="classifier">numpy.ndarray</span></dt><dd><p>Array of longitudes (e.g. RA or l) used to center regions used to
+determine astrometric corrections across the sky. Depending on
+<code class="docutils literal notranslate"><span class="pre">ax_correction</span></code>, either the unique values that with <code class="docutils literal notranslate"><span class="pre">ax2_mids</span></code>
+form a rectangle, or a unique ax-ax combination with a corresponding
+<code class="docutils literal notranslate"><span class="pre">ax2_mid</span></code>.</p>
+</dd>
+<dt><strong>ax2_mids</strong><span class="classifier">numpy.ndarray</span></dt><dd><p>Array of latitudes (Dec/b) defining regions for calculating
+astrometric corrections. Either unique rectangle values to combine
+with <code class="docutils literal notranslate"><span class="pre">ax1_mids</span></code> or unique <code class="docutils literal notranslate"><span class="pre">ax1_mids</span></code>-<code class="docutils literal notranslate"><span class="pre">ax2_mids</span></code> pairs, one
+per entry.</p>
+</dd>
+<dt><strong>ax_dimension</strong><span class="classifier">integer, either <code class="docutils literal notranslate"><span class="pre">1</span></code> or <code class="docutils literal notranslate"><span class="pre">2</span></code></span></dt><dd><p>If <code class="docutils literal notranslate"><span class="pre">1</span></code> then <code class="docutils literal notranslate"><span class="pre">ax1_mids</span></code> and <code class="docutils literal notranslate"><span class="pre">ax2_mids</span></code> form unique sides of a
+rectangle when combined in a grid, or if <code class="docutils literal notranslate"><span class="pre">2</span></code> each
+<code class="docutils literal notranslate"><span class="pre">ax1_mids</span></code>-<code class="docutils literal notranslate"><span class="pre">ax2_mids</span></code> combination is a unique ax-ax pairing used
+as given.</p>
+</dd>
+<dt><strong>mag_array</strong><span class="classifier">numpy.ndarray</span></dt><dd><p>List of magnitudes in the <code class="docutils literal notranslate"><span class="pre">trifiltname</span></code> filter to derive astrometry
+for.</p>
+</dd>
+<dt><strong>mag_slice</strong><span class="classifier">numpy.ndarray</span></dt><dd><p>Widths of interval at which to take slices of magnitudes for deriving
+astrometric properties. Each <code class="docutils literal notranslate"><span class="pre">mag_slice</span></code> maps elementwise to each
+<code class="docutils literal notranslate"><span class="pre">mag_array</span></code>, and hence they should be the same shape.</p>
+</dd>
+<dt><strong>sig_slice</strong><span class="classifier">numpy.ndarray</span></dt><dd><p>Interval widths of quoted astrometric uncertainty to use when
+isolating individual sets of objects for AUF derivation. Length
+should match <code class="docutils literal notranslate"><span class="pre">mag_array</span></code>.</p>
+</dd>
+<dt><strong>n_pool</strong><span class="classifier">integer</span></dt><dd><p>The maximum number of threads to use when calling
+<code class="docutils literal notranslate"><span class="pre">multiprocessing</span></code>.</p>
+</dd>
+<dt><strong>npy_or_csv</strong><span class="classifier">string, either <code class="docutils literal notranslate"><span class="pre">npy</span></code> or <code class="docutils literal notranslate"><span class="pre">csv</span></code></span></dt><dd><p>Indicator as to whether the small chunks of sky to be loaded for
+each sightline’s evaluation are in binary <code class="docutils literal notranslate"><span class="pre">numpy</span></code> format or saved
+to disk as a comma-separated values file.</p>
+</dd>
+<dt><strong>coord_or_chunk</strong><span class="classifier">string, either <code class="docutils literal notranslate"><span class="pre">coord</span></code> or <code class="docutils literal notranslate"><span class="pre">chunk</span></code></span></dt><dd><p>String indicating whether intermediate files should be saved with
+filenames that are unique by two coordinates (l/b or RA/Dec) or
+some kind of singular “chunk” number. Output filenames would then
+need to follow <code class="docutils literal notranslate"><span class="pre">'file_{}{}'</span></code> or <code class="docutils literal notranslate"><span class="pre">'file_{}'</span></code> formatting
+respectively.</p>
+</dd>
+<dt><strong>pos_and_err_indices</strong><span class="classifier">list of list or numpy.ndarray of integers</span></dt><dd><p>In order, the indices within catalogue “a” and then “b” respecetively
+of either the .npy or .csv file of the longitudinal (e.g. RA or l),
+latitudinal (Dec or b), and <em>singular</em>, circular astrometric
+precision array. Coordinates should be in degrees while precision
+should be in the same units as <code class="docutils literal notranslate"><span class="pre">sig_slice</span></code> and those of the
+nearest-neighbour distances, likely arcseconds. For example,
+<code class="docutils literal notranslate"><span class="pre">[[0,</span> <span class="pre">1,</span> <span class="pre">2],</span> <span class="pre">[6,</span> <span class="pre">3,</span> <span class="pre">0]]</span></code> where catalogue “a” has its coordinates
+in the first three columns in RA/Dec/Err order, while catalogue “b”
+has its coordinates in a more random order.</p>
+</dd>
+<dt><strong>mag_indices</strong><span class="classifier">list or numpy.ndarray</span></dt><dd><p>In appropriate order, as expected by e.g. <a class="reference internal" href="macauff.CrossMatch.html#macauff.CrossMatch" title="macauff.CrossMatch"><code class="xref py py-obj docutils literal notranslate"><span class="pre">CrossMatch</span></code></a> inputs
+and <a class="reference internal" href="macauff.make_perturb_aufs.html#macauff.make_perturb_aufs" title="macauff.make_perturb_aufs"><code class="xref py py-obj docutils literal notranslate"><span class="pre">make_perturb_aufs</span></code></a>, list the indexes of each magnitude
+column within either the <code class="docutils literal notranslate"><span class="pre">.npy</span></code> or <code class="docutils literal notranslate"><span class="pre">.csv</span></code> file loaded for each
+sub-catalogue sightline. These should be zero-indexed.</p>
+</dd>
+<dt><strong>mag_unc_indices</strong><span class="classifier">list or numpy.ndarray</span></dt><dd><p>For each <code class="docutils literal notranslate"><span class="pre">mag_indices</span></code> entry, the corresponding magnitude
+uncertainty index in the catalogue.</p>
+</dd>
+<dt><strong>mag_names</strong><span class="classifier">list or numpy.ndarray of strings</span></dt><dd><p>Names of each <code class="docutils literal notranslate"><span class="pre">mag_indices</span></code> magnitude.</p>
+</dd>
+<dt><strong>best_mag_index</strong><span class="classifier">integer</span></dt><dd><p>Index into <code class="docutils literal notranslate"><span class="pre">mag_indices</span></code> of the preferred magnitude to use to
+construct astrometric scaling relations from. Should generally
+be the one with the most coverage across all detections in a
+catalogue, or the one with the most precise fluxes.</p>
+</dd>
+<dt><strong>coord_system</strong><span class="classifier">string, “equatorial” or “galactic”</span></dt><dd><p>Identifier of which coordinate system the data are in. Both datasets
+must be in the same system, which can either be RA/Dec (equatorial)
+or l/b (galactic) coordinates.</p>
+</dd>
+<dt><strong>pregenerate_cutouts</strong><span class="classifier">boolean</span></dt><dd><p>Indicates whether sightline catalogues must have been pre-made,
+or whether they can be generated by <code class="docutils literal notranslate"><span class="pre">AstrometricCorrections</span></code>
+using specified lines-of-sight and cutout areas and heights.</p>
+</dd>
+<dt><strong>use_photometric_uncertainties</strong><span class="classifier">boolean, optional</span></dt><dd><p>Flag for whether or not to use the photometric uncertainties instead
+of astrometric uncertainties when deriving astrometric uncertainties
+as a function of input precision. Defaults to False (use astrometric
+uncertainties).</p>
+</dd>
+<dt><strong>cutout_area</strong><span class="classifier">float, optional</span></dt><dd><p>The size, in square degrees, of the regions used to simulate
+AUFs and determine astrometric corrections. Required if
+<code class="docutils literal notranslate"><span class="pre">pregenerate_cutouts</span></code> is <code class="docutils literal notranslate"><span class="pre">False</span></code>.</p>
+</dd>
+<dt><strong>cutout_height</strong><span class="classifier">float, optional</span></dt><dd><p>The latitudinal height of the rectangular regions used in
+calculating astrometric corrections. Required if
+<code class="docutils literal notranslate"><span class="pre">pregenerate_cutouts</span></code> is <code class="docutils literal notranslate"><span class="pre">False</span></code>.</p>
+</dd>
+<dt><strong>single_sided_auf</strong><span class="classifier">boolean, optional</span></dt><dd><p>Flag indicating whether the AUF of catalogue “a” can be ignored
+when considering match statistics, or if astrometric corrections
+are being constructed from matches to a catalogue that also suffers
+significant non-noise-based astrometric uncertainty.</p>
+</dd>
+<dt><strong>chunks = list or numpy.ndarray of strings, optional</strong></dt><dd><p>List of IDs for each unique set of data if <code class="docutils literal notranslate"><span class="pre">coord_or_chunk</span></code> is
+<code class="docutils literal notranslate"><span class="pre">chunk</span></code>. In this case, <code class="docutils literal notranslate"><span class="pre">ax_dimension</span></code> must be <code class="docutils literal notranslate"><span class="pre">2</span></code> and each
+<code class="docutils literal notranslate"><span class="pre">chunk</span></code> must correspond to its <code class="docutils literal notranslate"><span class="pre">ax1_mids</span></code>-<code class="docutils literal notranslate"><span class="pre">ax2_mids</span></code> coordinate.</p>
+</dd>
+</dl>
+</dd>
+</dl>
+<p class="rubric">Methods Summary</p>
+<table class="autosummary longtable docutils align-default">
+<tbody>
+<tr class="row-odd"><td><p><a class="reference internal" href="#macauff.AstrometricCorrections.__call__" title="macauff.AstrometricCorrections.__call__"><code class="xref py py-obj docutils literal notranslate"><span class="pre">__call__</span></code></a>(a_cat_name, b_cat_name[, ...])</p></td>
+<td><p>Call function for the correction calculation process.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#macauff.AstrometricCorrections.calculate_local_densities_and_nearest_neighbours" title="macauff.AstrometricCorrections.calculate_local_densities_and_nearest_neighbours"><code class="xref py py-obj docutils literal notranslate"><span class="pre">calculate_local_densities_and_nearest_neighbours</span></code></a>()</p></td>
+<td><p>Calculate local normalising catalogue densities and catalogue-catalogue nearest neighbour match pairings for each cutout region.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#macauff.AstrometricCorrections.create_auf_pdfs" title="macauff.AstrometricCorrections.create_auf_pdfs"><code class="xref py py-obj docutils literal notranslate"><span class="pre">create_auf_pdfs</span></code></a>()</p></td>
+<td><p>Using perturbation AUF simulations, generate probability density functions of perturbation distance for all cutout regions, as well as recording key statistics such as average magnitude or SNR.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#macauff.AstrometricCorrections.finalise_summary_plot" title="macauff.AstrometricCorrections.finalise_summary_plot"><code class="xref py py-obj docutils literal notranslate"><span class="pre">finalise_summary_plot</span></code></a>()</p></td>
+<td><p>After running all of the sightlines' fits, generate a final summary plot of the sig-sig relations, quality of fits, and resulting &quot;m&quot; and &quot;n&quot; scaling parameters.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#macauff.AstrometricCorrections.fit_auf_joint" title="macauff.AstrometricCorrections.fit_auf_joint"><code class="xref py py-obj docutils literal notranslate"><span class="pre">fit_auf_joint</span></code></a>(p)</p></td>
+<td><p>Fits all magnitude slices for a single sightline, modelling empirically derived centroid uncertainties in all cases in addition to fixed uncertainty contributions.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#macauff.AstrometricCorrections.fit_snr_model" title="macauff.AstrometricCorrections.fit_snr_model"><code class="xref py py-obj docutils literal notranslate"><span class="pre">fit_snr_model</span></code></a>(j)</p></td>
+<td><p>Function to derive the scaling relation between magnitude via flux and SNR.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#macauff.AstrometricCorrections.fit_uncertainty" title="macauff.AstrometricCorrections.fit_uncertainty"><code class="xref py py-obj docutils literal notranslate"><span class="pre">fit_uncertainty</span></code></a>()</p></td>
+<td><p>For all magnitudes for eachsightline, fit for the empirical centroid uncertainty relationship that describes the distribution of match separations.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#macauff.AstrometricCorrections.load_catalogue" title="macauff.AstrometricCorrections.load_catalogue"><code class="xref py py-obj docutils literal notranslate"><span class="pre">load_catalogue</span></code></a>(cat_type, sub_cat_id)</p></td>
+<td><p>Load specific sightline's catalogue, accounting for catalogue &quot;a&quot; vs &quot;b&quot;, filetype, and method by which sightlines are divided.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#macauff.AstrometricCorrections.make_ax_coords" title="macauff.AstrometricCorrections.make_ax_coords"><code class="xref py py-obj docutils literal notranslate"><span class="pre">make_ax_coords</span></code></a>([check_b_only])</p></td>
+<td><p>Derive the unique ax1-ax2 combinations used in fitting astrometry, and calculate corner coordinates based on the size of the box and its central coordinates.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#macauff.AstrometricCorrections.make_catalogue_cutouts" title="macauff.AstrometricCorrections.make_catalogue_cutouts"><code class="xref py py-obj docutils literal notranslate"><span class="pre">make_catalogue_cutouts</span></code></a>()</p></td>
+<td><p>Generate cutout catalogues for regions as defined by corner ax1-ax2 coordinates.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#macauff.AstrometricCorrections.make_gridspec" title="macauff.AstrometricCorrections.make_gridspec"><code class="xref py py-obj docutils literal notranslate"><span class="pre">make_gridspec</span></code></a>(name, y, x, ratio, z, **kwargs)</p></td>
+<td><p>Convenience function to generate a matplotlib canvas and populate it with a gridspec grid.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#macauff.AstrometricCorrections.make_snr_model" title="macauff.AstrometricCorrections.make_snr_model"><code class="xref py py-obj docutils literal notranslate"><span class="pre">make_snr_model</span></code></a>()</p></td>
+<td><p>Calculates the relationship between source magnitude and its typical signal-to-noise ratio, based on the ensemble scaling relations of a given region.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#macauff.AstrometricCorrections.make_star_galaxy_counts" title="macauff.AstrometricCorrections.make_star_galaxy_counts"><code class="xref py py-obj docutils literal notranslate"><span class="pre">make_star_galaxy_counts</span></code></a>()</p></td>
+<td><p>Generate differential source counts for each cutout region, simulating both stars and galaxies.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#macauff.AstrometricCorrections.plot_fits_calculate_chi_sq" title="macauff.AstrometricCorrections.plot_fits_calculate_chi_sq"><code class="xref py py-obj docutils literal notranslate"><span class="pre">plot_fits_calculate_chi_sq</span></code></a>()</p></td>
+<td><p>Calculate chi-squared value and create verification plots showing the quality of the fits.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#macauff.AstrometricCorrections.plot_star_galaxy_counts" title="macauff.AstrometricCorrections.plot_star_galaxy_counts"><code class="xref py py-obj docutils literal notranslate"><span class="pre">plot_star_galaxy_counts</span></code></a>()</p></td>
+<td><p>Plotting routine to display data and model differential source counts, for verification purposes.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#macauff.AstrometricCorrections.simulate_aufs" title="macauff.AstrometricCorrections.simulate_aufs"><code class="xref py py-obj docutils literal notranslate"><span class="pre">simulate_aufs</span></code></a>()</p></td>
+<td><p>Simulate unresolved blended contaminants for each magnitude-sightline combination, for both aperture photometry and background-dominated PSF algorithms.</p></td>
+</tr>
+</tbody>
+</table>
+<p class="rubric">Methods Documentation</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="macauff.AstrometricCorrections.__call__">
+<span class="sig-name descname"><span class="pre">__call__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">a_cat_name</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">b_cat_name</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">a_cat_func</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">b_cat_func</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">tri_download</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">overwrite_all_sightlines</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">make_plots</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">make_summary_plot</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/macauff/fit_astrometry.html#AstrometricCorrections.__call__"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#macauff.AstrometricCorrections.__call__" title="Link to this definition">¶</a></dt>
+<dd><p>Call function for the correction calculation process.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><dl class="simple">
+<dt><strong>a_cat_name</strong><span class="classifier">string</span></dt><dd><p>Name of the catalogue “a” filename, pre-generated or saved by
+<code class="docutils literal notranslate"><span class="pre">a_cat_func</span></code>. Must accept one or two formats via Python string
+formatting (e.g. <code class="docutils literal notranslate"><span class="pre">'a_string_{}'</span></code>) that represent <code class="docutils literal notranslate"><span class="pre">chunk</span></code>, or
+<code class="docutils literal notranslate"><span class="pre">ax1_mid</span></code> and <code class="docutils literal notranslate"><span class="pre">ax2_mid</span></code>, depending on <code class="docutils literal notranslate"><span class="pre">coord_or_chunk</span></code>.</p>
+</dd>
+<dt><strong>b_cat_name</strong><span class="classifier">string</span></dt><dd><p>Name of the catalogue “b” filename. Must accept the same string
+formatting as <code class="docutils literal notranslate"><span class="pre">a_cat_name</span></code>.</p>
+</dd>
+<dt><strong>a_cat_func</strong><span class="classifier">callable, optional</span></dt><dd><p>Function used to generate reduced catalogue table for catalogue “a”.
+Must be given if <code class="docutils literal notranslate"><span class="pre">pregenerate_cutouts</span></code> is <code class="docutils literal notranslate"><span class="pre">False</span></code>.</p>
+</dd>
+<dt><strong>b_cat_func</strong><span class="classifier">callable</span></dt><dd><p>Function used to generate reduced catalogue table for catalogue “b”.
+Must be given if <code class="docutils literal notranslate"><span class="pre">pregenerate_cutouts</span></code> is <code class="docutils literal notranslate"><span class="pre">False</span></code>.</p>
+</dd>
+<dt><strong>tri_download</strong><span class="classifier">boolean, optional</span></dt><dd><p>Flag determining if TRILEGAL simulations should be re-downloaded
+if they already exist on disk.</p>
+</dd>
+<dt><strong>overwrite_all_sightlines</strong><span class="classifier">boolean, optional</span></dt><dd><p>Flag for whether to create a totally fresh run of astrometric
+corrections, regardless of whether <code class="docutils literal notranslate"><span class="pre">abc_array</span></code> or <code class="docutils literal notranslate"><span class="pre">m_sigs_array</span></code>
+are saved on disk. Defaults to <code class="docutils literal notranslate"><span class="pre">False</span></code>.</p>
+</dd>
+<dt><strong>make_plots</strong><span class="classifier">boolean, optional</span></dt><dd><p>Determines if intermediate figures are generated in the process
+of deriving astrometric corrections.</p>
+</dd>
+<dt><strong>make_summary_plot</strong><span class="classifier">boolean, optional</span></dt><dd><p>If <code class="docutils literal notranslate"><span class="pre">True</span></code> then final summary plot is created, even if
+<code class="docutils literal notranslate"><span class="pre">make_plots</span></code> is <code class="docutils literal notranslate"><span class="pre">False</span></code> and intermediate plots are not created.</p>
+</dd>
+</dl>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="macauff.AstrometricCorrections.calculate_local_densities_and_nearest_neighbours">
+<span class="sig-name descname"><span class="pre">calculate_local_densities_and_nearest_neighbours</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/macauff/fit_astrometry.html#AstrometricCorrections.calculate_local_densities_and_nearest_neighbours"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#macauff.AstrometricCorrections.calculate_local_densities_and_nearest_neighbours" title="Link to this definition">¶</a></dt>
+<dd><p>Calculate local normalising catalogue densities and catalogue-catalogue
+nearest neighbour match pairings for each cutout region.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="macauff.AstrometricCorrections.create_auf_pdfs">
+<span class="sig-name descname"><span class="pre">create_auf_pdfs</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/macauff/fit_astrometry.html#AstrometricCorrections.create_auf_pdfs"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#macauff.AstrometricCorrections.create_auf_pdfs" title="Link to this definition">¶</a></dt>
+<dd><p>Using perturbation AUF simulations, generate probability density functions
+of perturbation distance for all cutout regions, as well as recording key
+statistics such as average magnitude or SNR.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="macauff.AstrometricCorrections.finalise_summary_plot">
+<span class="sig-name descname"><span class="pre">finalise_summary_plot</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/macauff/fit_astrometry.html#AstrometricCorrections.finalise_summary_plot"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#macauff.AstrometricCorrections.finalise_summary_plot" title="Link to this definition">¶</a></dt>
+<dd><p>After running all of the sightlines’ fits, generate a final
+summary plot of the sig-sig relations, quality of fits, and
+resulting “m” and “n” scaling parameters.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="macauff.AstrometricCorrections.fit_auf_joint">
+<span class="sig-name descname"><span class="pre">fit_auf_joint</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">p</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/macauff/fit_astrometry.html#AstrometricCorrections.fit_auf_joint"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#macauff.AstrometricCorrections.fit_auf_joint" title="Link to this definition">¶</a></dt>
+<dd><p>Fits all magnitude slices for a single sightline, modelling
+empirically derived centroid uncertainties in all cases in addition
+to fixed uncertainty contributions.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><dl class="simple">
+<dt><strong>p</strong><span class="classifier">list</span></dt><dd><p>List containing the two scaling values to be fit for.</p>
+</dd>
+</dl>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><dl class="simple">
+<dt><strong>chi_sq</strong><span class="classifier">float</span></dt><dd><p>Chi-squared of the fit, to be minimised in the wrapping function call.</p>
+</dd>
+</dl>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="macauff.AstrometricCorrections.fit_snr_model">
+<span class="sig-name descname"><span class="pre">fit_snr_model</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">j</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/macauff/fit_astrometry.html#AstrometricCorrections.fit_snr_model"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#macauff.AstrometricCorrections.fit_snr_model" title="Link to this definition">¶</a></dt>
+<dd><p>Function to derive the scaling relation between magnitude via flux
+and SNR.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><dl class="simple">
+<dt><strong>j</strong><span class="classifier">integer</span></dt><dd><p>Index into <code class="docutils literal notranslate"><span class="pre">self.mag_indices</span></code>.</p>
+</dd>
+</dl>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><dl class="simple">
+<dt><strong>res</strong><span class="classifier">~scipy.optimize.OptimizeResult`</span></dt><dd><p>Contains the results of the minimisation, as determined by <code class="xref py py-obj docutils literal notranslate"><span class="pre">scipy</span></code>.</p>
+</dd>
+<dt><strong>s_bins</strong><span class="classifier">numpy.ndarray</span></dt><dd><p>Log-flux bins used to construct <code class="docutils literal notranslate"><span class="pre">s_d_snr_med</span></code> and <code class="docutils literal notranslate"><span class="pre">snr_med</span></code>.</p>
+</dd>
+<dt><strong>s_d_snr_med</strong><span class="classifier">numpy.ndarray</span></dt><dd><p>Median ratio of flux to signal-to-noise ratio in each <code class="docutils literal notranslate"><span class="pre">s_bins</span></code>
+bin.</p>
+</dd>
+<dt><strong>s_d_snr_dmed</strong><span class="classifier">numpy.ndarray</span></dt><dd><p>Standard deviation of S/SNR in each <code class="docutils literal notranslate"><span class="pre">s_bins</span></code> bin.</p>
+</dd>
+<dt><strong>snr_med</strong><span class="classifier">numpy.ndarray</span></dt><dd><p>Median SNR for each <code class="docutils literal notranslate"><span class="pre">s_bins</span></code> bin.</p>
+</dd>
+<dt><strong>snr_dmed</strong><span class="classifier">numpy.ndarray</span></dt><dd><p>Standard deviation of SNR for all objects in a given <code class="docutils literal notranslate"><span class="pre">s_bins</span></code> bin.</p>
+</dd>
+</dl>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="macauff.AstrometricCorrections.fit_uncertainty">
+<span class="sig-name descname"><span class="pre">fit_uncertainty</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/macauff/fit_astrometry.html#AstrometricCorrections.fit_uncertainty"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#macauff.AstrometricCorrections.fit_uncertainty" title="Link to this definition">¶</a></dt>
+<dd><p>For all magnitudes for eachsightline, fit for the empirical centroid
+uncertainty relationship that describes the distribution of match
+separations.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><dl class="simple">
+<dt><strong>m</strong><span class="classifier">float</span></dt><dd><p>The multiplicative factor for converting old uncertainties to new
+astrometric precision.</p>
+</dd>
+<dt><strong>n</strong><span class="classifier">float</span></dt><dd><p>Quadratically added constant uncertainty to add to scaling between
+input and output uncertainties.</p>
+</dd>
+</dl>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="macauff.AstrometricCorrections.load_catalogue">
+<span class="sig-name descname"><span class="pre">load_catalogue</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">cat_type</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">sub_cat_id</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/macauff/fit_astrometry.html#AstrometricCorrections.load_catalogue"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#macauff.AstrometricCorrections.load_catalogue" title="Link to this definition">¶</a></dt>
+<dd><p>Load specific sightline’s catalogue, accounting for catalogue “a”
+vs “b”, filetype, and method by which sightlines are divided.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><dl class="simple">
+<dt><strong>cat_type</strong><span class="classifier">string, “a” or “b”</span></dt><dd><p>Identifier for which of the two catalogues to load.</p>
+</dd>
+<dt><strong>sub_cat_id</strong><span class="classifier">list</span></dt><dd><p>Contains the variables to format the name of the catalogue with,
+in the sense of <code class="docutils literal notranslate"><span class="pre">string.format(x,</span> <span class="pre">y,</span> <span class="pre">...)</span></code>. Should either contain
+ax1 and ax2, or chunk ID, depending on <code class="docutils literal notranslate"><span class="pre">coord_or_chunk</span></code>.</p>
+</dd>
+</dl>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><dl class="simple">
+<dt><strong>x</strong><span class="classifier">numpy.ndarray</span></dt><dd><p>The catalogue’s dataset.</p>
+</dd>
+</dl>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="macauff.AstrometricCorrections.make_ax_coords">
+<span class="sig-name descname"><span class="pre">make_ax_coords</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">check_b_only</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/macauff/fit_astrometry.html#AstrometricCorrections.make_ax_coords"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#macauff.AstrometricCorrections.make_ax_coords" title="Link to this definition">¶</a></dt>
+<dd><p>Derive the unique ax1-ax2 combinations used in fitting astrometry, and
+calculate corner coordinates based on the size of the box and its
+central coordinates.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><dl class="simple">
+<dt><strong>check_b_only</strong><span class="classifier">boolean, optional</span></dt><dd><p>Overloadable flag for cases where we can ignore catalogue ‘a’ and
+only need to check for catalogue ‘b’ existing if pregenerate_cutouts
+is True.</p>
+</dd>
+</dl>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="macauff.AstrometricCorrections.make_catalogue_cutouts">
+<span class="sig-name descname"><span class="pre">make_catalogue_cutouts</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/macauff/fit_astrometry.html#AstrometricCorrections.make_catalogue_cutouts"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#macauff.AstrometricCorrections.make_catalogue_cutouts" title="Link to this definition">¶</a></dt>
+<dd><p>Generate cutout catalogues for regions as defined by corner ax1-ax2
+coordinates.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="macauff.AstrometricCorrections.make_gridspec">
+<span class="sig-name descname"><span class="pre">make_gridspec</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">name</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">y</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">x</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ratio</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">z</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/macauff/fit_astrometry.html#AstrometricCorrections.make_gridspec"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#macauff.AstrometricCorrections.make_gridspec" title="Link to this definition">¶</a></dt>
+<dd><p>Convenience function to generate a matplotlib canvas and populate it
+with a gridspec grid.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><dl class="simple">
+<dt><strong>name</strong><span class="classifier">string</span></dt><dd><p>Unique identifier for the figure returned.</p>
+</dd>
+<dt><strong>y</strong><span class="classifier">int</span></dt><dd><p>Number of rows in the resulting grid of axes.</p>
+</dd>
+<dt><strong>x</strong><span class="classifier">int</span></dt><dd><p>Number of columns in the figure grid.</p>
+</dd>
+<dt><strong>ratio</strong><span class="classifier">float</span></dt><dd><p>Aspect ratio of axis, with <code class="docutils literal notranslate"><span class="pre">0.5</span></code> being half as tall as it is
+wide.</p>
+</dd>
+<dt><strong>z</strong><span class="classifier">float</span></dt><dd><p>Width of a single axis in real figure units, likely inches.</p>
+</dd>
+</dl>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><dl class="simple">
+<dt><strong>gs</strong><span class="classifier">~`matplotlib.gridspec.GridSpec`</span></dt><dd><p>The created gridspec instance.</p>
+</dd>
+</dl>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="macauff.AstrometricCorrections.make_snr_model">
+<span class="sig-name descname"><span class="pre">make_snr_model</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/macauff/fit_astrometry.html#AstrometricCorrections.make_snr_model"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#macauff.AstrometricCorrections.make_snr_model" title="Link to this definition">¶</a></dt>
+<dd><p>Calculates the relationship between source magnitude and its typical
+signal-to-noise ratio, based on the ensemble scaling relations of a
+given region.</p>
+<p>We treat SNR as being related to flux S with
+<span class="math notranslate nohighlight">\(\frac{S}{\sqrt{cS + b + (aS)^2}}\)</span>, with <code class="docutils literal notranslate"><span class="pre">a</span></code>, <code class="docutils literal notranslate"><span class="pre">b</span></code>, and <code class="docutils literal notranslate"><span class="pre">c</span></code>
+setting the scaling with systematic uncertainty, background flux,
+and photon noise respectively. We then use
+<span class="math notranslate nohighlight">\(S = 10^{-M/2.5}\)</span>, and hence typical magnitude-SNR
+relations are completely described by <code class="docutils literal notranslate"><span class="pre">a</span></code>, <code class="docutils literal notranslate"><span class="pre">b</span></code>, and <code class="docutils literal notranslate"><span class="pre">c</span></code>.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="macauff.AstrometricCorrections.make_star_galaxy_counts">
+<span class="sig-name descname"><span class="pre">make_star_galaxy_counts</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/macauff/fit_astrometry.html#AstrometricCorrections.make_star_galaxy_counts"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#macauff.AstrometricCorrections.make_star_galaxy_counts" title="Link to this definition">¶</a></dt>
+<dd><p>Generate differential source counts for each cutout region, simulating
+both stars and galaxies.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="macauff.AstrometricCorrections.plot_fits_calculate_chi_sq">
+<span class="sig-name descname"><span class="pre">plot_fits_calculate_chi_sq</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/macauff/fit_astrometry.html#AstrometricCorrections.plot_fits_calculate_chi_sq"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#macauff.AstrometricCorrections.plot_fits_calculate_chi_sq" title="Link to this definition">¶</a></dt>
+<dd><p>Calculate chi-squared value and create verification plots showing the
+quality of the fits.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="macauff.AstrometricCorrections.plot_star_galaxy_counts">
+<span class="sig-name descname"><span class="pre">plot_star_galaxy_counts</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/macauff/fit_astrometry.html#AstrometricCorrections.plot_star_galaxy_counts"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#macauff.AstrometricCorrections.plot_star_galaxy_counts" title="Link to this definition">¶</a></dt>
+<dd><p>Plotting routine to display data and model differential source counts,
+for verification purposes.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="macauff.AstrometricCorrections.simulate_aufs">
+<span class="sig-name descname"><span class="pre">simulate_aufs</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/macauff/fit_astrometry.html#AstrometricCorrections.simulate_aufs"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#macauff.AstrometricCorrections.simulate_aufs" title="Link to this definition">¶</a></dt>
+<dd><p>Simulate unresolved blended contaminants for each magnitude-sightline
+combination, for both aperture photometry and background-dominated PSF
+algorithms.</p>
+</dd></dl>
+
+</dd></dl>
+
+</section>
+
+
+            <div class="clearer"></div>
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="../f-modindex.html" title="Fortran Module Index"
+             >fortran modules</a> |</li>
+        <li class="right" >
+          <a href="../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="right" >
+          <a href="macauff.CrossMatch.html" title="CrossMatch"
+             >next</a> |</li>
+        <li class="right" >
+          <a href="macauff.source_pairing.html" title="source_pairing"
+             >previous</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../index.html">macauff</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../macauff.html" ><code class="docutils literal notranslate"><span class="pre">macauff</span></code> Documentation</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">AstrometricCorrections</a></li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+    &#169; Copyright 2022, Tom J Wilson.
+      Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 7.2.6.
+    </div>
+  </body>
+</html>

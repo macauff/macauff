@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="./">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>Pre- and Post-Processing &#8212; macauff</title>
+    <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=4848ba22" />
+    <link rel="stylesheet" type="text/css" href="_static/pyramid.css?v=a5b9c134" />
+    <link rel="stylesheet" type="text/css" href="_static/graphviz.css?v=eafc0fe6" />
+    <script src="_static/documentation_options.js?v=5929fcd5"></script>
+    <script src="_static/doctools.js?v=888ff710"></script>
+    <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script async="async" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="macauff Algorithms" href="algorithms.html" />
+    <link rel="prev" title="Input Parameters" href="inputs.html" />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Neuton&amp;subset=latin" type="text/css" media="screen" charset="utf-8" />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Nobile:regular,italic,bold,bolditalic&amp;subset=latin" type="text/css" media="screen" charset="utf-8" />
+<!--[if lte IE 6]>
+<link rel="stylesheet" href="_static/ie6.css" type="text/css" media="screen" charset="utf-8" />
+<![endif]-->
+
+  </head><body>
+
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="f-modindex.html" title="Fortran Module Index"
+             >fortran modules</a> |</li>
+        <li class="right" >
+          <a href="py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="right" >
+          <a href="algorithms.html" title="macauff Algorithms"
+             accesskey="N">next</a> |</li>
+        <li class="right" >
+          <a href="inputs.html" title="Input Parameters"
+             accesskey="P">previous</a> |</li>
+        <li class="nav-item nav-item-0"><a href="index.html">macauff</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">Pre- and Post-Processing</a></li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <section id="pre-and-post-processing">
+<h1>Pre- and Post-Processing<a class="headerlink" href="#pre-and-post-processing" title="Link to this heading">¶</a></h1>
+<p>The main aspect of macauff is the process of determining most likely counterparts between two photometric catalogues through <a class="reference internal" href="api/macauff.CrossMatch.html#macauff.CrossMatch" title="macauff.CrossMatch"><code class="xref py py-obj docutils literal notranslate"><span class="pre">CrossMatch</span></code></a>. However there are several steps that must (or can/should be) performed before and after the call to the matching process.</p>
+<p>Pre-processing is broken down into several steps: catalogues must always be converted from original form into binary <code class="docutils literal notranslate"><span class="pre">.npy</span></code> files, and optionally can have their centroid precisions updated if necessary during this process, and if necessary the parameterisation required for the background-dominated PSF photometry algorithm for use in the creation of perturbation AUF components should be derived. Post-processing is simply the creation of an output joined composite dataset from saved files created during the cross-match process.</p>
+<section id="pre-processing">
+<h2>Pre-Processing<a class="headerlink" href="#pre-processing" title="Link to this heading">¶</a></h2>
+<section id="create-input-files">
+<h3>Create Input Files<a class="headerlink" href="#create-input-files" title="Link to this heading">¶</a></h3>
+<p>The singular requirement for running macauff is that each photometric catalogue be distilled into three separate binary files: <code class="docutils literal notranslate"><span class="pre">con_cat_astro.npy</span></code>, <code class="docutils literal notranslate"><span class="pre">con_cat_photo.npy</span></code>, and <code class="docutils literal notranslate"><span class="pre">magref.npy</span></code>. As shown in the <a class="reference internal" href="quickstart.html"><span class="doc">Quick Start</span></a>, these have a set number of columns for each file, and should share the same number of rows. The layout should be as follows:</p>
+<blockquote>
+<div><div class="line-block">
+<div class="line">con_cat_astro.npy: shape (N, 3)</div>
+<div class="line-block">
+<div class="line">coord1 - RA or Galactic longitude (degrees)</div>
+<div class="line">coord2 - Dec or Galactic latitude (degrees)</div>
+<div class="line">uncert - singular, circular astrometric uncertainty (arcseconds)</div>
+</div>
+</div>
+<div class="line-block">
+<div class="line">con_cat_photo.npy: shape (N, M)</div>
+<div class="line-block">
+<div class="line">filter1 - magnitude in filter1</div>
+<div class="line">filter2 - magnitude in filter2</div>
+<div class="line">…</div>
+</div>
+</div>
+<div class="line-block">
+<div class="line">magref.npy: shape (N, 1) or (N,)</div>
+<div class="line-block">
+<div class="line">best detection (0 to M-1) across filter1, filter2, …</div>
+</div>
+</div>
+</div></blockquote>
+<p>Starting from commonly available photometric catalogues such as the ones downloaded from the <em>Gaia</em> archive, the initial steps that must be performed are the creation of a single astrometric uncertainty and the determination of the “best” detection.</p>
+<p>Singular astrometric uncertainty can be as simple as taking the average of the semi-major and semi-minor axes of the covariance ellipse. If the catalogue in question already reports covariance in the form of semi-major and semi-minor astrometric uncertainties along with their angle of rotation, simply take <span class="math notranslate nohighlight">\(\sigma = 0.5 \times (\sigma_\mathrm{major}+\sigma_\mathrm{minor})\)</span>. On the other hand, if the catalogue reports the “full” covariance matrix, <span class="math notranslate nohighlight">\(\sigma_\mathrm{RA}\)</span>, <span class="math notranslate nohighlight">\(\sigma_\mathrm{Dec}\)</span>, and correlation <span class="math notranslate nohighlight">\(\rho\)</span>, semi-major and semi-minor axes can be computed as</p>
+<div class="math notranslate nohighlight">
+\[\sigma_\mathrm{major}^2 = \frac{1}{2}\left[\sigma_\mathrm{RA}^2 + \sigma_\mathrm{Dec}^2 + \sqrt{(\sigma_\mathrm{RA}^2 - \sigma_\mathrm{Dec}^2)^2 + 4(\rho\sigma_\mathrm{RA}\sigma_\mathrm{Dec})^2}\right]\]</div>
+<div class="math notranslate nohighlight">
+\[\sigma_\mathrm{minor}^2 = \frac{1}{2}\left[\sigma_\mathrm{RA}^2 + \sigma_\mathrm{Dec}^2 - \sqrt{(\sigma_\mathrm{RA}^2 - \sigma_\mathrm{Dec}^2)^2 + 4(\rho\sigma_\mathrm{RA}\sigma_\mathrm{Dec})^2}\right]\]</div>
+<p>and the average taken.</p>
+<p>Determination of the “best” magnitude to use is left to the individual catalogue and the purpose for its use. However, some universal selection criteria likely apply. Removal of obvious artefacts, objects with signal-to-noise ratios (SNRs) of order unity, poor quality detections that e.g. do not pass a <span class="math notranslate nohighlight">\(\chi^2\)</span> cut, and any objects failing any other sensible filtering criteria should be applied initially. Then, for each object, priority should be given to the highest quality detection in all available bandpasses (high SNR, not saturated, less contaminated, etc.). If multiple bands meet the criteria, a good rule of thumb is to use the wavelength closest to the other catalogue to be matched, as this will result in more discernment if the photometric likelihoods are used and better rejection of false matches – in the limit that the same exact filters are used, true matches would follow <span class="math notranslate nohighlight">\(x = y\)</span> (with some scatter from measurement uncertainty), but this becomes blurred across magnitude-magnitude space with increasing wavelength separation between bandpasses.</p>
+<p>Once these new values – singular astrometric precision and “best detection” index – are computed, if they are available within a <code class="docutils literal notranslate"><span class="pre">.csv</span></code> file, the binary files macauff requires can be derived using <a class="reference internal" href="api/macauff.csv_to_npy.html#macauff.csv_to_npy" title="macauff.csv_to_npy"><code class="xref py py-obj docutils literal notranslate"><span class="pre">csv_to_npy</span></code></a>.</p>
+<section id="the-core-halo-chunk-model">
+<h4>The Core-Halo Chunk Model<a class="headerlink" href="#the-core-halo-chunk-model" title="Link to this heading">¶</a></h4>
+<p>While <code class="docutils literal notranslate"><span class="pre">macauff</span></code> can be used with a singular monolithic cross-match region, it can be preferable to split a large block of sky into smaller, more manageable sections to have counterparts assigned in an individual basis; the most obvious reason to do so is to parallelise these smaller regions to simultaneously cross-match through e.g. MPI distribution, as <code class="docutils literal notranslate"><span class="pre">macauff</span></code> offers.</p>
+<p>To do so, you will need to define the particular size of both the <em>core</em> and <em>halo</em> of each region, as shown in the schematic below.</p>
+<img alt="A schematic of the central core of chunks along with their halo regions surrounding them. Cores are squares that touch at the edges while halos are slightly larger than the cores, with a halo centered on each core. There is therefore a small region of each halo area in another core square." src="_images/core_halo_overlap.png" />
+<p>The cores are the red squares; these are defined such that they exactly touch one another with no source being in two cores. Halos, on the other hand, are padded regions around each core (i.e., slightly larger squares centered on the same sky coordinates as their respective core), shown as the black squares. This then means that each halo overlaps multiple different core regions, with each core having multiple overlapping halos.</p>
+<p>These should be defined such that you provide, for each so-called “chunk”, a region of <em>halo plus core</em> size, such that halos effectively contain superfluous matches. Taking into account that <code class="docutils literal notranslate"><span class="pre">macauff</span></code>’s island creation “bins” any <em>islands</em> of sources that are within <code class="docutils literal notranslate"><span class="pre">pos_corr_dist</span></code> of the four coordinates defining the rectangle of the match region – in this case, the <em>halo</em> region – we then further remove any additional objects that are still matched, but come from another region’s core.</p>
+<p>To this end, the halo should be defined such that, even after removing the <code class="docutils literal notranslate"><span class="pre">pos_corr_dist</span></code> edge-of-region-adjacent sources, we are left with all matches that overlap the <em>core</em>. A reasonably safe bet is to set the halo size to twice <code class="docutils literal notranslate"><span class="pre">pos_corr_dist</span></code>, but depending on the relative size of the core and this “unreliable island” region larger or smaller halo width regions may be required.</p>
+<p>The difference between core and halo is defined in the accompanying file <code class="docutils literal notranslate"><span class="pre">in_chunk_overlap.npy</span></code> which should be in the same folder as <code class="docutils literal notranslate"><span class="pre">con_cat_astro.npy</span></code> et al. This 1-D file should be a binary, where <code class="docutils literal notranslate"><span class="pre">True</span></code> (or equivalent) is a “yes” to the question “is this object in the halo region”, with false being a core-region source.</p>
+</section>
+</section>
+<section id="update-astrometry-precisions">
+<h3>Update Astrometry Precisions<a class="headerlink" href="#update-astrometry-precisions" title="Link to this heading">¶</a></h3>
+<p>As a full Bayesian cross-match code, it is vital that all aspects of input data are accurately reflected in the catalogues matched with macauff. To this end it provides key additional components to the AUF, but must also rely on accurate and precise astrometric precisions for all sources, as this determines the most fundamental AUF component in the noise-based centroid uncertainty. Hence, within macauff <code class="docutils literal notranslate"><span class="pre">AstrometricCorrections</span></code> is provided to ensure that if necessary corrections can be made to these quoted values.</p>
+<p>For numerous reasons, some photometric catalogues do not contain full uncertainties on the positions of each individual object. In some cases they may simply be smaller datasets that lack the processing power to derive such numbers; in others, the <em>statistical</em> precisions but not further full systematics may be provided. Either way, these uncertainties can be derived as an ensemble through distributions of separations to a second, well-understood catalogue. For a set of objects in a small range of magnitudes – and hence, to first order, the same astrometric precision – we can take a robust set of cross-matches to objects in a second dataset (ideally one with a much higher astrometric precision, such as <em>Gaia</em> or the Hubble Source Catalog) and, after accounting for any necessary additional AUF components (ensuring that all objects are from roughly the same normalising sky background density of sources), compute the best-fit astrometric precision for the ensemble of objects in question. Taking all of the additional AUF components and opposing catalogue object precision as fixed (or negligible), a least-squares minimisation that searches for the best-fit common astrometric precision for the objects in question – as well as nuisance parameters such as false match fraction – for multiple sets of objects in turn, we can then derive a series of “best fit” precisions and plot them as a function of “input” precision. Finally, we can then fit for a parameterisation of <span class="math notranslate nohighlight">\(\sigma_\mathrm{best}(\sigma_\mathrm{input})\)</span>, assuming that the key components are any potential missing systematic uncertainty and a mis-matched scaling relation for the statistical component and hence approximating the scaling as <span class="math notranslate nohighlight">\(\sigma_\mathrm{best} = \sqrt{n^2 + (m \sigma_\mathrm{input})^2}\)</span>.</p>
+<p>Thus the output from <code class="docutils literal notranslate"><span class="pre">AstrometricCorrections</span></code> is, ultimately, an array of <span class="math notranslate nohighlight">\(m\)</span> and <span class="math notranslate nohighlight">\(n\)</span> values, one of each per pointing input into the fitting routine.</p>
+</section>
+<section id="calculating-background-dominated-psf-photometry-auf-perturbation-parameterisation">
+<h3>Calculating Background-Dominated PSF Photometry AUF Perturbation Parameterisation<a class="headerlink" href="#calculating-background-dominated-psf-photometry-auf-perturbation-parameterisation" title="Link to this heading">¶</a></h3>
+<p>As part of the overarching generalisation of the AUF, macauff offers two algorithms for the determination of the effect of hidden, blended objects on the centre-of-light of the brighter central object. One of these is the case where the methodology being used to determine the centroids of objects in the astrophysical images uses PSF photometry to find the least-squares best-fit between a model and the data under the assumption that the sky background is sufficiently bright that all pixels have the same noise. In this regime we require the calculation of <span class="math notranslate nohighlight">\(\Delta x\)</span>, the offset a hidden contaminant object at some offset <span class="math notranslate nohighlight">\(x\)</span> creates. These are also a function of the relative flux of the two objects, and hence we have <span class="math notranslate nohighlight">\(\Delta x(x, f)\)</span>.</p>
+<p>We provide here a function <code class="docutils literal notranslate"><span class="pre">FitPSFPerturbations</span></code> that calculates this double parameterisation; for a given <span class="math notranslate nohighlight">\(f\)</span> we model <span class="math notranslate nohighlight">\(\Delta x\)</span> as a linear slope with <span class="math notranslate nohighlight">\(x\)</span> up to some critical cutoff radius <span class="math notranslate nohighlight">\(r_c\)</span> beyond which the perturbation is a skew normal, with <span class="math notranslate nohighlight">\(\sigma\)</span>, <span class="math notranslate nohighlight">\(\mu\)</span>, and <span class="math notranslate nohighlight">\(\alpha\)</span> as its parameters, plus overall amplitude <span class="math notranslate nohighlight">\(T\)</span>. Thus each of those five parameters is, as a function of relative flux <span class="math notranslate nohighlight">\(f\)</span> fit with two N-order polynomials (split around <span class="math notranslate nohighlight">\(f \simeq 0.5\)</span>).</p>
+<p><code class="docutils literal notranslate"><span class="pre">FitPSFPerturbations</span></code> calculates the individual offsets, fits each separation set of perturbations for its skew normal parameters, and fits the polynomial weightings for the scaling with flux. It then probes various orders of polynomial and derives the best-fit, accounting for lower complexity being preferred due to computational inefficiencies. Finally, various cubes of polynomial weightings and other key arrays are saved, in formats macauff understands for computing <span class="math notranslate nohighlight">\(\Delta x(x, f)\)</span> during the derivation of the perturbation component of the AUF.</p>
+<p>This parameterisation is offered in cases where the user does not have access to these pre-determined parameterisations.</p>
+</section>
+</section>
+<section id="post-processing">
+<h2>Post-Processing<a class="headerlink" href="#post-processing" title="Link to this heading">¶</a></h2>
+<section id="filter-for-core-halo-objects">
+<h3>Filter For Core-Halo Objects<a class="headerlink" href="#filter-for-core-halo-objects" title="Link to this heading">¶</a></h3>
+<p>Contained within the main <code class="docutils literal notranslate"><span class="pre">CrossMatch</span></code> routine, and therefore slightly different from the other points here, chunk post-processing is the final step of the cross-matching algorithms. Here we remove any objects that are in the “halo” of a given chunk – if chunking has been applied to larger match regions – to avoid the duplications of many objects.</p>
+<p>If you have broken a larger cross-match region into small chunks for parallel use, or to reduce memory use, then the duplicate objects must be removed as much as possible. Taking into account that <code class="docutils literal notranslate"><span class="pre">macauff</span></code> removes sources which potentially contain incomplete islands (limited by <code class="docutils literal notranslate"><span class="pre">pos_corr_dist</span></code>, discussed above), we currently filter for sources depending on a <code class="docutils literal notranslate"><span class="pre">in_chunk_overlap</span></code> flag, which must be provided at runtime.</p>
+<p>For matches, we currently keep any potential match that is in the core in <em>either</em> catalogue – i.e., a core object in catalogue “a” matches across the halo of catalogue “b” is kept, but a halo-halo match isn’t. For non-matches, similarly all non-halo sources are removed, but since these objects are “isolated” this is independent across the two catalogues.</p>
+<p>This has the small effect of potentially duplicating results – in the above match case of core A and halo B sources, the chunk over equally believes these to be <em>halo</em> A and <em>core</em> B sources (see schematic above); if both chunks return these sources as matches, a consolidated catalogue where all matches are combined would see these objects appear twice. At present this is a reasonable trade-off to allow for massive parallelisation of large-scale matches, but means that halos should be as small as possible – or core regions as <em>large</em> as possible – to minimise the fraction of objects with this potential overlap.</p>
+</section>
+<section id="creating-composite-datasets">
+<h3>Creating Composite Datasets<a class="headerlink" href="#creating-composite-datasets" title="Link to this heading">¶</a></h3>
+<p>The final activity that occurs after the calculation of maximum-probability counterpart assignments is the generation of the merged dataset. Taking each of the key columns from both datasets and combining it with macauff-generated information – such as match probability, chance of contamination due to blended object, likelihood ratios etc. – <code class="docutils literal notranslate"><span class="pre">npy_to_csv</span></code> generates a singular <code class="docutils literal notranslate"><span class="pre">.csv</span></code> file from the multiple separate arrays made for and during the cross-match process.</p>
+<p>Here, certain elements are strongly suggested:</p>
+<blockquote>
+<div><div class="line-block">
+<div class="line">ID of catalogue “a”</div>
+<div class="line">“a” RA</div>
+<div class="line">“a” Dec</div>
+<div class="line">“a” filter1</div>
+<div class="line">“a” filter2</div>
+<div class="line">…</div>
+</div>
+</div></blockquote>
+<p>for both catalogues. We also always include generated information in the output from <code class="docutils literal notranslate"><span class="pre">npy_to_csv</span></code>:</p>
+<blockquote>
+<div><div class="line-block">
+<div class="line">probability of match</div>
+<div class="line">separation between counterparts</div>
+<div class="line"><span class="math notranslate nohighlight">\(\eta\)</span>, the photometric likelihood ratio of match vs non-match</div>
+<div class="line"><span class="math notranslate nohighlight">\(\xi\)</span>, the likelihood ratio of match vs non-match on purely positional grounds</div>
+<div class="line">average contamination of “a” source</div>
+<div class="line">simulated average contamination of source in catalogue “b”</div>
+<div class="line">fraction of simulated “a” sources with contaminant of &gt;1% relative flux</div>
+<div class="line">fraction of simulated “a” sources with contaminant of &gt;10% relative flux</div>
+<div class="line">fraction of simulated “b” sources with contaminant of &gt;1% relative flux</div>
+<div class="line">fraction of simulated “b” sources with contaminant of &gt;10% relative flux</div>
+</div>
+</div></blockquote>
+<p>and finally any extra columns from either catalogue can be added, as suits the specific use case. Additionally, if astrometric uncertainties were updated using <code class="docutils literal notranslate"><span class="pre">AstrometricCorrections</span></code> and changes made to the input astrometric precision during <code class="docutils literal notranslate"><span class="pre">csv_to_npy</span></code> then those new, updated astrometric uncertainties can be included in the input <code class="docutils literal notranslate"><span class="pre">.csv</span></code> file.</p>
+</section>
+</section>
+</section>
+
+
+            <div class="clearer"></div>
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+  <div>
+    <h3><a href="index.html">Table of Contents</a></h3>
+    <ul>
+<li><a class="reference internal" href="#">Pre- and Post-Processing</a><ul>
+<li><a class="reference internal" href="#pre-processing">Pre-Processing</a><ul>
+<li><a class="reference internal" href="#create-input-files">Create Input Files</a><ul>
+<li><a class="reference internal" href="#the-core-halo-chunk-model">The Core-Halo Chunk Model</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#update-astrometry-precisions">Update Astrometry Precisions</a></li>
+<li><a class="reference internal" href="#calculating-background-dominated-psf-photometry-auf-perturbation-parameterisation">Calculating Background-Dominated PSF Photometry AUF Perturbation Parameterisation</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#post-processing">Post-Processing</a><ul>
+<li><a class="reference internal" href="#filter-for-core-halo-objects">Filter For Core-Halo Objects</a></li>
+<li><a class="reference internal" href="#creating-composite-datasets">Creating Composite Datasets</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+
+  </div>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="f-modindex.html" title="Fortran Module Index"
+             >fortran modules</a> |</li>
+        <li class="right" >
+          <a href="py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="right" >
+          <a href="algorithms.html" title="macauff Algorithms"
+             >next</a> |</li>
+        <li class="right" >
+          <a href="inputs.html" title="Input Parameters"
+             >previous</a> |</li>
+        <li class="nav-item nav-item-0"><a href="index.html">macauff</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">Pre- and Post-Processing</a></li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+    &#169; Copyright 2022, Tom J Wilson.
+      Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 7.2.6.
+    </div>
+  </body>
+</html>

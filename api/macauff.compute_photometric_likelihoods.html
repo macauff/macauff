@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>compute_photometric_likelihoods &#8212; macauff</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=4848ba22" />
+    <link rel="stylesheet" type="text/css" href="../_static/pyramid.css?v=a5b9c134" />
+    <link rel="stylesheet" type="text/css" href="../_static/graphviz.css?v=eafc0fe6" />
+    <script src="../_static/documentation_options.js?v=5929fcd5"></script>
+    <script src="../_static/doctools.js?v=888ff710"></script>
+    <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="create_galaxy_counts" href="macauff.create_galaxy_counts.html" />
+    <link rel="prev" title="calculate_proper_motions" href="macauff.calculate_proper_motions.html" />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Neuton&amp;subset=latin" type="text/css" media="screen" charset="utf-8" />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Nobile:regular,italic,bold,bolditalic&amp;subset=latin" type="text/css" media="screen" charset="utf-8" />
+<!--[if lte IE 6]>
+<link rel="stylesheet" href="../_static/ie6.css" type="text/css" media="screen" charset="utf-8" />
+<![endif]-->
+
+  </head><body>
+
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="../f-modindex.html" title="Fortran Module Index"
+             >fortran modules</a> |</li>
+        <li class="right" >
+          <a href="../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="right" >
+          <a href="macauff.create_galaxy_counts.html" title="create_galaxy_counts"
+             accesskey="N">next</a> |</li>
+        <li class="right" >
+          <a href="macauff.calculate_proper_motions.html" title="calculate_proper_motions"
+             accesskey="P">previous</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../index.html">macauff</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../macauff.html" accesskey="U"><code class="docutils literal notranslate"><span class="pre">macauff</span></code> Documentation</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">compute_photometric_likelihoods</a></li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <section id="compute-photometric-likelihoods">
+<h1>compute_photometric_likelihoods<a class="headerlink" href="#compute-photometric-likelihoods" title="Link to this heading">¶</a></h1>
+<dl class="py function">
+<dt class="sig sig-object py" id="macauff.compute_photometric_likelihoods">
+<span class="sig-prename descclassname"><span class="pre">macauff.</span></span><span class="sig-name descname"><span class="pre">compute_photometric_likelihoods</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">joint_folder_path</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">a_cat_folder_path</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">b_cat_folder_path</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">afilts</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">bfilts</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">cf_points</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">cf_areas</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">include_phot_like</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">use_phot_priors</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">group_sources_data</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">bright_frac</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">field_frac</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/macauff/photometric_likelihood.html#compute_photometric_likelihoods"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#macauff.compute_photometric_likelihoods" title="Link to this definition">¶</a></dt>
+<dd><p>Derives the photometric likelihoods and priors for use in the catalogue
+cross-match process.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><dl class="simple">
+<dt><strong>joint_folder_path</strong><span class="classifier">string</span></dt><dd><p>The folder where all folders and files created during the cross-match
+process are stored.</p>
+</dd>
+<dt><strong>a_cat_folder_path</strong><span class="classifier">string</span></dt><dd><p>The folder where the input data for catalogue “a” are located.</p>
+</dd>
+<dt><strong>b_cat_folder_path</strong><span class="classifier">string</span></dt><dd><p>The location of catalogue “b“‘s input data.</p>
+</dd>
+<dt><strong>afilts</strong><span class="classifier">list of string</span></dt><dd><p>A list of the filters in catalogue “a“‘s photometric data file.</p>
+</dd>
+<dt><strong>bfilts</strong><span class="classifier">list of string</span></dt><dd><p>List of catalogue “b“‘s filters.</p>
+</dd>
+<dt><strong>cf_points</strong><span class="classifier">numpy.ndarray</span></dt><dd><p>The on-sky coordinates that define the locations of each small
+set of sources to be used to derive the relative match and non-match
+photometric likelihoods.</p>
+</dd>
+<dt><strong>cf_areas</strong><span class="classifier">numpy.ndarray</span></dt><dd><p>The areas of closest on-sky separation surrounding each point in
+<code class="docutils literal notranslate"><span class="pre">cf_points</span></code>, used to normalise numbers of sources to sky densities.</p>
+</dd>
+<dt><strong>include_phot_like</strong><span class="classifier">boolean</span></dt><dd><p>Flag to indicate whether to derive astrophysical likelihoods <code class="docutils literal notranslate"><span class="pre">c</span></code> and
+<code class="docutils literal notranslate"><span class="pre">f</span></code>, based on the common coevality of sources of given magnitudes.</p>
+</dd>
+<dt><strong>use_phot_priors</strong><span class="classifier">boolean</span></dt><dd><p>Indicator as to whether to use astrophysical priors, based on the common
+number of likely matches and non-matches in each <code class="docutils literal notranslate"><span class="pre">cf_points</span></code> area, or
+use naive, asymmetric priors solely based on number density of sources.</p>
+</dd>
+<dt><strong>group_sources_data</strong><span class="classifier">class.StageData</span></dt><dd><p>Object containing all outputs from <code class="docutils literal notranslate"><span class="pre">make_island_groupings</span></code>
+TODO Improve description</p>
+</dd>
+<dt><strong>bright_frac</strong><span class="classifier">float, optional</span></dt><dd><p>Expected fraction of sources inside the “bright” error circles used to
+construct the counterpart distribution, to correct for missing numbers.
+If <code class="docutils literal notranslate"><span class="pre">include_phot_like</span></code> or <code class="docutils literal notranslate"><span class="pre">use_phot_prior</span></code> is True then this must
+be supplied, otherwise it can be omitted.</p>
+</dd>
+<dt><strong>field_frac</strong><span class="classifier">float, optional</span></dt><dd><p>Expected fraction of sources inside the “field” error circles used to
+construct the counterpart distribution, to correct for missing numbers.
+If <code class="docutils literal notranslate"><span class="pre">include_phot_like</span></code> or <code class="docutils literal notranslate"><span class="pre">use_phot_prior</span></code> is True then this must
+be supplied, otherwise it can be omitted.</p>
+</dd>
+</dl>
+</dd>
+</dl>
+</dd></dl>
+
+</section>
+
+
+            <div class="clearer"></div>
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="../f-modindex.html" title="Fortran Module Index"
+             >fortran modules</a> |</li>
+        <li class="right" >
+          <a href="../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="right" >
+          <a href="macauff.create_galaxy_counts.html" title="create_galaxy_counts"
+             >next</a> |</li>
+        <li class="right" >
+          <a href="macauff.calculate_proper_motions.html" title="calculate_proper_motions"
+             >previous</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../index.html">macauff</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../macauff.html" ><code class="docutils literal notranslate"><span class="pre">macauff</span></code> Documentation</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">compute_photometric_likelihoods</a></li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+    &#169; Copyright 2022, Tom J Wilson.
+      Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 7.2.6.
+    </div>
+  </body>
+</html>

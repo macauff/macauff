@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>Group Sources Fortran Subroutines &#8212; macauff</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=4848ba22" />
+    <link rel="stylesheet" type="text/css" href="../_static/pyramid.css?v=a5b9c134" />
+    <link rel="stylesheet" type="text/css" href="../_static/graphviz.css?v=eafc0fe6" />
+    <script src="../_static/documentation_options.js?v=5929fcd5"></script>
+    <script src="../_static/doctools.js?v=888ff710"></script>
+    <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="Photometric Likelihood Fortran Subroutines" href="phot_like_docs.html" />
+    <link rel="prev" title="Perturbation AUF Fortran Subroutines" href="perturb_auf_docs.html" />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Neuton&amp;subset=latin" type="text/css" media="screen" charset="utf-8" />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Nobile:regular,italic,bold,bolditalic&amp;subset=latin" type="text/css" media="screen" charset="utf-8" />
+<!--[if lte IE 6]>
+<link rel="stylesheet" href="../_static/ie6.css" type="text/css" media="screen" charset="utf-8" />
+<![endif]-->
+
+  </head><body>
+
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="../f-modindex.html" title="Fortran Module Index"
+             >fortran modules</a> |</li>
+        <li class="right" >
+          <a href="../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="right" >
+          <a href="phot_like_docs.html" title="Photometric Likelihood Fortran Subroutines"
+             accesskey="N">next</a> |</li>
+        <li class="right" >
+          <a href="perturb_auf_docs.html" title="Perturbation AUF Fortran Subroutines"
+             accesskey="P">previous</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../index.html">macauff</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">Group Sources Fortran Subroutines</a></li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <section id="group-sources-fortran-subroutines">
+<h1>Group Sources Fortran Subroutines<a class="headerlink" href="#group-sources-fortran-subroutines" title="Link to this heading">¶</a></h1>
+<p class="rubric" id="f/group_sources_fortran">Description</p>
+<p>This module provides the Fortran code for the handling of the grouping of sources between
+the two catalogues being cross-matched, identifying astrometric overlaps.</p>
+<p class="rubric">Quick access</p>
+<dl class="field-list simple">
+<dt class="field-odd">Routines<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference internal" href="#f/group_sources_fortran/calc_j1s" title="f/group_sources_fortran/calc_j1s"><code class="xref f f-func docutils literal notranslate"><span class="pre">calc_j1s()</span></code></a>, <a class="reference internal" href="#f/group_sources_fortran/cumulative_fourier_distance" title="f/group_sources_fortran/cumulative_fourier_distance"><code class="xref f f-func docutils literal notranslate"><span class="pre">cumulative_fourier_distance()</span></code></a>, <a class="reference internal" href="#f/group_sources_fortran/cumulative_fourier_probability" title="f/group_sources_fortran/cumulative_fourier_probability"><code class="xref f f-func docutils literal notranslate"><span class="pre">cumulative_fourier_probability()</span></code></a>, <a class="reference internal" href="#f/group_sources_fortran/get_integral_length" title="f/group_sources_fortran/get_integral_length"><code class="xref f f-func docutils literal notranslate"><span class="pre">get_integral_length()</span></code></a>, <a class="reference internal" href="#f/group_sources_fortran/get_max_overlap" title="f/group_sources_fortran/get_max_overlap"><code class="xref f f-func docutils literal notranslate"><span class="pre">get_max_overlap()</span></code></a>, <a class="reference internal" href="#f/group_sources_fortran/get_overlap_indices" title="f/group_sources_fortran/get_overlap_indices"><code class="xref f f-func docutils literal notranslate"><span class="pre">get_overlap_indices()</span></code></a></p>
+</dd>
+</dl>
+<p class="rubric">Variables</p>
+<ul>
+<li><dl class="f variable">
+<dt class="sig sig-object f" id="f/group_sources_fortran/dp">
+<span class="sig-prename descclassname"><span class="pre">group_sources_fortran/</span></span><span class="sig-name descname"><span class="pre">dp</span></span><em> <span class="pre">[</span></em><em><span class="pre">integer</span></em><em><span class="pre">,</span></em><em><span class="pre">parameter=</span></em><span class="pre">kind</span><span class="pre">(</span><span class="pre">0</span><span class="pre">.</span><span class="pre">0d0</span><span class="pre">)</span><em><span class="pre">]</span></em><a class="headerlink" href="#f/group_sources_fortran/dp" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+</li>
+<li><dl class="f variable">
+<dt class="sig sig-object f" id="f/group_sources_fortran/pi">
+<span class="sig-prename descclassname"><span class="pre">group_sources_fortran/</span></span><span class="sig-name descname"><span class="pre">pi</span></span><em> <span class="pre">[</span></em><em><span class="pre">real</span></em><em><span class="pre">,</span></em><em><span class="pre">parameter=</span></em><span class="pre">4</span><span class="pre">.</span><span class="pre">0_dp</span><span class="pre">*</span><span class="pre">atan</span><span class="pre">(</span><span class="pre">1</span><span class="pre">.</span><span class="pre">0_dp</span><span class="pre">)</span><em><span class="pre">]</span></em><a class="headerlink" href="#f/group_sources_fortran/pi" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+</li>
+</ul>
+<p class="rubric">Subroutines and functions</p>
+<dl>
+<dt class="sig sig-object f" id="f/group_sources_fortran/get_max_overlap">
+<em class="property"><span class="pre">subroutine</span>&#160; </em><span class="sig-prename descclassname"><span class="pre">group_sources_fortran/</span></span><span class="sig-name descname"><span class="pre">get_max_overlap</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="pre">a_ax_1</span></em>, <em class="sig-param"><span class="pre">a_ax_2</span></em>, <em class="sig-param"><span class="pre">b_ax_1</span></em>, <em class="sig-param"><span class="pre">b_ax_2</span></em>, <em class="sig-param"><span class="pre">max_sep</span></em>, <em class="sig-param"><span class="pre">a_axerr</span></em>, <em class="sig-param"><span class="pre">b_axerr</span></em>, <em class="sig-param"><span class="pre">r</span></em>, <em class="sig-param"><span class="pre">rho</span></em>, <em class="sig-param"><span class="pre">drho</span></em>, <em class="sig-param"><span class="pre">j1s</span></em>, <em class="sig-param"><span class="pre">afouriergrid</span></em>, <em class="sig-param"><span class="pre">bfouriergrid</span></em>, <em class="sig-param"><span class="pre">amodrefind</span></em>, <em class="sig-param"><span class="pre">bmodrefind</span></em>, <em class="sig-param"><span class="pre">max_frac</span></em>, <em class="sig-param"><span class="pre">anumoverlap</span></em>, <em class="sig-param"><span class="pre">bnumoverlap</span></em><span class="sig-paren">)</span><a class="headerlink" href="#f/group_sources_fortran/get_max_overlap" title="Link to this definition">¶</a></dt>
+<dd><p>Loop through all pairs of sources, recording all of those within maximum separation,
+keeping a running total of how many overlaps there are for each source in the two
+catalogues.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>a_ax_1</strong> (*)<em> [</em><em>real</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>a_ax_2</strong> (*)<em> [</em><em>real</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>b_ax_1</strong> (*)<em> [</em><em>real</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>b_ax_2</strong> (*)<em> [</em><em>real</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>max_sep</strong><em> [</em><em>real</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>a_axerr</strong> (*)<em> [</em><em>real</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>b_axerr</strong> (*)<em> [</em><em>real</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>r</strong> (*)<em> [</em><em>real</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>rho</strong> (*)<em> [</em><em>real</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>drho</strong> (*)<em> [</em><em>real</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>j1s</strong> (,)<em> [</em><em>real</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>afouriergrid</strong> (,,*,*)<em> [</em><em>real</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>bfouriergrid</strong> (,,*,*)<em> [</em><em>real</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>amodrefind</strong> (,)<em> [</em><em>integer</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>bmodrefind</strong> (,)<em> [</em><em>integer</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>max_frac</strong><em> [</em><em>real</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>anumoverlap</strong> (size(a_ax_1)<em> [</em><em>integer</em><em>,</em><em>out</em><em>]</em></p></li>
+<li><p><strong>bnumoverlap</strong> (size(b_ax_1)<em> [</em><em>integer</em><em>,</em><em>out</em><em>]</em></p></li>
+</ul>
+</dd>
+<dt class="field-even">Call to<span class="colon">:</span></dt>
+<dd class="field-even"><p><a class="reference internal" href="shared_library_docs.html#f/_/haversine" title="f/_/haversine"><code class="xref f f-func docutils literal notranslate"><span class="pre">haversine()</span></code></a>, <a class="reference internal" href="#f/group_sources_fortran/cumulative_fourier_probability" title="f/group_sources_fortran/cumulative_fourier_probability"><code class="xref f f-func docutils literal notranslate"><span class="pre">cumulative_fourier_probability()</span></code></a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl>
+<dt class="sig sig-object f" id="f/group_sources_fortran/calc_j1s">
+<em class="property"><span class="pre">subroutine</span>&#160; </em><span class="sig-prename descclassname"><span class="pre">group_sources_fortran/</span></span><span class="sig-name descname"><span class="pre">calc_j1s</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="pre">rho</span></em>, <em class="sig-param"><span class="pre">r</span></em>, <em class="sig-param"><span class="pre">j1s</span></em><span class="sig-paren">)</span><a class="headerlink" href="#f/group_sources_fortran/calc_j1s" title="Link to this definition">¶</a></dt>
+<dd><p>Calculate the Bessel Function of First Kind of First Order for a set of fourier-space coordinates.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>rho</strong> (*)<em> [</em><em>real</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>r</strong> (*)<em> [</em><em>real</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>j1s</strong> (size(rho,size(r)<em> [</em><em>real</em><em>,</em><em>out</em><em>]</em></p></li>
+</ul>
+</dd>
+<dt class="field-even">Call to<span class="colon">:</span></dt>
+<dd class="field-even"><p><a class="reference internal" href="shared_library_docs.html#f/_/jy01a_j1" title="f/_/jy01a_j1"><code class="xref f f-func docutils literal notranslate"><span class="pre">jy01a_j1()</span></code></a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl>
+<dt class="sig sig-object f" id="f/group_sources_fortran/cumulative_fourier_probability">
+<em class="property"><span class="pre">subroutine</span>&#160; </em><span class="sig-prename descclassname"><span class="pre">group_sources_fortran/</span></span><span class="sig-name descname"><span class="pre">cumulative_fourier_probability</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="pre">pr</span></em>, <em class="sig-param"><span class="pre">drho</span></em>, <em class="sig-param"><span class="pre">dist</span></em>, <em class="sig-param"><span class="pre">j1s</span></em>, <em class="sig-param"><span class="pre">cumulative_prob</span></em><span class="sig-paren">)</span><a class="headerlink" href="#f/group_sources_fortran/cumulative_fourier_probability" title="Link to this definition">¶</a></dt>
+<dd><p>Calculates the cumulative 2-D spacial integral of the convolved AUFs of two sources,
+based on an inverse 2-D Fourier (Hankel) transform of the fourier-space representation
+of the individual AUF components, returning the probability under a specific radial distance.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>pr</strong> (*)<em> [</em><em>real</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>drho</strong> (*)<em> [</em><em>real</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>dist</strong><em> [</em><em>real</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>j1s</strong> (*)<em> [</em><em>real</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>cumulative_prob</strong><em> [</em><em>real</em><em>,</em><em>out</em><em>]</em></p></li>
+</ul>
+</dd>
+<dt class="field-even">Called from<span class="colon">:</span></dt>
+<dd class="field-even"><p><a class="reference internal" href="#f/group_sources_fortran/get_max_overlap" title="f/group_sources_fortran/get_max_overlap"><code class="xref f f-func docutils literal notranslate"><span class="pre">get_max_overlap()</span></code></a>, <a class="reference internal" href="#f/group_sources_fortran/get_overlap_indices" title="f/group_sources_fortran/get_overlap_indices"><code class="xref f f-func docutils literal notranslate"><span class="pre">get_overlap_indices()</span></code></a>, <a class="reference internal" href="#f/group_sources_fortran/cumulative_fourier_distance" title="f/group_sources_fortran/cumulative_fourier_distance"><code class="xref f f-func docutils literal notranslate"><span class="pre">cumulative_fourier_distance()</span></code></a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl>
+<dt class="sig sig-object f" id="f/group_sources_fortran/get_overlap_indices">
+<em class="property"><span class="pre">subroutine</span>&#160; </em><span class="sig-prename descclassname"><span class="pre">group_sources_fortran/</span></span><span class="sig-name descname"><span class="pre">get_overlap_indices</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="pre">a_ax_1</span></em>, <em class="sig-param"><span class="pre">a_ax_2</span></em>, <em class="sig-param"><span class="pre">b_ax_1</span></em>, <em class="sig-param"><span class="pre">b_ax_2</span></em>, <em class="sig-param"><span class="pre">max_sep</span></em>, <em class="sig-param"><span class="pre">amax</span></em>, <em class="sig-param"><span class="pre">bmax</span></em>, <em class="sig-param"><span class="pre">a_axerr</span></em>, <em class="sig-param"><span class="pre">b_axerr</span></em>, <em class="sig-param"><span class="pre">r</span></em>, <em class="sig-param"><span class="pre">rho</span></em>, <em class="sig-param"><span class="pre">drho</span></em>, <em class="sig-param"><span class="pre">j1s</span></em>, <em class="sig-param"><span class="pre">afouriergrid</span></em>, <em class="sig-param"><span class="pre">bfouriergrid</span></em>, <em class="sig-param"><span class="pre">amodrefind</span></em>, <em class="sig-param"><span class="pre">bmodrefind</span></em>, <em class="sig-param"><span class="pre">max_frac</span></em>, <em class="sig-param"><span class="pre">aindices</span></em>, <em class="sig-param"><span class="pre">bindices</span></em>, <em class="sig-param"><span class="pre">anumoverlap</span></em>, <em class="sig-param"><span class="pre">bnumoverlap</span></em><span class="sig-paren">)</span><a class="headerlink" href="#f/group_sources_fortran/get_overlap_indices" title="Link to this definition">¶</a></dt>
+<dd><p>Once total potential overlap is found in getmaxn, we can keep track of each individual
+source overlap between the two catalogues, storing their respective indices to keep
+links of potential counterparts between the two catalogues.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>a_ax_1</strong> (*)<em> [</em><em>real</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>a_ax_2</strong> (*)<em> [</em><em>real</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>b_ax_1</strong> (*)<em> [</em><em>real</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>b_ax_2</strong> (*)<em> [</em><em>real</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>max_sep</strong><em> [</em><em>real</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>amax</strong><em> [</em><em>integer</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>bmax</strong><em> [</em><em>integer</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>a_axerr</strong> (*)<em> [</em><em>real</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>b_axerr</strong> (*)<em> [</em><em>real</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>r</strong> (*)<em> [</em><em>real</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>rho</strong> (*)<em> [</em><em>real</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>drho</strong> (*)<em> [</em><em>real</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>j1s</strong> (,)<em> [</em><em>real</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>afouriergrid</strong> (,,*,*)<em> [</em><em>real</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>bfouriergrid</strong> (,,*,*)<em> [</em><em>real</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>amodrefind</strong> (,)<em> [</em><em>integer</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>bmodrefind</strong> (,)<em> [</em><em>integer</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>max_frac</strong><em> [</em><em>real</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>aindices</strong> (amax,size(a_ax_1)<em> [</em><em>integer</em><em>,</em><em>out</em><em>]</em></p></li>
+<li><p><strong>bindices</strong> (bmax,size(b_ax_1)<em> [</em><em>integer</em><em>,</em><em>out</em><em>]</em></p></li>
+<li><p><strong>anumoverlap</strong> (size(a_ax_1)<em> [</em><em>integer</em><em>,</em><em>out</em><em>]</em></p></li>
+<li><p><strong>bnumoverlap</strong> (size(b_ax_1)<em> [</em><em>integer</em><em>,</em><em>out</em><em>]</em></p></li>
+</ul>
+</dd>
+<dt class="field-even">Call to<span class="colon">:</span></dt>
+<dd class="field-even"><p><a class="reference internal" href="shared_library_docs.html#f/_/haversine" title="f/_/haversine"><code class="xref f f-func docutils literal notranslate"><span class="pre">haversine()</span></code></a>, <a class="reference internal" href="#f/group_sources_fortran/cumulative_fourier_probability" title="f/group_sources_fortran/cumulative_fourier_probability"><code class="xref f f-func docutils literal notranslate"><span class="pre">cumulative_fourier_probability()</span></code></a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl>
+<dt class="sig sig-object f" id="f/group_sources_fortran/get_integral_length">
+<em class="property"><span class="pre">subroutine</span>&#160; </em><span class="sig-prename descclassname"><span class="pre">group_sources_fortran/</span></span><span class="sig-name descname"><span class="pre">get_integral_length</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="pre">a_err</span></em>, <em class="sig-param"><span class="pre">b_err</span></em>, <em class="sig-param"><span class="pre">r</span></em>, <em class="sig-param"><span class="pre">rho</span></em>, <em class="sig-param"><span class="pre">drho</span></em>, <em class="sig-param"><span class="pre">j1s</span></em>, <em class="sig-param"><span class="pre">a_fouriergrid</span></em>, <em class="sig-param"><span class="pre">b_fouriergrid</span></em>, <em class="sig-param"><span class="pre">a_modrefind</span></em>, <em class="sig-param"><span class="pre">b_modrefind</span></em>, <em class="sig-param"><span class="pre">a_inds</span></em>, <em class="sig-param"><span class="pre">a_size</span></em>, <em class="sig-param"><span class="pre">frac_array</span></em>, <em class="sig-param"><span class="pre">int_dists</span></em><span class="sig-paren">)</span><a class="headerlink" href="#f/group_sources_fortran/get_integral_length" title="Link to this definition">¶</a></dt>
+<dd><p>Calculate the “error circle” lengths for sources, based on various cumulative integral fractions
+of the convolution of all overlapping opposing catalogue source AUFs with the given source’s AUF.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>a_err</strong> (*)<em> [</em><em>real</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>b_err</strong> (*)<em> [</em><em>real</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>r</strong> (*)<em> [</em><em>real</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>rho</strong> (*)<em> [</em><em>real</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>drho</strong> (*)<em> [</em><em>real</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>j1s</strong> (,)<em> [</em><em>real</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>a_fouriergrid</strong> (,,*,*)<em> [</em><em>real</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>b_fouriergrid</strong> (,,*,*)<em> [</em><em>real</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>a_modrefind</strong> (,)<em> [</em><em>integer</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>b_modrefind</strong> (,)<em> [</em><em>integer</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>a_inds</strong> (,)<em> [</em><em>integer</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>a_size</strong> (*)<em> [</em><em>integer</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>frac_array</strong> (*)<em> [</em><em>real</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>int_dists</strong> (size(a_err,size(frac_array)<em> [</em><em>real</em><em>,</em><em>out</em><em>]</em></p></li>
+</ul>
+</dd>
+<dt class="field-even">Call to<span class="colon">:</span></dt>
+<dd class="field-even"><p><a class="reference internal" href="#f/group_sources_fortran/cumulative_fourier_distance" title="f/group_sources_fortran/cumulative_fourier_distance"><code class="xref f f-func docutils literal notranslate"><span class="pre">cumulative_fourier_distance()</span></code></a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl>
+<dt class="sig sig-object f" id="f/group_sources_fortran/cumulative_fourier_distance">
+<em class="property"><span class="pre">subroutine</span>&#160; </em><span class="sig-prename descclassname"><span class="pre">group_sources_fortran/</span></span><span class="sig-name descname"><span class="pre">cumulative_fourier_distance</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="pre">f</span></em>, <em class="sig-param"><span class="pre">r</span></em>, <em class="sig-param"><span class="pre">drho</span></em>, <em class="sig-param"><span class="pre">probs</span></em>, <em class="sig-param"><span class="pre">j1s</span></em>, <em class="sig-param"><span class="pre">cumulative_dists</span></em><span class="sig-paren">)</span><a class="headerlink" href="#f/group_sources_fortran/cumulative_fourier_distance" title="Link to this definition">¶</a></dt>
+<dd><p>Calculates the cumulative 2-D spacial integral of the convolved AUFs of two sources,
+based on an inverse 2-D Fourier (Hankel) transform of the fourier-space representation
+of the individual AUF components, up to a specified set of probabilities, returning the
+radial distance to reach those integral fractions.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>f</strong> (*)<em> [</em><em>real</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>r</strong> (*)<em> [</em><em>real</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>drho</strong> (*)<em> [</em><em>real</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>probs</strong> (*)<em> [</em><em>real</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>j1s</strong> (,)<em> [</em><em>real</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>cumulative_dists</strong> (size(probs)<em> [</em><em>real</em><em>,</em><em>out</em><em>]</em></p></li>
+</ul>
+</dd>
+<dt class="field-even">Called from<span class="colon">:</span></dt>
+<dd class="field-even"><p><a class="reference internal" href="#f/group_sources_fortran/get_integral_length" title="f/group_sources_fortran/get_integral_length"><code class="xref f f-func docutils literal notranslate"><span class="pre">get_integral_length()</span></code></a></p>
+</dd>
+<dt class="field-odd">Call to<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference internal" href="#f/group_sources_fortran/cumulative_fourier_probability" title="f/group_sources_fortran/cumulative_fourier_probability"><code class="xref f f-func docutils literal notranslate"><span class="pre">cumulative_fourier_probability()</span></code></a></p>
+</dd>
+</dl>
+</dd></dl>
+
+</section>
+
+
+            <div class="clearer"></div>
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="../f-modindex.html" title="Fortran Module Index"
+             >fortran modules</a> |</li>
+        <li class="right" >
+          <a href="../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="right" >
+          <a href="phot_like_docs.html" title="Photometric Likelihood Fortran Subroutines"
+             >next</a> |</li>
+        <li class="right" >
+          <a href="perturb_auf_docs.html" title="Perturbation AUF Fortran Subroutines"
+             >previous</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../index.html">macauff</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">Group Sources Fortran Subroutines</a></li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+    &#169; Copyright 2022, Tom J Wilson.
+      Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 7.2.6.
+    </div>
+  </body>
+</html>

@@ -1,0 +1,408 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>Counterpart Pairing Fortran Subroutines &#8212; macauff</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=4848ba22" />
+    <link rel="stylesheet" type="text/css" href="../_static/pyramid.css?v=a5b9c134" />
+    <link rel="stylesheet" type="text/css" href="../_static/graphviz.css?v=eafc0fe6" />
+    <script src="../_static/documentation_options.js?v=5929fcd5"></script>
+    <script src="../_static/doctools.js?v=888ff710"></script>
+    <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="Miscellaneous Functions Fortran Subroutines" href="misc_func_docs.html" />
+    <link rel="prev" title="Photometric Likelihood Fortran Subroutines" href="phot_like_docs.html" />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Neuton&amp;subset=latin" type="text/css" media="screen" charset="utf-8" />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Nobile:regular,italic,bold,bolditalic&amp;subset=latin" type="text/css" media="screen" charset="utf-8" />
+<!--[if lte IE 6]>
+<link rel="stylesheet" href="../_static/ie6.css" type="text/css" media="screen" charset="utf-8" />
+<![endif]-->
+
+  </head><body>
+
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="../f-modindex.html" title="Fortran Module Index"
+             >fortran modules</a> |</li>
+        <li class="right" >
+          <a href="../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="right" >
+          <a href="misc_func_docs.html" title="Miscellaneous Functions Fortran Subroutines"
+             accesskey="N">next</a> |</li>
+        <li class="right" >
+          <a href="phot_like_docs.html" title="Photometric Likelihood Fortran Subroutines"
+             accesskey="P">previous</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../index.html">macauff</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">Counterpart Pairing Fortran Subroutines</a></li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <section id="counterpart-pairing-fortran-subroutines">
+<h1>Counterpart Pairing Fortran Subroutines<a class="headerlink" href="#counterpart-pairing-fortran-subroutines" title="Link to this heading">¶</a></h1>
+<p class="rubric" id="f/counterpart_pairing_fortran">Description</p>
+<p>This module provides the Fortran code for the final act of cross-matching, in which
+sources are paired within their respective islands, and counterparts are established.</p>
+<p class="rubric">Quick access</p>
+<dl class="field-list simple">
+<dt class="field-odd">Routines<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference internal" href="#f/counterpart_pairing_fortran/calc_combs" title="f/counterpart_pairing_fortran/calc_combs"><code class="xref f f-func docutils literal notranslate"><span class="pre">calc_combs()</span></code></a>, <a class="reference internal" href="#f/counterpart_pairing_fortran/calc_permcombs" title="f/counterpart_pairing_fortran/calc_permcombs"><code class="xref f f-func docutils literal notranslate"><span class="pre">calc_permcombs()</span></code></a>, <a class="reference internal" href="#f/counterpart_pairing_fortran/comb" title="f/counterpart_pairing_fortran/comb"><code class="xref f f-func docutils literal notranslate"><span class="pre">comb()</span></code></a>, <a class="reference internal" href="#f/counterpart_pairing_fortran/contam_match_prob" title="f/counterpart_pairing_fortran/contam_match_prob"><code class="xref f f-func docutils literal notranslate"><span class="pre">contam_match_prob()</span></code></a>, <a class="reference internal" href="#f/counterpart_pairing_fortran/factorial" title="f/counterpart_pairing_fortran/factorial"><code class="xref f f-func docutils literal notranslate"><span class="pre">factorial()</span></code></a>, <a class="reference internal" href="#f/counterpart_pairing_fortran/find_island_probabilities" title="f/counterpart_pairing_fortran/find_island_probabilities"><code class="xref f f-func docutils literal notranslate"><span class="pre">find_island_probabilities()</span></code></a>, <a class="reference internal" href="#f/counterpart_pairing_fortran/find_single_island_prob" title="f/counterpart_pairing_fortran/find_single_island_prob"><code class="xref f f-func docutils literal notranslate"><span class="pre">find_single_island_prob()</span></code></a>, <a class="reference internal" href="#f/counterpart_pairing_fortran/perm" title="f/counterpart_pairing_fortran/perm"><code class="xref f f-func docutils literal notranslate"><span class="pre">perm()</span></code></a></p>
+</dd>
+</dl>
+<p class="rubric">Variables</p>
+<ul>
+<li><dl class="f variable">
+<dt class="sig sig-object f" id="f/counterpart_pairing_fortran/dp">
+<span class="sig-prename descclassname"><span class="pre">counterpart_pairing_fortran/</span></span><span class="sig-name descname"><span class="pre">dp</span></span><em> <span class="pre">[</span></em><em><span class="pre">integer</span></em><em><span class="pre">,</span></em><em><span class="pre">parameter=</span></em><span class="pre">kind</span><span class="pre">(</span><span class="pre">0</span><span class="pre">.</span><span class="pre">0d0</span><span class="pre">)</span><em><span class="pre">]</span></em><a class="headerlink" href="#f/counterpart_pairing_fortran/dp" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+</li>
+<li><dl class="f variable">
+<dt class="sig sig-object f" id="f/counterpart_pairing_fortran/pi">
+<span class="sig-prename descclassname"><span class="pre">counterpart_pairing_fortran/</span></span><span class="sig-name descname"><span class="pre">pi</span></span><em> <span class="pre">[</span></em><em><span class="pre">real</span></em><em><span class="pre">,</span></em><em><span class="pre">parameter=</span></em><span class="pre">4</span><span class="pre">.</span><span class="pre">0_dp</span><span class="pre">*</span><span class="pre">atan</span><span class="pre">(</span><span class="pre">1</span><span class="pre">.</span><span class="pre">0_dp</span><span class="pre">)</span><em><span class="pre">]</span></em><a class="headerlink" href="#f/counterpart_pairing_fortran/pi" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+</li>
+</ul>
+<p class="rubric">Subroutines and functions</p>
+<dl>
+<dt class="sig sig-object f" id="f/counterpart_pairing_fortran/find_island_probabilities">
+<em class="property"><span class="pre">subroutine</span>&#160; </em><span class="sig-prename descclassname"><span class="pre">counterpart_pairing_fortran/</span></span><span class="sig-name descname"><span class="pre">find_island_probabilities</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="pre">a_astro</span></em>, <em class="sig-param"><span class="pre">a_photo</span></em>, <em class="sig-param"><span class="pre">b_astro</span></em>, <em class="sig-param"><span class="pre">b_photo</span></em>, <em class="sig-param"><span class="pre">alist</span></em>, <em class="sig-param"><span class="pre">blist</span></em>, <em class="sig-param"><span class="pre">agrplen</span></em>, <em class="sig-param"><span class="pre">bgrplen</span></em>, <em class="sig-param"><span class="pre">c_array</span></em>, <em class="sig-param"><span class="pre">fa_array</span></em>, <em class="sig-param"><span class="pre">fb_array</span></em>, <em class="sig-param"><span class="pre">c_priors</span></em>, <em class="sig-param"><span class="pre">fa_priors</span></em>, <em class="sig-param"><span class="pre">fb_priors</span></em>, <em class="sig-param"><span class="pre">amagref</span></em>, <em class="sig-param"><span class="pre">bmagref</span></em>, <em class="sig-param"><span class="pre">amodrefind</span></em>, <em class="sig-param"><span class="pre">bmodrefind</span></em>, <em class="sig-param"><span class="pre">abinsarray</span></em>, <em class="sig-param"><span class="pre">abinlengths</span></em>, <em class="sig-param"><span class="pre">bbinsarray</span></em>, <em class="sig-param"><span class="pre">bbinlengths</span></em>, <em class="sig-param"><span class="pre">afrac_grids</span></em>, <em class="sig-param"><span class="pre">aflux_grids</span></em>, <em class="sig-param"><span class="pre">bfrac_grids</span></em>, <em class="sig-param"><span class="pre">bflux_grids</span></em>, <em class="sig-param"><span class="pre">afourier_grids</span></em>, <em class="sig-param"><span class="pre">bfourier_grids</span></em>, <em class="sig-param"><span class="pre">a_sky_inds</span></em>, <em class="sig-param"><span class="pre">b_sky_inds</span></em>, <em class="sig-param"><span class="pre">rho</span></em>, <em class="sig-param"><span class="pre">drho</span></em>, <em class="sig-param"><span class="pre">n_fracs</span></em>, <em class="sig-param"><span class="pre">large_len</span></em>, <em class="sig-param"><span class="pre">cprt_max_len</span></em>, <em class="sig-param"><span class="pre">acountinds</span></em>, <em class="sig-param"><span class="pre">bcountinds</span></em>, <em class="sig-param"><span class="pre">afieldinds</span></em>, <em class="sig-param"><span class="pre">bfieldinds</span></em>, <em class="sig-param"><span class="pre">acontamprob</span></em>, <em class="sig-param"><span class="pre">bcontamprob</span></em>, <em class="sig-param"><span class="pre">etaarray</span></em>, <em class="sig-param"><span class="pre">xiarray</span></em>, <em class="sig-param"><span class="pre">acontamflux</span></em>, <em class="sig-param"><span class="pre">bcontamflux</span></em>, <em class="sig-param"><span class="pre">probcarray</span></em>, <em class="sig-param"><span class="pre">crptseps</span></em>, <em class="sig-param"><span class="pre">probfaarray</span></em>, <em class="sig-param"><span class="pre">afieldfluxs</span></em>, <em class="sig-param"><span class="pre">afieldseps</span></em>, <em class="sig-param"><span class="pre">afieldetas</span></em>, <em class="sig-param"><span class="pre">afieldxis</span></em>, <em class="sig-param"><span class="pre">probfbarray</span></em>, <em class="sig-param"><span class="pre">bfieldfluxs</span></em>, <em class="sig-param"><span class="pre">bfieldseps</span></em>, <em class="sig-param"><span class="pre">bfieldetas</span></em>, <em class="sig-param"><span class="pre">bfieldxis</span></em><span class="sig-paren">)</span><a class="headerlink" href="#f/counterpart_pairing_fortran/find_island_probabilities" title="Link to this definition">¶</a></dt>
+<dd><p>Calculate the final cross-matches. For each island, unique permutations of match and non-match are
+compared, with the highest probability combination stored. The matches and non-matches then have
+various secondary parameters, such as log-likelihood-ratio of match or their contamination probability
+derived and returned.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>a_astro</strong> (,)<em> [</em><em>real</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>a_photo</strong> (,)<em> [</em><em>real</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>b_astro</strong> (,)<em> [</em><em>real</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>b_photo</strong> (,)<em> [</em><em>real</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>alist</strong> (,)<em> [</em><em>integer</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>blist</strong> (,)<em> [</em><em>integer</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>agrplen</strong> (*)<em> [</em><em>integer</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>bgrplen</strong> (*)<em> [</em><em>integer</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>c_array</strong> (,,*,*,*)<em> [</em><em>real</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>fa_array</strong> (,,*,*)<em> [</em><em>real</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>fb_array</strong> (,,*,*)<em> [</em><em>real</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>c_priors</strong> (,,*)<em> [</em><em>real</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>fa_priors</strong> (,,*)<em> [</em><em>real</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>fb_priors</strong> (,,*)<em> [</em><em>real</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>amagref</strong> (*)<em> [</em><em>integer</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>bmagref</strong> (*)<em> [</em><em>integer</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>amodrefind</strong> (,)<em> [</em><em>integer</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>bmodrefind</strong> (,)<em> [</em><em>integer</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>abinsarray</strong> (,,*)<em> [</em><em>real</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>abinlengths</strong> (,)<em> [</em><em>integer</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>bbinsarray</strong> (,,*)<em> [</em><em>real</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>bbinlengths</strong> (,)<em> [</em><em>integer</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>afrac_grids</strong> (,,*,*)<em> [</em><em>real</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>aflux_grids</strong> (,,*)<em> [</em><em>real</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>bfrac_grids</strong> (,,*,*)<em> [</em><em>real</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>bflux_grids</strong> (,,*)<em> [</em><em>real</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>afourier_grids</strong> (,,*,*)<em> [</em><em>real</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>bfourier_grids</strong> (,,*,*)<em> [</em><em>real</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>a_sky_inds</strong> (*)<em> [</em><em>integer</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>b_sky_inds</strong> (*)<em> [</em><em>integer</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>rho</strong> (*)<em> [</em><em>real</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>drho</strong> (*)<em> [</em><em>real</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>n_fracs</strong><em> [</em><em>integer</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>large_len</strong><em> [</em><em>integer</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>cprt_max_len</strong><em> [</em><em>integer</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>acountinds</strong> (cprt_max_len)<em> [</em><em>integer</em><em>,</em><em>out</em><em>]</em></p></li>
+<li><p><strong>bcountinds</strong> (cprt_max_len)<em> [</em><em>integer</em><em>,</em><em>out</em><em>]</em></p></li>
+<li><p><strong>afieldinds</strong> (size(a_astro, 1)<em> [</em><em>integer</em><em>,</em><em>out</em><em>]</em></p></li>
+<li><p><strong>bfieldinds</strong> (size(b_astro, 1)<em> [</em><em>integer</em><em>,</em><em>out</em><em>]</em></p></li>
+<li><p><strong>acontamprob</strong> (n_fracs,cprt_max_len)<em> [</em><em>real</em><em>,</em><em>out</em><em>]</em></p></li>
+<li><p><strong>bcontamprob</strong> (n_fracs,cprt_max_len)<em> [</em><em>real</em><em>,</em><em>out</em><em>]</em></p></li>
+<li><p><strong>etaarray</strong> (cprt_max_len)<em> [</em><em>real</em><em>,</em><em>out</em><em>]</em></p></li>
+<li><p><strong>xiarray</strong> (cprt_max_len)<em> [</em><em>real</em><em>,</em><em>out</em><em>]</em></p></li>
+<li><p><strong>acontamflux</strong> (cprt_max_len)<em> [</em><em>real</em><em>,</em><em>out</em><em>]</em></p></li>
+<li><p><strong>bcontamflux</strong> (cprt_max_len)<em> [</em><em>real</em><em>,</em><em>out</em><em>]</em></p></li>
+<li><p><strong>probcarray</strong> (cprt_max_len)<em> [</em><em>real</em><em>,</em><em>out</em><em>]</em></p></li>
+<li><p><strong>crptseps</strong> (cprt_max_len)<em> [</em><em>real</em><em>,</em><em>out</em><em>]</em></p></li>
+<li><p><strong>probfaarray</strong> (size(a_astro, 1)<em> [</em><em>real</em><em>,</em><em>out</em><em>]</em></p></li>
+<li><p><strong>afieldfluxs</strong> (size(a_astro, 1)<em> [</em><em>real</em><em>,</em><em>out</em><em>]</em></p></li>
+<li><p><strong>afieldseps</strong> (size(a_astro, 1)<em> [</em><em>real</em><em>,</em><em>out</em><em>]</em></p></li>
+<li><p><strong>afieldetas</strong> (size(a_astro, 1)<em> [</em><em>real</em><em>,</em><em>out</em><em>]</em></p></li>
+<li><p><strong>afieldxis</strong> (size(a_astro, 1)<em> [</em><em>real</em><em>,</em><em>out</em><em>]</em></p></li>
+<li><p><strong>probfbarray</strong> (size(b_astro, 1)<em> [</em><em>real</em><em>,</em><em>out</em><em>]</em></p></li>
+<li><p><strong>bfieldfluxs</strong> (size(b_astro, 1)<em> [</em><em>real</em><em>,</em><em>out</em><em>]</em></p></li>
+<li><p><strong>bfieldseps</strong> (size(b_astro, 1)<em> [</em><em>real</em><em>,</em><em>out</em><em>]</em></p></li>
+<li><p><strong>bfieldetas</strong> (size(b_astro, 1)<em> [</em><em>real</em><em>,</em><em>out</em><em>]</em></p></li>
+<li><p><strong>bfieldxis</strong> (size(b_astro, 1)<em> [</em><em>real</em><em>,</em><em>out</em><em>]</em></p></li>
+</ul>
+</dd>
+<dt class="field-even">Call to<span class="colon">:</span></dt>
+<dd class="field-even"><p><a class="reference internal" href="#f/counterpart_pairing_fortran/find_single_island_prob" title="f/counterpart_pairing_fortran/find_single_island_prob"><code class="xref f f-func docutils literal notranslate"><span class="pre">find_single_island_prob()</span></code></a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl>
+<dt class="sig sig-object f" id="f/counterpart_pairing_fortran/find_single_island_prob">
+<em class="property"><span class="pre">subroutine</span>&#160; </em><span class="sig-prename descclassname"><span class="pre">counterpart_pairing_fortran/</span></span><span class="sig-name descname"><span class="pre">find_single_island_prob</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="pre">a_astro</span></em>, <em class="sig-param"><span class="pre">a_photo</span></em>, <em class="sig-param"><span class="pre">b_astro</span></em>, <em class="sig-param"><span class="pre">b_photo</span></em>, <em class="sig-param"><span class="pre">c_array</span></em>, <em class="sig-param"><span class="pre">fa_array</span></em>, <em class="sig-param"><span class="pre">fb_array</span></em>, <em class="sig-param"><span class="pre">c_priors</span></em>, <em class="sig-param"><span class="pre">fa_priors</span></em>, <em class="sig-param"><span class="pre">fb_priors</span></em>, <em class="sig-param"><span class="pre">abinsarray</span></em>, <em class="sig-param"><span class="pre">bbinsarray</span></em>, <em class="sig-param"><span class="pre">abinlengths</span></em>, <em class="sig-param"><span class="pre">bbinlengths</span></em>, <em class="sig-param"><span class="pre">afrac_grids</span></em>, <em class="sig-param"><span class="pre">aflux_grids</span></em>, <em class="sig-param"><span class="pre">afourier_grids</span></em>, <em class="sig-param"><span class="pre">bfrac_grids</span></em>, <em class="sig-param"><span class="pre">bflux_grids</span></em>, <em class="sig-param"><span class="pre">bfourier_grids</span></em>, <em class="sig-param"><span class="pre">rho</span></em>, <em class="sig-param"><span class="pre">drho</span></em>, <em class="sig-param"><span class="pre">n_fracs</span></em>, <em class="sig-param"><span class="pre">large_len</span></em>, <em class="sig-param"><span class="pre">aperm</span></em>, <em class="sig-param"><span class="pre">bperm</span></em>, <em class="sig-param"><span class="pre">aused</span></em>, <em class="sig-param"><span class="pre">qa</span></em>, <em class="sig-param"><span class="pre">bused</span></em>, <em class="sig-param"><span class="pre">qb</span></em>, <em class="sig-param"><span class="pre">arefinds</span></em>, <em class="sig-param"><span class="pre">brefinds</span></em>, <em class="sig-param"><span class="pre">acrpts</span></em>, <em class="sig-param"><span class="pre">bcrpts</span></em>, <em class="sig-param"><span class="pre">acrptscontp</span></em>, <em class="sig-param"><span class="pre">bcrptscontp</span></em>, <em class="sig-param"><span class="pre">etacrpts</span></em>, <em class="sig-param"><span class="pre">xicrpts</span></em>, <em class="sig-param"><span class="pre">acrptflux</span></em>, <em class="sig-param"><span class="pre">bcrptflux</span></em>, <em class="sig-param"><span class="pre">crptseps</span></em>, <em class="sig-param"><span class="pre">afield</span></em>, <em class="sig-param"><span class="pre">bfield</span></em>, <em class="sig-param"><span class="pre">afieldflux</span></em>, <em class="sig-param"><span class="pre">bfieldflux</span></em>, <em class="sig-param"><span class="pre">afieldseps</span></em>, <em class="sig-param"><span class="pre">afieldeta</span></em>, <em class="sig-param"><span class="pre">afieldxi</span></em>, <em class="sig-param"><span class="pre">bfieldseps</span></em>, <em class="sig-param"><span class="pre">bfieldeta</span></em>, <em class="sig-param"><span class="pre">bfieldxi</span></em>, <em class="sig-param"><span class="pre">prob</span></em>, <em class="sig-param"><span class="pre">integral</span></em><span class="sig-paren">)</span><a class="headerlink" href="#f/counterpart_pairing_fortran/find_single_island_prob" title="Link to this definition">¶</a></dt>
+<dd><p>Calculate a single island match and non-match permutation. For each combination of N catalogue “a”
+and M catalogue “b” sources, find the pairings and non-pairings that maximise the likelihood. Also
+calculates secondary parameters such as likelihood ratios for astrometry and photometry and
+contamination probabilities for matches.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>a_astro</strong> (,)<em> [</em><em>real</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>a_photo</strong> (,)<em> [</em><em>real</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>b_astro</strong> (,)<em> [</em><em>real</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>b_photo</strong> (,)<em> [</em><em>real</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>c_array</strong> (,,*,*,*)<em> [</em><em>real</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>fa_array</strong> (,,*,*)<em> [</em><em>real</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>fb_array</strong> (,,*,*)<em> [</em><em>real</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>c_priors</strong> (,,*)<em> [</em><em>real</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>fa_priors</strong> (,,*)<em> [</em><em>real</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>fb_priors</strong> (,,*)<em> [</em><em>real</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>abinsarray</strong> (,,*)<em> [</em><em>real</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>bbinsarray</strong> (,,*)<em> [</em><em>real</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>abinlengths</strong> (,)<em> [</em><em>integer</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>bbinlengths</strong> (,)<em> [</em><em>integer</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>afrac_grids</strong> (,,*,*)<em> [</em><em>real</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>aflux_grids</strong> (,,*)<em> [</em><em>real</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>afourier_grids</strong> (,,*,*)<em> [</em><em>real</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>bfrac_grids</strong> (,,*,*)<em> [</em><em>real</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>bflux_grids</strong> (,,*)<em> [</em><em>real</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>bfourier_grids</strong> (,,*,*)<em> [</em><em>real</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>rho</strong> (*)<em> [</em><em>real</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>drho</strong> (*)<em> [</em><em>real</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>n_fracs</strong><em> [</em><em>integer</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>large_len</strong><em> [</em><em>integer</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>aperm</strong> (*)<em> [</em><em>integer</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>bperm</strong> (*)<em> [</em><em>integer</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>aused</strong> (*)<em> [</em><em>integer</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>qa</strong> (*)<em> [</em><em>integer</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>bused</strong> (*)<em> [</em><em>integer</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>qb</strong> (*)<em> [</em><em>integer</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>arefinds</strong> (,)<em> [</em><em>integer</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>brefinds</strong> (,)<em> [</em><em>integer</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>acrpts</strong> (min(size(aperm), size(bperm)<em> [</em><em>integer</em><em>,</em><em>out</em><em>]</em></p></li>
+<li><p><strong>bcrpts</strong> (min(size(aperm), size(bperm)<em> [</em><em>integer</em><em>,</em><em>out</em><em>]</em></p></li>
+<li><p><strong>acrptscontp</strong> (n_fracs,min(size(aperm), size(bperm)<em> [</em><em>real</em><em>,</em><em>out</em><em>]</em></p></li>
+<li><p><strong>bcrptscontp</strong> (n_fracs,min(size(aperm), size(bperm)<em> [</em><em>real</em><em>,</em><em>out</em><em>]</em></p></li>
+<li><p><strong>etacrpts</strong> (min(size(aperm), size(bperm)<em> [</em><em>real</em><em>,</em><em>out</em><em>]</em></p></li>
+<li><p><strong>xicrpts</strong> (min(size(aperm), size(bperm)<em> [</em><em>real</em><em>,</em><em>out</em><em>]</em></p></li>
+<li><p><strong>acrptflux</strong> (min(size(aperm), size(bperm)<em> [</em><em>real</em><em>,</em><em>out</em><em>]</em></p></li>
+<li><p><strong>bcrptflux</strong> (min(size(aperm), size(bperm)<em> [</em><em>real</em><em>,</em><em>out</em><em>]</em></p></li>
+<li><p><strong>crptseps</strong> (min(size(aperm), size(bperm)<em> [</em><em>real</em><em>,</em><em>out</em><em>]</em></p></li>
+<li><p><strong>afield</strong> (size(aperm)<em> [</em><em>integer</em><em>,</em><em>out</em><em>]</em></p></li>
+<li><p><strong>bfield</strong> (size(bperm)<em> [</em><em>integer</em><em>,</em><em>out</em><em>]</em></p></li>
+<li><p><strong>afieldflux</strong> (size(aperm)<em> [</em><em>real</em><em>,</em><em>out</em><em>]</em></p></li>
+<li><p><strong>bfieldflux</strong> (size(bperm)<em> [</em><em>real</em><em>,</em><em>out</em><em>]</em></p></li>
+<li><p><strong>afieldseps</strong> (size(aperm)<em> [</em><em>real</em><em>,</em><em>out</em><em>]</em></p></li>
+<li><p><strong>afieldeta</strong> (size(aperm)<em> [</em><em>real</em><em>,</em><em>out</em><em>]</em></p></li>
+<li><p><strong>afieldxi</strong> (size(aperm)<em> [</em><em>real</em><em>,</em><em>out</em><em>]</em></p></li>
+<li><p><strong>bfieldseps</strong> (size(bperm)<em> [</em><em>real</em><em>,</em><em>out</em><em>]</em></p></li>
+<li><p><strong>bfieldeta</strong> (size(bperm)<em> [</em><em>real</em><em>,</em><em>out</em><em>]</em></p></li>
+<li><p><strong>bfieldxi</strong> (size(bperm)<em> [</em><em>real</em><em>,</em><em>out</em><em>]</em></p></li>
+<li><p><strong>prob</strong><em> [</em><em>real</em><em>,</em><em>out</em><em>]</em></p></li>
+<li><p><strong>integral</strong><em> [</em><em>real</em><em>,</em><em>out</em><em>]</em></p></li>
+</ul>
+</dd>
+<dt class="field-even">Called from<span class="colon">:</span></dt>
+<dd class="field-even"><p><a class="reference internal" href="#f/counterpart_pairing_fortran/find_island_probabilities" title="f/counterpart_pairing_fortran/find_island_probabilities"><code class="xref f f-func docutils literal notranslate"><span class="pre">find_island_probabilities()</span></code></a></p>
+</dd>
+<dt class="field-odd">Call to<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference internal" href="shared_library_docs.html#f/_/haversine" title="f/_/haversine"><code class="xref f f-func docutils literal notranslate"><span class="pre">haversine()</span></code></a>, <a class="reference internal" href="#f/counterpart_pairing_fortran/contam_match_prob" title="f/counterpart_pairing_fortran/contam_match_prob"><code class="xref f f-func docutils literal notranslate"><span class="pre">contam_match_prob()</span></code></a>, <a class="reference internal" href="#f/counterpart_pairing_fortran/factorial" title="f/counterpart_pairing_fortran/factorial"><code class="xref f f-func docutils literal notranslate"><span class="pre">factorial()</span></code></a>, <a class="reference internal" href="#f/counterpart_pairing_fortran/calc_combs" title="f/counterpart_pairing_fortran/calc_combs"><code class="xref f f-func docutils literal notranslate"><span class="pre">calc_combs()</span></code></a>, <a class="reference internal" href="#f/counterpart_pairing_fortran/calc_permcombs" title="f/counterpart_pairing_fortran/calc_permcombs"><code class="xref f f-func docutils literal notranslate"><span class="pre">calc_permcombs()</span></code></a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl>
+<dt class="sig sig-object f" id="f/counterpart_pairing_fortran/factorial">
+<em class="property"><span class="pre">subroutine</span>&#160; </em><span class="sig-prename descclassname"><span class="pre">counterpart_pairing_fortran/</span></span><span class="sig-name descname"><span class="pre">factorial</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="pre">n</span></em>, <em class="sig-param"><span class="pre">m</span></em>, <em class="sig-param"><span class="pre">g</span></em><span class="sig-paren">)</span><a class="headerlink" href="#f/counterpart_pairing_fortran/factorial" title="Link to this definition">¶</a></dt>
+<dd><p>Calculates N * (N-1) * (N-2) * … * (N-M+1), equivalent to N! / (N-M)!.
+If M = N or M = N - 1 this is the same as N! and if M = 1 it is equal to N.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>n</strong><em> [</em><em>integer</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>m</strong><em> [</em><em>integer</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>g</strong><em> [</em><em>integer</em><em>,</em><em>out</em><em>]</em></p></li>
+</ul>
+</dd>
+<dt class="field-even">Called from<span class="colon">:</span></dt>
+<dd class="field-even"><p><a class="reference internal" href="#f/counterpart_pairing_fortran/find_single_island_prob" title="f/counterpart_pairing_fortran/find_single_island_prob"><code class="xref f f-func docutils literal notranslate"><span class="pre">find_single_island_prob()</span></code></a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl>
+<dt class="sig sig-object f" id="f/counterpart_pairing_fortran/contam_match_prob">
+<em class="property"><span class="pre">subroutine</span>&#160; </em><span class="sig-prename descclassname"><span class="pre">counterpart_pairing_fortran/</span></span><span class="sig-name descname"><span class="pre">contam_match_prob</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="pre">fcc</span></em>, <em class="sig-param"><span class="pre">fcn</span></em>, <em class="sig-param"><span class="pre">fnc</span></em>, <em class="sig-param"><span class="pre">fnn</span></em>, <em class="sig-param"><span class="pre">rho</span></em>, <em class="sig-param"><span class="pre">drho</span></em>, <em class="sig-param"><span class="pre">sep</span></em>, <em class="sig-param"><span class="pre">gcc</span></em>, <em class="sig-param"><span class="pre">gcn</span></em>, <em class="sig-param"><span class="pre">gnc</span></em>, <em class="sig-param"><span class="pre">gnn</span></em><span class="sig-paren">)</span><a class="headerlink" href="#f/counterpart_pairing_fortran/contam_match_prob" title="Link to this definition">¶</a></dt>
+<dd><p>Calculate the probability density of two sources being two detections of a single sky object
+given the separation between them, including the combinations of hypotheses that the sources
+independently suffer, or do not suffer, from a statistical description of blended source
+perturbation.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>fcc</strong> (*)<em> [</em><em>real</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>fcn</strong> (*)<em> [</em><em>real</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>fnc</strong> (*)<em> [</em><em>real</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>fnn</strong> (*)<em> [</em><em>real</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>rho</strong> (*)<em> [</em><em>real</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>drho</strong> (*)<em> [</em><em>real</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>sep</strong><em> [</em><em>real</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>gcc</strong><em> [</em><em>real</em><em>,</em><em>out</em><em>]</em></p></li>
+<li><p><strong>gcn</strong><em> [</em><em>real</em><em>,</em><em>out</em><em>]</em></p></li>
+<li><p><strong>gnc</strong><em> [</em><em>real</em><em>,</em><em>out</em><em>]</em></p></li>
+<li><p><strong>gnn</strong><em> [</em><em>real</em><em>,</em><em>out</em><em>]</em></p></li>
+</ul>
+</dd>
+<dt class="field-even">Called from<span class="colon">:</span></dt>
+<dd class="field-even"><p><a class="reference internal" href="#f/counterpart_pairing_fortran/find_single_island_prob" title="f/counterpart_pairing_fortran/find_single_island_prob"><code class="xref f f-func docutils literal notranslate"><span class="pre">find_single_island_prob()</span></code></a></p>
+</dd>
+<dt class="field-odd">Call to<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference internal" href="shared_library_docs.html#f/_/jy01a_j0" title="f/_/jy01a_j0"><code class="xref f f-func docutils literal notranslate"><span class="pre">jy01a_j0()</span></code></a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl>
+<dt class="sig sig-object f" id="f/counterpart_pairing_fortran/perm">
+<em class="property"><span class="pre">subroutine</span>&#160; </em><span class="sig-prename descclassname"><span class="pre">counterpart_pairing_fortran/</span></span><span class="sig-name descname"><span class="pre">perm</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="pre">i</span></em>, <em class="sig-param"><span class="pre">a</span></em>, <em class="sig-param"><span class="pre">perm_grid</span></em>, <em class="sig-param"><span class="pre">n</span></em>, <em class="sig-param"><span class="pre">ind</span></em><span class="sig-paren">)</span><a class="headerlink" href="#f/counterpart_pairing_fortran/perm" title="Link to this definition">¶</a></dt>
+<dd><dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>i</strong><em> [</em><em>integer</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>a</strong> (*)<em> [</em><em>integer</em><em>,</em><em>inout</em><em>]</em></p></li>
+<li><p><strong>perm_grid</strong> (,)<em> [</em><em>integer</em><em>,</em><em>inout</em><em>]</em></p></li>
+<li><p><strong>n</strong><em> [</em><em>integer</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>ind</strong><em> [</em><em>integer</em><em>,</em><em>inout</em><em>]</em></p></li>
+</ul>
+</dd>
+<dt class="field-even">Called from<span class="colon">:</span></dt>
+<dd class="field-even"><p><a class="reference internal" href="#f/counterpart_pairing_fortran/calc_permcombs" title="f/counterpart_pairing_fortran/calc_permcombs"><code class="xref f f-func docutils literal notranslate"><span class="pre">calc_permcombs()</span></code></a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl>
+<dt class="sig sig-object f" id="f/counterpart_pairing_fortran/calc_combs">
+<em class="property"><span class="pre">subroutine</span>&#160; </em><span class="sig-prename descclassname"><span class="pre">counterpart_pairing_fortran/</span></span><span class="sig-name descname"><span class="pre">calc_combs</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="pre">n</span></em>, <em class="sig-param"><span class="pre">n_combs</span></em>, <em class="sig-param"><span class="pre">m_pick</span></em>, <em class="sig-param"><span class="pre">comb_grid</span></em><span class="sig-paren">)</span><a class="headerlink" href="#f/counterpart_pairing_fortran/calc_combs" title="Link to this definition">¶</a></dt>
+<dd><p>Calculate all combinations of length m_pick from an array of length n.
+Size of array, total number of combinations, and size of sub-set array to select combinations of.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>n</strong><em> [</em><em>integer</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>n_combs</strong><em> [</em><em>integer</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>m_pick</strong><em> [</em><em>integer</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>comb_grid</strong> (m_pick,n_combs)<em> [</em><em>integer</em><em>,</em><em>out</em><em>]</em></p></li>
+</ul>
+</dd>
+<dt class="field-even">Called from<span class="colon">:</span></dt>
+<dd class="field-even"><p><a class="reference internal" href="#f/counterpart_pairing_fortran/find_single_island_prob" title="f/counterpart_pairing_fortran/find_single_island_prob"><code class="xref f f-func docutils literal notranslate"><span class="pre">find_single_island_prob()</span></code></a></p>
+</dd>
+<dt class="field-odd">Call to<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference internal" href="#f/counterpart_pairing_fortran/comb" title="f/counterpart_pairing_fortran/comb"><code class="xref f f-func docutils literal notranslate"><span class="pre">comb()</span></code></a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl>
+<dt class="sig sig-object f" id="f/counterpart_pairing_fortran/comb">
+<em class="property"><span class="pre">subroutine</span>&#160; </em><span class="sig-prename descclassname"><span class="pre">counterpart_pairing_fortran/</span></span><span class="sig-name descname"><span class="pre">comb</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="pre">m</span></em>, <em class="sig-param"><span class="pre">a</span></em>, <em class="sig-param"><span class="pre">comb_grid</span></em>, <em class="sig-param"><span class="pre">n_max</span></em>, <em class="sig-param"><span class="pre">ind</span></em>, <em class="sig-param"><span class="pre">m_pick</span></em><span class="sig-paren">)</span><a class="headerlink" href="#f/counterpart_pairing_fortran/comb" title="Link to this definition">¶</a></dt>
+<dd><dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>m</strong><em> [</em><em>integer</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>a</strong> (*)<em> [</em><em>integer</em><em>,</em><em>inout</em><em>]</em></p></li>
+<li><p><strong>comb_grid</strong> (,)<em> [</em><em>integer</em><em>,</em><em>inout</em><em>]</em></p></li>
+<li><p><strong>n_max</strong><em> [</em><em>integer</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>ind</strong><em> [</em><em>integer</em><em>,</em><em>inout</em><em>]</em></p></li>
+<li><p><strong>m_pick</strong><em> [</em><em>integer</em><em>,</em><em>in</em><em>]</em></p></li>
+</ul>
+</dd>
+<dt class="field-even">Called from<span class="colon">:</span></dt>
+<dd class="field-even"><p><a class="reference internal" href="#f/counterpart_pairing_fortran/calc_combs" title="f/counterpart_pairing_fortran/calc_combs"><code class="xref f f-func docutils literal notranslate"><span class="pre">calc_combs()</span></code></a>, <a class="reference internal" href="#f/counterpart_pairing_fortran/calc_permcombs" title="f/counterpart_pairing_fortran/calc_permcombs"><code class="xref f f-func docutils literal notranslate"><span class="pre">calc_permcombs()</span></code></a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl>
+<dt class="sig sig-object f" id="f/counterpart_pairing_fortran/calc_permcombs">
+<em class="property"><span class="pre">subroutine</span>&#160; </em><span class="sig-prename descclassname"><span class="pre">counterpart_pairing_fortran/</span></span><span class="sig-name descname"><span class="pre">calc_permcombs</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="pre">n</span></em>, <em class="sig-param"><span class="pre">m_pick</span></em>, <em class="sig-param"><span class="pre">n_perms</span></em>, <em class="sig-param"><span class="pre">n_combs</span></em>, <em class="sig-param"><span class="pre">combperm_grid</span></em><span class="sig-paren">)</span><a class="headerlink" href="#f/counterpart_pairing_fortran/calc_permcombs" title="Link to this definition">¶</a></dt>
+<dd><p>Calculate all permutations of selecting M items from an array of length N.
+Length of input array, length of output permutations array, and the number of combinations from
+:p integer n [in]: pick-m and the number of permutations of each unique combination for the array.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>m_pick</strong><em> [</em><em>integer</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>n_perms</strong><em> [</em><em>integer</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>n_combs</strong><em> [</em><em>integer</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>combperm_grid</strong> (m_pick,n_combs * n_perms)<em> [</em><em>integer</em><em>,</em><em>out</em><em>]</em></p></li>
+</ul>
+</dd>
+<dt class="field-even">Called from<span class="colon">:</span></dt>
+<dd class="field-even"><p><a class="reference internal" href="#f/counterpart_pairing_fortran/find_single_island_prob" title="f/counterpart_pairing_fortran/find_single_island_prob"><code class="xref f f-func docutils literal notranslate"><span class="pre">find_single_island_prob()</span></code></a></p>
+</dd>
+<dt class="field-odd">Call to<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference internal" href="#f/counterpart_pairing_fortran/comb" title="f/counterpart_pairing_fortran/comb"><code class="xref f f-func docutils literal notranslate"><span class="pre">comb()</span></code></a>, <a class="reference internal" href="#f/counterpart_pairing_fortran/perm" title="f/counterpart_pairing_fortran/perm"><code class="xref f f-func docutils literal notranslate"><span class="pre">perm()</span></code></a></p>
+</dd>
+</dl>
+</dd></dl>
+
+</section>
+
+
+            <div class="clearer"></div>
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="../f-modindex.html" title="Fortran Module Index"
+             >fortran modules</a> |</li>
+        <li class="right" >
+          <a href="../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="right" >
+          <a href="misc_func_docs.html" title="Miscellaneous Functions Fortran Subroutines"
+             >next</a> |</li>
+        <li class="right" >
+          <a href="phot_like_docs.html" title="Photometric Likelihood Fortran Subroutines"
+             >previous</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../index.html">macauff</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">Counterpart Pairing Fortran Subroutines</a></li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+    &#169; Copyright 2022, Tom J Wilson.
+      Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 7.2.6.
+    </div>
+  </body>
+</html>

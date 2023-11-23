@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>Photometric Likelihood Fortran Subroutines &#8212; macauff</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=4848ba22" />
+    <link rel="stylesheet" type="text/css" href="../_static/pyramid.css?v=a5b9c134" />
+    <link rel="stylesheet" type="text/css" href="../_static/graphviz.css?v=eafc0fe6" />
+    <script src="../_static/documentation_options.js?v=5929fcd5"></script>
+    <script src="../_static/doctools.js?v=888ff710"></script>
+    <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="Counterpart Pairing Fortran Subroutines" href="pairing_docs.html" />
+    <link rel="prev" title="Group Sources Fortran Subroutines" href="group_sources_docs.html" />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Neuton&amp;subset=latin" type="text/css" media="screen" charset="utf-8" />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Nobile:regular,italic,bold,bolditalic&amp;subset=latin" type="text/css" media="screen" charset="utf-8" />
+<!--[if lte IE 6]>
+<link rel="stylesheet" href="../_static/ie6.css" type="text/css" media="screen" charset="utf-8" />
+<![endif]-->
+
+  </head><body>
+
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="../f-modindex.html" title="Fortran Module Index"
+             >fortran modules</a> |</li>
+        <li class="right" >
+          <a href="../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="right" >
+          <a href="pairing_docs.html" title="Counterpart Pairing Fortran Subroutines"
+             accesskey="N">next</a> |</li>
+        <li class="right" >
+          <a href="group_sources_docs.html" title="Group Sources Fortran Subroutines"
+             accesskey="P">previous</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../index.html">macauff</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">Photometric Likelihood Fortran Subroutines</a></li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <section id="photometric-likelihood-fortran-subroutines">
+<h1>Photometric Likelihood Fortran Subroutines<a class="headerlink" href="#photometric-likelihood-fortran-subroutines" title="Link to this heading">¶</a></h1>
+<p class="rubric" id="f/photometric_likelihood_fortran">Description</p>
+<p>This module provides the Fortran code for the handling of the creation of photometric
+likelihood and priors based on a bandpass-bandpass pairing between catalogues.</p>
+<p class="rubric">Quick access</p>
+<dl class="field-list simple">
+<dt class="field-odd">Variables<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference internal" href="#f/photometric_likelihood_fortran/dp" title="f/photometric_likelihood_fortran/dp"><code class="xref f f-var docutils literal notranslate"><span class="pre">dp</span></code></a>, <a class="reference internal" href="#f/photometric_likelihood_fortran/pi" title="f/photometric_likelihood_fortran/pi"><code class="xref f f-var docutils literal notranslate"><span class="pre">pi</span></code></a></p>
+</dd>
+<dt class="field-even">Routines<span class="colon">:</span></dt>
+<dd class="field-even"><p><a class="reference internal" href="#f/photometric_likelihood_fortran/brightest_mag" title="f/photometric_likelihood_fortran/brightest_mag"><code class="xref f f-func docutils literal notranslate"><span class="pre">brightest_mag()</span></code></a>, <a class="reference internal" href="#f/photometric_likelihood_fortran/find_mag_bin_inds" title="f/photometric_likelihood_fortran/find_mag_bin_inds"><code class="xref f f-func docutils literal notranslate"><span class="pre">find_mag_bin_inds()</span></code></a>, <a class="reference internal" href="#f/photometric_likelihood_fortran/get_field_dists" title="f/photometric_likelihood_fortran/get_field_dists"><code class="xref f f-func docutils literal notranslate"><span class="pre">get_field_dists()</span></code></a></p>
+</dd>
+</dl>
+<p class="rubric">Variables</p>
+<ul>
+<li><dl class="f variable">
+<dt class="sig sig-object f" id="f/photometric_likelihood_fortran/dp">
+<span class="sig-prename descclassname"><span class="pre">photometric_likelihood_fortran/</span></span><span class="sig-name descname"><span class="pre">dp</span></span><em> <span class="pre">[</span></em><em><span class="pre">integer</span></em><em><span class="pre">,</span></em><em><span class="pre">parameter=</span></em><span class="pre">kind</span><span class="pre">(</span><span class="pre">0</span><span class="pre">.</span><span class="pre">0d0</span><span class="pre">)</span><em><span class="pre">]</span></em><a class="headerlink" href="#f/photometric_likelihood_fortran/dp" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+</li>
+<li><dl class="f variable">
+<dt class="sig sig-object f" id="f/photometric_likelihood_fortran/pi">
+<span class="sig-prename descclassname"><span class="pre">photometric_likelihood_fortran/</span></span><span class="sig-name descname"><span class="pre">pi</span></span><em> <span class="pre">[</span></em><em><span class="pre">real</span></em><em><span class="pre">,</span></em><em><span class="pre">parameter=</span></em><span class="pre">4</span><span class="pre">.</span><span class="pre">0_dp</span><span class="pre">*</span><span class="pre">atan</span><span class="pre">(</span><span class="pre">1</span><span class="pre">.</span><span class="pre">0_dp</span><span class="pre">)</span><em><span class="pre">]</span></em><a class="headerlink" href="#f/photometric_likelihood_fortran/pi" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+</li>
+</ul>
+<p class="rubric">Subroutines and functions</p>
+<dl>
+<dt class="sig sig-object f" id="f/photometric_likelihood_fortran/find_mag_bin_inds">
+<em class="property"><span class="pre">subroutine</span>&#160; </em><span class="sig-prename descclassname"><span class="pre">photometric_likelihood_fortran/</span></span><span class="sig-name descname"><span class="pre">find_mag_bin_inds</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="pre">mags</span></em>, <em class="sig-param"><span class="pre">flags</span></em>, <em class="sig-param"><span class="pre">bins</span></em>, <em class="sig-param"><span class="pre">cuts</span></em><span class="sig-paren">)</span><a class="headerlink" href="#f/photometric_likelihood_fortran/find_mag_bin_inds" title="Link to this definition">¶</a></dt>
+<dd><p>Find the indices of the bins to place all magnitudes in for a given magnitude bin array.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>mags</strong> (*)<em> [</em><em>real</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>flags</strong> (*)<em> [</em><em>logical</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>bins</strong> (*)<em> [</em><em>real</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>cuts</strong> (-1 + size(bins,size(mags)<em> [</em><em>integer</em><em>,</em><em>out</em><em>]</em></p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl>
+<dt class="sig sig-object f" id="f/photometric_likelihood_fortran/get_field_dists">
+<em class="property"><span class="pre">subroutine</span>&#160; </em><span class="sig-prename descclassname"><span class="pre">photometric_likelihood_fortran/</span></span><span class="sig-name descname"><span class="pre">get_field_dists</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="pre">a_ax1</span></em>, <em class="sig-param"><span class="pre">a_ax2</span></em>, <em class="sig-param"><span class="pre">b_ax1</span></em>, <em class="sig-param"><span class="pre">b_ax2</span></em>, <em class="sig-param"><span class="pre">a_indices</span></em>, <em class="sig-param"><span class="pre">a_overlap</span></em>, <em class="sig-param"><span class="pre">b_err_circ</span></em>, <em class="sig-param"><span class="pre">a_flags</span></em>, <em class="sig-param"><span class="pre">b_flags</span></em>, <em class="sig-param"><span class="pre">b_mag</span></em>, <em class="sig-param"><span class="pre">low_mag</span></em>, <em class="sig-param"><span class="pre">upp_mag</span></em>, <em class="sig-param"><span class="pre">a_mask_ind</span></em>, <em class="sig-param"><span class="pre">a_area_cut</span></em><span class="sig-paren">)</span><a class="headerlink" href="#f/photometric_likelihood_fortran/get_field_dists" title="Link to this definition">¶</a></dt>
+<dd><p>Derive the distribution of “field” sources, those with no counterpart in the opposing
+catalogue, by removing any source within the “field” integral fraction radius of any object.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>a_ax1</strong> (*)<em> [</em><em>real</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>a_ax2</strong> (*)<em> [</em><em>real</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>b_ax1</strong> (*)<em> [</em><em>real</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>b_ax2</strong> (*)<em> [</em><em>real</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>a_indices</strong> (,)<em> [</em><em>integer</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>a_overlap</strong> (*)<em> [</em><em>integer</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>b_err_circ</strong> (*)<em> [</em><em>real</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>a_flags</strong> (*)<em> [</em><em>logical</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>b_flags</strong> (*)<em> [</em><em>logical</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>b_mag</strong> (*)<em> [</em><em>real</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>low_mag</strong><em> [</em><em>real</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>upp_mag</strong><em> [</em><em>real</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>a_mask_ind</strong> (size(a_overlap)<em> [</em><em>integer</em><em>,</em><em>out</em><em>]</em></p></li>
+<li><p><strong>a_area_cut</strong><em> [</em><em>real</em><em>,</em><em>out</em><em>]</em></p></li>
+</ul>
+</dd>
+<dt class="field-even">Call to<span class="colon">:</span></dt>
+<dd class="field-even"><p><a class="reference internal" href="shared_library_docs.html#f/_/haversine" title="f/_/haversine"><code class="xref f f-func docutils literal notranslate"><span class="pre">haversine()</span></code></a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl>
+<dt class="sig sig-object f" id="f/photometric_likelihood_fortran/brightest_mag">
+<em class="property"><span class="pre">subroutine</span>&#160; </em><span class="sig-prename descclassname"><span class="pre">photometric_likelihood_fortran/</span></span><span class="sig-name descname"><span class="pre">brightest_mag</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="pre">a_ax1</span></em>, <em class="sig-param"><span class="pre">a_ax2</span></em>, <em class="sig-param"><span class="pre">b_ax1</span></em>, <em class="sig-param"><span class="pre">b_ax2</span></em>, <em class="sig-param"><span class="pre">a_mag</span></em>, <em class="sig-param"><span class="pre">b_mag</span></em>, <em class="sig-param"><span class="pre">a_indices</span></em>, <em class="sig-param"><span class="pre">a_overlap</span></em>, <em class="sig-param"><span class="pre">a_err_circ</span></em>, <em class="sig-param"><span class="pre">a_flags</span></em>, <em class="sig-param"><span class="pre">b_flags</span></em>, <em class="sig-param"><span class="pre">a_bin</span></em>, <em class="sig-param"><span class="pre">mag_mask</span></em>, <em class="sig-param"><span class="pre">av_area</span></em><span class="sig-paren">)</span><a class="headerlink" href="#f/photometric_likelihood_fortran/brightest_mag" title="Link to this definition">¶</a></dt>
+<dd><p>Derive the distribution of brightest sources of one catalogue inside “error circles” of
+another catalogue.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>a_ax1</strong> (*)<em> [</em><em>real</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>a_ax2</strong> (*)<em> [</em><em>real</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>b_ax1</strong> (*)<em> [</em><em>real</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>b_ax2</strong> (*)<em> [</em><em>real</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>a_mag</strong> (*)<em> [</em><em>real</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>b_mag</strong> (*)<em> [</em><em>real</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>a_indices</strong> (,)<em> [</em><em>integer</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>a_overlap</strong> (*)<em> [</em><em>integer</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>a_err_circ</strong> (*)<em> [</em><em>real</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>a_flags</strong> (*)<em> [</em><em>logical</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>b_flags</strong> (*)<em> [</em><em>logical</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>a_bin</strong> (*)<em> [</em><em>real</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>mag_mask</strong> (size(b_mag,-1 + size(a_bin)<em> [</em><em>integer</em><em>,</em><em>out</em><em>]</em></p></li>
+<li><p><strong>av_area</strong> (-1 + size(a_bin)<em> [</em><em>real</em><em>,</em><em>out</em><em>]</em></p></li>
+</ul>
+</dd>
+<dt class="field-even">Call to<span class="colon">:</span></dt>
+<dd class="field-even"><p><a class="reference internal" href="shared_library_docs.html#f/_/haversine" title="f/_/haversine"><code class="xref f f-func docutils literal notranslate"><span class="pre">haversine()</span></code></a></p>
+</dd>
+</dl>
+</dd></dl>
+
+</section>
+
+
+            <div class="clearer"></div>
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="../f-modindex.html" title="Fortran Module Index"
+             >fortran modules</a> |</li>
+        <li class="right" >
+          <a href="../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="right" >
+          <a href="pairing_docs.html" title="Counterpart Pairing Fortran Subroutines"
+             >next</a> |</li>
+        <li class="right" >
+          <a href="group_sources_docs.html" title="Group Sources Fortran Subroutines"
+             >previous</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../index.html">macauff</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">Photometric Likelihood Fortran Subroutines</a></li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+    &#169; Copyright 2022, Tom J Wilson.
+      Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 7.2.6.
+    </div>
+  </body>
+</html>

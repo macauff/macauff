@@ -1,0 +1,925 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="../../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>macauff.galactic_proper_motions &#8212; macauff</title>
+    <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=4848ba22" />
+    <link rel="stylesheet" type="text/css" href="../../_static/pyramid.css?v=a5b9c134" />
+    <link rel="stylesheet" type="text/css" href="../../_static/graphviz.css?v=eafc0fe6" />
+    <script src="../../_static/documentation_options.js?v=5929fcd5"></script>
+    <script src="../../_static/doctools.js?v=888ff710"></script>
+    <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Neuton&amp;subset=latin" type="text/css" media="screen" charset="utf-8" />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Nobile:regular,italic,bold,bolditalic&amp;subset=latin" type="text/css" media="screen" charset="utf-8" />
+<!--[if lte IE 6]>
+<link rel="stylesheet" href="../../_static/ie6.css" type="text/css" media="screen" charset="utf-8" />
+<![endif]-->
+
+  </head><body>
+
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="../../f-modindex.html" title="Fortran Module Index"
+             >fortran modules</a> |</li>
+        <li class="right" >
+          <a href="../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../index.html">macauff</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../index.html" accesskey="U">Module code</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">macauff.galactic_proper_motions</a></li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <h1>Source code for macauff.galactic_proper_motions</h1><div class="highlight"><pre>
+<span></span><span class="c1"># Licensed under a 3-clause BSD style license - see LICENSE</span>
+<span class="sd">&#39;&#39;&#39;</span>
+<span class="sd">Provides the mathematical framework for simulating distributions of proper</span>
+<span class="sd">motions based on the distance and Galactic coordinates of a set of Galactic</span>
+<span class="sd">stars.</span>
+<span class="sd">&#39;&#39;&#39;</span>
+
+<span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+<span class="kn">import</span> <span class="nn">multiprocessing</span>
+<span class="kn">import</span> <span class="nn">itertools</span>
+
+<span class="n">__all__</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;calculate_proper_motions&#39;</span><span class="p">]</span>
+
+
+<div class="viewcode-block" id="calculate_proper_motions">
+<a class="viewcode-back" href="../../api/macauff.calculate_proper_motions.html#macauff.calculate_proper_motions">[docs]</a>
+<span class="k">def</span> <span class="nf">calculate_proper_motions</span><span class="p">(</span><span class="n">d</span><span class="p">,</span> <span class="n">l</span><span class="p">,</span> <span class="n">b</span><span class="p">,</span> <span class="n">temp</span><span class="p">,</span> <span class="n">N</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&#39;&#39;&#39;</span>
+<span class="sd">    Calculates the statistical distribution of proper motions of a sightline,</span>
+<span class="sd">    from a set of theoretical sources within the particular sky area.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    d : numpy.ndarray</span>
+<span class="sd">        The set of distances to each theoretical source.</span>
+<span class="sd">    l : numpy.ndarray</span>
+<span class="sd">        The Galactic longitudes of each simulated source.</span>
+<span class="sd">    b : numpy.ndarray</span>
+<span class="sd">        The Galactic latitude of each source.</span>
+<span class="sd">    temp : numpy.ndarray</span>
+<span class="sd">        The simulated effective temperature of each object.</span>
+<span class="sd">    N : integer</span>
+<span class="sd">        The number of realisations of each object&#39;s Galactic velocities to draw</span>
+<span class="sd">        from its dispersion relation.</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    pm : numpy.ndarray</span>
+<span class="sd">        The Galactic and Equatorial proper motions of the ``len(d)`` simulated</span>
+<span class="sd">        sources, for the three simulated Galactic components each with ``N``</span>
+<span class="sd">        velocity dispersion realisations.</span>
+<span class="sd">    type_fracs : numpy.ndarray</span>
+<span class="sd">        The density-based weightings of each of the three Galactic components</span>
+<span class="sd">        for each source in ``d``, broadcast to shape ``(len(d), 3, N)`` to match</span>
+<span class="sd">        the shape of ``pm``.</span>
+<span class="sd">    &#39;&#39;&#39;</span>
+    <span class="c1"># Height of the Sun above the Galactic plane from Juric et al. (2008, ApJ, 673, 864).</span>
+    <span class="n">z_sol</span> <span class="o">=</span> <span class="mf">0.025</span>
+    <span class="c1"># Solar Galactic radius from Mroz et al. (2019, ApJ, 870, 10).</span>
+    <span class="n">r_sol</span> <span class="o">=</span> <span class="mf">8.09</span>
+    <span class="c1"># Scale lengths also from Juric et al. (2008).</span>
+    <span class="n">l_thin</span><span class="p">,</span> <span class="n">h_thin</span> <span class="o">=</span> <span class="mf">2.6</span><span class="p">,</span> <span class="mf">0.3</span>
+    <span class="n">l_thick</span><span class="p">,</span> <span class="n">h_thick</span> <span class="o">=</span> <span class="mf">3.6</span><span class="p">,</span> <span class="mf">0.9</span>
+    <span class="n">f_thick</span> <span class="o">=</span> <span class="mf">0.13</span>
+    <span class="n">f_h</span><span class="p">,</span> <span class="n">q</span><span class="p">,</span> <span class="n">n</span> <span class="o">=</span> <span class="mf">0.0051</span><span class="p">,</span> <span class="mf">0.64</span><span class="p">,</span> <span class="mf">2.77</span>
+    <span class="n">h_b</span> <span class="o">=</span> <span class="mf">0.8</span>
+    <span class="c1"># Bulge-to-disc normalisation, from Jackson et al. (2002, MNRAS, 337, 749).</span>
+    <span class="n">zeta_b</span> <span class="o">=</span> <span class="mi">2</span>
+
+    <span class="c1"># These coordinates do not account for any z_sol offset, and hence z = 0 is at b = 0.</span>
+    <span class="n">r</span><span class="p">,</span> <span class="n">z</span> <span class="o">=</span> <span class="n">convert_dist_coord_to_cylindrical</span><span class="p">(</span><span class="n">d</span><span class="p">,</span> <span class="n">l</span><span class="p">,</span> <span class="n">b</span><span class="p">,</span> <span class="n">r_sol</span><span class="p">)</span>
+    <span class="c1"># This comes out with shape (len(d), 3); have to factor an additional 1/N in the weights</span>
+    <span class="c1"># so that when we histogram an extra N times as many proper motions we smooth to the same</span>
+    <span class="c1"># counts as the original data.</span>
+    <span class="n">fractions</span> <span class="o">=</span> <span class="n">fraction_density_component</span><span class="p">(</span><span class="n">r</span><span class="p">,</span> <span class="n">z</span><span class="p">,</span> <span class="n">r_sol</span><span class="p">,</span> <span class="n">z_sol</span><span class="p">,</span> <span class="n">l_thin</span><span class="p">,</span> <span class="n">h_thin</span><span class="p">,</span> <span class="n">l_thick</span><span class="p">,</span> <span class="n">h_thick</span><span class="p">,</span>
+                                           <span class="n">f_thick</span><span class="p">,</span> <span class="n">f_h</span><span class="p">,</span> <span class="n">q</span><span class="p">,</span> <span class="n">n</span><span class="p">,</span> <span class="n">zeta_b</span><span class="p">,</span> <span class="n">h_b</span><span class="p">)</span><span class="o">.</span><span class="n">T</span> <span class="o">/</span> <span class="n">N</span>
+    <span class="c1"># We then tile it to (len(d), len(types), N)</span>
+    <span class="n">type_fracs</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">tile</span><span class="p">(</span><span class="n">fractions</span><span class="p">[:,</span> <span class="p">:,</span> <span class="n">np</span><span class="o">.</span><span class="n">newaxis</span><span class="p">],</span> <span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="n">N</span><span class="p">))</span>
+
+    <span class="c1"># V_a values come from Robin et al. (2003), A&amp;A, 409, 523; Pasetto et al. (2012), A&amp;A, 547,</span>
+    <span class="c1"># A70; &amp; (220km/s Halo drift velocity from Reddy (2009), Proc. IAU Symp., 265)</span>
+    <span class="c1"># 240 km/s Halo V_a from Golubov et al. (2013), A&amp;A, 557, A92.</span>
+    <span class="n">drift_vels</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mi">10</span><span class="p">,</span> <span class="mi">49</span><span class="p">,</span> <span class="mi">240</span><span class="p">],</span> <span class="n">dtype</span><span class="o">=</span><span class="nb">float</span><span class="p">)</span>
+    <span class="c1"># Assume our rotation curve was constructed from thin disc objects, so take the relative</span>
+    <span class="c1"># asymmetric drift from that. Objects in Mroz et al. are Classical Cepheids, so that&#39;s fine.</span>
+    <span class="n">drift_vels</span> <span class="o">-=</span> <span class="n">drift_vels</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+
+    <span class="c1"># Derive Oort constants from Pecaut &amp; Mamajek (2013, ApJS, 208, 9) and</span>
+    <span class="c1"># Olling &amp; Dehnen (2003, ApJ, 599, 275).</span>
+    <span class="c1"># First, get (B - V)_0 from Teff based on P&amp;M scalings:</span>
+    <span class="n">bv0</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">empty_like</span><span class="p">(</span><span class="n">temp</span><span class="p">)</span>
+    <span class="n">bv0</span><span class="p">[</span><span class="n">temp</span> <span class="o">&lt;</span> <span class="mi">10000</span><span class="p">]</span> <span class="o">=</span> <span class="mf">5.07836</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">exp</span><span class="p">(</span><span class="o">-</span><span class="mf">0.27083</span> <span class="o">*</span> <span class="n">temp</span><span class="p">[</span><span class="n">temp</span> <span class="o">&lt;</span> <span class="mi">10000</span><span class="p">]</span> <span class="o">/</span> <span class="mi">1000</span><span class="p">)</span> <span class="o">-</span> <span class="mf">0.40739</span>
+    <span class="n">bv0</span><span class="p">[</span><span class="n">temp</span> <span class="o">&gt;=</span> <span class="mi">10000</span><span class="p">]</span> <span class="o">=</span> <span class="mf">0.69012</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">exp</span><span class="p">(</span><span class="o">-</span><span class="mf">0.08179</span> <span class="o">*</span> <span class="n">temp</span><span class="p">[</span><span class="n">temp</span> <span class="o">&gt;=</span> <span class="mi">10000</span><span class="p">]</span> <span class="o">/</span> <span class="mi">1000</span><span class="p">)</span> <span class="o">-</span> <span class="mf">0.35093</span>
+    <span class="c1"># Next, get A/B from O&amp;D based on intrinsic B-V colour:</span>
+    <span class="n">A</span> <span class="o">=</span> <span class="mf">1.94553</span> <span class="o">*</span> <span class="n">bv0</span> <span class="o">+</span> <span class="mf">11.33138</span>
+    <span class="n">B</span> <span class="o">=</span> <span class="o">-</span><span class="mf">2.63360</span> <span class="o">*</span> <span class="n">bv0</span> <span class="o">-</span> <span class="mf">13.60611</span>
+
+    <span class="n">rng</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">default_rng</span><span class="p">()</span>
+    <span class="n">pm</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">empty</span><span class="p">((</span><span class="nb">len</span><span class="p">(</span><span class="n">d</span><span class="p">),</span> <span class="mi">3</span><span class="p">,</span> <span class="n">N</span><span class="p">,</span> <span class="mi">4</span><span class="p">))</span>
+    <span class="n">n_pool</span> <span class="o">=</span> <span class="mi">40</span>
+    <span class="n">pool</span> <span class="o">=</span> <span class="n">multiprocessing</span><span class="o">.</span><span class="n">Pool</span><span class="p">(</span><span class="n">n_pool</span><span class="p">)</span>
+    <span class="n">counter</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">d</span><span class="p">))</span>
+    <span class="n">iter_group</span> <span class="o">=</span> <span class="nb">zip</span><span class="p">(</span><span class="n">counter</span><span class="p">,</span> <span class="n">itertools</span><span class="o">.</span><span class="n">repeat</span><span class="p">(</span><span class="n">drift_vels</span><span class="p">),</span> <span class="n">itertools</span><span class="o">.</span><span class="n">repeat</span><span class="p">(</span><span class="n">rng</span><span class="p">),</span>
+                     <span class="n">itertools</span><span class="o">.</span><span class="n">repeat</span><span class="p">([</span><span class="n">l</span><span class="p">,</span> <span class="n">b</span><span class="p">,</span> <span class="n">d</span><span class="p">]),</span> <span class="n">itertools</span><span class="o">.</span><span class="n">repeat</span><span class="p">(</span><span class="n">N</span><span class="p">),</span> <span class="n">itertools</span><span class="o">.</span><span class="n">repeat</span><span class="p">([</span><span class="n">r</span><span class="p">,</span> <span class="n">z</span><span class="p">]),</span>
+                     <span class="n">itertools</span><span class="o">.</span><span class="n">repeat</span><span class="p">([</span><span class="n">r_sol</span><span class="p">,</span> <span class="n">z_sol</span><span class="p">]),</span> <span class="n">itertools</span><span class="o">.</span><span class="n">repeat</span><span class="p">([</span><span class="n">A</span><span class="p">,</span> <span class="n">B</span><span class="p">]),</span>
+                     <span class="n">itertools</span><span class="o">.</span><span class="n">repeat</span><span class="p">([</span><span class="n">l_thin</span><span class="p">,</span> <span class="n">l_thick</span><span class="p">]))</span>
+    <span class="k">for</span> <span class="n">stuff</span> <span class="ow">in</span> <span class="n">pool</span><span class="o">.</span><span class="n">imap_unordered</span><span class="p">(</span><span class="n">calc_pm</span><span class="p">,</span> <span class="n">iter_group</span><span class="p">,</span>
+                                     <span class="n">chunksize</span><span class="o">=</span><span class="nb">max</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">d</span><span class="p">)</span> <span class="o">//</span> <span class="n">n_pool</span><span class="p">)):</span>
+        <span class="n">j</span><span class="p">,</span> <span class="n">mu_a</span><span class="p">,</span> <span class="n">mu_d</span><span class="p">,</span> <span class="n">mu_l</span><span class="p">,</span> <span class="n">mu_b</span> <span class="o">=</span> <span class="n">stuff</span>
+        <span class="n">pm</span><span class="p">[</span><span class="n">j</span><span class="p">,</span> <span class="p">:,</span> <span class="p">:,</span> <span class="mi">0</span><span class="p">]</span> <span class="o">=</span> <span class="n">mu_a</span>
+        <span class="n">pm</span><span class="p">[</span><span class="n">j</span><span class="p">,</span> <span class="p">:,</span> <span class="p">:,</span> <span class="mi">1</span><span class="p">]</span> <span class="o">=</span> <span class="n">mu_d</span>
+        <span class="n">pm</span><span class="p">[</span><span class="n">j</span><span class="p">,</span> <span class="p">:,</span> <span class="p">:,</span> <span class="mi">2</span><span class="p">]</span> <span class="o">=</span> <span class="n">mu_l</span>
+        <span class="n">pm</span><span class="p">[</span><span class="n">j</span><span class="p">,</span> <span class="p">:,</span> <span class="p">:,</span> <span class="mi">3</span><span class="p">]</span> <span class="o">=</span> <span class="n">mu_b</span>
+
+    <span class="n">pool</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
+    <span class="n">pool</span><span class="o">.</span><span class="n">join</span><span class="p">()</span>
+
+    <span class="k">return</span> <span class="n">pm</span><span class="p">,</span> <span class="n">type_fracs</span></div>
+
+
+
+<span class="k">def</span> <span class="nf">convert_dist_coord_to_cylindrical</span><span class="p">(</span><span class="n">d</span><span class="p">,</span> <span class="n">l</span><span class="p">,</span> <span class="n">b</span><span class="p">,</span> <span class="n">r_sol</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&#39;&#39;&#39;</span>
+<span class="sd">    Convert distance and Galactic lat/lon to Galactocentric Cartesian coordinates.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    d : numpy.ndarray</span>
+<span class="sd">        Distance to a set of theoretical objects.</span>
+<span class="sd">    l : numpy.ndarray</span>
+<span class="sd">        Galactic longitude for each source.</span>
+<span class="sd">    b : numpy.ndarray</span>
+<span class="sd">        Galactic latitude for all sources.</span>
+<span class="sd">    r_sol : float</span>
+<span class="sd">        Galactocentric Cylindrical radius of the Sun from the Galactic center</span>
+<span class="sd">        in kpc.</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    r : numpy.ndarray</span>
+<span class="sd">        The Galactocentric Cylindrical radius of each object from the Galactic</span>
+<span class="sd">        center.</span>
+<span class="sd">    z : numpy.ndarray</span>
+<span class="sd">        The Galactocentric Cylindrical height of each object from the Galactic</span>
+<span class="sd">        plane.</span>
+<span class="sd">    &#39;&#39;&#39;</span>
+    <span class="c1"># Following notation where X points towards the GC from the Sun, with a right-handed system,</span>
+    <span class="c1"># but choice of handedness is irrelevant here since we only care about radial distance.</span>
+    <span class="n">x</span> <span class="o">=</span> <span class="n">d</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">cos</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">radians</span><span class="p">(</span><span class="n">l</span><span class="p">))</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">cos</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">radians</span><span class="p">(</span><span class="n">b</span><span class="p">))</span> <span class="o">-</span> <span class="n">r_sol</span>
+    <span class="n">y</span> <span class="o">=</span> <span class="n">d</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">sin</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">radians</span><span class="p">(</span><span class="n">l</span><span class="p">))</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">cos</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">radians</span><span class="p">(</span><span class="n">b</span><span class="p">))</span>
+    <span class="n">z</span> <span class="o">=</span> <span class="n">d</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">sin</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">radians</span><span class="p">(</span><span class="n">b</span><span class="p">))</span>
+    <span class="n">r</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="n">x</span><span class="o">**</span><span class="mi">2</span> <span class="o">+</span> <span class="n">y</span><span class="o">**</span><span class="mi">2</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">r</span><span class="p">,</span> <span class="n">z</span>
+
+
+<span class="k">def</span> <span class="nf">fraction_density_component</span><span class="p">(</span><span class="n">r</span><span class="p">,</span> <span class="n">z</span><span class="p">,</span> <span class="n">r_sol</span><span class="p">,</span> <span class="n">z_sol</span><span class="p">,</span> <span class="n">l_thin</span><span class="p">,</span> <span class="n">h_thin</span><span class="p">,</span> <span class="n">l_thick</span><span class="p">,</span> <span class="n">h_thick</span><span class="p">,</span> <span class="n">f_thick</span><span class="p">,</span>
+                               <span class="n">f_halo</span><span class="p">,</span> <span class="n">q</span><span class="p">,</span> <span class="n">n</span><span class="p">,</span> <span class="n">zeta_b</span><span class="p">,</span> <span class="n">h_b</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&#39;&#39;&#39;</span>
+<span class="sd">    Calculates the relative densities of each of the Galactic components used</span>
+<span class="sd">    in simulating potential proper motions of objects. At present, this is the</span>
+<span class="sd">    thin and thick discs, and the (outer) Galactic halo.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    r : numpy.ndarray</span>
+<span class="sd">        Galactocentric Cylindrical radii for each source used to simulate</span>
+<span class="sd">        proper motions for the particular sightline.</span>
+<span class="sd">    z : numpy.ndarray</span>
+<span class="sd">        Galactocentric Cylindrical heights above the Galactic plane for each</span>
+<span class="sd">        source.</span>
+<span class="sd">    r_sol : float</span>
+<span class="sd">        The Sun&#39;s Galactocentric Cylindrical radius.</span>
+<span class="sd">    z_sol : float</span>
+<span class="sd">        Solar Galactocentric Cylindrical height above the plane.</span>
+<span class="sd">    l_thin : float</span>
+<span class="sd">        Scale length of the thin disc in the radial direction.</span>
+<span class="sd">    h_thin : float</span>
+<span class="sd">        Vertical scale length of the thin disc.</span>
+<span class="sd">    l_thick : float</span>
+<span class="sd">        Thick disc radial scale length.</span>
+<span class="sd">    h_thick : float</span>
+<span class="sd">        Thick disc vertical scale length.</span>
+<span class="sd">    f_thick : float</span>
+<span class="sd">        Relative normalisation of the thick disc to the thin disc density.</span>
+<span class="sd">    f_halo : float</span>
+<span class="sd">        Normalisation of the outer Galactic halo to the thin disc.</span>
+<span class="sd">    q : float</span>
+<span class="sd">        Oblateness of the outer Galactic halo in the vertical direction.</span>
+<span class="sd">    n : float</span>
+<span class="sd">        Scaling relation of the halo with Galactocentric (oblate) Spherical</span>
+<span class="sd">        distance.</span>
+<span class="sd">    zeta_b : float</span>
+<span class="sd">        Relative normalisation of the Galactic bulge to the thin disc.</span>
+<span class="sd">    h_b : float</span>
+<span class="sd">        Spherical scale length of the Galactic bulge.</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    rel_dens : numpy.ndarray</span>
+<span class="sd">        The relative densities of the implemented Galactic components.</span>
+<span class="sd">    &#39;&#39;&#39;</span>
+    <span class="c1"># First three densities from eq 22-24 and table 10 of Juric et al. (2008), plus</span>
+    <span class="c1"># corrections and extension from eq 9-12 of Ivezic et al. (2008, ApJ, 684, 287), albeit with the</span>
+    <span class="c1"># exception of the removal of rho_d(r_sol, 0) as a normalising factor in all functions</span>
+    <span class="n">f_thin</span> <span class="o">=</span> <span class="n">thin_disc_density</span><span class="p">(</span><span class="n">r</span><span class="p">,</span> <span class="n">z</span><span class="p">,</span> <span class="n">r_sol</span><span class="p">,</span> <span class="n">z_sol</span><span class="p">,</span> <span class="n">l_thin</span><span class="p">,</span> <span class="n">h_thin</span><span class="p">)</span>
+    <span class="n">f_thick</span> <span class="o">=</span> <span class="n">thick_disc_density</span><span class="p">(</span><span class="n">r</span><span class="p">,</span> <span class="n">z</span><span class="p">,</span> <span class="n">r_sol</span><span class="p">,</span> <span class="n">z_sol</span><span class="p">,</span> <span class="n">l_thick</span><span class="p">,</span> <span class="n">h_thick</span><span class="p">,</span> <span class="n">f_thick</span><span class="p">)</span>
+    <span class="n">f_halo</span> <span class="o">=</span> <span class="n">halo_density</span><span class="p">(</span><span class="n">r</span><span class="p">,</span> <span class="n">z</span><span class="p">,</span> <span class="n">r_sol</span><span class="p">,</span> <span class="n">f_halo</span><span class="p">,</span> <span class="n">q</span><span class="p">,</span> <span class="n">n</span><span class="p">)</span>
+    <span class="c1"># To avoid a singularity within the solar circle, just set the halo component density</span>
+    <span class="c1"># to its value at r_sol, allowing for the thin+thick disc to overcome it towards</span>
+    <span class="c1"># the Galactic center. Test with e.g. Sandage (1987), AJ, 93, 610, Fig 2b.</span>
+    <span class="n">f_halo</span><span class="p">[</span><span class="n">r</span> <span class="o">&lt;</span> <span class="n">r_sol</span><span class="p">]</span> <span class="o">=</span> <span class="n">f_halo</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">argmin</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">abs</span><span class="p">(</span><span class="n">r</span> <span class="o">-</span> <span class="n">r_sol</span><span class="p">))]</span>
+    <span class="c1"># Currently not using f_bulge due to no parameterisation for its proper</span>
+    <span class="c1"># motion at present.</span>
+    <span class="c1"># f_bulge = bulge_density(r, z, zeta_b, h_b, q)</span>
+    <span class="n">norm</span> <span class="o">=</span> <span class="n">f_thin</span> <span class="o">+</span> <span class="n">f_thick</span> <span class="o">+</span> <span class="n">f_halo</span>  <span class="c1"># + f_bulge</span>
+    <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="n">f_thin</span><span class="p">,</span> <span class="n">f_thick</span><span class="p">,</span> <span class="n">f_halo</span><span class="p">])</span> <span class="o">/</span> <span class="n">norm</span>
+
+
+<span class="k">def</span> <span class="nf">thin_disc_density</span><span class="p">(</span><span class="n">r</span><span class="p">,</span> <span class="n">z</span><span class="p">,</span> <span class="n">r_sol</span><span class="p">,</span> <span class="n">z_sol</span><span class="p">,</span> <span class="n">l_thin</span><span class="p">,</span> <span class="n">h_thin</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&#39;&#39;&#39;</span>
+<span class="sd">    Calculates the relative density of the thin disc.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    r : numpy.ndarray</span>
+<span class="sd">        Galactocentric Cylindrical radii for each source used to simulate</span>
+<span class="sd">        proper motions for the particular sightline.</span>
+<span class="sd">    z : numpy.ndarray</span>
+<span class="sd">        Galactocentric Cylindrical heights above the Galactic plane for each</span>
+<span class="sd">        source.</span>
+<span class="sd">    r_sol : float</span>
+<span class="sd">        The Sun&#39;s Galactocentric Cylindrical radius.</span>
+<span class="sd">    z_sol : float</span>
+<span class="sd">        Solar Galactocentric Cylindrical height above the plane.</span>
+<span class="sd">    l_thin : float</span>
+<span class="sd">        Scale length of the thin disc in the radial direction.</span>
+<span class="sd">    h_thin : float</span>
+<span class="sd">        Vertical scale length of the thin disc.</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    disc_density : numpy.ndarray</span>
+<span class="sd">        The density of the thin disc evaluated at ``r`` and ``z``.</span>
+<span class="sd">    &#39;&#39;&#39;</span>
+    <span class="k">return</span> <span class="n">disc_density</span><span class="p">(</span><span class="n">r</span><span class="p">,</span> <span class="n">z</span><span class="p">,</span> <span class="n">l_thin</span><span class="p">,</span> <span class="n">h_thin</span><span class="p">,</span> <span class="n">r_sol</span><span class="p">,</span> <span class="n">z_sol</span><span class="p">)</span>
+
+
+<span class="k">def</span> <span class="nf">disc_density</span><span class="p">(</span><span class="n">r</span><span class="p">,</span> <span class="n">z</span><span class="p">,</span> <span class="n">l</span><span class="p">,</span> <span class="n">h</span><span class="p">,</span> <span class="n">r_sol</span><span class="p">,</span> <span class="n">z_sol</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&#39;&#39;&#39;</span>
+<span class="sd">    Calculates the relative density of an exponential disc, either</span>
+<span class="sd">    the thin or thick discs, depending on ``l`` and ``h``.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    r : numpy.ndarray</span>
+<span class="sd">        Galactocentric Cylindrical radii for each source used to simulate</span>
+<span class="sd">        proper motions for the particular sightline.</span>
+<span class="sd">    z : numpy.ndarray</span>
+<span class="sd">        Galactocentric Cylindrical heights above the Galactic plane for each</span>
+<span class="sd">        source.</span>
+<span class="sd">    r_sol : float</span>
+<span class="sd">        The Sun&#39;s Galactocentric Cylindrical radius.</span>
+<span class="sd">    z_sol : float</span>
+<span class="sd">        Solar Galactocentric Cylindrical height above the plane.</span>
+<span class="sd">    l : float</span>
+<span class="sd">        Scale length of the disc in the radial direction.</span>
+<span class="sd">    h : float</span>
+<span class="sd">        Vertical scale length of the disc.</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    disc_density : numpy.ndarray</span>
+<span class="sd">        The density of the disc evaluated at ``r`` and ``z``.</span>
+<span class="sd">    &#39;&#39;&#39;</span>
+    <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">exp</span><span class="p">(</span><span class="o">-</span><span class="p">(</span><span class="n">r</span> <span class="o">-</span> <span class="n">r_sol</span><span class="p">)</span> <span class="o">/</span> <span class="n">l</span> <span class="o">-</span> <span class="n">np</span><span class="o">.</span><span class="n">abs</span><span class="p">(</span><span class="n">z</span> <span class="o">+</span> <span class="n">z_sol</span><span class="p">)</span><span class="o">/</span><span class="n">h</span><span class="p">)</span>
+
+
+<span class="k">def</span> <span class="nf">thick_disc_density</span><span class="p">(</span><span class="n">r</span><span class="p">,</span> <span class="n">z</span><span class="p">,</span> <span class="n">r_sol</span><span class="p">,</span> <span class="n">z_sol</span><span class="p">,</span> <span class="n">l_thick</span><span class="p">,</span> <span class="n">h_thick</span><span class="p">,</span> <span class="n">f_thick</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&#39;&#39;&#39;</span>
+<span class="sd">    Calculates the relative density of the thick disc.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    r : numpy.ndarray</span>
+<span class="sd">        Galactocentric Cylindrical radii for each source used to simulate</span>
+<span class="sd">        proper motions for the particular sightline.</span>
+<span class="sd">    z : numpy.ndarray</span>
+<span class="sd">        Galactocentric Cylindrical heights above the Galactic plane for each</span>
+<span class="sd">        source.</span>
+<span class="sd">    r_sol : float</span>
+<span class="sd">        The Sun&#39;s Galactocentric Cylindrical radius.</span>
+<span class="sd">    z_sol : float</span>
+<span class="sd">        Solar Galactocentric Cylindrical height above the plane.</span>
+<span class="sd">    l_thick : float</span>
+<span class="sd">        Scale length of the thick disc in the radial direction.</span>
+<span class="sd">    h_thick : float</span>
+<span class="sd">        Vertical scale length of the thick disc.</span>
+<span class="sd">    f_thick : float</span>
+<span class="sd">        Relative scaling between the thin disc and thick disc.</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    disc_density : numpy.ndarray</span>
+<span class="sd">        The density of the thick disc evaluated at ``r`` and ``z``.</span>
+<span class="sd">    &#39;&#39;&#39;</span>
+    <span class="k">return</span> <span class="n">f_thick</span> <span class="o">*</span> <span class="n">disc_density</span><span class="p">(</span><span class="n">r</span><span class="p">,</span> <span class="n">z</span><span class="p">,</span> <span class="n">l_thick</span><span class="p">,</span> <span class="n">h_thick</span><span class="p">,</span> <span class="n">r_sol</span><span class="p">,</span> <span class="n">z_sol</span><span class="p">)</span>
+
+
+<span class="k">def</span> <span class="nf">halo_density</span><span class="p">(</span><span class="n">r</span><span class="p">,</span> <span class="n">z</span><span class="p">,</span> <span class="n">r_sol</span><span class="p">,</span> <span class="n">f_h</span><span class="p">,</span> <span class="n">q</span><span class="p">,</span> <span class="n">n</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&#39;&#39;&#39;</span>
+<span class="sd">    Calculates the relative density of the halo.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    r : numpy.ndarray</span>
+<span class="sd">        Galactocentric Cylindrical radii for each source used to simulate</span>
+<span class="sd">        proper motions for the particular sightline.</span>
+<span class="sd">    z : numpy.ndarray</span>
+<span class="sd">        Galactocentric Cylindrical heights above the Galactic plane for each</span>
+<span class="sd">        source.</span>
+<span class="sd">    r_sol : float</span>
+<span class="sd">        The Sun&#39;s Galactocentric Cylindrical radius.</span>
+<span class="sd">    f_h : float</span>
+<span class="sd">        The normalising constant between thin disc and halo parameterisations.</span>
+<span class="sd">    q : float</span>
+<span class="sd">        Oblateness of the halo.</span>
+<span class="sd">    n : float</span>
+<span class="sd">        Power law scaling relation for halo density.</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    halo_density : numpy.ndarray</span>
+<span class="sd">        The density of the halo evaluated at ``r`` and ``z``.</span>
+<span class="sd">    &#39;&#39;&#39;</span>
+    <span class="k">return</span> <span class="n">f_h</span> <span class="o">*</span> <span class="p">(</span><span class="n">r_sol</span> <span class="o">/</span> <span class="n">np</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="n">r</span><span class="o">**</span><span class="mi">2</span> <span class="o">+</span> <span class="p">(</span><span class="n">z</span><span class="o">/</span><span class="n">q</span><span class="p">)</span><span class="o">**</span><span class="mi">2</span><span class="p">))</span><span class="o">**</span><span class="n">n</span>
+
+
+<span class="k">def</span> <span class="nf">bulge_density</span><span class="p">(</span><span class="n">r</span><span class="p">,</span> <span class="n">z</span><span class="p">,</span> <span class="n">zeta_b</span><span class="p">,</span> <span class="n">h_b</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&#39;&#39;&#39;</span>
+<span class="sd">    Calculates the relative density of the Galactic bulge. Currently</span>
+<span class="sd">    not implemented.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    r : numpy.ndarray</span>
+<span class="sd">        Galactocentric Cylindrical radii for each source used to simulate</span>
+<span class="sd">        proper motions for the particular sightline.</span>
+<span class="sd">    z : numpy.ndarray</span>
+<span class="sd">        Galactocentric Cylindrical heights above the Galactic plane for each</span>
+<span class="sd">        source.</span>
+<span class="sd">    zeta_b : float</span>
+<span class="sd">        Normalising constant, setting the relative densities between the</span>
+<span class="sd">        bulge and thin disc.</span>
+<span class="sd">    h_b : float</span>
+<span class="sd">        Scale length of the bulge density.</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    bulge_density : numpy.ndarray</span>
+<span class="sd">        The density of the bulge evaluated at ``r`` and ``z``.</span>
+<span class="sd">    &#39;&#39;&#39;</span>
+    <span class="c1"># Bulge parameters from Jackson et al. (2002), equation 8.</span>
+    <span class="n">x</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="n">r</span><span class="o">**</span><span class="mi">2</span> <span class="o">+</span> <span class="n">z</span><span class="o">**</span><span class="mi">2</span><span class="p">)</span>
+
+    <span class="c1"># We drop C entirely, assuming it to be the equivalent of rho_d(r_sol, 0) for Jackson et al.</span>
+    <span class="k">return</span> <span class="n">zeta_b</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">exp</span><span class="p">(</span><span class="o">-</span><span class="n">x</span><span class="o">/</span><span class="n">h_b</span><span class="p">)</span>
+
+
+<span class="k">def</span> <span class="nf">calc_pm</span><span class="p">(</span><span class="n">iterable</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&#39;&#39;&#39;</span>
+<span class="sd">    Calculate an individual simulated object&#39;s distribution of proper motions</span>
+<span class="sd">    based on its different motions if it were a thin disc, thick disc, or outer</span>
+<span class="sd">    halo object, combined with relative weightings for its assignment to those</span>
+<span class="sd">    components of the Galaxy.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    iterable : list</span>
+<span class="sd">        The list of various variables passed through to ``calc_pm`` by</span>
+<span class="sd">        ``multiprocessing``.</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    j : integer</span>
+<span class="sd">        The index of the particular simulated source having proper motions</span>
+<span class="sd">        derived for it.</span>
+<span class="sd">    mu_a : numpy.ndarray</span>
+<span class="sd">        The simulated proper motions for this object, ``N`` simulated velocities</span>
+<span class="sd">        per ``drift_vels`` Galactic component, in right ascension.</span>
+<span class="sd">    mu_d : numpy.ndarray</span>
+<span class="sd">        The corresponding declination proper motions to ``mu_a``.</span>
+<span class="sd">    _mu_l : numpy.ndarray</span>
+<span class="sd">        Transposed Galactic longitude proper motions for the source&#39;s ``mu_a``</span>
+<span class="sd">        and ``mu_d``.</span>
+<span class="sd">    _mu_b : numpy.ndarray</span>
+<span class="sd">        Transposed Galactic latitude proper motions for the source&#39;s ``mu_a``</span>
+<span class="sd">        and ``mu_d``.</span>
+<span class="sd">    &#39;&#39;&#39;</span>
+    <span class="n">j</span><span class="p">,</span> <span class="n">drift_vels</span><span class="p">,</span> <span class="n">rng</span><span class="p">,</span> <span class="p">[</span><span class="n">l</span><span class="p">,</span> <span class="n">b</span><span class="p">,</span> <span class="n">d</span><span class="p">],</span> <span class="n">N</span><span class="p">,</span> <span class="p">[</span><span class="n">r</span><span class="p">,</span> <span class="n">z</span><span class="p">],</span> <span class="p">[</span><span class="n">r_sol</span><span class="p">,</span> <span class="n">z_sol</span><span class="p">],</span> \
+        <span class="p">[</span><span class="n">A</span><span class="p">,</span> <span class="n">B</span><span class="p">],</span> <span class="p">[</span><span class="n">l_thin</span><span class="p">,</span> <span class="n">l_thick</span><span class="p">]</span> <span class="o">=</span> <span class="n">iterable</span>
+    <span class="n">mu_a</span><span class="p">,</span> <span class="n">mu_d</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">empty</span><span class="p">((</span><span class="nb">len</span><span class="p">(</span><span class="n">drift_vels</span><span class="p">),</span> <span class="n">N</span><span class="p">),</span> <span class="nb">float</span><span class="p">),</span> <span class="n">np</span><span class="o">.</span><span class="n">empty</span><span class="p">((</span><span class="nb">len</span><span class="p">(</span><span class="n">drift_vels</span><span class="p">),</span> <span class="n">N</span><span class="p">),</span> <span class="nb">float</span><span class="p">)</span>
+    <span class="n">_mu_l</span><span class="p">,</span> <span class="n">_mu_b</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">empty</span><span class="p">((</span><span class="nb">len</span><span class="p">(</span><span class="n">drift_vels</span><span class="p">),</span> <span class="n">N</span><span class="p">),</span> <span class="nb">float</span><span class="p">),</span> <span class="n">np</span><span class="o">.</span><span class="n">empty</span><span class="p">((</span><span class="nb">len</span><span class="p">(</span><span class="n">drift_vels</span><span class="p">),</span> <span class="n">N</span><span class="p">),</span> <span class="nb">float</span><span class="p">)</span>
+
+    <span class="n">sinl</span><span class="p">,</span> <span class="n">cosl</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sin</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">radians</span><span class="p">(</span><span class="n">l</span><span class="p">[</span><span class="n">j</span><span class="p">])),</span> <span class="n">np</span><span class="o">.</span><span class="n">cos</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">radians</span><span class="p">(</span><span class="n">l</span><span class="p">[</span><span class="n">j</span><span class="p">]))</span>
+    <span class="n">sinb</span><span class="p">,</span> <span class="n">cosb</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sin</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">radians</span><span class="p">(</span><span class="n">b</span><span class="p">[</span><span class="n">j</span><span class="p">])),</span> <span class="n">np</span><span class="o">.</span><span class="n">cos</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">radians</span><span class="p">(</span><span class="n">b</span><span class="p">[</span><span class="n">j</span><span class="p">]))</span>
+
+    <span class="n">d_ip</span> <span class="o">=</span> <span class="n">cosb</span> <span class="o">*</span> <span class="n">d</span><span class="p">[</span><span class="n">j</span><span class="p">]</span>
+
+    <span class="c1"># Rotation+mirror matrix, to put R-phi-z dispersion along Vr-Vt-Vz plane</span>
+    <span class="n">rot</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span>
+        <span class="p">[[(</span><span class="n">r</span><span class="p">[</span><span class="n">j</span><span class="p">]</span><span class="o">**</span><span class="mi">2</span> <span class="o">+</span> <span class="n">d_ip</span><span class="o">**</span><span class="mi">2</span> <span class="o">-</span> <span class="n">r_sol</span><span class="o">**</span><span class="mi">2</span><span class="p">)</span> <span class="o">/</span> <span class="p">(</span><span class="mi">2</span> <span class="o">*</span> <span class="n">r</span><span class="p">[</span><span class="n">j</span><span class="p">]</span> <span class="o">*</span> <span class="n">d_ip</span><span class="p">),</span> <span class="n">r_sol</span> <span class="o">/</span> <span class="n">r</span><span class="p">[</span><span class="n">j</span><span class="p">]</span> <span class="o">*</span> <span class="n">sinl</span><span class="p">,</span> <span class="mi">0</span><span class="p">],</span>
+         <span class="p">[</span><span class="n">r_sol</span> <span class="o">/</span> <span class="n">r</span><span class="p">[</span><span class="n">j</span><span class="p">]</span> <span class="o">*</span> <span class="n">sinl</span><span class="p">,</span> <span class="o">-</span><span class="p">(</span><span class="n">r</span><span class="p">[</span><span class="n">j</span><span class="p">]</span><span class="o">**</span><span class="mi">2</span> <span class="o">+</span> <span class="n">d_ip</span><span class="o">**</span><span class="mi">2</span> <span class="o">-</span> <span class="n">r_sol</span><span class="o">**</span><span class="mi">2</span><span class="p">)</span> <span class="o">/</span> <span class="p">(</span><span class="mi">2</span> <span class="o">*</span> <span class="n">r</span><span class="p">[</span><span class="n">j</span><span class="p">]</span> <span class="o">*</span> <span class="n">d_ip</span><span class="p">),</span> <span class="mi">0</span><span class="p">],</span>
+         <span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">]])</span>
+
+    <span class="n">Us</span><span class="p">,</span> <span class="n">Vs</span><span class="p">,</span> <span class="n">Ws</span> <span class="o">=</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span>
+    <span class="n">Usol</span><span class="p">,</span> <span class="n">Vsol</span><span class="p">,</span> <span class="n">Wsol</span> <span class="o">=</span> <span class="mf">11.1</span><span class="p">,</span> <span class="mf">12.2</span><span class="p">,</span> <span class="mf">7.3</span>  <span class="c1"># km/s</span>
+    <span class="n">sinbeta</span> <span class="o">=</span> <span class="n">d</span><span class="p">[</span><span class="n">j</span><span class="p">]</span> <span class="o">*</span> <span class="n">sinl</span> <span class="o">/</span> <span class="n">r</span><span class="p">[</span><span class="n">j</span><span class="p">]</span>
+    <span class="n">cosbeta</span> <span class="o">=</span> <span class="p">(</span><span class="n">r_sol</span><span class="o">**</span><span class="mi">2</span> <span class="o">+</span> <span class="n">r</span><span class="p">[</span><span class="n">j</span><span class="p">]</span><span class="o">**</span><span class="mi">2</span> <span class="o">-</span> <span class="n">d</span><span class="p">[</span><span class="n">j</span><span class="p">]</span><span class="o">**</span><span class="mi">2</span><span class="p">)</span> <span class="o">/</span> <span class="p">(</span><span class="mi">2</span> <span class="o">*</span> <span class="n">r_sol</span> <span class="o">*</span> <span class="n">r</span><span class="p">[</span><span class="n">j</span><span class="p">])</span>
+
+    <span class="n">Theta_sol</span> <span class="o">=</span> <span class="mf">233.6</span>  <span class="c1"># km/s</span>
+    <span class="n">__b</span> <span class="o">=</span> <span class="mf">0.72</span>
+    <span class="n">a1</span><span class="p">,</span> <span class="n">a2</span><span class="p">,</span> <span class="n">a3</span> <span class="o">=</span> <span class="mf">235.0</span><span class="p">,</span> <span class="mf">0.89</span><span class="p">,</span> <span class="mf">1.31</span>
+    <span class="n">x</span> <span class="o">=</span> <span class="p">(</span><span class="n">r</span><span class="p">[</span><span class="n">j</span><span class="p">]</span> <span class="o">/</span> <span class="n">r_sol</span><span class="p">)</span> <span class="o">/</span> <span class="n">a2</span>
+    <span class="n">theta_d_sq</span> <span class="o">=</span> <span class="n">a1</span><span class="o">**</span><span class="mi">2</span> <span class="o">*</span> <span class="n">__b</span> <span class="o">*</span> <span class="mf">1.97</span> <span class="o">*</span> <span class="n">x</span><span class="o">**</span><span class="mf">1.22</span> <span class="o">/</span> <span class="p">(</span><span class="n">x</span><span class="o">**</span><span class="mi">2</span> <span class="o">+</span> <span class="mf">0.78</span><span class="o">**</span><span class="mi">2</span><span class="p">)</span><span class="o">**</span><span class="mf">1.43</span>
+    <span class="n">theta_h_sq</span> <span class="o">=</span> <span class="n">a1</span><span class="o">**</span><span class="mi">2</span> <span class="o">*</span> <span class="p">(</span><span class="mi">1</span> <span class="o">-</span> <span class="n">__b</span><span class="p">)</span> <span class="o">*</span> <span class="n">x</span><span class="o">**</span><span class="mi">2</span> <span class="o">*</span> <span class="p">(</span><span class="mi">1</span> <span class="o">+</span> <span class="n">a3</span><span class="o">**</span><span class="mi">2</span><span class="p">)</span> <span class="o">/</span> <span class="p">(</span><span class="n">x</span><span class="o">**</span><span class="mi">2</span> <span class="o">+</span> <span class="n">a3</span><span class="o">**</span><span class="mi">2</span><span class="p">)</span>
+    <span class="n">Theta_r</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="n">theta_d_sq</span> <span class="o">+</span> <span class="n">theta_h_sq</span><span class="p">)</span>
+
+    <span class="n">U1</span> <span class="o">=</span> <span class="n">Us</span> <span class="o">*</span> <span class="n">cosbeta</span> <span class="o">+</span> <span class="p">(</span><span class="n">Vs</span> <span class="o">+</span> <span class="n">Theta_r</span><span class="p">)</span> <span class="o">*</span> <span class="n">sinbeta</span> <span class="o">-</span> <span class="n">Usol</span>
+    <span class="n">V1</span> <span class="o">=</span> <span class="o">-</span><span class="n">Us</span><span class="o">*</span><span class="n">sinbeta</span> <span class="o">+</span> <span class="p">(</span><span class="n">Vs</span> <span class="o">+</span> <span class="n">Theta_r</span><span class="p">)</span> <span class="o">*</span> <span class="n">cosbeta</span> <span class="o">-</span> <span class="n">Vsol</span> <span class="o">-</span> <span class="n">Theta_sol</span>
+    <span class="n">W1</span> <span class="o">=</span> <span class="n">Ws</span> <span class="o">-</span> <span class="n">Wsol</span>
+
+    <span class="c1"># Based on Mroz et al. (2019), our components of Heliocentric Cylindrical</span>
+    <span class="c1"># coordinates are:</span>
+    <span class="n">Vr</span> <span class="o">=</span> <span class="n">U1</span> <span class="o">*</span> <span class="n">cosl</span> <span class="o">+</span> <span class="n">V1</span> <span class="o">*</span> <span class="n">sinl</span>
+    <span class="n">Vt</span> <span class="o">=</span> <span class="n">V1</span> <span class="o">*</span> <span class="n">cosl</span> <span class="o">-</span> <span class="n">U1</span> <span class="o">*</span> <span class="n">sinl</span>
+    <span class="n">Vz</span> <span class="o">=</span> <span class="n">W1</span>
+
+    <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">drift_vels</span><span class="p">)):</span>
+        <span class="n">drift_vel_rtz</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">matmul</span><span class="p">(</span><span class="n">rot</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([[</span><span class="mi">0</span><span class="p">],</span> <span class="p">[</span><span class="o">-</span><span class="n">drift_vels</span><span class="p">[</span><span class="n">i</span><span class="p">]],</span> <span class="p">[</span><span class="mi">0</span><span class="p">]]))</span>
+        <span class="n">mean</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="n">Vr</span> <span class="o">+</span> <span class="n">drift_vel_rtz</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">],</span> <span class="n">Vt</span> <span class="o">+</span> <span class="n">drift_vel_rtz</span><span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">],</span> <span class="n">Vz</span><span class="p">])</span>
+        <span class="k">if</span> <span class="n">i</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="n">cov</span> <span class="o">=</span> <span class="n">find_thin_disc_dispersion</span><span class="p">(</span><span class="n">r</span><span class="p">[</span><span class="n">j</span><span class="p">],</span> <span class="n">z</span><span class="p">[</span><span class="n">j</span><span class="p">],</span> <span class="n">l</span><span class="p">[</span><span class="n">j</span><span class="p">],</span> <span class="n">b</span><span class="p">[</span><span class="n">j</span><span class="p">],</span> <span class="n">d</span><span class="p">[</span><span class="n">j</span><span class="p">],</span> <span class="n">A</span><span class="p">[</span><span class="n">j</span><span class="p">],</span> <span class="n">B</span><span class="p">[</span><span class="n">j</span><span class="p">],</span> <span class="n">l_thin</span><span class="p">,</span>
+                                            <span class="n">r_sol</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">i</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
+            <span class="n">cov</span> <span class="o">=</span> <span class="n">find_thick_disc_dispersion</span><span class="p">(</span><span class="n">r</span><span class="p">[</span><span class="n">j</span><span class="p">],</span> <span class="n">l</span><span class="p">[</span><span class="n">j</span><span class="p">],</span> <span class="n">b</span><span class="p">[</span><span class="n">j</span><span class="p">],</span> <span class="n">d</span><span class="p">[</span><span class="n">j</span><span class="p">],</span> <span class="n">l_thick</span><span class="p">,</span> <span class="n">r_sol</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">i</span> <span class="o">==</span> <span class="mi">2</span><span class="p">:</span>
+            <span class="n">cov</span> <span class="o">=</span> <span class="n">find_halo_dispersion</span><span class="p">(</span><span class="n">l</span><span class="p">[</span><span class="n">j</span><span class="p">],</span> <span class="n">b</span><span class="p">[</span><span class="n">j</span><span class="p">],</span> <span class="n">d</span><span class="p">[</span><span class="n">j</span><span class="p">])</span>
+
+        <span class="n">new_uvw</span> <span class="o">=</span> <span class="n">rng</span><span class="o">.</span><span class="n">multivariate_normal</span><span class="p">(</span><span class="n">mean</span><span class="p">,</span> <span class="n">cov</span><span class="p">,</span> <span class="n">N</span><span class="p">)</span>
+        <span class="n">v_d</span><span class="p">,</span> <span class="n">v_l</span><span class="p">,</span> <span class="n">v_z</span> <span class="o">=</span> <span class="n">new_uvw</span><span class="p">[:,</span> <span class="mi">0</span><span class="p">],</span> <span class="n">new_uvw</span><span class="p">[:,</span> <span class="mi">1</span><span class="p">],</span> <span class="n">new_uvw</span><span class="p">[:,</span> <span class="mi">2</span><span class="p">]</span>
+
+        <span class="c1"># 1 km/s/kpc = 0.2108 mas/year</span>
+        <span class="n">mu_lstar</span> <span class="o">=</span> <span class="n">v_l</span> <span class="o">/</span> <span class="n">d</span><span class="p">[</span><span class="n">j</span><span class="p">]</span> <span class="o">*</span> <span class="mf">0.2108</span>
+        <span class="n">mu_b</span> <span class="o">=</span> <span class="mf">0.2108</span><span class="o">/</span><span class="n">d</span><span class="p">[</span><span class="n">j</span><span class="p">]</span> <span class="o">*</span> <span class="p">(</span><span class="n">v_z</span> <span class="o">*</span> <span class="n">cosb</span> <span class="o">-</span> <span class="n">v_d</span> <span class="o">*</span> <span class="n">sinb</span><span class="p">)</span>
+
+        <span class="n">mu_a</span><span class="p">[</span><span class="n">i</span><span class="p">,</span> <span class="p">:],</span> <span class="n">mu_d</span><span class="p">[</span><span class="n">i</span><span class="p">,</span> <span class="p">:]</span> <span class="o">=</span> <span class="n">galactic_to_equatorial</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">radians</span><span class="p">(</span><span class="n">l</span><span class="p">[</span><span class="n">j</span><span class="p">]),</span> <span class="n">np</span><span class="o">.</span><span class="n">radians</span><span class="p">(</span><span class="n">b</span><span class="p">[</span><span class="n">j</span><span class="p">]),</span>
+                                                        <span class="n">mu_lstar</span><span class="p">,</span> <span class="n">mu_b</span><span class="p">)</span>
+
+        <span class="n">_mu_l</span><span class="p">[</span><span class="n">i</span><span class="p">,</span> <span class="p">:],</span> <span class="n">_mu_b</span><span class="p">[</span><span class="n">i</span><span class="p">,</span> <span class="p">:]</span> <span class="o">=</span> <span class="n">mu_lstar</span><span class="p">,</span> <span class="n">mu_b</span>
+
+    <span class="k">return</span> <span class="p">(</span><span class="n">j</span><span class="p">,</span> <span class="n">mu_a</span><span class="p">,</span> <span class="n">mu_d</span><span class="p">,</span> <span class="n">_mu_l</span><span class="p">,</span> <span class="n">_mu_b</span><span class="p">)</span>
+
+
+<span class="k">def</span> <span class="nf">find_thin_disc_dispersion</span><span class="p">(</span><span class="n">r</span><span class="p">,</span> <span class="n">z</span><span class="p">,</span> <span class="n">l</span><span class="p">,</span> <span class="n">b</span><span class="p">,</span> <span class="n">d</span><span class="p">,</span> <span class="n">A</span><span class="p">,</span> <span class="n">B</span><span class="p">,</span> <span class="n">h</span><span class="p">,</span> <span class="n">r_sol</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&#39;&#39;&#39;</span>
+<span class="sd">    Calculate the dispersion in the thin disc as a function of Galactic position.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    r : float</span>
+<span class="sd">        The Galactic Cylindrical radius of the object.</span>
+<span class="sd">    z : float</span>
+<span class="sd">        The Galactic Cylindrical height of the source.</span>
+<span class="sd">    l : float</span>
+<span class="sd">        Galactic longitude of the star.</span>
+<span class="sd">    b : float</span>
+<span class="sd">        Galactic latitude of the star.</span>
+<span class="sd">    A : float</span>
+<span class="sd">        Oort constant.</span>
+<span class="sd">    B : float</span>
+<span class="sd">        Oort constant.</span>
+<span class="sd">    h : float</span>
+<span class="sd">        Scale length of the thin disc.</span>
+<span class="sd">    r_sol : float</span>
+<span class="sd">        Galactic Cylindrical radius of the Sun.</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    cov_rtz : numpy.ndarray</span>
+<span class="sd">        The covariance matrix dispersion vector, in Galactic Cylindrical</span>
+<span class="sd">        coordinates.</span>
+<span class="sd">    &#39;&#39;&#39;</span>
+    <span class="c1"># Data from Pasetto et al. (2012), A&amp;A, 547, A71, tables 4-9</span>
+    <span class="n">_r_sol</span> <span class="o">=</span> <span class="mf">8.5</span>  <span class="c1"># kpc; have to use the Pasetto et al. result of R0 ~ 8.4-8.6 kpc for consistency</span>
+
+    <span class="c1"># Assume that sig_rr^2 goes as R^2 exp(-2 R / h) by a stable Toomre Parameter (Lewis &amp; Freeman</span>
+    <span class="c1"># 1989, AJ, 97, 139) where rotation curve is flat (Mroz et al.), where h is the scale length</span>
+    <span class="c1"># of the disc. Pasetto et al. have a sig_rr^2(R0, 0) ~ 715 km^2/s^2</span>
+    <span class="n">sig_rr2_00</span> <span class="o">=</span> <span class="mf">715.93</span>  <span class="c1"># km^2/s^2</span>
+    <span class="n">sig_rr2_r0</span> <span class="o">=</span> <span class="n">sig_rr2_00</span> <span class="o">*</span> <span class="p">(</span><span class="n">r</span> <span class="o">/</span> <span class="n">_r_sol</span><span class="p">)</span><span class="o">**</span><span class="mi">2</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">exp</span><span class="p">(</span><span class="o">-</span><span class="mi">2</span> <span class="o">*</span> <span class="p">(</span><span class="n">r</span> <span class="o">-</span> <span class="n">_r_sol</span><span class="p">)</span> <span class="o">/</span> <span class="n">h</span><span class="p">)</span>
+    <span class="c1"># Now assume that the vertical gradient of the thin disc of Pasetto et al. goes for ~1kpc</span>
+    <span class="c1"># with a gradient of roughly 1200km^2/s^2/kpc at R=R0, but scaling the same as the dispersion.</span>
+    <span class="n">sig_rr2_z_grad_0</span> <span class="o">=</span> <span class="mf">1236.97</span>  <span class="c1"># km^2/s^2/kpc</span>
+    <span class="n">sig_rr2_z_grad</span> <span class="o">=</span> <span class="n">sig_rr2_z_grad_0</span>  <span class="c1"># * (r / r_sol)**2 * np.exp(-2 * (r - r_sol) / h)</span>
+    <span class="n">sig_rr2</span> <span class="o">=</span> <span class="n">sig_rr2_r0</span> <span class="o">+</span> <span class="nb">min</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">abs</span><span class="p">(</span><span class="n">z</span><span class="p">))</span> <span class="o">*</span> <span class="n">sig_rr2_z_grad</span>
+
+    <span class="c1"># Assume that the phi variance sigma can be approximated from the relation with</span>
+    <span class="c1"># the R sigma:</span>
+    <span class="n">sig_phiphi2</span> <span class="o">=</span> <span class="p">(</span><span class="o">-</span><span class="n">B</span> <span class="o">/</span> <span class="p">(</span><span class="n">A</span> <span class="o">-</span> <span class="n">B</span><span class="p">))</span> <span class="o">*</span> <span class="n">sig_rr2</span>
+
+    <span class="c1"># We assume the correlation along the R-phi covariance is zero, following Vallenari et al.</span>
+    <span class="n">sig_rphi2</span> <span class="o">=</span> <span class="mi">0</span>
+
+    <span class="c1"># Following the Pasetto et al. discussion, we conclude that the phi-z dispersion is</span>
+    <span class="c1"># essentially zero, to their uncertainties, and force it to be so:</span>
+    <span class="n">sig_phiz2</span> <span class="o">=</span> <span class="mi">0</span>
+
+    <span class="c1"># Similar to sig_rr, we assume that sig_zz^2 = sig_zz^2(R0, 0) * exp(-(r - r_sol) / h)</span>
+    <span class="c1"># where sig_zz^2(R0, 0) ~ 243 km^2/s^2</span>
+    <span class="n">sig_zz2_00</span> <span class="o">=</span> <span class="mf">243.71</span>  <span class="c1"># km^2/s^2</span>
+    <span class="n">sig_zz2_r0</span> <span class="o">=</span> <span class="n">sig_zz2_00</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">exp</span><span class="p">(</span><span class="o">-</span><span class="p">(</span><span class="n">r</span> <span class="o">-</span> <span class="n">_r_sol</span><span class="p">)</span> <span class="o">/</span> <span class="n">h</span><span class="p">)</span>
+    <span class="c1"># Now, again, extrapolate the vertical gradient seen in sig_zz(R, z) to 1 kpc above/below plane</span>
+    <span class="c1"># with a gradient, again, that scales with the radial gradient. Assume ~300km^2/s^2/kpc R = R0.</span>
+    <span class="n">sig_zz2_z_grad_0</span> <span class="o">=</span> <span class="mf">306.84</span>  <span class="c1"># km^2/s^2/kpc</span>
+    <span class="n">sig_zz2_z_grad</span> <span class="o">=</span> <span class="n">sig_zz2_z_grad_0</span>  <span class="c1"># * np.exp(-(r - r_sol) / h)</span>
+    <span class="n">sig_zz2</span> <span class="o">=</span> <span class="n">sig_zz2_r0</span> <span class="o">+</span> <span class="nb">min</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">abs</span><span class="p">(</span><span class="n">z</span><span class="p">))</span> <span class="o">*</span> <span class="n">sig_zz2_z_grad</span>
+
+    <span class="c1"># Given Vallenari et al. (2006), A&amp;A, 451, 125, following Cuddeford &amp; Amendt (1991), we</span>
+    <span class="c1"># assume that the vertical tilt goes as the gradient of sig^2_rz, which is given by</span>
+    <span class="c1"># the difference between sig^2_rr(R, 0) and sig^2_zz(R, 0); we assume lambda = 0.6, for now.</span>
+    <span class="n">dsig2_rz_dz</span> <span class="o">=</span> <span class="mf">0.6</span> <span class="o">*</span> <span class="p">(</span><span class="n">sig_rr2_r0</span> <span class="o">-</span> <span class="n">sig_zz2_r0</span><span class="p">)</span> <span class="o">/</span> <span class="n">r</span>
+    <span class="n">sig_rz2</span> <span class="o">=</span> <span class="n">z</span> <span class="o">*</span> <span class="n">dsig2_rz_dz</span>
+    <span class="c1"># If correlation gets above one, force sig_rz2 = +- sqrt(sig_rr^2) * sqrt(sig_zz^2) at largest</span>
+    <span class="k">if</span> <span class="n">np</span><span class="o">.</span><span class="n">abs</span><span class="p">(</span><span class="n">sig_rz2</span><span class="p">)</span> <span class="o">&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="n">sig_rr2</span><span class="p">)</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="n">sig_zz2</span><span class="p">):</span>
+        <span class="n">sig_rz2</span> <span class="o">=</span> <span class="mf">0.99</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">sign</span><span class="p">(</span><span class="n">sig_rz2</span><span class="p">)</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="n">sig_rr2</span><span class="p">)</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="n">sig_zz2</span><span class="p">)</span>
+
+    <span class="n">cov</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">empty</span><span class="p">((</span><span class="mi">3</span><span class="p">,</span> <span class="mi">3</span><span class="p">),</span> <span class="nb">float</span><span class="p">)</span>
+    <span class="n">cov</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">]</span> <span class="o">=</span> <span class="n">sig_rr2</span>
+    <span class="n">cov</span><span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">]</span> <span class="o">=</span> <span class="n">sig_phiphi2</span>
+    <span class="n">cov</span><span class="p">[</span><span class="mi">2</span><span class="p">,</span> <span class="mi">2</span><span class="p">]</span> <span class="o">=</span> <span class="n">sig_zz2</span>
+    <span class="n">cov</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">]</span> <span class="o">=</span> <span class="n">cov</span><span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">]</span> <span class="o">=</span> <span class="n">sig_rphi2</span>
+    <span class="n">cov</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">2</span><span class="p">]</span> <span class="o">=</span> <span class="n">cov</span><span class="p">[</span><span class="mi">2</span><span class="p">,</span> <span class="mi">0</span><span class="p">]</span> <span class="o">=</span> <span class="n">sig_rz2</span>
+    <span class="n">cov</span><span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">]</span> <span class="o">=</span> <span class="n">cov</span><span class="p">[</span><span class="mi">2</span><span class="p">,</span> <span class="mi">1</span><span class="p">]</span> <span class="o">=</span> <span class="n">sig_phiz2</span>
+
+    <span class="n">d_ip</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">cos</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">radians</span><span class="p">(</span><span class="n">b</span><span class="p">))</span> <span class="o">*</span> <span class="n">d</span>
+    <span class="c1"># Rotation matrix, to put R-phi-z dispersion along Vr-Vt-Vz plane</span>
+    <span class="n">sinl</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sin</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">radians</span><span class="p">(</span><span class="n">l</span><span class="p">))</span>
+    <span class="n">rot</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span>
+        <span class="p">[[(</span><span class="n">r</span><span class="o">**</span><span class="mi">2</span> <span class="o">+</span> <span class="n">d_ip</span><span class="o">**</span><span class="mi">2</span> <span class="o">-</span> <span class="n">r_sol</span><span class="o">**</span><span class="mi">2</span><span class="p">)</span> <span class="o">/</span> <span class="p">(</span><span class="mi">2</span> <span class="o">*</span> <span class="n">r</span> <span class="o">*</span> <span class="n">d_ip</span><span class="p">),</span> <span class="n">r_sol</span> <span class="o">/</span> <span class="n">r</span> <span class="o">*</span> <span class="n">sinl</span><span class="p">,</span> <span class="mi">0</span><span class="p">],</span>
+         <span class="p">[</span><span class="n">r_sol</span> <span class="o">/</span> <span class="n">r</span> <span class="o">*</span> <span class="n">sinl</span><span class="p">,</span> <span class="o">-</span><span class="p">(</span><span class="n">r</span><span class="o">**</span><span class="mi">2</span> <span class="o">+</span> <span class="n">d_ip</span><span class="o">**</span><span class="mi">2</span> <span class="o">-</span> <span class="n">r_sol</span><span class="o">**</span><span class="mi">2</span><span class="p">)</span> <span class="o">/</span> <span class="p">(</span><span class="mi">2</span> <span class="o">*</span> <span class="n">r</span> <span class="o">*</span> <span class="n">d_ip</span><span class="p">),</span> <span class="mi">0</span><span class="p">],</span>
+         <span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">]])</span>
+
+    <span class="n">cov_rtz</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">matmul</span><span class="p">(</span><span class="n">rot</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">matmul</span><span class="p">(</span><span class="n">cov</span><span class="p">,</span> <span class="n">rot</span><span class="o">.</span><span class="n">T</span><span class="p">))</span>
+
+    <span class="k">return</span> <span class="n">cov_rtz</span>
+
+
+<span class="k">def</span> <span class="nf">find_thick_disc_dispersion</span><span class="p">(</span><span class="n">r</span><span class="p">,</span> <span class="n">l</span><span class="p">,</span> <span class="n">b</span><span class="p">,</span> <span class="n">d</span><span class="p">,</span> <span class="n">h</span><span class="p">,</span> <span class="n">r_sol</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&#39;&#39;&#39;</span>
+<span class="sd">    Calculate the dispersion in the thick disc as a function of Galactic position.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    r : float</span>
+<span class="sd">        The Galactic Cylindrical radius of the object.</span>
+<span class="sd">    z : float</span>
+<span class="sd">        The Galactic Cylindrical height of the source.</span>
+<span class="sd">    l : float</span>
+<span class="sd">        Galactic longitude of the star.</span>
+<span class="sd">    b : float</span>
+<span class="sd">        Galactic latitude of the star.</span>
+<span class="sd">    A : float</span>
+<span class="sd">        Oort constant.</span>
+<span class="sd">    B : float</span>
+<span class="sd">        Oort constant.</span>
+<span class="sd">    h : float</span>
+<span class="sd">        Scale length of the thick disc.</span>
+<span class="sd">    r_sol : float</span>
+<span class="sd">        Galactic Cylindrical radius of the Sun.</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    cov_rtz : numpy.ndarray</span>
+<span class="sd">        The covariance matrix dispersion vector, in Galactic Cylindrical</span>
+<span class="sd">        coordinates.</span>
+<span class="sd">    &#39;&#39;&#39;</span>
+    <span class="c1"># Data from Pasetto et al. (2012), A&amp;A, 547, A70, table 3-4</span>
+    <span class="c1"># Assume sig_phiphi / sig_rr = const, so scale both the same. Currently assume there are no</span>
+    <span class="c1"># cross-term products.</span>
+
+    <span class="n">_r_sol</span> <span class="o">=</span> <span class="mf">8.5</span>  <span class="c1"># kpc; use the Pasetto et al. thin disc rough R0, figuring it should be equal</span>
+
+    <span class="k">if</span> <span class="n">r</span> <span class="o">&lt;</span> <span class="n">_r_sol</span><span class="p">:</span>
+        <span class="n">sig_rr2</span> <span class="o">=</span> <span class="mf">60.2</span><span class="o">**</span><span class="mi">2</span> <span class="o">*</span> <span class="p">(</span><span class="n">r</span> <span class="o">/</span> <span class="n">_r_sol</span><span class="p">)</span><span class="o">**</span><span class="mi">2</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">exp</span><span class="p">(</span><span class="o">-</span><span class="mi">2</span> <span class="o">*</span> <span class="p">(</span><span class="n">r</span> <span class="o">-</span> <span class="n">_r_sol</span><span class="p">)</span> <span class="o">/</span> <span class="n">h</span><span class="p">)</span>
+        <span class="n">sig_rphi2</span> <span class="o">=</span> <span class="mi">0</span>  <span class="c1"># 37.6 km/s(!)</span>
+        <span class="n">sig_rz2</span> <span class="o">=</span> <span class="mi">0</span>  <span class="c1"># 13.3 km/s(!)</span>
+        <span class="n">sig_phiphi2</span> <span class="o">=</span> <span class="mf">44.7</span><span class="o">**</span><span class="mi">2</span> <span class="o">*</span> <span class="p">(</span><span class="n">r</span> <span class="o">/</span> <span class="n">_r_sol</span><span class="p">)</span><span class="o">**</span><span class="mi">2</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">exp</span><span class="p">(</span><span class="o">-</span><span class="mi">2</span> <span class="o">*</span> <span class="p">(</span><span class="n">r</span> <span class="o">-</span> <span class="n">_r_sol</span><span class="p">)</span> <span class="o">/</span> <span class="n">h</span><span class="p">)</span>
+        <span class="n">sig_phiz2</span> <span class="o">=</span> <span class="mi">0</span>  <span class="c1"># 4.0 km/s(!)</span>
+        <span class="n">sig_zz2</span> <span class="o">=</span> <span class="mf">37.2</span><span class="o">**</span><span class="mi">2</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">exp</span><span class="p">(</span><span class="o">-</span><span class="p">(</span><span class="n">r</span> <span class="o">-</span> <span class="n">_r_sol</span><span class="p">)</span> <span class="o">/</span> <span class="n">h</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">sig_rr2</span> <span class="o">=</span> <span class="mf">55.8</span><span class="o">**</span><span class="mi">2</span> <span class="o">*</span> <span class="p">(</span><span class="n">r</span> <span class="o">/</span> <span class="n">_r_sol</span><span class="p">)</span><span class="o">**</span><span class="mi">2</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">exp</span><span class="p">(</span><span class="o">-</span><span class="mi">2</span> <span class="o">*</span> <span class="p">(</span><span class="n">r</span> <span class="o">-</span> <span class="n">_r_sol</span><span class="p">)</span> <span class="o">/</span> <span class="n">h</span><span class="p">)</span>
+        <span class="n">sig_rphi2</span> <span class="o">=</span> <span class="mi">0</span>  <span class="c1"># 35.5 km/s(!)</span>
+        <span class="n">sig_rz2</span> <span class="o">=</span> <span class="mi">0</span>  <span class="c1"># 9.6 km/s(!)</span>
+        <span class="n">sig_phiphi2</span> <span class="o">=</span> <span class="mf">45.2</span><span class="o">**</span><span class="mi">2</span> <span class="o">*</span> <span class="p">(</span><span class="n">r</span> <span class="o">/</span> <span class="n">_r_sol</span><span class="p">)</span><span class="o">**</span><span class="mi">2</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">exp</span><span class="p">(</span><span class="o">-</span><span class="mi">2</span> <span class="o">*</span> <span class="p">(</span><span class="n">r</span> <span class="o">-</span> <span class="n">_r_sol</span><span class="p">)</span> <span class="o">/</span> <span class="n">h</span><span class="p">)</span>
+        <span class="n">sig_phiz2</span> <span class="o">=</span> <span class="mi">0</span>  <span class="c1"># 3.8 km/s(!)</span>
+        <span class="n">sig_zz2</span> <span class="o">=</span> <span class="mf">36.3</span><span class="o">**</span><span class="mi">2</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">exp</span><span class="p">(</span><span class="o">-</span><span class="p">(</span><span class="n">r</span> <span class="o">-</span> <span class="n">_r_sol</span><span class="p">)</span> <span class="o">/</span> <span class="n">h</span><span class="p">)</span>
+
+    <span class="n">cov</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">empty</span><span class="p">((</span><span class="mi">3</span><span class="p">,</span> <span class="mi">3</span><span class="p">),</span> <span class="nb">float</span><span class="p">)</span>
+    <span class="n">cov</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">]</span> <span class="o">=</span> <span class="n">sig_rr2</span>
+    <span class="n">cov</span><span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">]</span> <span class="o">=</span> <span class="n">sig_phiphi2</span>
+    <span class="n">cov</span><span class="p">[</span><span class="mi">2</span><span class="p">,</span> <span class="mi">2</span><span class="p">]</span> <span class="o">=</span> <span class="n">sig_zz2</span>
+    <span class="n">cov</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">]</span> <span class="o">=</span> <span class="n">cov</span><span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">]</span> <span class="o">=</span> <span class="n">sig_rphi2</span>
+    <span class="n">cov</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">2</span><span class="p">]</span> <span class="o">=</span> <span class="n">cov</span><span class="p">[</span><span class="mi">2</span><span class="p">,</span> <span class="mi">0</span><span class="p">]</span> <span class="o">=</span> <span class="n">sig_rz2</span>
+    <span class="n">cov</span><span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">]</span> <span class="o">=</span> <span class="n">cov</span><span class="p">[</span><span class="mi">2</span><span class="p">,</span> <span class="mi">1</span><span class="p">]</span> <span class="o">=</span> <span class="n">sig_phiz2</span>
+
+    <span class="n">d_ip</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">cos</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">radians</span><span class="p">(</span><span class="n">b</span><span class="p">))</span> <span class="o">*</span> <span class="n">d</span>
+    <span class="c1"># Rotation matrix, to put R-phi-z dispersion along Vr-Vt-Vz plane</span>
+    <span class="n">sinl</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sin</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">radians</span><span class="p">(</span><span class="n">l</span><span class="p">))</span>
+    <span class="n">rot</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span>
+        <span class="p">[[(</span><span class="n">r</span><span class="o">**</span><span class="mi">2</span> <span class="o">+</span> <span class="n">d_ip</span><span class="o">**</span><span class="mi">2</span> <span class="o">-</span> <span class="n">r_sol</span><span class="o">**</span><span class="mi">2</span><span class="p">)</span> <span class="o">/</span> <span class="p">(</span><span class="mi">2</span> <span class="o">*</span> <span class="n">r</span> <span class="o">*</span> <span class="n">d_ip</span><span class="p">),</span> <span class="n">r_sol</span> <span class="o">/</span> <span class="n">r</span> <span class="o">*</span> <span class="n">sinl</span><span class="p">,</span> <span class="mi">0</span><span class="p">],</span>
+         <span class="p">[</span><span class="n">r_sol</span> <span class="o">/</span> <span class="n">r</span> <span class="o">*</span> <span class="n">sinl</span><span class="p">,</span> <span class="o">-</span><span class="p">(</span><span class="n">r</span><span class="o">**</span><span class="mi">2</span> <span class="o">+</span> <span class="n">d_ip</span><span class="o">**</span><span class="mi">2</span> <span class="o">-</span> <span class="n">r_sol</span><span class="o">**</span><span class="mi">2</span><span class="p">)</span> <span class="o">/</span> <span class="p">(</span><span class="mi">2</span> <span class="o">*</span> <span class="n">r</span> <span class="o">*</span> <span class="n">d_ip</span><span class="p">),</span> <span class="mi">0</span><span class="p">],</span>
+         <span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">]])</span>
+
+    <span class="n">cov_rtz</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">matmul</span><span class="p">(</span><span class="n">rot</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">matmul</span><span class="p">(</span><span class="n">cov</span><span class="p">,</span> <span class="n">rot</span><span class="o">.</span><span class="n">T</span><span class="p">))</span>
+
+    <span class="k">return</span> <span class="n">cov_rtz</span>
+
+
+<span class="k">def</span> <span class="nf">find_halo_dispersion</span><span class="p">(</span><span class="n">l</span><span class="p">,</span> <span class="n">b</span><span class="p">,</span> <span class="n">d</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&#39;&#39;&#39;</span>
+<span class="sd">    Calculate the dispersion in the halo as a function of Galactic position.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    l : float</span>
+<span class="sd">        Galactic longitude of the star.</span>
+<span class="sd">    b : float</span>
+<span class="sd">        Galactic latitude of the star.</span>
+<span class="sd">    d : float</span>
+<span class="sd">        The Galactic Spherical distance of the object from the Galactic center.</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    cov_rtz : numpy.ndarray</span>
+<span class="sd">        The covariance matrix dispersion vector, in Galactic Cylindrical</span>
+<span class="sd">        coordinates.</span>
+<span class="sd">    &#39;&#39;&#39;</span>
+    <span class="c1"># Data from King et al. (2015), ApJ, 813, 89, table 3; conversions from Appendix A</span>
+    <span class="c1"># Heliocentric d, l, b (x, y, z) become Galactocentric R, phi, theta (X, Y, Z)</span>
+    <span class="n">r_vals</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mf">8.4</span><span class="p">,</span> <span class="mf">10.1</span><span class="p">,</span> <span class="mf">11.1</span><span class="p">,</span> <span class="mf">12.0</span><span class="p">,</span> <span class="mf">13.1</span><span class="p">,</span> <span class="mf">14.4</span><span class="p">,</span> <span class="mf">16.7</span><span class="p">,</span> <span class="mf">22.4</span><span class="p">])</span>
+    <span class="n">sig_rr</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mf">155.3</span><span class="p">,</span> <span class="mf">156.5</span><span class="p">,</span> <span class="mf">107.4</span><span class="p">,</span> <span class="mf">150.1</span><span class="p">,</span> <span class="mf">105.0</span><span class="p">,</span> <span class="mf">95.1</span><span class="p">,</span> <span class="mf">56.8</span><span class="p">,</span> <span class="mf">76.8</span><span class="p">])</span>
+    <span class="n">sig_phiphi</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mf">88.3</span><span class="p">,</span> <span class="mf">86.2</span><span class="p">,</span> <span class="mf">110.3</span><span class="p">,</span> <span class="mf">85.9</span><span class="p">,</span> <span class="mf">194.0</span><span class="p">,</span> <span class="mf">172.6</span><span class="p">,</span> <span class="mf">225.8</span><span class="p">,</span> <span class="mf">195.8</span><span class="p">])</span>
+    <span class="n">sig_thetatheta</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mf">109.8</span><span class="p">,</span> <span class="mf">98.2</span><span class="p">,</span> <span class="mf">117.6</span><span class="p">,</span> <span class="mf">38.5</span><span class="p">,</span> <span class="mf">165.4</span><span class="p">,</span> <span class="mf">205.3</span><span class="p">,</span> <span class="mf">256.0</span><span class="p">,</span> <span class="mf">159.1</span><span class="p">])</span>
+    <span class="n">cov_rphi</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="o">-</span><span class="mf">271.8</span><span class="p">,</span> <span class="mf">2442.2</span><span class="p">,</span> <span class="o">-</span><span class="mf">2923.5</span><span class="p">,</span> <span class="mf">530.2</span><span class="p">,</span> <span class="mf">5801.2</span><span class="p">,</span> <span class="mf">1448.5</span><span class="p">,</span> <span class="mf">494.8</span><span class="p">,</span> <span class="mf">30.9</span><span class="p">])</span>
+    <span class="n">cov_rtheta</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mf">428.7</span><span class="p">,</span> <span class="o">-</span><span class="mf">123.2</span><span class="p">,</span> <span class="o">-</span><span class="mf">2806.8</span><span class="p">,</span> <span class="o">-</span><span class="mf">2088.1</span><span class="p">,</span> <span class="mf">1896.4</span><span class="p">,</span> <span class="mf">3053.6</span><span class="p">,</span> <span class="mf">1243.5</span><span class="p">,</span> <span class="mf">57.2</span><span class="p">])</span>
+    <span class="n">cov_phitheta</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="o">-</span><span class="mf">80.4</span><span class="p">,</span> <span class="o">-</span><span class="mf">456.0</span><span class="p">,</span> <span class="o">-</span><span class="mf">6839.6</span><span class="p">,</span> <span class="o">-</span><span class="mf">4335.6</span><span class="p">,</span> <span class="mf">5498.6</span><span class="p">,</span> <span class="mf">2843.3</span><span class="p">,</span> <span class="mf">831.7</span><span class="p">,</span> <span class="mf">10559.0</span><span class="p">])</span>
+
+    <span class="n">r_sol</span> <span class="o">=</span> <span class="mi">8</span>  <span class="c1"># kpc; use the King et al. result for self-consistency</span>
+    <span class="n">z_sol</span> <span class="o">=</span> <span class="mf">0.0196</span>  <span class="c1"># kpc</span>
+
+    <span class="c1"># Being unsure of why the r = 12kpc covariance matrix is not positive semi-definite, we</span>
+    <span class="c1"># just remove the covariances for the time being. The covariances are large, but with large</span>
+    <span class="c1"># uncertainties: cov_rphi is 0.25sigma away from zero, cov_rtheta 1.95 sigma from zero, and</span>
+    <span class="c1"># cov_phitheta 1.6 sigma from zero, so this isn&#39;t a terrible assumption to make at this time.</span>
+    <span class="n">cov_rphi</span><span class="p">[</span><span class="mi">3</span><span class="p">],</span> <span class="n">cov_rtheta</span><span class="p">[</span><span class="mi">3</span><span class="p">],</span> <span class="n">cov_phitheta</span><span class="p">[</span><span class="mi">3</span><span class="p">]</span> <span class="o">=</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span>
+
+    <span class="n">sinl</span><span class="p">,</span> <span class="n">cosl</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sin</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">radians</span><span class="p">(</span><span class="n">l</span><span class="p">)),</span> <span class="n">np</span><span class="o">.</span><span class="n">cos</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">radians</span><span class="p">(</span><span class="n">l</span><span class="p">))</span>
+    <span class="n">sinb</span><span class="p">,</span> <span class="n">cosb</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sin</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">radians</span><span class="p">(</span><span class="n">b</span><span class="p">)),</span> <span class="n">np</span><span class="o">.</span><span class="n">cos</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">radians</span><span class="p">(</span><span class="n">b</span><span class="p">))</span>
+
+    <span class="n">x</span> <span class="o">=</span> <span class="n">d</span> <span class="o">*</span> <span class="n">cosl</span> <span class="o">*</span> <span class="n">cosb</span>
+    <span class="n">y</span> <span class="o">=</span> <span class="n">d</span> <span class="o">*</span> <span class="n">sinl</span> <span class="o">*</span> <span class="n">cosb</span>
+    <span class="n">z</span> <span class="o">=</span> <span class="n">d</span> <span class="o">*</span> <span class="n">sinb</span>
+    <span class="n">X</span> <span class="o">=</span> <span class="n">x</span> <span class="o">-</span> <span class="n">r_sol</span>
+    <span class="n">Y</span> <span class="o">=</span> <span class="n">y</span>
+    <span class="n">Z</span> <span class="o">=</span> <span class="n">z</span> <span class="o">+</span> <span class="n">z_sol</span>
+    <span class="n">R</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="n">X</span><span class="o">**</span><span class="mi">2</span> <span class="o">+</span> <span class="n">Y</span><span class="o">**</span><span class="mi">2</span> <span class="o">+</span> <span class="n">Z</span><span class="o">**</span><span class="mi">2</span><span class="p">)</span>
+
+    <span class="n">q</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">argmin</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">abs</span><span class="p">(</span><span class="n">R</span> <span class="o">-</span> <span class="n">r_vals</span><span class="p">))</span>
+
+    <span class="n">cov</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">empty</span><span class="p">((</span><span class="mi">3</span><span class="p">,</span> <span class="mi">3</span><span class="p">),</span> <span class="nb">float</span><span class="p">)</span>
+    <span class="n">cov</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">]</span> <span class="o">=</span> <span class="n">sig_rr</span><span class="p">[</span><span class="n">q</span><span class="p">]</span><span class="o">**</span><span class="mi">2</span>
+    <span class="n">cov</span><span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">]</span> <span class="o">=</span> <span class="n">sig_phiphi</span><span class="p">[</span><span class="n">q</span><span class="p">]</span><span class="o">**</span><span class="mi">2</span>
+    <span class="n">cov</span><span class="p">[</span><span class="mi">2</span><span class="p">,</span> <span class="mi">2</span><span class="p">]</span> <span class="o">=</span> <span class="n">sig_thetatheta</span><span class="p">[</span><span class="n">q</span><span class="p">]</span><span class="o">**</span><span class="mi">2</span>
+    <span class="n">cov</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">]</span> <span class="o">=</span> <span class="n">cov</span><span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">]</span> <span class="o">=</span> <span class="n">cov_rphi</span><span class="p">[</span><span class="n">q</span><span class="p">]</span>
+    <span class="n">cov</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">2</span><span class="p">]</span> <span class="o">=</span> <span class="n">cov</span><span class="p">[</span><span class="mi">2</span><span class="p">,</span> <span class="mi">0</span><span class="p">]</span> <span class="o">=</span> <span class="n">cov_rtheta</span><span class="p">[</span><span class="n">q</span><span class="p">]</span>
+    <span class="n">cov</span><span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">]</span> <span class="o">=</span> <span class="n">cov</span><span class="p">[</span><span class="mi">2</span><span class="p">,</span> <span class="mi">1</span><span class="p">]</span> <span class="o">=</span> <span class="n">cov_phitheta</span><span class="p">[</span><span class="n">q</span><span class="p">]</span>
+
+    <span class="n">rho</span> <span class="o">=</span> <span class="n">r_sol</span><span class="o">**</span><span class="mi">2</span> <span class="o">+</span> <span class="n">d</span><span class="o">**</span><span class="mi">2</span> <span class="o">-</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">r_sol</span> <span class="o">*</span> <span class="n">d</span> <span class="o">*</span> <span class="n">cosb</span>
+    <span class="n">r</span> <span class="o">=</span> <span class="n">rho</span> <span class="o">*</span> <span class="n">cosb</span>
+
+    <span class="n">cosbeta</span> <span class="o">=</span> <span class="p">(</span><span class="n">r_sol</span><span class="o">**</span><span class="mi">2</span> <span class="o">+</span> <span class="n">rho</span><span class="o">**</span><span class="mi">2</span> <span class="o">-</span> <span class="n">d</span><span class="o">**</span><span class="mi">2</span><span class="p">)</span> <span class="o">/</span> <span class="p">(</span><span class="mi">2</span> <span class="o">*</span> <span class="n">r_sol</span> <span class="o">*</span> <span class="n">rho</span><span class="p">)</span>
+    <span class="n">d_ip</span> <span class="o">=</span> <span class="n">d</span> <span class="o">*</span> <span class="n">cosb</span>
+    <span class="c1"># Rotation matrix, to put R-phi-theta dispersion along Vr-Vt-Vz plane</span>
+    <span class="c1"># First put R-phi-theta into R-phi-z, but remembering the opposing definition</span>
+    <span class="c1"># of phi between the two coordinate frames.</span>
+    <span class="n">rot_sph_to_cyl</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([[</span><span class="n">cosbeta</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="n">d</span><span class="o">/</span><span class="n">rho</span> <span class="o">*</span> <span class="n">sinb</span><span class="p">],</span>
+                               <span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">],</span>
+                               <span class="p">[</span><span class="o">-</span><span class="n">d</span><span class="o">/</span><span class="n">rho</span><span class="o">*</span><span class="n">sinb</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="n">cosbeta</span><span class="p">]])</span>
+    <span class="c1"># Second put R-phi-z into vd-vl-vz, with phi/vl being of the same sign, and</span>
+    <span class="c1"># z/vz being aligned.</span>
+    <span class="n">sinl</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sin</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">radians</span><span class="p">(</span><span class="n">l</span><span class="p">))</span>
+    <span class="n">rot_cyl_to_cyl</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span>
+        <span class="p">[[(</span><span class="n">r</span><span class="o">**</span><span class="mi">2</span> <span class="o">+</span> <span class="n">d_ip</span><span class="o">**</span><span class="mi">2</span> <span class="o">-</span> <span class="n">r_sol</span><span class="o">**</span><span class="mi">2</span><span class="p">)</span> <span class="o">/</span> <span class="p">(</span><span class="mi">2</span> <span class="o">*</span> <span class="n">r</span> <span class="o">*</span> <span class="n">d_ip</span><span class="p">),</span> <span class="n">r_sol</span> <span class="o">/</span> <span class="n">r</span> <span class="o">*</span> <span class="n">sinl</span><span class="p">,</span> <span class="mi">0</span><span class="p">],</span>
+         <span class="p">[</span><span class="n">r_sol</span> <span class="o">/</span> <span class="n">r</span> <span class="o">*</span> <span class="n">sinl</span><span class="p">,</span> <span class="o">-</span><span class="p">(</span><span class="n">r</span><span class="o">**</span><span class="mi">2</span> <span class="o">+</span> <span class="n">d_ip</span><span class="o">**</span><span class="mi">2</span> <span class="o">-</span> <span class="n">r_sol</span><span class="o">**</span><span class="mi">2</span><span class="p">)</span> <span class="o">/</span> <span class="p">(</span><span class="mi">2</span> <span class="o">*</span> <span class="n">r</span> <span class="o">*</span> <span class="n">d_ip</span><span class="p">),</span> <span class="mi">0</span><span class="p">],</span>
+         <span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">]])</span>
+
+    <span class="n">rot</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">matmul</span><span class="p">(</span><span class="n">rot_cyl_to_cyl</span><span class="p">,</span> <span class="n">rot_sph_to_cyl</span><span class="p">)</span>
+
+    <span class="n">cov_rtz</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">matmul</span><span class="p">(</span><span class="n">rot</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">matmul</span><span class="p">(</span><span class="n">cov</span><span class="p">,</span> <span class="n">rot</span><span class="o">.</span><span class="n">T</span><span class="p">))</span>
+
+    <span class="k">return</span> <span class="n">cov_rtz</span>
+
+
+<span class="k">def</span> <span class="nf">galactic_to_equatorial</span><span class="p">(</span><span class="n">l</span><span class="p">,</span> <span class="n">b</span><span class="p">,</span> <span class="n">mu_l</span><span class="p">,</span> <span class="n">mu_b</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&#39;&#39;&#39;</span>
+<span class="sd">    Transform Galactic coordinate proper motions into proper motions in</span>
+<span class="sd">    equatorial coordinates.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    l : float</span>
+<span class="sd">        Galactic longitude of the source.</span>
+<span class="sd">    b : float</span>
+<span class="sd">        Galactic latitude of the object.</span>
+<span class="sd">    mu_l : numpy.ndarray</span>
+<span class="sd">        Galactic longitude component of the proper motion.</span>
+<span class="sd">    mu_b : numpy.ndarray</span>
+<span class="sd">        Galactic latitude component of the proper motion.</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    mu_a : numpy.ndarray</span>
+<span class="sd">        Right ascension component of the equatorial proper motions.</span>
+<span class="sd">    mu_d : numpy.ndarray</span>
+<span class="sd">        Declination component of the equatorial proper motions.</span>
+<span class="sd">    &#39;&#39;&#39;</span>
+    <span class="c1"># Rotation frame maths from https://gea.esac.esa.int/archive/documentation/GDR2/</span>
+    <span class="c1"># Data_processing/chap_cu3ast/sec_cu3ast_intro/ssec_cu3ast_intro_tansforms.html</span>
+    <span class="n">Ag_p</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([[</span><span class="o">-</span><span class="mf">0.0548755604162154</span><span class="p">,</span> <span class="o">-</span><span class="mf">0.8734370902348850</span><span class="p">,</span> <span class="o">-</span><span class="mf">0.4838350155487132</span><span class="p">],</span>
+                     <span class="p">[</span><span class="o">+</span><span class="mf">0.4941094278755837</span><span class="p">,</span> <span class="o">-</span><span class="mf">0.4448296299600112</span><span class="p">,</span> <span class="o">+</span><span class="mf">0.7469822444972189</span><span class="p">],</span>
+                     <span class="p">[</span><span class="o">-</span><span class="mf">0.8676661490190047</span><span class="p">,</span> <span class="o">-</span><span class="mf">0.1980763734312015</span><span class="p">,</span> <span class="o">+</span><span class="mf">0.4559837761750669</span><span class="p">]])</span>
+    <span class="n">Ag</span> <span class="o">=</span> <span class="n">Ag_p</span><span class="o">.</span><span class="n">T</span>
+
+    <span class="n">r_gal</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([[</span><span class="n">np</span><span class="o">.</span><span class="n">cos</span><span class="p">(</span><span class="n">l</span><span class="p">)</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">cos</span><span class="p">(</span><span class="n">b</span><span class="p">)],</span> <span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">sin</span><span class="p">(</span><span class="n">l</span><span class="p">)</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">cos</span><span class="p">(</span><span class="n">b</span><span class="p">)],</span> <span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">sin</span><span class="p">(</span><span class="n">b</span><span class="p">)]])</span>
+    <span class="n">r_icrs</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">matmul</span><span class="p">(</span><span class="n">Ag</span><span class="p">,</span> <span class="n">r_gal</span><span class="p">)</span>
+
+    <span class="n">a</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">arctan2</span><span class="p">(</span><span class="n">r_icrs</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="n">r_icrs</span><span class="p">[</span><span class="mi">0</span><span class="p">])[</span><span class="mi">0</span><span class="p">]</span>
+    <span class="n">d</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">arctan2</span><span class="p">(</span><span class="n">r_icrs</span><span class="p">[</span><span class="mi">2</span><span class="p">],</span> <span class="n">np</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="n">r_icrs</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">**</span><span class="mi">2</span> <span class="o">+</span> <span class="n">r_icrs</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">**</span><span class="mi">2</span><span class="p">))[</span><span class="mi">0</span><span class="p">]</span>
+
+    <span class="n">p_gal</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([[</span><span class="o">-</span><span class="n">np</span><span class="o">.</span><span class="n">sin</span><span class="p">(</span><span class="n">l</span><span class="p">)],</span> <span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">cos</span><span class="p">(</span><span class="n">l</span><span class="p">)],</span> <span class="p">[</span><span class="mi">0</span><span class="p">]])</span>
+    <span class="n">p_icrs</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([[</span><span class="o">-</span><span class="n">np</span><span class="o">.</span><span class="n">sin</span><span class="p">(</span><span class="n">a</span><span class="p">)],</span> <span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">cos</span><span class="p">(</span><span class="n">a</span><span class="p">)],</span> <span class="p">[</span><span class="mi">0</span><span class="p">]])</span>
+
+    <span class="n">q_gal</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([[</span><span class="o">-</span><span class="n">np</span><span class="o">.</span><span class="n">cos</span><span class="p">(</span><span class="n">l</span><span class="p">)</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">sin</span><span class="p">(</span><span class="n">b</span><span class="p">)],</span> <span class="p">[</span><span class="o">-</span><span class="n">np</span><span class="o">.</span><span class="n">sin</span><span class="p">(</span><span class="n">l</span><span class="p">)</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">sin</span><span class="p">(</span><span class="n">b</span><span class="p">)],</span> <span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">cos</span><span class="p">(</span><span class="n">b</span><span class="p">)]])</span>
+    <span class="n">q_icrs</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([[</span><span class="o">-</span><span class="n">np</span><span class="o">.</span><span class="n">cos</span><span class="p">(</span><span class="n">a</span><span class="p">)</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">sin</span><span class="p">(</span><span class="n">d</span><span class="p">)],</span> <span class="p">[</span><span class="o">-</span><span class="n">np</span><span class="o">.</span><span class="n">sin</span><span class="p">(</span><span class="n">a</span><span class="p">)</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">sin</span><span class="p">(</span><span class="n">d</span><span class="p">)],</span> <span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">cos</span><span class="p">(</span><span class="n">d</span><span class="p">)]])</span>
+
+    <span class="n">mu_gal</span> <span class="o">=</span> <span class="n">p_gal</span> <span class="o">*</span> <span class="n">mu_l</span> <span class="o">+</span> <span class="n">q_gal</span> <span class="o">*</span> <span class="n">mu_b</span>
+
+    <span class="n">mu_icrs</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">matmul</span><span class="p">(</span><span class="n">Ag</span><span class="p">,</span> <span class="n">mu_gal</span><span class="p">)</span>
+
+    <span class="n">mu_a</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">matmul</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">transpose</span><span class="p">(</span><span class="n">p_icrs</span><span class="p">),</span> <span class="n">mu_icrs</span><span class="p">)</span>
+    <span class="n">mu_d</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">matmul</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">transpose</span><span class="p">(</span><span class="n">q_icrs</span><span class="p">),</span> <span class="n">mu_icrs</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">mu_a</span><span class="p">,</span> <span class="n">mu_d</span>
+
+
+<span class="k">def</span> <span class="nf">equatorial_to_galactic</span><span class="p">(</span><span class="n">a</span><span class="p">,</span> <span class="n">d</span><span class="p">,</span> <span class="n">mu_a</span><span class="p">,</span> <span class="n">mu_d</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&#39;&#39;&#39;</span>
+<span class="sd">    Transform equatorial coordinate proper motions into proper motions in</span>
+<span class="sd">    Galactic coordinates.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    l : float</span>
+<span class="sd">        Galactic longitude of the source.</span>
+<span class="sd">    b : float</span>
+<span class="sd">        Galactic latitude of the object.</span>
+<span class="sd">    mu_a : numpy.ndarray</span>
+<span class="sd">        Right ascension component of the equatorial proper motions.</span>
+<span class="sd">    mu_d : numpy.ndarray</span>
+<span class="sd">        Declination component of the equatorial proper motions.</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    mu_l : numpy.ndarray</span>
+<span class="sd">        Galactic longitude component of the proper motion.</span>
+<span class="sd">    mu_b : numpy.ndarray</span>
+<span class="sd">        Galactic latitude component of the proper motion.</span>
+<span class="sd">    &#39;&#39;&#39;</span>
+    <span class="n">a</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">radians</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">copy</span><span class="p">(</span><span class="n">a</span><span class="p">))</span>
+    <span class="n">d</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">radians</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">copy</span><span class="p">(</span><span class="n">d</span><span class="p">))</span>
+    <span class="c1"># Rotation frame maths from https://gea.esac.esa.int/archive/documentation/GDR2/</span>
+    <span class="c1"># Data_processing/chap_cu3ast/sec_cu3ast_intro/ssec_cu3ast_intro_tansforms.html</span>
+    <span class="n">Ag_p</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([[</span><span class="o">-</span><span class="mf">0.0548755604162154</span><span class="p">,</span> <span class="o">-</span><span class="mf">0.8734370902348850</span><span class="p">,</span> <span class="o">-</span><span class="mf">0.4838350155487132</span><span class="p">],</span>
+                     <span class="p">[</span><span class="o">+</span><span class="mf">0.4941094278755837</span><span class="p">,</span> <span class="o">-</span><span class="mf">0.4448296299600112</span><span class="p">,</span> <span class="o">+</span><span class="mf">0.7469822444972189</span><span class="p">],</span>
+                     <span class="p">[</span><span class="o">-</span><span class="mf">0.8676661490190047</span><span class="p">,</span> <span class="o">-</span><span class="mf">0.1980763734312015</span><span class="p">,</span> <span class="o">+</span><span class="mf">0.4559837761750669</span><span class="p">]])</span>
+
+    <span class="n">r_icrs</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([[</span><span class="n">np</span><span class="o">.</span><span class="n">cos</span><span class="p">(</span><span class="n">a</span><span class="p">)</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">cos</span><span class="p">(</span><span class="n">d</span><span class="p">)],</span> <span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">sin</span><span class="p">(</span><span class="n">a</span><span class="p">)</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">cos</span><span class="p">(</span><span class="n">d</span><span class="p">)],</span> <span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">sin</span><span class="p">(</span><span class="n">d</span><span class="p">)]])</span>
+    <span class="n">r_gal</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">matmul</span><span class="p">(</span><span class="n">Ag_p</span><span class="p">,</span> <span class="n">r_icrs</span><span class="p">)</span>
+
+    <span class="n">l</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">arctan2</span><span class="p">(</span><span class="n">r_gal</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="n">r_gal</span><span class="p">[</span><span class="mi">0</span><span class="p">])[</span><span class="mi">0</span><span class="p">]</span>
+    <span class="n">b</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">arctan2</span><span class="p">(</span><span class="n">r_gal</span><span class="p">[</span><span class="mi">2</span><span class="p">],</span> <span class="n">np</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="n">r_gal</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">**</span><span class="mi">2</span> <span class="o">+</span> <span class="n">r_gal</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">**</span><span class="mi">2</span><span class="p">))[</span><span class="mi">0</span><span class="p">]</span>
+
+    <span class="n">p_gal</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([[</span><span class="o">-</span><span class="n">np</span><span class="o">.</span><span class="n">sin</span><span class="p">(</span><span class="n">l</span><span class="p">)],</span> <span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">cos</span><span class="p">(</span><span class="n">l</span><span class="p">)],</span> <span class="p">[</span><span class="mi">0</span><span class="p">]])</span>
+    <span class="n">p_icrs</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([[</span><span class="o">-</span><span class="n">np</span><span class="o">.</span><span class="n">sin</span><span class="p">(</span><span class="n">a</span><span class="p">)],</span> <span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">cos</span><span class="p">(</span><span class="n">a</span><span class="p">)],</span> <span class="p">[</span><span class="mi">0</span><span class="p">]])</span>
+
+    <span class="n">q_gal</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([[</span><span class="o">-</span><span class="n">np</span><span class="o">.</span><span class="n">cos</span><span class="p">(</span><span class="n">l</span><span class="p">)</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">sin</span><span class="p">(</span><span class="n">b</span><span class="p">)],</span> <span class="p">[</span><span class="o">-</span><span class="n">np</span><span class="o">.</span><span class="n">sin</span><span class="p">(</span><span class="n">l</span><span class="p">)</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">sin</span><span class="p">(</span><span class="n">b</span><span class="p">)],</span> <span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">cos</span><span class="p">(</span><span class="n">b</span><span class="p">)]])</span>
+    <span class="n">q_icrs</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([[</span><span class="o">-</span><span class="n">np</span><span class="o">.</span><span class="n">cos</span><span class="p">(</span><span class="n">a</span><span class="p">)</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">sin</span><span class="p">(</span><span class="n">d</span><span class="p">)],</span> <span class="p">[</span><span class="o">-</span><span class="n">np</span><span class="o">.</span><span class="n">sin</span><span class="p">(</span><span class="n">a</span><span class="p">)</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">sin</span><span class="p">(</span><span class="n">d</span><span class="p">)],</span> <span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">cos</span><span class="p">(</span><span class="n">d</span><span class="p">)]])</span>
+
+    <span class="n">mu_icrs</span> <span class="o">=</span> <span class="n">p_icrs</span> <span class="o">*</span> <span class="n">mu_a</span> <span class="o">+</span> <span class="n">q_icrs</span> <span class="o">*</span> <span class="n">mu_d</span>
+
+    <span class="n">mu_gal</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">matmul</span><span class="p">(</span><span class="n">Ag_p</span><span class="p">,</span> <span class="n">mu_icrs</span><span class="p">)</span>
+
+    <span class="n">mu_l</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">matmul</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">transpose</span><span class="p">(</span><span class="n">p_gal</span><span class="p">),</span> <span class="n">mu_gal</span><span class="p">)</span>
+    <span class="n">mu_b</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">matmul</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">transpose</span><span class="p">(</span><span class="n">q_gal</span><span class="p">),</span> <span class="n">mu_gal</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">mu_l</span><span class="p">,</span> <span class="n">mu_b</span>
+
+
+<span class="k">def</span> <span class="nf">weighted_quantile</span><span class="p">(</span><span class="n">values</span><span class="p">,</span> <span class="n">quantiles</span><span class="p">,</span> <span class="n">sample_weight</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+                      <span class="n">values_sorted</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">old_style</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Very close to numpy.percentile, but supports weights.</span>
+<span class="sd">    NOTE: quantiles should be in [0, 1]!</span>
+<span class="sd">    :param values: numpy.array with data</span>
+<span class="sd">    :param quantiles: array-like with many quantiles needed</span>
+<span class="sd">    :param sample_weight: array-like of the same length as `array`</span>
+<span class="sd">    :param values_sorted: bool, if True, then will avoid sorting of</span>
+<span class="sd">        initial array</span>
+<span class="sd">    :param old_style: if True, will correct output to be consistent</span>
+<span class="sd">        with numpy.percentile.</span>
+<span class="sd">    :return: numpy.array with computed quantiles.</span>
+<span class="sd">    Adapted from https://stackoverflow.com/questions/21844024/weighted-</span>
+<span class="sd">        percentile-using-numpy/29677616#29677616</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">values</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">values</span><span class="p">)</span><span class="o">.</span><span class="n">flatten</span><span class="p">()</span>
+    <span class="n">quantiles</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">quantiles</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">sample_weight</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">sample_weight</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">ones</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">values</span><span class="p">))</span>
+    <span class="n">sample_weight</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">sample_weight</span><span class="p">)</span><span class="o">.</span><span class="n">flatten</span><span class="p">()</span>
+    <span class="k">assert</span> <span class="n">np</span><span class="o">.</span><span class="n">all</span><span class="p">(</span><span class="n">quantiles</span> <span class="o">&gt;=</span> <span class="mi">0</span><span class="p">)</span> <span class="ow">and</span> <span class="n">np</span><span class="o">.</span><span class="n">all</span><span class="p">(</span><span class="n">quantiles</span> <span class="o">&lt;=</span> <span class="mi">1</span><span class="p">),</span> \
+        <span class="s1">&#39;quantiles should be in [0, 1]&#39;</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">values_sorted</span><span class="p">:</span>
+        <span class="n">sorter</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">argsort</span><span class="p">(</span><span class="n">values</span><span class="p">)</span>
+        <span class="n">values</span> <span class="o">=</span> <span class="n">values</span><span class="p">[</span><span class="n">sorter</span><span class="p">]</span>
+        <span class="n">sample_weight</span> <span class="o">=</span> <span class="n">sample_weight</span><span class="p">[</span><span class="n">sorter</span><span class="p">]</span>
+    <span class="n">weighted_quantiles</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">cumsum</span><span class="p">(</span><span class="n">sample_weight</span><span class="p">)</span> <span class="o">-</span> <span class="mf">0.5</span> <span class="o">*</span> <span class="n">sample_weight</span>
+    <span class="k">if</span> <span class="n">old_style</span><span class="p">:</span>
+        <span class="c1"># To be consistent with numpy.percentile</span>
+        <span class="n">weighted_quantiles</span> <span class="o">-=</span> <span class="n">weighted_quantiles</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+        <span class="n">weighted_quantiles</span> <span class="o">/=</span> <span class="n">weighted_quantiles</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">weighted_quantiles</span> <span class="o">/=</span> <span class="n">np</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">sample_weight</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">interp</span><span class="p">(</span><span class="n">quantiles</span><span class="p">,</span> <span class="n">weighted_quantiles</span><span class="p">,</span> <span class="n">values</span><span class="p">)</span>
+</pre></div>
+
+            <div class="clearer"></div>
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="../../f-modindex.html" title="Fortran Module Index"
+             >fortran modules</a> |</li>
+        <li class="right" >
+          <a href="../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../index.html">macauff</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../index.html" >Module code</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">macauff.galactic_proper_motions</a></li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+    &#169; Copyright 2022, Tom J Wilson.
+      Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 7.2.6.
+    </div>
+  </body>
+</html>

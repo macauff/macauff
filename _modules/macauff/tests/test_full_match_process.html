@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="../../../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>macauff.tests.test_full_match_process &#8212; macauff</title>
+    <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=4848ba22" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/pyramid.css?v=a5b9c134" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/graphviz.css?v=eafc0fe6" />
+    <script src="../../../_static/documentation_options.js?v=5929fcd5"></script>
+    <script src="../../../_static/doctools.js?v=888ff710"></script>
+    <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Neuton&amp;subset=latin" type="text/css" media="screen" charset="utf-8" />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Nobile:regular,italic,bold,bolditalic&amp;subset=latin" type="text/css" media="screen" charset="utf-8" />
+<!--[if lte IE 6]>
+<link rel="stylesheet" href="../../../_static/ie6.css" type="text/css" media="screen" charset="utf-8" />
+<![endif]-->
+
+  </head><body>
+
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="../../../f-modindex.html" title="Fortran Module Index"
+             >fortran modules</a> |</li>
+        <li class="right" >
+          <a href="../../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../../index.html">macauff</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../../index.html" accesskey="U">Module code</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">macauff.tests.test_full_match_process</a></li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <h1>Source code for macauff.tests.test_full_match_process</h1><div class="highlight"><pre>
+<span></span><span class="c1"># Licensed under a 3-clause BSD style license - see LICENSE</span>
+<span class="sd">&#39;&#39;&#39;</span>
+<span class="sd">Tests of full, end-to-end runs of the crossmatch process.</span>
+<span class="sd">&#39;&#39;&#39;</span>
+
+<span class="kn">import</span> <span class="nn">os</span>
+<span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+<span class="kn">import</span> <span class="nn">pytest</span>
+
+<span class="kn">from</span> <span class="nn">..matching</span> <span class="kn">import</span> <span class="n">CrossMatch</span>
+<span class="kn">from</span> <span class="nn">.test_matching</span> <span class="kn">import</span> <span class="n">_replace_line</span>
+
+<span class="n">__all__</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;generate_random_data&#39;</span><span class="p">]</span>
+
+
+<div class="viewcode-block" id="generate_random_data">
+<a class="viewcode-back" href="../../../api/macauff.tests.generate_random_data.html#macauff.tests.generate_random_data">[docs]</a>
+<span class="k">def</span> <span class="nf">generate_random_data</span><span class="p">(</span><span class="n">N_a</span><span class="p">,</span> <span class="n">N_b</span><span class="p">,</span> <span class="n">N_c</span><span class="p">,</span> <span class="n">extent</span><span class="p">,</span> <span class="n">n_a_filts</span><span class="p">,</span> <span class="n">n_b_filts</span><span class="p">,</span> <span class="n">a_astro_sig</span><span class="p">,</span> <span class="n">b_astro_sig</span><span class="p">,</span>
+                         <span class="n">a_cat</span><span class="p">,</span> <span class="n">b_cat</span><span class="p">,</span> <span class="n">seed</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&#39;&#39;&#39;</span>
+<span class="sd">    Convenience function to allow for the generation of two test datasets.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    N_a : integer</span>
+<span class="sd">        The number of sources to be generated in catalogue &quot;a&quot;.</span>
+<span class="sd">    N_b : integer</span>
+<span class="sd">        The number of catalogue &quot;b&quot; fake sources.</span>
+<span class="sd">    N_c : integer</span>
+<span class="sd">        The number of common, overlapping sources, in both catalogues.</span>
+<span class="sd">    extent : list of integers</span>
+<span class="sd">        The on-sky coordinates that mark out the rectangular limits over which</span>
+<span class="sd">        sources should be generated. Should be of the form</span>
+<span class="sd">        ``[lower_lon, upper_lon, lower_lat, upper_lat]``, in degrees.</span>
+<span class="sd">    n_a_filts : integer</span>
+<span class="sd">        The number of photometric filters catalogue &quot;a&quot; should have.</span>
+<span class="sd">    n_b_filts : integer</span>
+<span class="sd">        The number of catalogue &quot;b&quot; photometric filters.</span>
+<span class="sd">    a_astro_sig : float</span>
+<span class="sd">        The astrometric uncertainty of catalogue &quot;a&quot;, in arcseconds.</span>
+<span class="sd">    b_astro_sig : float</span>
+<span class="sd">        Catalogue &quot;b&quot;&#39;s astrometric uncertainty, in arcseconds.</span>
+<span class="sd">    a_cat : string</span>
+<span class="sd">        The folder path into which to save the binary files containing</span>
+<span class="sd">        catalogue &quot;a&quot;&#39;s astrometric and photometric data.</span>
+<span class="sd">    b_cat : string</span>
+<span class="sd">        Folder describing the save location of catalogue &quot;b&quot;&#39;s data.</span>
+<span class="sd">    seed : integer, optional</span>
+<span class="sd">        Random number generator seed. If ``None``, will be passed to</span>
+<span class="sd">        ``np.random.default_rng`` as such, and a seed will be generated</span>
+<span class="sd">        as per ``default_rng``&#39;s documentation.</span>
+<span class="sd">    &#39;&#39;&#39;</span>
+    <span class="k">if</span> <span class="n">N_a</span> <span class="o">&gt;</span> <span class="n">N_b</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;N_a must be smaller or equal to N_b.&quot;</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">N_c</span> <span class="o">&gt;</span> <span class="n">N_a</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;N_c must be smaller or equal to N_a.&quot;</span><span class="p">)</span>
+
+    <span class="n">a_astro</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">empty</span><span class="p">((</span><span class="n">N_a</span><span class="p">,</span> <span class="mi">3</span><span class="p">),</span> <span class="nb">float</span><span class="p">)</span>
+    <span class="n">b_astro</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">empty</span><span class="p">((</span><span class="n">N_b</span><span class="p">,</span> <span class="mi">3</span><span class="p">),</span> <span class="nb">float</span><span class="p">)</span>
+
+    <span class="n">rng</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">default_rng</span><span class="p">(</span><span class="n">seed</span><span class="p">)</span>
+    <span class="n">a_astro</span><span class="p">[:,</span> <span class="mi">0</span><span class="p">]</span> <span class="o">=</span> <span class="n">rng</span><span class="o">.</span><span class="n">uniform</span><span class="p">(</span><span class="n">extent</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">extent</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="n">size</span><span class="o">=</span><span class="n">N_a</span><span class="p">)</span>
+    <span class="n">a_astro</span><span class="p">[:,</span> <span class="mi">1</span><span class="p">]</span> <span class="o">=</span> <span class="n">rng</span><span class="o">.</span><span class="n">uniform</span><span class="p">(</span><span class="n">extent</span><span class="p">[</span><span class="mi">2</span><span class="p">],</span> <span class="n">extent</span><span class="p">[</span><span class="mi">3</span><span class="p">],</span> <span class="n">size</span><span class="o">=</span><span class="n">N_a</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">np</span><span class="o">.</span><span class="n">isscalar</span><span class="p">(</span><span class="n">a_astro_sig</span><span class="p">):</span>
+        <span class="n">a_astro</span><span class="p">[:,</span> <span class="mi">2</span><span class="p">]</span> <span class="o">=</span> <span class="n">a_astro_sig</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="c1"># Here we assume that astrometric uncertainty goes quadratically</span>
+        <span class="c1"># with magnitude</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;a_sig currently has to be an integer for all generated data.&quot;</span><span class="p">)</span>
+
+    <span class="n">a_pair_indices</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="n">N_c</span><span class="p">)</span>
+    <span class="n">b_pair_indices</span> <span class="o">=</span> <span class="n">rng</span><span class="o">.</span><span class="n">choice</span><span class="p">(</span><span class="n">N_b</span><span class="p">,</span> <span class="n">N_c</span><span class="p">,</span> <span class="n">replace</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+    <span class="n">b_astro</span><span class="p">[</span><span class="n">b_pair_indices</span><span class="p">,</span> <span class="mi">0</span><span class="p">]</span> <span class="o">=</span> <span class="n">a_astro</span><span class="p">[</span><span class="n">a_pair_indices</span><span class="p">,</span> <span class="mi">0</span><span class="p">]</span>
+    <span class="n">b_astro</span><span class="p">[</span><span class="n">b_pair_indices</span><span class="p">,</span> <span class="mi">1</span><span class="p">]</span> <span class="o">=</span> <span class="n">a_astro</span><span class="p">[</span><span class="n">a_pair_indices</span><span class="p">,</span> <span class="mi">1</span><span class="p">]</span>
+    <span class="n">inv_b_pair</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">delete</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="n">N_b</span><span class="p">),</span> <span class="n">b_pair_indices</span><span class="p">)</span>
+    <span class="n">b_astro</span><span class="p">[</span><span class="n">inv_b_pair</span><span class="p">,</span> <span class="mi">0</span><span class="p">]</span> <span class="o">=</span> <span class="n">rng</span><span class="o">.</span><span class="n">uniform</span><span class="p">(</span><span class="n">extent</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">extent</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="n">size</span><span class="o">=</span><span class="n">N_b</span><span class="o">-</span><span class="n">N_c</span><span class="p">)</span>
+    <span class="n">b_astro</span><span class="p">[</span><span class="n">inv_b_pair</span><span class="p">,</span> <span class="mi">1</span><span class="p">]</span> <span class="o">=</span> <span class="n">rng</span><span class="o">.</span><span class="n">uniform</span><span class="p">(</span><span class="n">extent</span><span class="p">[</span><span class="mi">2</span><span class="p">],</span> <span class="n">extent</span><span class="p">[</span><span class="mi">3</span><span class="p">],</span> <span class="n">size</span><span class="o">=</span><span class="n">N_b</span><span class="o">-</span><span class="n">N_c</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">np</span><span class="o">.</span><span class="n">isscalar</span><span class="p">(</span><span class="n">b_astro_sig</span><span class="p">):</span>
+        <span class="n">b_astro</span><span class="p">[:,</span> <span class="mi">2</span><span class="p">]</span> <span class="o">=</span> <span class="n">b_astro_sig</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="c1"># Here we assume that astrometric uncertainty goes quadratically</span>
+        <span class="c1"># with magnitude</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;b_sig currently has to be an integer for all generated data.&quot;</span><span class="p">)</span>
+
+    <span class="n">a_circ_dist</span> <span class="o">=</span> <span class="n">rng</span><span class="o">.</span><span class="n">normal</span><span class="p">(</span><span class="n">loc</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">scale</span><span class="o">=</span><span class="n">a_astro</span><span class="p">[:,</span> <span class="mi">2</span><span class="p">],</span> <span class="n">size</span><span class="o">=</span><span class="n">N_a</span><span class="p">)</span> <span class="o">/</span> <span class="mi">3600</span>
+    <span class="n">a_circ_angle</span> <span class="o">=</span> <span class="n">rng</span><span class="o">.</span><span class="n">uniform</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">2</span><span class="o">*</span><span class="n">np</span><span class="o">.</span><span class="n">pi</span><span class="p">,</span> <span class="n">size</span><span class="o">=</span><span class="n">N_a</span><span class="p">)</span>
+    <span class="n">a_astro</span><span class="p">[:,</span> <span class="mi">0</span><span class="p">]</span> <span class="o">=</span> <span class="n">a_astro</span><span class="p">[:,</span> <span class="mi">0</span><span class="p">]</span> <span class="o">+</span> <span class="n">a_circ_dist</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">cos</span><span class="p">(</span><span class="n">a_circ_angle</span><span class="p">)</span>
+    <span class="n">a_astro</span><span class="p">[:,</span> <span class="mi">1</span><span class="p">]</span> <span class="o">=</span> <span class="n">a_astro</span><span class="p">[:,</span> <span class="mi">1</span><span class="p">]</span> <span class="o">+</span> <span class="n">a_circ_dist</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">sin</span><span class="p">(</span><span class="n">a_circ_angle</span><span class="p">)</span>
+    <span class="n">b_circ_dist</span> <span class="o">=</span> <span class="n">rng</span><span class="o">.</span><span class="n">normal</span><span class="p">(</span><span class="n">loc</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">scale</span><span class="o">=</span><span class="n">b_astro</span><span class="p">[:,</span> <span class="mi">2</span><span class="p">],</span> <span class="n">size</span><span class="o">=</span><span class="n">N_b</span><span class="p">)</span> <span class="o">/</span> <span class="mi">3600</span>
+    <span class="n">b_circ_angle</span> <span class="o">=</span> <span class="n">rng</span><span class="o">.</span><span class="n">uniform</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">2</span><span class="o">*</span><span class="n">np</span><span class="o">.</span><span class="n">pi</span><span class="p">,</span> <span class="n">size</span><span class="o">=</span><span class="n">N_b</span><span class="p">)</span>
+    <span class="n">b_astro</span><span class="p">[:,</span> <span class="mi">0</span><span class="p">]</span> <span class="o">=</span> <span class="n">b_astro</span><span class="p">[:,</span> <span class="mi">0</span><span class="p">]</span> <span class="o">+</span> <span class="n">b_circ_dist</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">cos</span><span class="p">(</span><span class="n">b_circ_angle</span><span class="p">)</span>
+    <span class="n">b_astro</span><span class="p">[:,</span> <span class="mi">1</span><span class="p">]</span> <span class="o">=</span> <span class="n">b_astro</span><span class="p">[:,</span> <span class="mi">1</span><span class="p">]</span> <span class="o">+</span> <span class="n">b_circ_dist</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">sin</span><span class="p">(</span><span class="n">b_circ_angle</span><span class="p">)</span>
+
+    <span class="c1"># Currently all we do, given the only option available is a naive Bayes match,</span>
+    <span class="c1"># is ignore the photometry -- but we still require its file to be present.</span>
+    <span class="n">a_photo</span> <span class="o">=</span> <span class="n">rng</span><span class="o">.</span><span class="n">uniform</span><span class="p">(</span><span class="mf">0.9</span><span class="p">,</span> <span class="mf">1.1</span><span class="p">,</span> <span class="n">size</span><span class="o">=</span><span class="p">(</span><span class="n">N_a</span><span class="p">,</span> <span class="n">n_a_filts</span><span class="p">))</span>
+    <span class="n">b_photo</span> <span class="o">=</span> <span class="n">rng</span><span class="o">.</span><span class="n">uniform</span><span class="p">(</span><span class="mf">0.9</span><span class="p">,</span> <span class="mf">1.1</span><span class="p">,</span> <span class="n">size</span><span class="o">=</span><span class="p">(</span><span class="n">N_b</span><span class="p">,</span> <span class="n">n_b_filts</span><span class="p">))</span>
+
+    <span class="c1"># Similarly, we need magref for each catalogue, but don&#39;t care what&#39;s in it.</span>
+    <span class="n">amagref</span> <span class="o">=</span> <span class="n">rng</span><span class="o">.</span><span class="n">choice</span><span class="p">(</span><span class="n">n_a_filts</span><span class="p">,</span> <span class="n">size</span><span class="o">=</span><span class="n">N_a</span><span class="p">)</span>
+    <span class="n">bmagref</span> <span class="o">=</span> <span class="n">rng</span><span class="o">.</span><span class="n">choice</span><span class="p">(</span><span class="n">n_b_filts</span><span class="p">,</span> <span class="n">size</span><span class="o">=</span><span class="n">N_b</span><span class="p">)</span>
+
+    <span class="k">for</span> <span class="n">f</span> <span class="ow">in</span> <span class="p">[</span><span class="n">a_cat</span><span class="p">,</span> <span class="n">b_cat</span><span class="p">]:</span>
+        <span class="n">os</span><span class="o">.</span><span class="n">makedirs</span><span class="p">(</span><span class="n">f</span><span class="p">,</span> <span class="n">exist_ok</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="n">np</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="s1">&#39;</span><span class="si">{}</span><span class="s1">/con_cat_astro.npy&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">a_cat</span><span class="p">),</span> <span class="n">a_astro</span><span class="p">)</span>
+    <span class="n">np</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="s1">&#39;</span><span class="si">{}</span><span class="s1">/con_cat_astro.npy&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">b_cat</span><span class="p">),</span> <span class="n">b_astro</span><span class="p">)</span>
+    <span class="n">np</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="s1">&#39;</span><span class="si">{}</span><span class="s1">/con_cat_photo.npy&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">a_cat</span><span class="p">),</span> <span class="n">a_photo</span><span class="p">)</span>
+    <span class="n">np</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="s1">&#39;</span><span class="si">{}</span><span class="s1">/con_cat_photo.npy&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">b_cat</span><span class="p">),</span> <span class="n">b_photo</span><span class="p">)</span>
+    <span class="n">np</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="s1">&#39;</span><span class="si">{}</span><span class="s1">/magref.npy&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">a_cat</span><span class="p">),</span> <span class="n">amagref</span><span class="p">)</span>
+    <span class="n">np</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="s1">&#39;</span><span class="si">{}</span><span class="s1">/magref.npy&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">b_cat</span><span class="p">),</span> <span class="n">bmagref</span><span class="p">)</span>
+
+    <span class="c1"># Fake uninformative &quot;overlap&quot; flag data, where no sources are in the</span>
+    <span class="c1"># halo of the chunk.</span>
+    <span class="n">np</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="s1">&#39;</span><span class="si">{}</span><span class="s1">/in_chunk_overlap.npy&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">a_cat</span><span class="p">),</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">N_a</span><span class="p">,</span> <span class="nb">bool</span><span class="p">))</span>
+    <span class="n">np</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="s1">&#39;</span><span class="si">{}</span><span class="s1">/in_chunk_overlap.npy&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">b_cat</span><span class="p">),</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">N_b</span><span class="p">,</span> <span class="nb">bool</span><span class="p">))</span>
+
+    <span class="n">np</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="s1">&#39;</span><span class="si">{}</span><span class="s1">/test_match_indices.npy&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">a_cat</span><span class="p">),</span> <span class="n">a_pair_indices</span><span class="p">)</span>
+    <span class="n">np</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="s1">&#39;</span><span class="si">{}</span><span class="s1">/test_match_indices.npy&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">b_cat</span><span class="p">),</span> <span class="n">b_pair_indices</span><span class="p">)</span></div>
+
+
+
+<span class="nd">@pytest</span><span class="o">.</span><span class="n">mark</span><span class="o">.</span><span class="n">parametrize</span><span class="p">(</span><span class="s2">&quot;x,y&quot;</span><span class="p">,</span> <span class="p">[(</span><span class="mi">131</span><span class="p">,</span> <span class="mi">0</span><span class="p">),</span> <span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">)])</span>
+<span class="k">def</span> <span class="nf">test_naive_bayes_match</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">):</span>
+    <span class="c1"># Generate a small number of sources randomly, then run through the</span>
+    <span class="c1"># cross-match process.</span>
+    <span class="n">N_a</span><span class="p">,</span> <span class="n">N_b</span><span class="p">,</span> <span class="n">N_c</span> <span class="o">=</span> <span class="mi">40</span><span class="p">,</span> <span class="mi">50</span><span class="p">,</span> <span class="mi">35</span>
+    <span class="n">n_a_filts</span><span class="p">,</span> <span class="n">n_b_filts</span> <span class="o">=</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">4</span>
+    <span class="n">a_astro_sig</span><span class="p">,</span> <span class="n">b_astro_sig</span> <span class="o">=</span> <span class="mf">0.3</span><span class="p">,</span> <span class="mf">0.5</span>
+    <span class="n">r</span> <span class="o">=</span> <span class="mi">5</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="n">a_astro_sig</span><span class="o">**</span><span class="mi">2</span> <span class="o">+</span> <span class="n">b_astro_sig</span><span class="o">**</span><span class="mi">2</span><span class="p">)</span>
+    <span class="n">dx</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="n">N_b</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">pi</span> <span class="o">*</span> <span class="n">r</span><span class="o">**</span><span class="mi">2</span><span class="p">)</span><span class="o">/</span><span class="mi">3600</span>
+    <span class="n">extent</span> <span class="o">=</span> <span class="p">[</span><span class="n">x</span><span class="o">-</span><span class="n">dx</span><span class="o">/</span><span class="mi">2</span><span class="p">,</span> <span class="n">x</span><span class="o">+</span><span class="n">dx</span><span class="o">/</span><span class="mi">2</span><span class="p">,</span> <span class="n">y</span><span class="o">-</span><span class="n">dx</span><span class="o">/</span><span class="mi">2</span><span class="p">,</span> <span class="n">y</span><span class="o">+</span><span class="n">dx</span><span class="o">/</span><span class="mi">2</span><span class="p">]</span>
+
+    <span class="n">a_cat</span><span class="p">,</span> <span class="n">b_cat</span> <span class="o">=</span> <span class="s1">&#39;a_cat&#39;</span><span class="p">,</span> <span class="s1">&#39;b_cat&#39;</span>
+
+    <span class="n">generate_random_data</span><span class="p">(</span><span class="n">N_a</span><span class="p">,</span> <span class="n">N_b</span><span class="p">,</span> <span class="n">N_c</span><span class="p">,</span> <span class="n">extent</span><span class="p">,</span> <span class="n">n_a_filts</span><span class="p">,</span> <span class="n">n_b_filts</span><span class="p">,</span> <span class="n">a_astro_sig</span><span class="p">,</span> <span class="n">b_astro_sig</span><span class="p">,</span>
+                         <span class="n">a_cat</span><span class="p">,</span> <span class="n">b_cat</span><span class="p">,</span> <span class="n">seed</span><span class="o">=</span><span class="mi">9999</span><span class="p">)</span>
+
+    <span class="c1"># Ensure output chunk directory exists</span>
+    <span class="n">os</span><span class="o">.</span><span class="n">makedirs</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">dirname</span><span class="p">(</span><span class="vm">__file__</span><span class="p">),</span> <span class="s2">&quot;data/chunk0&quot;</span><span class="p">),</span> <span class="n">exist_ok</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+    <span class="n">ol</span><span class="p">,</span> <span class="n">nl</span> <span class="o">=</span> <span class="s1">&#39;pos_corr_dist = 11&#39;</span><span class="p">,</span> <span class="s1">&#39;pos_corr_dist = </span><span class="si">{:.2f}</span><span class="se">\n</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">r</span><span class="p">)</span>
+    <span class="n">f</span> <span class="o">=</span> <span class="nb">open</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">dirname</span><span class="p">(</span><span class="vm">__file__</span><span class="p">),</span>
+                          <span class="s1">&#39;data/crossmatch_params.txt&#39;</span><span class="p">))</span><span class="o">.</span><span class="n">readlines</span><span class="p">()</span>
+    <span class="n">idx</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">where</span><span class="p">([</span><span class="n">ol</span> <span class="ow">in</span> <span class="n">line</span> <span class="k">for</span> <span class="n">line</span> <span class="ow">in</span> <span class="n">f</span><span class="p">])[</span><span class="mi">0</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span>
+    <span class="n">_replace_line</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">dirname</span><span class="p">(</span><span class="vm">__file__</span><span class="p">),</span> <span class="s1">&#39;data/crossmatch_params.txt&#39;</span><span class="p">),</span>
+                  <span class="n">idx</span><span class="p">,</span> <span class="n">nl</span><span class="p">,</span> <span class="n">out_file</span><span class="o">=</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">dirname</span><span class="p">(</span><span class="vm">__file__</span><span class="p">),</span>
+                  <span class="s1">&#39;data/chunk0/crossmatch_params_.txt&#39;</span><span class="p">))</span>
+
+    <span class="n">new_region_points</span> <span class="o">=</span> <span class="s1">&#39;</span><span class="si">{}</span><span class="s1"> </span><span class="si">{}</span><span class="s1"> 1 </span><span class="si">{}</span><span class="s1"> </span><span class="si">{}</span><span class="s1"> 1&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">,</span> <span class="n">y</span><span class="p">)</span>
+
+    <span class="n">new_ext</span> <span class="o">=</span> <span class="p">[</span><span class="n">extent</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">-</span> <span class="n">r</span><span class="o">/</span><span class="mi">3600</span> <span class="o">-</span> <span class="mf">0.1</span><span class="o">/</span><span class="mi">3600</span><span class="p">,</span> <span class="n">extent</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">+</span> <span class="n">r</span><span class="o">/</span><span class="mi">3600</span> <span class="o">+</span> <span class="mf">0.1</span><span class="o">/</span><span class="mi">3600</span><span class="p">,</span>
+               <span class="n">extent</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span> <span class="o">-</span> <span class="n">r</span><span class="o">/</span><span class="mi">3600</span> <span class="o">-</span> <span class="mf">0.1</span><span class="o">/</span><span class="mi">3600</span><span class="p">,</span> <span class="n">extent</span><span class="p">[</span><span class="mi">3</span><span class="p">]</span> <span class="o">+</span> <span class="n">r</span><span class="o">/</span><span class="mi">3600</span> <span class="o">+</span> <span class="mf">0.1</span><span class="o">/</span><span class="mi">3600</span><span class="p">]</span>
+    <span class="k">for</span> <span class="n">ol</span><span class="p">,</span> <span class="n">nl</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">([</span><span class="s1">&#39;cross_match_extent = 131 138 -3 3&#39;</span><span class="p">,</span> <span class="s1">&#39;joint_folder_path = test_path&#39;</span><span class="p">,</span>
+                       <span class="s1">&#39;cf_region_points = 131 134 4 -1 1 3&#39;</span><span class="p">],</span>
+                      <span class="p">[</span><span class="s1">&#39;cross_match_extent = </span><span class="si">{:.3f}</span><span class="s1"> </span><span class="si">{:.3f}</span><span class="s1"> </span><span class="si">{:.3f}</span><span class="s1"> </span><span class="si">{:.3f}</span><span class="se">\n</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="o">*</span><span class="n">new_ext</span><span class="p">),</span>
+                       <span class="s1">&#39;joint_folder_path = new_test_path</span><span class="se">\n</span><span class="s1">&#39;</span><span class="p">,</span>
+                       <span class="s1">&#39;cf_region_points = </span><span class="si">{}</span><span class="se">\n</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">new_region_points</span><span class="p">)]):</span>
+        <span class="n">f</span> <span class="o">=</span> <span class="nb">open</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">dirname</span><span class="p">(</span><span class="vm">__file__</span><span class="p">),</span>
+                              <span class="s1">&#39;data/crossmatch_params.txt&#39;</span><span class="p">))</span><span class="o">.</span><span class="n">readlines</span><span class="p">()</span>
+        <span class="n">idx</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">where</span><span class="p">([</span><span class="n">ol</span> <span class="ow">in</span> <span class="n">line</span> <span class="k">for</span> <span class="n">line</span> <span class="ow">in</span> <span class="n">f</span><span class="p">])[</span><span class="mi">0</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span>
+        <span class="n">_replace_line</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">dirname</span><span class="p">(</span><span class="vm">__file__</span><span class="p">),</span> <span class="s1">&#39;data/chunk0/crossmatch_params_.txt&#39;</span><span class="p">),</span>
+                      <span class="n">idx</span><span class="p">,</span> <span class="n">nl</span><span class="p">)</span>
+
+    <span class="n">ol</span> <span class="o">=</span> <span class="s1">&#39;auf_region_points = 131 134 4 -1 1 </span><span class="si">{}</span><span class="s1">&#39;</span>
+    <span class="n">nl</span> <span class="o">=</span> <span class="s1">&#39;auf_region_points = </span><span class="si">{}</span><span class="se">\n</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">new_region_points</span><span class="p">)</span>
+    <span class="k">for</span> <span class="n">file_name</span> <span class="ow">in</span> <span class="p">[</span><span class="s1">&#39;cat_a_params&#39;</span><span class="p">,</span> <span class="s1">&#39;cat_b_params&#39;</span><span class="p">]:</span>
+        <span class="n">_ol</span> <span class="o">=</span> <span class="n">ol</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="s1">&#39;3&#39;</span> <span class="k">if</span> <span class="s1">&#39;_a_&#39;</span> <span class="ow">in</span> <span class="n">file_name</span> <span class="k">else</span> <span class="s1">&#39;4&#39;</span><span class="p">)</span>
+        <span class="n">f</span> <span class="o">=</span> <span class="nb">open</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">dirname</span><span class="p">(</span><span class="vm">__file__</span><span class="p">),</span>
+                              <span class="s1">&#39;data/</span><span class="si">{}</span><span class="s1">.txt&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">file_name</span><span class="p">)))</span><span class="o">.</span><span class="n">readlines</span><span class="p">()</span>
+        <span class="n">idx</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">where</span><span class="p">([</span><span class="n">_ol</span> <span class="ow">in</span> <span class="n">line</span> <span class="k">for</span> <span class="n">line</span> <span class="ow">in</span> <span class="n">f</span><span class="p">])[</span><span class="mi">0</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span>
+        <span class="n">_replace_line</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">dirname</span><span class="p">(</span><span class="vm">__file__</span><span class="p">),</span> <span class="s1">&#39;data/</span><span class="si">{}</span><span class="s1">.txt&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">file_name</span><span class="p">)),</span>
+                      <span class="n">idx</span><span class="p">,</span> <span class="n">nl</span><span class="p">,</span> <span class="n">out_file</span><span class="o">=</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">dirname</span><span class="p">(</span><span class="vm">__file__</span><span class="p">),</span>
+                      <span class="s1">&#39;data/chunk0/</span><span class="si">{}</span><span class="s1">_.txt&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">file_name</span><span class="p">)))</span>
+
+    <span class="k">for</span> <span class="n">cat</span><span class="p">,</span> <span class="n">ol</span><span class="p">,</span> <span class="n">nl</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">([</span><span class="s1">&#39;cat_a_params&#39;</span><span class="p">,</span> <span class="s1">&#39;cat_b_params&#39;</span><span class="p">],</span> <span class="p">[</span><span class="s1">&#39;cat_folder_path = gaia_folder&#39;</span><span class="p">,</span>
+                           <span class="s1">&#39;cat_folder_path = wise_folder&#39;</span><span class="p">],</span> <span class="p">[</span><span class="s1">&#39;cat_folder_path = a_cat</span><span class="se">\n</span><span class="s1">&#39;</span><span class="p">,</span>
+                           <span class="s1">&#39;cat_folder_path = b_cat</span><span class="se">\n</span><span class="s1">&#39;</span><span class="p">]):</span>
+        <span class="n">f</span> <span class="o">=</span> <span class="nb">open</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">dirname</span><span class="p">(</span><span class="vm">__file__</span><span class="p">),</span>
+                              <span class="s1">&#39;data/</span><span class="si">{}</span><span class="s1">.txt&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">cat</span><span class="p">)))</span><span class="o">.</span><span class="n">readlines</span><span class="p">()</span>
+        <span class="n">idx</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">where</span><span class="p">([</span><span class="n">ol</span> <span class="ow">in</span> <span class="n">line</span> <span class="k">for</span> <span class="n">line</span> <span class="ow">in</span> <span class="n">f</span><span class="p">])[</span><span class="mi">0</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span>
+        <span class="n">_replace_line</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">dirname</span><span class="p">(</span><span class="vm">__file__</span><span class="p">),</span> <span class="s1">&#39;data/chunk0/</span><span class="si">{}</span><span class="s1">_.txt&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">cat</span><span class="p">)),</span>
+                      <span class="n">idx</span><span class="p">,</span> <span class="n">nl</span><span class="p">)</span>
+
+    <span class="n">cm</span> <span class="o">=</span> <span class="n">CrossMatch</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">dirname</span><span class="p">(</span><span class="vm">__file__</span><span class="p">),</span> <span class="s1">&#39;data&#39;</span><span class="p">))</span>
+    <span class="n">cm</span><span class="p">()</span>
+
+    <span class="n">ac</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="s1">&#39;</span><span class="si">{}</span><span class="s1">/pairing/ac.npy&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">cm</span><span class="o">.</span><span class="n">joint_folder_path</span><span class="p">))</span>
+    <span class="n">bc</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="s1">&#39;</span><span class="si">{}</span><span class="s1">/pairing/bc.npy&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">cm</span><span class="o">.</span><span class="n">joint_folder_path</span><span class="p">))</span>
+    <span class="k">assert</span> <span class="nb">len</span><span class="p">(</span><span class="n">ac</span><span class="p">)</span> <span class="o">==</span> <span class="n">N_c</span>
+    <span class="k">assert</span> <span class="nb">len</span><span class="p">(</span><span class="n">bc</span><span class="p">)</span> <span class="o">==</span> <span class="n">N_c</span>
+
+    <span class="n">a_right_inds</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="s1">&#39;</span><span class="si">{}</span><span class="s1">/test_match_indices.npy&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">a_cat</span><span class="p">))</span>
+    <span class="n">b_right_inds</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="s1">&#39;</span><span class="si">{}</span><span class="s1">/test_match_indices.npy&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">b_cat</span><span class="p">))</span>
+
+    <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">N_c</span><span class="p">):</span>
+        <span class="k">assert</span> <span class="n">a_right_inds</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="ow">in</span> <span class="n">ac</span>
+        <span class="k">assert</span> <span class="n">b_right_inds</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="ow">in</span> <span class="n">bc</span>
+        <span class="n">q</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">a_right_inds</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">==</span> <span class="n">ac</span><span class="p">)[</span><span class="mi">0</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span>
+        <span class="k">assert</span> <span class="n">np</span><span class="o">.</span><span class="n">all</span><span class="p">([</span><span class="n">a_right_inds</span><span class="p">[</span><span class="n">i</span><span class="p">],</span> <span class="n">b_right_inds</span><span class="p">[</span><span class="n">i</span><span class="p">]]</span> <span class="o">==</span> <span class="p">[</span><span class="n">ac</span><span class="p">[</span><span class="n">q</span><span class="p">],</span> <span class="n">bc</span><span class="p">[</span><span class="n">q</span><span class="p">]])</span>
+</pre></div>
+
+            <div class="clearer"></div>
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="../../../f-modindex.html" title="Fortran Module Index"
+             >fortran modules</a> |</li>
+        <li class="right" >
+          <a href="../../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../../index.html">macauff</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../../index.html" >Module code</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">macauff.tests.test_full_match_process</a></li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+    &#169; Copyright 2022, Tom J Wilson.
+      Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 7.2.6.
+    </div>
+  </body>
+</html>

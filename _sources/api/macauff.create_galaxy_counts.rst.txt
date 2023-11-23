@@ -1,0 +1,6 @@
+create_galaxy_counts
+====================
+
+.. currentmodule:: macauff
+
+.. autofunction:: create_galaxy_counts

@@ -1,0 +1,47 @@
+AstrometricCorrections
+======================
+
+.. currentmodule:: macauff
+
+.. autoclass:: AstrometricCorrections
+   :show-inheritance:
+
+   .. rubric:: Methods Summary
+
+   .. autosummary::
+
+      ~AstrometricCorrections.__call__
+      ~AstrometricCorrections.calculate_local_densities_and_nearest_neighbours
+      ~AstrometricCorrections.create_auf_pdfs
+      ~AstrometricCorrections.finalise_summary_plot
+      ~AstrometricCorrections.fit_auf_joint
+      ~AstrometricCorrections.fit_snr_model
+      ~AstrometricCorrections.fit_uncertainty
+      ~AstrometricCorrections.load_catalogue
+      ~AstrometricCorrections.make_ax_coords
+      ~AstrometricCorrections.make_catalogue_cutouts
+      ~AstrometricCorrections.make_gridspec
+      ~AstrometricCorrections.make_snr_model
+      ~AstrometricCorrections.make_star_galaxy_counts
+      ~AstrometricCorrections.plot_fits_calculate_chi_sq
+      ~AstrometricCorrections.plot_star_galaxy_counts
+      ~AstrometricCorrections.simulate_aufs
+
+   .. rubric:: Methods Documentation
+
+   .. automethod:: __call__
+   .. automethod:: calculate_local_densities_and_nearest_neighbours
+   .. automethod:: create_auf_pdfs
+   .. automethod:: finalise_summary_plot
+   .. automethod:: fit_auf_joint
+   .. automethod:: fit_snr_model
+   .. automethod:: fit_uncertainty
+   .. automethod:: load_catalogue
+   .. automethod:: make_ax_coords
+   .. automethod:: make_catalogue_cutouts
+   .. automethod:: make_gridspec
+   .. automethod:: make_snr_model
+   .. automethod:: make_star_galaxy_counts
+   .. automethod:: plot_fits_calculate_chi_sq
+   .. automethod:: plot_star_galaxy_counts
+   .. automethod:: simulate_aufs

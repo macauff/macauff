@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="./">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>macauff Documentation &#8212; macauff</title>
+    <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=4848ba22" />
+    <link rel="stylesheet" type="text/css" href="_static/pyramid.css?v=a5b9c134" />
+    <link rel="stylesheet" type="text/css" href="_static/graphviz.css?v=eafc0fe6" />
+    <script src="_static/documentation_options.js?v=5929fcd5"></script>
+    <script src="_static/doctools.js?v=888ff710"></script>
+    <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="calculate_proper_motions" href="api/macauff.calculate_proper_motions.html" />
+    <link rel="prev" title="macauff" href="index.html" />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Neuton&amp;subset=latin" type="text/css" media="screen" charset="utf-8" />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Nobile:regular,italic,bold,bolditalic&amp;subset=latin" type="text/css" media="screen" charset="utf-8" />
+<!--[if lte IE 6]>
+<link rel="stylesheet" href="_static/ie6.css" type="text/css" media="screen" charset="utf-8" />
+<![endif]-->
+
+  </head><body>
+
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="f-modindex.html" title="Fortran Module Index"
+             >fortran modules</a> |</li>
+        <li class="right" >
+          <a href="py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="right" >
+          <a href="api/macauff.calculate_proper_motions.html" title="calculate_proper_motions"
+             accesskey="N">next</a> |</li>
+        <li class="right" >
+          <a href="index.html" title="macauff"
+             accesskey="P">previous</a> |</li>
+        <li class="nav-item nav-item-0"><a href="index.html">macauff</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href=""><code class="docutils literal notranslate"><span class="pre">macauff</span></code> Documentation</a></li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <section id="macauff-documentation">
+<h1><code class="docutils literal notranslate"><span class="pre">macauff</span></code> Documentation<a class="headerlink" href="#macauff-documentation" title="Link to this heading">¶</a></h1>
+<p>This page details the inputs and outputs for various Python and Fortran functions/subroutines used internally within macauff. While <a class="reference internal" href="api/macauff.CrossMatch.html#macauff.CrossMatch" title="macauff.CrossMatch"><code class="xref py py-obj docutils literal notranslate"><span class="pre">CrossMatch</span></code></a> is the main input for most users, it is possible to overwrite each of the four main steps within the matching process (AUF component creation, island group creation, photometric likelihood derivation, and final match assignment) and hence it may be important to understand the required I/O to a given step for compatibility purposes.</p>
+<p>For the details of the inputs that <a class="reference internal" href="api/macauff.CrossMatch.html#macauff.CrossMatch" title="macauff.CrossMatch"><code class="xref py py-obj docutils literal notranslate"><span class="pre">CrossMatch</span></code></a> expects and parses through its <code class="xref py py-obj docutils literal notranslate"><span class="pre">read_metadata</span></code> function, see <a class="reference internal" href="inputs.html"><span class="doc">Input Parameters</span></a> for specifics.</p>
+<section id="module-macauff">
+<span id="python"></span><h2>Python<a class="headerlink" href="#module-macauff" title="Link to this heading">¶</a></h2>
+<section id="functions">
+<h3>Functions<a class="headerlink" href="#functions" title="Link to this heading">¶</a></h3>
+<table class="autosummary longtable docutils align-default">
+<tbody>
+<tr class="row-odd"><td><p><a class="reference internal" href="api/macauff.calculate_proper_motions.html#macauff.calculate_proper_motions" title="macauff.calculate_proper_motions"><code class="xref py py-obj docutils literal notranslate"><span class="pre">calculate_proper_motions</span></code></a>(d, l, b, temp, N)</p></td>
+<td><p>Calculates the statistical distribution of proper motions of a sightline, from a set of theoretical sources within the particular sky area.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="api/macauff.compute_photometric_likelihoods.html#macauff.compute_photometric_likelihoods" title="macauff.compute_photometric_likelihoods"><code class="xref py py-obj docutils literal notranslate"><span class="pre">compute_photometric_likelihoods</span></code></a>(...[, ...])</p></td>
+<td><p>Derives the photometric likelihoods and priors for use in the catalogue cross-match process.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="api/macauff.create_galaxy_counts.html#macauff.create_galaxy_counts" title="macauff.create_galaxy_counts"><code class="xref py py-obj docutils literal notranslate"><span class="pre">create_galaxy_counts</span></code></a>(cmau_array, mag_bins, ...)</p></td>
+<td><p>Create a simulated distribution of galaxy magnitudes for a particular bandpass by consideration of double Schechter functions (for blue and red galaxies) in a specified range of redshifts, following <a class="reference internal" href="api/macauff.create_galaxy_counts.html#rf776fcfe5044-1" id="id1"><span>[Rf776fcfe5044-1]</span></a>.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="api/macauff.create_single_perturb_auf.html#macauff.create_single_perturb_auf" title="macauff.create_single_perturb_auf"><code class="xref py py-obj docutils literal notranslate"><span class="pre">create_single_perturb_auf</span></code></a>(tri_folder, ...[, ...])</p></td>
+<td><p>Creates the associated parameters for describing a single perturbation AUF component, for a single sky position.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="api/macauff.csv_to_npy.html#macauff.csv_to_npy" title="macauff.csv_to_npy"><code class="xref py py-obj docutils literal notranslate"><span class="pre">csv_to_npy</span></code></a>(input_folder, input_filename, ...)</p></td>
+<td><p>Convert a .csv file representation of a photometric catalogue into the appropriate .npy binary files used in the cross-matching process.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="api/macauff.generate_speclite_filters.html#macauff.generate_speclite_filters" title="macauff.generate_speclite_filters"><code class="xref py py-obj docutils literal notranslate"><span class="pre">generate_speclite_filters</span></code></a>(group_name, ...)</p></td>
+<td><p>Convenience function to create a new set of <code class="docutils literal notranslate"><span class="pre">speclite</span></code> filters, if bandpasses other than those provided in the module already are required.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="api/macauff.make_island_groupings.html#macauff.make_island_groupings" title="macauff.make_island_groupings"><code class="xref py py-obj docutils literal notranslate"><span class="pre">make_island_groupings</span></code></a>(joint_folder_path, ...)</p></td>
+<td><p>Function to handle the creation of &quot;islands&quot; of astrometrically coeval sources, and identify which overlap to some probability based on their combined AUFs.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="api/macauff.make_perturb_aufs.html#macauff.make_perturb_aufs" title="macauff.make_perturb_aufs"><code class="xref py py-obj docutils literal notranslate"><span class="pre">make_perturb_aufs</span></code></a>(auf_folder, cat_folder, ...)</p></td>
+<td><p>Function to perform the creation of the blended object perturbation component of the AUF.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="api/macauff.npy_to_csv.html#macauff.npy_to_csv" title="macauff.npy_to_csv"><code class="xref py py-obj docutils literal notranslate"><span class="pre">npy_to_csv</span></code></a>(input_csv_folders, ...[, ...])</p></td>
+<td><p>Function to convert output .npy files, as created during the cross-match process, and create a .csv file of matches and non-matches, combining columns from the original .csv catalogues.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="api/macauff.rect_slice_csv.html#macauff.rect_slice_csv" title="macauff.rect_slice_csv"><code class="xref py py-obj docutils literal notranslate"><span class="pre">rect_slice_csv</span></code></a>(input_folder, output_folder, ...)</p></td>
+<td><p>Convenience function to take a small rectangular slice of a larger .csv catalogue, based on its given orthogonal sky coordinates in the large catalogue.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="api/macauff.rect_slice_npy.html#macauff.rect_slice_npy" title="macauff.rect_slice_npy"><code class="xref py py-obj docutils literal notranslate"><span class="pre">rect_slice_npy</span></code></a>(input_folder, output_folder, ...)</p></td>
+<td><p>Convenience function to take a small rectangular slice of a larger catalogue, represented by three or four binary .npy files, based on its given orthogonal sky coordinates in the large catalogue.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="api/macauff.set_list.html#macauff.set_list" title="macauff.set_list"><code class="xref py py-obj docutils literal notranslate"><span class="pre">set_list</span></code></a>(aindices, bindices, aoverlap, ...)</p></td>
+<td><p>Creates the inter-catalogue groupings between catalogues &quot;a&quot; and &quot;b&quot;, based on previously determined individual source &quot;overlaps&quot; in astrometry.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="api/macauff.source_pairing.html#macauff.source_pairing" title="macauff.source_pairing"><code class="xref py py-obj docutils literal notranslate"><span class="pre">source_pairing</span></code></a>(joint_folder_path, ...)</p></td>
+<td><p>Function to iterate over all grouped islands of sources, calculating the probabilities of all permutations of matches and deriving the most likely counterparts for sources in the two catalogues.</p></td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="classes">
+<h3>Classes<a class="headerlink" href="#classes" title="Link to this heading">¶</a></h3>
+<table class="autosummary longtable docutils align-default">
+<tbody>
+<tr class="row-odd"><td><p><a class="reference internal" href="api/macauff.AstrometricCorrections.html#macauff.AstrometricCorrections" title="macauff.AstrometricCorrections"><code class="xref py py-obj docutils literal notranslate"><span class="pre">AstrometricCorrections</span></code></a>(psf_fwhm, numtrials, ...)</p></td>
+<td><p>Class to calculate any potential corrections to quoted astrometric precisions in photometric catalogues, based on reliable cross-matching to a well-understood second dataset.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="api/macauff.CrossMatch.html#macauff.CrossMatch" title="macauff.CrossMatch"><code class="xref py py-obj docutils literal notranslate"><span class="pre">CrossMatch</span></code></a>(chunks_folder_path[, ...])</p></td>
+<td><p>A class to cross-match two photometric catalogues with one another, producing a composite catalogue of merged sources.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="api/macauff.FitPSFPerturbations.html#macauff.FitPSFPerturbations" title="macauff.FitPSFPerturbations"><code class="xref py py-obj docutils literal notranslate"><span class="pre">FitPSFPerturbations</span></code></a>(psf_fwhm, d_di, d_Li, ...)</p></td>
+<td><p>Class that derives a parameterisation of the effect of a hidden, blended contaminant within a brighter source in a photometric image, based on fitting the composite object with a single Gaussian PSF in the limit that sky background dominates and noise is constant across the image.</p></td>
+</tr>
+</tbody>
+</table>
+<span class="target" id="module-macauff.tests"></span></section>
+<section id="id2">
+<h3>Functions<a class="headerlink" href="#id2" title="Link to this heading">¶</a></h3>
+<table class="autosummary longtable docutils align-default">
+<tbody>
+<tr class="row-odd"><td><p><a class="reference internal" href="api/macauff.tests.generate_random_data.html#macauff.tests.generate_random_data" title="macauff.tests.generate_random_data"><code class="xref py py-obj docutils literal notranslate"><span class="pre">generate_random_data</span></code></a>(N_a, N_b, N_c, extent, ...)</p></td>
+<td><p>Convenience function to allow for the generation of two test datasets.</p></td>
+</tr>
+</tbody>
+</table>
+</section>
+</section>
+<section id="fortran">
+<h2>Fortran<a class="headerlink" href="#fortran" title="Link to this heading">¶</a></h2>
+<section id="perturbation-auf">
+<h3><a class="reference internal" href="f90_docs/perturb_auf_docs.html"><span class="doc">Perturbation AUF</span></a><a class="headerlink" href="#perturbation-auf" title="Link to this heading">¶</a></h3>
+</section>
+<section id="group-sources">
+<h3><a class="reference internal" href="f90_docs/group_sources_docs.html"><span class="doc">Group Sources</span></a><a class="headerlink" href="#group-sources" title="Link to this heading">¶</a></h3>
+</section>
+<section id="photometric-likelihood">
+<h3><a class="reference internal" href="f90_docs/phot_like_docs.html"><span class="doc">Photometric Likelihood</span></a><a class="headerlink" href="#photometric-likelihood" title="Link to this heading">¶</a></h3>
+</section>
+<section id="counterpart-pairing">
+<h3><a class="reference internal" href="f90_docs/pairing_docs.html"><span class="doc">Counterpart Pairing</span></a><a class="headerlink" href="#counterpart-pairing" title="Link to this heading">¶</a></h3>
+</section>
+<section id="miscellaneous-functions">
+<h3><a class="reference internal" href="f90_docs/misc_func_docs.html"><span class="doc">Miscellaneous Functions</span></a><a class="headerlink" href="#miscellaneous-functions" title="Link to this heading">¶</a></h3>
+</section>
+<section id="shared-library">
+<h3><a class="reference internal" href="f90_docs/shared_library_docs.html"><span class="doc">Shared Library</span></a><a class="headerlink" href="#shared-library" title="Link to this heading">¶</a></h3>
+</section>
+</section>
+</section>
+
+
+            <div class="clearer"></div>
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+  <div>
+    <h3><a href="index.html">Table of Contents</a></h3>
+    <ul>
+<li><a class="reference internal" href="#"><code class="docutils literal notranslate"><span class="pre">macauff</span></code> Documentation</a><ul>
+<li><a class="reference internal" href="#module-macauff">Python</a><ul>
+<li><a class="reference internal" href="#functions">Functions</a></li>
+<li><a class="reference internal" href="#classes">Classes</a></li>
+<li><a class="reference internal" href="#id2">Functions</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#fortran">Fortran</a><ul>
+<li><a class="reference internal" href="#perturbation-auf"><span class="xref std std-doc">Perturbation AUF</span></a></li>
+<li><a class="reference internal" href="#group-sources"><span class="xref std std-doc">Group Sources</span></a></li>
+<li><a class="reference internal" href="#photometric-likelihood"><span class="xref std std-doc">Photometric Likelihood</span></a></li>
+<li><a class="reference internal" href="#counterpart-pairing"><span class="xref std std-doc">Counterpart Pairing</span></a></li>
+<li><a class="reference internal" href="#miscellaneous-functions"><span class="xref std std-doc">Miscellaneous Functions</span></a></li>
+<li><a class="reference internal" href="#shared-library"><span class="xref std std-doc">Shared Library</span></a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+
+  </div>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="f-modindex.html" title="Fortran Module Index"
+             >fortran modules</a> |</li>
+        <li class="right" >
+          <a href="py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="right" >
+          <a href="api/macauff.calculate_proper_motions.html" title="calculate_proper_motions"
+             >next</a> |</li>
+        <li class="right" >
+          <a href="index.html" title="macauff"
+             >previous</a> |</li>
+        <li class="nav-item nav-item-0"><a href="index.html">macauff</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href=""><code class="docutils literal notranslate"><span class="pre">macauff</span></code> Documentation</a></li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+    &#169; Copyright 2022, Tom J Wilson.
+      Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 7.2.6.
+    </div>
+  </body>
+</html>

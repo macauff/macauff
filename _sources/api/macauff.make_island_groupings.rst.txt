@@ -1,0 +1,6 @@
+make_island_groupings
+=====================
+
+.. currentmodule:: macauff
+
+.. autofunction:: make_island_groupings

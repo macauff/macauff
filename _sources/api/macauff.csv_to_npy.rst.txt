@@ -1,0 +1,6 @@
+csv_to_npy
+==========
+
+.. currentmodule:: macauff
+
+.. autofunction:: csv_to_npy

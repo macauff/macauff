@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>CrossMatch &#8212; macauff</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=4848ba22" />
+    <link rel="stylesheet" type="text/css" href="../_static/pyramid.css?v=a5b9c134" />
+    <link rel="stylesheet" type="text/css" href="../_static/graphviz.css?v=eafc0fe6" />
+    <script src="../_static/documentation_options.js?v=5929fcd5"></script>
+    <script src="../_static/doctools.js?v=888ff710"></script>
+    <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="FitPSFPerturbations" href="macauff.FitPSFPerturbations.html" />
+    <link rel="prev" title="AstrometricCorrections" href="macauff.AstrometricCorrections.html" />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Neuton&amp;subset=latin" type="text/css" media="screen" charset="utf-8" />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Nobile:regular,italic,bold,bolditalic&amp;subset=latin" type="text/css" media="screen" charset="utf-8" />
+<!--[if lte IE 6]>
+<link rel="stylesheet" href="../_static/ie6.css" type="text/css" media="screen" charset="utf-8" />
+<![endif]-->
+
+  </head><body>
+
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="../f-modindex.html" title="Fortran Module Index"
+             >fortran modules</a> |</li>
+        <li class="right" >
+          <a href="../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="right" >
+          <a href="macauff.FitPSFPerturbations.html" title="FitPSFPerturbations"
+             accesskey="N">next</a> |</li>
+        <li class="right" >
+          <a href="macauff.AstrometricCorrections.html" title="AstrometricCorrections"
+             accesskey="P">previous</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../index.html">macauff</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../macauff.html" accesskey="U"><code class="docutils literal notranslate"><span class="pre">macauff</span></code> Documentation</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">CrossMatch</a></li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <section id="crossmatch">
+<h1>CrossMatch<a class="headerlink" href="#crossmatch" title="Link to this heading">¶</a></h1>
+<dl class="py class">
+<dt class="sig sig-object py" id="macauff.CrossMatch">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">macauff.</span></span><span class="sig-name descname"><span class="pre">CrossMatch</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">chunks_folder_path</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">resume_file_path</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">use_mpi</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">walltime</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">end_within</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'00:10:00'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">polling_rate</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/macauff/matching.html#CrossMatch"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#macauff.CrossMatch" title="Link to this definition">¶</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+<p>A class to cross-match two photometric catalogues with one another, producing
+a composite catalogue of merged sources.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><dl class="simple">
+<dt><strong>chunks_folder_path</strong><span class="classifier">string</span></dt><dd><p>A path to the location of the folder containing one subfolder per chunk.</p>
+</dd>
+<dt><strong>resume_file_path</strong><span class="classifier">string, optional</span></dt><dd><p>A path to the location of the file containing resume information for the
+cross match.</p>
+</dd>
+<dt><strong>use_mpi</strong><span class="classifier">boolean, optional</span></dt><dd><p>Enable/disable the use of MPI parallelisation (enabled by default).</p>
+</dd>
+<dt><strong>walltime</strong><span class="classifier">string, optional</span></dt><dd><p>Maximum runtime of the cross-match job in format ‘HH:MM:SS’ (hours, minutes
+and seconds). Controls checkpointing.</p>
+</dd>
+<dt><strong>end_within</strong><span class="classifier">string, optional</span></dt><dd><p>End time in ‘HH:MM:SS’ format (hours, minutes and seconds). Default is
+‘00:10:00’, i.e. end within 10 minutes of the given walltime.</p>
+</dd>
+<dt><strong>polling_rate</strong><span class="classifier">integer, optional</span></dt><dd><p>Rate in seconds at which manager process checks for new work requests and
+monitors walltime. Default is 1 second.</p>
+</dd>
+</dl>
+</dd>
+</dl>
+<p>Initialisation function for cross-match class.</p>
+<p class="rubric">Methods Summary</p>
+<table class="autosummary longtable docutils align-default">
+<tbody>
+<tr class="row-odd"><td><p><a class="reference internal" href="#macauff.CrossMatch.__call__" title="macauff.CrossMatch.__call__"><code class="xref py py-obj docutils literal notranslate"><span class="pre">__call__</span></code></a>()</p></td>
+<td><p>Call function for CrossMatch, performs cross-matching two photometric catalogues.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#macauff.CrossMatch.calculate_phot_like" title="macauff.CrossMatch.calculate_phot_like"><code class="xref py py-obj docutils literal notranslate"><span class="pre">calculate_phot_like</span></code></a>([phot_like_func])</p></td>
+<td><p>Create the photometric likelihood information used in the cross-match process.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#macauff.CrossMatch.create_perturb_auf" title="macauff.CrossMatch.create_perturb_auf"><code class="xref py py-obj docutils literal notranslate"><span class="pre">create_perturb_auf</span></code></a>([perturb_auf_func])</p></td>
+<td><p>Function wrapping the main perturbation AUF component creation routines.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#macauff.CrossMatch.group_sources" title="macauff.CrossMatch.group_sources"><code class="xref py py-obj docutils literal notranslate"><span class="pre">group_sources</span></code></a>([group_func])</p></td>
+<td><p>Function to handle the creation of catalogue &quot;islands&quot; and potential astrometrically related sources across the two catalogues.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#macauff.CrossMatch.make_shared_data" title="macauff.CrossMatch.make_shared_data"><code class="xref py py-obj docutils literal notranslate"><span class="pre">make_shared_data</span></code></a>()</p></td>
+<td><p>Function to initialise the shared variables used in the cross-match process.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#macauff.CrossMatch.pair_sources" title="macauff.CrossMatch.pair_sources"><code class="xref py py-obj docutils literal notranslate"><span class="pre">pair_sources</span></code></a>([count_pair_func])</p></td>
+<td><p>Assign sources in the two catalogues as either counterparts to one another or singly detected &quot;field&quot; sources.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#macauff.CrossMatch.read_metadata" title="macauff.CrossMatch.read_metadata"><code class="xref py py-obj docutils literal notranslate"><span class="pre">read_metadata</span></code></a>()</p></td>
+<td><p>Helper function to read in metadata and set various class attributes.</p></td>
+</tr>
+</tbody>
+</table>
+<p class="rubric">Methods Documentation</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="macauff.CrossMatch.__call__">
+<span class="sig-name descname"><span class="pre">__call__</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/macauff/matching.html#CrossMatch.__call__"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#macauff.CrossMatch.__call__" title="Link to this definition">¶</a></dt>
+<dd><p>Call function for CrossMatch, performs cross-matching two photometric catalogues.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="macauff.CrossMatch.calculate_phot_like">
+<span class="sig-name descname"><span class="pre">calculate_phot_like</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">phot_like_func=&lt;function</span> <span class="pre">compute_photometric_likelihoods&gt;</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/macauff/matching.html#CrossMatch.calculate_phot_like"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#macauff.CrossMatch.calculate_phot_like" title="Link to this definition">¶</a></dt>
+<dd><p>Create the photometric likelihood information used in the cross-match
+process.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><dl class="simple">
+<dt><strong>phot_like_func</strong><span class="classifier">callable, optional</span></dt><dd><p>The function that calls the overall computation of the counterpart
+and “field” star photometric likelihood-related information.</p>
+</dd>
+</dl>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="macauff.CrossMatch.create_perturb_auf">
+<span class="sig-name descname"><span class="pre">create_perturb_auf</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">perturb_auf_func=&lt;function</span> <span class="pre">make_perturb_aufs&gt;</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/macauff/matching.html#CrossMatch.create_perturb_auf"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#macauff.CrossMatch.create_perturb_auf" title="Link to this definition">¶</a></dt>
+<dd><p>Function wrapping the main perturbation AUF component creation routines.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><dl class="simple">
+<dt><strong>perturb_auf_func</strong><span class="classifier">callable, optional</span></dt><dd><p><code class="docutils literal notranslate"><span class="pre">perturb_auf_func</span></code> should create the perturbation AUF output files
+for each filter-pointing combination.</p>
+</dd>
+</dl>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="macauff.CrossMatch.group_sources">
+<span class="sig-name descname"><span class="pre">group_sources</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">group_func=&lt;function</span> <span class="pre">make_island_groupings&gt;</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/macauff/matching.html#CrossMatch.group_sources"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#macauff.CrossMatch.group_sources" title="Link to this definition">¶</a></dt>
+<dd><p>Function to handle the creation of catalogue “islands” and potential
+astrometrically related sources across the two catalogues.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><dl class="simple">
+<dt><strong>group_func</strong><span class="classifier">callable, optional</span></dt><dd><p><code class="docutils literal notranslate"><span class="pre">group_func</span></code> should create the various island- and overlap-related
+files by which objects across the two catalogues are assigned as
+potentially counterparts to one another.</p>
+</dd>
+</dl>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="macauff.CrossMatch.make_shared_data">
+<span class="sig-name descname"><span class="pre">make_shared_data</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/macauff/matching.html#CrossMatch.make_shared_data"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#macauff.CrossMatch.make_shared_data" title="Link to this definition">¶</a></dt>
+<dd><p>Function to initialise the shared variables used in the cross-match process.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="macauff.CrossMatch.pair_sources">
+<span class="sig-name descname"><span class="pre">pair_sources</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">count_pair_func=&lt;function</span> <span class="pre">source_pairing&gt;</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/macauff/matching.html#CrossMatch.pair_sources"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#macauff.CrossMatch.pair_sources" title="Link to this definition">¶</a></dt>
+<dd><p>Assign sources in the two catalogues as either counterparts to one another
+or singly detected “field” sources.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><dl class="simple">
+<dt><strong>count_pair_func</strong><span class="classifier">callable, optional</span></dt><dd><p>The function that calls the counterpart determination routine.</p>
+</dd>
+</dl>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="macauff.CrossMatch.read_metadata">
+<span class="sig-name descname"><span class="pre">read_metadata</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/macauff/matching.html#CrossMatch.read_metadata"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#macauff.CrossMatch.read_metadata" title="Link to this definition">¶</a></dt>
+<dd><p>Helper function to read in metadata and set various class attributes.</p>
+</dd></dl>
+
+</dd></dl>
+
+</section>
+
+
+            <div class="clearer"></div>
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="../f-modindex.html" title="Fortran Module Index"
+             >fortran modules</a> |</li>
+        <li class="right" >
+          <a href="../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="right" >
+          <a href="macauff.FitPSFPerturbations.html" title="FitPSFPerturbations"
+             >next</a> |</li>
+        <li class="right" >
+          <a href="macauff.AstrometricCorrections.html" title="AstrometricCorrections"
+             >previous</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../index.html">macauff</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../macauff.html" ><code class="docutils literal notranslate"><span class="pre">macauff</span></code> Documentation</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">CrossMatch</a></li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+    &#169; Copyright 2022, Tom J Wilson.
+      Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 7.2.6.
+    </div>
+  </body>
+</html>

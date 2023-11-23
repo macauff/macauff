@@ -1,0 +1,47 @@
+FitPSFPerturbations
+===================
+
+.. currentmodule:: macauff
+
+.. autoclass:: FitPSFPerturbations
+   :show-inheritance:
+
+   .. rubric:: Methods Summary
+
+   .. autosummary::
+
+      ~FitPSFPerturbations.__call__
+      ~FitPSFPerturbations.dd_combined_fit
+      ~FitPSFPerturbations.dd_fitting_wrapper
+      ~FitPSFPerturbations.fit_one_skew
+      ~FitPSFPerturbations.fit_poly
+      ~FitPSFPerturbations.fit_polynomial_parameterisations
+      ~FitPSFPerturbations.fit_skew_distributions
+      ~FitPSFPerturbations.hess_dd_fit_xy
+      ~FitPSFPerturbations.loop_ind_fit
+      ~FitPSFPerturbations.make_initial_Ld_perturbations
+      ~FitPSFPerturbations.min_dd_fit_xy
+      ~FitPSFPerturbations.min_parallel_dd_fit
+      ~FitPSFPerturbations.min_parallel_dd_param_fit
+      ~FitPSFPerturbations.plot_fits
+      ~FitPSFPerturbations.psi
+      ~FitPSFPerturbations.return_ddparams
+
+   .. rubric:: Methods Documentation
+
+   .. automethod:: __call__
+   .. automethod:: dd_combined_fit
+   .. automethod:: dd_fitting_wrapper
+   .. automethod:: fit_one_skew
+   .. automethod:: fit_poly
+   .. automethod:: fit_polynomial_parameterisations
+   .. automethod:: fit_skew_distributions
+   .. automethod:: hess_dd_fit_xy
+   .. automethod:: loop_ind_fit
+   .. automethod:: make_initial_Ld_perturbations
+   .. automethod:: min_dd_fit_xy
+   .. automethod:: min_parallel_dd_fit
+   .. automethod:: min_parallel_dd_param_fit
+   .. automethod:: plot_fits
+   .. automethod:: psi
+   .. automethod:: return_ddparams

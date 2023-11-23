@@ -1,0 +1,588 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>FitPSFPerturbations &#8212; macauff</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=4848ba22" />
+    <link rel="stylesheet" type="text/css" href="../_static/pyramid.css?v=a5b9c134" />
+    <link rel="stylesheet" type="text/css" href="../_static/graphviz.css?v=eafc0fe6" />
+    <script src="../_static/documentation_options.js?v=5929fcd5"></script>
+    <script src="../_static/doctools.js?v=888ff710"></script>
+    <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script async="async" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="generate_random_data" href="macauff.tests.generate_random_data.html" />
+    <link rel="prev" title="CrossMatch" href="macauff.CrossMatch.html" />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Neuton&amp;subset=latin" type="text/css" media="screen" charset="utf-8" />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Nobile:regular,italic,bold,bolditalic&amp;subset=latin" type="text/css" media="screen" charset="utf-8" />
+<!--[if lte IE 6]>
+<link rel="stylesheet" href="../_static/ie6.css" type="text/css" media="screen" charset="utf-8" />
+<![endif]-->
+
+  </head><body>
+
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="../f-modindex.html" title="Fortran Module Index"
+             >fortran modules</a> |</li>
+        <li class="right" >
+          <a href="../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="right" >
+          <a href="macauff.tests.generate_random_data.html" title="generate_random_data"
+             accesskey="N">next</a> |</li>
+        <li class="right" >
+          <a href="macauff.CrossMatch.html" title="CrossMatch"
+             accesskey="P">previous</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../index.html">macauff</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../macauff.html" accesskey="U"><code class="docutils literal notranslate"><span class="pre">macauff</span></code> Documentation</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">FitPSFPerturbations</a></li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <section id="fitpsfperturbations">
+<h1>FitPSFPerturbations<a class="headerlink" href="#fitpsfperturbations" title="Link to this heading">¶</a></h1>
+<dl class="py class">
+<dt class="sig sig-object py" id="macauff.FitPSFPerturbations">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">macauff.</span></span><span class="sig-name descname"><span class="pre">FitPSFPerturbations</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">psf_fwhm</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">d_di</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">d_Li</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">n_pool</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">data_save_folder</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">plot_save_folder</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/macauff/derive_psf_auf_params.html#FitPSFPerturbations"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#macauff.FitPSFPerturbations" title="Link to this definition">¶</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+<p>Class that derives a parameterisation of the effect of a hidden, blended
+contaminant within a brighter source in a photometric image, based on
+fitting the composite object with a single Gaussian PSF in the limit that
+sky background dominates and noise is constant across the image.</p>
+<p>Initialise FitPSFPerturbations with necessary parameters.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><dl class="simple">
+<dt><strong>psf_fwhm</strong><span class="classifier">float</span></dt><dd><p>The full-width at half-maximum of the PSF to simulate fitting
+for perturbations.</p>
+</dd>
+<dt><strong>d_di</strong><span class="classifier">float</span></dt><dd><p>Separation between perturber offsets, setting the precision of the
+simulated perturbations.</p>
+</dd>
+<dt><strong>d_Li</strong><span class="classifier">float</span></dt><dd><p>Separation between relative perturber fluxes, affecting the
+precision of the derived offset relations.</p>
+</dd>
+<dt><strong>n_pool</strong><span class="classifier">integer</span></dt><dd><p>Number of parallel threads to use for <code class="docutils literal notranslate"><span class="pre">multiprocessing</span></code> calls.</p>
+</dd>
+<dt><strong>data_save_folder</strong><span class="classifier">string</span></dt><dd><p>Relative or absolute path into which to save the data created by
+the fitting process.</p>
+</dd>
+<dt><strong>plot_save_folder</strong><span class="classifier">string</span></dt><dd><p>Relative or absolute path, used to save plots generated as part
+of the PSF algorithm AUF perturbation parameters.</p>
+</dd>
+</dl>
+</dd>
+</dl>
+<p class="rubric">Methods Summary</p>
+<table class="autosummary longtable docutils align-default">
+<tbody>
+<tr class="row-odd"><td><p><a class="reference internal" href="#macauff.FitPSFPerturbations.__call__" title="macauff.FitPSFPerturbations.__call__"><code class="xref py py-obj docutils literal notranslate"><span class="pre">__call__</span></code></a>(run_initial_Ld, run_skew_fit, ...)</p></td>
+<td><p>Call function for FitPSFPerturbations.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#macauff.FitPSFPerturbations.dd_combined_fit" title="macauff.FitPSFPerturbations.dd_combined_fit"><code class="xref py py-obj docutils literal notranslate"><span class="pre">dd_combined_fit</span></code></a>(p, x, L, l_cut)</p></td>
+<td><p>Wrapper function for calculating the combined description of the perturber offsets as a linear relation up to a particular offset and a skew-normal distribution beyond that.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#macauff.FitPSFPerturbations.dd_fitting_wrapper" title="macauff.FitPSFPerturbations.dd_fitting_wrapper"><code class="xref py py-obj docutils literal notranslate"><span class="pre">dd_fitting_wrapper</span></code></a>(iterable)</p></td>
+<td><p>Wrapper for fitting the parameters for the skew-normal distribution to a position offset-perturber position relationship of a particular flux value of perturber, via basinhopping.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#macauff.FitPSFPerturbations.fit_one_skew" title="macauff.FitPSFPerturbations.fit_one_skew"><code class="xref py py-obj docutils literal notranslate"><span class="pre">fit_one_skew</span></code></a>(p, x, L)</p></td>
+<td><p>Function used in the fitting of a skew-normal distribution, calculating the value of the skew-normal and its derivative with respect to its parameters at the given value.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#macauff.FitPSFPerturbations.fit_poly" title="macauff.FitPSFPerturbations.fit_poly"><code class="xref py py-obj docutils literal notranslate"><span class="pre">fit_poly</span></code></a>(p, x)</p></td>
+<td><p>Wrapper function for evaluating a polynomial with weights <code class="xref py py-obj docutils literal notranslate"><span class="pre">p</span></code> at all <code class="xref py py-obj docutils literal notranslate"><span class="pre">x</span></code>, <span class="math notranslate nohighlight">\(y_j = \sum_{i=0}^N p_i x_j^i\)</span>, and its derivative with respect to each parameter <code class="xref py py-obj docutils literal notranslate"><span class="pre">p</span></code>.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#macauff.FitPSFPerturbations.fit_polynomial_parameterisations" title="macauff.FitPSFPerturbations.fit_polynomial_parameterisations"><code class="xref py py-obj docutils literal notranslate"><span class="pre">fit_polynomial_parameterisations</span></code></a>()</p></td>
+<td><p>Function controlling the derivation of power law polynomial fits to skew-normal distribution parameters as a function of the relative flux of the perturber.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#macauff.FitPSFPerturbations.fit_skew_distributions" title="macauff.FitPSFPerturbations.fit_skew_distributions"><code class="xref py py-obj docutils literal notranslate"><span class="pre">fit_skew_distributions</span></code></a>()</p></td>
+<td><p>Function for fitting sets of position offsets as a function of perturber position with skew-normal distributions, accounting for a break at small offsets where relationship becomes linear, for each value of perturber relative flux.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#macauff.FitPSFPerturbations.hess_dd_fit_xy" title="macauff.FitPSFPerturbations.hess_dd_fit_xy"><code class="xref py py-obj docutils literal notranslate"><span class="pre">hess_dd_fit_xy</span></code></a>(p, L, xis, yis, Lis, sig)</p></td>
+<td><p>Second-order derivatives of the fit of one PSF model to two or more simulated sources, following the minimisation routine <code class="docutils literal notranslate"><span class="pre">min_dd_fit_xy</span></code>.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#macauff.FitPSFPerturbations.loop_ind_fit" title="macauff.FitPSFPerturbations.loop_ind_fit"><code class="xref py py-obj docutils literal notranslate"><span class="pre">loop_ind_fit</span></code></a>(iterable)</p></td>
+<td><p>Wrapper function for fitting perturbation offset and flux brightening of one PSF model fit to multiple unresolved objects, for arbitrary relative flux and position.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#macauff.FitPSFPerturbations.make_initial_Ld_perturbations" title="macauff.FitPSFPerturbations.make_initial_Ld_perturbations"><code class="xref py py-obj docutils literal notranslate"><span class="pre">make_initial_Ld_perturbations</span></code></a>()</p></td>
+<td><p>Derive full perturbations due to additional blended object within PSF for a matrix of relative flux-positional offset combinations.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#macauff.FitPSFPerturbations.min_dd_fit_xy" title="macauff.FitPSFPerturbations.min_dd_fit_xy"><code class="xref py py-obj docutils literal notranslate"><span class="pre">min_dd_fit_xy</span></code></a>(p, L, xis, yis, Lis, sig)</p></td>
+<td><p>Minimisation function for fitting one PSF model to two or more simulated sources, including the first-order derivatives with respect to position offset and flux brightening of the single PSF.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#macauff.FitPSFPerturbations.min_parallel_dd_fit" title="macauff.FitPSFPerturbations.min_parallel_dd_fit"><code class="xref py py-obj docutils literal notranslate"><span class="pre">min_parallel_dd_fit</span></code></a>(iterable)</p></td>
+<td><p>Wrapper for minimisation routine used in fitting for positional offset caused by fitting two blended sources with a single PSF model.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#macauff.FitPSFPerturbations.min_parallel_dd_param_fit" title="macauff.FitPSFPerturbations.min_parallel_dd_param_fit"><code class="xref py py-obj docutils literal notranslate"><span class="pre">min_parallel_dd_param_fit</span></code></a>(iterable)</p></td>
+<td><p>Wrapper function for calculating the best-fit polynomial parameters for describing skew-normal distribution parameters as a function of relative perturber flux.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#macauff.FitPSFPerturbations.plot_fits" title="macauff.FitPSFPerturbations.plot_fits"><code class="xref py py-obj docutils literal notranslate"><span class="pre">plot_fits</span></code></a>()</p></td>
+<td><p>Visualisation function, plotting the various parameterisations fit in FitPSFPerturbations, enabling quality checks to be carried out.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#macauff.FitPSFPerturbations.psi" title="macauff.FitPSFPerturbations.psi"><code class="xref py py-obj docutils literal notranslate"><span class="pre">psi</span></code></a>(x, sig)</p></td>
+<td><p>Calculate Psi, the convolution of two PSFs <span class="math notranslate nohighlight">\(\phi\)</span> (equation 2, Plewa &amp; Sari, 2018, MNRAS, 476, 4372).</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#macauff.FitPSFPerturbations.return_ddparams" title="macauff.FitPSFPerturbations.return_ddparams"><code class="xref py py-obj docutils literal notranslate"><span class="pre">return_ddparams</span></code></a>(Li, l_cut, dd_params, N, N_ind)</p></td>
+<td><p>Convenience function for deriving skew-normal distribution parameters as a function of perturber flux from fit polynomial distributions.</p></td>
+</tr>
+</tbody>
+</table>
+<p class="rubric">Methods Documentation</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="macauff.FitPSFPerturbations.__call__">
+<span class="sig-name descname"><span class="pre">__call__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">run_initial_Ld</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">run_skew_fit</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">run_polynomial_fit</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">make_fit_plots</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">draw_sim_num</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">500000</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/macauff/derive_psf_auf_params.html#FitPSFPerturbations.__call__"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#macauff.FitPSFPerturbations.__call__" title="Link to this definition">¶</a></dt>
+<dd><p>Call function for FitPSFPerturbations.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><dl class="simple">
+<dt><strong>run_initial_Ld</strong><span class="classifier">boolean</span></dt><dd><p>Flag for whether to run the initial fitting of perturbation at
+various relative flux-distance combinations if data already exist.</p>
+</dd>
+<dt><strong>run_skew_fit</strong><span class="classifier">boolean</span></dt><dd><p>Toggle for whether to always run the fitting of each relative flux’s
+perturbation as a function of perturber position with a skew normal.</p>
+</dd>
+<dt><strong>run_polynomial_fit</strong><span class="classifier">boolean</span></dt><dd><p>Flag indicating whether to re-run fitting of skew normal parameters
+as a function of relative perturber flux even if already run
+previously.</p>
+</dd>
+<dt><strong>make_fit_plots</strong><span class="classifier">boolean</span></dt><dd><p>Controls whether summary plot is created for parameterisation run.</p>
+</dd>
+<dt><strong>draw_sim_num</strong><span class="classifier">integer, optional</span></dt><dd><p>Number of realisations to draw when plotting summary figure for
+goodness-of-fit distributions.</p>
+</dd>
+</dl>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="macauff.FitPSFPerturbations.dd_combined_fit">
+<span class="sig-name descname"><span class="pre">dd_combined_fit</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">p</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">x</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">L</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">l_cut</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/macauff/derive_psf_auf_params.html#FitPSFPerturbations.dd_combined_fit"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#macauff.FitPSFPerturbations.dd_combined_fit" title="Link to this definition">¶</a></dt>
+<dd><p>Wrapper function for calculating the combined description of the
+perturber offsets as a linear relation up to a particular offset
+and a skew-normal distribution beyond that.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><dl class="simple">
+<dt><strong>p</strong><span class="classifier">list</span></dt><dd><p>The values of the skew-normal distribution (sigma, mean, skewness,
+amplitude), as well as the cutoff radius inside which to follow
+a linear relation.</p>
+</dd>
+<dt><strong>x</strong><span class="classifier">numpy.ndarray</span></dt><dd><p>Values at which to evaluate the offset due to a blended perturber.</p>
+</dd>
+<dt><strong>L</strong><span class="classifier">float</span></dt><dd><p>Relative flux of the perturber as compared with the central object.</p>
+</dd>
+<dt><strong>l_cut</strong><span class="classifier">float</span></dt><dd><p>Cutoff relative flux, above which no skew-normal distribution is
+used at all.</p>
+</dd>
+</dl>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><dl class="simple">
+<dt><strong>y</strong><span class="classifier">numpy.ndarray</span></dt><dd><p>The composite perturbation function, linear within <code class="docutils literal notranslate"><span class="pre">p[-1]</span></code> and
+a skew-normal distribution outside.</p>
+</dd>
+</dl>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="macauff.FitPSFPerturbations.dd_fitting_wrapper">
+<span class="sig-name descname"><span class="pre">dd_fitting_wrapper</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">iterable</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/macauff/derive_psf_auf_params.html#FitPSFPerturbations.dd_fitting_wrapper"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#macauff.FitPSFPerturbations.dd_fitting_wrapper" title="Link to this definition">¶</a></dt>
+<dd><p>Wrapper for fitting the parameters for the skew-normal distribution
+to a position offset-perturber position relationship of a particular
+flux value of perturber, via basinhopping.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><dl class="simple">
+<dt><strong>iterable</strong><span class="classifier">list</span></dt><dd><p>List of values passed through <code class="docutils literal notranslate"><span class="pre">multiprocessing</span></code>, including the
+index into the relative flux array, the keywords passed through
+to <code class="xref py py-obj docutils literal notranslate"><span class="pre">basinhopping</span></code> (containing the method used, the arguments to
+pass to <code class="xref py py-obj docutils literal notranslate"><span class="pre">basinhopping</span></code>, and things like whether to compute the
+Jacobian), the number of basin hop iterations, starting argument
+values, and basin hop step size and “temperature”.</p>
+</dd>
+</dl>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><dl class="simple">
+<dt><strong>res</strong><span class="classifier">~`scipy.optimize.OptimizeResult`</span></dt><dd><p>The <code class="xref py py-obj docutils literal notranslate"><span class="pre">scipy</span></code> optimisation output containing the best-fit
+skew-normal parameters from all basins.</p>
+</dd>
+</dl>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="macauff.FitPSFPerturbations.fit_one_skew">
+<span class="sig-name descname"><span class="pre">fit_one_skew</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">p</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">x</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">L</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/macauff/derive_psf_auf_params.html#FitPSFPerturbations.fit_one_skew"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#macauff.FitPSFPerturbations.fit_one_skew" title="Link to this definition">¶</a></dt>
+<dd><p>Function used in the fitting of a skew-normal distribution, calculating
+the value of the skew-normal and its derivative with respect to its
+parameters at the given value.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><dl class="simple">
+<dt><strong>p</strong><span class="classifier">list</span></dt><dd><p>List of skew-normal parameters, the Gaussian sigma, mean, skewness
+and amplitude respectively.</p>
+</dd>
+<dt><strong>x</strong><span class="classifier">numpy.ndarray</span></dt><dd><p>Input values at which to evaluate the skew-normal distribution.</p>
+</dd>
+<dt><strong>L</strong><span class="classifier">float</span></dt><dd><p>Relative flux of perturber for which perturbation-position relations
+are being fit with the skew-normal distribution.</p>
+</dd>
+</dl>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><dl class="simple">
+<dt><strong>f</strong><span class="classifier">numpy.ndarray</span></dt><dd><p>The skew-normal distribution evaluated at all <code class="docutils literal notranslate"><span class="pre">x</span></code>.</p>
+</dd>
+<dt><strong>df</strong><span class="classifier">numpy.ndarray</span></dt><dd><p>The derivative of <code class="xref py py-obj docutils literal notranslate"><span class="pre">f</span></code> with respect to its Gaussian sigma, mean,
+skewness, and amplitude respectively.</p>
+</dd>
+</dl>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="macauff.FitPSFPerturbations.fit_poly">
+<span class="sig-name descname"><span class="pre">fit_poly</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">p</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">x</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/macauff/derive_psf_auf_params.html#FitPSFPerturbations.fit_poly"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#macauff.FitPSFPerturbations.fit_poly" title="Link to this definition">¶</a></dt>
+<dd><p>Wrapper function for evaluating a polynomial with weights <code class="xref py py-obj docutils literal notranslate"><span class="pre">p</span></code> at
+all <code class="xref py py-obj docutils literal notranslate"><span class="pre">x</span></code>, <span class="math notranslate nohighlight">\(y_j = \sum_{i=0}^N p_i x_j^i\)</span>, and its derivative with
+respect to each parameter <code class="xref py py-obj docutils literal notranslate"><span class="pre">p</span></code>.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><dl class="simple">
+<dt><strong>p</strong><span class="classifier">list or numpy.ndarray</span></dt><dd><p>The weights of the polynomial.</p>
+</dd>
+<dt><strong>x</strong><span class="classifier">numpy.ndarray</span></dt><dd><p>Values at which to calculate the polynomial.</p>
+</dd>
+</dl>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><dl class="simple">
+<dt><strong>y</strong><span class="classifier">numpy.ndarray</span></dt><dd><p>The evaluation of the polynomial with parameters <code class="xref py py-obj docutils literal notranslate"><span class="pre">p</span></code> at
+each <code class="xref py py-obj docutils literal notranslate"><span class="pre">x</span></code>.</p>
+</dd>
+<dt><strong>dy</strong><span class="classifier">list</span></dt><dd><p>The derivative of <code class="xref py py-obj docutils literal notranslate"><span class="pre">y</span></code> with respect to each <code class="xref py py-obj docutils literal notranslate"><span class="pre">p_i</span></code> parameter.</p>
+</dd>
+</dl>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="macauff.FitPSFPerturbations.fit_polynomial_parameterisations">
+<span class="sig-name descname"><span class="pre">fit_polynomial_parameterisations</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/macauff/derive_psf_auf_params.html#FitPSFPerturbations.fit_polynomial_parameterisations"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#macauff.FitPSFPerturbations.fit_polynomial_parameterisations" title="Link to this definition">¶</a></dt>
+<dd><p>Function controlling the derivation of power law polynomial fits to
+skew-normal distribution parameters as a function of the relative flux
+of the perturber.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="macauff.FitPSFPerturbations.fit_skew_distributions">
+<span class="sig-name descname"><span class="pre">fit_skew_distributions</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/macauff/derive_psf_auf_params.html#FitPSFPerturbations.fit_skew_distributions"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#macauff.FitPSFPerturbations.fit_skew_distributions" title="Link to this definition">¶</a></dt>
+<dd><p>Function for fitting sets of position offsets as a function of perturber
+position with skew-normal distributions, accounting for a break at small
+offsets where relationship becomes linear, for each value of perturber
+relative flux.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="macauff.FitPSFPerturbations.hess_dd_fit_xy">
+<span class="sig-name descname"><span class="pre">hess_dd_fit_xy</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">p</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">L</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">xis</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">yis</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">Lis</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">sig</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/macauff/derive_psf_auf_params.html#FitPSFPerturbations.hess_dd_fit_xy"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#macauff.FitPSFPerturbations.hess_dd_fit_xy" title="Link to this definition">¶</a></dt>
+<dd><p>Second-order derivatives of the fit of one PSF model to two or more
+simulated sources, following the minimisation routine <code class="docutils literal notranslate"><span class="pre">min_dd_fit_xy</span></code>.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><dl class="simple">
+<dt><strong>p</strong><span class="classifier">list</span></dt><dd><p>List of the current values of perturbation offset and
+flux brightening caused by all perturbers hidden within the
+central object’s PSF.</p>
+</dd>
+<dt><strong>L</strong><span class="classifier">float</span></dt><dd><p>Flux of the central object.</p>
+</dd>
+<dt><strong>xis</strong><span class="classifier">numpy.ndarray</span></dt><dd><p>x-axis positions of all perturbers being fit with a single PSF.</p>
+</dd>
+<dt><strong>yis</strong><span class="classifier">numpy.ndarray</span></dt><dd><p>Positions of perturbers in the opposing orthogonal axis.</p>
+</dd>
+<dt><strong>Lis</strong><span class="classifier">numpy.ndarray</span></dt><dd><p>Flux of perturbers relative to the central source flux <code class="docutils literal notranslate"><span class="pre">L</span></code>.</p>
+</dd>
+<dt><strong>sig</strong><span class="classifier">float</span></dt><dd><p>The Gaussian sigma of the PSFs being fit.</p>
+</dd>
+</dl>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><dl class="simple">
+<dt>numpy.ndarray</dt><dd><p>Negative of the Hessian of the log-likelihood fit between one PSF
+model and multiple injected blended sources.</p>
+</dd>
+</dl>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="macauff.FitPSFPerturbations.loop_ind_fit">
+<span class="sig-name descname"><span class="pre">loop_ind_fit</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">iterable</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/macauff/derive_psf_auf_params.html#FitPSFPerturbations.loop_ind_fit"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#macauff.FitPSFPerturbations.loop_ind_fit" title="Link to this definition">¶</a></dt>
+<dd><p>Wrapper function for fitting perturbation offset and flux brightening
+of one PSF model fit to multiple unresolved objects, for arbitrary
+relative flux and position.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><dl class="simple">
+<dt><strong>iterable</strong><span class="classifier">list</span></dt><dd><p>List passed through <code class="docutils literal notranslate"><span class="pre">multiprocessing</span></code>, containing the index of
+the fit, as well as PSF FWHM and Gaussian sigma, maximum relative
+flux at which skew-normal distributions still describe
+perturbation offsets, the array of skew-normal parameters as a
+function of relative flux, the polynomial order being fit, and
+an index into the polynomial order array.</p>
+</dd>
+</dl>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><dl class="simple">
+<dt><strong>i</strong><span class="classifier">integer</span></dt><dd><p>The index of the fit, looping through the number of simulations
+to draw.</p>
+</dd>
+<dt><strong>dx</strong><span class="classifier">float</span></dt><dd><p>The derived perturbation offset, normalised to the PSF sigma.</p>
+</dd>
+<dt><strong>Li</strong><span class="classifier">float</span></dt><dd><p>The randomly drawn relative flux of the perturbing object.</p>
+</dd>
+<dt><strong>x</strong><span class="classifier">float</span></dt><dd><p>Position of the perturbing object relative to the central source.</p>
+</dd>
+<dt><strong>ddparams</strong><span class="classifier">numpy.ndarray</span></dt><dd><p>The calculated skew-normal distribution parameters evaluated at
+the simulated <code class="xref py py-obj docutils literal notranslate"><span class="pre">Li</span></code> for the chosen polynomial order.</p>
+</dd>
+</dl>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="macauff.FitPSFPerturbations.make_initial_Ld_perturbations">
+<span class="sig-name descname"><span class="pre">make_initial_Ld_perturbations</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/macauff/derive_psf_auf_params.html#FitPSFPerturbations.make_initial_Ld_perturbations"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#macauff.FitPSFPerturbations.make_initial_Ld_perturbations" title="Link to this definition">¶</a></dt>
+<dd><p>Derive full perturbations due to additional blended object within PSF
+for a matrix of relative flux-positional offset combinations.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="macauff.FitPSFPerturbations.min_dd_fit_xy">
+<span class="sig-name descname"><span class="pre">min_dd_fit_xy</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">p</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">L</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">xis</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">yis</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">Lis</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">sig</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/macauff/derive_psf_auf_params.html#FitPSFPerturbations.min_dd_fit_xy"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#macauff.FitPSFPerturbations.min_dd_fit_xy" title="Link to this definition">¶</a></dt>
+<dd><p>Minimisation function for fitting one PSF model to two or more simulated
+sources, including the first-order derivatives with respect to position
+offset and flux brightening of the single PSF.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><dl class="simple">
+<dt><strong>p</strong><span class="classifier">list</span></dt><dd><p>List of the current values of perturbation offset and
+flux brightening caused by all perturbers hidden within the
+central object’s PSF.</p>
+</dd>
+<dt><strong>L</strong><span class="classifier">float</span></dt><dd><p>Flux of the central object.</p>
+</dd>
+<dt><strong>xis</strong><span class="classifier">numpy.ndarray</span></dt><dd><p>x-axis positions of all perturbers being fit with a single PSF.</p>
+</dd>
+<dt><strong>yis</strong><span class="classifier">numpy.ndarray</span></dt><dd><p>Positions of perturbers in the opposing orthogonal axis.</p>
+</dd>
+<dt><strong>Lis</strong><span class="classifier">numpy.ndarray</span></dt><dd><p>Flux of perturbers relative to the central source flux <code class="docutils literal notranslate"><span class="pre">L</span></code>.</p>
+</dd>
+<dt><strong>sig</strong><span class="classifier">float</span></dt><dd><p>The Gaussian sigma of the PSFs being fit.</p>
+</dd>
+</dl>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><dl class="simple">
+<dt>numpy.ndarray</dt><dd><p>Negative log-likelihood and its derivative with respect to position
+and flux offsets.</p>
+</dd>
+</dl>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="macauff.FitPSFPerturbations.min_parallel_dd_fit">
+<span class="sig-name descname"><span class="pre">min_parallel_dd_fit</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">iterable</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/macauff/derive_psf_auf_params.html#FitPSFPerturbations.min_parallel_dd_fit"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#macauff.FitPSFPerturbations.min_parallel_dd_fit" title="Link to this definition">¶</a></dt>
+<dd><p>Wrapper for minimisation routine used in fitting for positional
+offset caused by fitting two blended sources with a single PSF model.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><dl class="simple">
+<dt><strong>iterable</strong><span class="classifier">list</span></dt><dd><p>List of inputs from <code class="docutils literal notranslate"><span class="pre">multiprocessing</span></code>, including indices into
+perturber position and flux arrays, the perturber parameter
+arrays, and the width of the Gaussian used in modelling the PSF.</p>
+</dd>
+</dl>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><dl class="simple">
+<dt><strong>i</strong><span class="classifier">integer</span></dt><dd><p>The index into the relative flux array for this particular call.</p>
+</dd>
+<dt><strong>j</strong><span class="classifier">integer</span></dt><dd><p>The perturber positional offset array index.</p>
+</dd>
+<dt><strong>res</strong><span class="classifier">~`scipy.optimize.OptimizeResult`</span></dt><dd><p>The <code class="xref py py-obj docutils literal notranslate"><span class="pre">scipy</span></code> optimisation output.</p>
+</dd>
+</dl>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="macauff.FitPSFPerturbations.min_parallel_dd_param_fit">
+<span class="sig-name descname"><span class="pre">min_parallel_dd_param_fit</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">iterable</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/macauff/derive_psf_auf_params.html#FitPSFPerturbations.min_parallel_dd_param_fit"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#macauff.FitPSFPerturbations.min_parallel_dd_param_fit" title="Link to this definition">¶</a></dt>
+<dd><p>Wrapper function for calculating the best-fit polynomial parameters
+for describing skew-normal distribution parameters as a function of
+relative perturber flux.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><dl class="simple">
+<dt><strong>iterable</strong><span class="classifier">list</span></dt><dd><p>The parameters passed through <code class="docutils literal notranslate"><span class="pre">multiprocessing</span></code>, including
+index of polynomial order, the list of polynomial orders being
+fit across all parallel threads, the set of skew-normal
+distribution parameters at all fluxes, the fluxes evaluated for
+perturbation offsets, and the maximum perturber position.</p>
+</dd>
+</dl>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><dl class="simple">
+<dt><strong>j</strong><span class="classifier">integer</span></dt><dd><p>The index into the polynomial order array.</p>
+</dd>
+<dt><strong>N</strong><span class="classifier">integer</span></dt><dd><p>The polynomial order being fit.</p>
+</dd>
+<dt><strong>resses</strong><span class="classifier">list</span></dt><dd><p>A list containing the best-fit polynomial weights for each
+parameters in the skew-normal distributuon (Gaussian sigma, mean,
+skewness, amplitude) and linear-regime radius cutoff.</p>
+</dd>
+</dl>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="macauff.FitPSFPerturbations.plot_fits">
+<span class="sig-name descname"><span class="pre">plot_fits</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/macauff/derive_psf_auf_params.html#FitPSFPerturbations.plot_fits"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#macauff.FitPSFPerturbations.plot_fits" title="Link to this definition">¶</a></dt>
+<dd><p>Visualisation function, plotting the various parameterisations fit in
+FitPSFPerturbations, enabling quality checks to be carried out.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="macauff.FitPSFPerturbations.psi">
+<span class="sig-name descname"><span class="pre">psi</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">x</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">sig</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/macauff/derive_psf_auf_params.html#FitPSFPerturbations.psi"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#macauff.FitPSFPerturbations.psi" title="Link to this definition">¶</a></dt>
+<dd><p>Calculate Psi, the convolution of two PSFs <span class="math notranslate nohighlight">\(\phi\)</span> (equation 2,
+Plewa &amp; Sari, 2018, MNRAS, 476, 4372).</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><dl class="simple">
+<dt><strong>x</strong><span class="classifier">numpy.ndarray</span></dt><dd><p>Separation at which to evaluate the phi convolution. The first
+axis should contain the cartesian x- and y-axis positions, with
+each unique object filling the subsequent axes.</p>
+</dd>
+<dt><strong>sig</strong><span class="classifier">float</span></dt><dd><p>Gaussian sigma of the PSFs being convolved.</p>
+</dd>
+</dl>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><dl class="simple">
+<dt>numpy.ndarray</dt><dd><p>The convolution of two PSFs <span class="math notranslate nohighlight">\(\phi\)</span> evaluated at <code class="xref py py-obj docutils literal notranslate"><span class="pre">x</span></code>.</p>
+</dd>
+</dl>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="macauff.FitPSFPerturbations.return_ddparams">
+<span class="sig-name descname"><span class="pre">return_ddparams</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">Li</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">l_cut</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dd_params</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">N</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">N_ind</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/macauff/derive_psf_auf_params.html#FitPSFPerturbations.return_ddparams"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#macauff.FitPSFPerturbations.return_ddparams" title="Link to this definition">¶</a></dt>
+<dd><p>Convenience function for deriving skew-normal distribution parameters
+as a function of perturber flux from fit polynomial distributions.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><dl class="simple">
+<dt><strong>Li</strong><span class="classifier">float</span></dt><dd><p>The flux of the perturber relative to the flux of the central source.</p>
+</dd>
+<dt><strong>l_cut</strong><span class="classifier">list or numpy.ndarray</span></dt><dd><p>List of key cut-off relative fluxes, at which parameterisations of
+perturber effects change.</p>
+</dd>
+<dt><strong>dd_params</strong><span class="classifier">numpy.ndarray</span></dt><dd><p>Array of polynomial weights for each skew-normal distribution
+parameter, for multiple polynomial orders, for parameterisations
+above and below <code class="docutils literal notranslate"><span class="pre">l_cut[1]</span></code>.</p>
+</dd>
+<dt><strong>N</strong><span class="classifier">integer</span></dt><dd><p>Number of polynomial terms being used to calculate the skew-normal
+distribution values.</p>
+</dd>
+<dt><strong>N_ind</strong><span class="classifier">integer</span></dt><dd><p>Index of the chosen number of polynomial terms in <code class="docutils literal notranslate"><span class="pre">dd_params</span></code>.</p>
+</dd>
+</dl>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><dl class="simple">
+<dt><strong>dd_skew_params</strong><span class="classifier">numpy.ndarray</span></dt><dd><p>Values of the skew-normal sigma, mean, skewness, and amplitude,
+evaluated at <code class="xref py py-obj docutils literal notranslate"><span class="pre">Li</span></code>, from a polynomial of order <code class="xref py py-obj docutils literal notranslate"><span class="pre">N+1</span></code>.</p>
+</dd>
+</dl>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+</section>
+
+
+            <div class="clearer"></div>
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="../f-modindex.html" title="Fortran Module Index"
+             >fortran modules</a> |</li>
+        <li class="right" >
+          <a href="../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="right" >
+          <a href="macauff.tests.generate_random_data.html" title="generate_random_data"
+             >next</a> |</li>
+        <li class="right" >
+          <a href="macauff.CrossMatch.html" title="CrossMatch"
+             >previous</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../index.html">macauff</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../macauff.html" ><code class="docutils literal notranslate"><span class="pre">macauff</span></code> Documentation</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">FitPSFPerturbations</a></li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+    &#169; Copyright 2022, Tom J Wilson.
+      Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 7.2.6.
+    </div>
+  </body>
+</html>

@@ -1,0 +1,576 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="../../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>macauff.photometric_likelihood &#8212; macauff</title>
+    <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=4848ba22" />
+    <link rel="stylesheet" type="text/css" href="../../_static/pyramid.css?v=a5b9c134" />
+    <link rel="stylesheet" type="text/css" href="../../_static/graphviz.css?v=eafc0fe6" />
+    <script src="../../_static/documentation_options.js?v=5929fcd5"></script>
+    <script src="../../_static/doctools.js?v=888ff710"></script>
+    <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Neuton&amp;subset=latin" type="text/css" media="screen" charset="utf-8" />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Nobile:regular,italic,bold,bolditalic&amp;subset=latin" type="text/css" media="screen" charset="utf-8" />
+<!--[if lte IE 6]>
+<link rel="stylesheet" href="../../_static/ie6.css" type="text/css" media="screen" charset="utf-8" />
+<![endif]-->
+
+  </head><body>
+
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="../../f-modindex.html" title="Fortran Module Index"
+             >fortran modules</a> |</li>
+        <li class="right" >
+          <a href="../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../index.html">macauff</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../index.html" accesskey="U">Module code</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">macauff.photometric_likelihood</a></li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <h1>Source code for macauff.photometric_likelihood</h1><div class="highlight"><pre>
+<span></span><span class="c1"># Licensed under a 3-clause BSD style license - see LICENSE</span>
+<span class="sd">&#39;&#39;&#39;</span>
+<span class="sd">This module provides the framework for the creation of the photometric likelihoods</span>
+<span class="sd">used in the cross-matching of the two catalogues.</span>
+<span class="sd">&#39;&#39;&#39;</span>
+
+<span class="kn">import</span> <span class="nn">sys</span>
+<span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+
+<span class="kn">from</span> <span class="nn">.misc_functions</span> <span class="kn">import</span> <span class="n">StageData</span>
+<span class="kn">from</span> <span class="nn">.misc_functions_fortran</span> <span class="kn">import</span> <span class="n">misc_functions_fortran</span> <span class="k">as</span> <span class="n">mff</span>
+<span class="kn">from</span> <span class="nn">.photometric_likelihood_fortran</span> <span class="kn">import</span> <span class="n">photometric_likelihood_fortran</span> <span class="k">as</span> <span class="n">plf</span>
+
+<span class="n">__all__</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;compute_photometric_likelihoods&#39;</span><span class="p">]</span>
+
+
+<div class="viewcode-block" id="compute_photometric_likelihoods">
+<a class="viewcode-back" href="../../api/macauff.compute_photometric_likelihoods.html#macauff.compute_photometric_likelihoods">[docs]</a>
+<span class="k">def</span> <span class="nf">compute_photometric_likelihoods</span><span class="p">(</span><span class="n">joint_folder_path</span><span class="p">,</span> <span class="n">a_cat_folder_path</span><span class="p">,</span> <span class="n">b_cat_folder_path</span><span class="p">,</span>
+                                    <span class="n">afilts</span><span class="p">,</span> <span class="n">bfilts</span><span class="p">,</span> <span class="n">cf_points</span><span class="p">,</span> <span class="n">cf_areas</span><span class="p">,</span> <span class="n">include_phot_like</span><span class="p">,</span>
+                                    <span class="n">use_phot_priors</span><span class="p">,</span> <span class="n">group_sources_data</span><span class="p">,</span> <span class="n">bright_frac</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+                                    <span class="n">field_frac</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&#39;&#39;&#39;</span>
+<span class="sd">    Derives the photometric likelihoods and priors for use in the catalogue</span>
+<span class="sd">    cross-match process.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    joint_folder_path : string</span>
+<span class="sd">        The folder where all folders and files created during the cross-match</span>
+<span class="sd">        process are stored.</span>
+<span class="sd">    a_cat_folder_path : string</span>
+<span class="sd">        The folder where the input data for catalogue &quot;a&quot; are located.</span>
+<span class="sd">    b_cat_folder_path : string</span>
+<span class="sd">        The location of catalogue &quot;b&quot;&#39;s input data.</span>
+<span class="sd">    afilts : list of string</span>
+<span class="sd">        A list of the filters in catalogue &quot;a&quot;&#39;s photometric data file.</span>
+<span class="sd">    bfilts : list of string</span>
+<span class="sd">        List of catalogue &quot;b&quot;&#39;s filters.</span>
+<span class="sd">    cf_points : numpy.ndarray</span>
+<span class="sd">        The on-sky coordinates that define the locations of each small</span>
+<span class="sd">        set of sources to be used to derive the relative match and non-match</span>
+<span class="sd">        photometric likelihoods.</span>
+<span class="sd">    cf_areas : numpy.ndarray</span>
+<span class="sd">        The areas of closest on-sky separation surrounding each point in</span>
+<span class="sd">        ``cf_points``, used to normalise numbers of sources to sky densities.</span>
+<span class="sd">    include_phot_like : boolean</span>
+<span class="sd">        Flag to indicate whether to derive astrophysical likelihoods ``c`` and</span>
+<span class="sd">        ``f``, based on the common coevality of sources of given magnitudes.</span>
+<span class="sd">    use_phot_priors : boolean</span>
+<span class="sd">        Indicator as to whether to use astrophysical priors, based on the common</span>
+<span class="sd">        number of likely matches and non-matches in each ``cf_points`` area, or</span>
+<span class="sd">        use naive, asymmetric priors solely based on number density of sources.</span>
+<span class="sd">    group_sources_data : class.StageData</span>
+<span class="sd">        Object containing all outputs from ``make_island_groupings``</span>
+<span class="sd">        TODO Improve description</span>
+<span class="sd">    bright_frac : float, optional</span>
+<span class="sd">        Expected fraction of sources inside the &quot;bright&quot; error circles used to</span>
+<span class="sd">        construct the counterpart distribution, to correct for missing numbers.</span>
+<span class="sd">        If ``include_phot_like`` or ``use_phot_prior`` is True then this must</span>
+<span class="sd">        be supplied, otherwise it can be omitted.</span>
+<span class="sd">    field_frac : float, optional</span>
+<span class="sd">        Expected fraction of sources inside the &quot;field&quot; error circles used to</span>
+<span class="sd">        construct the counterpart distribution, to correct for missing numbers.</span>
+<span class="sd">        If ``include_phot_like`` or ``use_phot_prior`` is True then this must</span>
+<span class="sd">        be supplied, otherwise it can be omitted.</span>
+<span class="sd">    &#39;&#39;&#39;</span>
+
+    <span class="k">if</span> <span class="n">bright_frac</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">and</span> <span class="p">(</span><span class="n">include_phot_like</span> <span class="ow">or</span> <span class="n">use_phot_priors</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;bright_frac must be supplied if include_phot_like or use_phot_priors &quot;</span>
+                         <span class="s2">&quot;is set to True. Please supply an appropriate fraction.&quot;</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">field_frac</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">and</span> <span class="p">(</span><span class="n">include_phot_like</span> <span class="ow">or</span> <span class="n">use_phot_priors</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;field_frac must be supplied if include_phot_like or use_phot_priors &quot;</span>
+                         <span class="s2">&quot;is set to True. Please supply an appropriate fraction.&quot;</span><span class="p">)</span>
+
+    <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Creating c(m, m) and f(m)...&quot;</span><span class="p">)</span>
+
+    <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Distributing sources into sky slices...&quot;</span><span class="p">)</span>
+    <span class="n">sys</span><span class="o">.</span><span class="n">stdout</span><span class="o">.</span><span class="n">flush</span><span class="p">()</span>
+
+    <span class="n">a_astro</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="s1">&#39;</span><span class="si">{}</span><span class="s1">/con_cat_astro.npy&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">a_cat_folder_path</span><span class="p">))</span>
+    <span class="n">b_astro</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="s1">&#39;</span><span class="si">{}</span><span class="s1">/con_cat_astro.npy&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">b_cat_folder_path</span><span class="p">))</span>
+    <span class="n">a_photo</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="s1">&#39;</span><span class="si">{}</span><span class="s1">/con_cat_photo.npy&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">a_cat_folder_path</span><span class="p">))</span>
+    <span class="n">b_photo</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="s1">&#39;</span><span class="si">{}</span><span class="s1">/con_cat_photo.npy&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">b_cat_folder_path</span><span class="p">))</span>
+
+    <span class="n">a_sky_inds</span> <span class="o">=</span> <span class="n">mff</span><span class="o">.</span><span class="n">find_nearest_point</span><span class="p">(</span><span class="n">a_astro</span><span class="p">[:,</span> <span class="mi">0</span><span class="p">],</span> <span class="n">a_astro</span><span class="p">[:,</span> <span class="mi">1</span><span class="p">],</span> <span class="n">cf_points</span><span class="p">[:,</span> <span class="mi">0</span><span class="p">],</span>
+                                        <span class="n">cf_points</span><span class="p">[:,</span> <span class="mi">1</span><span class="p">])</span>
+    <span class="n">b_sky_inds</span> <span class="o">=</span> <span class="n">mff</span><span class="o">.</span><span class="n">find_nearest_point</span><span class="p">(</span><span class="n">b_astro</span><span class="p">[:,</span> <span class="mi">0</span><span class="p">],</span> <span class="n">b_astro</span><span class="p">[:,</span> <span class="mi">1</span><span class="p">],</span> <span class="n">cf_points</span><span class="p">[:,</span> <span class="mi">0</span><span class="p">],</span>
+                                        <span class="n">cf_points</span><span class="p">[:,</span> <span class="mi">1</span><span class="p">])</span>
+
+    <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Making bins...&quot;</span><span class="p">)</span>
+    <span class="n">sys</span><span class="o">.</span><span class="n">stdout</span><span class="o">.</span><span class="n">flush</span><span class="p">()</span>
+
+    <span class="n">abinlengths</span><span class="p">,</span> <span class="n">abinsarray</span><span class="p">,</span> <span class="n">longabinlen</span> <span class="o">=</span> <span class="n">create_magnitude_bins</span><span class="p">(</span>
+        <span class="n">cf_points</span><span class="p">,</span> <span class="n">afilts</span><span class="p">,</span> <span class="n">a_photo</span><span class="p">,</span> <span class="n">joint_folder_path</span><span class="p">,</span> <span class="n">a_cat_folder_path</span><span class="p">,</span> <span class="s1">&#39;a&#39;</span><span class="p">,</span> <span class="n">a_sky_inds</span><span class="p">,</span>
+        <span class="n">include_phot_like</span> <span class="ow">or</span> <span class="n">use_phot_priors</span><span class="p">,</span> <span class="n">group_sources_data</span><span class="o">.</span><span class="n">ablen</span><span class="p">,</span>
+        <span class="n">group_sources_data</span><span class="o">.</span><span class="n">ainds</span><span class="p">,</span> <span class="n">group_sources_data</span><span class="o">.</span><span class="n">asize</span><span class="p">)</span>
+    <span class="n">bbinlengths</span><span class="p">,</span> <span class="n">bbinsarray</span><span class="p">,</span> <span class="n">longbbinlen</span> <span class="o">=</span> <span class="n">create_magnitude_bins</span><span class="p">(</span>
+        <span class="n">cf_points</span><span class="p">,</span> <span class="n">bfilts</span><span class="p">,</span> <span class="n">b_photo</span><span class="p">,</span> <span class="n">joint_folder_path</span><span class="p">,</span> <span class="n">b_cat_folder_path</span><span class="p">,</span> <span class="s1">&#39;b&#39;</span><span class="p">,</span> <span class="n">b_sky_inds</span><span class="p">,</span>
+        <span class="n">include_phot_like</span> <span class="ow">or</span> <span class="n">use_phot_priors</span><span class="p">,</span> <span class="n">group_sources_data</span><span class="o">.</span><span class="n">bblen</span><span class="p">,</span>
+        <span class="n">group_sources_data</span><span class="o">.</span><span class="n">binds</span><span class="p">,</span> <span class="n">group_sources_data</span><span class="o">.</span><span class="n">bsize</span><span class="p">)</span>
+
+    <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Calculating PDFs...&quot;</span><span class="p">)</span>
+    <span class="n">sys</span><span class="o">.</span><span class="n">stdout</span><span class="o">.</span><span class="n">flush</span><span class="p">()</span>
+
+    <span class="n">c_priors</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">dtype</span><span class="o">=</span><span class="nb">float</span><span class="p">,</span> <span class="n">shape</span><span class="o">=</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">bfilts</span><span class="p">),</span> <span class="nb">len</span><span class="p">(</span><span class="n">afilts</span><span class="p">),</span> <span class="nb">len</span><span class="p">(</span><span class="n">cf_points</span><span class="p">)),</span> <span class="n">order</span><span class="o">=</span><span class="s1">&#39;F&#39;</span><span class="p">)</span>
+    <span class="n">fa_priors</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">dtype</span><span class="o">=</span><span class="nb">float</span><span class="p">,</span> <span class="n">shape</span><span class="o">=</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">bfilts</span><span class="p">),</span> <span class="nb">len</span><span class="p">(</span><span class="n">afilts</span><span class="p">),</span> <span class="nb">len</span><span class="p">(</span><span class="n">cf_points</span><span class="p">)),</span> <span class="n">order</span><span class="o">=</span><span class="s1">&#39;F&#39;</span><span class="p">)</span>
+    <span class="n">fb_priors</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">dtype</span><span class="o">=</span><span class="nb">float</span><span class="p">,</span> <span class="n">shape</span><span class="o">=</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">bfilts</span><span class="p">),</span> <span class="nb">len</span><span class="p">(</span><span class="n">afilts</span><span class="p">),</span> <span class="nb">len</span><span class="p">(</span><span class="n">cf_points</span><span class="p">)),</span> <span class="n">order</span><span class="o">=</span><span class="s1">&#39;F&#39;</span><span class="p">)</span>
+    <span class="n">c_array</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">dtype</span><span class="o">=</span><span class="nb">float</span><span class="p">,</span> <span class="n">shape</span><span class="o">=</span><span class="p">(</span><span class="n">longbbinlen</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="n">longabinlen</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">bfilts</span><span class="p">),</span> <span class="nb">len</span><span class="p">(</span><span class="n">afilts</span><span class="p">),</span>
+                       <span class="nb">len</span><span class="p">(</span><span class="n">cf_points</span><span class="p">)),</span> <span class="n">order</span><span class="o">=</span><span class="s1">&#39;F&#39;</span><span class="p">)</span>
+    <span class="n">fa_array</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">dtype</span><span class="o">=</span><span class="nb">float</span><span class="p">,</span> <span class="n">shape</span><span class="o">=</span><span class="p">(</span><span class="n">longabinlen</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">bfilts</span><span class="p">),</span> <span class="nb">len</span><span class="p">(</span><span class="n">afilts</span><span class="p">),</span>
+                                            <span class="nb">len</span><span class="p">(</span><span class="n">cf_points</span><span class="p">)),</span> <span class="n">order</span><span class="o">=</span><span class="s1">&#39;F&#39;</span><span class="p">)</span>
+    <span class="n">fb_array</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">dtype</span><span class="o">=</span><span class="nb">float</span><span class="p">,</span> <span class="n">shape</span><span class="o">=</span><span class="p">(</span><span class="n">longbbinlen</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">bfilts</span><span class="p">),</span> <span class="nb">len</span><span class="p">(</span><span class="n">afilts</span><span class="p">),</span>
+                                            <span class="nb">len</span><span class="p">(</span><span class="n">cf_points</span><span class="p">)),</span> <span class="n">order</span><span class="o">=</span><span class="s1">&#39;F&#39;</span><span class="p">)</span>
+
+    <span class="n">ablen</span> <span class="o">=</span> <span class="n">group_sources_data</span><span class="o">.</span><span class="n">ablen</span>
+    <span class="n">aflen</span> <span class="o">=</span> <span class="n">group_sources_data</span><span class="o">.</span><span class="n">aflen</span>
+    <span class="n">bflen</span> <span class="o">=</span> <span class="n">group_sources_data</span><span class="o">.</span><span class="n">bflen</span>
+    <span class="n">ainds</span> <span class="o">=</span> <span class="n">group_sources_data</span><span class="o">.</span><span class="n">ainds</span>
+    <span class="n">binds</span> <span class="o">=</span> <span class="n">group_sources_data</span><span class="o">.</span><span class="n">binds</span>
+    <span class="n">asize</span> <span class="o">=</span> <span class="n">group_sources_data</span><span class="o">.</span><span class="n">asize</span>
+    <span class="n">bsize</span> <span class="o">=</span> <span class="n">group_sources_data</span><span class="o">.</span><span class="n">bsize</span>
+
+    <span class="k">for</span> <span class="n">m</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">cf_points</span><span class="p">)):</span>
+        <span class="n">area</span> <span class="o">=</span> <span class="n">cf_areas</span><span class="p">[</span><span class="n">m</span><span class="p">]</span>
+        <span class="n">a_sky_cut</span> <span class="o">=</span> <span class="n">a_sky_inds</span> <span class="o">==</span> <span class="n">m</span>
+        <span class="n">a_photo_cut</span> <span class="o">=</span> <span class="n">a_photo</span><span class="p">[</span><span class="n">a_sky_cut</span><span class="p">]</span>
+        <span class="k">if</span> <span class="n">include_phot_like</span> <span class="ow">or</span> <span class="n">use_phot_priors</span><span class="p">:</span>
+            <span class="n">a_blen_cut</span><span class="p">,</span> <span class="n">a_flen_cut</span><span class="p">,</span> <span class="n">a_inds_cut</span><span class="p">,</span> <span class="n">a_size_cut</span> <span class="o">=</span> <span class="p">(</span>
+                <span class="n">ablen</span><span class="p">[</span><span class="n">a_sky_cut</span><span class="p">],</span> <span class="n">aflen</span><span class="p">[</span><span class="n">a_sky_cut</span><span class="p">],</span> <span class="n">ainds</span><span class="p">[:,</span> <span class="n">a_sky_cut</span><span class="p">],</span> <span class="n">asize</span><span class="p">[</span><span class="n">a_sky_cut</span><span class="p">])</span>
+
+        <span class="n">b_sky_cut</span> <span class="o">=</span> <span class="n">b_sky_inds</span> <span class="o">==</span> <span class="n">m</span>
+        <span class="n">b_photo_cut</span> <span class="o">=</span> <span class="n">b_photo</span><span class="p">[</span><span class="n">b_sky_cut</span><span class="p">]</span>
+        <span class="k">if</span> <span class="n">include_phot_like</span> <span class="ow">or</span> <span class="n">use_phot_priors</span><span class="p">:</span>
+            <span class="n">b_flen_cut</span><span class="p">,</span> <span class="n">b_inds_cut</span><span class="p">,</span> <span class="n">b_size_cut</span> <span class="o">=</span> <span class="p">(</span>
+                <span class="n">bflen</span><span class="p">[</span><span class="n">b_sky_cut</span><span class="p">],</span> <span class="n">binds</span><span class="p">[:,</span> <span class="n">b_sky_cut</span><span class="p">],</span> <span class="n">bsize</span><span class="p">[</span><span class="n">b_sky_cut</span><span class="p">])</span>
+
+        <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">afilts</span><span class="p">)):</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">include_phot_like</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">use_phot_priors</span><span class="p">:</span>
+                <span class="n">a_num_photo_cut</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="o">~</span><span class="n">np</span><span class="o">.</span><span class="n">isnan</span><span class="p">(</span><span class="n">a_photo_cut</span><span class="p">[:,</span> <span class="n">i</span><span class="p">]))</span>
+                <span class="n">Na</span> <span class="o">=</span> <span class="n">a_num_photo_cut</span> <span class="o">/</span> <span class="n">area</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">a_bins</span> <span class="o">=</span> <span class="n">abinsarray</span><span class="p">[:</span><span class="n">abinlengths</span><span class="p">[</span><span class="n">i</span><span class="p">,</span> <span class="n">m</span><span class="p">],</span> <span class="n">i</span><span class="p">,</span> <span class="n">m</span><span class="p">]</span>
+                <span class="n">a_mag</span> <span class="o">=</span> <span class="n">a_photo</span><span class="p">[:,</span> <span class="n">i</span><span class="p">]</span>
+                <span class="n">a_flags</span> <span class="o">=</span> <span class="o">~</span><span class="n">np</span><span class="o">.</span><span class="n">isnan</span><span class="p">(</span><span class="n">a_mag</span><span class="p">)</span>
+            <span class="k">for</span> <span class="n">j</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">bfilts</span><span class="p">)):</span>
+                <span class="k">if</span> <span class="ow">not</span> <span class="n">include_phot_like</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">use_phot_priors</span><span class="p">:</span>
+                    <span class="n">b_num_photo_cut</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="o">~</span><span class="n">np</span><span class="o">.</span><span class="n">isnan</span><span class="p">(</span><span class="n">b_photo_cut</span><span class="p">[:,</span> <span class="n">j</span><span class="p">]))</span>
+                    <span class="n">Nb</span> <span class="o">=</span> <span class="n">b_num_photo_cut</span> <span class="o">/</span> <span class="n">area</span>
+                    <span class="c1"># Without using photometric-based priors, all we can</span>
+                    <span class="c1"># do is set the prior on one catalogue to 0.5 -- that</span>
+                    <span class="c1"># is, equal chance of match or non-match; for this we</span>
+                    <span class="c1"># use the less dense of the two catalogues as our</span>
+                    <span class="c1"># &quot;one-sided&quot; match. Then, accordingly, we update the</span>
+                    <span class="c1"># &quot;field&quot; source density of the more dense catalogue</span>
+                    <span class="c1"># with its corresponding density, based on the input</span>
+                    <span class="c1"># density and the counterpart density calculated.</span>
+                    <span class="n">c_prior</span> <span class="o">=</span> <span class="nb">min</span><span class="p">(</span><span class="n">Na</span><span class="p">,</span> <span class="n">Nb</span><span class="p">)</span> <span class="o">/</span> <span class="mi">2</span>
+                    <span class="n">fa_prior</span> <span class="o">=</span> <span class="n">Na</span> <span class="o">-</span> <span class="n">c_prior</span>
+                    <span class="n">fb_prior</span> <span class="o">=</span> <span class="n">Nb</span> <span class="o">-</span> <span class="n">c_prior</span>
+                    <span class="c1"># To fake no photometric likelihoods, simply set all</span>
+                    <span class="c1"># values to one, to cancel in the ratio later.</span>
+                    <span class="n">c_like</span><span class="p">,</span> <span class="n">fa_like</span><span class="p">,</span> <span class="n">fb_like</span> <span class="o">=</span> <span class="p">(</span><span class="mi">1</span><span class="o">-</span><span class="mf">1e-10</span><span class="p">)</span><span class="o">**</span><span class="mi">2</span><span class="p">,</span> <span class="mi">1</span><span class="o">-</span><span class="mf">1e-10</span><span class="p">,</span> <span class="mi">1</span><span class="o">-</span><span class="mf">1e-10</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="n">b_bins</span> <span class="o">=</span> <span class="n">bbinsarray</span><span class="p">[:</span><span class="n">bbinlengths</span><span class="p">[</span><span class="n">j</span><span class="p">,</span> <span class="n">m</span><span class="p">],</span> <span class="n">j</span><span class="p">,</span> <span class="n">m</span><span class="p">]</span>
+                    <span class="n">b_mag</span> <span class="o">=</span> <span class="n">b_photo</span><span class="p">[:,</span> <span class="n">j</span><span class="p">]</span>
+                    <span class="n">b_flags</span> <span class="o">=</span> <span class="o">~</span><span class="n">np</span><span class="o">.</span><span class="n">isnan</span><span class="p">(</span><span class="n">b_mag</span><span class="p">)</span>
+
+                    <span class="n">c_prior</span><span class="p">,</span> <span class="n">c_like</span><span class="p">,</span> <span class="n">fa_prior</span><span class="p">,</span> <span class="n">fa_like</span><span class="p">,</span> <span class="n">fb_prior</span><span class="p">,</span> <span class="n">fb_like</span> <span class="o">=</span> <span class="n">create_c_and_f</span><span class="p">(</span>
+                        <span class="n">a_astro</span><span class="p">,</span> <span class="n">b_astro</span><span class="p">,</span> <span class="n">a_mag</span><span class="p">,</span> <span class="n">b_mag</span><span class="p">,</span> <span class="n">a_inds_cut</span><span class="p">,</span> <span class="n">a_size_cut</span><span class="p">,</span>
+                        <span class="n">b_inds_cut</span><span class="p">,</span> <span class="n">b_size_cut</span><span class="p">,</span> <span class="n">a_blen_cut</span><span class="p">,</span> <span class="n">a_flen_cut</span><span class="p">,</span> <span class="n">b_flen_cut</span><span class="p">,</span>
+                        <span class="n">a_bins</span><span class="p">,</span> <span class="n">b_bins</span><span class="p">,</span> <span class="n">bright_frac</span><span class="p">,</span> <span class="n">field_frac</span><span class="p">,</span> <span class="n">a_flags</span><span class="p">,</span> <span class="n">b_flags</span><span class="p">,</span> <span class="n">area</span><span class="p">)</span>
+                <span class="k">if</span> <span class="n">use_phot_priors</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">include_phot_like</span><span class="p">:</span>
+                    <span class="c1"># If we only used the create_c_and_f routine to derive</span>
+                    <span class="c1"># priors, then quickly update likelihoods here.</span>
+                    <span class="n">c_like</span><span class="p">,</span> <span class="n">fa_like</span><span class="p">,</span> <span class="n">fb_like</span> <span class="o">=</span> <span class="p">(</span><span class="mi">1</span><span class="o">-</span><span class="mf">1e-10</span><span class="p">)</span><span class="o">**</span><span class="mi">2</span><span class="p">,</span> <span class="mi">1</span><span class="o">-</span><span class="mf">1e-10</span><span class="p">,</span> <span class="mi">1</span><span class="o">-</span><span class="mf">1e-10</span>
+
+                <span class="c1"># Have to add a very small &quot;fire extinguisher&quot; value to all</span>
+                <span class="c1"># likelihoods and priors, to avoid ever having exactly zero</span>
+                <span class="c1"># value in either, which would mean all island permutations</span>
+                <span class="c1"># were rejected.</span>
+                <span class="n">c_priors</span><span class="p">[</span><span class="n">j</span><span class="p">,</span> <span class="n">i</span><span class="p">,</span> <span class="n">m</span><span class="p">]</span> <span class="o">=</span> <span class="n">c_prior</span> <span class="o">+</span> <span class="mf">1e-100</span>
+                <span class="n">fa_priors</span><span class="p">[</span><span class="n">j</span><span class="p">,</span> <span class="n">i</span><span class="p">,</span> <span class="n">m</span><span class="p">]</span> <span class="o">=</span> <span class="n">fa_prior</span> <span class="o">+</span> <span class="mf">1e-10</span>
+                <span class="n">fb_priors</span><span class="p">[</span><span class="n">j</span><span class="p">,</span> <span class="n">i</span><span class="p">,</span> <span class="n">m</span><span class="p">]</span> <span class="o">=</span> <span class="n">fb_prior</span> <span class="o">+</span> <span class="mf">1e-10</span>
+                <span class="c1"># c should be equal to f^2 in the limit of indifference, so</span>
+                <span class="c1"># add 1e-10 and (1e-10)^2 to f and c respectively.</span>
+                <span class="n">c_array</span><span class="p">[:</span><span class="n">bbinlengths</span><span class="p">[</span><span class="n">j</span><span class="p">,</span> <span class="n">m</span><span class="p">]</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span>
+                        <span class="p">:</span><span class="n">abinlengths</span><span class="p">[</span><span class="n">i</span><span class="p">,</span> <span class="n">m</span><span class="p">]</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="n">j</span><span class="p">,</span> <span class="n">i</span><span class="p">,</span> <span class="n">m</span><span class="p">]</span> <span class="o">=</span> <span class="n">c_like</span> <span class="o">+</span> <span class="mf">1e-100</span>
+                <span class="n">fa_array</span><span class="p">[:</span><span class="n">abinlengths</span><span class="p">[</span><span class="n">i</span><span class="p">,</span> <span class="n">m</span><span class="p">]</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="n">j</span><span class="p">,</span> <span class="n">i</span><span class="p">,</span> <span class="n">m</span><span class="p">]</span> <span class="o">=</span> <span class="n">fa_like</span> <span class="o">+</span> <span class="mf">1e-10</span>
+                <span class="n">fb_array</span><span class="p">[:</span><span class="n">bbinlengths</span><span class="p">[</span><span class="n">j</span><span class="p">,</span> <span class="n">m</span><span class="p">]</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="n">j</span><span class="p">,</span> <span class="n">i</span><span class="p">,</span> <span class="n">m</span><span class="p">]</span> <span class="o">=</span> <span class="n">fb_like</span> <span class="o">+</span> <span class="mf">1e-10</span>
+
+    <span class="n">phot_like_data</span> <span class="o">=</span> <span class="n">StageData</span><span class="p">(</span><span class="n">abinsarray</span><span class="o">=</span><span class="n">abinsarray</span><span class="p">,</span> <span class="n">abinlengths</span><span class="o">=</span><span class="n">abinlengths</span><span class="p">,</span>
+                               <span class="n">bbinsarray</span><span class="o">=</span><span class="n">bbinsarray</span><span class="p">,</span> <span class="n">bbinlengths</span><span class="o">=</span><span class="n">bbinlengths</span><span class="p">,</span>
+                               <span class="n">a_sky_inds</span><span class="o">=</span><span class="n">a_sky_inds</span><span class="p">,</span> <span class="n">b_sky_inds</span><span class="o">=</span><span class="n">b_sky_inds</span><span class="p">,</span>
+                               <span class="n">c_priors</span><span class="o">=</span><span class="n">c_priors</span><span class="p">,</span> <span class="n">c_array</span><span class="o">=</span><span class="n">c_array</span><span class="p">,</span>
+                               <span class="n">fa_priors</span><span class="o">=</span><span class="n">fa_priors</span><span class="p">,</span> <span class="n">fa_array</span><span class="o">=</span><span class="n">fa_array</span><span class="p">,</span>
+                               <span class="n">fb_priors</span><span class="o">=</span><span class="n">fb_priors</span><span class="p">,</span> <span class="n">fb_array</span><span class="o">=</span><span class="n">fb_array</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">phot_like_data</span></div>
+
+
+
+<span class="k">def</span> <span class="nf">create_magnitude_bins</span><span class="p">(</span><span class="n">cf_points</span><span class="p">,</span> <span class="n">filts</span><span class="p">,</span> <span class="n">a_photo</span><span class="p">,</span> <span class="n">joint_folder_path</span><span class="p">,</span>
+                          <span class="n">cat_folder_path</span><span class="p">,</span> <span class="n">cat_type</span><span class="p">,</span> <span class="n">sky_inds</span><span class="p">,</span> <span class="n">load_extra_arrays</span><span class="p">,</span>
+                          <span class="n">blen_cutout</span><span class="p">,</span> <span class="n">inds_cutout</span><span class="p">,</span> <span class="n">size_cutout</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&#39;&#39;&#39;</span>
+<span class="sd">    Creates the N-dimensional arrays of single-band photometric bins, and</span>
+<span class="sd">    corresponding array lengths.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    cf_points : numpy.ndarray</span>
+<span class="sd">        List of the two-dimensional on-sky coordinates defining the centers</span>
+<span class="sd">        of each cutout for which the photometric likelihoods should be</span>
+<span class="sd">        calculated.</span>
+<span class="sd">    filts : list of strings</span>
+<span class="sd">        List of the filters to create magnitude bins for in this catalogue.</span>
+<span class="sd">    a_photo : numpy.ndarray</span>
+<span class="sd">        Photometric detections from which to create magnitude bins.</span>
+<span class="sd">    joint_folder_path : string</span>
+<span class="sd">        Location of top-level folder into which all intermediate files are</span>
+<span class="sd">        saved for the cross-match process.</span>
+<span class="sd">    cat_folder_path : string</span>
+<span class="sd">        Location of the input data for this catalogue.</span>
+<span class="sd">    cat_type : string</span>
+<span class="sd">        String to indicate which catalogue we are creating bins for, either</span>
+<span class="sd">        &quot;a&quot;, or &quot;b&quot;.</span>
+<span class="sd">    sky_inds : numpy.ndarray</span>
+<span class="sd">         Array of indices, showing which on-sky photometric point, from</span>
+<span class="sd">        ``cf_points``, each source in the catalogue is closest to.</span>
+<span class="sd">    load_extra_arrays : boolean</span>
+<span class="sd">        Flag to indicate whether the photometric information is being used in</span>
+<span class="sd">        the cross-match process, and whether to load additional arrays accordingly.</span>
+<span class="sd">    blen_cutout : numpy.ndarray</span>
+<span class="sd">        Output from ``group_sources``. Used only when ``load_extra_arrays`` is True.</span>
+<span class="sd">    inds_cutout : numpy.ndarray</span>
+<span class="sd">        Output from ``group_sources``. Used only when ``load_extra_arrays`` is True.</span>
+<span class="sd">    size_cutout : numpy.ndarray</span>
+<span class="sd">        Output from ``group_sources``. Used only when ``load_extra_arrays`` is True.</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    binlengths : numpy.ndarray</span>
+<span class="sd">        Two-dimensional array, indicating the length of the magnitude bins for</span>
+<span class="sd">        each filter-sky coordinate combination.</span>
+<span class="sd">    binsarray : numpy.ndarray</span>
+<span class="sd">        Three-dimensional array, containing the values of the magnitude bins for</span>
+<span class="sd">        the filter-sky combinations.</span>
+<span class="sd">    longbinlen : integer</span>
+<span class="sd">        Value of the largest of all filter-sky combinations of ``binlengths``.</span>
+<span class="sd">    &#39;&#39;&#39;</span>
+    <span class="n">binlengths</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">empty</span><span class="p">((</span><span class="nb">len</span><span class="p">(</span><span class="n">filts</span><span class="p">),</span> <span class="nb">len</span><span class="p">(</span><span class="n">cf_points</span><span class="p">)),</span> <span class="nb">int</span><span class="p">)</span>
+
+    <span class="k">for</span> <span class="n">m</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">cf_points</span><span class="p">)):</span>
+        <span class="n">sky_cut</span> <span class="o">=</span> <span class="n">sky_inds</span> <span class="o">==</span> <span class="n">m</span>
+        <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">filts</span><span class="p">)):</span>
+            <span class="n">a</span> <span class="o">=</span> <span class="n">a_photo</span><span class="p">[</span><span class="n">sky_cut</span><span class="p">,</span> <span class="n">i</span><span class="p">]</span>
+            <span class="k">if</span> <span class="n">np</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="o">~</span><span class="n">np</span><span class="o">.</span><span class="n">isnan</span><span class="p">(</span><span class="n">a</span><span class="p">))</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+                <span class="n">f</span> <span class="o">=</span> <span class="n">make_bins</span><span class="p">(</span><span class="n">a</span><span class="p">[</span><span class="o">~</span><span class="n">np</span><span class="o">.</span><span class="n">isnan</span><span class="p">(</span><span class="n">a</span><span class="p">)])</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">f</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mi">0</span><span class="p">])</span>
+            <span class="k">del</span> <span class="n">a</span>
+            <span class="n">binlengths</span><span class="p">[</span><span class="n">i</span><span class="p">,</span> <span class="n">m</span><span class="p">]</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">f</span><span class="p">)</span>
+
+    <span class="n">longbinlen</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">amax</span><span class="p">(</span><span class="n">binlengths</span><span class="p">)</span>
+
+    <span class="n">binsarray</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">full</span><span class="p">(</span><span class="n">dtype</span><span class="o">=</span><span class="nb">float</span><span class="p">,</span> <span class="n">shape</span><span class="o">=</span><span class="p">(</span><span class="n">longbinlen</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">filts</span><span class="p">),</span> <span class="nb">len</span><span class="p">(</span><span class="n">cf_points</span><span class="p">)),</span> <span class="n">fill_value</span><span class="o">=-</span><span class="mi">1</span><span class="p">,</span> <span class="n">order</span><span class="o">=</span><span class="s1">&#39;F&#39;</span><span class="p">)</span>
+    <span class="k">for</span> <span class="n">m</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">cf_points</span><span class="p">)):</span>
+        <span class="n">sky_cut</span> <span class="o">=</span> <span class="n">sky_inds</span> <span class="o">==</span> <span class="n">m</span>
+        <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">filts</span><span class="p">)):</span>
+            <span class="n">a</span> <span class="o">=</span> <span class="n">a_photo</span><span class="p">[</span><span class="n">sky_cut</span><span class="p">,</span> <span class="n">i</span><span class="p">]</span>
+            <span class="k">if</span> <span class="n">np</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="o">~</span><span class="n">np</span><span class="o">.</span><span class="n">isnan</span><span class="p">(</span><span class="n">a</span><span class="p">))</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+                <span class="n">f</span> <span class="o">=</span> <span class="n">make_bins</span><span class="p">(</span><span class="n">a</span><span class="p">[</span><span class="o">~</span><span class="n">np</span><span class="o">.</span><span class="n">isnan</span><span class="p">(</span><span class="n">a</span><span class="p">)])</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">f</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mi">0</span><span class="p">])</span>
+            <span class="k">del</span> <span class="n">a</span>
+            <span class="n">binsarray</span><span class="p">[:</span><span class="n">binlengths</span><span class="p">[</span><span class="n">i</span><span class="p">,</span> <span class="n">m</span><span class="p">],</span> <span class="n">i</span><span class="p">,</span> <span class="n">m</span><span class="p">]</span> <span class="o">=</span> <span class="n">f</span>
+
+    <span class="k">return</span> <span class="n">binlengths</span><span class="p">,</span> <span class="n">binsarray</span><span class="p">,</span> <span class="n">longbinlen</span>
+
+
+<span class="k">def</span> <span class="nf">make_bins</span><span class="p">(</span><span class="n">input_mags</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&#39;&#39;&#39;</span>
+<span class="sd">    Calculate bins for a catalogue&#39;s magnitude distribution, ensuring all stars</span>
+<span class="sd">    are in histogram bins of sufficient number statistics.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    input_mags : numpy.ndarray</span>
+<span class="sd">        Array of magnitudes of given filter from the specific catalogue, to be</span>
+<span class="sd">        placed in a histogram.</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    output_bins : numpy.ndarray</span>
+<span class="sd">        Bins for the given catalogue-filter combination that produce robust</span>
+<span class="sd">        numbers of sources within each magnitude interval.</span>
+<span class="sd">    &#39;&#39;&#39;</span>
+    <span class="n">minamag</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">amin</span><span class="p">(</span><span class="n">input_mags</span><span class="p">)</span>
+    <span class="n">maxamag</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">amax</span><span class="p">(</span><span class="n">input_mags</span><span class="p">)</span>
+    <span class="n">da</span> <span class="o">=</span> <span class="mf">0.1</span>
+    <span class="n">maxa</span> <span class="o">=</span> <span class="n">da</span><span class="o">*</span><span class="n">np</span><span class="o">.</span><span class="n">ceil</span><span class="p">(</span><span class="n">maxamag</span><span class="o">/</span><span class="n">da</span><span class="p">)</span>
+    <span class="n">mina</span> <span class="o">=</span> <span class="n">da</span><span class="o">*</span><span class="n">np</span><span class="o">.</span><span class="n">floor</span><span class="p">(</span><span class="n">minamag</span><span class="o">/</span><span class="n">da</span><span class="p">)</span>
+    <span class="n">na</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">ceil</span><span class="p">((</span><span class="n">maxa</span> <span class="o">-</span> <span class="n">mina</span><span class="p">)</span><span class="o">/</span><span class="n">da</span><span class="p">)</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)</span>
+    <span class="n">output_bins</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">linspace</span><span class="p">(</span><span class="n">mina</span><span class="p">,</span> <span class="n">maxa</span><span class="p">,</span> <span class="n">na</span><span class="p">)</span>
+    <span class="c1"># If min/max magnitudes that define magnitude bins happen to lie exactly</span>
+    <span class="c1"># on a bin edge (i.e., maxamag % da == 0), then just pad bin edge slightly.</span>
+    <span class="k">if</span> <span class="n">np</span><span class="o">.</span><span class="n">abs</span><span class="p">(</span><span class="n">mina</span> <span class="o">-</span> <span class="n">minamag</span><span class="p">)</span> <span class="o">&lt;</span> <span class="mf">1e-5</span><span class="p">:</span>
+        <span class="n">output_bins</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">-=</span> <span class="mf">1e-4</span>
+    <span class="k">if</span> <span class="n">np</span><span class="o">.</span><span class="n">abs</span><span class="p">(</span><span class="n">maxa</span> <span class="o">-</span> <span class="n">maxamag</span><span class="p">)</span> <span class="o">&lt;</span> <span class="mf">1e-5</span><span class="p">:</span>
+        <span class="n">output_bins</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">+=</span> <span class="mf">1e-4</span>
+
+    <span class="n">hist</span><span class="p">,</span> <span class="n">output_bins</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">histogram</span><span class="p">(</span><span class="n">input_mags</span><span class="p">,</span> <span class="n">bins</span><span class="o">=</span><span class="n">output_bins</span><span class="p">)</span>
+    <span class="n">smalllist</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="c1"># Minimum number statistics in each 1-D bin.</span>
+    <span class="n">minnum</span> <span class="o">=</span> <span class="mi">250</span>
+
+    <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">output_bins</span><span class="p">)</span><span class="o">-</span><span class="mi">1</span><span class="p">):</span>
+        <span class="k">if</span> <span class="n">hist</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">&lt;</span> <span class="n">minnum</span><span class="p">:</span>
+            <span class="n">smalllist</span><span class="o">.</span><span class="n">extend</span><span class="p">([</span><span class="n">i</span><span class="p">])</span>
+    <span class="n">smalllist</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">smalllist</span><span class="p">)</span>
+    <span class="n">dellist</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">smalllist</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">smalllist</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">i</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">dellist</span><span class="p">:</span>
+                <span class="n">flag</span> <span class="o">=</span> <span class="mi">0</span>
+                <span class="k">for</span> <span class="n">j</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">i</span><span class="o">+</span><span class="mi">1</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">output_bins</span><span class="p">)</span><span class="o">-</span><span class="mi">1</span><span class="p">):</span>
+                    <span class="k">if</span> <span class="n">np</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">hist</span><span class="p">[</span><span class="n">i</span><span class="p">:</span><span class="n">j</span><span class="o">+</span><span class="mi">1</span><span class="p">])</span> <span class="o">&gt;</span> <span class="n">minnum</span><span class="p">:</span>
+                        <span class="n">dellist</span><span class="o">.</span><span class="n">extend</span><span class="p">([</span><span class="n">k</span> <span class="k">for</span> <span class="n">k</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">i</span><span class="o">+</span><span class="mi">1</span><span class="p">,</span> <span class="n">j</span><span class="o">+</span><span class="mi">1</span><span class="p">)])</span>
+                        <span class="n">flag</span> <span class="o">=</span> <span class="mi">1</span>
+                        <span class="k">break</span>
+                <span class="k">if</span> <span class="n">flag</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+                    <span class="n">dellist</span><span class="o">.</span><span class="n">extend</span><span class="p">([</span><span class="n">k</span> <span class="k">for</span> <span class="n">k</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">i</span><span class="o">+</span><span class="mi">1</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">output_bins</span><span class="p">)</span><span class="o">-</span><span class="mi">1</span><span class="p">)])</span>
+    <span class="n">output_bins</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">delete</span><span class="p">(</span><span class="n">output_bins</span><span class="p">,</span> <span class="n">dellist</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">output_bins</span>
+
+
+<span class="k">def</span> <span class="nf">create_c_and_f</span><span class="p">(</span><span class="n">a_astro</span><span class="p">,</span> <span class="n">b_astro</span><span class="p">,</span> <span class="n">a_mag</span><span class="p">,</span> <span class="n">b_mag</span><span class="p">,</span> <span class="n">a_inds</span><span class="p">,</span> <span class="n">a_size</span><span class="p">,</span> <span class="n">b_inds</span><span class="p">,</span> <span class="n">b_size</span><span class="p">,</span> <span class="n">a_blen</span><span class="p">,</span>
+                   <span class="n">a_flen</span><span class="p">,</span> <span class="n">b_flen</span><span class="p">,</span> <span class="n">a_bins</span><span class="p">,</span> <span class="n">b_bins</span><span class="p">,</span> <span class="n">bright_frac</span><span class="p">,</span> <span class="n">field_frac</span><span class="p">,</span> <span class="n">a_flags</span><span class="p">,</span> <span class="n">b_flags</span><span class="p">,</span> <span class="n">area</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&#39;&#39;&#39;</span>
+<span class="sd">    Functionality to create the photometric likelihood and priors from a set</span>
+<span class="sd">    of photometric data in a given pair of filters.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    a_astro : numpy.ndarray</span>
+<span class="sd">        Array of astrometric parameters for all catalogue &quot;a&quot; sources in this</span>
+<span class="sd">        given sky slice.</span>
+<span class="sd">    b_astro : numpy.ndarray</span>
+<span class="sd">        Astrometric parameters for small sky region catalogue &quot;b&quot; objects.</span>
+<span class="sd">    a_mag : numpy.ndarray</span>
+<span class="sd">        Catalogue &quot;a&quot; magnitudes for sky area.</span>
+<span class="sd">    b_mag : numpy.ndarray</span>
+<span class="sd">        Catalogue &quot;b&quot; magnitudes for sources in sky region.</span>
+<span class="sd">    a_inds : numpy.ndarray</span>
+<span class="sd">        Indices into catalogue &quot;b&quot; for each &quot;a&quot; object, indicating potential</span>
+<span class="sd">        overlaps in counterparts.</span>
+<span class="sd">    a_size : numpy.ndarray</span>
+<span class="sd">        The number of potential overlapping sources in catalogue &quot;b&quot;, for each</span>
+<span class="sd">        catalogue &quot;a&quot; object.</span>
+<span class="sd">    b_inds : numpy.ndarray</span>
+<span class="sd">        Overlap indices into catalogue &quot;a&quot; for each catalogue &quot;b&quot; object.</span>
+<span class="sd">    b_size : numpy.ndarray</span>
+<span class="sd">        Number of overlaps from catalogue &quot;b&quot; into catalogue &quot;a&quot;.</span>
+<span class="sd">    a_blen : numpy.ndarray</span>
+<span class="sd">        The &quot;bright&quot; error circle radius, integrating the joint AUF convolution</span>
+<span class="sd">        out to ``expected_frac`` for largest &quot;a&quot;-&quot;b&quot; potential pairing, for each</span>
+<span class="sd">        catalogue &quot;a&quot; object.</span>
+<span class="sd">    a_flen : numpy.ndarray</span>
+<span class="sd">        The &quot;field&quot; error circle radius, integrating the joint AUF convolution</span>
+<span class="sd">        out to ``expected_frac`` for largest &quot;a&quot;-&quot;b&quot; potential pairing, for each</span>
+<span class="sd">        catalogue &quot;a&quot; object.</span>
+<span class="sd">    b_flen : numpy.ndarray</span>
+<span class="sd">        Catalogue b&#39;s &quot;field&quot; error circle radii.</span>
+<span class="sd">    a_bins : numpy.ndarray</span>
+<span class="sd">        Array containing the magnitude bins into which to place catalogue &quot;a&quot;</span>
+<span class="sd">        sources.</span>
+<span class="sd">    b_bins : numpy.ndarray</span>
+<span class="sd">        Array containing the magnitude bins into which to place catalogue &quot;b&quot;</span>
+<span class="sd">        sources.</span>
+<span class="sd">    bright_frac : float</span>
+<span class="sd">        Fraction of total probability integral to consider potential counterparts</span>
+<span class="sd">        out to, when considering potential overlaps between catalogue-catalogue</span>
+<span class="sd">        pairings.</span>
+<span class="sd">    field_frac : float</span>
+<span class="sd">        Fraction of total probability integral out to which sources are removed</span>
+<span class="sd">        from consideration as &quot;field&quot; sources (i.e., they are not assumed to be</span>
+<span class="sd">        ruled out as potential counterparts), when considering potential overlaps</span>
+<span class="sd">        in pairs of objects between the two catalogues.</span>
+<span class="sd">    a_flags : numpy.ndarray</span>
+<span class="sd">        Boolean flags for whether a source in catalogue &quot;a&quot; has a detected</span>
+<span class="sd">        magnitude in ``a_mag``.</span>
+<span class="sd">    b_flags : numpy.ndarray</span>
+<span class="sd">        Detection flags for catalogue &quot;b&quot; sources in ``b_mag``.</span>
+<span class="sd">    area : float</span>
+<span class="sd">        Area of sky region for which photometric likelihood and prior are</span>
+<span class="sd">        being calculated, in square degrees.</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    Nc : float</span>
+<span class="sd">        The prior density of counterpart sources between the catalogues.</span>
+<span class="sd">    cdmdm : numpy.ndarray</span>
+<span class="sd">        Two-dimensional array of the photometric likelihood of counterpart between</span>
+<span class="sd">        the two catalogues.</span>
+<span class="sd">    Nfa : float</span>
+<span class="sd">        So-called &quot;field&quot; source density in catalogue &quot;a&quot;.</span>
+<span class="sd">    fa : numpy.ndarray</span>
+<span class="sd">        Probability density array of field sources for catalogue &quot;a&quot;.</span>
+<span class="sd">    Nfb : float</span>
+<span class="sd">        Field source density prior for catalogue &quot;b&quot;.</span>
+<span class="sd">    fb : numpy.ndarray</span>
+<span class="sd">        Field source PDF for catalogue &quot;b&quot;.</span>
+<span class="sd">    &#39;&#39;&#39;</span>
+    <span class="n">a_hist</span><span class="p">,</span> <span class="n">a_bins</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">histogram</span><span class="p">(</span><span class="n">a_mag</span><span class="p">[</span><span class="n">a_flags</span><span class="p">],</span> <span class="n">bins</span><span class="o">=</span><span class="n">a_bins</span><span class="p">)</span>
+    <span class="n">pa</span> <span class="o">=</span> <span class="n">a_hist</span><span class="o">/</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">a_hist</span><span class="p">)</span><span class="o">*</span><span class="n">np</span><span class="o">.</span><span class="n">diff</span><span class="p">(</span><span class="n">a_bins</span><span class="p">))</span>
+
+    <span class="n">a_cuts</span> <span class="o">=</span> <span class="n">plf</span><span class="o">.</span><span class="n">find_mag_bin_inds</span><span class="p">(</span><span class="n">a_mag</span><span class="p">,</span> <span class="n">a_flags</span><span class="p">,</span> <span class="n">a_bins</span><span class="p">)</span>
+
+    <span class="c1"># get_field_dists allows for magnitude slicing, to get f(m | m) instead of f(m),</span>
+    <span class="c1"># but when we do want f(m) we just pass two impossible magnitudes as the limits.</span>
+    <span class="n">a_mask</span><span class="p">,</span> <span class="n">a_area</span> <span class="o">=</span> <span class="n">plf</span><span class="o">.</span><span class="n">get_field_dists</span><span class="p">(</span><span class="n">a_astro</span><span class="p">[:,</span> <span class="mi">0</span><span class="p">],</span> <span class="n">a_astro</span><span class="p">[:,</span> <span class="mi">1</span><span class="p">],</span> <span class="n">b_astro</span><span class="p">[:,</span> <span class="mi">0</span><span class="p">],</span>
+                                         <span class="n">b_astro</span><span class="p">[:,</span> <span class="mi">1</span><span class="p">],</span> <span class="n">a_inds</span><span class="p">,</span> <span class="n">a_size</span><span class="p">,</span> <span class="n">b_flen</span><span class="p">,</span> <span class="n">a_flags</span><span class="p">,</span>
+                                         <span class="n">b_flags</span><span class="p">,</span> <span class="n">b_mag</span><span class="p">,</span> <span class="o">-</span><span class="mi">999</span><span class="p">,</span> <span class="mi">999</span><span class="p">)</span>
+    <span class="n">b_mask</span><span class="p">,</span> <span class="n">b_area</span> <span class="o">=</span> <span class="n">plf</span><span class="o">.</span><span class="n">get_field_dists</span><span class="p">(</span><span class="n">b_astro</span><span class="p">[:,</span> <span class="mi">0</span><span class="p">],</span> <span class="n">b_astro</span><span class="p">[:,</span> <span class="mi">1</span><span class="p">],</span> <span class="n">a_astro</span><span class="p">[:,</span> <span class="mi">0</span><span class="p">],</span>
+                                         <span class="n">a_astro</span><span class="p">[:,</span> <span class="mi">1</span><span class="p">],</span> <span class="n">b_inds</span><span class="p">,</span> <span class="n">b_size</span><span class="p">,</span> <span class="n">a_flen</span><span class="p">,</span> <span class="n">b_flags</span><span class="p">,</span>
+                                         <span class="n">a_flags</span><span class="p">,</span> <span class="n">a_mag</span><span class="p">,</span> <span class="o">-</span><span class="mi">999</span><span class="p">,</span> <span class="mi">999</span><span class="p">)</span>
+    <span class="n">a_mask</span> <span class="o">=</span> <span class="n">a_mask</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">bool</span><span class="p">)</span>
+    <span class="n">b_mask</span> <span class="o">=</span> <span class="n">b_mask</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">bool</span><span class="p">)</span>
+    <span class="n">a_left</span> <span class="o">=</span> <span class="n">a_mag</span><span class="p">[</span><span class="n">a_mask</span><span class="p">]</span>
+    <span class="n">b_left</span> <span class="o">=</span> <span class="n">b_mag</span><span class="p">[</span><span class="n">b_mask</span><span class="p">]</span>
+    <span class="n">hist</span><span class="p">,</span> <span class="n">a_bins</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">histogram</span><span class="p">(</span><span class="n">a_left</span><span class="p">,</span> <span class="n">bins</span><span class="o">=</span><span class="n">a_bins</span><span class="p">)</span>
+    <span class="n">Num_fa</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">a_mask</span><span class="p">)</span>
+
+    <span class="n">fa</span> <span class="o">=</span> <span class="n">hist</span> <span class="o">/</span> <span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">hist</span><span class="p">)</span><span class="o">*</span><span class="n">np</span><span class="o">.</span><span class="n">diff</span><span class="p">(</span><span class="n">a_bins</span><span class="p">))</span>
+
+    <span class="n">hist</span><span class="p">,</span> <span class="n">b_bins</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">histogram</span><span class="p">(</span><span class="n">b_left</span><span class="p">,</span> <span class="n">bins</span><span class="o">=</span><span class="n">b_bins</span><span class="p">)</span>
+    <span class="n">Num_fb</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">b_mask</span><span class="p">)</span>
+
+    <span class="n">fb</span> <span class="o">=</span> <span class="n">hist</span> <span class="o">/</span> <span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">hist</span><span class="p">)</span><span class="o">*</span><span class="n">np</span><span class="o">.</span><span class="n">diff</span><span class="p">(</span><span class="n">b_bins</span><span class="p">))</span>
+
+    <span class="n">Nfa</span> <span class="o">=</span> <span class="n">Num_fa</span><span class="o">/</span><span class="p">(</span><span class="n">area</span> <span class="o">-</span> <span class="n">a_area</span><span class="p">)</span>
+    <span class="n">Nfb</span> <span class="o">=</span> <span class="n">Num_fb</span><span class="o">/</span><span class="p">(</span><span class="n">area</span> <span class="o">-</span> <span class="n">b_area</span><span class="p">)</span>
+
+    <span class="n">bm</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">empty</span><span class="p">((</span><span class="nb">len</span><span class="p">(</span><span class="n">b_bins</span><span class="p">)</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">a_bins</span><span class="p">)</span><span class="o">-</span><span class="mi">1</span><span class="p">),</span> <span class="nb">float</span><span class="p">,</span> <span class="n">order</span><span class="o">=</span><span class="s1">&#39;F&#39;</span><span class="p">)</span>
+    <span class="n">z</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">empty</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">a_bins</span><span class="p">)</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="nb">float</span><span class="p">)</span>
+
+    <span class="n">mag_mask</span><span class="p">,</span> <span class="n">aa</span> <span class="o">=</span> <span class="n">plf</span><span class="o">.</span><span class="n">brightest_mag</span><span class="p">(</span><span class="n">a_astro</span><span class="p">[:,</span> <span class="mi">0</span><span class="p">],</span> <span class="n">a_astro</span><span class="p">[:,</span> <span class="mi">1</span><span class="p">],</span> <span class="n">b_astro</span><span class="p">[:,</span> <span class="mi">0</span><span class="p">],</span>
+                                     <span class="n">b_astro</span><span class="p">[:,</span> <span class="mi">1</span><span class="p">],</span> <span class="n">a_mag</span><span class="p">,</span> <span class="n">b_mag</span><span class="p">,</span> <span class="n">a_inds</span><span class="p">,</span> <span class="n">a_size</span><span class="p">,</span> <span class="n">a_blen</span><span class="p">,</span>
+                                     <span class="n">a_flags</span><span class="p">,</span> <span class="n">b_flags</span><span class="p">,</span> <span class="n">a_bins</span><span class="p">)</span>
+    <span class="n">mag_mask</span> <span class="o">=</span> <span class="n">mag_mask</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">bool</span><span class="p">)</span>
+    <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">a_bins</span><span class="p">)</span><span class="o">-</span><span class="mi">1</span><span class="p">):</span>
+        <span class="n">hist</span><span class="p">,</span> <span class="n">b_bins</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">histogram</span><span class="p">(</span><span class="n">b_mag</span><span class="p">[</span><span class="n">mag_mask</span><span class="p">[:,</span> <span class="n">i</span><span class="p">]],</span> <span class="n">bins</span><span class="o">=</span><span class="n">b_bins</span><span class="p">)</span>
+        <span class="n">q</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">mag_mask</span><span class="p">[:,</span> <span class="n">i</span><span class="p">])</span>
+        <span class="k">if</span> <span class="n">q</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="n">bm</span><span class="p">[:,</span> <span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="n">hist</span><span class="o">/</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">diff</span><span class="p">(</span><span class="n">b_bins</span><span class="p">)</span><span class="o">*</span><span class="n">q</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">bm</span><span class="p">[:,</span> <span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="n">z</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">hist</span><span class="p">)</span><span class="o">/</span><span class="n">np</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">a_cuts</span><span class="p">[</span><span class="n">i</span><span class="p">])</span>
+    <span class="n">cdmdm</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">empty</span><span class="p">((</span><span class="nb">len</span><span class="p">(</span><span class="n">b_bins</span><span class="p">)</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">a_bins</span><span class="p">)</span><span class="o">-</span><span class="mi">1</span><span class="p">),</span> <span class="nb">float</span><span class="p">,</span> <span class="n">order</span><span class="o">=</span><span class="s1">&#39;F&#39;</span><span class="p">)</span>
+    <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">a_bins</span><span class="p">)</span><span class="o">-</span><span class="mi">1</span><span class="p">):</span>
+        <span class="n">bmask</span><span class="p">,</span> <span class="n">barea</span> <span class="o">=</span> <span class="n">plf</span><span class="o">.</span><span class="n">get_field_dists</span><span class="p">(</span>
+            <span class="n">b_astro</span><span class="p">[:,</span> <span class="mi">0</span><span class="p">],</span> <span class="n">b_astro</span><span class="p">[:,</span> <span class="mi">1</span><span class="p">],</span> <span class="n">a_astro</span><span class="p">[:,</span> <span class="mi">0</span><span class="p">],</span> <span class="n">a_astro</span><span class="p">[:,</span> <span class="mi">1</span><span class="p">],</span> <span class="n">b_inds</span><span class="p">,</span> <span class="n">b_size</span><span class="p">,</span> <span class="n">a_flen</span><span class="p">,</span>
+            <span class="n">b_flags</span><span class="p">,</span> <span class="n">a_flags</span><span class="p">,</span> <span class="n">a_mag</span><span class="p">,</span> <span class="n">a_bins</span><span class="p">[</span><span class="n">i</span><span class="p">],</span> <span class="n">a_bins</span><span class="p">[</span><span class="n">i</span><span class="o">+</span><span class="mi">1</span><span class="p">])</span>
+        <span class="n">bmask</span> <span class="o">=</span> <span class="n">bmask</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">bool</span><span class="p">)</span>
+        <span class="n">b_left</span> <span class="o">=</span> <span class="n">b_mag</span><span class="p">[</span><span class="n">bmask</span><span class="p">]</span>
+        <span class="n">hist</span><span class="p">,</span> <span class="n">b_bins</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">histogram</span><span class="p">(</span><span class="n">b_left</span><span class="p">,</span> <span class="n">bins</span><span class="o">=</span><span class="n">b_bins</span><span class="p">)</span>
+        <span class="n">_Num_fb</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">b_mask</span><span class="p">)</span>
+
+        <span class="n">_fb</span> <span class="o">=</span> <span class="n">hist</span> <span class="o">/</span> <span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">hist</span><span class="p">)</span><span class="o">*</span><span class="n">np</span><span class="o">.</span><span class="n">diff</span><span class="p">(</span><span class="n">b_bins</span><span class="p">))</span>
+        <span class="n">_Nfb</span> <span class="o">=</span> <span class="n">_Num_fb</span><span class="o">/</span><span class="p">(</span><span class="n">area</span> <span class="o">-</span> <span class="n">barea</span><span class="p">)</span>
+        <span class="n">Fm</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">cumsum</span><span class="p">(</span><span class="n">_fb</span><span class="p">[:</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">diff</span><span class="p">(</span><span class="n">b_bins</span><span class="p">[:</span><span class="o">-</span><span class="mi">1</span><span class="p">])))</span>
+        <span class="k">for</span> <span class="n">j</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">b_bins</span><span class="p">)</span><span class="o">-</span><span class="mi">1</span><span class="p">):</span>
+            <span class="n">Cm</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">cdmdm</span><span class="p">[:</span><span class="n">j</span><span class="p">,</span> <span class="n">i</span><span class="p">]</span><span class="o">*</span><span class="n">np</span><span class="o">.</span><span class="n">diff</span><span class="p">(</span><span class="n">b_bins</span><span class="p">[:</span><span class="n">j</span><span class="o">+</span><span class="mi">1</span><span class="p">]))</span>
+            <span class="n">cdmdm</span><span class="p">[</span><span class="n">j</span><span class="p">,</span> <span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">z</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">*</span><span class="n">bm</span><span class="p">[</span><span class="n">j</span><span class="p">,</span> <span class="n">i</span><span class="p">]</span><span class="o">*</span><span class="n">np</span><span class="o">.</span><span class="n">exp</span><span class="p">(</span><span class="n">aa</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">*</span><span class="n">_Nfb</span><span class="o">*</span><span class="n">Fm</span><span class="p">[</span><span class="n">j</span><span class="p">])</span> <span class="o">-</span> <span class="p">(</span><span class="mi">1</span><span class="o">-</span><span class="n">Cm</span><span class="p">)</span><span class="o">*</span><span class="n">aa</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">*</span><span class="n">_Nfb</span><span class="o">*</span><span class="n">_fb</span><span class="p">[</span><span class="n">j</span><span class="p">])</span>
+
+    <span class="n">zc</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">cdmdm</span><span class="o">*</span><span class="n">np</span><span class="o">.</span><span class="n">diff</span><span class="p">(</span><span class="n">b_bins</span><span class="p">)</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">),</span> <span class="n">axis</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+    <span class="n">frac</span> <span class="o">=</span> <span class="n">zc</span><span class="o">/</span><span class="n">bright_frac</span>
+    <span class="n">density_of_inputs</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">a_cuts</span><span class="p">,</span> <span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span><span class="o">/</span><span class="n">area</span>
+    <span class="n">Nc</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">frac</span><span class="o">*</span><span class="n">density_of_inputs</span><span class="p">)</span>
+
+    <span class="n">integral</span> <span class="o">=</span> <span class="mi">0</span>
+    <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">a_bins</span><span class="p">)</span><span class="o">-</span><span class="mi">1</span><span class="p">):</span>
+        <span class="n">cdmdm</span><span class="p">[:,</span> <span class="n">i</span><span class="p">]</span> <span class="o">*=</span> <span class="n">pa</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">/</span> <span class="p">(</span><span class="n">a_bins</span><span class="p">[</span><span class="n">i</span><span class="o">+</span><span class="mi">1</span><span class="p">]</span> <span class="o">-</span> <span class="n">a_bins</span><span class="p">[</span><span class="n">i</span><span class="p">])</span>
+        <span class="n">integral</span> <span class="o">=</span> <span class="n">integral</span> <span class="o">+</span> <span class="n">np</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">cdmdm</span><span class="p">[:,</span> <span class="n">i</span><span class="p">]</span><span class="o">*</span><span class="n">np</span><span class="o">.</span><span class="n">diff</span><span class="p">(</span><span class="n">b_bins</span><span class="p">))</span><span class="o">*</span><span class="p">(</span><span class="n">a_bins</span><span class="p">[</span><span class="n">i</span><span class="o">+</span><span class="mi">1</span><span class="p">]</span> <span class="o">-</span> <span class="n">a_bins</span><span class="p">[</span><span class="n">i</span><span class="p">])</span>
+    <span class="k">if</span> <span class="n">integral</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="n">cdmdm</span> <span class="o">/=</span> <span class="n">integral</span>
+
+    <span class="c1"># Correct the field priors for the fraction of counterparts that get left</span>
+    <span class="c1"># in their &quot;cutout&quot; circle, by the fact that we don&#39;t use the entire integral:</span>
+    <span class="n">Nfa</span> <span class="o">=</span> <span class="n">Nfa</span> <span class="o">-</span> <span class="p">(</span><span class="mi">1</span> <span class="o">-</span> <span class="n">field_frac</span><span class="p">)</span><span class="o">*</span><span class="n">Nc</span>
+    <span class="n">Nfb</span> <span class="o">=</span> <span class="n">Nfb</span> <span class="o">-</span> <span class="p">(</span><span class="mi">1</span> <span class="o">-</span> <span class="n">field_frac</span><span class="p">)</span><span class="o">*</span><span class="n">Nc</span>
+
+    <span class="k">return</span> <span class="n">Nc</span><span class="p">,</span> <span class="n">cdmdm</span><span class="p">,</span> <span class="n">Nfa</span><span class="p">,</span> <span class="n">fa</span><span class="p">,</span> <span class="n">Nfb</span><span class="p">,</span> <span class="n">fb</span>
+</pre></div>
+
+            <div class="clearer"></div>
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="../../f-modindex.html" title="Fortran Module Index"
+             >fortran modules</a> |</li>
+        <li class="right" >
+          <a href="../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../index.html">macauff</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../index.html" >Module code</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">macauff.photometric_likelihood</a></li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+    &#169; Copyright 2022, Tom J Wilson.
+      Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 7.2.6.
+    </div>
+  </body>
+</html>

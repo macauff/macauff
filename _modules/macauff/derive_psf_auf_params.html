@@ -1,0 +1,1079 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="../../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>macauff.derive_psf_auf_params &#8212; macauff</title>
+    <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=4848ba22" />
+    <link rel="stylesheet" type="text/css" href="../../_static/pyramid.css?v=a5b9c134" />
+    <link rel="stylesheet" type="text/css" href="../../_static/graphviz.css?v=eafc0fe6" />
+    <script src="../../_static/documentation_options.js?v=5929fcd5"></script>
+    <script src="../../_static/doctools.js?v=888ff710"></script>
+    <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Neuton&amp;subset=latin" type="text/css" media="screen" charset="utf-8" />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Nobile:regular,italic,bold,bolditalic&amp;subset=latin" type="text/css" media="screen" charset="utf-8" />
+<!--[if lte IE 6]>
+<link rel="stylesheet" href="../../_static/ie6.css" type="text/css" media="screen" charset="utf-8" />
+<![endif]-->
+
+  </head><body>
+
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="../../f-modindex.html" title="Fortran Module Index"
+             >fortran modules</a> |</li>
+        <li class="right" >
+          <a href="../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../index.html">macauff</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../index.html" accesskey="U">Module code</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">macauff.derive_psf_auf_params</a></li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <h1>Source code for macauff.derive_psf_auf_params</h1><div class="highlight"><pre>
+<span></span><span class="c1"># Licensed under a 3-clause BSD style license - see LICENSE</span>
+<span class="sd">&#39;&#39;&#39;</span>
+<span class="sd">Provides the framework for calculating theoretical perturbations due to faint, unresolved</span>
+<span class="sd">objects blended with brighter sources, under the assumption that sources are fit with PSF</span>
+<span class="sd">photometry while in a sky background-dominated regime such that noise is constant across</span>
+<span class="sd">the detector.</span>
+<span class="sd">&#39;&#39;&#39;</span>
+
+<span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+<span class="kn">import</span> <span class="nn">matplotlib.pyplot</span> <span class="k">as</span> <span class="nn">plt</span>
+<span class="kn">import</span> <span class="nn">matplotlib.gridspec</span> <span class="k">as</span> <span class="nn">gridspec</span>
+<span class="kn">from</span> <span class="nn">scipy.optimize</span> <span class="kn">import</span> <span class="n">minimize</span>
+<span class="kn">from</span> <span class="nn">matplotlib.colors</span> <span class="kn">import</span> <span class="n">Normalize</span>
+<span class="kn">from</span> <span class="nn">matplotlib</span> <span class="kn">import</span> <span class="n">cm</span>
+<span class="kn">import</span> <span class="nn">itertools</span>
+<span class="kn">import</span> <span class="nn">multiprocessing</span>
+<span class="kn">from</span> <span class="nn">scipy.special</span> <span class="kn">import</span> <span class="n">erf</span>
+<span class="kn">from</span> <span class="nn">scipy.optimize</span> <span class="kn">import</span> <span class="n">basinhopping</span>
+<span class="kn">import</span> <span class="nn">os</span>
+<span class="kn">import</span> <span class="nn">shutil</span>
+<span class="c1"># Assume that usetex = False only applies for tests where no TeX is installed</span>
+<span class="c1"># at all, instead of users having half-installed TeX, dvipng et al. somewhere.</span>
+<span class="n">usetex</span> <span class="o">=</span> <span class="ow">not</span> <span class="ow">not</span> <span class="n">shutil</span><span class="o">.</span><span class="n">which</span><span class="p">(</span><span class="s2">&quot;tex&quot;</span><span class="p">)</span>
+<span class="k">if</span> <span class="n">usetex</span><span class="p">:</span>
+    <span class="n">plt</span><span class="o">.</span><span class="n">rcParams</span><span class="o">.</span><span class="n">update</span><span class="p">({</span><span class="s2">&quot;text.usetex&quot;</span><span class="p">:</span> <span class="kc">True</span><span class="p">,</span> <span class="s2">&quot;text.latex.preamble&quot;</span><span class="p">:</span> <span class="sa">r</span><span class="s2">&quot;\usepackage</span><span class="si">{amsmath}</span><span class="s2">&quot;</span><span class="p">})</span>
+
+
+<span class="n">__all__</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;FitPSFPerturbations&#39;</span><span class="p">]</span>
+
+
+<div class="viewcode-block" id="FitPSFPerturbations">
+<a class="viewcode-back" href="../../api/macauff.FitPSFPerturbations.html#macauff.FitPSFPerturbations">[docs]</a>
+<span class="k">class</span> <span class="nc">FitPSFPerturbations</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Class that derives a parameterisation of the effect of a hidden, blended</span>
+<span class="sd">    contaminant within a brighter source in a photometric image, based on</span>
+<span class="sd">    fitting the composite object with a single Gaussian PSF in the limit that</span>
+<span class="sd">    sky background dominates and noise is constant across the image.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">psf_fwhm</span><span class="p">,</span> <span class="n">d_di</span><span class="p">,</span> <span class="n">d_Li</span><span class="p">,</span> <span class="n">n_pool</span><span class="p">,</span> <span class="n">data_save_folder</span><span class="p">,</span> <span class="n">plot_save_folder</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Initialise FitPSFPerturbations with necessary parameters.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        psf_fwhm : float</span>
+<span class="sd">            The full-width at half-maximum of the PSF to simulate fitting</span>
+<span class="sd">            for perturbations.</span>
+<span class="sd">        d_di : float</span>
+<span class="sd">            Separation between perturber offsets, setting the precision of the</span>
+<span class="sd">            simulated perturbations.</span>
+<span class="sd">        d_Li : float</span>
+<span class="sd">            Separation between relative perturber fluxes, affecting the</span>
+<span class="sd">            precision of the derived offset relations.</span>
+<span class="sd">        n_pool : integer</span>
+<span class="sd">            Number of parallel threads to use for ``multiprocessing`` calls.</span>
+<span class="sd">        data_save_folder : string</span>
+<span class="sd">            Relative or absolute path into which to save the data created by</span>
+<span class="sd">            the fitting process.</span>
+<span class="sd">        plot_save_folder : string</span>
+<span class="sd">            Relative or absolute path, used to save plots generated as part</span>
+<span class="sd">            of the PSF algorithm AUF perturbation parameters.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">psf_fwhm</span> <span class="o">=</span> <span class="n">psf_fwhm</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">psf_sig</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">psf_fwhm</span> <span class="o">/</span> <span class="p">(</span><span class="mi">2</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="mi">2</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="mi">2</span><span class="p">)))</span>
+        <span class="c1"># Set the maximum offset to be the Rayleigh criterion, assuming</span>
+        <span class="c1"># we would resolve the blended object outside of this all of the time.</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">di</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mf">1.185</span><span class="o">*</span><span class="bp">self</span><span class="o">.</span><span class="n">psf_fwhm</span><span class="p">,</span> <span class="n">d_di</span><span class="p">)</span>
+        <span class="c1"># Handle L=1 separately</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">Li</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="mf">0.15</span><span class="p">,</span> <span class="mi">1</span><span class="o">-</span><span class="n">d_Li</span><span class="o">+</span><span class="mf">1e-10</span><span class="p">,</span> <span class="n">d_Li</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">n_pool</span> <span class="o">=</span> <span class="n">n_pool</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">data_save_folder</span> <span class="o">=</span> <span class="n">data_save_folder</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">plot_save_folder</span> <span class="o">=</span> <span class="n">plot_save_folder</span>
+
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">exists</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">data_save_folder</span><span class="p">):</span>
+            <span class="n">os</span><span class="o">.</span><span class="n">makedirs</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">data_save_folder</span><span class="p">)</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">plot_save_folder</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">exists</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">plot_save_folder</span><span class="p">):</span>
+            <span class="n">os</span><span class="o">.</span><span class="n">makedirs</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">plot_save_folder</span><span class="p">)</span>
+
+<div class="viewcode-block" id="FitPSFPerturbations.__call__">
+<a class="viewcode-back" href="../../api/macauff.FitPSFPerturbations.html#macauff.FitPSFPerturbations.__call__">[docs]</a>
+    <span class="k">def</span> <span class="fm">__call__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">run_initial_Ld</span><span class="p">,</span> <span class="n">run_skew_fit</span><span class="p">,</span> <span class="n">run_polynomial_fit</span><span class="p">,</span> <span class="n">make_fit_plots</span><span class="p">,</span>
+                 <span class="n">draw_sim_num</span><span class="o">=</span><span class="mi">500000</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Call function for FitPSFPerturbations.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        run_initial_Ld : boolean</span>
+<span class="sd">            Flag for whether to run the initial fitting of perturbation at</span>
+<span class="sd">            various relative flux-distance combinations if data already exist.</span>
+<span class="sd">        run_skew_fit : boolean</span>
+<span class="sd">            Toggle for whether to always run the fitting of each relative flux&#39;s</span>
+<span class="sd">            perturbation as a function of perturber position with a skew normal.</span>
+<span class="sd">        run_polynomial_fit : boolean</span>
+<span class="sd">            Flag indicating whether to re-run fitting of skew normal parameters</span>
+<span class="sd">            as a function of relative perturber flux even if already run</span>
+<span class="sd">            previously.</span>
+<span class="sd">        make_fit_plots : boolean</span>
+<span class="sd">            Controls whether summary plot is created for parameterisation run.</span>
+<span class="sd">        draw_sim_num : integer, optional</span>
+<span class="sd">            Number of realisations to draw when plotting summary figure for</span>
+<span class="sd">            goodness-of-fit distributions.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">plot_save_folder</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">make_fit_plots</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;plot_save_folder cannot be None if plots are &quot;</span>
+                             <span class="s2">&quot;to be made. Please specify a folder for plots &quot;</span>
+                             <span class="s2">&quot;to be saved into.&quot;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">run_initial_Ld</span> <span class="o">=</span> <span class="n">run_initial_Ld</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">run_skew_fit</span> <span class="o">=</span> <span class="n">run_skew_fit</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">run_polynomial_fit</span> <span class="o">=</span> <span class="n">run_polynomial_fit</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">make_fit_plots</span> <span class="o">=</span> <span class="n">make_fit_plots</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">draw_sim_num</span> <span class="o">=</span> <span class="n">draw_sim_num</span>
+
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">run_initial_Ld</span> <span class="ow">or</span> <span class="ow">not</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">exists</span><span class="p">(</span><span class="s1">&#39;</span><span class="si">{}</span><span class="s1">/dd_Ld.npy&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">data_save_folder</span><span class="p">)):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">make_initial_Ld_perturbations</span><span class="p">()</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">run_skew_fit</span> <span class="ow">or</span> <span class="ow">not</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">exists</span><span class="p">(</span>
+                <span class="s1">&#39;</span><span class="si">{}</span><span class="s1">/dd_skew_pars.npy&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">data_save_folder</span><span class="p">)):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">fit_skew_distributions</span><span class="p">()</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">run_polynomial_fit</span> <span class="ow">or</span> <span class="ow">not</span> <span class="n">np</span><span class="o">.</span><span class="n">all</span><span class="p">(</span>
+                <span class="p">[</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">exists</span><span class="p">(</span><span class="s1">&#39;</span><span class="si">{}</span><span class="s1">/</span><span class="si">{}</span><span class="s1">.npy&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">data_save_folder</span><span class="p">,</span> <span class="n">q</span><span class="p">))</span> <span class="k">for</span> <span class="n">q</span> <span class="ow">in</span>
+                 <span class="p">[</span><span class="s1">&#39;Ns&#39;</span><span class="p">,</span> <span class="s1">&#39;dd_ic&#39;</span><span class="p">,</span> <span class="s1">&#39;dd_params&#39;</span><span class="p">,</span> <span class="s1">&#39;dd_params_full&#39;</span><span class="p">,</span> <span class="s1">&#39;l_cut&#39;</span><span class="p">]]):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">fit_polynomial_parameterisations</span><span class="p">()</span>
+
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">make_fit_plots</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">plot_fits</span><span class="p">()</span></div>
+
+
+<div class="viewcode-block" id="FitPSFPerturbations.make_initial_Ld_perturbations">
+<a class="viewcode-back" href="../../api/macauff.FitPSFPerturbations.html#macauff.FitPSFPerturbations.make_initial_Ld_perturbations">[docs]</a>
+    <span class="k">def</span> <span class="nf">make_initial_Ld_perturbations</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Derive full perturbations due to additional blended object within PSF</span>
+<span class="sd">        for a matrix of relative flux-positional offset combinations.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># Save d and delta-d, derived &quot;properly&quot;, for each L/d combo</span>
+        <span class="n">dd</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">empty</span><span class="p">((</span><span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">Li</span><span class="p">),</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">di</span><span class="p">),</span> <span class="mi">2</span><span class="p">),</span> <span class="nb">float</span><span class="p">)</span>
+
+        <span class="n">ij</span> <span class="o">=</span> <span class="n">itertools</span><span class="o">.</span><span class="n">product</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">Li</span><span class="p">)),</span> <span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">di</span><span class="p">)))</span>
+        <span class="n">iter_array</span> <span class="o">=</span> <span class="nb">zip</span><span class="p">(</span><span class="n">ij</span><span class="p">,</span> <span class="n">itertools</span><span class="o">.</span><span class="n">repeat</span><span class="p">([</span><span class="bp">self</span><span class="o">.</span><span class="n">Li</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">di</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">psf_sig</span><span class="p">]))</span>
+        <span class="n">pool</span> <span class="o">=</span> <span class="n">multiprocessing</span><span class="o">.</span><span class="n">Pool</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">n_pool</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">return_values</span> <span class="ow">in</span> <span class="n">pool</span><span class="o">.</span><span class="n">imap_unordered</span><span class="p">(</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">min_parallel_dd_fit</span><span class="p">,</span> <span class="n">iter_array</span><span class="p">,</span>
+                <span class="n">chunksize</span><span class="o">=</span><span class="nb">int</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">Li</span><span class="p">)</span> <span class="o">*</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">di</span><span class="p">)</span><span class="o">/</span><span class="bp">self</span><span class="o">.</span><span class="n">n_pool</span><span class="p">)):</span>
+            <span class="p">(</span><span class="n">i</span><span class="p">,</span> <span class="n">j</span><span class="p">),</span> <span class="n">res_xy</span> <span class="o">=</span> <span class="n">return_values</span>
+            <span class="n">res</span> <span class="o">=</span> <span class="n">res_xy</span><span class="o">.</span><span class="n">x</span>
+            <span class="n">dd</span><span class="p">[</span><span class="n">i</span><span class="p">,</span> <span class="n">j</span><span class="p">,</span> <span class="mi">0</span><span class="p">]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="n">res</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">**</span><span class="mi">2</span> <span class="o">+</span> <span class="n">res</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">**</span><span class="mi">2</span><span class="p">)</span>
+            <span class="n">dd</span><span class="p">[</span><span class="n">i</span><span class="p">,</span> <span class="n">j</span><span class="p">,</span> <span class="mi">1</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">di</span><span class="p">[</span><span class="n">j</span><span class="p">]</span>
+
+        <span class="n">pool</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
+        <span class="n">pool</span><span class="o">.</span><span class="n">join</span><span class="p">()</span>
+        <span class="n">np</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="s1">&#39;</span><span class="si">{}</span><span class="s1">/dd_Ld.npy&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">data_save_folder</span><span class="p">),</span> <span class="n">dd</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="FitPSFPerturbations.min_parallel_dd_fit">
+<a class="viewcode-back" href="../../api/macauff.FitPSFPerturbations.html#macauff.FitPSFPerturbations.min_parallel_dd_fit">[docs]</a>
+    <span class="k">def</span> <span class="nf">min_parallel_dd_fit</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">iterable</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Wrapper for minimisation routine used in fitting for positional</span>
+<span class="sd">        offset caused by fitting two blended sources with a single PSF model.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        iterable : list</span>
+<span class="sd">            List of inputs from ``multiprocessing``, including indices into</span>
+<span class="sd">            perturber position and flux arrays, the perturber parameter</span>
+<span class="sd">            arrays, and the width of the Gaussian used in modelling the PSF.</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        i : integer</span>
+<span class="sd">            The index into the relative flux array for this particular call.</span>
+<span class="sd">        j : integer</span>
+<span class="sd">            The perturber positional offset array index.</span>
+<span class="sd">        res : ~`scipy.optimize.OptimizeResult`</span>
+<span class="sd">            The `scipy` optimisation output.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="p">(</span><span class="n">i</span><span class="p">,</span> <span class="n">j</span><span class="p">),</span> <span class="p">(</span><span class="n">Li</span><span class="p">,</span> <span class="n">di</span><span class="p">,</span> <span class="n">c</span><span class="p">)</span> <span class="o">=</span> <span class="n">iterable</span>
+        <span class="n">L</span><span class="p">,</span> <span class="n">d</span> <span class="o">=</span> <span class="n">Li</span><span class="p">[</span><span class="n">i</span><span class="p">],</span> <span class="n">di</span><span class="p">[</span><span class="n">j</span><span class="p">]</span>
+        <span class="n">res</span> <span class="o">=</span> <span class="n">minimize</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">min_dd_fit_xy</span><span class="p">,</span> <span class="n">x0</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="n">L</span><span class="p">,</span> <span class="n">d</span> <span class="o">*</span> <span class="n">L</span> <span class="o">/</span> <span class="p">(</span><span class="mi">1</span> <span class="o">+</span> <span class="n">L</span><span class="p">),</span> <span class="mi">0</span><span class="p">]),</span>
+                       <span class="n">args</span><span class="o">=</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="p">[</span><span class="n">d</span><span class="p">],</span> <span class="p">[</span><span class="mf">1e-4</span><span class="p">],</span> <span class="p">[</span><span class="n">L</span><span class="p">],</span> <span class="n">c</span><span class="p">),</span>
+                       <span class="n">jac</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">method</span><span class="o">=</span><span class="s1">&#39;newton-cg&#39;</span><span class="p">,</span> <span class="n">hess</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">hess_dd_fit_xy</span><span class="p">,</span>
+                       <span class="n">options</span><span class="o">=</span><span class="p">{</span><span class="s1">&#39;xtol&#39;</span><span class="p">:</span> <span class="mf">1e-15</span><span class="p">})</span>
+
+        <span class="k">return</span> <span class="p">(</span><span class="n">i</span><span class="p">,</span> <span class="n">j</span><span class="p">),</span> <span class="n">res</span></div>
+
+
+<div class="viewcode-block" id="FitPSFPerturbations.min_dd_fit_xy">
+<a class="viewcode-back" href="../../api/macauff.FitPSFPerturbations.html#macauff.FitPSFPerturbations.min_dd_fit_xy">[docs]</a>
+    <span class="k">def</span> <span class="nf">min_dd_fit_xy</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">p</span><span class="p">,</span> <span class="n">L</span><span class="p">,</span> <span class="n">xis</span><span class="p">,</span> <span class="n">yis</span><span class="p">,</span> <span class="n">Lis</span><span class="p">,</span> <span class="n">sig</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Minimisation function for fitting one PSF model to two or more simulated</span>
+<span class="sd">        sources, including the first-order derivatives with respect to position</span>
+<span class="sd">        offset and flux brightening of the single PSF.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        p : list</span>
+<span class="sd">            List of the current values of perturbation offset and</span>
+<span class="sd">            flux brightening caused by all perturbers hidden within the</span>
+<span class="sd">            central object&#39;s PSF.</span>
+<span class="sd">        L : float</span>
+<span class="sd">            Flux of the central object.</span>
+<span class="sd">        xis : numpy.ndarray</span>
+<span class="sd">            x-axis positions of all perturbers being fit with a single PSF.</span>
+<span class="sd">        yis : numpy.ndarray</span>
+<span class="sd">            Positions of perturbers in the opposing orthogonal axis.</span>
+<span class="sd">        Lis : numpy.ndarray</span>
+<span class="sd">            Flux of perturbers relative to the central source flux ``L``.</span>
+<span class="sd">        sig : float</span>
+<span class="sd">            The Gaussian sigma of the PSFs being fit.</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        numpy.ndarray</span>
+<span class="sd">            Negative log-likelihood and its derivative with respect to position</span>
+<span class="sd">            and flux offsets.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">dx</span><span class="p">,</span> <span class="n">dy</span><span class="p">,</span> <span class="n">dl</span> <span class="o">=</span> <span class="n">p</span>
+        <span class="n">di_dd</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="n">xis</span> <span class="o">-</span> <span class="n">dx</span><span class="p">,</span> <span class="n">yis</span> <span class="o">-</span> <span class="n">dy</span><span class="p">])</span>
+        <span class="n">dd</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="n">dx</span><span class="p">,</span> <span class="n">dy</span><span class="p">])</span>
+        <span class="n">fx</span> <span class="o">=</span> <span class="p">((</span><span class="n">L</span><span class="o">+</span><span class="n">dl</span><span class="p">)</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">Lis</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">psi</span><span class="p">(</span><span class="n">di_dd</span><span class="p">,</span> <span class="n">sig</span><span class="p">))</span> <span class="o">+</span>
+              <span class="n">L</span> <span class="o">*</span> <span class="p">(</span><span class="n">L</span><span class="o">+</span><span class="n">dl</span><span class="p">)</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">psi</span><span class="p">(</span><span class="n">dd</span><span class="p">,</span> <span class="n">sig</span><span class="p">)</span> <span class="o">-</span> <span class="mf">0.5</span><span class="o">*</span><span class="p">(</span><span class="n">L</span><span class="o">+</span><span class="n">dl</span><span class="p">)</span><span class="o">**</span><span class="mi">2</span><span class="p">)</span>
+        <span class="n">dfx</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([(</span><span class="n">L</span><span class="o">+</span><span class="n">dl</span><span class="p">)</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">Lis</span> <span class="o">*</span> <span class="p">(</span><span class="n">xis</span> <span class="o">-</span> <span class="n">dx</span><span class="p">)</span><span class="o">/</span><span class="mi">2</span><span class="o">/</span><span class="n">sig</span><span class="o">**</span><span class="mi">2</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">psi</span><span class="p">(</span><span class="n">di_dd</span><span class="p">,</span> <span class="n">sig</span><span class="p">))</span> <span class="o">-</span>
+                        <span class="n">L</span> <span class="o">*</span> <span class="p">(</span><span class="n">L</span><span class="o">+</span><span class="n">dl</span><span class="p">)</span> <span class="o">*</span> <span class="n">dx</span><span class="o">/</span><span class="mi">2</span><span class="o">/</span><span class="n">sig</span><span class="o">**</span><span class="mi">2</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">psi</span><span class="p">(</span><span class="n">dd</span><span class="p">,</span> <span class="n">sig</span><span class="p">),</span>
+                        <span class="p">(</span><span class="n">L</span><span class="o">+</span><span class="n">dl</span><span class="p">)</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">Lis</span> <span class="o">*</span> <span class="p">(</span><span class="n">yis</span> <span class="o">-</span> <span class="n">dy</span><span class="p">)</span><span class="o">/</span><span class="mi">2</span><span class="o">/</span><span class="n">sig</span><span class="o">**</span><span class="mi">2</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">psi</span><span class="p">(</span><span class="n">di_dd</span><span class="p">,</span> <span class="n">sig</span><span class="p">))</span> <span class="o">-</span>
+                        <span class="n">L</span> <span class="o">*</span> <span class="p">(</span><span class="n">L</span><span class="o">+</span><span class="n">dl</span><span class="p">)</span> <span class="o">*</span> <span class="n">dy</span><span class="o">/</span><span class="mi">2</span><span class="o">/</span><span class="n">sig</span><span class="o">**</span><span class="mi">2</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">psi</span><span class="p">(</span><span class="n">dd</span><span class="p">,</span> <span class="n">sig</span><span class="p">),</span>
+                        <span class="o">-</span><span class="p">(</span><span class="n">L</span> <span class="o">+</span> <span class="n">dl</span><span class="p">)</span> <span class="o">+</span> <span class="n">np</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">Lis</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">psi</span><span class="p">(</span><span class="n">di_dd</span><span class="p">,</span> <span class="n">sig</span><span class="p">))</span> <span class="o">+</span> <span class="n">L</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">psi</span><span class="p">(</span><span class="n">dd</span><span class="p">,</span> <span class="n">sig</span><span class="p">)])</span>
+
+        <span class="k">return</span> <span class="o">-</span><span class="mi">1</span><span class="o">*</span><span class="n">fx</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="o">*</span><span class="n">dfx</span></div>
+
+
+<div class="viewcode-block" id="FitPSFPerturbations.hess_dd_fit_xy">
+<a class="viewcode-back" href="../../api/macauff.FitPSFPerturbations.html#macauff.FitPSFPerturbations.hess_dd_fit_xy">[docs]</a>
+    <span class="k">def</span> <span class="nf">hess_dd_fit_xy</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">p</span><span class="p">,</span> <span class="n">L</span><span class="p">,</span> <span class="n">xis</span><span class="p">,</span> <span class="n">yis</span><span class="p">,</span> <span class="n">Lis</span><span class="p">,</span> <span class="n">sig</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Second-order derivatives of the fit of one PSF model to two or more</span>
+<span class="sd">        simulated sources, following the minimisation routine ``min_dd_fit_xy``.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        p : list</span>
+<span class="sd">            List of the current values of perturbation offset and</span>
+<span class="sd">            flux brightening caused by all perturbers hidden within the</span>
+<span class="sd">            central object&#39;s PSF.</span>
+<span class="sd">        L : float</span>
+<span class="sd">            Flux of the central object.</span>
+<span class="sd">        xis : numpy.ndarray</span>
+<span class="sd">            x-axis positions of all perturbers being fit with a single PSF.</span>
+<span class="sd">        yis : numpy.ndarray</span>
+<span class="sd">            Positions of perturbers in the opposing orthogonal axis.</span>
+<span class="sd">        Lis : numpy.ndarray</span>
+<span class="sd">            Flux of perturbers relative to the central source flux ``L``.</span>
+<span class="sd">        sig : float</span>
+<span class="sd">            The Gaussian sigma of the PSFs being fit.</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        numpy.ndarray</span>
+<span class="sd">            Negative of the Hessian of the log-likelihood fit between one PSF</span>
+<span class="sd">            model and multiple injected blended sources.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">dx</span><span class="p">,</span> <span class="n">dy</span><span class="p">,</span> <span class="n">dl</span> <span class="o">=</span> <span class="n">p</span>
+        <span class="n">di_dd</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="n">xis</span> <span class="o">-</span> <span class="n">dx</span><span class="p">,</span> <span class="n">yis</span> <span class="o">-</span> <span class="n">dy</span><span class="p">])</span>
+        <span class="n">dd</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="n">dx</span><span class="p">,</span> <span class="n">dy</span><span class="p">])</span>
+        <span class="n">dx2</span> <span class="o">=</span> <span class="p">((</span><span class="n">L</span><span class="o">+</span><span class="n">dl</span><span class="p">)</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">Lis</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">psi</span><span class="p">(</span><span class="n">di_dd</span><span class="p">,</span> <span class="n">sig</span><span class="p">)</span> <span class="o">*</span> <span class="p">((</span><span class="n">xis</span> <span class="o">-</span> <span class="n">dx</span><span class="p">)</span><span class="o">**</span><span class="mi">2</span><span class="o">/</span><span class="mi">2</span><span class="o">/</span><span class="n">sig</span><span class="o">**</span><span class="mi">2</span> <span class="o">-</span> <span class="mi">1</span><span class="p">))</span> <span class="o">/</span> <span class="mi">2</span> <span class="o">/</span>
+               <span class="n">sig</span><span class="o">**</span><span class="mi">2</span> <span class="o">+</span> <span class="n">L</span> <span class="o">*</span> <span class="p">(</span><span class="n">L</span><span class="o">+</span><span class="n">dl</span><span class="p">)</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">psi</span><span class="p">(</span><span class="n">dd</span><span class="p">,</span> <span class="n">sig</span><span class="p">)</span> <span class="o">*</span> <span class="p">(</span><span class="n">dx</span><span class="o">**</span><span class="mi">2</span> <span class="o">/</span> <span class="mi">2</span> <span class="o">/</span> <span class="n">sig</span><span class="o">**</span><span class="mi">2</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)</span> <span class="o">/</span> <span class="mi">2</span> <span class="o">/</span> <span class="n">sig</span><span class="o">**</span><span class="mi">2</span><span class="p">)</span>
+        <span class="n">dxdy</span> <span class="o">=</span> <span class="p">((</span><span class="n">L</span><span class="o">+</span><span class="n">dl</span><span class="p">)</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">Lis</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">psi</span><span class="p">(</span><span class="n">di_dd</span><span class="p">,</span> <span class="n">sig</span><span class="p">)</span> <span class="o">*</span> <span class="p">(</span><span class="n">xis</span> <span class="o">-</span> <span class="n">dx</span><span class="p">)</span> <span class="o">*</span> <span class="p">(</span><span class="n">yis</span> <span class="o">-</span> <span class="n">dy</span><span class="p">)</span><span class="o">/</span><span class="mi">4</span><span class="o">/</span><span class="n">sig</span><span class="o">**</span><span class="mi">4</span><span class="p">)</span> <span class="o">+</span>
+                <span class="n">L</span> <span class="o">*</span> <span class="p">(</span><span class="n">L</span><span class="o">+</span><span class="n">dl</span><span class="p">)</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">psi</span><span class="p">(</span><span class="n">dd</span><span class="p">,</span> <span class="n">sig</span><span class="p">)</span> <span class="o">*</span> <span class="n">dx</span><span class="o">*</span><span class="n">dy</span> <span class="o">/</span> <span class="mi">4</span> <span class="o">/</span> <span class="n">sig</span><span class="o">**</span><span class="mi">4</span><span class="p">)</span>
+        <span class="n">dy2</span> <span class="o">=</span> <span class="p">((</span><span class="n">L</span><span class="o">+</span><span class="n">dl</span><span class="p">)</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">Lis</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">psi</span><span class="p">(</span><span class="n">di_dd</span><span class="p">,</span> <span class="n">sig</span><span class="p">)</span> <span class="o">*</span> <span class="p">((</span><span class="n">yis</span> <span class="o">-</span> <span class="n">dy</span><span class="p">)</span><span class="o">**</span><span class="mi">2</span><span class="o">/</span><span class="mi">2</span><span class="o">/</span><span class="n">sig</span><span class="o">**</span><span class="mi">2</span> <span class="o">-</span> <span class="mi">1</span><span class="p">))</span> <span class="o">/</span> <span class="mi">2</span> <span class="o">/</span>
+               <span class="n">sig</span><span class="o">**</span><span class="mi">2</span> <span class="o">+</span> <span class="n">L</span> <span class="o">*</span> <span class="p">(</span><span class="n">L</span><span class="o">+</span><span class="n">dl</span><span class="p">)</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">psi</span><span class="p">(</span><span class="n">dd</span><span class="p">,</span> <span class="n">sig</span><span class="p">)</span> <span class="o">*</span> <span class="p">(</span><span class="n">dy</span><span class="o">**</span><span class="mi">2</span> <span class="o">/</span> <span class="mi">2</span> <span class="o">/</span> <span class="n">sig</span><span class="o">**</span><span class="mi">2</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)</span> <span class="o">/</span> <span class="mi">2</span> <span class="o">/</span> <span class="n">sig</span><span class="o">**</span><span class="mi">2</span><span class="p">)</span>
+        <span class="n">dxdl</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">Lis</span><span class="o">*</span><span class="p">(</span><span class="n">xis</span> <span class="o">-</span> <span class="n">dx</span><span class="p">)</span><span class="o">/</span><span class="mi">2</span><span class="o">/</span><span class="n">sig</span><span class="o">**</span><span class="mi">2</span> <span class="o">*</span>
+                      <span class="bp">self</span><span class="o">.</span><span class="n">psi</span><span class="p">(</span><span class="n">di_dd</span><span class="p">,</span> <span class="n">sig</span><span class="p">))</span> <span class="o">-</span> <span class="n">L</span> <span class="o">*</span> <span class="n">dx</span><span class="o">/</span><span class="mi">2</span><span class="o">/</span><span class="n">sig</span><span class="o">**</span><span class="mi">2</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">psi</span><span class="p">(</span><span class="n">dd</span><span class="p">,</span> <span class="n">sig</span><span class="p">)</span>
+        <span class="n">dydl</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">Lis</span><span class="o">*</span><span class="p">(</span><span class="n">yis</span> <span class="o">-</span> <span class="n">dy</span><span class="p">)</span><span class="o">/</span><span class="mi">2</span><span class="o">/</span><span class="n">sig</span><span class="o">**</span><span class="mi">2</span> <span class="o">*</span>
+                      <span class="bp">self</span><span class="o">.</span><span class="n">psi</span><span class="p">(</span><span class="n">di_dd</span><span class="p">,</span> <span class="n">sig</span><span class="p">))</span> <span class="o">-</span> <span class="n">L</span> <span class="o">*</span> <span class="n">dy</span><span class="o">/</span><span class="mi">2</span><span class="o">/</span><span class="n">sig</span><span class="o">**</span><span class="mi">2</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">psi</span><span class="p">(</span><span class="n">dd</span><span class="p">,</span> <span class="n">sig</span><span class="p">)</span>
+        <span class="n">dl2</span> <span class="o">=</span> <span class="o">-</span><span class="mi">1</span>
+
+        <span class="k">return</span> <span class="o">-</span><span class="mi">1</span><span class="o">*</span><span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([[</span><span class="n">dx2</span><span class="p">,</span> <span class="n">dxdy</span><span class="p">,</span> <span class="n">dxdl</span><span class="p">],</span> <span class="p">[</span><span class="n">dxdy</span><span class="p">,</span> <span class="n">dy2</span><span class="p">,</span> <span class="n">dydl</span><span class="p">],</span> <span class="p">[</span><span class="n">dxdl</span><span class="p">,</span> <span class="n">dydl</span><span class="p">,</span> <span class="n">dl2</span><span class="p">]])</span></div>
+
+
+<div class="viewcode-block" id="FitPSFPerturbations.psi">
+<a class="viewcode-back" href="../../api/macauff.FitPSFPerturbations.html#macauff.FitPSFPerturbations.psi">[docs]</a>
+    <span class="k">def</span> <span class="nf">psi</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">x</span><span class="p">,</span> <span class="n">sig</span><span class="p">):</span>
+<span class="w">        </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Calculate Psi, the convolution of two PSFs :math:`\phi` (equation 2,</span>
+<span class="sd">        Plewa &amp; Sari, 2018, MNRAS, 476, 4372).</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        x : numpy.ndarray</span>
+<span class="sd">            Separation at which to evaluate the phi convolution. The first</span>
+<span class="sd">            axis should contain the cartesian x- and y-axis positions, with</span>
+<span class="sd">            each unique object filling the subsequent axes.</span>
+<span class="sd">        sig : float</span>
+<span class="sd">            Gaussian sigma of the PSFs being convolved.</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        numpy.ndarray</span>
+<span class="sd">            The convolution of two PSFs :math:`\phi` evaluated at `x`.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">exp</span><span class="p">(</span><span class="o">-</span><span class="mf">0.25</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">x</span><span class="o">**</span><span class="mi">2</span><span class="p">,</span> <span class="n">axis</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span> <span class="o">/</span> <span class="n">sig</span><span class="o">**</span><span class="mi">2</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="FitPSFPerturbations.fit_skew_distributions">
+<a class="viewcode-back" href="../../api/macauff.FitPSFPerturbations.html#macauff.FitPSFPerturbations.fit_skew_distributions">[docs]</a>
+    <span class="k">def</span> <span class="nf">fit_skew_distributions</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Function for fitting sets of position offsets as a function of perturber</span>
+<span class="sd">        position with skew-normal distributions, accounting for a break at small</span>
+<span class="sd">        offsets where relationship becomes linear, for each value of perturber</span>
+<span class="sd">        relative flux.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">dd</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="s1">&#39;</span><span class="si">{}</span><span class="s1">/dd_Ld.npy&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">data_save_folder</span><span class="p">))</span>
+        <span class="n">dd_skew_pars</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">empty</span><span class="p">((</span><span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">Li</span><span class="p">),</span> <span class="mi">5</span><span class="p">),</span> <span class="nb">float</span><span class="p">)</span>
+
+        <span class="c1"># Fit each L distribution for its parameters as a function of D</span>
+        <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">Li</span><span class="p">)):</span>
+            <span class="n">_x</span><span class="p">,</span> <span class="n">_y</span> <span class="o">=</span> <span class="n">dd</span><span class="p">[</span><span class="n">i</span><span class="p">,</span> <span class="mi">1</span><span class="p">:,</span> <span class="mi">1</span><span class="p">]</span> <span class="o">/</span> <span class="bp">self</span><span class="o">.</span><span class="n">psf_sig</span><span class="p">,</span> <span class="n">dd</span><span class="p">[</span><span class="n">i</span><span class="p">,</span> <span class="mi">1</span><span class="p">:,</span> <span class="mi">0</span><span class="p">]</span> <span class="o">/</span> <span class="bp">self</span><span class="o">.</span><span class="n">psf_sig</span>
+            <span class="n">slices</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">abs</span><span class="p">((</span><span class="n">_y</span> <span class="o">-</span> <span class="n">_x</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">Li</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">/</span><span class="p">(</span><span class="mi">1</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">Li</span><span class="p">[</span><span class="n">i</span><span class="p">]))</span><span class="o">/</span><span class="n">_y</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mf">0.01</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span>
+            <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">slices</span><span class="p">)</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+                <span class="n">dd_skew_pars</span><span class="p">[</span><span class="n">i</span><span class="p">,</span> <span class="p">:</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">=</span> <span class="mi">0</span>
+                <span class="n">dd_skew_pars</span><span class="p">[</span><span class="n">i</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">=</span> <span class="n">_x</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">+</span> <span class="mf">0.1</span>
+                <span class="nb">print</span><span class="p">(</span><span class="sa">r</span><span class="s1">&#39;All derived perturbations within 1</span><span class="si">% o</span><span class="s1">f linear fit for &#39;</span>
+                      <span class="sa">r</span><span class="s1">&#39;relative flux of </span><span class="si">{}</span><span class="s1">. No skew-normal fit needed.&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">Li</span><span class="p">[</span><span class="n">i</span><span class="p">]))</span>
+                <span class="k">continue</span>
+            <span class="n">cutr</span> <span class="o">=</span> <span class="n">_x</span><span class="p">[</span><span class="n">slices</span><span class="p">[</span><span class="mi">0</span><span class="p">]]</span>
+
+            <span class="n">x</span> <span class="o">=</span> <span class="n">_x</span><span class="p">[</span><span class="n">slices</span><span class="p">[</span><span class="mi">0</span><span class="p">]:]</span>
+            <span class="n">y</span> <span class="o">=</span> <span class="n">_y</span><span class="p">[</span><span class="n">slices</span><span class="p">[</span><span class="mi">0</span><span class="p">]:]</span>
+
+            <span class="n">w</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">ones_like</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
+            <span class="n">w</span><span class="p">[:</span><span class="mi">10</span><span class="p">]</span> <span class="o">=</span> <span class="mi">100</span>
+
+            <span class="n">N_pools</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">n_pool</span>
+            <span class="n">N_overloop</span> <span class="o">=</span> <span class="mi">2</span>
+            <span class="n">niters</span> <span class="o">=</span> <span class="mi">150</span>
+            <span class="n">pool</span> <span class="o">=</span> <span class="n">multiprocessing</span><span class="o">.</span><span class="n">Pool</span><span class="p">(</span><span class="n">N_pools</span><span class="p">)</span>
+            <span class="n">counter</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">N_pools</span><span class="o">*</span><span class="n">N_overloop</span><span class="p">)</span>
+            <span class="n">xy_step</span> <span class="o">=</span> <span class="mf">0.1</span>
+            <span class="n">temp</span> <span class="o">=</span> <span class="mf">0.01</span>
+            <span class="n">x0</span> <span class="o">=</span> <span class="kc">None</span>
+            <span class="n">method</span> <span class="o">=</span> <span class="s1">&#39;L-BFGS-B&#39;</span>
+            <span class="n">min_kwarg</span> <span class="o">=</span> <span class="p">{</span><span class="s1">&#39;method&#39;</span><span class="p">:</span> <span class="n">method</span><span class="p">,</span> <span class="s1">&#39;args&#39;</span><span class="p">:</span> <span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">,</span> <span class="n">w</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">Li</span><span class="p">[</span><span class="n">i</span><span class="p">]),</span> <span class="s1">&#39;jac&#39;</span><span class="p">:</span> <span class="kc">True</span><span class="p">}</span>
+            <span class="n">iter_rep</span> <span class="o">=</span> <span class="n">itertools</span><span class="o">.</span><span class="n">repeat</span><span class="p">([</span><span class="n">min_kwarg</span><span class="p">,</span> <span class="n">niters</span><span class="p">,</span> <span class="n">x0</span><span class="p">,</span> <span class="n">xy_step</span><span class="p">,</span> <span class="n">temp</span><span class="p">])</span>
+            <span class="n">iter_group</span> <span class="o">=</span> <span class="nb">zip</span><span class="p">(</span><span class="n">counter</span><span class="p">,</span> <span class="n">iter_rep</span><span class="p">)</span>
+            <span class="n">res</span> <span class="o">=</span> <span class="kc">None</span>
+            <span class="n">min_val</span> <span class="o">=</span> <span class="kc">None</span>
+            <span class="k">for</span> <span class="n">return_res</span> <span class="ow">in</span> <span class="n">pool</span><span class="o">.</span><span class="n">imap_unordered</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">dd_fitting_wrapper</span><span class="p">,</span> <span class="n">iter_group</span><span class="p">,</span>
+                                                  <span class="n">chunksize</span><span class="o">=</span><span class="n">N_overloop</span><span class="p">):</span>
+                <span class="k">if</span> <span class="n">min_val</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">or</span> <span class="n">return_res</span><span class="o">.</span><span class="n">fun</span> <span class="o">&lt;</span> <span class="n">min_val</span><span class="p">:</span>
+                    <span class="n">res</span> <span class="o">=</span> <span class="n">return_res</span>
+                    <span class="n">min_val</span> <span class="o">=</span> <span class="n">return_res</span><span class="o">.</span><span class="n">fun</span>
+            <span class="n">pool</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
+            <span class="n">pool</span><span class="o">.</span><span class="n">join</span><span class="p">()</span>
+
+            <span class="n">dd_skew_pars</span><span class="p">[</span><span class="n">i</span><span class="p">,</span> <span class="p">:</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">=</span> <span class="n">res</span><span class="o">.</span><span class="n">x</span>
+            <span class="n">dd_skew_pars</span><span class="p">[</span><span class="n">i</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">=</span> <span class="n">cutr</span>
+
+        <span class="c1"># With degeneracy between T/sig/alpha, we need to ensure values are of</span>
+        <span class="c1"># the correct sign. T and sig should always be positive, so if negative</span>
+        <span class="c1"># their sign needs correcting. However, if sig is negative then alpha will</span>
+        <span class="c1"># also be of the wrong sign, to correct for a * (x - u) / c within the</span>
+        <span class="c1"># skew-normal CDF. Thus, if either T or sig is negative, correct all</span>
+        <span class="c1"># three values.</span>
+        <span class="n">q</span> <span class="o">=</span> <span class="p">(</span><span class="n">dd_skew_pars</span><span class="p">[:,</span> <span class="mi">3</span><span class="p">]</span> <span class="o">&lt;</span> <span class="mi">0</span><span class="p">)</span> <span class="o">|</span> <span class="p">(</span><span class="n">dd_skew_pars</span><span class="p">[:,</span> <span class="mi">0</span><span class="p">]</span> <span class="o">&lt;</span> <span class="mi">0</span><span class="p">)</span>
+        <span class="n">dd_skew_pars</span><span class="p">[</span><span class="n">q</span><span class="p">,</span> <span class="mi">0</span><span class="p">]</span> <span class="o">*=</span> <span class="o">-</span><span class="mi">1</span>
+        <span class="n">dd_skew_pars</span><span class="p">[</span><span class="n">q</span><span class="p">,</span> <span class="mi">2</span><span class="p">]</span> <span class="o">*=</span> <span class="o">-</span><span class="mi">1</span>
+        <span class="n">dd_skew_pars</span><span class="p">[</span><span class="n">q</span><span class="p">,</span> <span class="mi">3</span><span class="p">]</span> <span class="o">*=</span> <span class="o">-</span><span class="mi">1</span>
+
+        <span class="n">np</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="s1">&#39;</span><span class="si">{}</span><span class="s1">/dd_skew_pars.npy&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">data_save_folder</span><span class="p">),</span> <span class="n">dd_skew_pars</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="FitPSFPerturbations.dd_fitting_wrapper">
+<a class="viewcode-back" href="../../api/macauff.FitPSFPerturbations.html#macauff.FitPSFPerturbations.dd_fitting_wrapper">[docs]</a>
+    <span class="k">def</span> <span class="nf">dd_fitting_wrapper</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">iterable</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Wrapper for fitting the parameters for the skew-normal distribution</span>
+<span class="sd">        to a position offset-perturber position relationship of a particular</span>
+<span class="sd">        flux value of perturber, via basinhopping.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        iterable : list</span>
+<span class="sd">            List of values passed through ``multiprocessing``, including the</span>
+<span class="sd">            index into the relative flux array, the keywords passed through</span>
+<span class="sd">            to `basinhopping` (containing the method used, the arguments to</span>
+<span class="sd">            pass to `basinhopping`, and things like whether to compute the</span>
+<span class="sd">            Jacobian), the number of basin hop iterations, starting argument</span>
+<span class="sd">            values, and basin hop step size and &quot;temperature&quot;.</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        res : ~`scipy.optimize.OptimizeResult`</span>
+<span class="sd">            The `scipy` optimisation output containing the best-fit</span>
+<span class="sd">            skew-normal parameters from all basins.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">def</span> <span class="nf">sum_one_skew</span><span class="p">(</span><span class="n">p</span><span class="p">,</span> <span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">,</span> <span class="n">w</span><span class="p">,</span> <span class="n">L</span><span class="p">):</span>
+<span class="w">            </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">            Calculate the weighted sum-of-square-residuals between the</span>
+<span class="sd">            skew-normal and input data values, as well as its derivative</span>
+<span class="sd">            with respect to the parameters of the skew-normal.</span>
+
+<span class="sd">            Parameters</span>
+<span class="sd">            ----------</span>
+<span class="sd">            p : list</span>
+<span class="sd">                Input values of Gaussian sigma, mean, skewness, and amplitude</span>
+<span class="sd">                for this particular skew-normal.</span>
+<span class="sd">            x : numpy.ndarray</span>
+<span class="sd">                Perturber distance from central source.</span>
+<span class="sd">            y : numpy.ndarray</span>
+<span class="sd">                Perturbation offsets, as calculated from full model residual</span>
+<span class="sd">                fitting.</span>
+<span class="sd">            w : numpy.ndarray</span>
+<span class="sd">                Weights for each data point.</span>
+<span class="sd">            L : numpy.ndarray</span>
+<span class="sd">                The relative flux of the perturber.</span>
+
+<span class="sd">            Returns</span>
+<span class="sd">            -------</span>
+<span class="sd">            numpy.ndarray</span>
+<span class="sd">                Weighted sum of data-model fits and derivatives of the</span>
+<span class="sd">                goodness-of-fit parameter.</span>
+<span class="sd">            &quot;&quot;&quot;</span>
+            <span class="n">f</span><span class="p">,</span> <span class="n">df</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">fit_one_skew</span><span class="p">(</span><span class="n">p</span><span class="p">,</span> <span class="n">x</span><span class="p">,</span> <span class="n">L</span><span class="p">)</span>
+            <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">sum</span><span class="p">((</span><span class="n">y</span> <span class="o">-</span> <span class="n">f</span><span class="p">)</span><span class="o">**</span><span class="mi">2</span> <span class="o">*</span> <span class="n">w</span><span class="p">),</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="n">np</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="o">-</span><span class="mi">2</span> <span class="o">*</span> <span class="n">w</span> <span class="o">*</span> <span class="p">(</span><span class="n">y</span> <span class="o">-</span> <span class="n">f</span><span class="p">)</span> <span class="o">*</span> <span class="n">q</span><span class="p">)</span> <span class="k">for</span> <span class="n">q</span> <span class="ow">in</span> <span class="n">df</span><span class="p">])</span>
+
+        <span class="n">rng</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">default_rng</span><span class="p">()</span>
+        <span class="n">i</span><span class="p">,</span> <span class="p">(</span><span class="n">min_kwarg</span><span class="p">,</span> <span class="n">niters</span><span class="p">,</span> <span class="n">x0</span><span class="p">,</span> <span class="n">s</span><span class="p">,</span> <span class="n">t</span><span class="p">)</span> <span class="o">=</span> <span class="n">iterable</span>
+        <span class="k">if</span> <span class="n">x0</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="c1"># sigma, mu, alpha, T</span>
+            <span class="n">x0</span> <span class="o">=</span> <span class="p">[</span><span class="n">rng</span><span class="o">.</span><span class="n">uniform</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">3</span><span class="p">),</span> <span class="n">rng</span><span class="o">.</span><span class="n">uniform</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">4</span><span class="p">),</span> <span class="n">rng</span><span class="o">.</span><span class="n">uniform</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">),</span> <span class="n">rng</span><span class="o">.</span><span class="n">uniform</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">)]</span>
+        <span class="n">res</span> <span class="o">=</span> <span class="n">basinhopping</span><span class="p">(</span><span class="n">sum_one_skew</span><span class="p">,</span> <span class="n">x0</span><span class="p">,</span> <span class="n">minimizer_kwargs</span><span class="o">=</span><span class="n">min_kwarg</span><span class="p">,</span> <span class="n">niter</span><span class="o">=</span><span class="n">niters</span><span class="p">,</span> <span class="n">T</span><span class="o">=</span><span class="n">t</span><span class="p">,</span>
+                           <span class="n">stepsize</span><span class="o">=</span><span class="n">s</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">res</span></div>
+
+
+<div class="viewcode-block" id="FitPSFPerturbations.fit_one_skew">
+<a class="viewcode-back" href="../../api/macauff.FitPSFPerturbations.html#macauff.FitPSFPerturbations.fit_one_skew">[docs]</a>
+    <span class="k">def</span> <span class="nf">fit_one_skew</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">p</span><span class="p">,</span> <span class="n">x</span><span class="p">,</span> <span class="n">L</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Function used in the fitting of a skew-normal distribution, calculating</span>
+<span class="sd">        the value of the skew-normal and its derivative with respect to its</span>
+<span class="sd">        parameters at the given value.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        p : list</span>
+<span class="sd">            List of skew-normal parameters, the Gaussian sigma, mean, skewness</span>
+<span class="sd">            and amplitude respectively.</span>
+<span class="sd">        x : numpy.ndarray</span>
+<span class="sd">            Input values at which to evaluate the skew-normal distribution.</span>
+<span class="sd">        L : float</span>
+<span class="sd">            Relative flux of perturber for which perturbation-position relations</span>
+<span class="sd">            are being fit with the skew-normal distribution.</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        f : numpy.ndarray</span>
+<span class="sd">            The skew-normal distribution evaluated at all ``x``.</span>
+<span class="sd">        df : numpy.ndarray</span>
+<span class="sd">            The derivative of `f` with respect to its Gaussian sigma, mean,</span>
+<span class="sd">            skewness, and amplitude respectively.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">def</span> <span class="nf">calc_psi_pdf</span><span class="p">(</span><span class="n">x</span><span class="p">):</span>
+<span class="w">            </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">            Probability density function :math:`\psi` of the standard normal</span>
+<span class="sd">            distribution, used in calculating the skew-normal distribution.</span>
+
+<span class="sd">            Parameters</span>
+<span class="sd">            ----------</span>
+<span class="sd">            x : numpy.ndarray</span>
+<span class="sd">                Values at which to evaluate the standard normal distribution.</span>
+
+<span class="sd">            Returns</span>
+<span class="sd">            -------</span>
+<span class="sd">            numpy.ndarray</span>
+<span class="sd">                :math:`\psi` at every `x` value.</span>
+<span class="sd">            &quot;&quot;&quot;</span>
+            <span class="k">return</span> <span class="mi">1</span><span class="o">/</span><span class="n">np</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="mi">2</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">pi</span><span class="p">)</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">exp</span><span class="p">(</span><span class="o">-</span><span class="mf">0.5</span> <span class="o">*</span> <span class="n">x</span><span class="o">**</span><span class="mi">2</span><span class="p">)</span>
+
+        <span class="k">def</span> <span class="nf">calc_psi_cdf</span><span class="p">(</span><span class="n">x</span><span class="p">):</span>
+<span class="w">            </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">            Cumulative distribution function, :math:`\psi` integrated from</span>
+<span class="sd">            :math:`-\infty` to `x`, of the standard normal distribution, used</span>
+<span class="sd">            in calculating the skew-normal distribution.</span>
+
+<span class="sd">            Parameters</span>
+<span class="sd">            ----------</span>
+<span class="sd">            x : numpy.ndarray</span>
+<span class="sd">                Values at which to evaluate the CDF of the standard normal</span>
+<span class="sd">                distribution.</span>
+
+<span class="sd">            Returns</span>
+<span class="sd">            -------</span>
+<span class="sd">            numpy.ndarray</span>
+<span class="sd">                :math:`\psi` integrated from :math:`-\infty` to `x`, at every</span>
+<span class="sd">                `x`.</span>
+<span class="sd">            &quot;&quot;&quot;</span>
+            <span class="k">return</span> <span class="mf">0.5</span> <span class="o">*</span> <span class="p">(</span><span class="mi">1</span> <span class="o">+</span> <span class="n">erf</span><span class="p">(</span><span class="n">x</span> <span class="o">/</span> <span class="n">np</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="mi">2</span><span class="p">)))</span>
+
+        <span class="n">c</span><span class="p">,</span> <span class="n">u</span><span class="p">,</span> <span class="n">a</span><span class="p">,</span> <span class="n">t</span> <span class="o">=</span> <span class="n">p</span>
+
+        <span class="n">x_</span> <span class="o">=</span> <span class="p">(</span><span class="n">x</span> <span class="o">-</span> <span class="n">u</span><span class="p">)</span> <span class="o">/</span> <span class="n">c</span>
+
+        <span class="n">psi_pdf</span> <span class="o">=</span> <span class="n">calc_psi_pdf</span><span class="p">(</span><span class="n">x_</span><span class="p">)</span>
+        <span class="n">psi_pdf_skew</span> <span class="o">=</span> <span class="n">calc_psi_pdf</span><span class="p">(</span><span class="n">a</span> <span class="o">*</span> <span class="n">x_</span><span class="p">)</span>
+        <span class="n">psi_cdf_skew</span> <span class="o">=</span> <span class="n">calc_psi_cdf</span><span class="p">(</span><span class="n">a</span> <span class="o">*</span> <span class="n">x_</span><span class="p">)</span>
+        <span class="n">dx_dc</span> <span class="o">=</span> <span class="o">-</span><span class="p">(</span><span class="n">x</span> <span class="o">-</span> <span class="n">u</span><span class="p">)</span> <span class="o">/</span> <span class="n">c</span><span class="o">**</span><span class="mi">2</span>
+        <span class="n">dx_du</span> <span class="o">=</span> <span class="o">-</span><span class="mi">1</span> <span class="o">/</span> <span class="n">c</span>
+        <span class="n">f</span> <span class="o">=</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">t</span> <span class="o">/</span> <span class="n">c</span> <span class="o">*</span> <span class="n">L</span> <span class="o">*</span> <span class="n">psi_pdf</span> <span class="o">*</span> <span class="n">psi_cdf_skew</span>
+        <span class="n">dfdc</span> <span class="o">=</span> <span class="p">(</span><span class="mi">2</span> <span class="o">*</span> <span class="n">t</span> <span class="o">/</span> <span class="n">c</span> <span class="o">*</span> <span class="n">L</span> <span class="o">*</span> <span class="n">psi_pdf</span> <span class="o">*</span> <span class="p">(</span><span class="n">dx_dc</span> <span class="o">*</span> <span class="p">(</span><span class="o">-</span><span class="n">x_</span> <span class="o">*</span> <span class="n">psi_cdf_skew</span> <span class="o">+</span>
+                                                    <span class="n">psi_pdf_skew</span> <span class="o">*</span> <span class="n">a</span><span class="p">)</span> <span class="o">-</span> <span class="n">psi_cdf_skew</span><span class="o">/</span><span class="n">c</span><span class="p">))</span>
+        <span class="n">dfdu</span> <span class="o">=</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">t</span> <span class="o">/</span> <span class="n">c</span> <span class="o">*</span> <span class="n">L</span> <span class="o">*</span> <span class="n">psi_pdf</span> <span class="o">*</span> <span class="n">dx_du</span> <span class="o">*</span> <span class="p">(</span><span class="o">-</span><span class="n">psi_cdf_skew</span> <span class="o">*</span> <span class="n">x_</span> <span class="o">+</span> <span class="n">a</span> <span class="o">*</span> <span class="n">psi_pdf_skew</span><span class="p">)</span>
+        <span class="n">dfda</span> <span class="o">=</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">t</span> <span class="o">/</span> <span class="n">c</span> <span class="o">*</span> <span class="n">L</span> <span class="o">*</span> <span class="n">psi_pdf</span> <span class="o">*</span> <span class="n">psi_pdf_skew</span> <span class="o">*</span> <span class="n">x_</span>
+        <span class="n">dfdt</span> <span class="o">=</span> <span class="mi">2</span> <span class="o">/</span> <span class="n">c</span> <span class="o">*</span> <span class="n">L</span> <span class="o">*</span> <span class="n">psi_pdf</span> <span class="o">*</span> <span class="n">psi_cdf_skew</span>
+
+        <span class="n">df</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="n">dfdc</span><span class="p">,</span> <span class="n">dfdu</span><span class="p">,</span> <span class="n">dfda</span><span class="p">,</span> <span class="n">dfdt</span><span class="p">])</span>
+
+        <span class="k">return</span> <span class="n">f</span><span class="p">,</span> <span class="n">df</span></div>
+
+
+<div class="viewcode-block" id="FitPSFPerturbations.fit_polynomial_parameterisations">
+<a class="viewcode-back" href="../../api/macauff.FitPSFPerturbations.html#macauff.FitPSFPerturbations.fit_polynomial_parameterisations">[docs]</a>
+    <span class="k">def</span> <span class="nf">fit_polynomial_parameterisations</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Function controlling the derivation of power law polynomial fits to</span>
+<span class="sd">        skew-normal distribution parameters as a function of the relative flux</span>
+<span class="sd">        of the perturber.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">dd</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="s1">&#39;</span><span class="si">{}</span><span class="s1">/dd_Ld.npy&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">data_save_folder</span><span class="p">))</span>
+        <span class="n">dd_skew_pars</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="s1">&#39;</span><span class="si">{}</span><span class="s1">/dd_skew_pars.npy&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">data_save_folder</span><span class="p">))</span>
+
+        <span class="n">l_cut</span> <span class="o">=</span> <span class="p">[</span><span class="mf">0.15</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">Li</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">Li</span> <span class="o">&lt;</span> <span class="mf">0.75</span><span class="p">][</span><span class="n">np</span><span class="o">.</span><span class="n">argmin</span><span class="p">(</span><span class="n">dd_skew_pars</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">Li</span> <span class="o">&lt;</span> <span class="mf">0.75</span><span class="p">,</span> <span class="mi">0</span><span class="p">])],</span>
+                 <span class="bp">self</span><span class="o">.</span><span class="n">Li</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">argmin</span><span class="p">(</span><span class="n">dd_skew_pars</span><span class="p">[:,</span> <span class="mi">2</span><span class="p">])]]</span>
+
+        <span class="n">Ns</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="mi">4</span><span class="p">,</span> <span class="mi">25</span><span class="p">)</span>
+        <span class="n">dd_params</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">empty</span><span class="p">((</span><span class="nb">len</span><span class="p">(</span><span class="n">Ns</span><span class="p">),</span> <span class="n">dd_skew_pars</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="n">np</span><span class="o">.</span><span class="n">amax</span><span class="p">(</span><span class="n">Ns</span><span class="p">),</span> <span class="mi">2</span><span class="p">),</span> <span class="nb">float</span><span class="p">)</span>
+
+        <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="n">q</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">([</span><span class="bp">self</span><span class="o">.</span><span class="n">Li</span> <span class="o">&lt;=</span> <span class="n">l_cut</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">Li</span> <span class="o">&gt;</span> <span class="n">l_cut</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span> <span class="o">&amp;</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">Li</span> <span class="o">&lt;</span> <span class="n">l_cut</span><span class="p">[</span><span class="mi">2</span><span class="p">])]):</span>
+            <span class="n">ij</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">Ns</span><span class="p">))</span>
+            <span class="n">iter_array</span> <span class="o">=</span> <span class="nb">zip</span><span class="p">(</span><span class="n">ij</span><span class="p">,</span> <span class="n">itertools</span><span class="o">.</span><span class="n">repeat</span><span class="p">([</span><span class="n">Ns</span><span class="p">,</span> <span class="n">dd_skew_pars</span><span class="p">[</span><span class="n">q</span><span class="p">,</span> <span class="p">:],</span> <span class="bp">self</span><span class="o">.</span><span class="n">Li</span><span class="p">[</span><span class="n">q</span><span class="p">],</span>
+                                                   <span class="bp">self</span><span class="o">.</span><span class="n">di</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span><span class="o">/</span><span class="bp">self</span><span class="o">.</span><span class="n">psf_sig</span><span class="p">]))</span>
+            <span class="n">pool</span> <span class="o">=</span> <span class="n">multiprocessing</span><span class="o">.</span><span class="n">Pool</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">n_pool</span><span class="p">)</span>
+            <span class="k">for</span> <span class="n">results</span> <span class="ow">in</span> <span class="n">pool</span><span class="o">.</span><span class="n">imap_unordered</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">min_parallel_dd_param_fit</span><span class="p">,</span> <span class="n">iter_array</span><span class="p">,</span>
+                                               <span class="n">chunksize</span><span class="o">=</span><span class="nb">max</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="nb">int</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">Ns</span><span class="p">)</span><span class="o">/</span><span class="bp">self</span><span class="o">.</span><span class="n">n_pool</span><span class="p">))):</span>
+                <span class="n">j</span><span class="p">,</span> <span class="n">N</span><span class="p">,</span> <span class="n">resses</span> <span class="o">=</span> <span class="n">results</span>
+                <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">res</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">resses</span><span class="p">):</span>
+                    <span class="n">dd_params</span><span class="p">[</span><span class="n">j</span><span class="p">,</span> <span class="n">i</span><span class="p">,</span> <span class="p">:</span><span class="n">N</span><span class="p">,</span> <span class="n">k</span><span class="p">]</span> <span class="o">=</span> <span class="n">res</span>
+
+            <span class="n">pool</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
+            <span class="n">pool</span><span class="o">.</span><span class="n">join</span><span class="p">()</span>
+
+        <span class="c1"># Keep track of the total goodness-of-fit values across all di-Li</span>
+        <span class="c1"># combinations, as well as the goodness-of-fits just for individual</span>
+        <span class="c1"># Lis, across di.</span>
+        <span class="n">dd_ic</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="nb">len</span><span class="p">(</span><span class="n">Ns</span><span class="p">),</span> <span class="mi">2</span><span class="p">),</span> <span class="nb">float</span><span class="p">)</span>
+        <span class="n">dd_x2s</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">empty</span><span class="p">((</span><span class="nb">len</span><span class="p">(</span><span class="n">Ns</span><span class="p">),</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">Li</span><span class="p">),</span> <span class="mi">2</span><span class="p">),</span> <span class="nb">float</span><span class="p">)</span>
+
+        <span class="k">for</span> <span class="n">j</span><span class="p">,</span> <span class="n">N</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">Ns</span><span class="p">):</span>
+            <span class="n">dd_x2</span> <span class="o">=</span> <span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">]</span>
+            <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">Li</span><span class="p">)):</span>
+                <span class="n">x</span> <span class="o">=</span> <span class="n">dd</span><span class="p">[</span><span class="n">i</span><span class="p">,</span> <span class="p">:,</span> <span class="mi">1</span><span class="p">]</span> <span class="o">/</span> <span class="bp">self</span><span class="o">.</span><span class="n">psf_sig</span>
+                <span class="n">y</span> <span class="o">=</span> <span class="n">dd</span><span class="p">[</span><span class="n">i</span><span class="p">,</span> <span class="p">:,</span> <span class="mi">0</span><span class="p">]</span> <span class="o">/</span> <span class="bp">self</span><span class="o">.</span><span class="n">psf_sig</span>
+                <span class="n">ddparams</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">return_ddparams</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">Li</span><span class="p">[</span><span class="n">i</span><span class="p">],</span> <span class="n">l_cut</span><span class="p">,</span> <span class="n">dd_params</span><span class="p">,</span> <span class="n">Ns</span><span class="p">[</span><span class="n">j</span><span class="p">],</span> <span class="n">j</span><span class="p">)</span>
+                <span class="n">q</span> <span class="o">=</span> <span class="p">(</span><span class="o">~</span><span class="n">np</span><span class="o">.</span><span class="n">isnan</span><span class="p">(</span><span class="n">x</span><span class="p">))</span> <span class="o">&amp;</span> <span class="p">(</span><span class="o">~</span><span class="n">np</span><span class="o">.</span><span class="n">isnan</span><span class="p">(</span><span class="n">y</span><span class="p">))</span>
+                <span class="n">x2_w</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sum</span><span class="p">((</span><span class="n">y</span><span class="p">[</span><span class="n">q</span><span class="p">]</span> <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">dd_combined_fit</span><span class="p">(</span><span class="n">ddparams</span><span class="p">,</span> <span class="n">x</span><span class="p">[</span><span class="n">q</span><span class="p">],</span> <span class="bp">self</span><span class="o">.</span><span class="n">Li</span><span class="p">[</span><span class="n">i</span><span class="p">],</span>
+                                                           <span class="n">l_cut</span><span class="p">[</span><span class="mi">2</span><span class="p">]))</span><span class="o">**</span><span class="mi">2</span> <span class="o">/</span> <span class="n">y</span><span class="p">[</span><span class="n">q</span><span class="p">]</span><span class="o">**</span><span class="mi">2</span><span class="p">)</span>
+                <span class="n">x2_nw</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sum</span><span class="p">((</span><span class="n">y</span><span class="p">[</span><span class="n">q</span><span class="p">]</span> <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">dd_combined_fit</span><span class="p">(</span><span class="n">ddparams</span><span class="p">,</span> <span class="n">x</span><span class="p">[</span><span class="n">q</span><span class="p">],</span> <span class="bp">self</span><span class="o">.</span><span class="n">Li</span><span class="p">[</span><span class="n">i</span><span class="p">],</span>
+                                                            <span class="n">l_cut</span><span class="p">[</span><span class="mi">2</span><span class="p">]))</span><span class="o">**</span><span class="mi">2</span><span class="p">)</span>
+                <span class="n">dd_x2</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">+=</span> <span class="n">x2_w</span>
+                <span class="n">dd_x2</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">+=</span> <span class="n">x2_nw</span>
+                <span class="n">dd_x2s</span><span class="p">[</span><span class="n">j</span><span class="p">,</span> <span class="n">i</span><span class="p">,</span> <span class="p">:]</span> <span class="o">=</span> <span class="p">[</span><span class="n">x2_w</span><span class="p">,</span> <span class="n">x2_nw</span><span class="p">]</span>
+
+            <span class="n">dd_ic</span><span class="p">[</span><span class="n">j</span><span class="p">,</span> <span class="p">:]</span> <span class="o">=</span> <span class="n">dd_x2</span>
+
+        <span class="n">np</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="s1">&#39;</span><span class="si">{}</span><span class="s1">/Ns.npy&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">data_save_folder</span><span class="p">),</span> <span class="n">Ns</span><span class="p">)</span>
+        <span class="n">np</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="s1">&#39;</span><span class="si">{}</span><span class="s1">/dd_ic.npy&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">data_save_folder</span><span class="p">),</span> <span class="n">dd_ic</span><span class="p">)</span>
+        <span class="n">np</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="s1">&#39;</span><span class="si">{}</span><span class="s1">/dd_x2s.npy&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">data_save_folder</span><span class="p">),</span> <span class="n">dd_x2s</span><span class="p">)</span>
+        <span class="n">np</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="s1">&#39;</span><span class="si">{}</span><span class="s1">/dd_params_full.npy&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">data_save_folder</span><span class="p">),</span> <span class="n">dd_params</span><span class="p">)</span>
+        <span class="n">np</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="s1">&#39;</span><span class="si">{}</span><span class="s1">/l_cut.npy&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">data_save_folder</span><span class="p">),</span> <span class="n">l_cut</span><span class="p">)</span>
+
+        <span class="c1"># Use the relative sum-of-square-residuals as the metric for deciding</span>
+        <span class="c1"># which polynomial order is the best, but with an AIC complexity factor.</span>
+        <span class="n">N_ind</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">unravel_index</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">argmin</span><span class="p">(</span><span class="n">dd_ic</span><span class="p">[:,</span> <span class="mi">0</span><span class="p">]</span> <span class="o">+</span> <span class="mi">2</span><span class="o">*</span><span class="n">Ns</span><span class="p">),</span> <span class="n">dd_ic</span><span class="p">[:,</span> <span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">shape</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span>
+        <span class="n">dd_params_final</span> <span class="o">=</span> <span class="n">dd_params</span><span class="p">[</span><span class="n">N_ind</span><span class="p">,</span> <span class="p">:,</span> <span class="p">:</span><span class="n">Ns</span><span class="p">[</span><span class="n">N_ind</span><span class="p">]]</span>
+        <span class="n">np</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="s1">&#39;</span><span class="si">{}</span><span class="s1">/dd_params.npy&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">data_save_folder</span><span class="p">),</span> <span class="n">dd_params_final</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="FitPSFPerturbations.min_parallel_dd_param_fit">
+<a class="viewcode-back" href="../../api/macauff.FitPSFPerturbations.html#macauff.FitPSFPerturbations.min_parallel_dd_param_fit">[docs]</a>
+    <span class="k">def</span> <span class="nf">min_parallel_dd_param_fit</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">iterable</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Wrapper function for calculating the best-fit polynomial parameters</span>
+<span class="sd">        for describing skew-normal distribution parameters as a function of</span>
+<span class="sd">        relative perturber flux.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        iterable : list</span>
+<span class="sd">            The parameters passed through ``multiprocessing``, including</span>
+<span class="sd">            index of polynomial order, the list of polynomial orders being</span>
+<span class="sd">            fit across all parallel threads, the set of skew-normal</span>
+<span class="sd">            distribution parameters at all fluxes, the fluxes evaluated for</span>
+<span class="sd">            perturbation offsets, and the maximum perturber position.</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        j : integer</span>
+<span class="sd">            The index into the polynomial order array.</span>
+<span class="sd">        N : integer</span>
+<span class="sd">            The polynomial order being fit.</span>
+<span class="sd">        resses : list</span>
+<span class="sd">            A list containing the best-fit polynomial weights for each</span>
+<span class="sd">            parameters in the skew-normal distributuon (Gaussian sigma, mean,</span>
+<span class="sd">            skewness, amplitude) and linear-regime radius cutoff.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">def</span> <span class="nf">sum_poly</span><span class="p">(</span><span class="n">p</span><span class="p">,</span> <span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">):</span>
+<span class="w">            </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">            Computes the sum-of-squares goodness-of-fit of a polynomial to</span>
+<span class="sd">            some data, and returns it and its first-order derivative with</span>
+<span class="sd">            respect to the polynomial parameters.</span>
+
+<span class="sd">            Parameters</span>
+<span class="sd">            ----------</span>
+<span class="sd">            p : list</span>
+<span class="sd">                The polynomial weights.</span>
+<span class="sd">            x : numpy.ndarray</span>
+<span class="sd">                Values at which to evaluate the polynomial</span>
+<span class="sd">            y : numpy.ndarray</span>
+<span class="sd">                The data points, each of which corresponds to an element in</span>
+<span class="sd">                ``x``.</span>
+
+<span class="sd">            Returns</span>
+<span class="sd">            -------</span>
+<span class="sd">            numpy.ndarray</span>
+<span class="sd">                The sum-of-squares between the model and data `y`, as well as</span>
+<span class="sd">                the derivative of the sum-of-squares with respect to each</span>
+<span class="sd">                parameter in the list `p`.</span>
+<span class="sd">            &quot;&quot;&quot;</span>
+            <span class="n">f</span><span class="p">,</span> <span class="n">df</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">fit_poly</span><span class="p">(</span><span class="n">p</span><span class="p">,</span> <span class="n">x</span><span class="p">)</span>
+            <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">sum</span><span class="p">((</span><span class="n">y</span> <span class="o">-</span> <span class="n">f</span><span class="p">)</span><span class="o">**</span><span class="mi">2</span><span class="p">),</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="n">np</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="o">-</span><span class="mi">2</span> <span class="o">*</span> <span class="p">(</span><span class="n">y</span> <span class="o">-</span> <span class="n">f</span><span class="p">)</span> <span class="o">*</span> <span class="n">q</span><span class="p">)</span> <span class="k">for</span> <span class="n">q</span> <span class="ow">in</span> <span class="n">df</span><span class="p">])</span>
+
+        <span class="n">j</span><span class="p">,</span> <span class="p">(</span><span class="n">Ns</span><span class="p">,</span> <span class="n">dd_skew_pars</span><span class="p">,</span> <span class="n">Li</span><span class="p">,</span> <span class="n">dcut</span><span class="p">)</span> <span class="o">=</span> <span class="n">iterable</span>
+        <span class="n">N</span> <span class="o">=</span> <span class="n">Ns</span><span class="p">[</span><span class="n">j</span><span class="p">]</span>
+        <span class="n">resses</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">dd_skew_pars</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">]):</span>
+            <span class="c1"># Filter for any &quot;non-fit&quot; fluxes, which are indicated by having</span>
+            <span class="c1"># a linear-regime cutoff radius larger than the maximum extent</span>
+            <span class="c1"># of dd probed.</span>
+            <span class="n">q</span> <span class="o">=</span> <span class="n">dd_skew_pars</span><span class="p">[:,</span> <span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">&lt;</span> <span class="n">dcut</span>
+            <span class="n">resses</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">minimize</span><span class="p">(</span><span class="n">sum_poly</span><span class="p">,</span> <span class="n">x0</span><span class="o">=</span><span class="p">[</span><span class="mf">0.5</span><span class="p">]</span><span class="o">*</span><span class="n">N</span><span class="p">,</span>
+                                   <span class="n">args</span><span class="o">=</span><span class="p">(</span><span class="n">Li</span><span class="p">[</span><span class="n">q</span><span class="p">],</span> <span class="n">dd_skew_pars</span><span class="p">[</span><span class="n">q</span><span class="p">,</span> <span class="n">i</span><span class="p">]),</span>
+                                   <span class="n">jac</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">method</span><span class="o">=</span><span class="s1">&#39;L-BFGS-B&#39;</span><span class="p">,</span> <span class="n">options</span><span class="o">=</span><span class="p">{</span><span class="s1">&#39;ftol&#39;</span><span class="p">:</span> <span class="mf">1e-12</span><span class="p">})</span><span class="o">.</span><span class="n">x</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">j</span><span class="p">,</span> <span class="n">N</span><span class="p">,</span> <span class="n">resses</span></div>
+
+
+<div class="viewcode-block" id="FitPSFPerturbations.fit_poly">
+<a class="viewcode-back" href="../../api/macauff.FitPSFPerturbations.html#macauff.FitPSFPerturbations.fit_poly">[docs]</a>
+    <span class="k">def</span> <span class="nf">fit_poly</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">p</span><span class="p">,</span> <span class="n">x</span><span class="p">):</span>
+<span class="w">        </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Wrapper function for evaluating a polynomial with weights `p` at</span>
+<span class="sd">        all `x`, :math:`y_j = \sum_{i=0}^N p_i x_j^i`, and its derivative with</span>
+<span class="sd">        respect to each parameter `p`.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        p : list or numpy.ndarray</span>
+<span class="sd">            The weights of the polynomial.</span>
+<span class="sd">        x : numpy.ndarray</span>
+<span class="sd">            Values at which to calculate the polynomial.</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        y : numpy.ndarray</span>
+<span class="sd">            The evaluation of the polynomial with parameters `p` at</span>
+<span class="sd">            each `x`.</span>
+<span class="sd">        dy : list</span>
+<span class="sd">            The derivative of `y` with respect to each `p_i` parameter.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">x</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">atleast_1d</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
+        <span class="n">y</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">empty</span><span class="p">((</span><span class="nb">len</span><span class="p">(</span><span class="n">p</span><span class="p">),</span> <span class="nb">len</span><span class="p">(</span><span class="n">x</span><span class="p">)),</span> <span class="nb">float</span><span class="p">)</span>
+        <span class="c1"># y = sum_i=0^N p_i x**i</span>
+        <span class="n">y</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="p">:]</span> <span class="o">=</span> <span class="n">p</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+        <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">p</span><span class="p">)):</span>
+            <span class="n">y</span><span class="p">[</span><span class="n">i</span><span class="p">,</span> <span class="p">:]</span> <span class="o">=</span> <span class="n">y</span><span class="p">[</span><span class="n">i</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="p">:]</span> <span class="o">*</span> <span class="n">x</span> <span class="o">/</span> <span class="n">p</span><span class="p">[</span><span class="n">i</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">*</span> <span class="n">p</span><span class="p">[</span><span class="n">i</span><span class="p">]</span>
+
+        <span class="n">y</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">y</span><span class="p">,</span> <span class="n">axis</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+
+        <span class="n">dy</span> <span class="o">=</span> <span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">ones_like</span><span class="p">(</span><span class="n">x</span><span class="p">)]</span>
+        <span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">p</span><span class="p">)):</span>
+            <span class="n">dy</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">dy</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">*</span> <span class="n">x</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">y</span><span class="p">,</span> <span class="n">dy</span></div>
+
+
+<div class="viewcode-block" id="FitPSFPerturbations.return_ddparams">
+<a class="viewcode-back" href="../../api/macauff.FitPSFPerturbations.html#macauff.FitPSFPerturbations.return_ddparams">[docs]</a>
+    <span class="k">def</span> <span class="nf">return_ddparams</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">Li</span><span class="p">,</span> <span class="n">l_cut</span><span class="p">,</span> <span class="n">dd_params</span><span class="p">,</span> <span class="n">N</span><span class="p">,</span> <span class="n">N_ind</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Convenience function for deriving skew-normal distribution parameters</span>
+<span class="sd">        as a function of perturber flux from fit polynomial distributions.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        Li : float</span>
+<span class="sd">            The flux of the perturber relative to the flux of the central source.</span>
+<span class="sd">        l_cut : list or numpy.ndarray</span>
+<span class="sd">            List of key cut-off relative fluxes, at which parameterisations of</span>
+<span class="sd">            perturber effects change.</span>
+<span class="sd">        dd_params : numpy.ndarray</span>
+<span class="sd">            Array of polynomial weights for each skew-normal distribution</span>
+<span class="sd">            parameter, for multiple polynomial orders, for parameterisations</span>
+<span class="sd">            above and below ``l_cut[1]``.</span>
+<span class="sd">        N : integer</span>
+<span class="sd">            Number of polynomial terms being used to calculate the skew-normal</span>
+<span class="sd">            distribution values.</span>
+<span class="sd">        N_ind : integer</span>
+<span class="sd">            Index of the chosen number of polynomial terms in ``dd_params``.</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        dd_skew_params : numpy.ndarray</span>
+<span class="sd">            Values of the skew-normal sigma, mean, skewness, and amplitude,</span>
+<span class="sd">            evaluated at `Li`, from a polynomial of order `N+1`.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">dd_skew_params</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="n">p</span> <span class="o">=</span> <span class="mi">0</span> <span class="k">if</span> <span class="n">Li</span> <span class="o">&lt;=</span> <span class="n">l_cut</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="k">else</span> <span class="mi">1</span>
+        <span class="k">for</span> <span class="n">q</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">dd_params</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">]):</span>
+            <span class="n">dd_skew_params</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">fit_poly</span><span class="p">(</span><span class="n">dd_params</span><span class="p">[</span><span class="n">N_ind</span><span class="p">,</span> <span class="n">q</span><span class="p">,</span> <span class="p">:</span><span class="n">N</span><span class="p">,</span> <span class="n">p</span><span class="p">],</span> <span class="n">Li</span><span class="p">)[</span><span class="mi">0</span><span class="p">])</span>
+        <span class="n">dd_skew_params</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">dd_skew_params</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">dd_skew_params</span></div>
+
+
+<div class="viewcode-block" id="FitPSFPerturbations.dd_combined_fit">
+<a class="viewcode-back" href="../../api/macauff.FitPSFPerturbations.html#macauff.FitPSFPerturbations.dd_combined_fit">[docs]</a>
+    <span class="k">def</span> <span class="nf">dd_combined_fit</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">p</span><span class="p">,</span> <span class="n">x</span><span class="p">,</span> <span class="n">L</span><span class="p">,</span> <span class="n">l_cut</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Wrapper function for calculating the combined description of the</span>
+<span class="sd">        perturber offsets as a linear relation up to a particular offset</span>
+<span class="sd">        and a skew-normal distribution beyond that.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        p : list</span>
+<span class="sd">            The values of the skew-normal distribution (sigma, mean, skewness,</span>
+<span class="sd">            amplitude), as well as the cutoff radius inside which to follow</span>
+<span class="sd">            a linear relation.</span>
+<span class="sd">        x : numpy.ndarray</span>
+<span class="sd">            Values at which to evaluate the offset due to a blended perturber.</span>
+<span class="sd">        L : float</span>
+<span class="sd">            Relative flux of the perturber as compared with the central object.</span>
+<span class="sd">        l_cut : float</span>
+<span class="sd">            Cutoff relative flux, above which no skew-normal distribution is</span>
+<span class="sd">            used at all.</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        y : numpy.ndarray</span>
+<span class="sd">            The composite perturbation function, linear within ``p[-1]`` and</span>
+<span class="sd">            a skew-normal distribution outside.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">L</span> <span class="o">&gt;=</span> <span class="n">l_cut</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">x</span> <span class="o">*</span> <span class="n">L</span> <span class="o">/</span> <span class="p">(</span><span class="n">L</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)</span>
+        <span class="n">y</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">empty_like</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
+        <span class="n">q</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">x</span> <span class="o">&lt;=</span> <span class="n">p</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">])</span>
+        <span class="n">y</span><span class="p">[</span><span class="n">q</span><span class="p">]</span> <span class="o">=</span> <span class="n">x</span><span class="p">[</span><span class="n">q</span><span class="p">]</span> <span class="o">*</span> <span class="n">L</span> <span class="o">/</span> <span class="p">(</span><span class="n">L</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)</span>
+        <span class="n">q</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">x</span> <span class="o">&gt;</span> <span class="n">p</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">])</span>
+        <span class="n">y</span><span class="p">[</span><span class="n">q</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">fit_one_skew</span><span class="p">(</span><span class="n">p</span><span class="p">[:</span><span class="o">-</span><span class="mi">1</span><span class="p">],</span> <span class="n">x</span><span class="p">[</span><span class="n">q</span><span class="p">],</span> <span class="n">L</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span>
+        <span class="k">return</span> <span class="n">y</span></div>
+
+
+<div class="viewcode-block" id="FitPSFPerturbations.plot_fits">
+<a class="viewcode-back" href="../../api/macauff.FitPSFPerturbations.html#macauff.FitPSFPerturbations.plot_fits">[docs]</a>
+    <span class="k">def</span> <span class="nf">plot_fits</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Visualisation function, plotting the various parameterisations fit in</span>
+<span class="sd">        FitPSFPerturbations, enabling quality checks to be carried out.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">dd</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="s1">&#39;</span><span class="si">{}</span><span class="s1">/dd_Ld.npy&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">data_save_folder</span><span class="p">))</span>
+        <span class="n">dd_skew_pars</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="s1">&#39;</span><span class="si">{}</span><span class="s1">/dd_skew_pars.npy&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">data_save_folder</span><span class="p">))</span>
+        <span class="n">Ns</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="s1">&#39;</span><span class="si">{}</span><span class="s1">/Ns.npy&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">data_save_folder</span><span class="p">))</span>
+        <span class="n">dd_ic</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="s1">&#39;</span><span class="si">{}</span><span class="s1">/dd_ic.npy&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">data_save_folder</span><span class="p">))</span>
+        <span class="n">dd_x2s</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="s1">&#39;</span><span class="si">{}</span><span class="s1">/dd_x2s.npy&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">data_save_folder</span><span class="p">))</span>
+        <span class="n">l_cut</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="s1">&#39;</span><span class="si">{}</span><span class="s1">/l_cut.npy&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">data_save_folder</span><span class="p">))</span>
+        <span class="n">dd_params_full</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="s1">&#39;</span><span class="si">{}</span><span class="s1">/dd_params_full.npy&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">data_save_folder</span><span class="p">))</span>
+        <span class="n">N_ind</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">unravel_index</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">argmin</span><span class="p">(</span><span class="n">dd_ic</span><span class="p">[:,</span> <span class="mi">0</span><span class="p">]</span> <span class="o">+</span> <span class="mi">2</span><span class="o">*</span><span class="n">Ns</span><span class="p">),</span> <span class="n">dd_ic</span><span class="p">[:,</span> <span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">shape</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span>
+
+        <span class="n">plt</span><span class="o">.</span><span class="n">figure</span><span class="p">(</span><span class="s1">&#39;figure&#39;</span><span class="p">,</span> <span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">40</span><span class="p">,</span> <span class="mi">16</span><span class="p">))</span>
+        <span class="n">gs</span> <span class="o">=</span> <span class="n">gridspec</span><span class="o">.</span><span class="n">GridSpec</span><span class="p">(</span><span class="mi">2</span><span class="p">,</span> <span class="mi">4</span><span class="p">)</span>
+        <span class="n">norm</span> <span class="o">=</span> <span class="n">Normalize</span><span class="p">(</span><span class="n">vmin</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">Li</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">vmax</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">Li</span><span class="p">[</span><span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">Li</span><span class="p">)</span><span class="o">-</span><span class="mi">1</span><span class="p">])</span>
+        <span class="n">ax</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">subplot</span><span class="p">(</span><span class="n">gs</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">])</span>
+        <span class="c1"># Work backwards from maximum Li to minimum in 0.05 Li steps.</span>
+        <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">Li</span><span class="p">)</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="o">-</span><span class="nb">int</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">ceil</span><span class="p">(</span><span class="mf">0.05</span><span class="o">/</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">Li</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">Li</span><span class="p">[</span><span class="mi">0</span><span class="p">])))):</span>
+            <span class="n">x</span> <span class="o">=</span> <span class="n">dd</span><span class="p">[</span><span class="n">i</span><span class="p">,</span> <span class="p">:,</span> <span class="mi">1</span><span class="p">]</span> <span class="o">/</span> <span class="bp">self</span><span class="o">.</span><span class="n">psf_sig</span>
+            <span class="n">y</span> <span class="o">=</span> <span class="n">dd</span><span class="p">[</span><span class="n">i</span><span class="p">,</span> <span class="p">:,</span> <span class="mi">0</span><span class="p">]</span> <span class="o">/</span> <span class="bp">self</span><span class="o">.</span><span class="n">psf_sig</span>
+            <span class="n">q</span> <span class="o">=</span> <span class="p">(</span><span class="o">~</span><span class="n">np</span><span class="o">.</span><span class="n">isnan</span><span class="p">(</span><span class="n">x</span><span class="p">))</span> <span class="o">&amp;</span> <span class="p">(</span><span class="o">~</span><span class="n">np</span><span class="o">.</span><span class="n">isnan</span><span class="p">(</span><span class="n">y</span><span class="p">))</span>
+            <span class="n">x</span><span class="p">,</span> <span class="n">y</span> <span class="o">=</span> <span class="n">x</span><span class="p">[</span><span class="n">q</span><span class="p">],</span> <span class="n">y</span><span class="p">[</span><span class="n">q</span><span class="p">]</span>
+            <span class="n">ax</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">,</span> <span class="n">ls</span><span class="o">=</span><span class="s1">&#39;-&#39;</span><span class="p">,</span> <span class="n">c</span><span class="o">=</span><span class="n">cm</span><span class="o">.</span><span class="n">viridis</span><span class="p">(</span><span class="n">norm</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">Li</span><span class="p">[</span><span class="n">i</span><span class="p">])))</span>
+
+            <span class="n">ddparams</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">return_ddparams</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">Li</span><span class="p">[</span><span class="n">i</span><span class="p">],</span> <span class="n">l_cut</span><span class="p">,</span> <span class="n">dd_params_full</span><span class="p">,</span>
+                                            <span class="n">Ns</span><span class="p">[</span><span class="n">N_ind</span><span class="p">],</span> <span class="n">N_ind</span><span class="p">)</span>
+            <span class="n">ax</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">dd_combined_fit</span><span class="p">(</span><span class="n">ddparams</span><span class="p">,</span> <span class="n">x</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">Li</span><span class="p">[</span><span class="n">i</span><span class="p">],</span> <span class="n">l_cut</span><span class="p">[</span><span class="mi">2</span><span class="p">]),</span> <span class="n">ls</span><span class="o">=</span><span class="s1">&#39;--&#39;</span><span class="p">,</span>
+                    <span class="n">c</span><span class="o">=</span><span class="n">cm</span><span class="o">.</span><span class="n">viridis</span><span class="p">(</span><span class="n">norm</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">Li</span><span class="p">[</span><span class="n">i</span><span class="p">])))</span>
+
+        <span class="k">if</span> <span class="n">usetex</span><span class="p">:</span>
+            <span class="n">ax</span><span class="o">.</span><span class="n">set_xlabel</span><span class="p">(</span><span class="sa">r</span><span class="s1">&#39;$x / \sigma_\mathrm</span><span class="si">{PSF}</span><span class="s1">$&#39;</span><span class="p">)</span>
+            <span class="n">ax</span><span class="o">.</span><span class="n">set_ylabel</span><span class="p">(</span><span class="sa">r</span><span class="s1">&#39;$\Delta x / \sigma_\mathrm</span><span class="si">{PSF}</span><span class="s1">$&#39;</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">ax</span><span class="o">.</span><span class="n">set_xlabel</span><span class="p">(</span><span class="sa">r</span><span class="s1">&#39;x / sigma_PSF&#39;</span><span class="p">)</span>
+            <span class="n">ax</span><span class="o">.</span><span class="n">set_ylabel</span><span class="p">(</span><span class="sa">r</span><span class="s1">&#39;Delta x / sigma_PSF&#39;</span><span class="p">)</span>
+
+        <span class="n">ax</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">subplot</span><span class="p">(</span><span class="n">gs</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">])</span>
+        <span class="k">if</span> <span class="n">usetex</span><span class="p">:</span>
+            <span class="n">label_list</span> <span class="o">=</span> <span class="p">[</span><span class="sa">r</span><span class="s1">&#39;$\sigma$&#39;</span><span class="p">,</span> <span class="sa">r</span><span class="s1">&#39;$\mu$&#39;</span><span class="p">,</span> <span class="sa">r</span><span class="s1">&#39;$\alpha$&#39;</span><span class="p">,</span> <span class="sa">r</span><span class="s1">&#39;$T$&#39;</span><span class="p">,</span> <span class="sa">r</span><span class="s1">&#39;$r_\mathrm</span><span class="si">{c}</span><span class="s1">$&#39;</span><span class="p">]</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">label_list</span> <span class="o">=</span> <span class="p">[</span><span class="sa">r</span><span class="s1">&#39;sigma&#39;</span><span class="p">,</span> <span class="sa">r</span><span class="s1">&#39;mu&#39;</span><span class="p">,</span> <span class="sa">r</span><span class="s1">&#39;alpha&#39;</span><span class="p">,</span> <span class="sa">r</span><span class="s1">&#39;T&#39;</span><span class="p">,</span> <span class="sa">r</span><span class="s1">&#39;r_c&#39;</span><span class="p">]</span>
+        <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="p">(</span><span class="n">label</span><span class="p">,</span> <span class="n">c</span><span class="p">,</span> <span class="n">c2</span><span class="p">)</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="nb">zip</span><span class="p">(</span><span class="n">label_list</span><span class="p">,</span> <span class="p">[</span><span class="s1">&#39;k&#39;</span><span class="p">,</span> <span class="s1">&#39;r&#39;</span><span class="p">,</span> <span class="s1">&#39;b&#39;</span><span class="p">,</span> <span class="s1">&#39;g&#39;</span><span class="p">,</span> <span class="s1">&#39;purple&#39;</span><span class="p">],</span>
+                                           <span class="p">[</span><span class="s1">&#39;gray&#39;</span><span class="p">,</span> <span class="s1">&#39;orange&#39;</span><span class="p">,</span> <span class="s1">&#39;aquamarine&#39;</span><span class="p">,</span> <span class="s1">&#39;olive&#39;</span><span class="p">,</span> <span class="s1">&#39;violet&#39;</span><span class="p">])):</span>
+            <span class="n">ax</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">Li</span><span class="p">,</span> <span class="n">dd_skew_pars</span><span class="p">[:,</span> <span class="n">i</span><span class="p">],</span> <span class="n">ls</span><span class="o">=</span><span class="s1">&#39;-&#39;</span><span class="p">,</span> <span class="n">c</span><span class="o">=</span><span class="n">c</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="s1">&#39;</span><span class="si">{}</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">label</span><span class="p">))</span>
+            <span class="n">q</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">Li</span> <span class="o">&lt;=</span> <span class="n">l_cut</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
+            <span class="n">ax</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">Li</span><span class="p">[</span><span class="n">q</span><span class="p">],</span> <span class="bp">self</span><span class="o">.</span><span class="n">fit_poly</span><span class="p">(</span><span class="n">dd_params_full</span><span class="p">[</span><span class="n">N_ind</span><span class="p">,</span> <span class="n">i</span><span class="p">,</span> <span class="p">:</span><span class="n">Ns</span><span class="p">[</span><span class="n">N_ind</span><span class="p">],</span> <span class="mi">0</span><span class="p">],</span>
+                                              <span class="bp">self</span><span class="o">.</span><span class="n">Li</span><span class="p">[</span><span class="n">q</span><span class="p">])[</span><span class="mi">0</span><span class="p">],</span> <span class="n">ls</span><span class="o">=</span><span class="s1">&#39;--&#39;</span><span class="p">,</span> <span class="n">c</span><span class="o">=</span><span class="n">c2</span><span class="p">,</span> <span class="n">lw</span><span class="o">=</span><span class="mi">4</span><span class="p">)</span>
+            <span class="n">q</span> <span class="o">=</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">Li</span> <span class="o">&gt;</span> <span class="n">l_cut</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span> <span class="o">&amp;</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">Li</span> <span class="o">&lt;</span> <span class="n">l_cut</span><span class="p">[</span><span class="mi">2</span><span class="p">])</span>
+            <span class="n">ax</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">Li</span><span class="p">[</span><span class="n">q</span><span class="p">],</span> <span class="bp">self</span><span class="o">.</span><span class="n">fit_poly</span><span class="p">(</span><span class="n">dd_params_full</span><span class="p">[</span><span class="n">N_ind</span><span class="p">,</span> <span class="n">i</span><span class="p">,</span> <span class="p">:</span><span class="n">Ns</span><span class="p">[</span><span class="n">N_ind</span><span class="p">],</span> <span class="mi">1</span><span class="p">],</span>
+                                              <span class="bp">self</span><span class="o">.</span><span class="n">Li</span><span class="p">[</span><span class="n">q</span><span class="p">])[</span><span class="mi">0</span><span class="p">],</span> <span class="n">ls</span><span class="o">=</span><span class="s1">&#39;-.&#39;</span><span class="p">,</span> <span class="n">c</span><span class="o">=</span><span class="n">c2</span><span class="p">,</span> <span class="n">lw</span><span class="o">=</span><span class="mi">4</span><span class="p">)</span>
+
+        <span class="n">ax</span><span class="o">.</span><span class="n">legend</span><span class="p">(</span><span class="n">fontsize</span><span class="o">=</span><span class="mi">14</span><span class="p">,</span> <span class="n">ncol</span><span class="o">=</span><span class="mi">2</span><span class="p">)</span>
+        <span class="n">ax</span><span class="o">.</span><span class="n">set_xlabel</span><span class="p">(</span><span class="s1">&#39;Relative perturber flux&#39;</span><span class="p">)</span>
+        <span class="n">ax</span><span class="o">.</span><span class="n">set_ylabel</span><span class="p">(</span><span class="s1">&#39;Perturbation terms&#39;</span><span class="p">)</span>
+
+        <span class="n">ax</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">subplot</span><span class="p">(</span><span class="n">gs</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">2</span><span class="p">])</span>
+        <span class="n">ax1</span> <span class="o">=</span> <span class="n">ax</span><span class="o">.</span><span class="n">twinx</span><span class="p">()</span>
+        <span class="n">ax</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">Ns</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">log10</span><span class="p">(</span><span class="n">dd_ic</span><span class="p">[:,</span> <span class="mi">1</span><span class="p">]),</span> <span class="n">ls</span><span class="o">=</span><span class="s1">&#39;-&#39;</span><span class="p">,</span> <span class="n">c</span><span class="o">=</span><span class="s1">&#39;k&#39;</span><span class="p">)</span>
+        <span class="n">ax</span><span class="o">.</span><span class="n">axvline</span><span class="p">(</span><span class="n">Ns</span><span class="p">[</span><span class="n">N_ind</span><span class="p">],</span> <span class="n">ls</span><span class="o">=</span><span class="s1">&#39;-&#39;</span><span class="p">,</span> <span class="n">c</span><span class="o">=</span><span class="s1">&#39;k&#39;</span><span class="p">)</span>
+        <span class="n">ax1</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">Ns</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">log10</span><span class="p">(</span><span class="n">dd_ic</span><span class="p">[:,</span> <span class="mi">0</span><span class="p">]),</span> <span class="n">ls</span><span class="o">=</span><span class="s1">&#39;-&#39;</span><span class="p">,</span> <span class="n">c</span><span class="o">=</span><span class="s1">&#39;r&#39;</span><span class="p">)</span>
+
+        <span class="n">ax</span><span class="o">.</span><span class="n">set_xlabel</span><span class="p">(</span><span class="s1">&#39;Order of polynomial fit&#39;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">usetex</span><span class="p">:</span>
+            <span class="n">ax</span><span class="o">.</span><span class="n">set_ylabel</span><span class="p">(</span><span class="sa">r</span><span class="s1">&#39;$\mathrm</span><span class="si">{log}</span><span class="s1">_</span><span class="si">{10}</span><span class="s1">(\sum_i (y_i - f(x_i))^2)$&#39;</span><span class="p">)</span>
+            <span class="n">ax1</span><span class="o">.</span><span class="n">set_ylabel</span><span class="p">(</span><span class="sa">r</span><span class="s1">&#39;$\mathrm</span><span class="si">{log}</span><span class="s1">_</span><span class="si">{10}</span><span class="s1">(\sum_i \frac{(y_i - f(x_i))^2}{y_i^2})$&#39;</span><span class="p">,</span> <span class="n">c</span><span class="o">=</span><span class="s1">&#39;r&#39;</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">ax</span><span class="o">.</span><span class="n">set_ylabel</span><span class="p">(</span><span class="sa">r</span><span class="s1">&#39;log10(sum_i (y_i - f(x_i))**2)&#39;</span><span class="p">)</span>
+            <span class="n">ax1</span><span class="o">.</span><span class="n">set_ylabel</span><span class="p">(</span><span class="sa">r</span><span class="s1">&#39;log10(sum_i (y_i - f(x_i))**2 / y_i**2)&#39;</span><span class="p">,</span> <span class="n">c</span><span class="o">=</span><span class="s1">&#39;r&#39;</span><span class="p">)</span>
+
+        <span class="n">ax</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">subplot</span><span class="p">(</span><span class="n">gs</span><span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">])</span>
+        <span class="n">ax1</span> <span class="o">=</span> <span class="n">ax</span><span class="o">.</span><span class="n">twinx</span><span class="p">()</span>
+        <span class="n">ax</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">Li</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">log10</span><span class="p">(</span><span class="n">dd_x2s</span><span class="p">[</span><span class="n">N_ind</span><span class="p">,</span> <span class="p">:,</span> <span class="mi">1</span><span class="p">]),</span> <span class="n">ls</span><span class="o">=</span><span class="s1">&#39;-&#39;</span><span class="p">,</span> <span class="n">c</span><span class="o">=</span><span class="s1">&#39;k&#39;</span><span class="p">)</span>
+        <span class="n">ax</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">Li</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">log10</span><span class="p">(</span><span class="n">dd_x2s</span><span class="p">[</span><span class="n">N_ind</span><span class="p">,</span> <span class="p">:,</span> <span class="mi">0</span><span class="p">]),</span> <span class="n">ls</span><span class="o">=</span><span class="s1">&#39;-&#39;</span><span class="p">,</span> <span class="n">c</span><span class="o">=</span><span class="s1">&#39;r&#39;</span><span class="p">)</span>
+
+        <span class="n">ax</span><span class="o">.</span><span class="n">set_xlabel</span><span class="p">(</span><span class="s1">&#39;Relative perturber flux&#39;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">usetex</span><span class="p">:</span>
+            <span class="n">ax</span><span class="o">.</span><span class="n">set_ylabel</span><span class="p">(</span><span class="sa">r</span><span class="s1">&#39;$\mathrm</span><span class="si">{log}</span><span class="s1">_</span><span class="si">{10}</span><span class="s1">(\sum_i (y_i - f(x_i))^2)$&#39;</span><span class="p">)</span>
+            <span class="n">ax1</span><span class="o">.</span><span class="n">set_ylabel</span><span class="p">(</span><span class="sa">r</span><span class="s1">&#39;$\mathrm</span><span class="si">{log}</span><span class="s1">_</span><span class="si">{10}</span><span class="s1">(\sum_i \frac{(y_i - f(x_i))^2}{y_i^2})$&#39;</span><span class="p">,</span> <span class="n">c</span><span class="o">=</span><span class="s1">&#39;r&#39;</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">ax</span><span class="o">.</span><span class="n">set_ylabel</span><span class="p">(</span><span class="sa">r</span><span class="s1">&#39;log10(sum_i (y_i - f(x_i))**2)&#39;</span><span class="p">)</span>
+            <span class="n">ax1</span><span class="o">.</span><span class="n">set_ylabel</span><span class="p">(</span><span class="sa">r</span><span class="s1">&#39;log10(sum_i (y_i - f(x_i))**2 / y_i**2)&#39;</span><span class="p">,</span> <span class="n">c</span><span class="o">=</span><span class="s1">&#39;r&#39;</span><span class="p">)</span>
+
+        <span class="n">ax</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">subplot</span><span class="p">(</span><span class="n">gs</span><span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">])</span>
+        <span class="n">max_perc_diff</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">empty_like</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">Li</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">Li</span><span class="p">)):</span>
+            <span class="n">x</span> <span class="o">=</span> <span class="n">dd</span><span class="p">[</span><span class="n">i</span><span class="p">,</span> <span class="mi">1</span><span class="p">:,</span> <span class="mi">1</span><span class="p">]</span> <span class="o">/</span> <span class="bp">self</span><span class="o">.</span><span class="n">psf_sig</span>
+            <span class="n">y</span> <span class="o">=</span> <span class="n">dd</span><span class="p">[</span><span class="n">i</span><span class="p">,</span> <span class="mi">1</span><span class="p">:,</span> <span class="mi">0</span><span class="p">]</span> <span class="o">/</span> <span class="bp">self</span><span class="o">.</span><span class="n">psf_sig</span>
+            <span class="n">q</span> <span class="o">=</span> <span class="p">(</span><span class="o">~</span><span class="n">np</span><span class="o">.</span><span class="n">isnan</span><span class="p">(</span><span class="n">x</span><span class="p">))</span> <span class="o">&amp;</span> <span class="p">(</span><span class="o">~</span><span class="n">np</span><span class="o">.</span><span class="n">isnan</span><span class="p">(</span><span class="n">y</span><span class="p">))</span>
+            <span class="n">x</span><span class="p">,</span> <span class="n">y</span> <span class="o">=</span> <span class="n">x</span><span class="p">[</span><span class="n">q</span><span class="p">],</span> <span class="n">y</span><span class="p">[</span><span class="n">q</span><span class="p">]</span>
+            <span class="n">ddparams</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">return_ddparams</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">Li</span><span class="p">[</span><span class="n">i</span><span class="p">],</span> <span class="n">l_cut</span><span class="p">,</span> <span class="n">dd_params_full</span><span class="p">,</span> <span class="n">Ns</span><span class="p">[</span><span class="n">N_ind</span><span class="p">],</span> <span class="n">N_ind</span><span class="p">)</span>
+            <span class="n">max_perc_diff</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">amax</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">abs</span><span class="p">((</span><span class="bp">self</span><span class="o">.</span><span class="n">dd_combined_fit</span><span class="p">(</span><span class="n">ddparams</span><span class="p">,</span> <span class="n">x</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">Li</span><span class="p">[</span><span class="n">i</span><span class="p">],</span>
+                                               <span class="n">l_cut</span><span class="p">[</span><span class="mi">2</span><span class="p">])</span> <span class="o">-</span> <span class="n">y</span><span class="p">)</span> <span class="o">/</span> <span class="p">(</span><span class="n">y</span> <span class="o">+</span> <span class="mf">1e-5</span><span class="p">)))</span>
+        <span class="n">ax</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">Li</span><span class="p">,</span> <span class="n">max_perc_diff</span><span class="p">,</span> <span class="n">ls</span><span class="o">=</span><span class="s1">&#39;-&#39;</span><span class="p">,</span> <span class="n">c</span><span class="o">=</span><span class="s1">&#39;k&#39;</span><span class="p">)</span>
+
+        <span class="n">ax</span><span class="o">.</span><span class="n">set_xlabel</span><span class="p">(</span><span class="s1">&#39;Relative perturber flux&#39;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">usetex</span><span class="p">:</span>
+            <span class="n">ax</span><span class="o">.</span><span class="n">set_ylabel</span><span class="p">(</span><span class="sa">r</span><span class="s1">&#39;Max $\lvert\frac{\Delta x_\mathrm</span><span class="si">{f}</span><span class="s1"> / \sigma_\mathrm</span><span class="si">{PSF}</span><span class="s1"> - &#39;</span>
+                          <span class="sa">r</span><span class="s1">&#39;\Delta x_\mathrm</span><span class="si">{t}</span><span class="s1"> / \sigma_\mathrm</span><span class="si">{PSF}</span><span class="s1">}{\Delta x_\mathrm</span><span class="si">{t}</span><span class="s1"> / &#39;</span>
+                          <span class="sa">r</span><span class="s1">&#39;\sigma_\mathrm</span><span class="si">{PSF}</span><span class="s1">}\lvert$&#39;</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">ax</span><span class="o">.</span><span class="n">set_ylabel</span><span class="p">(</span><span class="sa">r</span><span class="s1">&#39;Max abs((Delta x_f / sigma_PSF - Delta x_t / sigma_PSF) / &#39;</span>
+                          <span class="sa">r</span><span class="s1">&#39;(Delta x_t / sigma_PSF))&#39;</span><span class="p">)</span>
+
+        <span class="n">ax</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">subplot</span><span class="p">(</span><span class="n">gs</span><span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">])</span>
+        <span class="n">max_abs_diff</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">empty_like</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">Li</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">Li</span><span class="p">)):</span>
+            <span class="n">x</span> <span class="o">=</span> <span class="n">dd</span><span class="p">[</span><span class="n">i</span><span class="p">,</span> <span class="mi">1</span><span class="p">:,</span> <span class="mi">1</span><span class="p">]</span> <span class="o">/</span> <span class="bp">self</span><span class="o">.</span><span class="n">psf_sig</span>
+            <span class="n">y</span> <span class="o">=</span> <span class="n">dd</span><span class="p">[</span><span class="n">i</span><span class="p">,</span> <span class="mi">1</span><span class="p">:,</span> <span class="mi">0</span><span class="p">]</span> <span class="o">/</span> <span class="bp">self</span><span class="o">.</span><span class="n">psf_sig</span>
+            <span class="n">q</span> <span class="o">=</span> <span class="p">(</span><span class="o">~</span><span class="n">np</span><span class="o">.</span><span class="n">isnan</span><span class="p">(</span><span class="n">x</span><span class="p">))</span> <span class="o">&amp;</span> <span class="p">(</span><span class="o">~</span><span class="n">np</span><span class="o">.</span><span class="n">isnan</span><span class="p">(</span><span class="n">y</span><span class="p">))</span>
+            <span class="n">x</span><span class="p">,</span> <span class="n">y</span> <span class="o">=</span> <span class="n">x</span><span class="p">[</span><span class="n">q</span><span class="p">],</span> <span class="n">y</span><span class="p">[</span><span class="n">q</span><span class="p">]</span>
+            <span class="n">ddparams</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">return_ddparams</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">Li</span><span class="p">[</span><span class="n">i</span><span class="p">],</span> <span class="n">l_cut</span><span class="p">,</span> <span class="n">dd_params_full</span><span class="p">,</span> <span class="n">Ns</span><span class="p">[</span><span class="n">N_ind</span><span class="p">],</span> <span class="n">N_ind</span><span class="p">)</span>
+            <span class="n">max_abs_diff</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">amax</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">abs</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">dd_combined_fit</span><span class="p">(</span><span class="n">ddparams</span><span class="p">,</span> <span class="n">x</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">Li</span><span class="p">[</span><span class="n">i</span><span class="p">],</span>
+                                                                  <span class="n">l_cut</span><span class="p">[</span><span class="mi">2</span><span class="p">])</span> <span class="o">-</span> <span class="n">y</span><span class="p">))</span>
+        <span class="n">ax</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">Li</span><span class="p">,</span> <span class="n">max_abs_diff</span><span class="p">,</span> <span class="n">ls</span><span class="o">=</span><span class="s1">&#39;-&#39;</span><span class="p">,</span> <span class="n">c</span><span class="o">=</span><span class="s1">&#39;k&#39;</span><span class="p">)</span>
+
+        <span class="n">ax</span><span class="o">.</span><span class="n">set_xlabel</span><span class="p">(</span><span class="s1">&#39;Relative perturber flux&#39;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">usetex</span><span class="p">:</span>
+            <span class="n">ax</span><span class="o">.</span><span class="n">set_ylabel</span><span class="p">(</span><span class="sa">r</span><span class="s1">&#39;Max $\lvert\Delta x_\mathrm</span><span class="si">{f}</span><span class="s1"> / \sigma_\mathrm</span><span class="si">{PSF}</span><span class="s1"> - &#39;</span>
+                          <span class="sa">r</span><span class="s1">&#39;\Delta x_\mathrm</span><span class="si">{t}</span><span class="s1"> / \sigma_\mathrm</span><span class="si">{PSF}</span><span class="s1">\lvert$&#39;</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">ax</span><span class="o">.</span><span class="n">set_ylabel</span><span class="p">(</span><span class="sa">r</span><span class="s1">&#39;Max abs(Delta x_f / sigma_PSF - Delta x_t / sigma_PSF)&#39;</span><span class="p">)</span>
+
+        <span class="n">diff</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">empty</span><span class="p">((</span><span class="bp">self</span><span class="o">.</span><span class="n">draw_sim_num</span><span class="p">,</span> <span class="mi">6</span><span class="p">),</span> <span class="nb">float</span><span class="p">)</span>
+        <span class="n">ij</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="n">diff</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+        <span class="n">iter_array</span> <span class="o">=</span> <span class="nb">zip</span><span class="p">(</span><span class="n">ij</span><span class="p">,</span> <span class="n">itertools</span><span class="o">.</span><span class="n">repeat</span><span class="p">([</span><span class="bp">self</span><span class="o">.</span><span class="n">psf_fwhm</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">psf_sig</span><span class="p">,</span> <span class="n">l_cut</span><span class="p">,</span>
+                                               <span class="n">dd_params_full</span><span class="p">,</span> <span class="n">Ns</span><span class="p">[</span><span class="n">N_ind</span><span class="p">],</span> <span class="n">N_ind</span><span class="p">]))</span>
+        <span class="n">pool</span> <span class="o">=</span> <span class="n">multiprocessing</span><span class="o">.</span><span class="n">Pool</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">n_pool</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">results</span> <span class="ow">in</span> <span class="n">pool</span><span class="o">.</span><span class="n">imap_unordered</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">loop_ind_fit</span><span class="p">,</span> <span class="n">iter_array</span><span class="p">,</span>
+                                           <span class="n">chunksize</span><span class="o">=</span><span class="nb">int</span><span class="p">(</span><span class="n">diff</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">/</span><span class="bp">self</span><span class="o">.</span><span class="n">n_pool</span><span class="p">)):</span>
+            <span class="n">i</span><span class="p">,</span> <span class="n">dx</span><span class="p">,</span> <span class="n">_Li</span><span class="p">,</span> <span class="n">x</span><span class="p">,</span> <span class="n">ddparams</span> <span class="o">=</span> <span class="n">results</span>
+            <span class="n">dx_fit</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">dd_combined_fit</span><span class="p">(</span><span class="n">ddparams</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="n">x</span><span class="p">]),</span> <span class="n">_Li</span><span class="p">,</span> <span class="n">l_cut</span><span class="p">[</span><span class="mi">2</span><span class="p">])</span>
+            <span class="n">diff</span><span class="p">[</span><span class="n">i</span><span class="p">,</span> <span class="mi">0</span><span class="p">]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">amax</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">abs</span><span class="p">((</span><span class="n">dx_fit</span> <span class="o">-</span> <span class="n">dx</span><span class="p">)</span><span class="o">/</span><span class="p">(</span><span class="n">dx</span> <span class="o">+</span> <span class="mf">1e-3</span><span class="p">)))</span>
+            <span class="n">diff</span><span class="p">[</span><span class="n">i</span><span class="p">,</span> <span class="mi">1</span><span class="p">]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">amax</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">abs</span><span class="p">(</span><span class="n">dx_fit</span> <span class="o">-</span> <span class="n">dx</span><span class="p">))</span>
+            <span class="n">diff</span><span class="p">[</span><span class="n">i</span><span class="p">,</span> <span class="mi">2</span><span class="p">]</span> <span class="o">=</span> <span class="n">_Li</span>
+            <span class="n">diff</span><span class="p">[</span><span class="n">i</span><span class="p">,</span> <span class="mi">3</span><span class="p">]</span> <span class="o">=</span> <span class="n">x</span>
+            <span class="n">diff</span><span class="p">[</span><span class="n">i</span><span class="p">,</span> <span class="mi">4</span><span class="p">]</span> <span class="o">=</span> <span class="n">dx</span>
+            <span class="n">diff</span><span class="p">[</span><span class="n">i</span><span class="p">,</span> <span class="mi">5</span><span class="p">]</span> <span class="o">=</span> <span class="n">dx_fit</span>
+
+        <span class="n">pool</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
+        <span class="n">pool</span><span class="o">.</span><span class="n">join</span><span class="p">()</span>
+
+        <span class="n">ax</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">subplot</span><span class="p">(</span><span class="n">gs</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">3</span><span class="p">])</span>
+        <span class="n">hist</span><span class="p">,</span> <span class="n">bins</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">histogram</span><span class="p">(</span><span class="n">diff</span><span class="p">[:,</span> <span class="mi">0</span><span class="p">],</span> <span class="n">bins</span><span class="o">=</span><span class="s1">&#39;auto&#39;</span><span class="p">)</span>
+        <span class="n">ax</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">bins</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">hist</span><span class="p">,</span> <span class="mi">0</span><span class="p">),</span> <span class="s1">&#39;k-&#39;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">usetex</span><span class="p">:</span>
+            <span class="n">ax</span><span class="o">.</span><span class="n">set_xlabel</span><span class="p">(</span><span class="sa">r</span><span class="s1">&#39;$\lvert\frac{\Delta x_\mathrm</span><span class="si">{f}</span><span class="s1"> / \sigma_\mathrm</span><span class="si">{PSF}</span><span class="s1"> - &#39;</span>
+                          <span class="sa">r</span><span class="s1">&#39;\Delta x_\mathrm</span><span class="si">{t}</span><span class="s1"> / \sigma_\mathrm</span><span class="si">{PSF}</span><span class="s1">}{\Delta x_\mathrm</span><span class="si">{t}</span><span class="s1"> / &#39;</span>
+                          <span class="sa">r</span><span class="s1">&#39;\sigma_\mathrm</span><span class="si">{PSF}</span><span class="s1">}\lvert$&#39;</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">ax</span><span class="o">.</span><span class="n">set_xlabel</span><span class="p">(</span><span class="sa">r</span><span class="s1">&#39;Max abs((Delta x_f / sigma_PSF - Delta x_t / sigma_PSF) / &#39;</span>
+                          <span class="sa">r</span><span class="s1">&#39;(Delta x_t / sigma_PSF))&#39;</span><span class="p">)</span>
+        <span class="n">ax</span><span class="o">.</span><span class="n">set_ylabel</span><span class="p">(</span><span class="s1">&#39;N&#39;</span><span class="p">)</span>
+
+        <span class="n">ax</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">subplot</span><span class="p">(</span><span class="n">gs</span><span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">3</span><span class="p">])</span>
+        <span class="n">hist</span><span class="p">,</span> <span class="n">bins</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">histogram</span><span class="p">(</span><span class="n">diff</span><span class="p">[:,</span> <span class="mi">1</span><span class="p">],</span> <span class="n">bins</span><span class="o">=</span><span class="s1">&#39;auto&#39;</span><span class="p">)</span>
+        <span class="n">ax</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">bins</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">hist</span><span class="p">,</span> <span class="mi">0</span><span class="p">),</span> <span class="s1">&#39;k-&#39;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">usetex</span><span class="p">:</span>
+            <span class="n">ax</span><span class="o">.</span><span class="n">set_xlabel</span><span class="p">(</span><span class="sa">r</span><span class="s1">&#39;$\lvert\Delta x_\mathrm</span><span class="si">{f}</span><span class="s1"> / \sigma_\mathrm</span><span class="si">{PSF}</span><span class="s1"> - &#39;</span>
+                          <span class="sa">r</span><span class="s1">&#39;\Delta x_\mathrm</span><span class="si">{t}</span><span class="s1"> / \sigma_\mathrm</span><span class="si">{PSF}</span><span class="s1">\lvert$&#39;</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">ax</span><span class="o">.</span><span class="n">set_xlabel</span><span class="p">(</span><span class="sa">r</span><span class="s1">&#39;Max abs(Delta x_f / sigma_PSF - Delta x_t / sigma_PSF)&#39;</span><span class="p">)</span>
+        <span class="n">ax</span><span class="o">.</span><span class="n">set_ylabel</span><span class="p">(</span><span class="s1">&#39;N&#39;</span><span class="p">)</span>
+
+        <span class="n">plt</span><span class="o">.</span><span class="n">tight_layout</span><span class="p">()</span>
+        <span class="n">plt</span><span class="o">.</span><span class="n">savefig</span><span class="p">(</span><span class="s1">&#39;</span><span class="si">{}</span><span class="s1">/dd_params_visualisation.pdf&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">plot_save_folder</span><span class="p">))</span></div>
+
+
+<div class="viewcode-block" id="FitPSFPerturbations.loop_ind_fit">
+<a class="viewcode-back" href="../../api/macauff.FitPSFPerturbations.html#macauff.FitPSFPerturbations.loop_ind_fit">[docs]</a>
+    <span class="k">def</span> <span class="nf">loop_ind_fit</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">iterable</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Wrapper function for fitting perturbation offset and flux brightening</span>
+<span class="sd">        of one PSF model fit to multiple unresolved objects, for arbitrary</span>
+<span class="sd">        relative flux and position.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        iterable : list</span>
+<span class="sd">            List passed through ``multiprocessing``, containing the index of</span>
+<span class="sd">            the fit, as well as PSF FWHM and Gaussian sigma, maximum relative</span>
+<span class="sd">            flux at which skew-normal distributions still describe</span>
+<span class="sd">            perturbation offsets, the array of skew-normal parameters as a</span>
+<span class="sd">            function of relative flux, the polynomial order being fit, and</span>
+<span class="sd">            an index into the polynomial order array.</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        i : integer</span>
+<span class="sd">            The index of the fit, looping through the number of simulations</span>
+<span class="sd">            to draw.</span>
+<span class="sd">        dx : float</span>
+<span class="sd">            The derived perturbation offset, normalised to the PSF sigma.</span>
+<span class="sd">        Li : float</span>
+<span class="sd">            The randomly drawn relative flux of the perturbing object.</span>
+<span class="sd">        x : float</span>
+<span class="sd">            Position of the perturbing object relative to the central source.</span>
+<span class="sd">        ddparams : numpy.ndarray</span>
+<span class="sd">            The calculated skew-normal distribution parameters evaluated at</span>
+<span class="sd">            the simulated `Li` for the chosen polynomial order.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">rng</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">default_rng</span><span class="p">()</span>
+        <span class="n">i</span><span class="p">,</span> <span class="p">(</span><span class="n">psf_fwhm</span><span class="p">,</span> <span class="n">psf_sig</span><span class="p">,</span> <span class="n">t_cut</span><span class="p">,</span> <span class="n">dd_params</span><span class="p">,</span> <span class="n">N</span><span class="p">,</span> <span class="n">N_ind</span><span class="p">)</span> <span class="o">=</span> <span class="n">iterable</span>
+        <span class="n">Li</span> <span class="o">=</span> <span class="n">rng</span><span class="o">.</span><span class="n">uniform</span><span class="p">(</span><span class="mf">0.15</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+        <span class="n">x_</span> <span class="o">=</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">psf_fwhm</span>
+        <span class="k">while</span> <span class="n">x_</span> <span class="o">&gt;</span> <span class="mf">1.185</span><span class="o">*</span><span class="n">psf_fwhm</span><span class="p">:</span>
+            <span class="n">x_</span> <span class="o">=</span> <span class="n">rng</span><span class="o">.</span><span class="n">rayleigh</span><span class="p">(</span><span class="n">scale</span><span class="o">=</span><span class="n">psf_sig</span><span class="p">)</span>
+        <span class="n">res</span> <span class="o">=</span> <span class="n">minimize</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">min_dd_fit_xy</span><span class="p">,</span> <span class="n">x0</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="n">Li</span><span class="p">,</span> <span class="n">x_</span> <span class="o">*</span> <span class="n">Li</span> <span class="o">/</span> <span class="p">(</span><span class="mi">1</span> <span class="o">+</span> <span class="n">Li</span><span class="p">),</span> <span class="mi">0</span><span class="p">]),</span>
+                       <span class="n">args</span><span class="o">=</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="p">[</span><span class="n">x_</span><span class="p">],</span> <span class="p">[</span><span class="mf">1e-4</span><span class="p">],</span> <span class="p">[</span><span class="n">Li</span><span class="p">],</span> <span class="n">psf_sig</span><span class="p">),</span>
+                       <span class="n">jac</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">method</span><span class="o">=</span><span class="s1">&#39;newton-cg&#39;</span><span class="p">,</span> <span class="n">hess</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">hess_dd_fit_xy</span><span class="p">,</span>
+                       <span class="n">options</span><span class="o">=</span><span class="p">{</span><span class="s1">&#39;xtol&#39;</span><span class="p">:</span> <span class="mf">1e-15</span><span class="p">})</span>
+        <span class="n">dx</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="n">res</span><span class="o">.</span><span class="n">x</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">**</span><span class="mi">2</span> <span class="o">+</span> <span class="n">res</span><span class="o">.</span><span class="n">x</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">**</span><span class="mi">2</span><span class="p">)</span> <span class="o">/</span> <span class="n">psf_sig</span>
+        <span class="n">x</span> <span class="o">=</span> <span class="n">x_</span> <span class="o">/</span> <span class="n">psf_sig</span>
+
+        <span class="n">ddparams</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">return_ddparams</span><span class="p">(</span><span class="n">Li</span><span class="p">,</span> <span class="n">t_cut</span><span class="p">,</span> <span class="n">dd_params</span><span class="p">,</span> <span class="n">N</span><span class="p">,</span> <span class="n">N_ind</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">i</span><span class="p">,</span> <span class="n">dx</span><span class="p">,</span> <span class="n">Li</span><span class="p">,</span> <span class="n">x</span><span class="p">,</span> <span class="n">ddparams</span></div>
+</div>
+
+</pre></div>
+
+            <div class="clearer"></div>
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="../../f-modindex.html" title="Fortran Module Index"
+             >fortran modules</a> |</li>
+        <li class="right" >
+          <a href="../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../index.html">macauff</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../index.html" >Module code</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">macauff.derive_psf_auf_params</a></li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+    &#169; Copyright 2022, Tom J Wilson.
+      Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 7.2.6.
+    </div>
+  </body>
+</html>

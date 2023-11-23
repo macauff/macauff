@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>csv_to_npy &#8212; macauff</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=4848ba22" />
+    <link rel="stylesheet" type="text/css" href="../_static/pyramid.css?v=a5b9c134" />
+    <link rel="stylesheet" type="text/css" href="../_static/graphviz.css?v=eafc0fe6" />
+    <script src="../_static/documentation_options.js?v=5929fcd5"></script>
+    <script src="../_static/doctools.js?v=888ff710"></script>
+    <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="generate_speclite_filters" href="macauff.generate_speclite_filters.html" />
+    <link rel="prev" title="create_single_perturb_auf" href="macauff.create_single_perturb_auf.html" />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Neuton&amp;subset=latin" type="text/css" media="screen" charset="utf-8" />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Nobile:regular,italic,bold,bolditalic&amp;subset=latin" type="text/css" media="screen" charset="utf-8" />
+<!--[if lte IE 6]>
+<link rel="stylesheet" href="../_static/ie6.css" type="text/css" media="screen" charset="utf-8" />
+<![endif]-->
+
+  </head><body>
+
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="../f-modindex.html" title="Fortran Module Index"
+             >fortran modules</a> |</li>
+        <li class="right" >
+          <a href="../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="right" >
+          <a href="macauff.generate_speclite_filters.html" title="generate_speclite_filters"
+             accesskey="N">next</a> |</li>
+        <li class="right" >
+          <a href="macauff.create_single_perturb_auf.html" title="create_single_perturb_auf"
+             accesskey="P">previous</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../index.html">macauff</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../macauff.html" accesskey="U"><code class="docutils literal notranslate"><span class="pre">macauff</span></code> Documentation</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">csv_to_npy</a></li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <section id="csv-to-npy">
+<h1>csv_to_npy<a class="headerlink" href="#csv-to-npy" title="Link to this heading">¶</a></h1>
+<dl class="py function">
+<dt class="sig sig-object py" id="macauff.csv_to_npy">
+<span class="sig-prename descclassname"><span class="pre">macauff.</span></span><span class="sig-name descname"><span class="pre">csv_to_npy</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">input_folder</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">input_filename</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">output_folder</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">astro_cols</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">photo_cols</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">bestindex_col</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">chunk_overlap_col</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">header</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">process_uncerts</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">astro_sig_fits_filepath</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">cat_in_radec</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">mn_in_radec</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/macauff/parse_catalogue.html#csv_to_npy"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#macauff.csv_to_npy" title="Link to this definition">¶</a></dt>
+<dd><p>Convert a .csv file representation of a photometric catalogue into the
+appropriate .npy binary files used in the cross-matching process.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><dl class="simple">
+<dt><strong>input_folder</strong><span class="classifier">string</span></dt><dd><p>Folder on disk where the catalogue .csv file is stored.</p>
+</dd>
+<dt><strong>input_filename</strong><span class="classifier">string</span></dt><dd><p>Name of the CSV file, including extension, to convert to binary files.</p>
+</dd>
+<dt><strong>output_folder</strong><span class="classifier">string</span></dt><dd><p>Folder on disk of where to save the .npy versions of the catalogue.</p>
+</dd>
+<dt><strong>astro_cols</strong><span class="classifier">list or numpy.array of integers</span></dt><dd><p>List of zero-indexed columns in the input catalogue representing the
+three required astrometric parameters, two orthogonal sky axis
+coordinates and a single, circular astrometric precision. The precision
+must be the last column, with the first two columns of <code class="docutils literal notranslate"><span class="pre">astro_cols</span></code>
+matching in order to the first two columns of the output astrometry
+binary file, if <code class="docutils literal notranslate"><span class="pre">process_uncerts</span></code> is <code class="docutils literal notranslate"><span class="pre">True</span></code>.</p>
+</dd>
+<dt><strong>photo_cols</strong><span class="classifier">list or numpy.array of integers</span></dt><dd><p>List of zero-indexed columns in the input catalogue representing the
+magnitudes of each photometric source to be used in the cross-matching.</p>
+</dd>
+<dt><strong>bestindex_col</strong><span class="classifier">integer</span></dt><dd><p>Zero-indexed column of the flag indicating which of the available
+photometric brightnesses (represented by <code class="docutils literal notranslate"><span class="pre">photo_cols</span></code>) is the
+preferred choice – usually the most precise and highest quality
+detection.</p>
+</dd>
+<dt><strong>chunk_overlap_col</strong><span class="classifier">integer</span></dt><dd><p>Zero-indexed column in the .csv file containing an integer representation
+of the boolean representation of whether sources are in the “halo”
+(<code class="docutils literal notranslate"><span class="pre">1</span></code> in the .csv) or “core” (<code class="docutils literal notranslate"><span class="pre">0</span></code>) of the region. If <code class="docutils literal notranslate"><span class="pre">None</span></code> then all
+objects are assumed to be in the core.</p>
+</dd>
+<dt><strong>header</strong><span class="classifier">boolean, optional</span></dt><dd><p>Flag indicating whether the .csv file has a first line with the names
+of the columns in it, or whether the first line of the file is the first
+line of the dataset.</p>
+</dd>
+<dt><strong>process_uncerts</strong><span class="classifier">boolean, optional</span></dt><dd><p>Determines whether uncertainties are re-processed in light of astrometric
+fitting on large scales.</p>
+</dd>
+<dt><strong>astro_sig_fits_filepath</strong><span class="classifier">string, optional</span></dt><dd><p>Location on disk of the two saved files that contain the parameters
+that describe best-fit astrometric precision as a function of quoted
+astrometric precision. Must be provided if <code class="docutils literal notranslate"><span class="pre">process_uncerts</span></code> is <code class="docutils literal notranslate"><span class="pre">True</span></code>.</p>
+</dd>
+<dt><strong>cat_in_radec</strong><span class="classifier">boolean, optional</span></dt><dd><p>If <code class="docutils literal notranslate"><span class="pre">process_uncerts</span></code> is <code class="docutils literal notranslate"><span class="pre">True</span></code>, must be provided, and either be
+<code class="docutils literal notranslate"><span class="pre">True</span></code> or <code class="docutils literal notranslate"><span class="pre">False</span></code>, indicating whether the catalogue being processed
+is in RA-Dec coordinates or not. If <code class="docutils literal notranslate"><span class="pre">True</span></code>, coordinates of mid-points
+for derivations of <code class="docutils literal notranslate"><span class="pre">m</span></code> and <code class="docutils literal notranslate"><span class="pre">n</span></code> for quoted-fit uncertainty relations
+will be converted from Galactic Longitude and Latitude to Right Ascension
+and Declination for the purposes of nearest-neighbour use, if
+<code class="docutils literal notranslate"><span class="pre">mn_in_radec</span></code> is <code class="docutils literal notranslate"><span class="pre">False</span></code> (and m-n coordinates are in l/b).</p>
+</dd>
+<dt><strong>mn_in_radec</strong><span class="classifier">boolean, optional</span></dt><dd><p>If <code class="docutils literal notranslate"><span class="pre">process_uncerts</span></code> is <code class="docutils literal notranslate"><span class="pre">True</span></code>, must be provided, and similar to
+<code class="docutils literal notranslate"><span class="pre">cat_in_radec</span></code> is a flag indcating whether the coordinates used to
+compute m-n scaling relations are in RA/Dec or not. If <code class="docutils literal notranslate"><span class="pre">mn_in_radec</span></code>
+disagrees with <code class="docutils literal notranslate"><span class="pre">cat_in_radec</span></code> then m-n coordinates will be converted
+to the coordinate system of the catalogue.</p>
+</dd>
+</dl>
+</dd>
+</dl>
+</dd></dl>
+
+</section>
+
+
+            <div class="clearer"></div>
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="../f-modindex.html" title="Fortran Module Index"
+             >fortran modules</a> |</li>
+        <li class="right" >
+          <a href="../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="right" >
+          <a href="macauff.generate_speclite_filters.html" title="generate_speclite_filters"
+             >next</a> |</li>
+        <li class="right" >
+          <a href="macauff.create_single_perturb_auf.html" title="create_single_perturb_auf"
+             >previous</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../index.html">macauff</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../macauff.html" ><code class="docutils literal notranslate"><span class="pre">macauff</span></code> Documentation</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">csv_to_npy</a></li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+    &#169; Copyright 2022, Tom J Wilson.
+      Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 7.2.6.
+    </div>
+  </body>
+</html>

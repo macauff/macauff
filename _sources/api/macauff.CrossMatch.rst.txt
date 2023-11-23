@@ -1,0 +1,29 @@
+CrossMatch
+==========
+
+.. currentmodule:: macauff
+
+.. autoclass:: CrossMatch
+   :show-inheritance:
+
+   .. rubric:: Methods Summary
+
+   .. autosummary::
+
+      ~CrossMatch.__call__
+      ~CrossMatch.calculate_phot_like
+      ~CrossMatch.create_perturb_auf
+      ~CrossMatch.group_sources
+      ~CrossMatch.make_shared_data
+      ~CrossMatch.pair_sources
+      ~CrossMatch.read_metadata
+
+   .. rubric:: Methods Documentation
+
+   .. automethod:: __call__
+   .. automethod:: calculate_phot_like
+   .. automethod:: create_perturb_auf
+   .. automethod:: group_sources
+   .. automethod:: make_shared_data
+   .. automethod:: pair_sources
+   .. automethod:: read_metadata

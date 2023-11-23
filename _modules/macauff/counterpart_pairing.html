@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="../../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>macauff.counterpart_pairing &#8212; macauff</title>
+    <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=4848ba22" />
+    <link rel="stylesheet" type="text/css" href="../../_static/pyramid.css?v=a5b9c134" />
+    <link rel="stylesheet" type="text/css" href="../../_static/graphviz.css?v=eafc0fe6" />
+    <script src="../../_static/documentation_options.js?v=5929fcd5"></script>
+    <script src="../../_static/doctools.js?v=888ff710"></script>
+    <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Neuton&amp;subset=latin" type="text/css" media="screen" charset="utf-8" />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Nobile:regular,italic,bold,bolditalic&amp;subset=latin" type="text/css" media="screen" charset="utf-8" />
+<!--[if lte IE 6]>
+<link rel="stylesheet" href="../../_static/ie6.css" type="text/css" media="screen" charset="utf-8" />
+<![endif]-->
+
+  </head><body>
+
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="../../f-modindex.html" title="Fortran Module Index"
+             >fortran modules</a> |</li>
+        <li class="right" >
+          <a href="../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../index.html">macauff</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../index.html" accesskey="U">Module code</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">macauff.counterpart_pairing</a></li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <h1>Source code for macauff.counterpart_pairing</h1><div class="highlight"><pre>
+<span></span><span class="c1"># Licensed under a 3-clause BSD style license - see LICENSE</span>
+<span class="sd">&#39;&#39;&#39;</span>
+<span class="sd">This module provides the functionality for the final cross-match process, the</span>
+<span class="sd">act of actually pairing sources across the two catalogues as counterparts.</span>
+<span class="sd">&#39;&#39;&#39;</span>
+
+<span class="kn">import</span> <span class="nn">sys</span>
+<span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+<span class="kn">import</span> <span class="nn">warnings</span>
+
+<span class="kn">from</span> <span class="nn">.counterpart_pairing_fortran</span> <span class="kn">import</span> <span class="n">counterpart_pairing_fortran</span> <span class="k">as</span> <span class="n">cpf</span>
+
+<span class="n">__all__</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;source_pairing&#39;</span><span class="p">]</span>
+
+
+<div class="viewcode-block" id="source_pairing">
+<a class="viewcode-back" href="../../api/macauff.source_pairing.html#macauff.source_pairing">[docs]</a>
+<span class="k">def</span> <span class="nf">source_pairing</span><span class="p">(</span><span class="n">joint_folder_path</span><span class="p">,</span> <span class="n">a_cat_folder_path</span><span class="p">,</span> <span class="n">b_cat_folder_path</span><span class="p">,</span> <span class="n">a_filt_names</span><span class="p">,</span>
+                   <span class="n">b_filt_names</span><span class="p">,</span> <span class="n">a_auf_pointings</span><span class="p">,</span> <span class="n">b_auf_pointings</span><span class="p">,</span> <span class="n">a_modelrefinds</span><span class="p">,</span> <span class="n">b_modelrefinds</span><span class="p">,</span>
+                   <span class="n">rho</span><span class="p">,</span> <span class="n">drho</span><span class="p">,</span> <span class="n">n_fracs</span><span class="p">,</span> <span class="n">group_sources_data</span><span class="p">,</span> <span class="n">phot_like_data</span><span class="p">,</span>
+                   <span class="n">a_perturb_auf_outputs</span><span class="p">,</span> <span class="n">b_perturb_auf_outputs</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&#39;&#39;&#39;</span>
+<span class="sd">    Function to iterate over all grouped islands of sources, calculating the</span>
+<span class="sd">    probabilities of all permutations of matches and deriving the most likely</span>
+<span class="sd">    counterparts for sources in the two catalogues.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    joint_folder_path : string</span>
+<span class="sd">        Folder in which all common match files are stored for this crossmatch.</span>
+<span class="sd">    a_cat_folder_path : string</span>
+<span class="sd">        Folder in which the &quot;a&quot; catalogue input catalogues are stored.</span>
+<span class="sd">    b_cat_folder_path : string</span>
+<span class="sd">        Folder where catalogue &quot;b&quot; files are located.</span>
+<span class="sd">    a_filt_names : numpy.ndarray or list of strings</span>
+<span class="sd">        Array or list containing names of the filters used in catalogue &quot;a&quot;.</span>
+<span class="sd">    b_filt_names : numpy.ndarray or list of strings</span>
+<span class="sd">        Array or list of catalogue &quot;b&quot; filter names.</span>
+<span class="sd">    a_auf_pointings : numpy.ndarray</span>
+<span class="sd">        Array of celestial coordinates indicating the locations used in the</span>
+<span class="sd">        simulations of perturbation AUFs for catalogue &quot;a&quot;.</span>
+<span class="sd">    b_auf_pointings : numpy.ndarray</span>
+<span class="sd">        Sky coordinates of locations of catalogue &quot;b&quot; perturbation AUF</span>
+<span class="sd">        component simulations.</span>
+<span class="sd">    a_modelrefinds : numpy.ndarray</span>
+<span class="sd">        Catalogue &quot;a&quot; modelrefinds array output from ``create_perturb_auf``.</span>
+<span class="sd">        TODO Improve description</span>
+<span class="sd">    b_modelrefinds : numpy.ndarray</span>
+<span class="sd">        Catalogue &quot;b&quot; modelrefinds array output from ``create_perturb_auf``.</span>
+<span class="sd">        TODO Improve description</span>
+<span class="sd">    rho : numpy.ndarray</span>
+<span class="sd">        Array of fourier-space values, used in the convolution of PDFs.</span>
+<span class="sd">    drho : numpy.ndarray</span>
+<span class="sd">        The spacings between the `rho` array elements.</span>
+<span class="sd">    n_fracs : integer</span>
+<span class="sd">        The number of relative contamination fluxes previously considered</span>
+<span class="sd">        when calculating the probability of a source being contaminated by</span>
+<span class="sd">        a perturbing source brighter than a given flux.</span>
+<span class="sd">    group_sources_data : class.StageData</span>
+<span class="sd">        Object containing all outputs from ``make_island_groupings``</span>
+<span class="sd">        TODO Improve description</span>
+<span class="sd">    phot_like_data : class.StageData</span>
+<span class="sd">        Object containing all outputs from ``compute_photometric_likelihoods``</span>
+<span class="sd">        TODO Improve description</span>
+<span class="sd">    a_perturb_auf_outputs : dictionary</span>
+<span class="sd">        Dict containing the results from the previous step of the cross-match,</span>
+<span class="sd">        the simulations of the perturbation component of catalogue a&#39;s AUF.</span>
+<span class="sd">    b_perturb_auf_outputs : dictionary</span>
+<span class="sd">        Dict containing the results from the previous step of the cross-match,</span>
+<span class="sd">        the simulations of the perturbation component of catalogue b&#39;s AUF.</span>
+<span class="sd">    &#39;&#39;&#39;</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Creating catalogue matches...&quot;</span><span class="p">)</span>
+    <span class="n">sys</span><span class="o">.</span><span class="n">stdout</span><span class="o">.</span><span class="n">flush</span><span class="p">()</span>
+
+    <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Pairing sources...&quot;</span><span class="p">)</span>
+    <span class="n">sys</span><span class="o">.</span><span class="n">stdout</span><span class="o">.</span><span class="n">flush</span><span class="p">()</span>
+
+    <span class="n">agrplen</span> <span class="o">=</span> <span class="n">group_sources_data</span><span class="o">.</span><span class="n">agrplen</span>
+    <span class="n">bgrplen</span> <span class="o">=</span> <span class="n">group_sources_data</span><span class="o">.</span><span class="n">bgrplen</span>
+
+    <span class="n">len_a</span><span class="p">,</span> <span class="n">len_b</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">agrplen</span><span class="p">),</span> <span class="n">np</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">bgrplen</span><span class="p">)</span>
+
+    <span class="n">abinsarray</span> <span class="o">=</span> <span class="n">phot_like_data</span><span class="o">.</span><span class="n">abinsarray</span>
+    <span class="n">abinlengths</span> <span class="o">=</span> <span class="n">phot_like_data</span><span class="o">.</span><span class="n">abinlengths</span>
+    <span class="n">bbinsarray</span> <span class="o">=</span> <span class="n">phot_like_data</span><span class="o">.</span><span class="n">bbinsarray</span>
+    <span class="n">bbinlengths</span> <span class="o">=</span> <span class="n">phot_like_data</span><span class="o">.</span><span class="n">bbinlengths</span>
+
+    <span class="n">c_priors</span> <span class="o">=</span> <span class="n">phot_like_data</span><span class="o">.</span><span class="n">c_priors</span>
+    <span class="n">c_array</span> <span class="o">=</span> <span class="n">phot_like_data</span><span class="o">.</span><span class="n">c_array</span>
+    <span class="n">fa_priors</span> <span class="o">=</span> <span class="n">phot_like_data</span><span class="o">.</span><span class="n">fa_priors</span>
+    <span class="n">fa_array</span> <span class="o">=</span> <span class="n">phot_like_data</span><span class="o">.</span><span class="n">fa_array</span>
+    <span class="n">fb_priors</span> <span class="o">=</span> <span class="n">phot_like_data</span><span class="o">.</span><span class="n">fb_priors</span>
+    <span class="n">fb_array</span> <span class="o">=</span> <span class="n">phot_like_data</span><span class="o">.</span><span class="n">fb_array</span>
+
+    <span class="n">alist</span> <span class="o">=</span> <span class="n">group_sources_data</span><span class="o">.</span><span class="n">alist</span>
+    <span class="n">agrplen</span> <span class="o">=</span> <span class="n">group_sources_data</span><span class="o">.</span><span class="n">agrplen</span>
+
+    <span class="n">a_astro</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="s1">&#39;</span><span class="si">{}</span><span class="s1">/con_cat_astro.npy&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">a_cat_folder_path</span><span class="p">))</span>
+    <span class="n">a_photo</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="s1">&#39;</span><span class="si">{}</span><span class="s1">/con_cat_photo.npy&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">a_cat_folder_path</span><span class="p">))</span>
+    <span class="n">amagref</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="s1">&#39;</span><span class="si">{}</span><span class="s1">/magref.npy&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">a_cat_folder_path</span><span class="p">))</span>
+
+    <span class="n">b_astro</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="s1">&#39;</span><span class="si">{}</span><span class="s1">/con_cat_astro.npy&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">b_cat_folder_path</span><span class="p">))</span>
+    <span class="n">b_photo</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="s1">&#39;</span><span class="si">{}</span><span class="s1">/con_cat_photo.npy&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">b_cat_folder_path</span><span class="p">))</span>
+    <span class="n">bmagref</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="s1">&#39;</span><span class="si">{}</span><span class="s1">/magref.npy&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">b_cat_folder_path</span><span class="p">))</span>
+
+    <span class="n">big_len_a</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">a_astro</span><span class="p">)</span>
+    <span class="n">big_len_b</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">b_astro</span><span class="p">)</span>
+    <span class="c1"># large_len is the &quot;safe&quot; initialisation value for arrays, such that no index</span>
+    <span class="c1"># can ever reach this value.</span>
+    <span class="n">large_len</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="n">big_len_a</span><span class="p">,</span> <span class="n">big_len_b</span><span class="p">)</span>
+
+    <span class="n">a_sky_inds</span> <span class="o">=</span> <span class="n">phot_like_data</span><span class="o">.</span><span class="n">a_sky_inds</span>
+
+    <span class="n">blist</span> <span class="o">=</span> <span class="n">group_sources_data</span><span class="o">.</span><span class="n">blist</span>
+    <span class="n">bgrplen</span> <span class="o">=</span> <span class="n">group_sources_data</span><span class="o">.</span><span class="n">bgrplen</span>
+
+    <span class="n">b_sky_inds</span> <span class="o">=</span> <span class="n">phot_like_data</span><span class="o">.</span><span class="n">b_sky_inds</span>
+
+    <span class="n">afourier_grids</span> <span class="o">=</span> <span class="n">a_perturb_auf_outputs</span><span class="p">[</span><span class="s1">&#39;fourier_grid&#39;</span><span class="p">]</span>
+    <span class="n">afrac_grids</span> <span class="o">=</span> <span class="n">a_perturb_auf_outputs</span><span class="p">[</span><span class="s1">&#39;frac_grid&#39;</span><span class="p">]</span>
+    <span class="n">aflux_grids</span> <span class="o">=</span> <span class="n">a_perturb_auf_outputs</span><span class="p">[</span><span class="s1">&#39;flux_grid&#39;</span><span class="p">]</span>
+    <span class="n">bfourier_grids</span> <span class="o">=</span> <span class="n">b_perturb_auf_outputs</span><span class="p">[</span><span class="s1">&#39;fourier_grid&#39;</span><span class="p">]</span>
+    <span class="n">bfrac_grids</span> <span class="o">=</span> <span class="n">b_perturb_auf_outputs</span><span class="p">[</span><span class="s1">&#39;frac_grid&#39;</span><span class="p">]</span>
+    <span class="n">bflux_grids</span> <span class="o">=</span> <span class="n">b_perturb_auf_outputs</span><span class="p">[</span><span class="s1">&#39;flux_grid&#39;</span><span class="p">]</span>
+
+    <span class="c1"># crpts_max_len is the maximum number of counterparts at 100% match rate.</span>
+    <span class="n">cprt_max_len</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">minimum</span><span class="p">(</span><span class="n">agrplen</span><span class="p">,</span> <span class="n">bgrplen</span><span class="p">))</span>
+
+    <span class="p">(</span><span class="n">acountinds</span><span class="p">,</span> <span class="n">bcountinds</span><span class="p">,</span> <span class="n">afieldinds</span><span class="p">,</span> <span class="n">bfieldinds</span><span class="p">,</span> <span class="n">acontamprob</span><span class="p">,</span> <span class="n">bcontamprob</span><span class="p">,</span> <span class="n">etaarray</span><span class="p">,</span>
+     <span class="n">xiarray</span><span class="p">,</span> <span class="n">acontamflux</span><span class="p">,</span> <span class="n">bcontamflux</span><span class="p">,</span> <span class="n">probcarray</span><span class="p">,</span> <span class="n">crptseps</span><span class="p">,</span> <span class="n">probfaarray</span><span class="p">,</span> <span class="n">afieldfluxs</span><span class="p">,</span>
+     <span class="n">afieldseps</span><span class="p">,</span> <span class="n">afieldetas</span><span class="p">,</span> <span class="n">afieldxis</span><span class="p">,</span> <span class="n">probfbarray</span><span class="p">,</span> <span class="n">bfieldfluxs</span><span class="p">,</span> <span class="n">bfieldseps</span><span class="p">,</span> <span class="n">bfieldetas</span><span class="p">,</span>
+     <span class="n">bfieldxis</span><span class="p">)</span> <span class="o">=</span> <span class="n">cpf</span><span class="o">.</span><span class="n">find_island_probabilities</span><span class="p">(</span>
+        <span class="n">a_astro</span><span class="p">,</span> <span class="n">a_photo</span><span class="p">,</span> <span class="n">b_astro</span><span class="p">,</span> <span class="n">b_photo</span><span class="p">,</span> <span class="n">alist</span><span class="p">,</span> <span class="n">blist</span><span class="p">,</span> <span class="n">agrplen</span><span class="p">,</span> <span class="n">bgrplen</span><span class="p">,</span>
+        <span class="n">c_array</span><span class="p">,</span> <span class="n">fa_array</span><span class="p">,</span> <span class="n">fb_array</span><span class="p">,</span> <span class="n">c_priors</span><span class="p">,</span> <span class="n">fa_priors</span><span class="p">,</span> <span class="n">fb_priors</span><span class="p">,</span> <span class="n">amagref</span><span class="p">,</span> <span class="n">bmagref</span><span class="p">,</span>
+        <span class="n">a_modelrefinds</span><span class="p">,</span> <span class="n">b_modelrefinds</span><span class="p">,</span> <span class="n">abinsarray</span><span class="p">,</span> <span class="n">abinlengths</span><span class="p">,</span> <span class="n">bbinsarray</span><span class="p">,</span> <span class="n">bbinlengths</span><span class="p">,</span>
+        <span class="n">afrac_grids</span><span class="p">,</span> <span class="n">aflux_grids</span><span class="p">,</span> <span class="n">bfrac_grids</span><span class="p">,</span> <span class="n">bflux_grids</span><span class="p">,</span> <span class="n">afourier_grids</span><span class="p">,</span> <span class="n">bfourier_grids</span><span class="p">,</span>
+        <span class="n">a_sky_inds</span><span class="p">,</span> <span class="n">b_sky_inds</span><span class="p">,</span> <span class="n">rho</span><span class="p">,</span> <span class="n">drho</span><span class="p">,</span> <span class="n">n_fracs</span><span class="p">,</span> <span class="n">large_len</span><span class="p">,</span> <span class="n">cprt_max_len</span><span class="p">)</span>
+
+    <span class="n">afieldfilter</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">dtype</span><span class="o">=</span><span class="nb">bool</span><span class="p">,</span> <span class="n">shape</span><span class="o">=</span><span class="p">(</span><span class="n">len_a</span><span class="p">,))</span>
+    <span class="n">bfieldfilter</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">dtype</span><span class="o">=</span><span class="nb">bool</span><span class="p">,</span> <span class="n">shape</span><span class="o">=</span><span class="p">(</span><span class="n">len_b</span><span class="p">,))</span>
+
+    <span class="c1"># *contamprob is (smalllen, nfracs) in shape and our check for correctness needs to check</span>
+    <span class="c1"># all nfrac values, requiring an all check.</span>
+    <span class="n">countfilter</span> <span class="o">=</span> <span class="p">(</span>
+        <span class="p">(</span><span class="n">acountinds</span> <span class="o">&lt;</span> <span class="n">large_len</span><span class="o">+</span><span class="mi">1</span><span class="p">)</span> <span class="o">&amp;</span> <span class="p">(</span><span class="n">bcountinds</span> <span class="o">&lt;</span> <span class="n">large_len</span><span class="o">+</span><span class="mi">1</span><span class="p">)</span> <span class="o">&amp;</span>
+        <span class="n">np</span><span class="o">.</span><span class="n">all</span><span class="p">(</span><span class="n">acontamprob</span> <span class="o">&gt;=</span> <span class="mi">0</span><span class="p">,</span> <span class="n">axis</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span> <span class="o">&amp;</span> <span class="n">np</span><span class="o">.</span><span class="n">all</span><span class="p">(</span><span class="n">bcontamprob</span> <span class="o">&gt;=</span> <span class="mi">0</span><span class="p">,</span> <span class="n">axis</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span> <span class="o">&amp;</span>
+        <span class="p">(</span><span class="n">acontamflux</span> <span class="o">&gt;=</span> <span class="mi">0</span><span class="p">)</span> <span class="o">&amp;</span> <span class="p">(</span><span class="n">bcontamflux</span> <span class="o">&gt;=</span> <span class="mi">0</span><span class="p">)</span> <span class="o">&amp;</span> <span class="p">(</span><span class="n">probcarray</span> <span class="o">&gt;=</span> <span class="mi">0</span><span class="p">)</span> <span class="o">&amp;</span> <span class="p">(</span><span class="n">etaarray</span> <span class="o">&gt;=</span> <span class="o">-</span><span class="mi">30</span><span class="p">)</span> <span class="o">&amp;</span>
+        <span class="p">(</span><span class="n">xiarray</span> <span class="o">&gt;=</span> <span class="o">-</span><span class="mi">30</span><span class="p">))</span>
+
+    <span class="n">afieldfilter</span> <span class="o">=</span> <span class="p">((</span><span class="n">afieldinds</span> <span class="o">&lt;</span> <span class="n">large_len</span><span class="o">+</span><span class="mi">1</span><span class="p">)</span> <span class="o">&amp;</span> <span class="p">(</span><span class="n">probfaarray</span> <span class="o">&gt;=</span> <span class="mi">0</span><span class="p">))</span>
+
+    <span class="n">bfieldfilter</span> <span class="o">=</span> <span class="p">((</span><span class="n">bfieldinds</span> <span class="o">&lt;</span> <span class="n">large_len</span><span class="o">+</span><span class="mi">1</span><span class="p">)</span> <span class="o">&amp;</span> <span class="p">(</span><span class="n">probfbarray</span> <span class="o">&gt;=</span> <span class="mi">0</span><span class="p">))</span>
+
+    <span class="n">lenrejecta</span> <span class="o">=</span> <span class="n">group_sources_data</span><span class="o">.</span><span class="n">lenrejecta</span>
+    <span class="n">lenrejectb</span> <span class="o">=</span> <span class="n">group_sources_data</span><span class="o">.</span><span class="n">lenrejectb</span>
+
+    <span class="n">countsum</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">countfilter</span><span class="p">))</span>
+    <span class="n">afieldsum</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">afieldfilter</span><span class="p">))</span>
+    <span class="n">bfieldsum</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">bfieldfilter</span><span class="p">))</span>
+
+    <span class="c1"># Reduce size of output files, removing anything that doesn&#39;t meet the</span>
+    <span class="c1"># criteria above from all saved numpy arrays.</span>
+    <span class="k">for</span> <span class="n">file_name</span><span class="p">,</span> <span class="n">variable</span><span class="p">,</span> <span class="n">filter_variable</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span>
+        <span class="p">[</span><span class="s1">&#39;ac&#39;</span><span class="p">,</span> <span class="s1">&#39;bc&#39;</span><span class="p">,</span> <span class="s1">&#39;pacontam&#39;</span><span class="p">,</span> <span class="s1">&#39;pbcontam&#39;</span><span class="p">,</span> <span class="s1">&#39;acontamflux&#39;</span><span class="p">,</span> <span class="s1">&#39;bcontamflux&#39;</span><span class="p">,</span> <span class="s1">&#39;af&#39;</span><span class="p">,</span> <span class="s1">&#39;bf&#39;</span><span class="p">,</span> <span class="s1">&#39;pc&#39;</span><span class="p">,</span> <span class="s1">&#39;eta&#39;</span><span class="p">,</span>
+         <span class="s1">&#39;xi&#39;</span><span class="p">,</span> <span class="s1">&#39;pfa&#39;</span><span class="p">,</span> <span class="s1">&#39;pfb&#39;</span><span class="p">,</span> <span class="s1">&#39;afieldflux&#39;</span><span class="p">,</span> <span class="s1">&#39;bfieldflux&#39;</span><span class="p">,</span> <span class="s1">&#39;crptseps&#39;</span><span class="p">,</span> <span class="s1">&#39;afieldseps&#39;</span><span class="p">,</span> <span class="s1">&#39;afieldeta&#39;</span><span class="p">,</span>
+         <span class="s1">&#39;afieldxi&#39;</span><span class="p">,</span> <span class="s1">&#39;bfieldseps&#39;</span><span class="p">,</span> <span class="s1">&#39;bfieldeta&#39;</span><span class="p">,</span> <span class="s1">&#39;bfieldxi&#39;</span><span class="p">],</span>
+        <span class="p">[</span><span class="n">acountinds</span><span class="p">,</span> <span class="n">bcountinds</span><span class="p">,</span> <span class="n">acontamprob</span><span class="p">,</span> <span class="n">bcontamprob</span><span class="p">,</span> <span class="n">acontamflux</span><span class="p">,</span> <span class="n">bcontamflux</span><span class="p">,</span> <span class="n">afieldinds</span><span class="p">,</span>
+         <span class="n">bfieldinds</span><span class="p">,</span> <span class="n">probcarray</span><span class="p">,</span> <span class="n">etaarray</span><span class="p">,</span> <span class="n">xiarray</span><span class="p">,</span> <span class="n">probfaarray</span><span class="p">,</span> <span class="n">probfbarray</span><span class="p">,</span> <span class="n">afieldfluxs</span><span class="p">,</span>
+         <span class="n">bfieldfluxs</span><span class="p">,</span> <span class="n">crptseps</span><span class="p">,</span> <span class="n">afieldseps</span><span class="p">,</span> <span class="n">afieldetas</span><span class="p">,</span> <span class="n">afieldxis</span><span class="p">,</span> <span class="n">bfieldseps</span><span class="p">,</span> <span class="n">bfieldetas</span><span class="p">,</span>
+         <span class="n">bfieldxis</span><span class="p">],</span>
+        <span class="p">[</span><span class="n">countfilter</span><span class="p">,</span> <span class="n">countfilter</span><span class="p">,</span> <span class="n">countfilter</span><span class="p">,</span> <span class="n">countfilter</span><span class="p">,</span> <span class="n">countfilter</span><span class="p">,</span> <span class="n">countfilter</span><span class="p">,</span>
+         <span class="n">afieldfilter</span><span class="p">,</span> <span class="n">bfieldfilter</span><span class="p">,</span> <span class="n">countfilter</span><span class="p">,</span> <span class="n">countfilter</span><span class="p">,</span> <span class="n">countfilter</span><span class="p">,</span> <span class="n">afieldfilter</span><span class="p">,</span>
+         <span class="n">bfieldfilter</span><span class="p">,</span> <span class="n">afieldfilter</span><span class="p">,</span> <span class="n">bfieldfilter</span><span class="p">,</span> <span class="n">countfilter</span><span class="p">,</span> <span class="n">afieldfilter</span><span class="p">,</span> <span class="n">afieldfilter</span><span class="p">,</span>
+         <span class="n">afieldfilter</span><span class="p">,</span> <span class="n">bfieldfilter</span><span class="p">,</span> <span class="n">bfieldfilter</span><span class="p">,</span> <span class="n">bfieldfilter</span><span class="p">]):</span>
+
+        <span class="k">if</span> <span class="n">file_name</span> <span class="o">==</span> <span class="s1">&#39;pacontam&#39;</span> <span class="ow">or</span> <span class="n">file_name</span> <span class="o">==</span> <span class="s1">&#39;pbcontam&#39;</span><span class="p">:</span>
+            <span class="n">temp_variable</span> <span class="o">=</span> <span class="n">variable</span><span class="p">[:,</span> <span class="n">filter_variable</span><span class="p">]</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">temp_variable</span> <span class="o">=</span> <span class="n">variable</span><span class="p">[</span><span class="n">filter_variable</span><span class="p">]</span>
+        <span class="n">np</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="s1">&#39;</span><span class="si">{}</span><span class="s1">/pairing/</span><span class="si">{}</span><span class="s1">.npy&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">joint_folder_path</span><span class="p">,</span> <span class="n">file_name</span><span class="p">),</span> <span class="n">temp_variable</span><span class="p">)</span>
+
+    <span class="n">tot</span> <span class="o">=</span> <span class="n">countsum</span> <span class="o">+</span> <span class="n">afieldsum</span> <span class="o">+</span> <span class="n">lenrejecta</span>
+    <span class="k">if</span> <span class="n">tot</span> <span class="o">&lt;</span> <span class="n">big_len_a</span><span class="p">:</span>
+        <span class="n">warnings</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span><span class="s2">&quot;</span><span class="si">{}</span><span class="s2"> catalogue a source</span><span class="si">{}</span><span class="s2"> not in either counterpart, field, or rejected &quot;</span>
+                      <span class="s2">&quot;source lists.&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">big_len_a</span> <span class="o">-</span> <span class="n">tot</span><span class="p">,</span> <span class="s1">&#39;s&#39;</span> <span class="k">if</span> <span class="n">big_len_a</span> <span class="o">-</span> <span class="n">tot</span> <span class="o">&gt;</span> <span class="mi">1</span> <span class="k">else</span> <span class="s1">&#39;&#39;</span><span class="p">))</span>
+    <span class="k">if</span> <span class="n">tot</span> <span class="o">&gt;</span> <span class="n">big_len_a</span><span class="p">:</span>
+        <span class="n">warnings</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span><span class="s2">&quot;</span><span class="si">{}</span><span class="s2"> additional catalogue a </span><span class="si">{}</span><span class="s2"> recorded, check results for duplications &quot;</span>
+                      <span class="s2">&quot;carefully&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">tot</span> <span class="o">-</span> <span class="n">big_len_a</span><span class="p">,</span> <span class="s1">&#39;indices&#39;</span> <span class="k">if</span> <span class="n">tot</span> <span class="o">-</span> <span class="n">big_len_a</span> <span class="o">&gt;</span> <span class="mi">1</span> <span class="k">else</span>
+                                         <span class="s1">&#39;index&#39;</span><span class="p">))</span>
+    <span class="n">tot</span> <span class="o">=</span> <span class="n">countsum</span> <span class="o">+</span> <span class="n">bfieldsum</span> <span class="o">+</span> <span class="n">lenrejectb</span>
+    <span class="k">if</span> <span class="n">tot</span> <span class="o">&lt;</span> <span class="n">big_len_b</span><span class="p">:</span>
+        <span class="n">warnings</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span><span class="s2">&quot;</span><span class="si">{}</span><span class="s2"> catalogue b source</span><span class="si">{}</span><span class="s2"> not in either counterpart, field, or rejected &quot;</span>
+                      <span class="s2">&quot;source lists.&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">big_len_b</span> <span class="o">-</span> <span class="n">tot</span><span class="p">,</span> <span class="s1">&#39;s&#39;</span> <span class="k">if</span> <span class="n">big_len_b</span> <span class="o">-</span> <span class="n">tot</span> <span class="o">&gt;</span> <span class="mi">1</span> <span class="k">else</span> <span class="s1">&#39;&#39;</span><span class="p">))</span>
+    <span class="k">if</span> <span class="n">tot</span> <span class="o">&gt;</span> <span class="n">big_len_b</span><span class="p">:</span>
+        <span class="n">warnings</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span><span class="s2">&quot;</span><span class="si">{}</span><span class="s2"> additional catalogue b </span><span class="si">{}</span><span class="s2"> recorded, check results for duplications &quot;</span>
+                      <span class="s2">&quot;carefully&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">tot</span> <span class="o">-</span> <span class="n">big_len_b</span><span class="p">,</span> <span class="s1">&#39;indices&#39;</span> <span class="k">if</span> <span class="n">tot</span> <span class="o">-</span> <span class="n">big_len_b</span> <span class="o">&gt;</span> <span class="mi">1</span> <span class="k">else</span>
+                                         <span class="s1">&#39;index&#39;</span><span class="p">))</span>
+    <span class="n">sys</span><span class="o">.</span><span class="n">stdout</span><span class="o">.</span><span class="n">flush</span><span class="p">()</span>
+
+    <span class="k">return</span></div>
+
+</pre></div>
+
+            <div class="clearer"></div>
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="../../f-modindex.html" title="Fortran Module Index"
+             >fortran modules</a> |</li>
+        <li class="right" >
+          <a href="../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../index.html">macauff</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../index.html" >Module code</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">macauff.counterpart_pairing</a></li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+    &#169; Copyright 2022, Tom J Wilson.
+      Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 7.2.6.
+    </div>
+  </body>
+</html>

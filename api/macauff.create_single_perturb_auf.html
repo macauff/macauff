@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>create_single_perturb_auf &#8212; macauff</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=4848ba22" />
+    <link rel="stylesheet" type="text/css" href="../_static/pyramid.css?v=a5b9c134" />
+    <link rel="stylesheet" type="text/css" href="../_static/graphviz.css?v=eafc0fe6" />
+    <script src="../_static/documentation_options.js?v=5929fcd5"></script>
+    <script src="../_static/doctools.js?v=888ff710"></script>
+    <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script async="async" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="csv_to_npy" href="macauff.csv_to_npy.html" />
+    <link rel="prev" title="create_galaxy_counts" href="macauff.create_galaxy_counts.html" />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Neuton&amp;subset=latin" type="text/css" media="screen" charset="utf-8" />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Nobile:regular,italic,bold,bolditalic&amp;subset=latin" type="text/css" media="screen" charset="utf-8" />
+<!--[if lte IE 6]>
+<link rel="stylesheet" href="../_static/ie6.css" type="text/css" media="screen" charset="utf-8" />
+<![endif]-->
+
+  </head><body>
+
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="../f-modindex.html" title="Fortran Module Index"
+             >fortran modules</a> |</li>
+        <li class="right" >
+          <a href="../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="right" >
+          <a href="macauff.csv_to_npy.html" title="csv_to_npy"
+             accesskey="N">next</a> |</li>
+        <li class="right" >
+          <a href="macauff.create_galaxy_counts.html" title="create_galaxy_counts"
+             accesskey="P">previous</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../index.html">macauff</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../macauff.html" accesskey="U"><code class="docutils literal notranslate"><span class="pre">macauff</span></code> Documentation</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">create_single_perturb_auf</a></li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <section id="create-single-perturb-auf">
+<h1>create_single_perturb_auf<a class="headerlink" href="#create-single-perturb-auf" title="Link to this heading">¶</a></h1>
+<dl class="py function">
+<dt class="sig sig-object py" id="macauff.create_single_perturb_auf">
+<span class="sig-prename descclassname"><span class="pre">macauff.</span></span><span class="sig-name descname"><span class="pre">create_single_perturb_auf</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">tri_folder</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">auf_point</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">filt</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">r</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dr</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">rho</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">drho</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">j0s</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">num_trials</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">psf_fwhm</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">header</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">density_mag</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">a_photo</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">localN</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">d_mag</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">mag_cut</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dd_params</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">l_cut</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">run_fw</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">run_psf</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">snr_mag_params</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">al_av</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">region_frame</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ax1s</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ax2s</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">fit_gal_flag</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">cmau_array</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">wav</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">z_max</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">nz</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">alpha0</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">alpha1</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">alpha_weight</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ab_offset</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">filter_name</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/macauff/perturbation_auf.html#create_single_perturb_auf"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#macauff.create_single_perturb_auf" title="Link to this definition">¶</a></dt>
+<dd><p>Creates the associated parameters for describing a single perturbation AUF
+component, for a single sky position.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><dl class="simple">
+<dt><strong>tri_folder</strong><span class="classifier">string</span></dt><dd><p>Folder where the TRILEGAL datafile is stored, and where the individual
+filter-specific perturbation AUF simulations should be saved.</p>
+</dd>
+<dt><strong>auf_point</strong><span class="classifier">numpy.ndarray</span></dt><dd><p>The orthogonal sky coordinates of the simulated AUF component.</p>
+</dd>
+<dt><strong>filt</strong><span class="classifier">float</span></dt><dd><p>Filter for which to simulate the AUF component.</p>
+</dd>
+<dt><strong>r</strong><span class="classifier">numpy.ndarray</span></dt><dd><p>Array of real-space positions.</p>
+</dd>
+<dt><strong>dr</strong><span class="classifier">numpy.ndarray</span></dt><dd><p>Array of the bin sizes of each <code class="docutils literal notranslate"><span class="pre">r</span></code> position.</p>
+</dd>
+<dt><strong>rho</strong><span class="classifier">numpy.ndarray</span></dt><dd><p>Fourier-space coordinates at which to sample the fourier transformation
+of the distribution of perturbations due to blended sources.</p>
+</dd>
+<dt><strong>drho</strong><span class="classifier">numpy.ndarray</span></dt><dd><p>Bin widths of each <code class="docutils literal notranslate"><span class="pre">rho</span></code> coordinate.</p>
+</dd>
+<dt><strong>j0s</strong><span class="classifier">numpy.ndarray</span></dt><dd><p>The Bessel Function of First Kind of Zeroth Order, evaluated at all
+<code class="docutils literal notranslate"><span class="pre">r</span></code>-<code class="docutils literal notranslate"><span class="pre">rho</span></code> combinations.</p>
+</dd>
+<dt><strong>num_trials</strong><span class="classifier">integer</span></dt><dd><p>The number of realisations of blended contaminant sources to draw
+when simulating perturbations of source positions.</p>
+</dd>
+<dt><strong>psf_fwhm</strong><span class="classifier">float</span></dt><dd><p>The full-width at half maxima of the <code class="docutils literal notranslate"><span class="pre">filt</span></code> filter.</p>
+</dd>
+<dt><strong>header</strong><span class="classifier">float</span></dt><dd><p>The filter name, as given by the TRILEGAL datafile, for this simulation.</p>
+</dd>
+<dt><strong>density_mag</strong><span class="classifier">float</span></dt><dd><p>The limiting magnitude above which to consider local normalising densities,
+corresponding to the <code class="docutils literal notranslate"><span class="pre">filt</span></code> bandpass.</p>
+</dd>
+<dt><strong>a_photo</strong><span class="classifier">numpy.ndarray</span></dt><dd><p>The photometry of each source for which simulated perturbations should be
+made.</p>
+</dd>
+<dt><strong>localN</strong><span class="classifier">numpy.ndarray</span></dt><dd><p>The local normalising densities for each source.</p>
+</dd>
+<dt><strong>d_mag</strong><span class="classifier">float</span></dt><dd><p>The interval at which to bin the magnitudes of a given set of objects,
+for the creation of the appropriate brightness/density combinations to
+simulate.</p>
+</dd>
+<dt><strong>mag_cut</strong><span class="classifier">numpy.ndarray or list of floats</span></dt><dd><p>The magnitude offsets – or relative fluxes – above which to keep track of
+the fraction of objects suffering from a contaminating source.</p>
+</dd>
+<dt><strong>dd_params</strong><span class="classifier">numpy.ndarray</span></dt><dd><p>Polynomial fits for the various parameters controlling the background
+limited PSF-fit algorithm for centroid perturbations.</p>
+</dd>
+<dt><strong>l_cut</strong><span class="classifier">numpy.ndarray or list</span></dt><dd><p>Relative flux cutoffs for which algorithm to use in the background
+limited PSF-fit algorithm case.</p>
+</dd>
+<dt><strong>run_fw</strong><span class="classifier">bool</span></dt><dd><p>Flag indicating whether to run the “flux-weighted” version of the
+perturbation algorithm.</p>
+</dd>
+<dt><strong>run_psf</strong><span class="classifier">bool</span></dt><dd><p>Flag indicating whether to run the “background-dominated PSF” version
+of the perturbation algorithm.</p>
+</dd>
+<dt><strong>snr_mag_params</strong><span class="classifier">numpy.ndarray</span></dt><dd><p>Array, of shape <code class="docutils literal notranslate"><span class="pre">(Y,</span> <span class="pre">5)</span></code>, containing the pre-determined values of the
+magnitude-perturbation weighting relationship for a series of Galactic
+sightlines for this particular filter.</p>
+</dd>
+<dt><strong>al_av</strong><span class="classifier">float</span></dt><dd><p>Reddening vector for the filter, <span class="math notranslate nohighlight">\(\frac{A_\lambda}{A_V}\)</span>.</p>
+</dd>
+<dt><strong>region_frame</strong><span class="classifier">string</span></dt><dd><p>Indicator as to whether we are in <code class="docutils literal notranslate"><span class="pre">equatorial</span></code> or <code class="docutils literal notranslate"><span class="pre">galactic</span></code>
+coordinates.</p>
+</dd>
+<dt><strong>ax1s</strong><span class="classifier">list or numpy.ndarray of floats</span></dt><dd><p>The unique longitudinal coordinates which, when combined with <code class="docutils literal notranslate"><span class="pre">ax1s</span></code>,
+form a rectangular grid of extinctions to sample for model counts.</p>
+</dd>
+<dt><strong>ax2s</strong><span class="classifier">list or numpy.ndarray of floats</span></dt><dd><p>Unique latitudinal coordinates to combine with <code class="docutils literal notranslate"><span class="pre">ax1s</span></code> for individual
+ra-dec or l-b pairings for which to simulate extinction-at-infinity.</p>
+</dd>
+<dt><strong>fit_gal_flag</strong><span class="classifier">bool</span></dt><dd><p>Flag to indicate whether to simulate galaxy counts for the purposes of
+simulating the perturbation component of the AUF.</p>
+</dd>
+<dt><strong>cmau_array</strong><span class="classifier">numpy.ndarray, optional</span></dt><dd><p>Array holding the c/m/a/u values that describe the parameterisation
+of the Schechter functions with wavelength, following Wilson (2022, RNAAS,
+6, 60) <a class="reference internal" href="#rf743dfb666d7-1" id="id1">[1]</a>. Shape should be <code class="xref py py-obj docutils literal notranslate"><span class="pre">(5,</span> <span class="pre">2,</span> <span class="pre">4)</span></code>, with 5 parameters for both blue
+and red galaxies.</p>
+</dd>
+<dt><strong>wav</strong><span class="classifier">float, optional</span></dt><dd><p>Wavelength, in microns, of the filter of the current observations.</p>
+</dd>
+<dt><strong>z_max</strong><span class="classifier">float, optional</span></dt><dd><p>Maximum redshift to simulate differential galaxy counts out to.</p>
+</dd>
+<dt><strong>nz</strong><span class="classifier">int, optional</span></dt><dd><p>Number of redshifts to simulate, to dictate resolution of Schechter
+functions used to generate differential galaxy counts.</p>
+</dd>
+<dt><strong>alpha0</strong><span class="classifier">list of numpy.ndarray or numpy.ndarray, optional</span></dt><dd><p>Zero-redshift indices used to calculate Dirichlet SED coefficients,
+used within the differential galaxy count simulations. Should either be
+a two-element list or shape <code class="docutils literal notranslate"><span class="pre">(2,</span> <span class="pre">5)</span></code> array. See <a class="reference internal" href="#rf743dfb666d7-2" id="id2">[2]</a> and <a class="reference internal" href="#rf743dfb666d7-3" id="id3">[3]</a> for
+more details.</p>
+</dd>
+<dt><strong>alpha1</strong><span class="classifier">list of numpy.ndarray or numpy.ndarray, optional</span></dt><dd><p>Dirichlet SED coefficients at z=1.</p>
+</dd>
+<dt><strong>alpha_weight</strong><span class="classifier">list of numpy.ndarray or numpy.ndarray, optional</span></dt><dd><p>Weights used to derive the <code class="docutils literal notranslate"><span class="pre">kcorrect</span></code> coefficients within the
+galaxy count framework.</p>
+</dd>
+<dt><strong>ab_offset</strong><span class="classifier">float, optional</span></dt><dd><p>The zero point difference between the chosen filter and the AB system,
+for conversion of simulated galaxy counts from AB magnitudes. Should
+be of the convention m = m_AB - ab_offset</p>
+</dd>
+<dt><strong>filter_name</strong><span class="classifier">string, optional</span></dt><dd><p>The <code class="docutils literal notranslate"><span class="pre">speclite</span></code> style <code class="docutils literal notranslate"><span class="pre">group_name-band_name</span></code> name for the filter,
+for use in the creation of simulated galaxy counts.</p>
+</dd>
+</dl>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><dl class="simple">
+<dt><strong>count_array</strong><span class="classifier">numpy.ndarray</span></dt><dd><p>The simulated local normalising densities that were used to simulate
+potential perturbation distributions.</p>
+</dd>
+</dl>
+</dd>
+</dl>
+<p class="rubric">References</p>
+<div role="list" class="citation-list">
+<div class="citation" id="rf743dfb666d7-1" role="doc-biblioentry">
+<span class="label"><span class="fn-bracket">[</span><a role="doc-backlink" href="#id1">1</a><span class="fn-bracket">]</span></span>
+<p>Wilson T. J. (2022), RNAAS, 6, 60</p>
+</div>
+<div class="citation" id="rf743dfb666d7-2" role="doc-biblioentry">
+<span class="label"><span class="fn-bracket">[</span><a role="doc-backlink" href="#id2">2</a><span class="fn-bracket">]</span></span>
+<p>Herbel J., Kacprzak T., Amara A., et al. (2017), JCAP, 8, 35</p>
+</div>
+<div class="citation" id="rf743dfb666d7-3" role="doc-biblioentry">
+<span class="label"><span class="fn-bracket">[</span><a role="doc-backlink" href="#id3">3</a><span class="fn-bracket">]</span></span>
+<p>Blanton M. R., Roweis S. (2007), AJ, 133, 734</p>
+</div>
+</div>
+</dd></dl>
+
+</section>
+
+
+            <div class="clearer"></div>
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="../f-modindex.html" title="Fortran Module Index"
+             >fortran modules</a> |</li>
+        <li class="right" >
+          <a href="../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="right" >
+          <a href="macauff.csv_to_npy.html" title="csv_to_npy"
+             >next</a> |</li>
+        <li class="right" >
+          <a href="macauff.create_galaxy_counts.html" title="create_galaxy_counts"
+             >previous</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../index.html">macauff</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../macauff.html" ><code class="docutils literal notranslate"><span class="pre">macauff</span></code> Documentation</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">create_single_perturb_auf</a></li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+    &#169; Copyright 2022, Tom J Wilson.
+      Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 7.2.6.
+    </div>
+  </body>
+</html>

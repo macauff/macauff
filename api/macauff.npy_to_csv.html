@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>npy_to_csv &#8212; macauff</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=4848ba22" />
+    <link rel="stylesheet" type="text/css" href="../_static/pyramid.css?v=a5b9c134" />
+    <link rel="stylesheet" type="text/css" href="../_static/graphviz.css?v=eafc0fe6" />
+    <script src="../_static/documentation_options.js?v=5929fcd5"></script>
+    <script src="../_static/doctools.js?v=888ff710"></script>
+    <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="rect_slice_csv" href="macauff.rect_slice_csv.html" />
+    <link rel="prev" title="make_perturb_aufs" href="macauff.make_perturb_aufs.html" />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Neuton&amp;subset=latin" type="text/css" media="screen" charset="utf-8" />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Nobile:regular,italic,bold,bolditalic&amp;subset=latin" type="text/css" media="screen" charset="utf-8" />
+<!--[if lte IE 6]>
+<link rel="stylesheet" href="../_static/ie6.css" type="text/css" media="screen" charset="utf-8" />
+<![endif]-->
+
+  </head><body>
+
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="../f-modindex.html" title="Fortran Module Index"
+             >fortran modules</a> |</li>
+        <li class="right" >
+          <a href="../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="right" >
+          <a href="macauff.rect_slice_csv.html" title="rect_slice_csv"
+             accesskey="N">next</a> |</li>
+        <li class="right" >
+          <a href="macauff.make_perturb_aufs.html" title="make_perturb_aufs"
+             accesskey="P">previous</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../index.html">macauff</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../macauff.html" accesskey="U"><code class="docutils literal notranslate"><span class="pre">macauff</span></code> Documentation</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">npy_to_csv</a></li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <section id="npy-to-csv">
+<h1>npy_to_csv<a class="headerlink" href="#npy-to-csv" title="Link to this heading">¶</a></h1>
+<dl class="py function">
+<dt class="sig sig-object py" id="macauff.npy_to_csv">
+<span class="sig-prename descclassname"><span class="pre">macauff.</span></span><span class="sig-name descname"><span class="pre">npy_to_csv</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">input_csv_folders</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">input_match_folder</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">output_folder</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">csv_filenames</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">output_filenames</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">column_name_lists</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">column_num_lists</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">extra_col_cat_names</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">input_npy_folders</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">headers</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">[False,</span> <span class="pre">False]</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">extra_col_name_lists</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">[None,</span> <span class="pre">None]</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">extra_col_num_lists</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">[None,</span> <span class="pre">None]</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/macauff/parse_catalogue.html#npy_to_csv"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#macauff.npy_to_csv" title="Link to this definition">¶</a></dt>
+<dd><p>Function to convert output .npy files, as created during the cross-match
+process, and create a .csv file of matches and non-matches, combining columns
+from the original .csv catalogues.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><dl class="simple">
+<dt><strong>input_csv_folders</strong><span class="classifier">list of strings</span></dt><dd><p>List of the folders in which the two respective .csv file catalogues
+are stored.</p>
+</dd>
+<dt><strong>input_match_folder</strong><span class="classifier">string</span></dt><dd><p>Folder in which all intermediate cross-match files have been stored.</p>
+</dd>
+<dt><strong>output_folder</strong><span class="classifier">string</span></dt><dd><p>Folder into which to save the resulting .csv output files.</p>
+</dd>
+<dt><strong>csv_filenames</strong><span class="classifier">list of strings</span></dt><dd><p>List of names, including extensions, of the two catalogues that were matched.</p>
+</dd>
+<dt><strong>output_filenames</strong><span class="classifier">list of strings</span></dt><dd><p>List of the names, including extensions, out to which to save merged
+datasets.</p>
+</dd>
+<dt><strong>column_name_lists</strong><span class="classifier">list of list or array of strings</span></dt><dd><p>List containing two lists of strings, one per catalogue. Each inner list
+should contain the names of the columns in each respective catalogue to
+be included in the merged dataset – its ID or designation, two
+orthogonal sky positions, and N magnitudes, as were originally used
+in the matching process, and likely used in <code class="docutils literal notranslate"><span class="pre">csv_to_npy</span></code>.</p>
+</dd>
+<dt><strong>column_num_lists</strong><span class="classifier">list of list or array of integers</span></dt><dd><p>List containing two lists or arrays of integers, one per catalogue,
+with the zero-index column integers corresponding to those columns listed
+in <code class="docutils literal notranslate"><span class="pre">column_name_lists</span></code>.</p>
+</dd>
+<dt><strong>extra_col_cat_names</strong><span class="classifier">list of strings</span></dt><dd><p>List of two strings, one per catalogue, indicating the names of the two
+catalogues, to append to the front of the derived contamination-based
+values included in the output datasets.</p>
+</dd>
+<dt><strong>input_npy_folders</strong><span class="classifier">list of strings</span></dt><dd><p>List of folders in which the respective catalogues’ .npy files were
+saved to, as part of <code class="docutils literal notranslate"><span class="pre">csv_to_npy</span></code>, in the same order as
+<code class="docutils literal notranslate"><span class="pre">input_csv_folders</span></code>. If a catalogue did not have its uncertainties
+processed, its entry should be None, so a case where both catalogues in
+a match had their uncertainties treated as given would be
+<code class="docutils literal notranslate"><span class="pre">[None,</span> <span class="pre">None]</span></code>.</p>
+</dd>
+<dt><strong>headers</strong><span class="classifier">list of booleans, optional</span></dt><dd><p>List of two boolmean flags, one per catalogue, indicating whether the
+original input .csv file for this catalogue had a header which provides
+names for each column on its first line, or whether its first line is the
+first line of the data.</p>
+</dd>
+<dt><strong>extra_col_name_lists</strong><span class="classifier">list of list or array of strings, or None, optional</span></dt><dd><p>Should be a list of two lists of strings, one per catalogue. As with
+<code class="docutils literal notranslate"><span class="pre">column_name_lists</span></code>, these should be names of columns from their
+respective catalogue in <code class="docutils literal notranslate"><span class="pre">csv_filenames</span></code>, to be included in the output
+merged datasets. For a particular catalogue, if no extra columns should
+be included, put <code class="docutils literal notranslate"><span class="pre">None</span></code> in that entry. For example, to only include
+an extra single column <code class="docutils literal notranslate"><span class="pre">Q</span></code> for the second catalogue,
+<code class="docutils literal notranslate"><span class="pre">extra_col_name_lists=[None,</span> <span class="pre">['Q']]</span></code>.</p>
+</dd>
+<dt><strong>extra_col_num_lists</strong><span class="classifier">list of list or array of integer, or None, optional</span></dt><dd><p>Should be a list of two lists of strings, analagous to
+<code class="docutils literal notranslate"><span class="pre">column_num_lists</span></code>, providing the column indices for additional
+catalogue columns in the original .csv files to be included in the
+output datafiles. Like <code class="docutils literal notranslate"><span class="pre">extra_col_name_lists</span></code>, for either catalogue
+<code class="docutils literal notranslate"><span class="pre">None</span></code> can be entered for no additional columns; for the above example
+we would use <code class="docutils literal notranslate"><span class="pre">extra_col_num_lists=[None,</span> <span class="pre">[7]]</span></code>.</p>
+</dd>
+</dl>
+</dd>
+</dl>
+</dd></dl>
+
+</section>
+
+
+            <div class="clearer"></div>
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="../f-modindex.html" title="Fortran Module Index"
+             >fortran modules</a> |</li>
+        <li class="right" >
+          <a href="../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="right" >
+          <a href="macauff.rect_slice_csv.html" title="rect_slice_csv"
+             >next</a> |</li>
+        <li class="right" >
+          <a href="macauff.make_perturb_aufs.html" title="make_perturb_aufs"
+             >previous</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../index.html">macauff</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../macauff.html" ><code class="docutils literal notranslate"><span class="pre">macauff</span></code> Documentation</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">npy_to_csv</a></li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+    &#169; Copyright 2022, Tom J Wilson.
+      Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 7.2.6.
+    </div>
+  </body>
+</html>

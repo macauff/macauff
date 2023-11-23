@@ -1,0 +1,643 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="../../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>macauff.parse_catalogue &#8212; macauff</title>
+    <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=4848ba22" />
+    <link rel="stylesheet" type="text/css" href="../../_static/pyramid.css?v=a5b9c134" />
+    <link rel="stylesheet" type="text/css" href="../../_static/graphviz.css?v=eafc0fe6" />
+    <script src="../../_static/documentation_options.js?v=5929fcd5"></script>
+    <script src="../../_static/doctools.js?v=888ff710"></script>
+    <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Neuton&amp;subset=latin" type="text/css" media="screen" charset="utf-8" />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Nobile:regular,italic,bold,bolditalic&amp;subset=latin" type="text/css" media="screen" charset="utf-8" />
+<!--[if lte IE 6]>
+<link rel="stylesheet" href="../../_static/ie6.css" type="text/css" media="screen" charset="utf-8" />
+<![endif]-->
+
+  </head><body>
+
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="../../f-modindex.html" title="Fortran Module Index"
+             >fortran modules</a> |</li>
+        <li class="right" >
+          <a href="../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../index.html">macauff</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../index.html" accesskey="U">Module code</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">macauff.parse_catalogue</a></li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <h1>Source code for macauff.parse_catalogue</h1><div class="highlight"><pre>
+<span></span><span class="c1"># Licensed under a 3-clause BSD style license - see LICENSE</span>
+<span class="sd">&#39;&#39;&#39;</span>
+<span class="sd">This module provides functionality to convert input photometric catalogues</span>
+<span class="sd">to the required numpy binary files used within the cross-match process.</span>
+<span class="sd">&#39;&#39;&#39;</span>
+
+<span class="kn">import</span> <span class="nn">os</span>
+<span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+<span class="kn">from</span> <span class="nn">numpy.lib.format</span> <span class="kn">import</span> <span class="n">open_memmap</span>
+<span class="kn">import</span> <span class="nn">pandas</span> <span class="k">as</span> <span class="nn">pd</span>
+
+<span class="kn">from</span> <span class="nn">.misc_functions</span> <span class="kn">import</span> <span class="n">_load_rectangular_slice</span>
+<span class="kn">from</span> <span class="nn">.misc_functions_fortran</span> <span class="kn">import</span> <span class="n">misc_functions_fortran</span> <span class="k">as</span> <span class="n">mff</span>
+
+<span class="n">__all__</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;csv_to_npy&#39;</span><span class="p">,</span> <span class="s1">&#39;rect_slice_npy&#39;</span><span class="p">,</span> <span class="s1">&#39;npy_to_csv&#39;</span><span class="p">,</span> <span class="s1">&#39;rect_slice_csv&#39;</span><span class="p">]</span>
+
+
+<div class="viewcode-block" id="csv_to_npy">
+<a class="viewcode-back" href="../../api/macauff.csv_to_npy.html#macauff.csv_to_npy">[docs]</a>
+<span class="k">def</span> <span class="nf">csv_to_npy</span><span class="p">(</span><span class="n">input_folder</span><span class="p">,</span> <span class="n">input_filename</span><span class="p">,</span> <span class="n">output_folder</span><span class="p">,</span> <span class="n">astro_cols</span><span class="p">,</span> <span class="n">photo_cols</span><span class="p">,</span> <span class="n">bestindex_col</span><span class="p">,</span>
+               <span class="n">chunk_overlap_col</span><span class="p">,</span> <span class="n">header</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">process_uncerts</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">astro_sig_fits_filepath</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+               <span class="n">cat_in_radec</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">mn_in_radec</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&#39;&#39;&#39;</span>
+<span class="sd">    Convert a .csv file representation of a photometric catalogue into the</span>
+<span class="sd">    appropriate .npy binary files used in the cross-matching process.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    input_folder : string</span>
+<span class="sd">        Folder on disk where the catalogue .csv file is stored.</span>
+<span class="sd">    input_filename : string</span>
+<span class="sd">        Name of the CSV file, including extension, to convert to binary files.</span>
+<span class="sd">    output_folder : string</span>
+<span class="sd">        Folder on disk of where to save the .npy versions of the catalogue.</span>
+<span class="sd">    astro_cols : list or numpy.array of integers</span>
+<span class="sd">        List of zero-indexed columns in the input catalogue representing the</span>
+<span class="sd">        three required astrometric parameters, two orthogonal sky axis</span>
+<span class="sd">        coordinates and a single, circular astrometric precision. The precision</span>
+<span class="sd">        must be the last column, with the first two columns of ``astro_cols``</span>
+<span class="sd">        matching in order to the first two columns of the output astrometry</span>
+<span class="sd">        binary file, if ``process_uncerts`` is ``True``.</span>
+<span class="sd">    photo_cols : list or numpy.array of integers</span>
+<span class="sd">        List of zero-indexed columns in the input catalogue representing the</span>
+<span class="sd">        magnitudes of each photometric source to be used in the cross-matching.</span>
+<span class="sd">    bestindex_col : integer</span>
+<span class="sd">        Zero-indexed column of the flag indicating which of the available</span>
+<span class="sd">        photometric brightnesses (represented by ``photo_cols``) is the</span>
+<span class="sd">        preferred choice -- usually the most precise and highest quality</span>
+<span class="sd">        detection.</span>
+<span class="sd">    chunk_overlap_col : integer</span>
+<span class="sd">        Zero-indexed column in the .csv file containing an integer representation</span>
+<span class="sd">        of the boolean representation of whether sources are in the &quot;halo&quot;</span>
+<span class="sd">        (``1`` in the .csv) or &quot;core&quot; (``0``) of the region. If ``None`` then all</span>
+<span class="sd">        objects are assumed to be in the core.</span>
+<span class="sd">    header : boolean, optional</span>
+<span class="sd">        Flag indicating whether the .csv file has a first line with the names</span>
+<span class="sd">        of the columns in it, or whether the first line of the file is the first</span>
+<span class="sd">        line of the dataset.</span>
+<span class="sd">    process_uncerts : boolean, optional</span>
+<span class="sd">        Determines whether uncertainties are re-processed in light of astrometric</span>
+<span class="sd">        fitting on large scales.</span>
+<span class="sd">    astro_sig_fits_filepath : string, optional</span>
+<span class="sd">        Location on disk of the two saved files that contain the parameters</span>
+<span class="sd">        that describe best-fit astrometric precision as a function of quoted</span>
+<span class="sd">        astrometric precision. Must be provided if ``process_uncerts`` is ``True``.</span>
+<span class="sd">    cat_in_radec : boolean, optional</span>
+<span class="sd">        If ``process_uncerts`` is ``True``, must be provided, and either be</span>
+<span class="sd">        ``True`` or ``False``, indicating whether the catalogue being processed</span>
+<span class="sd">        is in RA-Dec coordinates or not. If ``True``, coordinates of mid-points</span>
+<span class="sd">        for derivations of ``m`` and ``n`` for quoted-fit uncertainty relations</span>
+<span class="sd">        will be converted from Galactic Longitude and Latitude to Right Ascension</span>
+<span class="sd">        and Declination for the purposes of nearest-neighbour use, if</span>
+<span class="sd">        ``mn_in_radec`` is ``False`` (and m-n coordinates are in l/b).</span>
+<span class="sd">    mn_in_radec : boolean, optional</span>
+<span class="sd">        If ``process_uncerts`` is ``True``, must be provided, and similar to</span>
+<span class="sd">        ``cat_in_radec`` is a flag indcating whether the coordinates used to</span>
+<span class="sd">        compute m-n scaling relations are in RA/Dec or not. If ``mn_in_radec``</span>
+<span class="sd">        disagrees with ``cat_in_radec`` then m-n coordinates will be converted</span>
+<span class="sd">        to the coordinate system of the catalogue.</span>
+<span class="sd">    &#39;&#39;&#39;</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="p">(</span><span class="n">process_uncerts</span> <span class="ow">is</span> <span class="kc">True</span> <span class="ow">or</span> <span class="n">process_uncerts</span> <span class="ow">is</span> <span class="kc">False</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;process_uncerts must either be True or False.&quot;</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">process_uncerts</span> <span class="ow">and</span> <span class="n">astro_sig_fits_filepath</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;astro_sig_fits_filepath must given if process_uncerts is True.&quot;</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">process_uncerts</span> <span class="ow">and</span> <span class="n">cat_in_radec</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;cat_in_radec must given if process_uncerts is True.&quot;</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">process_uncerts</span> <span class="ow">and</span> <span class="n">mn_in_radec</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;mn_in_radec must given if process_uncerts is True.&quot;</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">process_uncerts</span> <span class="ow">and</span> <span class="ow">not</span> <span class="p">(</span><span class="n">cat_in_radec</span> <span class="ow">is</span> <span class="kc">True</span> <span class="ow">or</span> <span class="n">cat_in_radec</span> <span class="ow">is</span> <span class="kc">False</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;If process_uncerts is True, cat_in_radec must either be True or False.&quot;</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">process_uncerts</span> <span class="ow">and</span> <span class="ow">not</span> <span class="p">(</span><span class="n">mn_in_radec</span> <span class="ow">is</span> <span class="kc">True</span> <span class="ow">or</span> <span class="n">mn_in_radec</span> <span class="ow">is</span> <span class="kc">False</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;If process_uncerts is True, mn_in_radec must either be True or False.&quot;</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">process_uncerts</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">exists</span><span class="p">(</span><span class="n">astro_sig_fits_filepath</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;process_uncerts is True but astro_sig_fits_filepath does not exist. &quot;</span>
+                         <span class="s2">&quot;Please ensure file path is correct.&quot;</span><span class="p">)</span>
+    <span class="n">astro_cols</span><span class="p">,</span> <span class="n">photo_cols</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">astro_cols</span><span class="p">),</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">photo_cols</span><span class="p">)</span>
+    <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="s1">&#39;</span><span class="si">{}</span><span class="s1">/</span><span class="si">{}</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">input_folder</span><span class="p">,</span> <span class="n">input_filename</span><span class="p">))</span> <span class="k">as</span> <span class="n">fp</span><span class="p">:</span>
+        <span class="n">n_rows</span> <span class="o">=</span> <span class="mi">0</span> <span class="k">if</span> <span class="ow">not</span> <span class="n">header</span> <span class="k">else</span> <span class="o">-</span><span class="mi">1</span>
+        <span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="n">fp</span><span class="p">:</span>
+            <span class="n">n_rows</span> <span class="o">+=</span> <span class="mi">1</span>
+
+    <span class="n">astro</span> <span class="o">=</span> <span class="n">open_memmap</span><span class="p">(</span><span class="s1">&#39;</span><span class="si">{}</span><span class="s1">/con_cat_astro.npy&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">output_folder</span><span class="p">),</span> <span class="n">mode</span><span class="o">=</span><span class="s1">&#39;w+&#39;</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="nb">float</span><span class="p">,</span>
+                        <span class="n">shape</span><span class="o">=</span><span class="p">(</span><span class="n">n_rows</span><span class="p">,</span> <span class="mi">3</span><span class="p">))</span>
+    <span class="n">photo</span> <span class="o">=</span> <span class="n">open_memmap</span><span class="p">(</span><span class="s1">&#39;</span><span class="si">{}</span><span class="s1">/con_cat_photo.npy&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">output_folder</span><span class="p">),</span> <span class="n">mode</span><span class="o">=</span><span class="s1">&#39;w+&#39;</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="nb">float</span><span class="p">,</span>
+                        <span class="n">shape</span><span class="o">=</span><span class="p">(</span><span class="n">n_rows</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">photo_cols</span><span class="p">)))</span>
+    <span class="n">best_index</span> <span class="o">=</span> <span class="n">open_memmap</span><span class="p">(</span><span class="s1">&#39;</span><span class="si">{}</span><span class="s1">/magref.npy&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">output_folder</span><span class="p">),</span> <span class="n">mode</span><span class="o">=</span><span class="s1">&#39;w+&#39;</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="nb">int</span><span class="p">,</span>
+                             <span class="n">shape</span><span class="o">=</span><span class="p">(</span><span class="n">n_rows</span><span class="p">,))</span>
+    <span class="n">chunk_overlap</span> <span class="o">=</span> <span class="n">open_memmap</span><span class="p">(</span><span class="s1">&#39;</span><span class="si">{}</span><span class="s1">/in_chunk_overlap.npy&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">output_folder</span><span class="p">),</span> <span class="n">mode</span><span class="o">=</span><span class="s1">&#39;w+&#39;</span><span class="p">,</span>
+                                <span class="n">dtype</span><span class="o">=</span><span class="nb">bool</span><span class="p">,</span> <span class="n">shape</span><span class="o">=</span><span class="p">(</span><span class="n">n_rows</span><span class="p">,))</span>
+
+    <span class="k">if</span> <span class="n">process_uncerts</span><span class="p">:</span>
+        <span class="n">m_sigs</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="s1">&#39;</span><span class="si">{}</span><span class="s1">/m_sigs_array.npy&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">astro_sig_fits_filepath</span><span class="p">))</span>
+        <span class="n">n_sigs</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="s1">&#39;</span><span class="si">{}</span><span class="s1">/n_sigs_array.npy&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">astro_sig_fits_filepath</span><span class="p">))</span>
+        <span class="n">mn_coords</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">empty</span><span class="p">((</span><span class="nb">len</span><span class="p">(</span><span class="n">m_sigs</span><span class="p">),</span> <span class="mi">2</span><span class="p">),</span> <span class="nb">float</span><span class="p">)</span>
+        <span class="n">mn_coords</span><span class="p">[:,</span> <span class="mi">0</span><span class="p">]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="s1">&#39;</span><span class="si">{}</span><span class="s1">/ax1_mids.npy&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">astro_sig_fits_filepath</span><span class="p">))</span>
+        <span class="n">mn_coords</span><span class="p">[:,</span> <span class="mi">1</span><span class="p">]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="s1">&#39;</span><span class="si">{}</span><span class="s1">/ax2_mids.npy&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">astro_sig_fits_filepath</span><span class="p">))</span>
+        <span class="k">if</span> <span class="n">cat_in_radec</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">mn_in_radec</span><span class="p">:</span>
+            <span class="c1"># Convert mn_coords to RA/Dec if catalogue is in Equatorial coords.</span>
+            <span class="kn">from</span> <span class="nn">astropy.coordinates</span> <span class="kn">import</span> <span class="n">SkyCoord</span>
+            <span class="n">a</span> <span class="o">=</span> <span class="n">SkyCoord</span><span class="p">(</span><span class="n">l</span><span class="o">=</span><span class="n">mn_coords</span><span class="p">[:,</span> <span class="mi">0</span><span class="p">],</span> <span class="n">b</span><span class="o">=</span><span class="n">mn_coords</span><span class="p">[:,</span> <span class="mi">1</span><span class="p">],</span> <span class="n">unit</span><span class="o">=</span><span class="s1">&#39;deg&#39;</span><span class="p">,</span> <span class="n">frame</span><span class="o">=</span><span class="s1">&#39;galactic&#39;</span><span class="p">)</span>
+            <span class="n">mn_coords</span><span class="p">[:,</span> <span class="mi">0</span><span class="p">]</span> <span class="o">=</span> <span class="n">a</span><span class="o">.</span><span class="n">icrs</span><span class="o">.</span><span class="n">ra</span><span class="o">.</span><span class="n">degree</span>
+            <span class="n">mn_coords</span><span class="p">[:,</span> <span class="mi">1</span><span class="p">]</span> <span class="o">=</span> <span class="n">a</span><span class="o">.</span><span class="n">icrs</span><span class="o">.</span><span class="n">dec</span><span class="o">.</span><span class="n">degree</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">cat_in_radec</span> <span class="ow">and</span> <span class="n">mn_in_radec</span><span class="p">:</span>
+            <span class="c1"># Convert mn_coords to l/b if catalogue is in Galactic coords.</span>
+            <span class="kn">from</span> <span class="nn">astropy.coordinates</span> <span class="kn">import</span> <span class="n">SkyCoord</span>
+            <span class="n">a</span> <span class="o">=</span> <span class="n">SkyCoord</span><span class="p">(</span><span class="n">ra</span><span class="o">=</span><span class="n">mn_coords</span><span class="p">[:,</span> <span class="mi">0</span><span class="p">],</span> <span class="n">dec</span><span class="o">=</span><span class="n">mn_coords</span><span class="p">[:,</span> <span class="mi">1</span><span class="p">],</span> <span class="n">unit</span><span class="o">=</span><span class="s1">&#39;deg&#39;</span><span class="p">,</span> <span class="n">frame</span><span class="o">=</span><span class="s1">&#39;icrs&#39;</span><span class="p">)</span>
+            <span class="n">mn_coords</span><span class="p">[:,</span> <span class="mi">0</span><span class="p">]</span> <span class="o">=</span> <span class="n">a</span><span class="o">.</span><span class="n">galactic</span><span class="o">.</span><span class="n">l</span><span class="o">.</span><span class="n">degree</span>
+            <span class="n">mn_coords</span><span class="p">[:,</span> <span class="mi">1</span><span class="p">]</span> <span class="o">=</span> <span class="n">a</span><span class="o">.</span><span class="n">galactic</span><span class="o">.</span><span class="n">b</span><span class="o">.</span><span class="n">degree</span>
+
+    <span class="n">used_cols</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">concatenate</span><span class="p">((</span><span class="n">astro_cols</span><span class="p">,</span> <span class="n">photo_cols</span><span class="p">,</span> <span class="p">[</span><span class="n">bestindex_col</span><span class="p">]))</span>
+    <span class="k">if</span> <span class="n">chunk_overlap_col</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">used_cols</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">concatenate</span><span class="p">((</span><span class="n">used_cols</span><span class="p">,</span> <span class="p">[</span><span class="n">chunk_overlap_col</span><span class="p">]))</span>
+    <span class="n">new_astro_cols</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="n">np</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">used_cols</span> <span class="o">==</span> <span class="n">a</span><span class="p">)[</span><span class="mi">0</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span> <span class="k">for</span> <span class="n">a</span> <span class="ow">in</span> <span class="n">astro_cols</span><span class="p">])</span>
+    <span class="n">new_photo_cols</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="n">np</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">used_cols</span> <span class="o">==</span> <span class="n">a</span><span class="p">)[</span><span class="mi">0</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span> <span class="k">for</span> <span class="n">a</span> <span class="ow">in</span> <span class="n">photo_cols</span><span class="p">])</span>
+    <span class="n">new_bestindex_col</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">used_cols</span> <span class="o">==</span> <span class="n">bestindex_col</span><span class="p">)[</span><span class="mi">0</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span>
+    <span class="k">if</span> <span class="n">chunk_overlap_col</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">new_chunk_overlap_col</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">used_cols</span> <span class="o">==</span> <span class="n">chunk_overlap_col</span><span class="p">)[</span><span class="mi">0</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span>
+    <span class="n">n</span> <span class="o">=</span> <span class="mi">0</span>
+    <span class="k">for</span> <span class="n">chunk</span> <span class="ow">in</span> <span class="n">pd</span><span class="o">.</span><span class="n">read_csv</span><span class="p">(</span><span class="s1">&#39;</span><span class="si">{}</span><span class="s1">/</span><span class="si">{}</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">input_folder</span><span class="p">,</span> <span class="n">input_filename</span><span class="p">),</span> <span class="n">chunksize</span><span class="o">=</span><span class="mi">100000</span><span class="p">,</span>
+                             <span class="n">usecols</span><span class="o">=</span><span class="n">used_cols</span><span class="p">,</span> <span class="n">header</span><span class="o">=</span><span class="kc">None</span> <span class="k">if</span> <span class="ow">not</span> <span class="n">header</span> <span class="k">else</span> <span class="mi">0</span><span class="p">):</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">process_uncerts</span><span class="p">:</span>
+            <span class="n">astro</span><span class="p">[</span><span class="n">n</span><span class="p">:</span><span class="n">n</span><span class="o">+</span><span class="n">chunk</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]]</span> <span class="o">=</span> <span class="n">chunk</span><span class="o">.</span><span class="n">values</span><span class="p">[:,</span> <span class="n">new_astro_cols</span><span class="p">]</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">astro</span><span class="p">[</span><span class="n">n</span><span class="p">:</span><span class="n">n</span><span class="o">+</span><span class="n">chunk</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="mi">0</span><span class="p">]</span> <span class="o">=</span> <span class="n">chunk</span><span class="o">.</span><span class="n">values</span><span class="p">[:,</span> <span class="n">new_astro_cols</span><span class="p">[</span><span class="mi">0</span><span class="p">]]</span>
+            <span class="n">astro</span><span class="p">[</span><span class="n">n</span><span class="p">:</span><span class="n">n</span><span class="o">+</span><span class="n">chunk</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="mi">1</span><span class="p">]</span> <span class="o">=</span> <span class="n">chunk</span><span class="o">.</span><span class="n">values</span><span class="p">[:,</span> <span class="n">new_astro_cols</span><span class="p">[</span><span class="mi">1</span><span class="p">]]</span>
+            <span class="n">old_sigs</span> <span class="o">=</span> <span class="n">chunk</span><span class="o">.</span><span class="n">values</span><span class="p">[:,</span> <span class="n">new_astro_cols</span><span class="p">[</span><span class="mi">2</span><span class="p">]]</span>
+            <span class="n">sig_mn_inds</span> <span class="o">=</span> <span class="n">mff</span><span class="o">.</span><span class="n">find_nearest_point</span><span class="p">(</span><span class="n">chunk</span><span class="o">.</span><span class="n">values</span><span class="p">[:,</span> <span class="n">new_astro_cols</span><span class="p">[</span><span class="mi">0</span><span class="p">]],</span>
+                                                 <span class="n">chunk</span><span class="o">.</span><span class="n">values</span><span class="p">[:,</span> <span class="n">new_astro_cols</span><span class="p">[</span><span class="mi">1</span><span class="p">]],</span>
+                                                 <span class="n">mn_coords</span><span class="p">[:,</span> <span class="mi">0</span><span class="p">],</span> <span class="n">mn_coords</span><span class="p">[:,</span> <span class="mi">1</span><span class="p">])</span>
+            <span class="n">new_sigs</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sqrt</span><span class="p">((</span><span class="n">m_sigs</span><span class="p">[</span><span class="n">sig_mn_inds</span><span class="p">]</span><span class="o">*</span><span class="n">old_sigs</span><span class="p">)</span><span class="o">**</span><span class="mi">2</span> <span class="o">+</span> <span class="n">n_sigs</span><span class="p">[</span><span class="n">sig_mn_inds</span><span class="p">]</span><span class="o">**</span><span class="mi">2</span><span class="p">)</span>
+            <span class="n">astro</span><span class="p">[</span><span class="n">n</span><span class="p">:</span><span class="n">n</span><span class="o">+</span><span class="n">chunk</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="mi">2</span><span class="p">]</span> <span class="o">=</span> <span class="n">new_sigs</span>
+        <span class="n">photo</span><span class="p">[</span><span class="n">n</span><span class="p">:</span><span class="n">n</span><span class="o">+</span><span class="n">chunk</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]]</span> <span class="o">=</span> <span class="n">chunk</span><span class="o">.</span><span class="n">values</span><span class="p">[:,</span> <span class="n">new_photo_cols</span><span class="p">]</span>
+        <span class="n">best_index</span><span class="p">[</span><span class="n">n</span><span class="p">:</span><span class="n">n</span><span class="o">+</span><span class="n">chunk</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]]</span> <span class="o">=</span> <span class="n">chunk</span><span class="o">.</span><span class="n">values</span><span class="p">[:,</span> <span class="n">new_bestindex_col</span><span class="p">]</span>
+        <span class="k">if</span> <span class="n">chunk_overlap_col</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">chunk_overlap</span><span class="p">[</span><span class="n">n</span><span class="p">:</span><span class="n">n</span><span class="o">+</span><span class="n">chunk</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]]</span> <span class="o">=</span> <span class="n">chunk</span><span class="o">.</span><span class="n">values</span><span class="p">[:,</span> <span class="n">new_chunk_overlap_col</span><span class="p">]</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">bool</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">chunk_overlap</span><span class="p">[</span><span class="n">n</span><span class="p">:</span><span class="n">n</span><span class="o">+</span><span class="n">chunk</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">False</span>
+
+        <span class="n">n</span> <span class="o">+=</span> <span class="n">chunk</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+
+    <span class="k">return</span></div>
+
+
+
+<div class="viewcode-block" id="npy_to_csv">
+<a class="viewcode-back" href="../../api/macauff.npy_to_csv.html#macauff.npy_to_csv">[docs]</a>
+<span class="k">def</span> <span class="nf">npy_to_csv</span><span class="p">(</span><span class="n">input_csv_folders</span><span class="p">,</span> <span class="n">input_match_folder</span><span class="p">,</span> <span class="n">output_folder</span><span class="p">,</span> <span class="n">csv_filenames</span><span class="p">,</span>
+               <span class="n">output_filenames</span><span class="p">,</span> <span class="n">column_name_lists</span><span class="p">,</span> <span class="n">column_num_lists</span><span class="p">,</span> <span class="n">extra_col_cat_names</span><span class="p">,</span>
+               <span class="n">input_npy_folders</span><span class="p">,</span> <span class="n">headers</span><span class="o">=</span><span class="p">[</span><span class="kc">False</span><span class="p">,</span> <span class="kc">False</span><span class="p">],</span> <span class="n">extra_col_name_lists</span><span class="o">=</span><span class="p">[</span><span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">],</span>
+               <span class="n">extra_col_num_lists</span><span class="o">=</span><span class="p">[</span><span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">]):</span>
+<span class="w">    </span><span class="sd">&#39;&#39;&#39;</span>
+<span class="sd">    Function to convert output .npy files, as created during the cross-match</span>
+<span class="sd">    process, and create a .csv file of matches and non-matches, combining columns</span>
+<span class="sd">    from the original .csv catalogues.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    input_csv_folders : list of strings</span>
+<span class="sd">        List of the folders in which the two respective .csv file catalogues</span>
+<span class="sd">        are stored.</span>
+<span class="sd">    input_match_folder : string</span>
+<span class="sd">        Folder in which all intermediate cross-match files have been stored.</span>
+<span class="sd">    output_folder : string</span>
+<span class="sd">        Folder into which to save the resulting .csv output files.</span>
+<span class="sd">    csv_filenames : list of strings</span>
+<span class="sd">        List of names, including extensions, of the two catalogues that were matched.</span>
+<span class="sd">    output_filenames : list of strings</span>
+<span class="sd">        List of the names, including extensions, out to which to save merged</span>
+<span class="sd">        datasets.</span>
+<span class="sd">    column_name_lists : list of list or array of strings</span>
+<span class="sd">        List containing two lists of strings, one per catalogue. Each inner list</span>
+<span class="sd">        should contain the names of the columns in each respective catalogue to</span>
+<span class="sd">        be included in the merged dataset -- its ID or designation, two</span>
+<span class="sd">        orthogonal sky positions, and N magnitudes, as were originally used</span>
+<span class="sd">        in the matching process, and likely used in ``csv_to_npy``.</span>
+<span class="sd">    column_num_lists : list of list or array of integers</span>
+<span class="sd">        List containing two lists or arrays of integers, one per catalogue,</span>
+<span class="sd">        with the zero-index column integers corresponding to those columns listed</span>
+<span class="sd">        in ``column_name_lists``.</span>
+<span class="sd">    extra_col_cat_names : list of strings</span>
+<span class="sd">        List of two strings, one per catalogue, indicating the names of the two</span>
+<span class="sd">        catalogues, to append to the front of the derived contamination-based</span>
+<span class="sd">        values included in the output datasets.</span>
+<span class="sd">    input_npy_folders : list of strings</span>
+<span class="sd">        List of folders in which the respective catalogues&#39; .npy files were</span>
+<span class="sd">        saved to, as part of ``csv_to_npy``, in the same order as</span>
+<span class="sd">        ``input_csv_folders``. If a catalogue did not have its uncertainties</span>
+<span class="sd">        processed, its entry should be None, so a case where both catalogues in</span>
+<span class="sd">        a match had their uncertainties treated as given would be</span>
+<span class="sd">        ``[None, None]``.</span>
+<span class="sd">    headers : list of booleans, optional</span>
+<span class="sd">        List of two boolmean flags, one per catalogue, indicating whether the</span>
+<span class="sd">        original input .csv file for this catalogue had a header which provides</span>
+<span class="sd">        names for each column on its first line, or whether its first line is the</span>
+<span class="sd">        first line of the data.</span>
+<span class="sd">    extra_col_name_lists : list of list or array of strings, or None, optional</span>
+<span class="sd">        Should be a list of two lists of strings, one per catalogue. As with</span>
+<span class="sd">        ``column_name_lists``, these should be names of columns from their</span>
+<span class="sd">        respective catalogue in ``csv_filenames``, to be included in the output</span>
+<span class="sd">        merged datasets. For a particular catalogue, if no extra columns should</span>
+<span class="sd">        be included, put ``None`` in that entry. For example, to only include</span>
+<span class="sd">        an extra single column ``Q`` for the second catalogue,</span>
+<span class="sd">        ``extra_col_name_lists=[None, [&#39;Q&#39;]]``.</span>
+<span class="sd">    extra_col_num_lists : list of list or array of integer, or None, optional</span>
+<span class="sd">        Should be a list of two lists of strings, analagous to</span>
+<span class="sd">        ``column_num_lists``, providing the column indices for additional</span>
+<span class="sd">        catalogue columns in the original .csv files to be included in the</span>
+<span class="sd">        output datafiles. Like ``extra_col_name_lists``, for either catalogue</span>
+<span class="sd">        ``None`` can be entered for no additional columns; for the above example</span>
+<span class="sd">        we would use ``extra_col_num_lists=[None, [7]]``.</span>
+<span class="sd">    &#39;&#39;&#39;</span>
+    <span class="c1"># Need IDs/coordinates x2, mags (xN), then our columns: match probability, average</span>
+    <span class="c1"># contaminant flux, eta/xi, and then M contaminant fractions for M relative fluxes.</span>
+    <span class="c1"># TODO: un-hardcode number of relative contaminant fractions</span>
+    <span class="c1"># TODO: remove photometric likelihood when not used.</span>
+    <span class="n">our_columns</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;MATCH_P&#39;</span><span class="p">,</span> <span class="s1">&#39;SEPARATION&#39;</span><span class="p">,</span> <span class="s1">&#39;ETA&#39;</span><span class="p">,</span> <span class="s1">&#39;XI&#39;</span><span class="p">,</span>
+                   <span class="s1">&#39;</span><span class="si">{}</span><span class="s1">_AVG_CONT&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">extra_col_cat_names</span><span class="p">[</span><span class="mi">0</span><span class="p">]),</span>
+                   <span class="s1">&#39;</span><span class="si">{}</span><span class="s1">_AVG_CONT&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">extra_col_cat_names</span><span class="p">[</span><span class="mi">1</span><span class="p">]),</span>
+                   <span class="s1">&#39;</span><span class="si">{}</span><span class="s1">_CONT_F1&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">extra_col_cat_names</span><span class="p">[</span><span class="mi">0</span><span class="p">]),</span>
+                   <span class="s1">&#39;</span><span class="si">{}</span><span class="s1">_CONT_F10&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">extra_col_cat_names</span><span class="p">[</span><span class="mi">0</span><span class="p">]),</span>
+                   <span class="s1">&#39;</span><span class="si">{}</span><span class="s1">_CONT_F1&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">extra_col_cat_names</span><span class="p">[</span><span class="mi">1</span><span class="p">]),</span>
+                   <span class="s1">&#39;</span><span class="si">{}</span><span class="s1">_CONT_F10&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">extra_col_cat_names</span><span class="p">[</span><span class="mi">1</span><span class="p">])]</span>
+    <span class="n">cols</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">column_name_lists</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">column_name_lists</span><span class="p">[</span><span class="mi">1</span><span class="p">]),</span> <span class="n">our_columns</span><span class="p">)</span>
+    <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">entry</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">([</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">],</span> <span class="p">[</span><span class="s1">&#39;1st&#39;</span><span class="p">,</span> <span class="s1">&#39;2nd&#39;</span><span class="p">]):</span>
+        <span class="k">if</span> <span class="p">((</span><span class="n">extra_col_name_lists</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">extra_col_num_lists</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">)</span> <span class="ow">or</span>
+                <span class="p">(</span><span class="n">extra_col_name_lists</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">extra_col_num_lists</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">)):</span>
+            <span class="k">raise</span> <span class="ne">UserWarning</span><span class="p">(</span><span class="s2">&quot;extra_col_name_lists and extra_col_num_lists either both &quot;</span>
+                              <span class="s2">&quot;need to be None, or both need to not be None, for the </span><span class="si">{}</span><span class="s2"> &quot;</span>
+                              <span class="s2">&quot;catalogue.&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">entry</span><span class="p">))</span>
+        <span class="k">if</span> <span class="n">extra_col_num_lists</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">cols</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">cols</span><span class="p">,</span> <span class="n">extra_col_name_lists</span><span class="p">[</span><span class="n">i</span><span class="p">])</span>
+    <span class="n">ac</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="s1">&#39;</span><span class="si">{}</span><span class="s1">/pairing/ac.npy&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">input_match_folder</span><span class="p">))</span>
+    <span class="n">bc</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="s1">&#39;</span><span class="si">{}</span><span class="s1">/pairing/bc.npy&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">input_match_folder</span><span class="p">))</span>
+    <span class="n">p</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="s1">&#39;</span><span class="si">{}</span><span class="s1">/pairing/pc.npy&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">input_match_folder</span><span class="p">))</span>
+    <span class="n">eta</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="s1">&#39;</span><span class="si">{}</span><span class="s1">/pairing/eta.npy&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">input_match_folder</span><span class="p">))</span>
+    <span class="n">xi</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="s1">&#39;</span><span class="si">{}</span><span class="s1">/pairing/xi.npy&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">input_match_folder</span><span class="p">))</span>
+    <span class="n">a_avg_cont</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="s1">&#39;</span><span class="si">{}</span><span class="s1">/pairing/acontamflux.npy&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">input_match_folder</span><span class="p">))</span>
+    <span class="n">b_avg_cont</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="s1">&#39;</span><span class="si">{}</span><span class="s1">/pairing/bcontamflux.npy&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">input_match_folder</span><span class="p">))</span>
+    <span class="n">acontprob</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="s1">&#39;</span><span class="si">{}</span><span class="s1">/pairing/pacontam.npy&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">input_match_folder</span><span class="p">))</span>
+    <span class="n">bcontprob</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="s1">&#39;</span><span class="si">{}</span><span class="s1">/pairing/pbcontam.npy&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">input_match_folder</span><span class="p">))</span>
+    <span class="n">seps</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="s1">&#39;</span><span class="si">{}</span><span class="s1">/pairing/crptseps.npy&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">input_match_folder</span><span class="p">))</span>
+
+    <span class="k">if</span> <span class="n">input_npy_folders</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">cols</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">cols</span><span class="p">,</span> <span class="p">[</span><span class="s1">&#39;</span><span class="si">{}</span><span class="s1">_FIT_SIG&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">extra_col_cat_names</span><span class="p">[</span><span class="mi">0</span><span class="p">])])</span>
+        <span class="n">a_concatastro</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="s1">&#39;</span><span class="si">{}</span><span class="s1">/con_cat_astro.npy&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">input_npy_folders</span><span class="p">[</span><span class="mi">0</span><span class="p">]))</span>
+    <span class="k">if</span> <span class="n">input_npy_folders</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">cols</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">cols</span><span class="p">,</span> <span class="p">[</span><span class="s1">&#39;</span><span class="si">{}</span><span class="s1">_FIT_SIG&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">extra_col_cat_names</span><span class="p">[</span><span class="mi">1</span><span class="p">])])</span>
+        <span class="n">b_concatastro</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="s1">&#39;</span><span class="si">{}</span><span class="s1">/con_cat_astro.npy&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">input_npy_folders</span><span class="p">[</span><span class="mi">1</span><span class="p">]))</span>
+
+    <span class="n">n_amags</span><span class="p">,</span> <span class="n">n_bmags</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">column_name_lists</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span> <span class="o">-</span> <span class="mi">3</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">column_name_lists</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span> <span class="o">-</span> <span class="mi">3</span>
+    <span class="k">if</span> <span class="n">extra_col_num_lists</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">a_cols</span> <span class="o">=</span> <span class="n">column_num_lists</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+        <span class="n">a_names</span> <span class="o">=</span> <span class="n">column_name_lists</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">a_cols</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">column_num_lists</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">extra_col_num_lists</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">int</span><span class="p">)</span>
+        <span class="n">a_names</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">column_name_lists</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">extra_col_name_lists</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+    <span class="k">if</span> <span class="n">extra_col_num_lists</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">b_cols</span> <span class="o">=</span> <span class="n">column_num_lists</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
+        <span class="n">b_names</span> <span class="o">=</span> <span class="n">column_name_lists</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">b_cols</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">column_num_lists</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="n">extra_col_num_lists</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">int</span><span class="p">)</span>
+        <span class="n">b_names</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">column_name_lists</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="n">extra_col_name_lists</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span>
+    <span class="n">a_names</span><span class="p">,</span> <span class="n">b_names</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">a_names</span><span class="p">)[</span><span class="n">np</span><span class="o">.</span><span class="n">argsort</span><span class="p">(</span><span class="n">a_cols</span><span class="p">)],</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">b_names</span><span class="p">)[</span><span class="n">np</span><span class="o">.</span><span class="n">argsort</span><span class="p">(</span><span class="n">b_cols</span><span class="p">)]</span>
+
+    <span class="n">cat_a</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">read_csv</span><span class="p">(</span><span class="s1">&#39;</span><span class="si">{}</span><span class="s1">/</span><span class="si">{}</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">input_csv_folders</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">csv_filenames</span><span class="p">[</span><span class="mi">0</span><span class="p">]),</span>
+                        <span class="n">memory_map</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">header</span><span class="o">=</span><span class="kc">None</span> <span class="k">if</span> <span class="ow">not</span> <span class="n">headers</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="k">else</span> <span class="mi">0</span><span class="p">,</span>
+                        <span class="n">usecols</span><span class="o">=</span><span class="n">a_cols</span><span class="p">,</span> <span class="n">names</span><span class="o">=</span><span class="n">a_names</span><span class="p">)</span>
+    <span class="n">cat_b</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">read_csv</span><span class="p">(</span><span class="s1">&#39;</span><span class="si">{}</span><span class="s1">/</span><span class="si">{}</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">input_csv_folders</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="n">csv_filenames</span><span class="p">[</span><span class="mi">1</span><span class="p">]),</span>
+                        <span class="n">memory_map</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">header</span><span class="o">=</span><span class="kc">None</span> <span class="k">if</span> <span class="ow">not</span> <span class="n">headers</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="k">else</span> <span class="mi">0</span><span class="p">,</span>
+                        <span class="n">usecols</span><span class="o">=</span><span class="n">b_cols</span><span class="p">,</span> <span class="n">names</span><span class="o">=</span><span class="n">b_names</span><span class="p">)</span>
+    <span class="n">n_matches</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">ac</span><span class="p">)</span>
+    <span class="n">match_df</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span><span class="n">columns</span><span class="o">=</span><span class="n">cols</span><span class="p">,</span> <span class="n">index</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">n_matches</span><span class="p">))</span>
+
+    <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">column_name_lists</span><span class="p">[</span><span class="mi">0</span><span class="p">]:</span>
+        <span class="n">match_df</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">.</span><span class="n">iloc</span><span class="p">[:]</span> <span class="o">=</span> <span class="n">cat_a</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">.</span><span class="n">iloc</span><span class="p">[</span><span class="n">ac</span><span class="p">]</span><span class="o">.</span><span class="n">values</span>
+    <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">column_name_lists</span><span class="p">[</span><span class="mi">1</span><span class="p">]:</span>
+        <span class="n">match_df</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">.</span><span class="n">iloc</span><span class="p">[:]</span> <span class="o">=</span> <span class="n">cat_b</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">.</span><span class="n">iloc</span><span class="p">[</span><span class="n">bc</span><span class="p">]</span><span class="o">.</span><span class="n">values</span>
+    <span class="n">match_df</span><span class="o">.</span><span class="n">iloc</span><span class="p">[:,</span> <span class="mi">6</span><span class="o">+</span><span class="n">n_amags</span><span class="o">+</span><span class="n">n_bmags</span><span class="p">]</span> <span class="o">=</span> <span class="n">p</span>
+    <span class="n">match_df</span><span class="o">.</span><span class="n">iloc</span><span class="p">[:,</span> <span class="mi">6</span><span class="o">+</span><span class="n">n_amags</span><span class="o">+</span><span class="n">n_bmags</span><span class="o">+</span><span class="mi">1</span><span class="p">]</span> <span class="o">=</span> <span class="n">seps</span>
+    <span class="n">match_df</span><span class="o">.</span><span class="n">iloc</span><span class="p">[:,</span> <span class="mi">6</span><span class="o">+</span><span class="n">n_amags</span><span class="o">+</span><span class="n">n_bmags</span><span class="o">+</span><span class="mi">2</span><span class="p">]</span> <span class="o">=</span> <span class="n">eta</span>
+    <span class="n">match_df</span><span class="o">.</span><span class="n">iloc</span><span class="p">[:,</span> <span class="mi">6</span><span class="o">+</span><span class="n">n_amags</span><span class="o">+</span><span class="n">n_bmags</span><span class="o">+</span><span class="mi">3</span><span class="p">]</span> <span class="o">=</span> <span class="n">xi</span>
+    <span class="n">match_df</span><span class="o">.</span><span class="n">iloc</span><span class="p">[:,</span> <span class="mi">6</span><span class="o">+</span><span class="n">n_amags</span><span class="o">+</span><span class="n">n_bmags</span><span class="o">+</span><span class="mi">4</span><span class="p">]</span> <span class="o">=</span> <span class="n">a_avg_cont</span>
+    <span class="n">match_df</span><span class="o">.</span><span class="n">iloc</span><span class="p">[:,</span> <span class="mi">6</span><span class="o">+</span><span class="n">n_amags</span><span class="o">+</span><span class="n">n_bmags</span><span class="o">+</span><span class="mi">5</span><span class="p">]</span> <span class="o">=</span> <span class="n">b_avg_cont</span>
+    <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">acontprob</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]):</span>
+        <span class="n">match_df</span><span class="o">.</span><span class="n">iloc</span><span class="p">[:,</span> <span class="mi">6</span><span class="o">+</span><span class="n">n_amags</span><span class="o">+</span><span class="n">n_bmags</span><span class="o">+</span><span class="mi">6</span><span class="o">+</span><span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="n">acontprob</span><span class="p">[</span><span class="n">i</span><span class="p">,</span> <span class="p">:]</span>
+    <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">bcontprob</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]):</span>
+        <span class="n">match_df</span><span class="o">.</span><span class="n">iloc</span><span class="p">[:,</span> <span class="mi">6</span><span class="o">+</span><span class="n">n_amags</span><span class="o">+</span><span class="n">n_bmags</span><span class="o">+</span><span class="mi">6</span><span class="o">+</span><span class="n">acontprob</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">+</span><span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="n">bcontprob</span><span class="p">[</span><span class="n">i</span><span class="p">,</span> <span class="p">:]</span>
+    <span class="k">if</span> <span class="n">extra_col_name_lists</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">extra_col_name_lists</span><span class="p">[</span><span class="mi">0</span><span class="p">]:</span>
+            <span class="n">match_df</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">.</span><span class="n">iloc</span><span class="p">[:]</span> <span class="o">=</span> <span class="n">cat_a</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">.</span><span class="n">iloc</span><span class="p">[</span><span class="n">ac</span><span class="p">]</span><span class="o">.</span><span class="n">values</span>
+    <span class="k">if</span> <span class="n">extra_col_name_lists</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">extra_col_name_lists</span><span class="p">[</span><span class="mi">1</span><span class="p">]:</span>
+            <span class="n">match_df</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">.</span><span class="n">iloc</span><span class="p">[:]</span> <span class="o">=</span> <span class="n">cat_b</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">.</span><span class="n">iloc</span><span class="p">[</span><span class="n">bc</span><span class="p">]</span><span class="o">.</span><span class="n">values</span>
+
+    <span class="c1"># FIT_SIG are the last 0-2 columns, after [ID+coords(x2)+mag(xN)]x2 +</span>
+    <span class="c1"># Q match-made columns, plus len(extra_col_name_lists)x2.</span>
+    <span class="k">if</span> <span class="n">input_npy_folders</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">ind</span> <span class="o">=</span> <span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">column_name_lists</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span> <span class="o">+</span> <span class="nb">len</span><span class="p">(</span><span class="n">column_name_lists</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span> <span class="o">+</span> <span class="nb">len</span><span class="p">(</span><span class="n">our_columns</span><span class="p">)</span> <span class="o">+</span>
+               <span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">extra_col_name_lists</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span> <span class="k">if</span> <span class="n">extra_col_name_lists</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="mi">0</span><span class="p">)</span> <span class="o">+</span>
+               <span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">extra_col_name_lists</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span> <span class="k">if</span> <span class="n">extra_col_name_lists</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="mi">0</span><span class="p">))</span>
+        <span class="n">match_df</span><span class="o">.</span><span class="n">iloc</span><span class="p">[:,</span> <span class="n">ind</span><span class="p">]</span> <span class="o">=</span> <span class="n">a_concatastro</span><span class="p">[</span><span class="n">ac</span><span class="p">,</span> <span class="mi">2</span><span class="p">]</span>
+    <span class="k">if</span> <span class="n">input_npy_folders</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="c1"># Here we also need to check if catalogue &quot;a&quot; has processed uncertainties too.</span>
+        <span class="n">_dx</span> <span class="o">=</span> <span class="mi">1</span> <span class="k">if</span> <span class="n">input_npy_folders</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="mi">0</span>
+        <span class="n">ind</span> <span class="o">=</span> <span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">column_name_lists</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span> <span class="o">+</span> <span class="nb">len</span><span class="p">(</span><span class="n">column_name_lists</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span> <span class="o">+</span> <span class="nb">len</span><span class="p">(</span><span class="n">our_columns</span><span class="p">)</span> <span class="o">+</span>
+               <span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">extra_col_name_lists</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span> <span class="k">if</span> <span class="n">extra_col_name_lists</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="mi">0</span><span class="p">)</span> <span class="o">+</span>
+               <span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">extra_col_name_lists</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span> <span class="k">if</span> <span class="n">extra_col_name_lists</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="mi">0</span><span class="p">))</span> <span class="o">+</span> <span class="n">_dx</span>
+        <span class="n">match_df</span><span class="o">.</span><span class="n">iloc</span><span class="p">[:,</span> <span class="n">ind</span><span class="p">]</span> <span class="o">=</span> <span class="n">b_concatastro</span><span class="p">[</span><span class="n">bc</span><span class="p">,</span> <span class="mi">2</span><span class="p">]</span>
+
+    <span class="n">match_df</span><span class="o">.</span><span class="n">to_csv</span><span class="p">(</span><span class="s1">&#39;</span><span class="si">{}</span><span class="s1">/</span><span class="si">{}</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">output_folder</span><span class="p">,</span> <span class="n">output_filenames</span><span class="p">[</span><span class="mi">0</span><span class="p">]),</span> <span class="n">encoding</span><span class="o">=</span><span class="s1">&#39;utf-8&#39;</span><span class="p">,</span>
+                    <span class="n">index</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">header</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+
+    <span class="c1"># For non-match, ID/coordinates/mags, then island probability + average</span>
+    <span class="c1"># contamination.</span>
+    <span class="n">af</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="s1">&#39;</span><span class="si">{}</span><span class="s1">/pairing/af.npy&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">input_match_folder</span><span class="p">))</span>
+    <span class="n">a_avg_cont</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="s1">&#39;</span><span class="si">{}</span><span class="s1">/pairing/afieldflux.npy&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">input_match_folder</span><span class="p">))</span>
+    <span class="n">p</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="s1">&#39;</span><span class="si">{}</span><span class="s1">/pairing/pfa.npy&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">input_match_folder</span><span class="p">))</span>
+    <span class="n">seps</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="s1">&#39;</span><span class="si">{}</span><span class="s1">/pairing/afieldseps.npy&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">input_match_folder</span><span class="p">))</span>
+    <span class="n">afeta</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="s1">&#39;</span><span class="si">{}</span><span class="s1">/pairing/afieldeta.npy&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">input_match_folder</span><span class="p">))</span>
+    <span class="n">afxi</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="s1">&#39;</span><span class="si">{}</span><span class="s1">/pairing/afieldxi.npy&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">input_match_folder</span><span class="p">))</span>
+    <span class="n">our_columns</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;MATCH_P&#39;</span><span class="p">,</span> <span class="s1">&#39;NNM_SEPARATION&#39;</span><span class="p">,</span> <span class="s1">&#39;NNM_ETA&#39;</span><span class="p">,</span> <span class="s1">&#39;NNM_XI&#39;</span><span class="p">,</span>
+                   <span class="s1">&#39;</span><span class="si">{}</span><span class="s1">_AVG_CONT&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">extra_col_cat_names</span><span class="p">[</span><span class="mi">0</span><span class="p">])]</span>
+    <span class="n">cols</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">column_name_lists</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">our_columns</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">extra_col_num_lists</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">cols</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">cols</span><span class="p">,</span> <span class="n">extra_col_name_lists</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+    <span class="k">if</span> <span class="n">input_npy_folders</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">cols</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">cols</span><span class="p">,</span> <span class="p">[</span><span class="s1">&#39;</span><span class="si">{}</span><span class="s1">_FIT_SIG&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">extra_col_cat_names</span><span class="p">[</span><span class="mi">0</span><span class="p">])])</span>
+        <span class="n">a_concatastro</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="s1">&#39;</span><span class="si">{}</span><span class="s1">/con_cat_astro.npy&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">input_npy_folders</span><span class="p">[</span><span class="mi">0</span><span class="p">]))</span>
+    <span class="n">n_anonmatches</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">af</span><span class="p">)</span>
+    <span class="n">a_nonmatch_df</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span><span class="n">columns</span><span class="o">=</span><span class="n">cols</span><span class="p">,</span> <span class="n">index</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">n_anonmatches</span><span class="p">))</span>
+    <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">column_name_lists</span><span class="p">[</span><span class="mi">0</span><span class="p">]:</span>
+        <span class="n">a_nonmatch_df</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">.</span><span class="n">iloc</span><span class="p">[:]</span> <span class="o">=</span> <span class="n">cat_a</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">.</span><span class="n">iloc</span><span class="p">[</span><span class="n">af</span><span class="p">]</span><span class="o">.</span><span class="n">values</span>
+    <span class="n">a_nonmatch_df</span><span class="o">.</span><span class="n">iloc</span><span class="p">[:,</span> <span class="mi">3</span><span class="o">+</span><span class="n">n_amags</span><span class="p">]</span> <span class="o">=</span> <span class="n">p</span>
+    <span class="n">a_nonmatch_df</span><span class="o">.</span><span class="n">iloc</span><span class="p">[:,</span> <span class="mi">3</span><span class="o">+</span><span class="n">n_amags</span><span class="o">+</span><span class="mi">1</span><span class="p">]</span> <span class="o">=</span> <span class="n">seps</span>
+    <span class="n">a_nonmatch_df</span><span class="o">.</span><span class="n">iloc</span><span class="p">[:,</span> <span class="mi">3</span><span class="o">+</span><span class="n">n_amags</span><span class="o">+</span><span class="mi">2</span><span class="p">]</span> <span class="o">=</span> <span class="n">afeta</span>
+    <span class="n">a_nonmatch_df</span><span class="o">.</span><span class="n">iloc</span><span class="p">[:,</span> <span class="mi">3</span><span class="o">+</span><span class="n">n_amags</span><span class="o">+</span><span class="mi">3</span><span class="p">]</span> <span class="o">=</span> <span class="n">afxi</span>
+    <span class="n">a_nonmatch_df</span><span class="o">.</span><span class="n">iloc</span><span class="p">[:,</span> <span class="mi">3</span><span class="o">+</span><span class="n">n_amags</span><span class="o">+</span><span class="mi">4</span><span class="p">]</span> <span class="o">=</span> <span class="n">a_avg_cont</span>
+    <span class="k">if</span> <span class="n">extra_col_name_lists</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">extra_col_name_lists</span><span class="p">[</span><span class="mi">0</span><span class="p">]:</span>
+            <span class="n">a_nonmatch_df</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">.</span><span class="n">iloc</span><span class="p">[:]</span> <span class="o">=</span> <span class="n">cat_a</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">.</span><span class="n">iloc</span><span class="p">[</span><span class="n">af</span><span class="p">]</span><span class="o">.</span><span class="n">values</span>
+
+    <span class="k">if</span> <span class="n">input_npy_folders</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">ind</span> <span class="o">=</span> <span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">column_name_lists</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span> <span class="o">+</span> <span class="nb">len</span><span class="p">(</span><span class="n">our_columns</span><span class="p">)</span> <span class="o">+</span>
+               <span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">extra_col_name_lists</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span> <span class="k">if</span> <span class="n">extra_col_name_lists</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="mi">0</span><span class="p">))</span>
+        <span class="n">a_nonmatch_df</span><span class="o">.</span><span class="n">iloc</span><span class="p">[:,</span> <span class="n">ind</span><span class="p">]</span> <span class="o">=</span> <span class="n">a_concatastro</span><span class="p">[</span><span class="n">af</span><span class="p">,</span> <span class="mi">2</span><span class="p">]</span>
+
+    <span class="n">a_nonmatch_df</span><span class="o">.</span><span class="n">to_csv</span><span class="p">(</span><span class="s1">&#39;</span><span class="si">{}</span><span class="s1">/</span><span class="si">{}</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">output_folder</span><span class="p">,</span> <span class="n">output_filenames</span><span class="p">[</span><span class="mi">1</span><span class="p">]),</span> <span class="n">encoding</span><span class="o">=</span><span class="s1">&#39;utf-8&#39;</span><span class="p">,</span>
+                         <span class="n">index</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">header</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+
+    <span class="n">bf</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="s1">&#39;</span><span class="si">{}</span><span class="s1">/pairing/bf.npy&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">input_match_folder</span><span class="p">))</span>
+    <span class="n">b_avg_cont</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="s1">&#39;</span><span class="si">{}</span><span class="s1">/pairing/bfieldflux.npy&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">input_match_folder</span><span class="p">))</span>
+    <span class="n">p</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="s1">&#39;</span><span class="si">{}</span><span class="s1">/pairing/pfb.npy&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">input_match_folder</span><span class="p">))</span>
+    <span class="n">seps</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="s1">&#39;</span><span class="si">{}</span><span class="s1">/pairing/bfieldseps.npy&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">input_match_folder</span><span class="p">))</span>
+    <span class="n">bfeta</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="s1">&#39;</span><span class="si">{}</span><span class="s1">/pairing/bfieldeta.npy&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">input_match_folder</span><span class="p">))</span>
+    <span class="n">bfxi</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="s1">&#39;</span><span class="si">{}</span><span class="s1">/pairing/bfieldxi.npy&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">input_match_folder</span><span class="p">))</span>
+    <span class="n">our_columns</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;MATCH_P&#39;</span><span class="p">,</span> <span class="s1">&#39;NNM_SEPARATION&#39;</span><span class="p">,</span> <span class="s1">&#39;NNM_ETA&#39;</span><span class="p">,</span> <span class="s1">&#39;NNM_XI&#39;</span><span class="p">,</span>
+                   <span class="s1">&#39;</span><span class="si">{}</span><span class="s1">_AVG_CONT&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">extra_col_cat_names</span><span class="p">[</span><span class="mi">1</span><span class="p">])]</span>
+    <span class="n">cols</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">column_name_lists</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="n">our_columns</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">extra_col_num_lists</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">cols</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">cols</span><span class="p">,</span> <span class="n">extra_col_name_lists</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span>
+    <span class="k">if</span> <span class="n">input_npy_folders</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">cols</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">cols</span><span class="p">,</span> <span class="p">[</span><span class="s1">&#39;</span><span class="si">{}</span><span class="s1">_FIT_SIG&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">extra_col_cat_names</span><span class="p">[</span><span class="mi">1</span><span class="p">])])</span>
+        <span class="n">b_concatastro</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="s1">&#39;</span><span class="si">{}</span><span class="s1">/con_cat_astro.npy&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">input_npy_folders</span><span class="p">[</span><span class="mi">1</span><span class="p">]))</span>
+    <span class="n">n_bnonmatches</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">bf</span><span class="p">)</span>
+    <span class="n">b_nonmatch_df</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span><span class="n">columns</span><span class="o">=</span><span class="n">cols</span><span class="p">,</span> <span class="n">index</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">n_bnonmatches</span><span class="p">))</span>
+    <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">column_name_lists</span><span class="p">[</span><span class="mi">1</span><span class="p">]:</span>
+        <span class="n">b_nonmatch_df</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">.</span><span class="n">iloc</span><span class="p">[:]</span> <span class="o">=</span> <span class="n">cat_b</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">.</span><span class="n">iloc</span><span class="p">[</span><span class="n">bf</span><span class="p">]</span><span class="o">.</span><span class="n">values</span>
+    <span class="n">b_nonmatch_df</span><span class="o">.</span><span class="n">iloc</span><span class="p">[:,</span> <span class="mi">3</span><span class="o">+</span><span class="n">n_bmags</span><span class="p">]</span> <span class="o">=</span> <span class="n">p</span>
+    <span class="n">b_nonmatch_df</span><span class="o">.</span><span class="n">iloc</span><span class="p">[:,</span> <span class="mi">3</span><span class="o">+</span><span class="n">n_bmags</span><span class="o">+</span><span class="mi">1</span><span class="p">]</span> <span class="o">=</span> <span class="n">seps</span>
+    <span class="n">b_nonmatch_df</span><span class="o">.</span><span class="n">iloc</span><span class="p">[:,</span> <span class="mi">3</span><span class="o">+</span><span class="n">n_bmags</span><span class="o">+</span><span class="mi">2</span><span class="p">]</span> <span class="o">=</span> <span class="n">bfeta</span>
+    <span class="n">b_nonmatch_df</span><span class="o">.</span><span class="n">iloc</span><span class="p">[:,</span> <span class="mi">3</span><span class="o">+</span><span class="n">n_bmags</span><span class="o">+</span><span class="mi">3</span><span class="p">]</span> <span class="o">=</span> <span class="n">bfxi</span>
+    <span class="n">b_nonmatch_df</span><span class="o">.</span><span class="n">iloc</span><span class="p">[:,</span> <span class="mi">3</span><span class="o">+</span><span class="n">n_bmags</span><span class="o">+</span><span class="mi">4</span><span class="p">]</span> <span class="o">=</span> <span class="n">b_avg_cont</span>
+    <span class="k">if</span> <span class="n">extra_col_name_lists</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">extra_col_name_lists</span><span class="p">[</span><span class="mi">1</span><span class="p">]:</span>
+            <span class="n">b_nonmatch_df</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">.</span><span class="n">iloc</span><span class="p">[:]</span> <span class="o">=</span> <span class="n">cat_b</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">.</span><span class="n">iloc</span><span class="p">[</span><span class="n">bf</span><span class="p">]</span><span class="o">.</span><span class="n">values</span>
+
+    <span class="k">if</span> <span class="n">input_npy_folders</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">ind</span> <span class="o">=</span> <span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">column_name_lists</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span> <span class="o">+</span> <span class="nb">len</span><span class="p">(</span><span class="n">our_columns</span><span class="p">)</span> <span class="o">+</span>
+               <span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">extra_col_name_lists</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span> <span class="k">if</span> <span class="n">extra_col_name_lists</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="mi">0</span><span class="p">))</span>
+        <span class="n">b_nonmatch_df</span><span class="o">.</span><span class="n">iloc</span><span class="p">[:,</span> <span class="n">ind</span><span class="p">]</span> <span class="o">=</span> <span class="n">b_concatastro</span><span class="p">[</span><span class="n">bf</span><span class="p">,</span> <span class="mi">2</span><span class="p">]</span>
+
+    <span class="n">b_nonmatch_df</span><span class="o">.</span><span class="n">to_csv</span><span class="p">(</span><span class="s1">&#39;</span><span class="si">{}</span><span class="s1">/</span><span class="si">{}</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">output_folder</span><span class="p">,</span> <span class="n">output_filenames</span><span class="p">[</span><span class="mi">2</span><span class="p">]),</span> <span class="n">encoding</span><span class="o">=</span><span class="s1">&#39;utf-8&#39;</span><span class="p">,</span>
+                         <span class="n">index</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">header</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+
+    <span class="k">return</span></div>
+
+
+
+<div class="viewcode-block" id="rect_slice_csv">
+<a class="viewcode-back" href="../../api/macauff.rect_slice_csv.html#macauff.rect_slice_csv">[docs]</a>
+<span class="k">def</span> <span class="nf">rect_slice_csv</span><span class="p">(</span><span class="n">input_folder</span><span class="p">,</span> <span class="n">output_folder</span><span class="p">,</span> <span class="n">input_filename</span><span class="p">,</span> <span class="n">output_filename</span><span class="p">,</span> <span class="n">rect_coords</span><span class="p">,</span>
+                   <span class="n">padding</span><span class="p">,</span> <span class="n">astro_cols</span><span class="p">,</span> <span class="n">mem_chunk_num</span><span class="p">,</span> <span class="n">header</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&#39;&#39;&#39;</span>
+<span class="sd">    Convenience function to take a small rectangular slice of a larger .csv catalogue,</span>
+<span class="sd">    based on its given orthogonal sky coordinates in the large catalogue.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    input_folder : string</span>
+<span class="sd">        Folder in which the larger .csv catalogue is stored.</span>
+<span class="sd">    output_folder : string</span>
+<span class="sd">        Folder into which to save the cutout catalogue.</span>
+<span class="sd">    input_filename : string</span>
+<span class="sd">        Name, including extension, of the larger catalogue file.</span>
+<span class="sd">    output_filename : string</span>
+<span class="sd">        Name, including extension, of the cutout catalogue.</span>
+<span class="sd">    rect_coords : list or array of floats</span>
+<span class="sd">        List of coordinates inside which to take the subset catalogue. Should</span>
+<span class="sd">        be of the kind [lower_ax1, upper_ax1, lower_ax2, upper_ax2], where ax1</span>
+<span class="sd">        is e.g. Right Ascension and ax2 is e.g. Declination.</span>
+<span class="sd">    padding : float</span>
+<span class="sd">        Amount of additional on-sky area to permit outside of ``rect_coords``.</span>
+<span class="sd">        In these cases sources must be within ``padding`` distance of the</span>
+<span class="sd">        rectangle defined by ``rect_coords`` by the Haversine formula.</span>
+<span class="sd">    astro_cols : list or array of integers</span>
+<span class="sd">        List of zero-index columns representing the orthogonal sky axes, in the</span>
+<span class="sd">        sense of [ax1, ax2], with ax1 being e.g. Galactic Longitude and ax2 being</span>
+<span class="sd">        e.g. Galactic Latitude, as with ``rect_coords``.</span>
+<span class="sd">    mem_chunk_num : integer</span>
+<span class="sd">        Integer representing the number of sub-slices of the catalogue to load,</span>
+<span class="sd">        in cases where the larger file is larger than available memory.</span>
+<span class="sd">    header : boolean, optional</span>
+<span class="sd">        Flag indicating whether .csv file has a header line, giving names of</span>
+<span class="sd">        each column, or if the first line of the file is the first line of the</span>
+<span class="sd">        dataset.</span>
+<span class="sd">    &#39;&#39;&#39;</span>
+    <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="s1">&#39;</span><span class="si">{}</span><span class="s1">/</span><span class="si">{}</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">input_folder</span><span class="p">,</span> <span class="n">input_filename</span><span class="p">))</span> <span class="k">as</span> <span class="n">fp</span><span class="p">:</span>
+        <span class="n">n_rows</span> <span class="o">=</span> <span class="mi">0</span> <span class="k">if</span> <span class="ow">not</span> <span class="n">header</span> <span class="k">else</span> <span class="o">-</span><span class="mi">1</span>
+        <span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="n">fp</span><span class="p">:</span>
+            <span class="n">n_rows</span> <span class="o">+=</span> <span class="mi">1</span>
+    <span class="n">small_astro</span> <span class="o">=</span> <span class="n">open_memmap</span><span class="p">(</span><span class="s1">&#39;</span><span class="si">{}</span><span class="s1">/temp_astro.npy&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">input_folder</span><span class="p">),</span> <span class="n">mode</span><span class="o">=</span><span class="s1">&#39;w+&#39;</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="nb">float</span><span class="p">,</span>
+                              <span class="n">shape</span><span class="o">=</span><span class="p">(</span><span class="n">n_rows</span><span class="p">,</span> <span class="mi">2</span><span class="p">))</span>
+
+    <span class="n">n</span> <span class="o">=</span> <span class="mi">0</span>
+    <span class="k">for</span> <span class="n">chunk</span> <span class="ow">in</span> <span class="n">pd</span><span class="o">.</span><span class="n">read_csv</span><span class="p">(</span><span class="s1">&#39;</span><span class="si">{}</span><span class="s1">/</span><span class="si">{}</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">input_folder</span><span class="p">,</span> <span class="n">input_filename</span><span class="p">),</span> <span class="n">chunksize</span><span class="o">=</span><span class="mi">100000</span><span class="p">,</span>
+                             <span class="n">usecols</span><span class="o">=</span><span class="n">astro_cols</span><span class="p">,</span> <span class="n">header</span><span class="o">=</span><span class="kc">None</span> <span class="k">if</span> <span class="ow">not</span> <span class="n">header</span> <span class="k">else</span> <span class="mi">0</span><span class="p">):</span>
+        <span class="n">small_astro</span><span class="p">[</span><span class="n">n</span><span class="p">:</span><span class="n">n</span><span class="o">+</span><span class="n">chunk</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]]</span> <span class="o">=</span> <span class="n">chunk</span><span class="o">.</span><span class="n">values</span>
+        <span class="n">n</span> <span class="o">+=</span> <span class="n">chunk</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+
+    <span class="n">sky_cut</span> <span class="o">=</span> <span class="n">_load_rectangular_slice</span><span class="p">(</span><span class="s1">&#39;&#39;</span><span class="p">,</span> <span class="n">small_astro</span><span class="p">,</span> <span class="n">rect_coords</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">rect_coords</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span>
+                                      <span class="n">rect_coords</span><span class="p">[</span><span class="mi">2</span><span class="p">],</span> <span class="n">rect_coords</span><span class="p">[</span><span class="mi">3</span><span class="p">],</span> <span class="n">padding</span><span class="p">)</span>
+
+    <span class="n">n_inside_rows</span> <span class="o">=</span> <span class="mi">0</span>
+    <span class="k">for</span> <span class="n">cnum</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">mem_chunk_num</span><span class="p">):</span>
+        <span class="n">lowind</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">floor</span><span class="p">(</span><span class="n">n_rows</span><span class="o">*</span><span class="n">cnum</span><span class="o">/</span><span class="n">mem_chunk_num</span><span class="p">)</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">int</span><span class="p">)</span>
+        <span class="n">highind</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">floor</span><span class="p">(</span><span class="n">n_rows</span><span class="o">*</span><span class="p">(</span><span class="n">cnum</span><span class="o">+</span><span class="mi">1</span><span class="p">)</span><span class="o">/</span><span class="n">mem_chunk_num</span><span class="p">)</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">int</span><span class="p">)</span>
+        <span class="n">n_inside_rows</span> <span class="o">+=</span> <span class="n">np</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">sky_cut</span><span class="p">[</span><span class="n">lowind</span><span class="p">:</span><span class="n">highind</span><span class="p">])</span>
+    <span class="n">df_orig</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">read_csv</span><span class="p">(</span><span class="s1">&#39;</span><span class="si">{}</span><span class="s1">/</span><span class="si">{}</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">input_folder</span><span class="p">,</span> <span class="n">input_filename</span><span class="p">),</span> <span class="n">nrows</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
+                          <span class="n">header</span><span class="o">=</span><span class="kc">None</span> <span class="k">if</span> <span class="ow">not</span> <span class="n">header</span> <span class="k">else</span> <span class="mi">0</span><span class="p">)</span>
+    <span class="n">df</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span><span class="n">columns</span><span class="o">=</span><span class="n">df_orig</span><span class="o">.</span><span class="n">columns</span><span class="p">,</span> <span class="n">index</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">n_inside_rows</span><span class="p">))</span>
+
+    <span class="n">counter</span> <span class="o">=</span> <span class="mi">0</span>
+    <span class="n">outer_counter</span> <span class="o">=</span> <span class="mi">0</span>
+    <span class="n">chunksize</span> <span class="o">=</span> <span class="mi">100000</span>
+    <span class="k">for</span> <span class="n">chunk</span> <span class="ow">in</span> <span class="n">pd</span><span class="o">.</span><span class="n">read_csv</span><span class="p">(</span><span class="s1">&#39;</span><span class="si">{}</span><span class="s1">/</span><span class="si">{}</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">input_folder</span><span class="p">,</span> <span class="n">input_filename</span><span class="p">),</span> <span class="n">chunksize</span><span class="o">=</span><span class="n">chunksize</span><span class="p">,</span>
+                             <span class="n">header</span><span class="o">=</span><span class="kc">None</span> <span class="k">if</span> <span class="ow">not</span> <span class="n">header</span> <span class="k">else</span> <span class="mi">0</span><span class="p">):</span>
+        <span class="n">inside_n</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">sky_cut</span><span class="p">[</span><span class="n">outer_counter</span><span class="p">:</span><span class="n">outer_counter</span><span class="o">+</span><span class="n">chunksize</span><span class="p">])</span>
+        <span class="n">df</span><span class="o">.</span><span class="n">iloc</span><span class="p">[</span><span class="n">counter</span><span class="p">:</span><span class="n">counter</span><span class="o">+</span><span class="n">inside_n</span><span class="p">]</span> <span class="o">=</span> <span class="n">chunk</span><span class="o">.</span><span class="n">values</span><span class="p">[</span>
+            <span class="n">sky_cut</span><span class="p">[</span><span class="n">outer_counter</span><span class="p">:</span><span class="n">outer_counter</span><span class="o">+</span><span class="n">chunksize</span><span class="p">]]</span>
+        <span class="n">counter</span> <span class="o">+=</span> <span class="n">inside_n</span>
+        <span class="n">outer_counter</span> <span class="o">+=</span> <span class="n">chunksize</span>
+
+    <span class="n">df</span><span class="o">.</span><span class="n">to_csv</span><span class="p">(</span><span class="s1">&#39;</span><span class="si">{}</span><span class="s1">/</span><span class="si">{}</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">output_folder</span><span class="p">,</span> <span class="n">output_filename</span><span class="p">),</span> <span class="n">encoding</span><span class="o">=</span><span class="s1">&#39;utf-8&#39;</span><span class="p">,</span> <span class="n">index</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+              <span class="n">header</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+
+    <span class="n">os</span><span class="o">.</span><span class="n">remove</span><span class="p">(</span><span class="s1">&#39;</span><span class="si">{}</span><span class="s1">/temp_astro.npy&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">input_folder</span><span class="p">))</span>
+
+    <span class="k">return</span></div>
+
+
+
+<div class="viewcode-block" id="rect_slice_npy">
+<a class="viewcode-back" href="../../api/macauff.rect_slice_npy.html#macauff.rect_slice_npy">[docs]</a>
+<span class="k">def</span> <span class="nf">rect_slice_npy</span><span class="p">(</span><span class="n">input_folder</span><span class="p">,</span> <span class="n">output_folder</span><span class="p">,</span> <span class="n">rect_coords</span><span class="p">,</span> <span class="n">padding</span><span class="p">,</span> <span class="n">mem_chunk_num</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&#39;&#39;&#39;</span>
+<span class="sd">    Convenience function to take a small rectangular slice of a larger catalogue,</span>
+<span class="sd">    represented by three or four binary .npy files, based on its given orthogonal</span>
+<span class="sd">    sky coordinates in the large catalogue.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    input_folder : string</span>
+<span class="sd">        Folder in which the larger .npy files representing the catalogue</span>
+<span class="sd">        are stored.</span>
+<span class="sd">    output_folder : string</span>
+<span class="sd">        Folder into which to save the cutout catalogue .npy files.</span>
+<span class="sd">    rect_coords : list or array of floats</span>
+<span class="sd">        List of coordinates inside which to take the subset catalogue. Should</span>
+<span class="sd">        be of the kind [lower_ax1, upper_ax1, lower_ax2, upper_ax2], where ax1</span>
+<span class="sd">        is e.g. Right Ascension and ax2 is e.g. Declination.</span>
+<span class="sd">    padding : float</span>
+<span class="sd">        Amount of additional on-sky area to permit outside of ``rect_coords``.</span>
+<span class="sd">        In these cases sources must be within ``padding`` distance of the</span>
+<span class="sd">        rectangle defined by ``rect_coords`` by the Haversine formula.</span>
+<span class="sd">    astro_cols : list or array of integers</span>
+<span class="sd">        List of zero-index columns representing the orthogonal sky axes, in the</span>
+<span class="sd">        sense of [ax1, ax2], with ax1 being e.g. Galactic Longitude and ax2 being</span>
+<span class="sd">        e.g. Galactic Latitude, as with ``rect_coords``.</span>
+<span class="sd">    mem_chunk_num : integer</span>
+<span class="sd">        Integer representing the number of sub-slices of the catalogue to load,</span>
+<span class="sd">        in cases where the larger file is larger than available memory.</span>
+<span class="sd">    &#39;&#39;&#39;</span>
+    <span class="n">astro</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="s1">&#39;</span><span class="si">{}</span><span class="s1">/con_cat_astro.npy&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">input_folder</span><span class="p">),</span> <span class="n">mmap_mode</span><span class="o">=</span><span class="s1">&#39;r&#39;</span><span class="p">)</span>
+    <span class="n">photo</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="s1">&#39;</span><span class="si">{}</span><span class="s1">/con_cat_photo.npy&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">input_folder</span><span class="p">),</span> <span class="n">mmap_mode</span><span class="o">=</span><span class="s1">&#39;r&#39;</span><span class="p">)</span>
+    <span class="n">best_index</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="s1">&#39;</span><span class="si">{}</span><span class="s1">/magref.npy&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">input_folder</span><span class="p">),</span> <span class="n">mmap_mode</span><span class="o">=</span><span class="s1">&#39;r&#39;</span><span class="p">)</span>
+    <span class="n">n_rows</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">astro</span><span class="p">)</span>
+    <span class="n">sky_cut</span> <span class="o">=</span> <span class="n">_load_rectangular_slice</span><span class="p">(</span><span class="s1">&#39;&#39;</span><span class="p">,</span> <span class="n">astro</span><span class="p">,</span> <span class="n">rect_coords</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">rect_coords</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="n">rect_coords</span><span class="p">[</span><span class="mi">2</span><span class="p">],</span>
+                                      <span class="n">rect_coords</span><span class="p">[</span><span class="mi">3</span><span class="p">],</span> <span class="n">padding</span><span class="p">)</span>
+
+    <span class="n">n_inside_rows</span> <span class="o">=</span> <span class="mi">0</span>
+    <span class="k">for</span> <span class="n">cnum</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">mem_chunk_num</span><span class="p">):</span>
+        <span class="n">lowind</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">floor</span><span class="p">(</span><span class="n">n_rows</span><span class="o">*</span><span class="n">cnum</span><span class="o">/</span><span class="n">mem_chunk_num</span><span class="p">)</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">int</span><span class="p">)</span>
+        <span class="n">highind</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">floor</span><span class="p">(</span><span class="n">n_rows</span><span class="o">*</span><span class="p">(</span><span class="n">cnum</span><span class="o">+</span><span class="mi">1</span><span class="p">)</span><span class="o">/</span><span class="n">mem_chunk_num</span><span class="p">)</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">int</span><span class="p">)</span>
+        <span class="n">n_inside_rows</span> <span class="o">+=</span> <span class="n">np</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">sky_cut</span><span class="p">[</span><span class="n">lowind</span><span class="p">:</span><span class="n">highind</span><span class="p">])</span>
+
+    <span class="n">small_astro</span> <span class="o">=</span> <span class="n">open_memmap</span><span class="p">(</span><span class="s1">&#39;</span><span class="si">{}</span><span class="s1">/con_cat_astro.npy&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">output_folder</span><span class="p">),</span> <span class="n">mode</span><span class="o">=</span><span class="s1">&#39;w+&#39;</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="nb">float</span><span class="p">,</span>
+                              <span class="n">shape</span><span class="o">=</span><span class="p">(</span><span class="n">n_inside_rows</span><span class="p">,</span> <span class="mi">3</span><span class="p">))</span>
+    <span class="n">small_photo</span> <span class="o">=</span> <span class="n">open_memmap</span><span class="p">(</span><span class="s1">&#39;</span><span class="si">{}</span><span class="s1">/con_cat_photo.npy&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">output_folder</span><span class="p">),</span> <span class="n">mode</span><span class="o">=</span><span class="s1">&#39;w+&#39;</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="nb">float</span><span class="p">,</span>
+                              <span class="n">shape</span><span class="o">=</span><span class="p">(</span><span class="n">n_inside_rows</span><span class="p">,</span> <span class="n">photo</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">]))</span>
+    <span class="n">small_best_index</span> <span class="o">=</span> <span class="n">open_memmap</span><span class="p">(</span><span class="s1">&#39;</span><span class="si">{}</span><span class="s1">/magref.npy&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">output_folder</span><span class="p">),</span> <span class="n">mode</span><span class="o">=</span><span class="s1">&#39;w+&#39;</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="nb">int</span><span class="p">,</span>
+                                   <span class="n">shape</span><span class="o">=</span><span class="p">(</span><span class="n">n_inside_rows</span><span class="p">,))</span>
+    <span class="n">small_chunk_overlap</span> <span class="o">=</span> <span class="n">open_memmap</span><span class="p">(</span><span class="s1">&#39;</span><span class="si">{}</span><span class="s1">/in_chunk_overlap.npy&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">output_folder</span><span class="p">),</span> <span class="n">mode</span><span class="o">=</span><span class="s1">&#39;w+&#39;</span><span class="p">,</span>
+                                      <span class="n">dtype</span><span class="o">=</span><span class="nb">bool</span><span class="p">,</span> <span class="n">shape</span><span class="o">=</span><span class="p">(</span><span class="n">n_inside_rows</span><span class="p">,))</span>
+
+    <span class="n">counter</span> <span class="o">=</span> <span class="mi">0</span>
+    <span class="k">for</span> <span class="n">cnum</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">mem_chunk_num</span><span class="p">):</span>
+        <span class="n">lowind</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">floor</span><span class="p">(</span><span class="n">n_rows</span><span class="o">*</span><span class="n">cnum</span><span class="o">/</span><span class="n">mem_chunk_num</span><span class="p">)</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">int</span><span class="p">)</span>
+        <span class="n">highind</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">floor</span><span class="p">(</span><span class="n">n_rows</span><span class="o">*</span><span class="p">(</span><span class="n">cnum</span><span class="o">+</span><span class="mi">1</span><span class="p">)</span><span class="o">/</span><span class="n">mem_chunk_num</span><span class="p">)</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">int</span><span class="p">)</span>
+        <span class="n">inside_n</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">sky_cut</span><span class="p">[</span><span class="n">lowind</span><span class="p">:</span><span class="n">highind</span><span class="p">])</span>
+        <span class="n">small_astro</span><span class="p">[</span><span class="n">counter</span><span class="p">:</span><span class="n">counter</span><span class="o">+</span><span class="n">inside_n</span><span class="p">]</span> <span class="o">=</span> <span class="n">astro</span><span class="p">[</span><span class="n">lowind</span><span class="p">:</span><span class="n">highind</span><span class="p">][</span>
+            <span class="n">sky_cut</span><span class="p">[</span><span class="n">lowind</span><span class="p">:</span><span class="n">highind</span><span class="p">]]</span>
+        <span class="n">small_photo</span><span class="p">[</span><span class="n">counter</span><span class="p">:</span><span class="n">counter</span><span class="o">+</span><span class="n">inside_n</span><span class="p">]</span> <span class="o">=</span> <span class="n">photo</span><span class="p">[</span><span class="n">lowind</span><span class="p">:</span><span class="n">highind</span><span class="p">][</span>
+            <span class="n">sky_cut</span><span class="p">[</span><span class="n">lowind</span><span class="p">:</span><span class="n">highind</span><span class="p">]]</span>
+        <span class="n">small_best_index</span><span class="p">[</span><span class="n">counter</span><span class="p">:</span><span class="n">counter</span><span class="o">+</span><span class="n">inside_n</span><span class="p">]</span> <span class="o">=</span> <span class="n">best_index</span><span class="p">[</span><span class="n">lowind</span><span class="p">:</span><span class="n">highind</span><span class="p">][</span>
+            <span class="n">sky_cut</span><span class="p">[</span><span class="n">lowind</span><span class="p">:</span><span class="n">highind</span><span class="p">]]</span>
+        <span class="c1"># Always assume that a cutout is a single &quot;visit&quot; with no chunk &quot;halo&quot;.</span>
+        <span class="n">small_chunk_overlap</span><span class="p">[</span><span class="n">counter</span><span class="p">:</span><span class="n">counter</span><span class="p">:</span><span class="n">inside_n</span><span class="p">]</span> <span class="o">=</span> <span class="kc">False</span>
+        <span class="n">counter</span> <span class="o">+=</span> <span class="n">inside_n</span>
+
+    <span class="k">return</span></div>
+
+</pre></div>
+
+            <div class="clearer"></div>
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="../../f-modindex.html" title="Fortran Module Index"
+             >fortran modules</a> |</li>
+        <li class="right" >
+          <a href="../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../index.html">macauff</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../index.html" >Module code</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">macauff.parse_catalogue</a></li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+    &#169; Copyright 2022, Tom J Wilson.
+      Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 7.2.6.
+    </div>
+  </body>
+</html>

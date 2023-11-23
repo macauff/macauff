@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>Miscellaneous Functions Fortran Subroutines &#8212; macauff</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=4848ba22" />
+    <link rel="stylesheet" type="text/css" href="../_static/pyramid.css?v=a5b9c134" />
+    <link rel="stylesheet" type="text/css" href="../_static/graphviz.css?v=eafc0fe6" />
+    <script src="../_static/documentation_options.js?v=5929fcd5"></script>
+    <script src="../_static/doctools.js?v=888ff710"></script>
+    <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="Shared Library Fortran Subroutines" href="shared_library_docs.html" />
+    <link rel="prev" title="Counterpart Pairing Fortran Subroutines" href="pairing_docs.html" />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Neuton&amp;subset=latin" type="text/css" media="screen" charset="utf-8" />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Nobile:regular,italic,bold,bolditalic&amp;subset=latin" type="text/css" media="screen" charset="utf-8" />
+<!--[if lte IE 6]>
+<link rel="stylesheet" href="../_static/ie6.css" type="text/css" media="screen" charset="utf-8" />
+<![endif]-->
+
+  </head><body>
+
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="../f-modindex.html" title="Fortran Module Index"
+             >fortran modules</a> |</li>
+        <li class="right" >
+          <a href="../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="right" >
+          <a href="shared_library_docs.html" title="Shared Library Fortran Subroutines"
+             accesskey="N">next</a> |</li>
+        <li class="right" >
+          <a href="pairing_docs.html" title="Counterpart Pairing Fortran Subroutines"
+             accesskey="P">previous</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../index.html">macauff</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">Miscellaneous Functions Fortran Subroutines</a></li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <section id="miscellaneous-functions-fortran-subroutines">
+<h1>Miscellaneous Functions Fortran Subroutines<a class="headerlink" href="#miscellaneous-functions-fortran-subroutines" title="Link to this heading">¶</a></h1>
+<p class="rubric" id="f/misc_functions_fortran">Description</p>
+<p>This module provides the Fortran code for the handling of various miscellaneous functions,
+not tied to one specific sub-section of the codebase.</p>
+<p class="rubric">Quick access</p>
+<dl class="field-list simple">
+<dt class="field-odd">Routines<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference internal" href="#f/misc_functions_fortran/calc_j0" title="f/misc_functions_fortran/calc_j0"><code class="xref f f-func docutils literal notranslate"><span class="pre">calc_j0()</span></code></a>, <a class="reference internal" href="#f/misc_functions_fortran/find_nearest_point" title="f/misc_functions_fortran/find_nearest_point"><code class="xref f f-func docutils literal notranslate"><span class="pre">find_nearest_point()</span></code></a>, <a class="reference internal" href="#f/misc_functions_fortran/haversine_wrapper" title="f/misc_functions_fortran/haversine_wrapper"><code class="xref f f-func docutils literal notranslate"><span class="pre">haversine_wrapper()</span></code></a></p>
+</dd>
+</dl>
+<p class="rubric">Variables</p>
+<ul>
+<li><dl class="f variable">
+<dt class="sig sig-object f" id="f/misc_functions_fortran/dp">
+<span class="sig-prename descclassname"><span class="pre">misc_functions_fortran/</span></span><span class="sig-name descname"><span class="pre">dp</span></span><em> <span class="pre">[</span></em><em><span class="pre">integer</span></em><em><span class="pre">,</span></em><em><span class="pre">parameter=</span></em><span class="pre">kind</span><span class="pre">(</span><span class="pre">0</span><span class="pre">.</span><span class="pre">0d0</span><span class="pre">)</span><em><span class="pre">]</span></em><a class="headerlink" href="#f/misc_functions_fortran/dp" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+</li>
+<li><dl class="f variable">
+<dt class="sig sig-object f" id="f/misc_functions_fortran/pi">
+<span class="sig-prename descclassname"><span class="pre">misc_functions_fortran/</span></span><span class="sig-name descname"><span class="pre">pi</span></span><em> <span class="pre">[</span></em><em><span class="pre">real</span></em><em><span class="pre">,</span></em><em><span class="pre">parameter=</span></em><span class="pre">4</span><span class="pre">.</span><span class="pre">0_dp</span><span class="pre">*</span><span class="pre">atan</span><span class="pre">(</span><span class="pre">1</span><span class="pre">.</span><span class="pre">0_dp</span><span class="pre">)</span><em><span class="pre">]</span></em><a class="headerlink" href="#f/misc_functions_fortran/pi" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+</li>
+</ul>
+<p class="rubric">Subroutines and functions</p>
+<dl>
+<dt class="sig sig-object f" id="f/misc_functions_fortran/haversine_wrapper">
+<em class="property"><span class="pre">subroutine</span>&#160; </em><span class="sig-prename descclassname"><span class="pre">misc_functions_fortran/</span></span><span class="sig-name descname"><span class="pre">haversine_wrapper</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="pre">lon1</span></em>, <em class="sig-param"><span class="pre">lon2</span></em>, <em class="sig-param"><span class="pre">lat1</span></em>, <em class="sig-param"><span class="pre">lat2</span></em>, <em class="sig-param"><span class="pre">hav_dist</span></em><span class="sig-paren">)</span><a class="headerlink" href="#f/misc_functions_fortran/haversine_wrapper" title="Link to this definition">¶</a></dt>
+<dd><p>Wrapper for the haversine formula in shared_library.f90.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>lon1</strong><em> [</em><em>real</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>lon2</strong><em> [</em><em>real</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>lat1</strong><em> [</em><em>real</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>lat2</strong><em> [</em><em>real</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>hav_dist</strong><em> [</em><em>real</em><em>,</em><em>out</em><em>]</em></p></li>
+</ul>
+</dd>
+<dt class="field-even">Call to<span class="colon">:</span></dt>
+<dd class="field-even"><p><a class="reference internal" href="shared_library_docs.html#f/_/haversine" title="f/_/haversine"><code class="xref f f-func docutils literal notranslate"><span class="pre">haversine()</span></code></a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl>
+<dt class="sig sig-object f" id="f/misc_functions_fortran/find_nearest_point">
+<em class="property"><span class="pre">subroutine</span>&#160; </em><span class="sig-prename descclassname"><span class="pre">misc_functions_fortran/</span></span><span class="sig-name descname"><span class="pre">find_nearest_point</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="pre">source_lon</span></em>, <em class="sig-param"><span class="pre">source_lat</span></em>, <em class="sig-param"><span class="pre">point_lon</span></em>, <em class="sig-param"><span class="pre">point_lat</span></em>, <em class="sig-param"><span class="pre">point_ind</span></em><span class="sig-paren">)</span><a class="headerlink" href="#f/misc_functions_fortran/find_nearest_point" title="Link to this definition">¶</a></dt>
+<dd><p>Find the nearest on-sky distance between a series of coordinates and another list of positions.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>source_lon</strong> (*)<em> [</em><em>real</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>source_lat</strong> (*)<em> [</em><em>real</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>point_lon</strong> (*)<em> [</em><em>real</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>point_lat</strong> (*)<em> [</em><em>real</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>point_ind</strong> (size(source_lon)<em> [</em><em>integer</em><em>,</em><em>out</em><em>]</em> :: pre-convert one-index fortran to zero-index python indices</p></li>
+</ul>
+</dd>
+<dt class="field-even">Call to<span class="colon">:</span></dt>
+<dd class="field-even"><p><a class="reference internal" href="shared_library_docs.html#f/_/haversine" title="f/_/haversine"><code class="xref f f-func docutils literal notranslate"><span class="pre">haversine()</span></code></a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl>
+<dt class="sig sig-object f" id="f/misc_functions_fortran/calc_j0">
+<em class="property"><span class="pre">subroutine</span>&#160; </em><span class="sig-prename descclassname"><span class="pre">misc_functions_fortran/</span></span><span class="sig-name descname"><span class="pre">calc_j0</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="pre">r</span></em>, <em class="sig-param"><span class="pre">r0</span></em>, <em class="sig-param"><span class="pre">j0s</span></em><span class="sig-paren">)</span><a class="headerlink" href="#f/misc_functions_fortran/calc_j0" title="Link to this definition">¶</a></dt>
+<dd><p>Wrapper for jy01a_j0, to calculate the Bessel Function of First Kind of
+Zeroth Order for arrays of rs and rhos.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>r</strong> (*)<em> [</em><em>real</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>r0</strong> (*)<em> [</em><em>real</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>j0s</strong> (size(r,size(r0)<em> [</em><em>real</em><em>,</em><em>out</em><em>]</em></p></li>
+</ul>
+</dd>
+<dt class="field-even">Call to<span class="colon">:</span></dt>
+<dd class="field-even"><p><a class="reference internal" href="shared_library_docs.html#f/_/jy01a_j0" title="f/_/jy01a_j0"><code class="xref f f-func docutils literal notranslate"><span class="pre">jy01a_j0()</span></code></a></p>
+</dd>
+</dl>
+</dd></dl>
+
+</section>
+
+
+            <div class="clearer"></div>
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="../f-modindex.html" title="Fortran Module Index"
+             >fortran modules</a> |</li>
+        <li class="right" >
+          <a href="../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="right" >
+          <a href="shared_library_docs.html" title="Shared Library Fortran Subroutines"
+             >next</a> |</li>
+        <li class="right" >
+          <a href="pairing_docs.html" title="Counterpart Pairing Fortran Subroutines"
+             >previous</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../index.html">macauff</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">Miscellaneous Functions Fortran Subroutines</a></li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+    &#169; Copyright 2022, Tom J Wilson.
+      Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 7.2.6.
+    </div>
+  </body>
+</html>

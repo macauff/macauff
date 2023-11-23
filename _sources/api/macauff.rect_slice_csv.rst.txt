@@ -1,0 +1,6 @@
+rect_slice_csv
+==============
+
+.. currentmodule:: macauff
+
+.. autofunction:: rect_slice_csv

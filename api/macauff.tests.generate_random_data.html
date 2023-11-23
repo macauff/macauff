@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>generate_random_data &#8212; macauff</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=4848ba22" />
+    <link rel="stylesheet" type="text/css" href="../_static/pyramid.css?v=a5b9c134" />
+    <link rel="stylesheet" type="text/css" href="../_static/graphviz.css?v=eafc0fe6" />
+    <script src="../_static/documentation_options.js?v=5929fcd5"></script>
+    <script src="../_static/doctools.js?v=888ff710"></script>
+    <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="Installation" href="../installation.html" />
+    <link rel="prev" title="FitPSFPerturbations" href="macauff.FitPSFPerturbations.html" />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Neuton&amp;subset=latin" type="text/css" media="screen" charset="utf-8" />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Nobile:regular,italic,bold,bolditalic&amp;subset=latin" type="text/css" media="screen" charset="utf-8" />
+<!--[if lte IE 6]>
+<link rel="stylesheet" href="../_static/ie6.css" type="text/css" media="screen" charset="utf-8" />
+<![endif]-->
+
+  </head><body>
+
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="../f-modindex.html" title="Fortran Module Index"
+             >fortran modules</a> |</li>
+        <li class="right" >
+          <a href="../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="right" >
+          <a href="../installation.html" title="Installation"
+             accesskey="N">next</a> |</li>
+        <li class="right" >
+          <a href="macauff.FitPSFPerturbations.html" title="FitPSFPerturbations"
+             accesskey="P">previous</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../index.html">macauff</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../macauff.html" accesskey="U"><code class="docutils literal notranslate"><span class="pre">macauff</span></code> Documentation</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">generate_random_data</a></li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <section id="generate-random-data">
+<h1>generate_random_data<a class="headerlink" href="#generate-random-data" title="Link to this heading">¶</a></h1>
+<dl class="py function">
+<dt class="sig sig-object py" id="macauff.tests.generate_random_data">
+<span class="sig-prename descclassname"><span class="pre">macauff.tests.</span></span><span class="sig-name descname"><span class="pre">generate_random_data</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">N_a</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">N_b</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">N_c</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">extent</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">n_a_filts</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">n_b_filts</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">a_astro_sig</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">b_astro_sig</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">a_cat</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">b_cat</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">seed</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/macauff/tests/test_full_match_process.html#generate_random_data"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#macauff.tests.generate_random_data" title="Link to this definition">¶</a></dt>
+<dd><p>Convenience function to allow for the generation of two test datasets.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><dl class="simple">
+<dt><strong>N_a</strong><span class="classifier">integer</span></dt><dd><p>The number of sources to be generated in catalogue “a”.</p>
+</dd>
+<dt><strong>N_b</strong><span class="classifier">integer</span></dt><dd><p>The number of catalogue “b” fake sources.</p>
+</dd>
+<dt><strong>N_c</strong><span class="classifier">integer</span></dt><dd><p>The number of common, overlapping sources, in both catalogues.</p>
+</dd>
+<dt><strong>extent</strong><span class="classifier">list of integers</span></dt><dd><p>The on-sky coordinates that mark out the rectangular limits over which
+sources should be generated. Should be of the form
+<code class="docutils literal notranslate"><span class="pre">[lower_lon,</span> <span class="pre">upper_lon,</span> <span class="pre">lower_lat,</span> <span class="pre">upper_lat]</span></code>, in degrees.</p>
+</dd>
+<dt><strong>n_a_filts</strong><span class="classifier">integer</span></dt><dd><p>The number of photometric filters catalogue “a” should have.</p>
+</dd>
+<dt><strong>n_b_filts</strong><span class="classifier">integer</span></dt><dd><p>The number of catalogue “b” photometric filters.</p>
+</dd>
+<dt><strong>a_astro_sig</strong><span class="classifier">float</span></dt><dd><p>The astrometric uncertainty of catalogue “a”, in arcseconds.</p>
+</dd>
+<dt><strong>b_astro_sig</strong><span class="classifier">float</span></dt><dd><p>Catalogue “b“‘s astrometric uncertainty, in arcseconds.</p>
+</dd>
+<dt><strong>a_cat</strong><span class="classifier">string</span></dt><dd><p>The folder path into which to save the binary files containing
+catalogue “a“‘s astrometric and photometric data.</p>
+</dd>
+<dt><strong>b_cat</strong><span class="classifier">string</span></dt><dd><p>Folder describing the save location of catalogue “b“‘s data.</p>
+</dd>
+<dt><strong>seed</strong><span class="classifier">integer, optional</span></dt><dd><p>Random number generator seed. If <code class="docutils literal notranslate"><span class="pre">None</span></code>, will be passed to
+<code class="docutils literal notranslate"><span class="pre">np.random.default_rng</span></code> as such, and a seed will be generated
+as per <code class="docutils literal notranslate"><span class="pre">default_rng</span></code>’s documentation.</p>
+</dd>
+</dl>
+</dd>
+</dl>
+</dd></dl>
+
+</section>
+
+
+            <div class="clearer"></div>
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="../f-modindex.html" title="Fortran Module Index"
+             >fortran modules</a> |</li>
+        <li class="right" >
+          <a href="../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="right" >
+          <a href="../installation.html" title="Installation"
+             >next</a> |</li>
+        <li class="right" >
+          <a href="macauff.FitPSFPerturbations.html" title="FitPSFPerturbations"
+             >previous</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../index.html">macauff</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../macauff.html" ><code class="docutils literal notranslate"><span class="pre">macauff</span></code> Documentation</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">generate_random_data</a></li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+    &#169; Copyright 2022, Tom J Wilson.
+      Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 7.2.6.
+    </div>
+  </body>
+</html>

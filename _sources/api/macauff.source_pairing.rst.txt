@@ -1,0 +1,6 @@
+source_pairing
+==============
+
+.. currentmodule:: macauff
+
+.. autofunction:: source_pairing

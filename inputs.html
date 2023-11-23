@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="./">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>Input Parameters &#8212; macauff</title>
+    <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=4848ba22" />
+    <link rel="stylesheet" type="text/css" href="_static/pyramid.css?v=a5b9c134" />
+    <link rel="stylesheet" type="text/css" href="_static/graphviz.css?v=eafc0fe6" />
+    <script src="_static/documentation_options.js?v=5929fcd5"></script>
+    <script src="_static/doctools.js?v=888ff710"></script>
+    <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Pre- and Post-Processing" href="pre_post_process.html" />
+    <link rel="prev" title="Quick Start" href="quickstart.html" />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Neuton&amp;subset=latin" type="text/css" media="screen" charset="utf-8" />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Nobile:regular,italic,bold,bolditalic&amp;subset=latin" type="text/css" media="screen" charset="utf-8" />
+<!--[if lte IE 6]>
+<link rel="stylesheet" href="_static/ie6.css" type="text/css" media="screen" charset="utf-8" />
+<![endif]-->
+
+  </head><body>
+
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="f-modindex.html" title="Fortran Module Index"
+             >fortran modules</a> |</li>
+        <li class="right" >
+          <a href="py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="right" >
+          <a href="pre_post_process.html" title="Pre- and Post-Processing"
+             accesskey="N">next</a> |</li>
+        <li class="right" >
+          <a href="quickstart.html" title="Quick Start"
+             accesskey="P">previous</a> |</li>
+        <li class="nav-item nav-item-0"><a href="index.html">macauff</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">Input Parameters</a></li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <section id="input-parameters">
+<h1>Input Parameters<a class="headerlink" href="#input-parameters" title="Link to this heading">¶</a></h1>
+<p>This page details the various inputs expected by <a class="reference internal" href="api/macauff.CrossMatch.html#macauff.CrossMatch" title="macauff.CrossMatch"><code class="xref py py-obj docutils literal notranslate"><span class="pre">CrossMatch</span></code></a> via its input parameter files. These are split into two main sections: inputs that both catalogues need separately (contained in their respective catalogue parameters file) and inputs that are defined with respect to the catalogue-catalogue cross-match.</p>
+<p>These input parameters are required to be in <code class="docutils literal notranslate"><span class="pre">crossmatch_params*.txt</span></code> for the <a class="reference internal" href="#joint-parameters">Joint Parameters</a> options, and <code class="docutils literal notranslate"><span class="pre">cat_a_params*.txt</span></code>, <code class="docutils literal notranslate"><span class="pre">cat_b_params*.txt</span></code> for the <a class="reference internal" href="#catalogue-specific-parameters">Catalogue-specific Parameters</a> options, where the asterisk indicates a wildcard – i.e., the text files must end <code class="docutils literal notranslate"><span class="pre">.txt</span></code> and begin e.g. <code class="docutils literal notranslate"><span class="pre">crossmatch_params</span></code>,  but can contain text between those two parts of the file.</p>
+<p>Depending on the size of the match being performed, it is likely that you may want to use the MPI parallelisation option to save runtime or memory overhead, splitting your matches into “chunks.” Even if your cross-match area is small enough that you only have a single file per catalogue, this is treated as a single chunk. Each individual chunk – or your only chunk – is required to have its own set of three input text parameter files, within folders inside <code class="docutils literal notranslate"><span class="pre">chunks_folder_path</span></code> as passed to <a class="reference internal" href="api/macauff.CrossMatch.html#macauff.CrossMatch" title="macauff.CrossMatch"><code class="xref py py-obj docutils literal notranslate"><span class="pre">CrossMatch</span></code></a>. Most of the parameters within these files will be the same across all chunks – you’ll likely always want to include the perturbation component of the AUF or include photometric likelihoods, or use the same filters across all sub-catalogue cross-matches – but some will vary on a per-chunk basis, most notably anything that involves astrometric coordinates, like <code class="docutils literal notranslate"><span class="pre">cross_match_extent</span></code>.</p>
+<p>The sub-folder structure should look something like:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>/path/to/your/chunks_folder_path
+                               ├─── 2017
+                               │       ├── crossmatch_params_2017.txt
+                               │       ├── cat_a_params_2017.txt
+                               │       └── cat_b_params_2017.txt
+                               │
+                               ├─── 2018
+                               │       ├── crossmatch_params_2018.txt
+                               │       ├── cat_a_params_2018.txt
+                               │       └── cat_b_params_2018.txt
+</pre></div>
+</div>
+<p>where e.g. <code class="docutils literal notranslate"><span class="pre">crossmatch_params_2017.txt</span></code> and <code class="docutils literal notranslate"><span class="pre">crossmatch_params_2018.txt</span></code> would both contain all of the “Joint Parameters” parameters necessary to run the matches in their respective chunks; again, significant numbers of these would be the same, but e.g. <code class="docutils literal notranslate"><span class="pre">cf_region_points</span></code> would differ.</p>
+<p>For a simple example of how this works for a one-chunk cross-match, see <a class="reference internal" href="quickstart.html"><span class="doc">Quick Start</span></a>, and for more details on the inputs and outputs from individual functions within the cross-match process check the <a class="reference internal" href="macauff.html"><span class="doc">documentation</span></a>.</p>
+<section id="crossmatch-inputs">
+<h2>CrossMatch Inputs<a class="headerlink" href="#crossmatch-inputs" title="Link to this heading">¶</a></h2>
+<p>As well as the parameters required that are ingested through the input parameters files, <a class="reference internal" href="api/macauff.CrossMatch.html#macauff.CrossMatch" title="macauff.CrossMatch"><code class="xref py py-obj docutils literal notranslate"><span class="pre">CrossMatch</span></code></a> itself requires some input arguments.</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">chunks_folder_path</span></code>: the directory in which the folders containing parameters files are stored</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">use_mpi</span></code>: boolean flag for whether to parallelise distribution of chunks using MPI. If <code class="docutils literal notranslate"><span class="pre">False</span></code> chunks will be run in serial; defaults to <code class="docutils literal notranslate"><span class="pre">True</span></code>, but with a fallback for if the appropriate module is not available.</p></li>
+</ul>
+<p>If you do not want to (or cannot) use MPI to distribute larger cross-match runs, with numerous chunks that will take significant compute time to run, then the first two inputs, combined with with <code class="docutils literal notranslate"><span class="pre">use_mpi=False</span></code>, are all you need to consider. However, if you wish to use MPI then the remaining keyword arguments control its use:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">resume_file_path</span></code>: location of where to store the file that contains information on whether a particular chunk (e.g. <code class="docutils literal notranslate"><span class="pre">2018</span></code> in the example above) is finished, to avoid re-running parameters if matches have to be re-started for any reason. Optional, defaulting to having no such checkpointing capabilities.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">walltime</span></code>: related to <code class="docutils literal notranslate"><span class="pre">resume_file_path</span></code>, this controls how long a singular run of the cross-matching can be performed for on the particular machine before being stopped (e.g. if being run on a shared machine). Default is no such consideration for duration of match runtimes, but otherwise expects a string in the format <code class="docutils literal notranslate"><span class="pre">H:M:S</span></code>.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">end_within</span></code>: combined with <code class="docutils literal notranslate"><span class="pre">walltime</span></code> this avoids unnecessarily starting new chunks being run by the MPI manager if within <code class="docutils literal notranslate"><span class="pre">end_within</span></code> of the <code class="docutils literal notranslate"><span class="pre">walltime</span></code> stoppage. Also expects <code class="docutils literal notranslate"><span class="pre">H:M:S</span></code> string format.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">polling_rate</span></code>: controls the speed at which the MPI manager checks for finished jobs and distributes follow-up jobs to the worker.</p></li>
+</ul>
+</section>
+<section id="joint-parameters">
+<h2>Joint Parameters<a class="headerlink" href="#joint-parameters" title="Link to this heading">¶</a></h2>
+<p>These parameters are only provided in the single, common-parameter input file, and given as <code class="docutils literal notranslate"><span class="pre">joint_file_path</span></code> in <a class="reference internal" href="api/macauff.CrossMatch.html#macauff.CrossMatch" title="macauff.CrossMatch"><code class="xref py py-obj docutils literal notranslate"><span class="pre">CrossMatch</span></code></a>.</p>
+<p>There are some parameters that must be given in all runs:</p>
+<p><code class="docutils literal notranslate"><span class="pre">joint_folder_path</span></code>, <code class="docutils literal notranslate"><span class="pre">include_perturb_auf</span></code>, <code class="docutils literal notranslate"><span class="pre">include_phot_like</span></code>, <code class="docutils literal notranslate"><span class="pre">use_phot_priors</span></code>, <code class="docutils literal notranslate"><span class="pre">cross_match_extent</span></code>, <code class="docutils literal notranslate"><span class="pre">pos_corr_dist</span></code>, <code class="docutils literal notranslate"><span class="pre">cf_region_type</span></code>, <code class="docutils literal notranslate"><span class="pre">cf_region_frame</span></code>, <code class="docutils literal notranslate"><span class="pre">cf_region_points</span></code>, <code class="docutils literal notranslate"><span class="pre">real_hankel_points</span></code>, <code class="docutils literal notranslate"><span class="pre">four_hankel_points</span></code>, <code class="docutils literal notranslate"><span class="pre">four_max_rho</span></code>, <code class="docutils literal notranslate"><span class="pre">int_fracs</span></code>, <code class="docutils literal notranslate"><span class="pre">make_output_csv</span></code>, and <code class="docutils literal notranslate"><span class="pre">n_pool</span></code>;</p>
+<p>options which need to be supplied if <code class="docutils literal notranslate"><span class="pre">make_output_csv</span></code> is <code class="docutils literal notranslate"><span class="pre">True</span></code>:</p>
+<p><code class="docutils literal notranslate"><span class="pre">output_csv_folder</span></code>, <code class="docutils literal notranslate"><span class="pre">match_out_csv_name</span></code>, and <code class="docutils literal notranslate"><span class="pre">nonmatch_out_csv_name</span></code>;</p>
+<p>and those options which only need to be supplied if <code class="docutils literal notranslate"><span class="pre">include_perturb_auf</span></code> is <code class="docutils literal notranslate"><span class="pre">True</span></code>:</p>
+<p><code class="docutils literal notranslate"><span class="pre">num_trials</span></code>, and <code class="docutils literal notranslate"><span class="pre">d_mag</span></code>.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p><code class="docutils literal notranslate"><span class="pre">num_trials</span></code> and <code class="docutils literal notranslate"><span class="pre">d_mag</span></code> currently need to be supplied if either <code class="docutils literal notranslate"><span class="pre">correct_astrometry</span></code> option in the two <a class="reference internal" href="#catalogue-specific-parameters">Catalogue-specific Parameters</a> config files is <code class="docutils literal notranslate"><span class="pre">True</span></code> as well.</p>
+</div>
+<section id="common-parameter-description">
+<h3>Common Parameter Description<a class="headerlink" href="#common-parameter-description" title="Link to this heading">¶</a></h3>
+<p><code class="docutils literal notranslate"><span class="pre">joint_folder_path</span></code></p>
+<p>The top-level folder location, into which all intermediate files and folders are placed, when created during the cross-match process. This can either be an absolute file path, or relative to the folder from which your script that called <code class="xref py py-obj docutils literal notranslate"><span class="pre">CrossMatch()</span></code> is based.</p>
+<p><code class="docutils literal notranslate"><span class="pre">include_perturb_auf</span></code></p>
+<p>Flag for whether to include the simulated effects of blended sources on the measured astrometry in the two catalogues or not.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>If <code class="docutils literal notranslate"><span class="pre">include_perturb_auf</span></code> is <code class="docutils literal notranslate"><span class="pre">True</span></code> then <code class="docutils literal notranslate"><span class="pre">dustmaps</span></code> will be called to obtain line-of-sight extinction values. You will need the SFD dustmaps to be pre-downloaded; to do so before you call the cross-match procedure you must run <code class="docutils literal notranslate"><span class="pre">dustmaps.sfd.fetch()</span></code>; see the <code class="docutils literal notranslate"><span class="pre">dustmaps</span></code> documentation for more details on how to specific a particular download location.</p>
+</div>
+<p><code class="docutils literal notranslate"><span class="pre">include_phot_like</span></code></p>
+<p>Flag for the inclusion of the likelihood of match or non-match based on the photometric information in the two catalogues.</p>
+<p><code class="docutils literal notranslate"><span class="pre">use_phot_priors</span></code></p>
+<p>Flag to determine whether to calculate the priors on match or non-match using the photometry (if set to <code class="docutils literal notranslate"><span class="pre">True</span></code>) or calculate them based on a naive asymmetric density argument (<code class="docutils literal notranslate"><span class="pre">False</span></code>).</p>
+<p><code class="docutils literal notranslate"><span class="pre">cross_match_extent</span></code></p>
+<p>The maximum extent of the matching process. When not matching all-sky catalogues, these extents are used to eliminate potential matches within “island” overlap range of the edge of the data, whose potential incompleteness renders the probabilities of match derived uncertain. Must be of the form <code class="docutils literal notranslate"><span class="pre">lower-longitude</span> <span class="pre">upper-longitude</span> <span class="pre">lower-latitude</span> <span class="pre">upper-latitude</span></code>; accepts four space-separated floats.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>In cases where the boundary defining the cross-match overlaps the 0-360 boundary of the given coordinate system, the longitudes should be given relative to 0 degrees. For example, if we had a boundary that ran from 350 degrees up to 360 (0) degrees, and on to 10 degrees, <code class="docutils literal notranslate"><span class="pre">cross_match_extent</span></code> would have for its input longitudes <code class="docutils literal notranslate"><span class="pre">-10</span> <span class="pre">10</span></code>. Internally the software is able to handle the boundary for source coordinates, but requires the extents to be correctly input for these regions.</p>
+</div>
+<p><code class="docutils literal notranslate"><span class="pre">pos_corr_dist</span></code></p>
+<p>The floating point precision number determining the maximum possible separation between two sources in opposing catalogues.</p>
+<p><code class="docutils literal notranslate"><span class="pre">cf_region_type</span></code></p>
+<p>This flag controls whether the areas in which photometry-related variables (likelihoods, priors, etc.) are calculated is determined by <code class="docutils literal notranslate"><span class="pre">rectangle</span></code> – evenly spaced longitude/latitude pairings – or <code class="docutils literal notranslate"><span class="pre">points</span></code> – tuples of randomly placed coordinates.</p>
+<p><code class="docutils literal notranslate"><span class="pre">cf_region_frame</span></code></p>
+<p>This allows either <code class="docutils literal notranslate"><span class="pre">equatorial</span></code> or <code class="docutils literal notranslate"><span class="pre">galactic</span></code> frame coordinates to be used in the match process.</p>
+<p><code class="docutils literal notranslate"><span class="pre">cf_region_points</span></code></p>
+<p>The list of pointings for which to run simulations of perturbations due to blended sources, if applicable. If <code class="docutils literal notranslate"><span class="pre">cf_region_type</span></code> is <code class="docutils literal notranslate"><span class="pre">rectangle</span></code>, then <code class="docutils literal notranslate"><span class="pre">cf_region_points</span></code> accepts six numbers: <code class="docutils literal notranslate"><span class="pre">start</span> <span class="pre">longitude,</span> <span class="pre">end</span> <span class="pre">longitude,</span> <span class="pre">number</span> <span class="pre">of</span> <span class="pre">longitude</span> <span class="pre">points,</span> <span class="pre">start</span> <span class="pre">latitude,</span> <span class="pre">end</span> <span class="pre">latitude,</span> <span class="pre">number</span> <span class="pre">of</span> <span class="pre">latitude</span> <span class="pre">points</span></code>; if <code class="docutils literal notranslate"><span class="pre">points</span></code> then tuples must be of the syntax <code class="docutils literal notranslate"><span class="pre">(a,</span> <span class="pre">b),</span> <span class="pre">(c,</span> <span class="pre">d)</span></code> where <code class="docutils literal notranslate"><span class="pre">a</span></code> and <code class="docutils literal notranslate"><span class="pre">c</span></code> are RA or Galactic Longitude, and <code class="docutils literal notranslate"><span class="pre">b</span></code> and <code class="docutils literal notranslate"><span class="pre">d</span></code> are Declination or Galactic Latitude.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>For consistency with <code class="docutils literal notranslate"><span class="pre">cross_match_extent</span></code>, <code class="docutils literal notranslate"><span class="pre">cf_region_points</span></code> longitudes may be given with negative coordinates for cases where the region <code class="docutils literal notranslate"><span class="pre">cross_match_extent</span></code> defines is both above and below zero degrees, but they can also be given within the [0, 360] phase space, as 350 degrees and -10 degrees are handled the same where needed by <code class="docutils literal notranslate"><span class="pre">cf_region_points</span></code>.</p>
+</div>
+<p><code class="docutils literal notranslate"><span class="pre">real_hankel_points</span></code></p>
+<p>The integer number of points, for Hankel (two-dimensional Fourier) transformations, in which to approximate the fourier transformation integral of the AUFs.</p>
+<p><code class="docutils literal notranslate"><span class="pre">four_hankel_points</span></code></p>
+<p>The integer number of points for approximating the inverse Hankel transformation, representing the convolution of two real-space AUFs.</p>
+<p><code class="docutils literal notranslate"><span class="pre">four_max_rho</span></code></p>
+<p>The largest fourier-space value, up to which inverse Hankel transformation integrals are considered. Should typically be larger than the inverse of the smallest typical centroiding Gaussian one-dimensional uncertainty.</p>
+<p><code class="docutils literal notranslate"><span class="pre">n_pool</span></code></p>
+<p>Determines how many CPUs are used when parallelising within <code class="docutils literal notranslate"><span class="pre">Python</span></code> using <code class="docutils literal notranslate"><span class="pre">multiprocessing</span></code>.</p>
+<p><code class="docutils literal notranslate"><span class="pre">int_fracs</span></code></p>
+<p>The integral fractions of the various so-called “error circles” used in the cross-match process. Should be space-separated floats, in the order of: bright error circle fraction, “field” error circle fraction, and potential counterpart cutoff limit.</p>
+<p><code class="docutils literal notranslate"><span class="pre">output_csv_folder</span></code></p>
+<p>The folder path into which to save the stored <code class="docutils literal notranslate"><span class="pre">.csv</span></code> files that are created if <code class="docutils literal notranslate"><span class="pre">make_output_csv</span></code> is <code class="docutils literal notranslate"><span class="pre">True</span></code>.</p>
+<p><code class="docutils literal notranslate"><span class="pre">match_out_csv_name</span></code></p>
+<p>Name of the band-merged, cross-matched dataset of counterpart associations and accompanying metadata, including the appropriate file extension (currently <code class="docutils literal notranslate"><span class="pre">.csv</span></code>).</p>
+<p><code class="docutils literal notranslate"><span class="pre">nonmatch_out_csv_name</span></code></p>
+<p>Filename to save out the respective non-match catalogue objects and metadata to. Will have appended to the front <code class="docutils literal notranslate"><span class="pre">cat_name</span></code> to distinguish the two non-match files. <code class="docutils literal notranslate"><span class="pre">nonmatch_out_csv_name</span></code> should contain the appropriate file extension.</p>
+<p><code class="docutils literal notranslate"><span class="pre">num_trials</span></code></p>
+<p>The number of PSF realisations to draw when simulating the perturbation component of the AUF. Should be an integer. Only required if <code class="docutils literal notranslate"><span class="pre">include_perturb_auf</span></code> is <code class="docutils literal notranslate"><span class="pre">True</span></code>.</p>
+<p><code class="docutils literal notranslate"><span class="pre">d_mag</span></code></p>
+<p>Bin sizes for magnitudes used to represent the source number density used in the random drawing of perturbation AUF component PSFs. Should be a single float. Only required if <code class="docutils literal notranslate"><span class="pre">include_perturb_auf</span></code> is <code class="docutils literal notranslate"><span class="pre">True</span></code>.</p>
+</section>
+</section>
+<section id="catalogue-specific-parameters">
+<h2>Catalogue-specific Parameters<a class="headerlink" href="#catalogue-specific-parameters" title="Link to this heading">¶</a></h2>
+<p>These parameters are required in two separate files, one per catalogue to be cross-matched, the files <code class="docutils literal notranslate"><span class="pre">cat_a_params.txt</span></code> and <code class="docutils literal notranslate"><span class="pre">cat_b_params.txt</span></code> read from sub-folders within <code class="docutils literal notranslate"><span class="pre">chunks_folder_path</span></code> as passed to <a class="reference internal" href="api/macauff.CrossMatch.html#macauff.CrossMatch" title="macauff.CrossMatch"><code class="xref py py-obj docutils literal notranslate"><span class="pre">CrossMatch</span></code></a>.</p>
+<p>These can be divided into those inputs that are always required:</p>
+<p><code class="docutils literal notranslate"><span class="pre">cat_folder_path</span></code>, <code class="docutils literal notranslate"><span class="pre">cat_name</span></code>, <code class="docutils literal notranslate"><span class="pre">filt_names</span></code>, <code class="docutils literal notranslate"><span class="pre">auf_folder_path</span></code>, <code class="docutils literal notranslate"><span class="pre">auf_region_type</span></code>, <code class="docutils literal notranslate"><span class="pre">auf_region_frame</span></code>, <code class="docutils literal notranslate"><span class="pre">auf_region_points</span></code>, <code class="docutils literal notranslate"><span class="pre">correct_astrometry</span></code>, and <code class="docutils literal notranslate"><span class="pre">compute_snr_mag_relation</span></code>;</p>
+<p>those that are only required if the <a class="reference internal" href="#joint-parameters">Joint Parameters</a> option <code class="docutils literal notranslate"><span class="pre">include_perturb_auf</span></code> is <code class="docutils literal notranslate"><span class="pre">True</span></code>:</p>
+<p><code class="docutils literal notranslate"><span class="pre">fit_gal_flag</span></code>, <code class="docutils literal notranslate"><span class="pre">run_fw_auf</span></code>, <code class="docutils literal notranslate"><span class="pre">run_psf_auf</span></code>, <code class="docutils literal notranslate"><span class="pre">psf_fwhms</span></code>, <code class="docutils literal notranslate"><span class="pre">snr_mag_params_path</span></code>, <code class="docutils literal notranslate"><span class="pre">download_tri</span></code>, <code class="docutils literal notranslate"><span class="pre">tri_set_name</span></code>, <code class="docutils literal notranslate"><span class="pre">tri_filt_names</span></code>, <code class="docutils literal notranslate"><span class="pre">tri_filt_num</span></code>, <code class="docutils literal notranslate"><span class="pre">tri_maglim_faint</span></code>, <code class="docutils literal notranslate"><span class="pre">tri_num_faint</span></code>, <code class="docutils literal notranslate"><span class="pre">gal_al_avs</span></code>, and <code class="docutils literal notranslate"><span class="pre">dens_dist</span></code>;</p>
+<p>parameters required if <code class="docutils literal notranslate"><span class="pre">run_psf_auf</span></code> is <code class="docutils literal notranslate"><span class="pre">True</span></code>:</p>
+<p><code class="docutils literal notranslate"><span class="pre">dd_params_path</span></code> and <code class="docutils literal notranslate"><span class="pre">l_cut_path</span></code>;</p>
+<p>the inputs required in each catalogue parameters file if <code class="docutils literal notranslate"><span class="pre">fit_gal_flag</span></code> is <code class="docutils literal notranslate"><span class="pre">True</span></code> (and hence <code class="docutils literal notranslate"><span class="pre">include_perturb_auf</span></code> is <code class="docutils literal notranslate"><span class="pre">True</span></code>):</p>
+<p><code class="docutils literal notranslate"><span class="pre">gal_wavs</span></code>, <code class="docutils literal notranslate"><span class="pre">gal_zmax</span></code>, <code class="docutils literal notranslate"><span class="pre">gal_nzs</span></code>, <code class="docutils literal notranslate"><span class="pre">gal_aboffsets</span></code>, and <code class="docutils literal notranslate"><span class="pre">gal_filternames</span></code>;</p>
+<p>inputs required if <code class="docutils literal notranslate"><span class="pre">make_output_csv</span></code> is <code class="docutils literal notranslate"><span class="pre">True</span></code>:</p>
+<p><code class="docutils literal notranslate"><span class="pre">input_csv_folder</span></code>, <code class="docutils literal notranslate"><span class="pre">cat_csv_name</span></code>, <code class="docutils literal notranslate"><span class="pre">cat_col_names</span></code>, <code class="docutils literal notranslate"><span class="pre">cat_col_nums</span></code>, <code class="docutils literal notranslate"><span class="pre">input_npy_folder</span></code>, <code class="docutils literal notranslate"><span class="pre">csv_has_header</span></code>, <code class="docutils literal notranslate"><span class="pre">extra_col_names</span></code>, and <code class="docutils literal notranslate"><span class="pre">extra_col_nums</span></code>;</p>
+<p>the inputs required if either <code class="docutils literal notranslate"><span class="pre">correct_astrometry</span></code> or <code class="docutils literal notranslate"><span class="pre">compute_snr_mag_relation</span></code> are <code class="docutils literal notranslate"><span class="pre">True</span></code>:</p>
+<p><code class="docutils literal notranslate"><span class="pre">correct_astro_save_folder</span></code>, <code class="docutils literal notranslate"><span class="pre">csv_cat_file_string</span></code>, <code class="docutils literal notranslate"><span class="pre">mag_indices</span></code>, <code class="docutils literal notranslate"><span class="pre">mag_unc_indices</span></code>, and <code class="docutils literal notranslate"><span class="pre">pos_and_err_indices</span></code>;</p>
+<p>and the inputs required if <code class="docutils literal notranslate"><span class="pre">correct_astrometry</span></code> is <code class="docutils literal notranslate"><span class="pre">True</span></code>:</p>
+<p><code class="docutils literal notranslate"><span class="pre">best_mag_index</span></code>, <code class="docutils literal notranslate"><span class="pre">nn_radius</span></code>, <code class="docutils literal notranslate"><span class="pre">ref_csv_cat_file_string</span></code>, <code class="docutils literal notranslate"><span class="pre">correct_mag_array</span></code>, <code class="docutils literal notranslate"><span class="pre">correct_mag_slice</span></code>, <code class="docutils literal notranslate"><span class="pre">correct_sig_slice</span></code>, <code class="docutils literal notranslate"><span class="pre">chunk_overlap_col</span></code>, and <code class="docutils literal notranslate"><span class="pre">best_mag_index_col</span></code>.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p><code class="docutils literal notranslate"><span class="pre">run_fw_auf</span></code>, <code class="docutils literal notranslate"><span class="pre">run_psf_auf</span></code>, <code class="docutils literal notranslate"><span class="pre">psf_fwhms</span></code>, <code class="docutils literal notranslate"><span class="pre">snr_mag_params_path</span></code>, <code class="docutils literal notranslate"><span class="pre">download_tri</span></code>, <code class="docutils literal notranslate"><span class="pre">tri_set_name</span></code>, <code class="docutils literal notranslate"><span class="pre">tri_filt_names</span></code>, <code class="docutils literal notranslate"><span class="pre">tri_filt_num</span></code>, <code class="docutils literal notranslate"><span class="pre">tri_maglim_faint</span></code>, <code class="docutils literal notranslate"><span class="pre">tri_num_faint</span></code>, <code class="docutils literal notranslate"><span class="pre">dens_dist</span></code>, <code class="docutils literal notranslate"><span class="pre">dd_params_path</span></code>, <code class="docutils literal notranslate"><span class="pre">l_cut_path</span></code>, <code class="docutils literal notranslate"><span class="pre">gal_wavs</span></code>, <code class="docutils literal notranslate"><span class="pre">gal_zmax</span></code>, <code class="docutils literal notranslate"><span class="pre">gal_nzs</span></code>, <code class="docutils literal notranslate"><span class="pre">gal_aboffsets</span></code>, <code class="docutils literal notranslate"><span class="pre">gal_filternames</span></code>, and <code class="docutils literal notranslate"><span class="pre">gal_al_avs</span></code> are all currently required if <code class="docutils literal notranslate"><span class="pre">correct_astrometry</span></code> is <code class="docutils literal notranslate"><span class="pre">True</span></code>, bypassing the nested flags above. For example, <code class="docutils literal notranslate"><span class="pre">dens_dist</span></code> is required as an input if <code class="docutils literal notranslate"><span class="pre">include_perturb_auf</span></code> is <code class="docutils literal notranslate"><span class="pre">True</span></code>, or if <code class="docutils literal notranslate"><span class="pre">correct_astrometry</span></code> is set. This means that <code class="docutils literal notranslate"><span class="pre">AstrometricCorrections</span></code> implicitly always runs and fits for a full Astrometric Uncertainty Function.</p>
+</div>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p><code class="docutils literal notranslate"><span class="pre">snr_mag_params_path</span></code> is currently also required if <code class="docutils literal notranslate"><span class="pre">compute_snr_mag_relation</span></code> is <code class="docutils literal notranslate"><span class="pre">True</span></code>, bypassing the above flags. It is therefore currently a required input if any one of <code class="docutils literal notranslate"><span class="pre">include_perturb_auf</span></code>, <code class="docutils literal notranslate"><span class="pre">correct_astrometry</span></code>, or <code class="docutils literal notranslate"><span class="pre">compute_snr_mag_relation</span></code> are set to <code class="docutils literal notranslate"><span class="pre">True</span></code>.</p>
+</div>
+<section id="catalogue-parameter-description">
+<h3>Catalogue Parameter Description<a class="headerlink" href="#catalogue-parameter-description" title="Link to this heading">¶</a></h3>
+<p><code class="docutils literal notranslate"><span class="pre">cat_folder_path</span></code></p>
+<p>The folder containing the three files (see <a class="reference internal" href="quickstart.html"><span class="doc">Quick Start</span></a> for more details) describing the given input catalogue. Can either be an absolute path, or relative to the folder from which the script was called.</p>
+<p><code class="docutils literal notranslate"><span class="pre">cat_name</span></code></p>
+<p>The name of the catalogue. This is used to generate intermediate folder structure within the cross-matching process, and during any output file creation process.</p>
+<p><code class="docutils literal notranslate"><span class="pre">filt_names</span></code></p>
+<p>The filter names of the photometric bandpasses used in this catalogue, in the order in which they are saved in <code class="docutils literal notranslate"><span class="pre">con_cat_photo</span></code>. These will be used to describe any output data files generated after the matching process. Should be a space-separated list.</p>
+<p><code class="docutils literal notranslate"><span class="pre">auf_folder_path</span></code></p>
+<p>The folder into which the Astrometric Uncertainty Function (AUF) related files will be, or have been, saved. Can also either be an absolute or relative path, like <code class="docutils literal notranslate"><span class="pre">cat_folder_path</span></code>.</p>
+<p><code class="docutils literal notranslate"><span class="pre">auf_region_type</span></code></p>
+<p>Similar to <code class="docutils literal notranslate"><span class="pre">cf_region_type</span></code>, flag indicating which definition to use for determining the pointings of the AUF simulations; accepts either <code class="docutils literal notranslate"><span class="pre">rectangle</span></code> or <code class="docutils literal notranslate"><span class="pre">points</span></code>. If <code class="docutils literal notranslate"><span class="pre">rectangle</span></code>, then <code class="docutils literal notranslate"><span class="pre">auf_region_points</span></code> will map out a rectangle of evenly spaced points, otherwise it accepts pairs of coordinates at otherwise random coordinates.</p>
+<p><code class="docutils literal notranslate"><span class="pre">auf_region_frame</span></code></p>
+<p>As with <code class="docutils literal notranslate"><span class="pre">auf_region_frame</span></code>, this flag indicates which frame the data, and thus AUF simulations, are in. Can either be <code class="docutils literal notranslate"><span class="pre">equatorial</span></code> or <code class="docutils literal notranslate"><span class="pre">galactic</span></code>, allowing for data to be input either in Right Ascension and Declination, or Galactic Longitude and Galactic Latitude.</p>
+<p><code class="docutils literal notranslate"><span class="pre">auf_region_points</span></code></p>
+<p>Based on <code class="docutils literal notranslate"><span class="pre">auf_region_type</span></code>, this must either by six space-separated floats, controlling the start and end, and number of, longitude and latitude points in <code class="docutils literal notranslate"><span class="pre">start</span> <span class="pre">lon</span> <span class="pre">end</span> <span class="pre">lon</span> <span class="pre">#</span> <span class="pre">steps</span> <span class="pre">start</span> <span class="pre">lat</span> <span class="pre">end</span> <span class="pre">lat</span> <span class="pre">#steps</span></code> order (see <code class="docutils literal notranslate"><span class="pre">cf_region_points</span></code>), or a series of comma-separated tuples cf. <code class="docutils literal notranslate"><span class="pre">(a,</span> <span class="pre">b),</span> <span class="pre">(c,</span> <span class="pre">d)</span></code>.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>For consistency with <code class="docutils literal notranslate"><span class="pre">cross_match_extent</span></code>, <code class="docutils literal notranslate"><span class="pre">auf_region_points</span></code> longitudes may be given with negative coordinates for cases where the region <code class="docutils literal notranslate"><span class="pre">cross_match_extent</span></code> defines is both above and below zero degrees, but they can also be given within the [0, 360] phase space, as 350 degrees and -10 degrees are handled the same where needed by <code class="docutils literal notranslate"><span class="pre">auf_region_points</span></code>.</p>
+</div>
+<p><code class="docutils literal notranslate"><span class="pre">correct_astrometry</span></code></p>
+<p>In cases where catalogues have unreliable <em>centroid</em> uncertainties, before catalogue matching occurs the dataset can be fit for systematic corrections to its quoted astrometric precisions through ensemble match separation distance distributions to a higher-precision dataset (see the <a class="reference internal" href="pre_post_process.html"><span class="doc">Processing</span></a> section). This flag controls whether this is performed on a chunk-by-chunk basis during the initialisation step of <code class="docutils literal notranslate"><span class="pre">CrossMatch</span></code>.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>If <code class="docutils literal notranslate"><span class="pre">correct_astrometry</span></code> is <code class="docutils literal notranslate"><span class="pre">True</span></code> then <code class="docutils literal notranslate"><span class="pre">dustmaps</span></code> will be called to obtain line-of-sight extinction values. You will need the SFD dustmaps to be pre-downloaded; to do so before you call the cross-match procedure you must run <code class="docutils literal notranslate"><span class="pre">dustmaps.sfd.fetch()</span></code>; see the <code class="docutils literal notranslate"><span class="pre">dustmaps</span></code> documentation for more details on how to specific a particular download location.</p>
+</div>
+<p><code class="docutils literal notranslate"><span class="pre">compute_snr_mag_relation</span></code></p>
+<p>This flag can be <code class="docutils literal notranslate"><span class="pre">False</span></code> if the relationship between signal-to-noise ratio and magnitude is pre-computed; otherwise it indicates that the functional form of SNR vs brightness should be derived for the particular catalogue in question.</p>
+<p><code class="docutils literal notranslate"><span class="pre">fit_gal_flag</span></code></p>
+<p>Optional flag for whether to include simulated external galaxy counts, or just include Galactic sources when deriving the perturbation component of the AUF. Only needed if <code class="docutils literal notranslate"><span class="pre">include_perturb_auf</span></code> is <code class="docutils literal notranslate"><span class="pre">True</span></code>.</p>
+<p><code class="docutils literal notranslate"><span class="pre">run_fw_auf</span></code></p>
+<p>Boolean flag controlling the option to include the flux-weighted algorithm for determining the centre-of-light perturbation with AUF component simulations. Only required if  <code class="docutils literal notranslate"><span class="pre">include_perturb_auf</span></code> is <code class="docutils literal notranslate"><span class="pre">True</span></code>.</p>
+<p><code class="docutils literal notranslate"><span class="pre">run_psf_auf</span></code></p>
+<p>Complementary flag to <code class="docutils literal notranslate"><span class="pre">run_fw_auf</span></code>, indicates whether to run background-dominated, PSF photometry algorithm for the determination of perturbation due to hidden contaminant objects. If both this and <code class="docutils literal notranslate"><span class="pre">run_fw_auf</span></code> are <code class="docutils literal notranslate"><span class="pre">True</span></code> a signal-to-noise-based weighting between the two algorithms is implemented. Must be provided if  <code class="docutils literal notranslate"><span class="pre">include_perturb_auf</span></code> is <code class="docutils literal notranslate"><span class="pre">True</span></code>.</p>
+<p><code class="docutils literal notranslate"><span class="pre">psf_fwhms</span></code></p>
+<p>The Full-Width-At-Half-Maximum of each filter’s Point Spread Function (PSF), in the same order as in <code class="docutils literal notranslate"><span class="pre">filt_names</span></code>. These are used to simulate the PSF if <code class="docutils literal notranslate"><span class="pre">include_perturb_auf</span></code> is set to <code class="docutils literal notranslate"><span class="pre">True</span></code>, and are unnecessary otherwise. Should be a space-separated list of floats.</p>
+<p><code class="docutils literal notranslate"><span class="pre">snr_mag_params_path</span></code></p>
+<p>File path, either absolute or relative to the location of the script the cross-matches are run from, of a binary <code class="docutils literal notranslate"><span class="pre">.npy</span></code> file containing the parameterisation of the signal-to-noise ratio of sources as a function of magnitude, in a series of given sightlines. Must be of shape <code class="docutils literal notranslate"><span class="pre">(N,</span> <span class="pre">M,</span> <span class="pre">5)</span></code> where <code class="docutils literal notranslate"><span class="pre">N</span></code> is the number of filters in <code class="docutils literal notranslate"><span class="pre">filt_names</span></code> order, <code class="docutils literal notranslate"><span class="pre">M</span></code> is the number of sightlines for which SNR vs mag has been derived, and the 5 entries for each filter-sightline combination must be in order <code class="docutils literal notranslate"><span class="pre">a</span></code>, <code class="docutils literal notranslate"><span class="pre">b</span></code>, <code class="docutils literal notranslate"><span class="pre">c</span></code>, <code class="docutils literal notranslate"><span class="pre">coord1</span></code> (e.g. RA), and <code class="docutils literal notranslate"><span class="pre">coord2</span></code> (e.g. Dec). See pre-processing for more information on the meaning of those terms and how <code class="docutils literal notranslate"><span class="pre">snr_mag_params</span></code> is used.</p>
+<p><code class="docutils literal notranslate"><span class="pre">download_tri</span></code></p>
+<p>Boolean flag, indicating whether to re-download a TRILEGAL simulation in a given <code class="docutils literal notranslate"><span class="pre">auf_region_points</span></code> sky coordinate, once it has successfully been run, and to overwrite the original simulation data or not. Optional if <code class="docutils literal notranslate"><span class="pre">include_perturb_aufs</span></code> is <code class="docutils literal notranslate"><span class="pre">False</span></code>.</p>
+<p><code class="docutils literal notranslate"><span class="pre">tri_set_name</span></code>
+The name of the filter set used to simulate the catalogue’s sources in TRILEGAL <a class="footnote-reference brackets" href="#id2" id="id1" role="doc-noteref"><span class="fn-bracket">[</span>1<span class="fn-bracket">]</span></a>. Used to interact with the TRILEGAL API; optional if <code class="docutils literal notranslate"><span class="pre">include_perturb_aufs</span></code> is <code class="docutils literal notranslate"><span class="pre">False</span></code>.</p>
+<p><code class="docutils literal notranslate"><span class="pre">tri_filt_names</span></code></p>
+<p>The names of the filters, in the same order as <code class="docutils literal notranslate"><span class="pre">filt_names</span></code>, as given in the data <code class="docutils literal notranslate"><span class="pre">tri_set_name</span></code> calls. Optional if <code class="docutils literal notranslate"><span class="pre">include_perturb_aufs</span></code> is <code class="docutils literal notranslate"><span class="pre">False</span></code>.</p>
+<p><code class="docutils literal notranslate"><span class="pre">tri_filt_num</span></code></p>
+<p>The one-indexed column number of the magnitude, as determined by the column order of the saved data returned by the TRILEGAL API, to which to set the maximum magnitude limit for the simulation. Optional if <code class="docutils literal notranslate"><span class="pre">include_perturb_aufs</span></code> is <code class="docutils literal notranslate"><span class="pre">False</span></code>.</p>
+<p><code class="docutils literal notranslate"><span class="pre">tri_maglim_faint</span></code></p>
+<p>This is the float that represents the magnitude down to which to simulate TRILEGAL sources in the full-scale simulation, bearing in mind the limiting magnitude cut of the public API but also making sure this value is sufficiently faint that it contains all potentially perturbing objects for the dynamic range of this catalogue (approximately 10 magnitudes fainter than the limiting magnitude of the survey)</p>
+<p><code class="docutils literal notranslate"><span class="pre">tri_num_faint</span></code></p>
+<p>Integer number of objects to draw from the TRILEGAL simulation – affecting the area of simulation, up to the limit imposed by TRILEGAL – down to the full <code class="docutils literal notranslate"><span class="pre">tri_maglim_faint</span></code> magnitude.</p>
+<p><code class="docutils literal notranslate"><span class="pre">dd_params_path</span></code></p>
+<p>File path containin the <code class="docutils literal notranslate"><span class="pre">.npy</span></code> file describing the parameterisations of perturbation offsets due to single hidden contaminating, perturbing objects in the <code class="docutils literal notranslate"><span class="pre">run_psf_auf</span></code> background-dominated, PSF photometry algorithm case. See pre-processing documentation for more details on this, and how to generate this file if necessary.</p>
+<p><code class="docutils literal notranslate"><span class="pre">l_cut_path</span></code></p>
+<p>Alongside <code class="docutils literal notranslate"><span class="pre">dd_params_path</span></code>, path to the <code class="docutils literal notranslate"><span class="pre">.npy</span></code> file containing the limiting flux cuts at which various PSF photometry perturbation algorithms apply. See pre-processing documentation for the specifics and how to generate this file if necesssary.</p>
+<p><code class="docutils literal notranslate"><span class="pre">dens_dist</span></code></p>
+<p>The radius, in arcseconds, within which to count internal catalogue sources for each object, to calculate the local source density. Used to scale TRILEGAL simulated source counts to match smaller scale density fluctuations. Only required if <code class="docutils literal notranslate"><span class="pre">include_perturb_auf</span></code> is <code class="docutils literal notranslate"><span class="pre">True</span></code>.</p>
+<p><code class="docutils literal notranslate"><span class="pre">gal_wavs</span></code></p>
+<p>List of floating point central wavelengths, in the order filters are given in <code class="docutils literal notranslate"><span class="pre">filt_names</span></code>, for each filter, in microns. Used to approximate Schechter function parameters for deriving galaxy counts. Must be given if <code class="docutils literal notranslate"><span class="pre">fit_gal_flag</span></code> is <code class="docutils literal notranslate"><span class="pre">True</span></code>, and hence only required if <code class="docutils literal notranslate"><span class="pre">include_perturb_auf</span></code> is <code class="docutils literal notranslate"><span class="pre">True</span></code>.</p>
+<p><code class="docutils literal notranslate"><span class="pre">gal_zmax</span></code></p>
+<p>Maximum redshift <code class="docutils literal notranslate"><span class="pre">z</span></code> to calculate galactic densities out to for Schechter function derivations, one per <code class="docutils literal notranslate"><span class="pre">gal_wavs</span></code> point. Only needed if <code class="docutils literal notranslate"><span class="pre">fit_gal_flag</span></code> is <code class="docutils literal notranslate"><span class="pre">True</span></code>.</p>
+<p><code class="docutils literal notranslate"><span class="pre">gal_nzs</span></code></p>
+<p>Integer number of redshift points, from zero to <code class="docutils literal notranslate"><span class="pre">gal_zmax</span></code>, to evaluate Schechter functions on, for each filter. Must be given if <code class="docutils literal notranslate"><span class="pre">fit_gal_flag</span></code> is <code class="docutils literal notranslate"><span class="pre">True</span></code>.</p>
+<p><code class="docutils literal notranslate"><span class="pre">gal_aboffsets</span></code></p>
+<p>For each filter, floating point offset between the given filter’s zeropoint system and that of the AB magnitude system – in the same that m = m_AB - offset_AB – for each filter. If <code class="docutils literal notranslate"><span class="pre">fit_gal_flag</span></code> is <code class="docutils literal notranslate"><span class="pre">True</span></code>, must be provided.</p>
+<p><code class="docutils literal notranslate"><span class="pre">gal_filternames</span></code></p>
+<p>Name of each filter as appropriate for providing to <code class="docutils literal notranslate"><span class="pre">speclite</span></code> for each filter. See <a class="reference internal" href="api/macauff.generate_speclite_filters.html#macauff.generate_speclite_filters" title="macauff.generate_speclite_filters"><code class="xref py py-obj docutils literal notranslate"><span class="pre">generate_speclite_filters</span></code></a> for how to create appropriate filters if not provided by the module by default. Required if <code class="docutils literal notranslate"><span class="pre">fit_gal_flag</span></code> is <code class="docutils literal notranslate"><span class="pre">True</span></code>.</p>
+<p><code class="docutils literal notranslate"><span class="pre">gal_al_avs</span></code></p>
+<p>Differential extinction relative to the V-band for each filter, a set of space-separated floats. Must be provided if <code class="docutils literal notranslate"><span class="pre">fit_gal_flag</span></code> is <code class="docutils literal notranslate"><span class="pre">True</span></code>.</p>
+<p><code class="docutils literal notranslate"><span class="pre">input_csv_folder</span></code></p>
+<p>Location of the catalogue’s original input <code class="docutils literal notranslate"><span class="pre">.csv</span></code> file, generally converted to a binary file for use within the main code via <code class="docutils literal notranslate"><span class="pre">csv_to_npy</span></code>.</p>
+<p><code class="docutils literal notranslate"><span class="pre">cat_csv_name</span></code></p>
+<p>Name, including extension, of the <code class="docutils literal notranslate"><span class="pre">.csv</span></code> file located in <code class="docutils literal notranslate"><span class="pre">input_csv_folder</span></code>.</p>
+<p><code class="docutils literal notranslate"><span class="pre">cat_col_names</span></code></p>
+<p>The names of the mandatory columns from each respctive catalogue. Should contain at least the column name for the name or ID of the object, and the names of the columns containing the two orthogonal sky coordinates, as well as the names of each column containing magnitude information to be transferred to the output match and non-match files.</p>
+<p><code class="docutils literal notranslate"><span class="pre">cat_col_nums</span></code></p>
+<p>For each column name in <code class="docutils literal notranslate"><span class="pre">cat_col_names</span></code>, <code class="docutils literal notranslate"><span class="pre">cat_col_nums</span></code> is the zero-indexed position of the column. For example, if we had <code class="docutils literal notranslate"><span class="pre">['ID',</span> <span class="pre">'RA',</span> <span class="pre">'Dec',</span> <span class="pre">'V']</span></code> as our <code class="docutils literal notranslate"><span class="pre">cat_col_names</span></code>, we might have <code class="docutils literal notranslate"><span class="pre">[0,</span> <span class="pre">1,</span> <span class="pre">2,</span> <span class="pre">5]</span></code> as our <code class="docutils literal notranslate"><span class="pre">cat_col_nums</span></code>, in which our designation and coordinates are the first three columns, but our V-band magnitude is a few columns down.</p>
+<p><code class="docutils literal notranslate"><span class="pre">input_npy_folder</span></code></p>
+<p>The location on disk of the folder that contains the converted binary <code class="docutils literal notranslate"><span class="pre">.npy</span></code> files used as inputs to the software. Likely the same as <code class="docutils literal notranslate"><span class="pre">cat_folder_path</span></code>, or <code class="docutils literal notranslate"><span class="pre">None</span></code> can be given if we do not need to load a converted astrometric uncertainty from the binary files and instead can rely solely on the original quoted astrometric uncertainty from the <code class="docutils literal notranslate"><span class="pre">.csv</span></code> files.</p>
+<p><code class="docutils literal notranslate"><span class="pre">csv_has_header</span></code></p>
+<p>A boolean, yes/no, for whether there is a header in the first line of the <code class="docutils literal notranslate"><span class="pre">.csv</span></code> input catalogue files (<code class="docutils literal notranslate"><span class="pre">yes</span></code>), or if the first line is a line of data (<code class="docutils literal notranslate"><span class="pre">no</span></code>).</p>
+<p><code class="docutils literal notranslate"><span class="pre">extra_col_names</span></code></p>
+<p>Analogous to <code class="docutils literal notranslate"><span class="pre">cat_col_names</span></code>, a list of the additional columns from the original csv catalogue file that we wish to add to the match and non-match output files.</p>
+<p><code class="docutils literal notranslate"><span class="pre">extra_col_nums</span></code></p>
+<p>The zero-indexed positions of each corresponding column in <code class="docutils literal notranslate"><span class="pre">extra_col_names</span></code>, much the same as in <code class="docutils literal notranslate"><span class="pre">cat_col_nums</span></code>, but for additional, optional columns we may wish to transfer from input to output dataset.</p>
+<p><code class="docutils literal notranslate"><span class="pre">best_mag_index</span></code></p>
+<p>For the purposes of correcting systematic biases in a given catalogue, a single photometric band is used. <code class="docutils literal notranslate"><span class="pre">best_mag_index</span></code> indicates which filter to use – e.g., <code class="docutils literal notranslate"><span class="pre">best_mag_index</span> <span class="pre">=</span> <span class="pre">0</span></code> says to use the first filter as given in <code class="docutils literal notranslate"><span class="pre">filt_names</span></code> or <code class="docutils literal notranslate"><span class="pre">mag_indices</span></code>. Must be a single integer value no larger than <code class="docutils literal notranslate"><span class="pre">len(filt_names)-1</span></code>.</p>
+<p><code class="docutils literal notranslate"><span class="pre">nn_radius</span></code></p>
+<p>Nearest neighbour radius out to which to search for potential counterparts for the purposes of ensemble match separation distributions; should be a single float.</p>
+<p><code class="docutils literal notranslate"><span class="pre">correct_astro_save_folder</span></code></p>
+<p>File path, relative or absolute, into which to save files as generated by the astrometric correction process.</p>
+<p><code class="docutils literal notranslate"><span class="pre">csv_cat_file_string</span></code></p>
+<p>Path and filename, including extension, all in a single string, containing the location of each correction sightline’s dataset to test. Must contain the appropriate number of string format <code class="docutils literal notranslate"><span class="pre">{}</span></code> identifiers depending on <code class="docutils literal notranslate"><span class="pre">coord_or_chunk</span></code> – in this case, a single “chunk” identifier for corrections done through <code class="docutils literal notranslate"><span class="pre">CrossMatch</span></code>. For example, <code class="docutils literal notranslate"><span class="pre">/your/path/to/file/data_{}.csv</span></code> where each “chunk” is saved into a csv file called <code class="docutils literal notranslate"><span class="pre">data_1</span></code>, <code class="docutils literal notranslate"><span class="pre">data_2</span></code>, <code class="docutils literal notranslate"><span class="pre">data_104</span></code> etc.</p>
+<p><code class="docutils literal notranslate"><span class="pre">ref_csv_cat_file_string</span></code></p>
+<p>Similar to <code class="docutils literal notranslate"><span class="pre">csv_cat_file_string</span></code>, but the path and filename, including extension, of the <em>reference</em> dataset used in the matching process. These chunks should correspond one-to-one with those used in <code class="docutils literal notranslate"><span class="pre">csv_cat_file_string</span></code> – i.e., <code class="docutils literal notranslate"><span class="pre">data_1.csv</span></code> in <code class="docutils literal notranslate"><span class="pre">/your/path/to/file</span></code> should be the same region of the sky as the reference catalogue in <code class="docutils literal notranslate"><span class="pre">/another/path/to/elsewhere/reference_data_1.csv</span></code>, potentially with some buffer overlap to avoid false matches at the edges.</p>
+<p><code class="docutils literal notranslate"><span class="pre">correct_mag_array</span></code></p>
+<p>List of magnitudes at which to evaluate the distribution of matches to the higher-astrometric-precision dataset in the chosen <code class="docutils literal notranslate"><span class="pre">best_mag_index</span></code> filter. Accepts a list of floats.</p>
+<p><code class="docutils literal notranslate"><span class="pre">correct_mag_slice</span></code></p>
+<p>Corresponding to each magnitude in <code class="docutils literal notranslate"><span class="pre">correct_mag_array</span></code>, each element of this list of floats should be a width around each <code class="docutils literal notranslate"><span class="pre">correct_mag_array</span></code> element to select sources, ensuring a small sub-set of similar brightness objects are used to determine the Astrometric Uncertainty Function of.</p>
+<p><code class="docutils literal notranslate"><span class="pre">correct_sig_slice</span></code></p>
+<p>Elementwise with <code class="docutils literal notranslate"><span class="pre">correct_mag_array</span></code> and <code class="docutils literal notranslate"><span class="pre">correct_mag_slice</span></code>, a list of floats of widths of astrometric precision to select a robust sub-sample of objects in each magnitude bin for, ensuring a self-similar AUF.</p>
+<p><code class="docutils literal notranslate"><span class="pre">pos_and_err_indices</span></code></p>
+<p>A list of either three or six whitespace-separated integers. If <code class="docutils literal notranslate"><span class="pre">correct_astrometry</span></code> is <code class="docutils literal notranslate"><span class="pre">True</span></code>, a list of six integers, the first three elements of which are the zero-indexed indices into the <em>reference</em> catalogue .csv file (<code class="docutils literal notranslate"><span class="pre">ref_csv_cat_file_string</span></code>) for the longitudinal coordinate, latitudinal coordinate, and circular astrometric precision respectively, followed by the lon/lat/uncert of the <em>input</em> catalogue. For example, <code class="docutils literal notranslate"><span class="pre">0</span> <span class="pre">1</span> <span class="pre">2</span> <span class="pre">10</span> <span class="pre">9</span> <span class="pre">8</span></code> suggests that the reference catalogue begins with the position and uncertainty of its objects while the catalogue “a” or “b” sources have, in their original .csv file, a backwards list of coordinates and precisions towards the final columns of the filing system. If <code class="docutils literal notranslate"><span class="pre">compute_snr_mag_relation</span></code> is <code class="docutils literal notranslate"><span class="pre">True</span></code>, then only three integers should be passed, the respective coordinates for its own catalogue (dropping the indices of the reference catalogue); in the above example we would therefore only pass <code class="docutils literal notranslate"><span class="pre">10</span> <span class="pre">9</span> <span class="pre">8</span></code>.</p>
+<p><code class="docutils literal notranslate"><span class="pre">mag_indices</span></code></p>
+<p>Just for the input catalogue, a list of <code class="docutils literal notranslate"><span class="pre">len(filt_names)</span></code> space-separated integers detailing the zero-indexed column number of the magnitudes in the dataset.</p>
+<p><code class="docutils literal notranslate"><span class="pre">mag_unc_indices</span></code></p>
+<p>Similar to <code class="docutils literal notranslate"><span class="pre">mag_indices</span></code>, a list of <code class="docutils literal notranslate"><span class="pre">len(mag_indices)</span></code> space-separated integers, one for each column in <code class="docutils literal notranslate"><span class="pre">mag_indices</span></code> for where the corresponding uncertainty column is held for each magnitude in the input .csv file.</p>
+<p><code class="docutils literal notranslate"><span class="pre">chunk_overlap_col</span></code></p>
+<p>Column number in the original csv file for the column containing the boolean flag indicating whether sources are in the “halo” or “core” of the chunk. Used within <code class="docutils literal notranslate"><span class="pre">CrossMatch</span></code> after calling <code class="docutils literal notranslate"><span class="pre">AstrometricCorrections</span></code> to create final npy files via <code class="docutils literal notranslate"><span class="pre">csv_to_npy</span></code>. Should be a single integer number.</p>
+<p><code class="docutils literal notranslate"><span class="pre">best_mag_index_col</span></code></p>
+<p>The zero-indexed integer column number in the original input csv file used in <code class="docutils literal notranslate"><span class="pre">AstrometricCorrections</span></code> that corresponds to the column containing the highest quality detection for each source in the catalogue, used when calling <code class="docutils literal notranslate"><span class="pre">csv_to_npy</span></code>.</p>
+<p class="rubric">Footnotes</p>
+<aside class="footnote-list brackets">
+<aside class="footnote brackets" id="id2" role="doc-footnote">
+<span class="label"><span class="fn-bracket">[</span><a role="doc-backlink" href="#id1">1</a><span class="fn-bracket">]</span></span>
+<p>Please see <a class="reference external" href="http://stev.oapd.inaf.it/~webmaster/trilegal_1.6/papers.html">here</a> to view the TRILEGAL papers to cite, if you use this software in your publication.</p>
+</aside>
+</aside>
+</section>
+</section>
+</section>
+
+
+            <div class="clearer"></div>
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+  <div>
+    <h3><a href="index.html">Table of Contents</a></h3>
+    <ul>
+<li><a class="reference internal" href="#">Input Parameters</a><ul>
+<li><a class="reference internal" href="#crossmatch-inputs">CrossMatch Inputs</a></li>
+<li><a class="reference internal" href="#joint-parameters">Joint Parameters</a><ul>
+<li><a class="reference internal" href="#common-parameter-description">Common Parameter Description</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#catalogue-specific-parameters">Catalogue-specific Parameters</a><ul>
+<li><a class="reference internal" href="#catalogue-parameter-description">Catalogue Parameter Description</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+
+  </div>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="f-modindex.html" title="Fortran Module Index"
+             >fortran modules</a> |</li>
+        <li class="right" >
+          <a href="py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="right" >
+          <a href="pre_post_process.html" title="Pre- and Post-Processing"
+             >next</a> |</li>
+        <li class="right" >
+          <a href="quickstart.html" title="Quick Start"
+             >previous</a> |</li>
+        <li class="nav-item nav-item-0"><a href="index.html">macauff</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">Input Parameters</a></li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+    &#169; Copyright 2022, Tom J Wilson.
+      Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 7.2.6.
+    </div>
+  </body>
+</html>

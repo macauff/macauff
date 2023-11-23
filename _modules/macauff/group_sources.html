@@ -1,0 +1,620 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="../../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>macauff.group_sources &#8212; macauff</title>
+    <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=4848ba22" />
+    <link rel="stylesheet" type="text/css" href="../../_static/pyramid.css?v=a5b9c134" />
+    <link rel="stylesheet" type="text/css" href="../../_static/graphviz.css?v=eafc0fe6" />
+    <script src="../../_static/documentation_options.js?v=5929fcd5"></script>
+    <script src="../../_static/doctools.js?v=888ff710"></script>
+    <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Neuton&amp;subset=latin" type="text/css" media="screen" charset="utf-8" />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Nobile:regular,italic,bold,bolditalic&amp;subset=latin" type="text/css" media="screen" charset="utf-8" />
+<!--[if lte IE 6]>
+<link rel="stylesheet" href="../../_static/ie6.css" type="text/css" media="screen" charset="utf-8" />
+<![endif]-->
+
+  </head><body>
+
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="../../f-modindex.html" title="Fortran Module Index"
+             >fortran modules</a> |</li>
+        <li class="right" >
+          <a href="../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../index.html">macauff</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../index.html" accesskey="U">Module code</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">macauff.group_sources</a></li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <h1>Source code for macauff.group_sources</h1><div class="highlight"><pre>
+<span></span><span class="c1"># Licensed under a 3-clause BSD style license - see LICENSE</span>
+<span class="sd">&#39;&#39;&#39;</span>
+<span class="sd">This module provides the framework for grouping sources from two photometric catalogues into</span>
+<span class="sd">distinct &quot;islands&quot; of sources, along with calculating whether they are within overlap for</span>
+<span class="sd">various photometric integral purposes.</span>
+<span class="sd">&#39;&#39;&#39;</span>
+
+<span class="kn">import</span> <span class="nn">sys</span>
+<span class="kn">import</span> <span class="nn">multiprocessing</span>
+<span class="kn">import</span> <span class="nn">itertools</span>
+<span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+
+<span class="kn">from</span> <span class="nn">.misc_functions</span> <span class="kn">import</span> <span class="p">(</span><span class="n">load_small_ref_auf_grid</span><span class="p">,</span> <span class="n">hav_dist_constant_lat</span><span class="p">,</span>
+                             <span class="n">_load_rectangular_slice</span><span class="p">,</span> <span class="n">StageData</span><span class="p">)</span>
+<span class="kn">from</span> <span class="nn">.group_sources_fortran</span> <span class="kn">import</span> <span class="n">group_sources_fortran</span> <span class="k">as</span> <span class="n">gsf</span>
+<span class="kn">from</span> <span class="nn">.make_set_list</span> <span class="kn">import</span> <span class="n">set_list</span>
+
+<span class="n">__all__</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;make_island_groupings&#39;</span><span class="p">]</span>
+
+
+<div class="viewcode-block" id="make_island_groupings">
+<a class="viewcode-back" href="../../api/macauff.make_island_groupings.html#macauff.make_island_groupings">[docs]</a>
+<span class="k">def</span> <span class="nf">make_island_groupings</span><span class="p">(</span><span class="n">joint_folder_path</span><span class="p">,</span> <span class="n">a_cat_folder_path</span><span class="p">,</span> <span class="n">b_cat_folder_path</span><span class="p">,</span>
+                          <span class="n">a_auf_pointings</span><span class="p">,</span> <span class="n">b_auf_pointings</span><span class="p">,</span> <span class="n">a_filt_names</span><span class="p">,</span> <span class="n">b_filt_names</span><span class="p">,</span> <span class="n">a_title</span><span class="p">,</span>
+                          <span class="n">b_title</span><span class="p">,</span> <span class="n">a_modelrefinds</span><span class="p">,</span> <span class="n">b_modelrefinds</span><span class="p">,</span> <span class="n">r</span><span class="p">,</span> <span class="n">dr</span><span class="p">,</span> <span class="n">rho</span><span class="p">,</span> <span class="n">drho</span><span class="p">,</span> <span class="n">j1s</span><span class="p">,</span> <span class="n">max_sep</span><span class="p">,</span>
+                          <span class="n">ax_lims</span><span class="p">,</span> <span class="n">int_fracs</span><span class="p">,</span> <span class="n">include_phot_like</span><span class="p">,</span> <span class="n">use_phot_priors</span><span class="p">,</span>
+                          <span class="n">n_pool</span><span class="p">,</span> <span class="n">a_perturb_auf_outputs</span><span class="p">,</span> <span class="n">b_perturb_auf_outputs</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&#39;&#39;&#39;</span>
+<span class="sd">    Function to handle the creation of &quot;islands&quot; of astrometrically coeval</span>
+<span class="sd">    sources, and identify which overlap to some probability based on their</span>
+<span class="sd">    combined AUFs.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    joint_folder_path : string</span>
+<span class="sd">        Folder on disk containing the files related to the cross-match between</span>
+<span class="sd">        the two catalogues.</span>
+<span class="sd">    a_cat_folder_path : string</span>
+<span class="sd">        Folder on disk where catalogue &quot;a&quot; files have been stored.</span>
+<span class="sd">    b_cat_folder_path : string</span>
+<span class="sd">        Folder on disk where catalogue &quot;b&quot; files are saved.</span>
+<span class="sd">    a_auf_pointings : 2-D numpy.ndarray</span>
+<span class="sd">        Array containing the listings of longitude, latitude pointings at which</span>
+<span class="sd">        the perturbation AUF components were computed for catalogue &quot;a&quot;.</span>
+<span class="sd">    b_auf_pointings : 2-D numpy.ndarray</span>
+<span class="sd">        Array containing the listings of longitude, latitude pointings at which</span>
+<span class="sd">        the perturbation AUF components were computed for catalogue &quot;b&quot;.</span>
+<span class="sd">    a_filt_names : list of string</span>
+<span class="sd">        List of ordered names for filters used in catalogue &quot;a&quot; cross-match.</span>
+<span class="sd">    b_filt_names : list of string</span>
+<span class="sd">        List of filters in catalogue &quot;b&quot; matching.</span>
+<span class="sd">    a_title : string</span>
+<span class="sd">        Name used to describe catalogue &quot;a&quot; in the cross-match.</span>
+<span class="sd">    b_title : string</span>
+<span class="sd">        Catalogue &quot;b&quot; description, for identifying its given folder.</span>
+<span class="sd">    a_modelrefinds : numpy.ndarray</span>
+<span class="sd">        Catalogue &quot;a&quot; modelrefinds array output from ``create_perturb_auf``.</span>
+<span class="sd">        TODO Improve description</span>
+<span class="sd">    b_modelrefinds : numpy.ndarray</span>
+<span class="sd">        Catalogue &quot;b&quot; modelrefinds array output from ``create_perturb_auf``.</span>
+<span class="sd">        TODO Improve description</span>
+<span class="sd">    r : numpy.ndarray</span>
+<span class="sd">        Array of real-space distances, in arcseconds, used in the evaluation of</span>
+<span class="sd">        convolved AUF integrals; represent bin edges.</span>
+<span class="sd">    dr : numpy.ndarray</span>
+<span class="sd">        Widths of real-space bins in ``r``. Will have shape one shorter than ``r``,</span>
+<span class="sd">        due to ``r`` requiring an additional right-hand bin edge.</span>
+<span class="sd">    rho : numpy.ndarray</span>
+<span class="sd">        Fourier-space array, used in handling the Hankel transformation for</span>
+<span class="sd">        convolution of AUFs. As with ``r``, represents bin edges.</span>
+<span class="sd">    drho : numpy.ndarray</span>
+<span class="sd">        Array representing the bin widths of ``rho``. As with ``dr``, is one</span>
+<span class="sd">        shorter than ``rho`` due to its additional bin edge.</span>
+<span class="sd">    j1s : 2-D numpy.ndarray</span>
+<span class="sd">        Array holding the evaluations of the Bessel Function of First kind of</span>
+<span class="sd">        First Order, evaluated at all ``r`` and ``rho`` bin-middle combination.</span>
+<span class="sd">    max_sep : float</span>
+<span class="sd">        The maximum allowed sky separation between two sources in opposing</span>
+<span class="sd">        catalogues for consideration as potential counterparts.</span>
+<span class="sd">    ax_lims : list of floats, or numpy.ndarray</span>
+<span class="sd">        The four limits of the cross-match between catalogues &quot;a&quot; and &quot;b&quot;,</span>
+<span class="sd">        as lower and upper longitudinal coordinate, lower and upper latitudinal</span>
+<span class="sd">        coordinates respectively.</span>
+<span class="sd">    int_fracs : list of floats, or numpy.ndarray</span>
+<span class="sd">        List of integral limits used in evaluating probability of match based on</span>
+<span class="sd">        separation distance.</span>
+<span class="sd">    include_phot_like : boolean</span>
+<span class="sd">        Flag indicating whether to perform additional computations required for</span>
+<span class="sd">        the future calculation of photometric likelihoods.</span>
+<span class="sd">    use_phot_priors : boolean</span>
+<span class="sd">        Flag indicating whether to calcualte additional parameters needed to</span>
+<span class="sd">        calculate photometric-information dependent priors for cross-matching.</span>
+<span class="sd">    n_pool : integer</span>
+<span class="sd">        Number of multiprocessing pools to use when parallelising.</span>
+<span class="sd">    a_perturb_auf_outputs : dictionary</span>
+<span class="sd">        Dict containing the results from the previous step of the cross-match,</span>
+<span class="sd">        the simulations of the perturbation component of catalogue a&#39;s AUF.</span>
+<span class="sd">    b_perturb_auf_outputs : dictionary</span>
+<span class="sd">        Dict containing the results from the previous step of the cross-match,</span>
+<span class="sd">        the simulations of the perturbation component of catalogue b&#39;s AUF.</span>
+<span class="sd">    &#39;&#39;&#39;</span>
+
+    <span class="c1"># Convert from arcseconds to degrees internally.</span>
+    <span class="n">max_sep</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">copy</span><span class="p">(</span><span class="n">max_sep</span><span class="p">)</span> <span class="o">/</span> <span class="mi">3600</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Creating catalogue islands and overlaps...&quot;</span><span class="p">)</span>
+    <span class="n">sys</span><span class="o">.</span><span class="n">stdout</span><span class="o">.</span><span class="n">flush</span><span class="p">()</span>
+
+    <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Calculating maximum overlap...&quot;</span><span class="p">)</span>
+    <span class="n">sys</span><span class="o">.</span><span class="n">stdout</span><span class="o">.</span><span class="n">flush</span><span class="p">()</span>
+
+    <span class="c1"># The initial step to create island groupings is to find the largest number</span>
+    <span class="c1"># of overlaps for a single source, to minimise the size of the array of</span>
+    <span class="c1"># overlap indices. To do so, we load small-ish chunks of the sky, with</span>
+    <span class="c1"># padding in one catalogue to ensure all pairings can be found, and total</span>
+    <span class="c1"># the number of overlaps for each object across all sky slices.</span>
+
+    <span class="n">ax1_skip</span><span class="p">,</span> <span class="n">ax2_skip</span> <span class="o">=</span> <span class="mi">8</span><span class="p">,</span> <span class="mi">8</span>
+    <span class="n">ax1_loops</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">linspace</span><span class="p">(</span><span class="n">ax_lims</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">ax_lims</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="mi">41</span><span class="p">)</span>
+    <span class="c1"># Force the sub-division of the sky area in question to be 1600 chunks, or</span>
+    <span class="c1"># roughly quarter square degree chunks, whichever is larger in area.</span>
+    <span class="k">if</span> <span class="n">ax1_loops</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">-</span> <span class="n">ax1_loops</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">&lt;</span> <span class="mf">0.25</span><span class="p">:</span>
+        <span class="n">ax1_loops</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">linspace</span><span class="p">(</span><span class="n">ax_lims</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">ax_lims</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span>
+                                <span class="nb">int</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">ceil</span><span class="p">((</span><span class="n">ax_lims</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">-</span> <span class="n">ax_lims</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span><span class="o">/</span><span class="mf">0.25</span><span class="p">)</span> <span class="o">+</span> <span class="mi">1</span><span class="p">))</span>
+    <span class="n">ax2_loops</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">linspace</span><span class="p">(</span><span class="n">ax_lims</span><span class="p">[</span><span class="mi">2</span><span class="p">],</span> <span class="n">ax_lims</span><span class="p">[</span><span class="mi">3</span><span class="p">],</span> <span class="mi">41</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">ax2_loops</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">-</span> <span class="n">ax2_loops</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">&lt;</span> <span class="mf">0.25</span><span class="p">:</span>
+        <span class="n">ax2_loops</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">linspace</span><span class="p">(</span><span class="n">ax_lims</span><span class="p">[</span><span class="mi">2</span><span class="p">],</span> <span class="n">ax_lims</span><span class="p">[</span><span class="mi">3</span><span class="p">],</span>
+                                <span class="nb">int</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">ceil</span><span class="p">((</span><span class="n">ax_lims</span><span class="p">[</span><span class="mi">3</span><span class="p">]</span> <span class="o">-</span> <span class="n">ax_lims</span><span class="p">[</span><span class="mi">2</span><span class="p">])</span><span class="o">/</span><span class="mf">0.25</span><span class="p">)</span> <span class="o">+</span> <span class="mi">1</span><span class="p">))</span>
+    <span class="n">ax1_sparse_loops</span> <span class="o">=</span> <span class="n">ax1_loops</span><span class="p">[::</span><span class="n">ax1_skip</span><span class="p">]</span>
+    <span class="k">if</span> <span class="n">ax1_sparse_loops</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">!=</span> <span class="n">ax1_loops</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]:</span>
+        <span class="n">ax1_sparse_loops</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">ax1_sparse_loops</span><span class="p">,</span> <span class="n">ax1_loops</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">])</span>
+    <span class="n">ax2_sparse_loops</span> <span class="o">=</span> <span class="n">ax2_loops</span><span class="p">[::</span><span class="n">ax2_skip</span><span class="p">]</span>
+    <span class="k">if</span> <span class="n">ax2_sparse_loops</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">!=</span> <span class="n">ax2_loops</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]:</span>
+        <span class="n">ax2_sparse_loops</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">ax2_sparse_loops</span><span class="p">,</span> <span class="n">ax2_loops</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">])</span>
+
+    <span class="c1"># Load the astrometry of each catalogue for slicing.</span>
+    <span class="n">a_full</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="s1">&#39;</span><span class="si">{}</span><span class="s1">/con_cat_astro.npy&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">a_cat_folder_path</span><span class="p">))</span>
+    <span class="n">b_full</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="s1">&#39;</span><span class="si">{}</span><span class="s1">/con_cat_astro.npy&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">b_cat_folder_path</span><span class="p">))</span>
+
+    <span class="n">asize</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">dtype</span><span class="o">=</span><span class="nb">int</span><span class="p">,</span> <span class="n">shape</span><span class="o">=</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">a_full</span><span class="p">),))</span>
+    <span class="n">bsize</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">dtype</span><span class="o">=</span><span class="nb">int</span><span class="p">,</span> <span class="n">shape</span><span class="o">=</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">b_full</span><span class="p">),))</span>
+
+    <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="p">(</span><span class="n">ax1_sparse_start</span><span class="p">,</span> <span class="n">ax1_sparse_end</span><span class="p">)</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="nb">zip</span><span class="p">(</span><span class="n">ax1_sparse_loops</span><span class="p">[:</span><span class="o">-</span><span class="mi">1</span><span class="p">],</span>
+                                                               <span class="n">ax1_sparse_loops</span><span class="p">[</span><span class="mi">1</span><span class="p">:])):</span>
+        <span class="k">for</span> <span class="n">j</span><span class="p">,</span> <span class="p">(</span><span class="n">ax2_sparse_start</span><span class="p">,</span> <span class="n">ax2_sparse_end</span><span class="p">)</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="nb">zip</span><span class="p">(</span><span class="n">ax2_sparse_loops</span><span class="p">[:</span><span class="o">-</span><span class="mi">1</span><span class="p">],</span>
+                                                                   <span class="n">ax2_sparse_loops</span><span class="p">[</span><span class="mi">1</span><span class="p">:])):</span>
+            <span class="n">a_big_sky_cut</span> <span class="o">=</span> <span class="n">_load_rectangular_slice</span><span class="p">(</span><span class="s1">&#39;&#39;</span><span class="p">,</span> <span class="n">a_full</span><span class="p">,</span> <span class="n">ax1_sparse_start</span><span class="p">,</span> <span class="n">ax1_sparse_end</span><span class="p">,</span>
+                                                    <span class="n">ax2_sparse_start</span><span class="p">,</span> <span class="n">ax2_sparse_end</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
+            <span class="n">b_big_sky_cut</span> <span class="o">=</span> <span class="n">_load_rectangular_slice</span><span class="p">(</span><span class="s1">&#39;&#39;</span><span class="p">,</span> <span class="n">b_full</span><span class="p">,</span> <span class="n">ax1_sparse_start</span><span class="p">,</span> <span class="n">ax1_sparse_end</span><span class="p">,</span>
+                                                    <span class="n">ax2_sparse_start</span><span class="p">,</span> <span class="n">ax2_sparse_end</span><span class="p">,</span> <span class="n">max_sep</span><span class="p">)</span>
+            <span class="n">a_cutout</span> <span class="o">=</span> <span class="n">a_full</span><span class="p">[</span><span class="n">a_big_sky_cut</span><span class="p">]</span>
+            <span class="n">b_cutout</span> <span class="o">=</span> <span class="n">b_full</span><span class="p">[</span><span class="n">b_big_sky_cut</span><span class="p">]</span>
+
+            <span class="n">a_sky_inds</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">a_full</span><span class="p">))[</span><span class="n">a_big_sky_cut</span><span class="p">]</span>
+            <span class="n">b_sky_inds</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">b_full</span><span class="p">))[</span><span class="n">b_big_sky_cut</span><span class="p">]</span>
+            <span class="k">for</span> <span class="n">ax1_start</span><span class="p">,</span> <span class="n">ax1_end</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">ax1_loops</span><span class="p">[</span><span class="n">i</span><span class="o">*</span><span class="n">ax1_skip</span><span class="p">:(</span><span class="n">i</span><span class="o">+</span><span class="mi">1</span><span class="p">)</span><span class="o">*</span><span class="n">ax1_skip</span><span class="p">],</span>
+                                          <span class="n">ax1_loops</span><span class="p">[</span><span class="n">i</span><span class="o">*</span><span class="n">ax1_skip</span><span class="o">+</span><span class="mi">1</span><span class="p">:(</span><span class="n">i</span><span class="o">+</span><span class="mi">1</span><span class="p">)</span><span class="o">*</span><span class="n">ax1_skip</span><span class="o">+</span><span class="mi">1</span><span class="p">]):</span>
+                <span class="k">for</span> <span class="n">ax2_start</span><span class="p">,</span> <span class="n">ax2_end</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">ax2_loops</span><span class="p">[</span><span class="n">j</span><span class="o">*</span><span class="n">ax2_skip</span><span class="p">:(</span><span class="n">j</span><span class="o">+</span><span class="mi">1</span><span class="p">)</span><span class="o">*</span><span class="n">ax2_skip</span><span class="p">],</span>
+                                              <span class="n">ax2_loops</span><span class="p">[</span><span class="n">j</span><span class="o">*</span><span class="n">ax2_skip</span><span class="o">+</span><span class="mi">1</span><span class="p">:(</span><span class="n">j</span><span class="o">+</span><span class="mi">1</span><span class="p">)</span><span class="o">*</span><span class="n">ax2_skip</span><span class="o">+</span><span class="mi">1</span><span class="p">]):</span>
+                    <span class="n">ax_cutout</span> <span class="o">=</span> <span class="p">[</span><span class="n">ax1_start</span><span class="p">,</span> <span class="n">ax1_end</span><span class="p">,</span> <span class="n">ax2_start</span><span class="p">,</span> <span class="n">ax2_end</span><span class="p">]</span>
+                    <span class="n">a</span><span class="p">,</span> <span class="n">afouriergrid</span><span class="p">,</span> <span class="n">amodrefindsmall</span><span class="p">,</span> <span class="n">a_cut</span> <span class="o">=</span> <span class="n">_load_fourier_grid_cutouts</span><span class="p">(</span>
+                        <span class="n">a_cutout</span><span class="p">,</span> <span class="n">ax_cutout</span><span class="p">,</span> <span class="n">joint_folder_path</span><span class="p">,</span> <span class="n">a_cat_folder_path</span><span class="p">,</span>
+                        <span class="n">a_perturb_auf_outputs</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="s1">&#39;a&#39;</span><span class="p">,</span> <span class="n">a_big_sky_cut</span><span class="p">,</span> <span class="n">a_modelrefinds</span><span class="p">)</span>
+                    <span class="n">b</span><span class="p">,</span> <span class="n">bfouriergrid</span><span class="p">,</span> <span class="n">bmodrefindsmall</span><span class="p">,</span> <span class="n">b_cut</span> <span class="o">=</span> <span class="n">_load_fourier_grid_cutouts</span><span class="p">(</span>
+                        <span class="n">b_cutout</span><span class="p">,</span> <span class="n">ax_cutout</span><span class="p">,</span> <span class="n">joint_folder_path</span><span class="p">,</span> <span class="n">b_cat_folder_path</span><span class="p">,</span>
+                        <span class="n">b_perturb_auf_outputs</span><span class="p">,</span> <span class="n">max_sep</span><span class="p">,</span> <span class="s1">&#39;b&#39;</span><span class="p">,</span> <span class="n">b_big_sky_cut</span><span class="p">,</span> <span class="n">b_modelrefinds</span><span class="p">)</span>
+
+                    <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">a</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">0</span> <span class="ow">and</span> <span class="nb">len</span><span class="p">(</span><span class="n">b</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+                        <span class="n">overlapa</span><span class="p">,</span> <span class="n">overlapb</span> <span class="o">=</span> <span class="n">gsf</span><span class="o">.</span><span class="n">get_max_overlap</span><span class="p">(</span>
+                            <span class="n">a</span><span class="p">[:,</span> <span class="mi">0</span><span class="p">],</span> <span class="n">a</span><span class="p">[:,</span> <span class="mi">1</span><span class="p">],</span> <span class="n">b</span><span class="p">[:,</span> <span class="mi">0</span><span class="p">],</span> <span class="n">b</span><span class="p">[:,</span> <span class="mi">1</span><span class="p">],</span> <span class="n">max_sep</span><span class="p">,</span> <span class="n">a</span><span class="p">[:,</span> <span class="mi">2</span><span class="p">],</span> <span class="n">b</span><span class="p">[:,</span> <span class="mi">2</span><span class="p">],</span>
+                            <span class="n">r</span><span class="p">[:</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span><span class="o">+</span><span class="n">dr</span><span class="o">/</span><span class="mi">2</span><span class="p">,</span> <span class="n">rho</span><span class="p">[:</span><span class="o">-</span><span class="mi">1</span><span class="p">],</span> <span class="n">drho</span><span class="p">,</span> <span class="n">j1s</span><span class="p">,</span> <span class="n">afouriergrid</span><span class="p">,</span> <span class="n">bfouriergrid</span><span class="p">,</span>
+                            <span class="n">amodrefindsmall</span><span class="p">,</span> <span class="n">bmodrefindsmall</span><span class="p">,</span> <span class="n">int_fracs</span><span class="p">[</span><span class="mi">2</span><span class="p">])</span>
+                        <span class="n">a_cut2</span> <span class="o">=</span> <span class="n">a_sky_inds</span><span class="p">[</span><span class="n">a_cut</span><span class="p">]</span>
+                        <span class="n">b_cut2</span> <span class="o">=</span> <span class="n">b_sky_inds</span><span class="p">[</span><span class="n">b_cut</span><span class="p">]</span>
+
+                        <span class="n">asize</span><span class="p">[</span><span class="n">a_cut2</span><span class="p">]</span> <span class="o">=</span> <span class="n">asize</span><span class="p">[</span><span class="n">a_cut2</span><span class="p">]</span> <span class="o">+</span> <span class="n">overlapa</span>
+                        <span class="n">bsize</span><span class="p">[</span><span class="n">b_cut2</span><span class="p">]</span> <span class="o">=</span> <span class="n">bsize</span><span class="p">[</span><span class="n">b_cut2</span><span class="p">]</span> <span class="o">+</span> <span class="n">overlapb</span>
+
+    <span class="n">amaxsize</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">amax</span><span class="p">(</span><span class="n">asize</span><span class="p">))</span>
+    <span class="n">bmaxsize</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">amax</span><span class="p">(</span><span class="n">bsize</span><span class="p">))</span>
+    <span class="k">del</span> <span class="p">(</span><span class="n">overlapa</span><span class="p">,</span> <span class="n">overlapb</span><span class="p">,</span> <span class="n">a</span><span class="p">,</span> <span class="n">b</span><span class="p">,</span> <span class="n">a_cut</span><span class="p">,</span> <span class="n">b_cut</span><span class="p">,</span> <span class="n">amodrefindsmall</span><span class="p">,</span> <span class="n">bmodrefindsmall</span><span class="p">,</span>
+         <span class="n">afouriergrid</span><span class="p">,</span> <span class="n">bfouriergrid</span><span class="p">)</span>
+
+    <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Truncating star overlaps by AUF integral...&quot;</span><span class="p">)</span>
+    <span class="n">sys</span><span class="o">.</span><span class="n">stdout</span><span class="o">.</span><span class="n">flush</span><span class="p">()</span>
+
+    <span class="n">ainds</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">dtype</span><span class="o">=</span><span class="nb">int</span><span class="p">,</span> <span class="n">shape</span><span class="o">=</span><span class="p">(</span><span class="n">amaxsize</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">a_full</span><span class="p">)),</span> <span class="n">order</span><span class="o">=</span><span class="s1">&#39;F&#39;</span><span class="p">)</span>
+    <span class="n">binds</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">dtype</span><span class="o">=</span><span class="nb">int</span><span class="p">,</span> <span class="n">shape</span><span class="o">=</span><span class="p">(</span><span class="n">bmaxsize</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">b_full</span><span class="p">)),</span> <span class="n">order</span><span class="o">=</span><span class="s1">&#39;F&#39;</span><span class="p">)</span>
+
+    <span class="n">ainds</span><span class="p">[:,</span> <span class="p">:]</span> <span class="o">=</span> <span class="o">-</span><span class="mi">1</span>
+    <span class="n">binds</span><span class="p">[:,</span> <span class="p">:]</span> <span class="o">=</span> <span class="o">-</span><span class="mi">1</span>
+    <span class="n">asize</span><span class="p">[:]</span> <span class="o">=</span> <span class="mi">0</span>
+    <span class="n">bsize</span><span class="p">[:]</span> <span class="o">=</span> <span class="mi">0</span>
+
+    <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="p">(</span><span class="n">ax1_sparse_start</span><span class="p">,</span> <span class="n">ax1_sparse_end</span><span class="p">)</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="nb">zip</span><span class="p">(</span><span class="n">ax1_sparse_loops</span><span class="p">[:</span><span class="o">-</span><span class="mi">1</span><span class="p">],</span>
+                                                               <span class="n">ax1_sparse_loops</span><span class="p">[</span><span class="mi">1</span><span class="p">:])):</span>
+        <span class="k">for</span> <span class="n">j</span><span class="p">,</span> <span class="p">(</span><span class="n">ax2_sparse_start</span><span class="p">,</span> <span class="n">ax2_sparse_end</span><span class="p">)</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="nb">zip</span><span class="p">(</span><span class="n">ax2_sparse_loops</span><span class="p">[:</span><span class="o">-</span><span class="mi">1</span><span class="p">],</span>
+                                                                   <span class="n">ax2_sparse_loops</span><span class="p">[</span><span class="mi">1</span><span class="p">:])):</span>
+            <span class="n">a_big_sky_cut</span> <span class="o">=</span> <span class="n">_load_rectangular_slice</span><span class="p">(</span><span class="s1">&#39;&#39;</span><span class="p">,</span> <span class="n">a_full</span><span class="p">,</span> <span class="n">ax1_sparse_start</span><span class="p">,</span> <span class="n">ax1_sparse_end</span><span class="p">,</span>
+                                                    <span class="n">ax2_sparse_start</span><span class="p">,</span> <span class="n">ax2_sparse_end</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
+            <span class="n">b_big_sky_cut</span> <span class="o">=</span> <span class="n">_load_rectangular_slice</span><span class="p">(</span><span class="s1">&#39;&#39;</span><span class="p">,</span> <span class="n">b_full</span><span class="p">,</span> <span class="n">ax1_sparse_start</span><span class="p">,</span> <span class="n">ax1_sparse_end</span><span class="p">,</span>
+                                                    <span class="n">ax2_sparse_start</span><span class="p">,</span> <span class="n">ax2_sparse_end</span><span class="p">,</span> <span class="n">max_sep</span><span class="p">)</span>
+            <span class="n">a_cutout</span> <span class="o">=</span> <span class="n">a_full</span><span class="p">[</span><span class="n">a_big_sky_cut</span><span class="p">]</span>
+            <span class="n">b_cutout</span> <span class="o">=</span> <span class="n">b_full</span><span class="p">[</span><span class="n">b_big_sky_cut</span><span class="p">]</span>
+
+            <span class="n">a_sky_inds</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">a_full</span><span class="p">))[</span><span class="n">a_big_sky_cut</span><span class="p">]</span>
+            <span class="n">b_sky_inds</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">b_full</span><span class="p">))[</span><span class="n">b_big_sky_cut</span><span class="p">]</span>
+            <span class="k">for</span> <span class="n">ax1_start</span><span class="p">,</span> <span class="n">ax1_end</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">ax1_loops</span><span class="p">[</span><span class="n">i</span><span class="o">*</span><span class="n">ax1_skip</span><span class="p">:(</span><span class="n">i</span><span class="o">+</span><span class="mi">1</span><span class="p">)</span><span class="o">*</span><span class="n">ax1_skip</span><span class="p">],</span>
+                                          <span class="n">ax1_loops</span><span class="p">[</span><span class="n">i</span><span class="o">*</span><span class="n">ax1_skip</span><span class="o">+</span><span class="mi">1</span><span class="p">:(</span><span class="n">i</span><span class="o">+</span><span class="mi">1</span><span class="p">)</span><span class="o">*</span><span class="n">ax1_skip</span><span class="o">+</span><span class="mi">1</span><span class="p">]):</span>
+                <span class="k">for</span> <span class="n">ax2_start</span><span class="p">,</span> <span class="n">ax2_end</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">ax2_loops</span><span class="p">[</span><span class="n">j</span><span class="o">*</span><span class="n">ax2_skip</span><span class="p">:(</span><span class="n">j</span><span class="o">+</span><span class="mi">1</span><span class="p">)</span><span class="o">*</span><span class="n">ax2_skip</span><span class="p">],</span>
+                                              <span class="n">ax2_loops</span><span class="p">[</span><span class="n">j</span><span class="o">*</span><span class="n">ax2_skip</span><span class="o">+</span><span class="mi">1</span><span class="p">:(</span><span class="n">j</span><span class="o">+</span><span class="mi">1</span><span class="p">)</span><span class="o">*</span><span class="n">ax2_skip</span><span class="o">+</span><span class="mi">1</span><span class="p">]):</span>
+                    <span class="n">ax_cutout</span> <span class="o">=</span> <span class="p">[</span><span class="n">ax1_start</span><span class="p">,</span> <span class="n">ax1_end</span><span class="p">,</span> <span class="n">ax2_start</span><span class="p">,</span> <span class="n">ax2_end</span><span class="p">]</span>
+                    <span class="n">a</span><span class="p">,</span> <span class="n">afouriergrid</span><span class="p">,</span> <span class="n">amodrefindsmall</span><span class="p">,</span> <span class="n">a_cut</span> <span class="o">=</span> <span class="n">_load_fourier_grid_cutouts</span><span class="p">(</span>
+                        <span class="n">a_cutout</span><span class="p">,</span> <span class="n">ax_cutout</span><span class="p">,</span> <span class="n">joint_folder_path</span><span class="p">,</span> <span class="n">a_cat_folder_path</span><span class="p">,</span>
+                        <span class="n">a_perturb_auf_outputs</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="s1">&#39;a&#39;</span><span class="p">,</span> <span class="n">a_big_sky_cut</span><span class="p">,</span> <span class="n">a_modelrefinds</span><span class="p">)</span>
+                    <span class="n">b</span><span class="p">,</span> <span class="n">bfouriergrid</span><span class="p">,</span> <span class="n">bmodrefindsmall</span><span class="p">,</span> <span class="n">b_cut</span> <span class="o">=</span> <span class="n">_load_fourier_grid_cutouts</span><span class="p">(</span>
+                        <span class="n">b_cutout</span><span class="p">,</span> <span class="n">ax_cutout</span><span class="p">,</span> <span class="n">joint_folder_path</span><span class="p">,</span> <span class="n">b_cat_folder_path</span><span class="p">,</span>
+                        <span class="n">b_perturb_auf_outputs</span><span class="p">,</span> <span class="n">max_sep</span><span class="p">,</span> <span class="s1">&#39;b&#39;</span><span class="p">,</span> <span class="n">b_big_sky_cut</span><span class="p">,</span> <span class="n">b_modelrefinds</span><span class="p">)</span>
+
+                    <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">a</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">0</span> <span class="ow">and</span> <span class="nb">len</span><span class="p">(</span><span class="n">b</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+                        <span class="n">indicesa</span><span class="p">,</span> <span class="n">indicesb</span><span class="p">,</span> <span class="n">overlapa</span><span class="p">,</span> <span class="n">overlapb</span> <span class="o">=</span> <span class="n">gsf</span><span class="o">.</span><span class="n">get_overlap_indices</span><span class="p">(</span>
+                            <span class="n">a</span><span class="p">[:,</span> <span class="mi">0</span><span class="p">],</span> <span class="n">a</span><span class="p">[:,</span> <span class="mi">1</span><span class="p">],</span> <span class="n">b</span><span class="p">[:,</span> <span class="mi">0</span><span class="p">],</span> <span class="n">b</span><span class="p">[:,</span> <span class="mi">1</span><span class="p">],</span> <span class="n">max_sep</span><span class="p">,</span> <span class="n">amaxsize</span><span class="p">,</span> <span class="n">bmaxsize</span><span class="p">,</span>
+                            <span class="n">a</span><span class="p">[:,</span> <span class="mi">2</span><span class="p">],</span> <span class="n">b</span><span class="p">[:,</span> <span class="mi">2</span><span class="p">],</span> <span class="n">r</span><span class="p">[:</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span><span class="o">+</span><span class="n">dr</span><span class="o">/</span><span class="mi">2</span><span class="p">,</span> <span class="n">rho</span><span class="p">[:</span><span class="o">-</span><span class="mi">1</span><span class="p">],</span> <span class="n">drho</span><span class="p">,</span> <span class="n">j1s</span><span class="p">,</span> <span class="n">afouriergrid</span><span class="p">,</span>
+                            <span class="n">bfouriergrid</span><span class="p">,</span> <span class="n">amodrefindsmall</span><span class="p">,</span> <span class="n">bmodrefindsmall</span><span class="p">,</span> <span class="n">int_fracs</span><span class="p">[</span><span class="mi">2</span><span class="p">])</span>
+
+                        <span class="n">a_cut2</span> <span class="o">=</span> <span class="n">a_sky_inds</span><span class="p">[</span><span class="n">a_cut</span><span class="p">]</span>
+                        <span class="n">b_cut2</span> <span class="o">=</span> <span class="n">b_sky_inds</span><span class="p">[</span><span class="n">b_cut</span><span class="p">]</span>
+
+                        <span class="k">for</span> <span class="n">k</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">a_cut2</span><span class="p">)):</span>
+                            <span class="n">ainds</span><span class="p">[</span><span class="n">asize</span><span class="p">[</span><span class="n">a_cut2</span><span class="p">[</span><span class="n">k</span><span class="p">]]:</span><span class="n">asize</span><span class="p">[</span><span class="n">a_cut2</span><span class="p">[</span><span class="n">k</span><span class="p">]]</span><span class="o">+</span><span class="n">overlapa</span><span class="p">[</span><span class="n">k</span><span class="p">],</span> <span class="n">a_cut2</span><span class="p">[</span><span class="n">k</span><span class="p">]]</span> <span class="o">=</span> \
+                                <span class="n">b_cut2</span><span class="p">[</span><span class="n">indicesa</span><span class="p">[:</span><span class="n">overlapa</span><span class="p">[</span><span class="n">k</span><span class="p">],</span> <span class="n">k</span><span class="p">]</span> <span class="o">-</span> <span class="mi">1</span><span class="p">]</span>
+                        <span class="k">for</span> <span class="n">k</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">b_cut2</span><span class="p">)):</span>
+                            <span class="n">binds</span><span class="p">[</span><span class="n">bsize</span><span class="p">[</span><span class="n">b_cut2</span><span class="p">[</span><span class="n">k</span><span class="p">]]:</span><span class="n">bsize</span><span class="p">[</span><span class="n">b_cut2</span><span class="p">[</span><span class="n">k</span><span class="p">]]</span><span class="o">+</span><span class="n">overlapb</span><span class="p">[</span><span class="n">k</span><span class="p">],</span> <span class="n">b_cut2</span><span class="p">[</span><span class="n">k</span><span class="p">]]</span> <span class="o">=</span> \
+                                <span class="n">a_cut2</span><span class="p">[</span><span class="n">indicesb</span><span class="p">[:</span><span class="n">overlapb</span><span class="p">[</span><span class="n">k</span><span class="p">],</span> <span class="n">k</span><span class="p">]</span> <span class="o">-</span> <span class="mi">1</span><span class="p">]</span>
+
+                        <span class="n">asize</span><span class="p">[</span><span class="n">a_cut2</span><span class="p">]</span> <span class="o">=</span> <span class="n">asize</span><span class="p">[</span><span class="n">a_cut2</span><span class="p">]</span> <span class="o">+</span> <span class="n">overlapa</span>
+                        <span class="n">bsize</span><span class="p">[</span><span class="n">b_cut2</span><span class="p">]</span> <span class="o">=</span> <span class="n">bsize</span><span class="p">[</span><span class="n">b_cut2</span><span class="p">]</span> <span class="o">+</span> <span class="n">overlapb</span>
+
+    <span class="k">del</span> <span class="p">(</span><span class="n">a_cut</span><span class="p">,</span> <span class="n">a_cut2</span><span class="p">,</span> <span class="n">b_cut</span><span class="p">,</span> <span class="n">b_cut2</span><span class="p">,</span> <span class="n">indicesa</span><span class="p">,</span> <span class="n">indicesb</span><span class="p">,</span> <span class="n">overlapa</span><span class="p">,</span> <span class="n">overlapb</span><span class="p">,</span> <span class="n">a</span><span class="p">,</span> <span class="n">b</span><span class="p">,</span>
+         <span class="n">amodrefindsmall</span><span class="p">,</span> <span class="n">bmodrefindsmall</span><span class="p">,</span> <span class="n">afouriergrid</span><span class="p">,</span> <span class="n">bfouriergrid</span><span class="p">)</span>
+
+    <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Cleaning overlaps...&quot;</span><span class="p">)</span>
+    <span class="n">sys</span><span class="o">.</span><span class="n">stdout</span><span class="o">.</span><span class="n">flush</span><span class="p">()</span>
+
+    <span class="n">ainds</span><span class="p">,</span> <span class="n">asize</span> <span class="o">=</span> <span class="n">_clean_overlaps</span><span class="p">(</span><span class="n">ainds</span><span class="p">,</span> <span class="n">asize</span><span class="p">,</span> <span class="n">n_pool</span><span class="p">)</span>
+    <span class="n">binds</span><span class="p">,</span> <span class="n">bsize</span> <span class="o">=</span> <span class="n">_clean_overlaps</span><span class="p">(</span><span class="n">binds</span><span class="p">,</span> <span class="n">bsize</span><span class="p">,</span> <span class="n">n_pool</span><span class="p">)</span>
+
+    <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Calculating integral lengths...&quot;</span><span class="p">)</span>
+    <span class="n">sys</span><span class="o">.</span><span class="n">stdout</span><span class="o">.</span><span class="n">flush</span><span class="p">()</span>
+
+    <span class="k">if</span> <span class="n">include_phot_like</span> <span class="ow">or</span> <span class="n">use_phot_priors</span><span class="p">:</span>
+        <span class="n">a_err</span> <span class="o">=</span> <span class="n">a_full</span><span class="p">[:,</span> <span class="mi">2</span><span class="p">]</span>
+
+        <span class="n">b_err</span> <span class="o">=</span> <span class="n">b_full</span><span class="p">[:,</span> <span class="mi">2</span><span class="p">]</span>
+
+        <span class="n">a_fouriergrid</span> <span class="o">=</span> <span class="n">a_perturb_auf_outputs</span><span class="p">[</span><span class="s1">&#39;fourier_grid&#39;</span><span class="p">]</span>
+        <span class="n">b_fouriergrid</span> <span class="o">=</span> <span class="n">b_perturb_auf_outputs</span><span class="p">[</span><span class="s1">&#39;fourier_grid&#39;</span><span class="p">]</span>
+
+        <span class="n">a_int_lens</span> <span class="o">=</span> <span class="n">gsf</span><span class="o">.</span><span class="n">get_integral_length</span><span class="p">(</span>
+            <span class="n">a_err</span><span class="p">,</span> <span class="n">b_err</span><span class="p">,</span> <span class="n">r</span><span class="p">[:</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span><span class="o">+</span><span class="n">dr</span><span class="o">/</span><span class="mi">2</span><span class="p">,</span> <span class="n">rho</span><span class="p">[:</span><span class="o">-</span><span class="mi">1</span><span class="p">],</span> <span class="n">drho</span><span class="p">,</span> <span class="n">j1s</span><span class="p">,</span> <span class="n">a_fouriergrid</span><span class="p">,</span> <span class="n">b_fouriergrid</span><span class="p">,</span>
+            <span class="n">a_modelrefinds</span><span class="p">,</span> <span class="n">b_modelrefinds</span><span class="p">,</span> <span class="n">ainds</span><span class="p">,</span> <span class="n">asize</span><span class="p">,</span> <span class="n">int_fracs</span><span class="p">[</span><span class="mi">0</span><span class="p">:</span><span class="mi">2</span><span class="p">])</span>
+        <span class="n">ablen</span> <span class="o">=</span> <span class="n">a_int_lens</span><span class="p">[:,</span> <span class="mi">0</span><span class="p">]</span>
+        <span class="n">aflen</span> <span class="o">=</span> <span class="n">a_int_lens</span><span class="p">[:,</span> <span class="mi">1</span><span class="p">]</span>
+
+        <span class="n">b_int_lens</span> <span class="o">=</span> <span class="n">gsf</span><span class="o">.</span><span class="n">get_integral_length</span><span class="p">(</span>
+            <span class="n">b_err</span><span class="p">,</span> <span class="n">a_err</span><span class="p">,</span> <span class="n">r</span><span class="p">[:</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span><span class="o">+</span><span class="n">dr</span><span class="o">/</span><span class="mi">2</span><span class="p">,</span> <span class="n">rho</span><span class="p">[:</span><span class="o">-</span><span class="mi">1</span><span class="p">],</span> <span class="n">drho</span><span class="p">,</span> <span class="n">j1s</span><span class="p">,</span> <span class="n">b_fouriergrid</span><span class="p">,</span> <span class="n">a_fouriergrid</span><span class="p">,</span>
+            <span class="n">b_modelrefinds</span><span class="p">,</span> <span class="n">a_modelrefinds</span><span class="p">,</span> <span class="n">binds</span><span class="p">,</span> <span class="n">bsize</span><span class="p">,</span> <span class="n">int_fracs</span><span class="p">[</span><span class="mi">0</span><span class="p">:</span><span class="mi">2</span><span class="p">])</span>
+        <span class="n">bblen</span> <span class="o">=</span> <span class="n">b_int_lens</span><span class="p">[:,</span> <span class="mi">0</span><span class="p">]</span>
+        <span class="n">bflen</span> <span class="o">=</span> <span class="n">b_int_lens</span><span class="p">[:,</span> <span class="mi">1</span><span class="p">]</span>
+
+    <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Maximum overlaps are:&quot;</span><span class="p">,</span> <span class="n">amaxsize</span><span class="p">,</span> <span class="n">bmaxsize</span><span class="p">)</span>
+    <span class="n">sys</span><span class="o">.</span><span class="n">stdout</span><span class="o">.</span><span class="n">flush</span><span class="p">()</span>
+
+    <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Finding unique sets...&quot;</span><span class="p">)</span>
+    <span class="n">sys</span><span class="o">.</span><span class="n">stdout</span><span class="o">.</span><span class="n">flush</span><span class="p">()</span>
+
+    <span class="n">set_list_items</span> <span class="o">=</span> <span class="n">set_list</span><span class="p">(</span><span class="n">ainds</span><span class="p">,</span> <span class="n">binds</span><span class="p">,</span> <span class="n">asize</span><span class="p">,</span> <span class="n">bsize</span><span class="p">,</span> <span class="n">joint_folder_path</span><span class="p">,</span> <span class="n">n_pool</span><span class="p">)</span>
+    <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">set_list_items</span><span class="p">)</span> <span class="o">==</span> <span class="mi">6</span><span class="p">:</span>
+        <span class="n">alist</span><span class="p">,</span> <span class="n">blist</span><span class="p">,</span> <span class="n">agrplen</span><span class="p">,</span> <span class="n">bgrplen</span><span class="p">,</span> <span class="n">areject</span><span class="p">,</span> <span class="n">breject</span> <span class="o">=</span> <span class="n">set_list_items</span>
+        <span class="n">reject_flag</span> <span class="o">=</span> <span class="kc">True</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">alist</span><span class="p">,</span> <span class="n">blist</span><span class="p">,</span> <span class="n">agrplen</span><span class="p">,</span> <span class="n">bgrplen</span> <span class="o">=</span> <span class="n">set_list_items</span>
+        <span class="n">reject_flag</span> <span class="o">=</span> <span class="kc">False</span>
+
+    <span class="c1"># The final act of creating island groups is to clear out any sources too</span>
+    <span class="c1"># close to the edge of the catalogue -- defined by its rectangular extend.</span>
+    <span class="c1"># TODO: add flag for allowing the keeping of potentially incomplete islands</span>
+    <span class="c1"># in the main catalogue; here we default to, and only allow, their removal.</span>
+
+    <span class="n">passed_check</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">dtype</span><span class="o">=</span><span class="nb">bool</span><span class="p">,</span> <span class="n">shape</span><span class="o">=</span><span class="p">(</span><span class="n">alist</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">],))</span>
+    <span class="n">failed_check</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">ones</span><span class="p">(</span><span class="n">dtype</span><span class="o">=</span><span class="nb">bool</span><span class="p">,</span> <span class="n">shape</span><span class="o">=</span><span class="p">(</span><span class="n">alist</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">],))</span>
+
+    <span class="n">num_a_failed_checks</span> <span class="o">=</span> <span class="mi">0</span>
+    <span class="n">num_b_failed_checks</span> <span class="o">=</span> <span class="mi">0</span>
+
+    <span class="c1"># Here, since we know no source can be outside of extent, we can simply</span>
+    <span class="c1"># look at whether any source has a sky separation of less than max_sep</span>
+    <span class="c1"># from any of the four lines defining extent in orthogonal sky axes.</span>
+    <span class="n">counter</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">alist</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span>
+    <span class="n">expand_constants</span> <span class="o">=</span> <span class="p">[</span><span class="n">itertools</span><span class="o">.</span><span class="n">repeat</span><span class="p">(</span><span class="n">item</span><span class="p">)</span> <span class="k">for</span> <span class="n">item</span> <span class="ow">in</span> <span class="p">[</span>
+        <span class="n">a_full</span><span class="p">,</span> <span class="n">b_full</span><span class="p">,</span> <span class="n">alist</span><span class="p">,</span> <span class="n">blist</span><span class="p">,</span> <span class="n">agrplen</span><span class="p">,</span> <span class="n">bgrplen</span><span class="p">,</span> <span class="n">ax_lims</span><span class="p">,</span> <span class="n">max_sep</span><span class="p">]]</span>
+    <span class="n">iter_group</span> <span class="o">=</span> <span class="nb">zip</span><span class="p">(</span><span class="n">counter</span><span class="p">,</span> <span class="o">*</span><span class="n">expand_constants</span><span class="p">)</span>
+    <span class="c1"># Initialise the multiprocessing loop setup:</span>
+    <span class="n">pool</span> <span class="o">=</span> <span class="n">multiprocessing</span><span class="o">.</span><span class="n">Pool</span><span class="p">(</span><span class="n">n_pool</span><span class="p">)</span>
+    <span class="k">for</span> <span class="n">return_items</span> <span class="ow">in</span> <span class="n">pool</span><span class="o">.</span><span class="n">imap_unordered</span><span class="p">(</span><span class="n">_distance_check</span><span class="p">,</span> <span class="n">iter_group</span><span class="p">,</span>
+                                            <span class="n">chunksize</span><span class="o">=</span><span class="nb">max</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">counter</span><span class="p">)</span> <span class="o">//</span> <span class="n">n_pool</span><span class="p">)):</span>
+        <span class="n">i</span><span class="p">,</span> <span class="n">dist_check</span><span class="p">,</span> <span class="n">a</span><span class="p">,</span> <span class="n">b</span> <span class="o">=</span> <span class="n">return_items</span>
+        <span class="k">if</span> <span class="n">dist_check</span><span class="p">:</span>
+            <span class="n">passed_check</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="mi">1</span>
+            <span class="n">failed_check</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="c1"># While &quot;good&quot; islands just need their total number incrementing</span>
+            <span class="c1"># for the group, &quot;failed&quot; islands we need to track the number of</span>
+            <span class="c1"># sources in each catalogue for.</span>
+            <span class="n">num_a_failed_checks</span> <span class="o">+=</span> <span class="nb">len</span><span class="p">(</span><span class="n">a</span><span class="p">)</span>
+            <span class="n">num_b_failed_checks</span> <span class="o">+=</span> <span class="nb">len</span><span class="p">(</span><span class="n">b</span><span class="p">)</span>
+
+    <span class="n">pool</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
+    <span class="n">pool</span><span class="o">.</span><span class="n">join</span><span class="p">()</span>
+
+    <span class="c1"># If set_list returned any rejected sources, then add any sources too close</span>
+    <span class="c1"># to match extent to those now. Ensure that we only reject the unique source IDs</span>
+    <span class="c1"># across each island group, ignoring the &quot;default&quot; -1 index.</span>
+    <span class="k">if</span> <span class="n">reject_flag</span><span class="p">:</span>
+        <span class="n">a_first_rejected_len</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">areject</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">a_first_rejected_len</span> <span class="o">=</span> <span class="mi">0</span>
+    <span class="k">if</span> <span class="n">num_a_failed_checks</span> <span class="o">+</span> <span class="n">a_first_rejected_len</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="n">reject_a</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">dtype</span><span class="o">=</span><span class="nb">int</span><span class="p">,</span> <span class="n">shape</span><span class="o">=</span><span class="p">(</span><span class="n">num_a_failed_checks</span><span class="o">+</span><span class="n">a_first_rejected_len</span><span class="p">,))</span>
+    <span class="k">if</span> <span class="n">reject_flag</span><span class="p">:</span>
+        <span class="n">reject_a</span><span class="p">[</span><span class="n">num_a_failed_checks</span><span class="p">:]</span> <span class="o">=</span> <span class="n">areject</span>
+    <span class="k">if</span> <span class="n">reject_flag</span><span class="p">:</span>
+        <span class="n">b_first_rejected_len</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">breject</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">b_first_rejected_len</span> <span class="o">=</span> <span class="mi">0</span>
+    <span class="k">if</span> <span class="n">num_b_failed_checks</span> <span class="o">+</span> <span class="n">b_first_rejected_len</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="n">reject_b</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">dtype</span><span class="o">=</span><span class="nb">int</span><span class="p">,</span> <span class="n">shape</span><span class="o">=</span><span class="p">(</span><span class="n">num_b_failed_checks</span><span class="o">+</span><span class="n">b_first_rejected_len</span><span class="p">,))</span>
+    <span class="k">if</span> <span class="n">reject_flag</span><span class="p">:</span>
+        <span class="n">reject_b</span><span class="p">[</span><span class="n">num_b_failed_checks</span><span class="p">:]</span> <span class="o">=</span> <span class="n">breject</span>
+
+    <span class="k">if</span> <span class="n">reject_flag</span><span class="p">:</span>
+        <span class="n">alist_reject</span> <span class="o">=</span> <span class="n">alist</span><span class="p">[:,</span> <span class="n">failed_check</span><span class="p">]</span>
+        <span class="n">reject_a</span><span class="p">[:</span><span class="n">num_a_failed_checks</span><span class="p">]</span> <span class="o">=</span> <span class="n">alist_reject</span><span class="p">[</span><span class="n">alist_reject</span> <span class="o">&gt;</span> <span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+        <span class="n">blist_reject</span> <span class="o">=</span> <span class="n">blist</span><span class="p">[:,</span> <span class="n">failed_check</span><span class="p">]</span>
+        <span class="n">reject_b</span><span class="p">[:</span><span class="n">num_b_failed_checks</span><span class="p">]</span> <span class="o">=</span> <span class="n">blist_reject</span><span class="p">[</span><span class="n">blist_reject</span> <span class="o">&gt;</span> <span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">reject_a</span> <span class="o">=</span> <span class="n">alist</span><span class="p">[:,</span> <span class="n">failed_check</span><span class="p">]</span>
+        <span class="n">reject_a</span> <span class="o">=</span> <span class="n">reject_a</span><span class="p">[</span><span class="n">reject_a</span> <span class="o">&gt;</span> <span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+        <span class="n">reject_b</span> <span class="o">=</span> <span class="n">blist</span><span class="p">[:,</span> <span class="n">failed_check</span><span class="p">]</span>
+        <span class="n">reject_b</span> <span class="o">=</span> <span class="n">reject_b</span><span class="p">[</span><span class="n">reject_b</span> <span class="o">&gt;</span> <span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+
+    <span class="c1"># This should basically be alist = alist[:, passed_check] and</span>
+    <span class="c1"># agrplen = agrplen[passed_check], simply removing those above failed</span>
+    <span class="c1"># islands from the list, analagous to the same functionality in set_list.</span>
+    <span class="n">alist</span> <span class="o">=</span> <span class="n">alist</span><span class="p">[:,</span> <span class="n">passed_check</span><span class="p">]</span>
+    <span class="n">agrplen</span> <span class="o">=</span> <span class="n">agrplen</span><span class="p">[</span><span class="n">passed_check</span><span class="p">]</span>
+    <span class="n">blist</span> <span class="o">=</span> <span class="n">blist</span><span class="p">[:,</span> <span class="n">passed_check</span><span class="p">]</span>
+    <span class="n">bgrplen</span> <span class="o">=</span> <span class="n">bgrplen</span><span class="p">[</span><span class="n">passed_check</span><span class="p">]</span>
+    <span class="c1"># Only return aflen and bflen if they were created</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="p">(</span><span class="n">include_phot_like</span> <span class="ow">or</span> <span class="n">use_phot_priors</span><span class="p">):</span>
+        <span class="n">ablen</span> <span class="o">=</span> <span class="n">bblen</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="n">aflen</span> <span class="o">=</span> <span class="n">bflen</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="c1"># Only return reject counts if they were created</span>
+    <span class="k">if</span> <span class="n">num_a_failed_checks</span> <span class="o">+</span> <span class="n">a_first_rejected_len</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="n">lenrejecta</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">reject_a</span><span class="p">)</span>
+        <span class="c1"># Save rejects output files.</span>
+        <span class="n">np</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="s1">&#39;</span><span class="si">{}</span><span class="s1">/reject/reject_a.npy&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">joint_folder_path</span><span class="p">),</span> <span class="n">reject_a</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">lenrejecta</span> <span class="o">=</span> <span class="mi">0</span>
+    <span class="k">if</span> <span class="n">num_b_failed_checks</span> <span class="o">+</span> <span class="n">b_first_rejected_len</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="n">lenrejectb</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">reject_b</span><span class="p">)</span>
+        <span class="n">np</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="s1">&#39;</span><span class="si">{}</span><span class="s1">/reject/reject_b.npy&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">joint_folder_path</span><span class="p">),</span> <span class="n">reject_b</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">lenrejectb</span> <span class="o">=</span> <span class="mi">0</span>
+
+    <span class="n">group_sources_data</span> <span class="o">=</span> <span class="n">StageData</span><span class="p">(</span><span class="n">ablen</span><span class="o">=</span><span class="n">ablen</span><span class="p">,</span> <span class="n">bblen</span><span class="o">=</span><span class="n">bblen</span><span class="p">,</span> <span class="n">ainds</span><span class="o">=</span><span class="n">ainds</span><span class="p">,</span> <span class="n">binds</span><span class="o">=</span><span class="n">binds</span><span class="p">,</span>
+                                   <span class="n">asize</span><span class="o">=</span><span class="n">asize</span><span class="p">,</span> <span class="n">bsize</span><span class="o">=</span><span class="n">bsize</span><span class="p">,</span> <span class="n">aflen</span><span class="o">=</span><span class="n">aflen</span><span class="p">,</span> <span class="n">bflen</span><span class="o">=</span><span class="n">bflen</span><span class="p">,</span>
+                                   <span class="n">alist</span><span class="o">=</span><span class="n">alist</span><span class="p">,</span> <span class="n">blist</span><span class="o">=</span><span class="n">blist</span><span class="p">,</span> <span class="n">agrplen</span><span class="o">=</span><span class="n">agrplen</span><span class="p">,</span> <span class="n">bgrplen</span><span class="o">=</span><span class="n">bgrplen</span><span class="p">,</span>
+                                   <span class="n">lenrejecta</span><span class="o">=</span><span class="n">lenrejecta</span><span class="p">,</span> <span class="n">lenrejectb</span><span class="o">=</span><span class="n">lenrejectb</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">group_sources_data</span></div>
+
+
+
+<span class="k">def</span> <span class="nf">_load_fourier_grid_cutouts</span><span class="p">(</span><span class="n">a</span><span class="p">,</span> <span class="n">sky_rect_coords</span><span class="p">,</span> <span class="n">joint_folder_path</span><span class="p">,</span> <span class="n">cat_folder_path</span><span class="p">,</span>
+                               <span class="n">perturb_auf_outputs</span><span class="p">,</span> <span class="n">padding</span><span class="p">,</span> <span class="n">cat_name</span><span class="p">,</span> <span class="n">large_sky_slice</span><span class="p">,</span>
+                               <span class="n">modelrefinds</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&#39;&#39;&#39;</span>
+<span class="sd">    Function to load a sub-set of a given catalogue&#39;s astrometry, slicing it</span>
+<span class="sd">    in a given sky coordinate rectangle, and load the appropriate sub-array</span>
+<span class="sd">    of the perturbation AUF&#39;s fourier-space PDF.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    a : numpy.ndarray</span>
+<span class="sd">        Array containing the full entries for a given catalogue.</span>
+<span class="sd">    sky_rect_coords : numpy.ndarray or list</span>
+<span class="sd">        Array with the rectangular extents of the cutout to be performed, in the</span>
+<span class="sd">        order lower longitudinal coordinate, upper longitudinal coordinate,</span>
+<span class="sd">        lower latitudinal coordinate, and upper latitudinal coordinate.</span>
+<span class="sd">    joint_folder_path : string</span>
+<span class="sd">        Folder on disk indicating where to store files related to the joint</span>
+<span class="sd">        cross-match being performed.</span>
+<span class="sd">    cat_folder_path : string</span>
+<span class="sd">        Location on disk where catalogues for the same dataset given in ``a``</span>
+<span class="sd">        are stored.</span>
+<span class="sd">    perturb_auf_outputs : dictionary</span>
+<span class="sd">        Results from the simulations of catalogue ``a``&#39;s AUF extensions.</span>
+<span class="sd">    padding : float</span>
+<span class="sd">        Maximum allowed sky separation the &quot;wrong&quot; side of ``sky_rect_coords``,</span>
+<span class="sd">        allowing for an increase in sky box size which ensures that all overlaps</span>
+<span class="sd">        get caught in ``get_max_overlap`` and ``get_max_indices``.</span>
+<span class="sd">    cat_name : string</span>
+<span class="sd">        String indicating whether we are loading cutouts from catalogue &quot;a&quot; or</span>
+<span class="sd">        &quot;b&quot;.</span>
+<span class="sd">    large_sky_slice : boolean</span>
+<span class="sd">        Slice array containing the ``True`` and ``False`` elements of which</span>
+<span class="sd">        elements of the full catalogue, in ``con_cat_astro.npy``, are in ``a``.</span>
+<span class="sd">    modelrefinds : numpy.ndarray</span>
+<span class="sd">        The modelrefinds array output from ``create_perturb_auf``.</span>
+<span class="sd">        TODO Improve description</span>
+<span class="sd">    &#39;&#39;&#39;</span>
+
+    <span class="n">lon1</span><span class="p">,</span> <span class="n">lon2</span><span class="p">,</span> <span class="n">lat1</span><span class="p">,</span> <span class="n">lat2</span> <span class="o">=</span> <span class="n">sky_rect_coords</span>
+
+    <span class="n">sky_cut</span> <span class="o">=</span> <span class="n">_load_rectangular_slice</span><span class="p">(</span><span class="n">cat_name</span><span class="p">,</span> <span class="n">a</span><span class="p">,</span> <span class="n">lon1</span><span class="p">,</span> <span class="n">lon2</span><span class="p">,</span> <span class="n">lat1</span><span class="p">,</span> <span class="n">lat2</span><span class="p">,</span> <span class="n">padding</span><span class="p">)</span>
+
+    <span class="n">a_cutout</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="s1">&#39;</span><span class="si">{}</span><span class="s1">/con_cat_astro.npy&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">cat_folder_path</span><span class="p">))[</span><span class="n">large_sky_slice</span><span class="p">][</span><span class="n">sky_cut</span><span class="p">]</span>
+
+    <span class="n">modrefind</span> <span class="o">=</span> <span class="n">modelrefinds</span><span class="p">[:,</span> <span class="n">large_sky_slice</span><span class="p">][:,</span> <span class="n">sky_cut</span><span class="p">]</span>
+
+    <span class="p">[</span><span class="n">fouriergrid</span><span class="p">],</span> <span class="n">modrefindsmall</span> <span class="o">=</span> <span class="n">load_small_ref_auf_grid</span><span class="p">(</span><span class="n">modrefind</span><span class="p">,</span> <span class="n">perturb_auf_outputs</span><span class="p">,</span>
+                                                            <span class="p">[</span><span class="s1">&#39;fourier&#39;</span><span class="p">])</span>
+
+    <span class="k">return</span> <span class="n">a_cutout</span><span class="p">,</span> <span class="n">fouriergrid</span><span class="p">,</span> <span class="n">modrefindsmall</span><span class="p">,</span> <span class="n">sky_cut</span>
+
+
+<span class="k">def</span> <span class="nf">_clean_overlaps</span><span class="p">(</span><span class="n">inds</span><span class="p">,</span> <span class="n">size</span><span class="p">,</span> <span class="n">n_pool</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&#39;&#39;&#39;</span>
+<span class="sd">    Convenience function to parse either catalogue&#39;s indices array for</span>
+<span class="sd">    duplicate references to the opposing array on a per-source basis,</span>
+<span class="sd">    and filter duplications.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    inds : numpy.ndarray</span>
+<span class="sd">        Array containing the indices of overlap between this catalogue, for each</span>
+<span class="sd">        source, and the opposing catalogue, including potential duplication.</span>
+<span class="sd">    size : numpy.ndarray</span>
+<span class="sd">        Array containing the number of overlaps between this catalogue and the</span>
+<span class="sd">        opposing catalogue prior to duplication removal.</span>
+<span class="sd">    n_pool : integer</span>
+<span class="sd">        Number of multiprocessing threads to use.</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    inds : numpy.ndarray</span>
+<span class="sd">        The unique indices of overlap into the opposing catalogue for each</span>
+<span class="sd">        source in a given catalogue, stripped of potential duplicates.</span>
+<span class="sd">    size : numpy.ndarray</span>
+<span class="sd">        Newly updated ``size`` array, containing the lengths of the unique</span>
+<span class="sd">        indices of overlap into the opposing catalogue for each source.</span>
+<span class="sd">    &#39;&#39;&#39;</span>
+    <span class="n">maxsize</span> <span class="o">=</span> <span class="mi">0</span>
+    <span class="n">size</span><span class="p">[:]</span> <span class="o">=</span> <span class="mi">0</span>
+    <span class="n">pool</span> <span class="o">=</span> <span class="n">multiprocessing</span><span class="o">.</span><span class="n">Pool</span><span class="p">(</span><span class="n">n_pool</span><span class="p">)</span>
+    <span class="n">counter</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">inds</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span>
+    <span class="n">iter_group</span> <span class="o">=</span> <span class="nb">zip</span><span class="p">(</span><span class="n">counter</span><span class="p">,</span> <span class="n">itertools</span><span class="o">.</span><span class="n">repeat</span><span class="p">(</span><span class="n">inds</span><span class="p">))</span>
+    <span class="k">for</span> <span class="n">return_items</span> <span class="ow">in</span> <span class="n">pool</span><span class="o">.</span><span class="n">imap_unordered</span><span class="p">(</span><span class="n">_calc_unique_inds</span><span class="p">,</span> <span class="n">iter_group</span><span class="p">,</span>
+                                            <span class="n">chunksize</span><span class="o">=</span><span class="nb">max</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">counter</span><span class="p">)</span> <span class="o">//</span> <span class="n">n_pool</span><span class="p">)):</span>
+        <span class="n">i</span><span class="p">,</span> <span class="n">unique_inds</span> <span class="o">=</span> <span class="n">return_items</span>
+        <span class="n">y</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">unique_inds</span><span class="p">)</span>
+        <span class="n">inds</span><span class="p">[:</span><span class="n">y</span><span class="p">,</span> <span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="n">unique_inds</span>
+        <span class="n">inds</span><span class="p">[</span><span class="n">y</span><span class="p">:,</span> <span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="o">-</span><span class="mi">1</span>
+        <span class="k">if</span> <span class="n">y</span> <span class="o">&gt;</span> <span class="n">maxsize</span><span class="p">:</span>
+            <span class="n">maxsize</span> <span class="o">=</span> <span class="n">y</span>
+        <span class="n">size</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="n">y</span>
+
+    <span class="n">pool</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
+    <span class="n">pool</span><span class="o">.</span><span class="n">join</span><span class="p">()</span>
+
+    <span class="n">inds</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asfortranarray</span><span class="p">(</span><span class="n">inds</span><span class="p">[:</span><span class="n">maxsize</span><span class="p">,</span> <span class="p">:])</span>
+
+    <span class="k">return</span> <span class="n">inds</span><span class="p">,</span> <span class="n">size</span>
+
+
+<span class="k">def</span> <span class="nf">_calc_unique_inds</span><span class="p">(</span><span class="n">iterable</span><span class="p">):</span>
+    <span class="n">i</span><span class="p">,</span> <span class="n">inds</span> <span class="o">=</span> <span class="n">iterable</span>
+    <span class="k">return</span> <span class="n">i</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">unique</span><span class="p">(</span><span class="n">inds</span><span class="p">[</span><span class="n">inds</span><span class="p">[:,</span> <span class="n">i</span><span class="p">]</span> <span class="o">&gt;</span> <span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="n">i</span><span class="p">])</span>
+
+
+<span class="k">def</span> <span class="nf">_distance_check</span><span class="p">(</span><span class="n">iterable</span><span class="p">):</span>
+    <span class="n">i</span><span class="p">,</span> <span class="n">a_</span><span class="p">,</span> <span class="n">b_</span><span class="p">,</span> <span class="n">alist_1</span><span class="p">,</span> <span class="n">blist_1</span><span class="p">,</span> <span class="n">agrplen_small</span><span class="p">,</span> <span class="n">bgrplen_small</span><span class="p">,</span> <span class="n">ax_lims</span><span class="p">,</span> <span class="n">max_sep</span> <span class="o">=</span> <span class="n">iterable</span>
+    <span class="n">subset</span> <span class="o">=</span> <span class="n">alist_1</span><span class="p">[:</span><span class="n">agrplen_small</span><span class="p">[</span><span class="n">i</span><span class="p">],</span> <span class="n">i</span><span class="p">]</span>
+    <span class="n">a</span> <span class="o">=</span> <span class="n">a_</span><span class="p">[</span><span class="n">subset</span><span class="p">]</span>
+    <span class="n">subset</span> <span class="o">=</span> <span class="n">blist_1</span><span class="p">[:</span><span class="n">bgrplen_small</span><span class="p">[</span><span class="n">i</span><span class="p">],</span> <span class="n">i</span><span class="p">]</span>
+    <span class="n">b</span> <span class="o">=</span> <span class="n">b_</span><span class="p">[</span><span class="n">subset</span><span class="p">]</span>
+    <span class="n">meets_min_distance</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">a</span><span class="p">)</span><span class="o">+</span><span class="nb">len</span><span class="p">(</span><span class="n">b</span><span class="p">),</span> <span class="nb">bool</span><span class="p">)</span>
+    <span class="c1"># Do not check for longitudinal &quot;extent&quot; small separations for cases</span>
+    <span class="c1"># where all 0-360 degrees are included, as this will result in no loss</span>
+    <span class="c1"># of sources from consideration, with the 0-&gt;360 wraparound of</span>
+    <span class="c1"># coordinates. In either case if there is a small slice of sky not</span>
+    <span class="c1"># considered, however, we must remove sources near the &quot;empty&quot; strip.</span>
+    <span class="c1"># Likely redundant, explicitly check for either limits being inside of</span>
+    <span class="c1"># 0-360 exactly by the top edge being &lt;360 but also the bottom edge</span>
+    <span class="c1"># being positive or negative -- i.e., not exactly zero.</span>
+    <span class="k">if</span> <span class="n">ax_lims</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">&gt;</span> <span class="mi">0</span> <span class="ow">or</span> <span class="n">ax_lims</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">&lt;</span> <span class="mi">0</span> <span class="ow">or</span> <span class="n">ax_lims</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">&lt;</span> <span class="mi">360</span><span class="p">:</span>
+        <span class="k">for</span> <span class="n">lon</span> <span class="ow">in</span> <span class="n">ax_lims</span><span class="p">[:</span><span class="mi">2</span><span class="p">]:</span>
+            <span class="c1"># The Haversine formula doesn&#39;t care if lon &lt; 0 or if lon ~ 360,</span>
+            <span class="c1"># so no need to consider ax_lims that straddle 0 longitude here.</span>
+            <span class="n">is_within_dist_of_lon</span> <span class="o">=</span> <span class="p">(</span>
+                <span class="n">hav_dist_constant_lat</span><span class="p">(</span><span class="n">a</span><span class="p">[:,</span> <span class="mi">0</span><span class="p">],</span> <span class="n">a</span><span class="p">[:,</span> <span class="mi">1</span><span class="p">],</span> <span class="n">lon</span><span class="p">)</span> <span class="o">&lt;=</span> <span class="n">max_sep</span><span class="p">)</span>
+            <span class="c1"># Progressively update the boolean for each source in the group</span>
+            <span class="c1"># for each distance check for the four extents.</span>
+            <span class="n">meets_min_distance</span><span class="p">[:</span><span class="nb">len</span><span class="p">(</span><span class="n">a</span><span class="p">)]</span> <span class="o">=</span> <span class="p">(</span><span class="n">meets_min_distance</span><span class="p">[:</span><span class="nb">len</span><span class="p">(</span><span class="n">a</span><span class="p">)]</span> <span class="o">|</span>
+                                           <span class="n">is_within_dist_of_lon</span><span class="p">)</span>
+    <span class="c1"># Similarly, if either &quot;latitude&quot; is set to 90 degrees, we cannot have</span>
+    <span class="c1"># lack of up-down missing sources, so we must check (individually this</span>
+    <span class="c1"># time) for whether we should skip this check.</span>
+    <span class="k">for</span> <span class="n">lat</span> <span class="ow">in</span> <span class="n">ax_lims</span><span class="p">[</span><span class="mi">2</span><span class="p">:]:</span>
+        <span class="k">if</span> <span class="n">np</span><span class="o">.</span><span class="n">abs</span><span class="p">(</span><span class="n">lat</span><span class="p">)</span> <span class="o">&lt;</span> <span class="mi">90</span><span class="p">:</span>
+            <span class="n">is_within_dist_of_lat</span> <span class="o">=</span> <span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">abs</span><span class="p">(</span><span class="n">a</span><span class="p">[:,</span> <span class="mi">1</span><span class="p">]</span> <span class="o">-</span> <span class="n">lat</span><span class="p">)</span> <span class="o">&lt;=</span> <span class="n">max_sep</span><span class="p">)</span>
+            <span class="n">meets_min_distance</span><span class="p">[:</span><span class="nb">len</span><span class="p">(</span><span class="n">a</span><span class="p">)]</span> <span class="o">=</span> <span class="p">(</span><span class="n">meets_min_distance</span><span class="p">[:</span><span class="nb">len</span><span class="p">(</span><span class="n">a</span><span class="p">)]</span> <span class="o">|</span>
+                                           <span class="n">is_within_dist_of_lat</span><span class="p">)</span>
+
+    <span class="c1"># Because all sources in BOTH catalogues must pass, we continue</span>
+    <span class="c1"># to update meets_min_distance for catalogue &quot;b&quot; as well.</span>
+    <span class="k">if</span> <span class="n">ax_lims</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">&gt;</span> <span class="mi">0</span> <span class="ow">or</span> <span class="n">ax_lims</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">&lt;</span> <span class="mi">0</span> <span class="ow">or</span> <span class="n">ax_lims</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">&lt;</span> <span class="mi">360</span><span class="p">:</span>
+        <span class="k">for</span> <span class="n">lon</span> <span class="ow">in</span> <span class="n">ax_lims</span><span class="p">[:</span><span class="mi">2</span><span class="p">]:</span>
+            <span class="n">is_within_dist_of_lon</span> <span class="o">=</span> <span class="p">(</span>
+                <span class="n">hav_dist_constant_lat</span><span class="p">(</span><span class="n">b</span><span class="p">[:,</span> <span class="mi">0</span><span class="p">],</span> <span class="n">b</span><span class="p">[:,</span> <span class="mi">1</span><span class="p">],</span> <span class="n">lon</span><span class="p">)</span> <span class="o">&lt;=</span> <span class="n">max_sep</span><span class="p">)</span>
+            <span class="n">meets_min_distance</span><span class="p">[</span><span class="nb">len</span><span class="p">(</span><span class="n">a</span><span class="p">):]</span> <span class="o">=</span> <span class="p">(</span><span class="n">meets_min_distance</span><span class="p">[</span><span class="nb">len</span><span class="p">(</span><span class="n">a</span><span class="p">):]</span> <span class="o">|</span>
+                                           <span class="n">is_within_dist_of_lon</span><span class="p">)</span>
+    <span class="k">for</span> <span class="n">lat</span> <span class="ow">in</span> <span class="n">ax_lims</span><span class="p">[</span><span class="mi">2</span><span class="p">:]:</span>
+        <span class="k">if</span> <span class="n">np</span><span class="o">.</span><span class="n">abs</span><span class="p">(</span><span class="n">lat</span><span class="p">)</span> <span class="o">&lt;</span> <span class="mi">90</span><span class="p">:</span>
+            <span class="n">is_within_dist_of_lat</span> <span class="o">=</span> <span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">abs</span><span class="p">(</span><span class="n">b</span><span class="p">[:,</span> <span class="mi">1</span><span class="p">]</span> <span class="o">-</span> <span class="n">lat</span><span class="p">)</span> <span class="o">&lt;=</span> <span class="n">max_sep</span><span class="p">)</span>
+            <span class="n">meets_min_distance</span><span class="p">[</span><span class="nb">len</span><span class="p">(</span><span class="n">a</span><span class="p">):]</span> <span class="o">=</span> <span class="p">(</span><span class="n">meets_min_distance</span><span class="p">[</span><span class="nb">len</span><span class="p">(</span><span class="n">a</span><span class="p">):]</span> <span class="o">|</span>
+                                           <span class="n">is_within_dist_of_lat</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="p">[</span><span class="n">i</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">all</span><span class="p">(</span><span class="n">meets_min_distance</span> <span class="o">==</span> <span class="mi">0</span><span class="p">),</span> <span class="n">a</span><span class="p">,</span> <span class="n">b</span><span class="p">]</span>
+</pre></div>
+
+            <div class="clearer"></div>
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="../../f-modindex.html" title="Fortran Module Index"
+             >fortran modules</a> |</li>
+        <li class="right" >
+          <a href="../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../index.html">macauff</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../index.html" >Module code</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">macauff.group_sources</a></li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+    &#169; Copyright 2022, Tom J Wilson.
+      Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 7.2.6.
+    </div>
+  </body>
+</html>

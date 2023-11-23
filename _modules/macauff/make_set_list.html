@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="../../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>macauff.make_set_list &#8212; macauff</title>
+    <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=4848ba22" />
+    <link rel="stylesheet" type="text/css" href="../../_static/pyramid.css?v=a5b9c134" />
+    <link rel="stylesheet" type="text/css" href="../../_static/graphviz.css?v=eafc0fe6" />
+    <script src="../../_static/documentation_options.js?v=5929fcd5"></script>
+    <script src="../../_static/doctools.js?v=888ff710"></script>
+    <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Neuton&amp;subset=latin" type="text/css" media="screen" charset="utf-8" />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Nobile:regular,italic,bold,bolditalic&amp;subset=latin" type="text/css" media="screen" charset="utf-8" />
+<!--[if lte IE 6]>
+<link rel="stylesheet" href="../../_static/ie6.css" type="text/css" media="screen" charset="utf-8" />
+<![endif]-->
+
+  </head><body>
+
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="../../f-modindex.html" title="Fortran Module Index"
+             >fortran modules</a> |</li>
+        <li class="right" >
+          <a href="../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../index.html">macauff</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../index.html" accesskey="U">Module code</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">macauff.make_set_list</a></li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <h1>Source code for macauff.make_set_list</h1><div class="highlight"><pre>
+<span></span><span class="c1"># Licensed under a 3-clause BSD style license - see LICENSE</span>
+<span class="sd">&#39;&#39;&#39;</span>
+<span class="sd">This module hosts the functions to create overlapping groups of &quot;islands&quot; of</span>
+<span class="sd">objects, astrometrically in common based on relative sky separation compared to</span>
+<span class="sd">their respective uncertainties across two catalogues.</span>
+<span class="sd">&#39;&#39;&#39;</span>
+
+<span class="kn">import</span> <span class="nn">sys</span>
+<span class="kn">import</span> <span class="nn">warnings</span>
+<span class="kn">import</span> <span class="nn">multiprocessing</span>
+<span class="kn">import</span> <span class="nn">itertools</span>
+<span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+<span class="kn">import</span> <span class="nn">scipy.special</span>
+
+<span class="n">__all__</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;set_list&#39;</span><span class="p">]</span>
+
+
+<div class="viewcode-block" id="set_list">
+<a class="viewcode-back" href="../../api/macauff.set_list.html#macauff.set_list">[docs]</a>
+<span class="k">def</span> <span class="nf">set_list</span><span class="p">(</span><span class="n">aindices</span><span class="p">,</span> <span class="n">bindices</span><span class="p">,</span> <span class="n">aoverlap</span><span class="p">,</span> <span class="n">boverlap</span><span class="p">,</span> <span class="n">joint_folder_path</span><span class="p">,</span> <span class="n">n_pool</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&#39;&#39;&#39;</span>
+<span class="sd">    Creates the inter-catalogue groupings between catalogues &quot;a&quot; and &quot;b&quot;, based</span>
+<span class="sd">    on previously determined individual source &quot;overlaps&quot; in astrometry.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    aindices : numpy.ndarray</span>
+<span class="sd">        The indices into catalogue &quot;b&quot;, for each catalogue &quot;a&quot; source, that have</span>
+<span class="sd">        been determined to be potentially positionally correlated.</span>
+<span class="sd">    bindices : numpy.ndarray</span>
+<span class="sd">        The equivalent to ``aindices``, but mapping the overlaps in catalogue &quot;a&quot;</span>
+<span class="sd">        for each catalogue &quot;b&quot; source.</span>
+<span class="sd">    aoverlap : numpy.ndarray</span>
+<span class="sd">        The number of overlaps for each catalogue &quot;a&quot; source (i.e., the length</span>
+<span class="sd">        of each row in ``aindices`` for each source).</span>
+<span class="sd">    boverlap : numpy.ndarray</span>
+<span class="sd">        The equivalent number of overlaps for each catalogue &quot;b&quot; object.</span>
+<span class="sd">    joint_folder_path : string</span>
+<span class="sd">        Location of top-level folder containing the &quot;group&quot; folder in which</span>
+<span class="sd">        index and overlap arrays are stored.</span>
+<span class="sd">    n_pool : integer</span>
+<span class="sd">        Number of multiprocessing pools to use when parallelising.</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    alist : numpy.ndarray</span>
+<span class="sd">        The indices of all catalogue &quot;a&quot; sources that are in a common &quot;island&quot;</span>
+<span class="sd">        group together. Each row of ``alist`` indicates all &quot;a&quot; sources</span>
+<span class="sd">        potentially positionally correlated.</span>
+<span class="sd">    blist : numpy.ndarray</span>
+<span class="sd">        The indices of all catalogue &quot;b&quot; objects in the same groups (as other</span>
+<span class="sd">        &quot;b&quot; sources, as well as mapping to catalogue &quot;a&quot; objects).</span>
+<span class="sd">    agrouplengths : numpy.ndarray</span>
+<span class="sd">        The number of catalogue &quot;a&quot; sources in each unique &quot;island&quot;.</span>
+<span class="sd">    bgrouplengths : numpy.ndarray</span>
+<span class="sd">        The number of catalogue &quot;b&quot; sources in each island grouping.</span>
+<span class="sd">    &#39;&#39;&#39;</span>
+    <span class="n">agroup</span><span class="p">,</span> <span class="n">bgroup</span> <span class="o">=</span> <span class="n">_initial_group_numbering</span><span class="p">(</span><span class="n">aindices</span><span class="p">,</span> <span class="n">bindices</span><span class="p">,</span> <span class="n">aoverlap</span><span class="p">,</span> <span class="n">boverlap</span><span class="p">,</span>
+                                              <span class="n">joint_folder_path</span><span class="p">)</span>
+    <span class="n">groupmax</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">amax</span><span class="p">(</span><span class="n">agroup</span><span class="p">),</span> <span class="n">np</span><span class="o">.</span><span class="n">amax</span><span class="p">(</span><span class="n">bgroup</span><span class="p">))</span>
+
+    <span class="n">agrouplengths</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">dtype</span><span class="o">=</span><span class="nb">int</span><span class="p">,</span> <span class="n">shape</span><span class="o">=</span><span class="p">(</span><span class="n">groupmax</span><span class="p">,))</span>
+    <span class="n">bgrouplengths</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">dtype</span><span class="o">=</span><span class="nb">int</span><span class="p">,</span> <span class="n">shape</span><span class="o">=</span><span class="p">(</span><span class="n">groupmax</span><span class="p">,))</span>
+
+    <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">agroup</span><span class="p">)):</span>
+        <span class="n">agrouplengths</span><span class="p">[</span><span class="n">agroup</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">+=</span> <span class="mi">1</span>
+    <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">bgroup</span><span class="p">)):</span>
+        <span class="n">bgrouplengths</span><span class="p">[</span><span class="n">bgroup</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">+=</span> <span class="mi">1</span>
+
+    <span class="c1"># Search for any island groupings which are too large to calculate the</span>
+    <span class="c1"># permutations of reasonably (limiting at 50,000). When considering a set,</span>
+    <span class="c1"># the total number of matches considered is:</span>
+    <span class="c1"># sum k from 0 to min(len(a), len(b)) [#] of k-combinations of a times</span>
+    <span class="c1"># [#] of k-permutations of b, with</span>
+    <span class="c1"># number of k-combinations = len(a)! / (k! (len(a) - k)!)</span>
+    <span class="c1"># and number of k-permutations = len(b)! / (len(b) - k)!</span>
+
+    <span class="c1"># However we can&#39;t do x! / (x-k)! so we do prod(range(x-k+1, x, 1)) for</span>
+    <span class="c1"># computational simplicity.</span>
+    <span class="c1"># Since 21! is larger than a 64-bit integer (see factorial maths in</span>
+    <span class="c1"># counterpart_pairing_fortran.find_single_island_prob), we also filter for</span>
+    <span class="c1"># islands with more than 20 objects in both catalogues within</span>
+    <span class="c1"># _calc_group_length_exceeded.</span>
+    <span class="n">maxiters</span> <span class="o">=</span> <span class="mi">5000000</span>
+    <span class="n">grouplengthexceeded</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">dtype</span><span class="o">=</span><span class="nb">bool</span><span class="p">,</span> <span class="n">shape</span><span class="o">=</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">agrouplengths</span><span class="p">),))</span>
+    <span class="n">pool</span> <span class="o">=</span> <span class="n">multiprocessing</span><span class="o">.</span><span class="n">Pool</span><span class="p">(</span><span class="n">n_pool</span><span class="p">)</span>
+    <span class="n">counter</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">agrouplengths</span><span class="p">))</span>
+    <span class="n">iter_group</span> <span class="o">=</span> <span class="nb">zip</span><span class="p">(</span><span class="n">counter</span><span class="p">,</span> <span class="n">agrouplengths</span><span class="p">,</span> <span class="n">bgrouplengths</span><span class="p">,</span> <span class="n">itertools</span><span class="o">.</span><span class="n">repeat</span><span class="p">(</span><span class="n">maxiters</span><span class="p">))</span>
+    <span class="k">for</span> <span class="n">return_items</span> <span class="ow">in</span> <span class="n">pool</span><span class="o">.</span><span class="n">imap_unordered</span><span class="p">(</span><span class="n">_calc_group_length_exceeded</span><span class="p">,</span> <span class="n">iter_group</span><span class="p">,</span>
+                                            <span class="n">chunksize</span><span class="o">=</span><span class="nb">max</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">counter</span><span class="p">)</span> <span class="o">//</span> <span class="n">n_pool</span><span class="p">)):</span>
+        <span class="n">i</span><span class="p">,</span> <span class="n">len_exceeded_flag</span> <span class="o">=</span> <span class="n">return_items</span>
+        <span class="n">grouplengthexceeded</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="n">len_exceeded_flag</span>
+
+    <span class="n">pool</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
+    <span class="n">pool</span><span class="o">.</span><span class="n">join</span><span class="p">()</span>
+
+    <span class="k">if</span> <span class="n">np</span><span class="o">.</span><span class="n">any</span><span class="p">(</span><span class="n">grouplengthexceeded</span><span class="p">):</span>
+        <span class="n">nremoveisland</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">grouplengthexceeded</span><span class="p">)</span>
+        <span class="n">nacatremove</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">agrouplengths</span><span class="p">[</span><span class="n">grouplengthexceeded</span><span class="p">])</span>
+        <span class="n">nbcatremove</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">bgrouplengths</span><span class="p">[</span><span class="n">grouplengthexceeded</span><span class="p">])</span>
+        <span class="n">warnings</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span><span class="s2">&quot;</span><span class="si">{}</span><span class="s2"> island</span><span class="si">{}</span><span class="s2">, containing </span><span class="si">{}</span><span class="s2">/</span><span class="si">{}</span><span class="s2"> catalogue a and </span><span class="si">{}</span><span class="s2">/</span><span class="si">{}</span><span class="s2"> catalogue b stars, &quot;</span>
+                      <span class="s2">&quot;</span><span class="si">{}</span><span class="s2"> removed for having more than </span><span class="si">{}</span><span class="s2"> possible iterations. Please check any &quot;</span>
+                      <span class="s2">&quot;results carefully.&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">nremoveisland</span><span class="p">,</span> <span class="s1">&#39;&#39;</span> <span class="k">if</span> <span class="n">nremoveisland</span> <span class="o">==</span> <span class="mi">1</span> <span class="k">else</span> <span class="s1">&#39;s&#39;</span><span class="p">,</span>
+                                                  <span class="n">nacatremove</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">aoverlap</span><span class="p">),</span> <span class="n">nbcatremove</span><span class="p">,</span>
+                                                  <span class="nb">len</span><span class="p">(</span><span class="n">boverlap</span><span class="p">),</span> <span class="s1">&#39;was&#39;</span> <span class="k">if</span> <span class="n">nremoveisland</span> <span class="o">==</span> <span class="mi">1</span> <span class="k">else</span>
+                                                  <span class="s1">&#39;were&#39;</span><span class="p">,</span> <span class="n">maxiters</span><span class="p">))</span>
+        <span class="n">sys</span><span class="o">.</span><span class="n">stdout</span><span class="o">.</span><span class="n">flush</span><span class="p">()</span>
+        <span class="n">rejectgroupnum</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">groupmax</span><span class="o">+</span><span class="mi">1</span><span class="p">)[</span><span class="n">grouplengthexceeded</span><span class="p">]</span>
+        <span class="n">areject</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">aoverlap</span><span class="p">))[</span><span class="n">np</span><span class="o">.</span><span class="n">in1d</span><span class="p">(</span><span class="n">agroup</span><span class="p">,</span> <span class="n">rejectgroupnum</span><span class="p">)]</span>
+        <span class="n">breject</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">boverlap</span><span class="p">))[</span><span class="n">np</span><span class="o">.</span><span class="n">in1d</span><span class="p">(</span><span class="n">bgroup</span><span class="p">,</span> <span class="n">rejectgroupnum</span><span class="p">)]</span>
+        <span class="n">reject_flag</span> <span class="o">=</span> <span class="kc">True</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">reject_flag</span> <span class="o">=</span> <span class="kc">False</span>
+
+    <span class="c1"># Keep track of which sources have &quot;good&quot; group sizes, and the size of each</span>
+    <span class="c1"># group in the two catalogues (e.g., group 1 has 2 &quot;a&quot; and 3 &quot;b&quot; sources).</span>
+    <span class="n">goodlength</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">logical_not</span><span class="p">(</span><span class="n">grouplengthexceeded</span><span class="p">)</span>
+    <span class="n">acounters</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">dtype</span><span class="o">=</span><span class="nb">int</span><span class="p">,</span> <span class="n">shape</span><span class="o">=</span><span class="p">(</span><span class="n">groupmax</span><span class="p">,))</span>
+    <span class="n">bcounters</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">dtype</span><span class="o">=</span><span class="nb">int</span><span class="p">,</span> <span class="n">shape</span><span class="o">=</span><span class="p">(</span><span class="n">groupmax</span><span class="p">,))</span>
+
+    <span class="n">amaxlen</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">amax</span><span class="p">(</span><span class="n">agrouplengths</span><span class="p">[</span><span class="n">goodlength</span><span class="p">]))</span>
+    <span class="n">bmaxlen</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">amax</span><span class="p">(</span><span class="n">bgrouplengths</span><span class="p">[</span><span class="n">goodlength</span><span class="p">]))</span>
+    <span class="n">alist</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">full</span><span class="p">(</span><span class="n">dtype</span><span class="o">=</span><span class="nb">int</span><span class="p">,</span> <span class="n">shape</span><span class="o">=</span><span class="p">(</span><span class="n">amaxlen</span><span class="p">,</span> <span class="n">groupmax</span><span class="p">),</span> <span class="n">fill_value</span><span class="o">=-</span><span class="mi">1</span><span class="p">,</span> <span class="n">order</span><span class="o">=</span><span class="s1">&#39;F&#39;</span><span class="p">)</span>
+    <span class="n">blist</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">full</span><span class="p">(</span><span class="n">dtype</span><span class="o">=</span><span class="nb">int</span><span class="p">,</span> <span class="n">shape</span><span class="o">=</span><span class="p">(</span><span class="n">bmaxlen</span><span class="p">,</span> <span class="n">groupmax</span><span class="p">),</span> <span class="n">fill_value</span><span class="o">=-</span><span class="mi">1</span><span class="p">,</span> <span class="n">order</span><span class="o">=</span><span class="s1">&#39;F&#39;</span><span class="p">)</span>
+    <span class="c1"># Remember that we started groups from one, so convert to zero-indexing.</span>
+    <span class="c1"># Loop over each source in turn, skipping any which belong to an island</span>
+    <span class="c1"># too large to run, updating alist or blist with the corresponding island</span>
+    <span class="c1"># number the source belongs to.</span>
+    <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">agroup</span><span class="p">)):</span>
+        <span class="k">if</span> <span class="n">goodlength</span><span class="p">[</span><span class="n">agroup</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">-</span><span class="mi">1</span><span class="p">]:</span>
+            <span class="n">alist</span><span class="p">[</span><span class="n">acounters</span><span class="p">[</span><span class="n">agroup</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">-</span><span class="mi">1</span><span class="p">],</span> <span class="n">agroup</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">=</span> <span class="n">i</span>
+            <span class="n">acounters</span><span class="p">[</span><span class="n">agroup</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">+=</span> <span class="mi">1</span>
+    <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">bgroup</span><span class="p">)):</span>
+        <span class="k">if</span> <span class="n">goodlength</span><span class="p">[</span><span class="n">bgroup</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">-</span><span class="mi">1</span><span class="p">]:</span>
+            <span class="n">blist</span><span class="p">[</span><span class="n">bcounters</span><span class="p">[</span><span class="n">bgroup</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">-</span><span class="mi">1</span><span class="p">],</span> <span class="n">bgroup</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">=</span> <span class="n">i</span>
+            <span class="n">bcounters</span><span class="p">[</span><span class="n">bgroup</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">+=</span> <span class="mi">1</span>
+
+    <span class="c1"># Now, we simply want to remove any sources from the list with islands too</span>
+    <span class="c1"># large to run.</span>
+    <span class="n">alist</span> <span class="o">=</span> <span class="n">alist</span><span class="p">[:,</span> <span class="n">goodlength</span><span class="p">]</span>
+    <span class="n">blist</span> <span class="o">=</span> <span class="n">blist</span><span class="p">[:,</span> <span class="n">goodlength</span><span class="p">]</span>
+    <span class="n">agrouplengths</span> <span class="o">=</span> <span class="n">agrouplengths</span><span class="p">[</span><span class="n">goodlength</span><span class="p">]</span>
+    <span class="n">bgrouplengths</span> <span class="o">=</span> <span class="n">bgrouplengths</span><span class="p">[</span><span class="n">goodlength</span><span class="p">]</span>
+
+    <span class="k">if</span> <span class="n">reject_flag</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">alist</span><span class="p">,</span> <span class="n">blist</span><span class="p">,</span> <span class="n">agrouplengths</span><span class="p">,</span> <span class="n">bgrouplengths</span><span class="p">,</span> <span class="n">areject</span><span class="p">,</span> <span class="n">breject</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">alist</span><span class="p">,</span> <span class="n">blist</span><span class="p">,</span> <span class="n">agrouplengths</span><span class="p">,</span> <span class="n">bgrouplengths</span></div>
+
+
+
+<span class="k">def</span> <span class="nf">_initial_group_numbering</span><span class="p">(</span><span class="n">aindices</span><span class="p">,</span> <span class="n">bindices</span><span class="p">,</span> <span class="n">aoverlap</span><span class="p">,</span> <span class="n">boverlap</span><span class="p">,</span> <span class="n">joint_folder_path</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&#39;&#39;&#39;</span>
+<span class="sd">    Iterates over the indices mapping overlaps between the two catalogues,</span>
+<span class="sd">    assigning initial group numbers to sources to be placed in &quot;islands&quot;.</span>
+
+<span class="sd">    Loops through all &quot;lonely&quot;, single-source islands in each catalogue, and</span>
+<span class="sd">    those with a one-to-one mapping of a single &quot;a&quot; object and one &quot;b&quot; source,</span>
+<span class="sd">    before iteratively grouping all multi-object islands together.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    aindices : numpy.ndarray</span>
+<span class="sd">        The indices into catalogue &quot;b&quot;, for each catalogue &quot;a&quot; source, that have</span>
+<span class="sd">        been determined to be potentially positionally correlated.</span>
+<span class="sd">    bindices : numpy.ndarray</span>
+<span class="sd">        The equivalent to ``aindices``, but mapping the overlaps in catalogue &quot;a&quot;</span>
+<span class="sd">        for each catalogue &quot;b&quot; source.</span>
+<span class="sd">    aoverlap : numpy.ndarray</span>
+<span class="sd">        The number of overlaps for each catalogue &quot;a&quot; source (i.e., the length</span>
+<span class="sd">        of each row in ``aindices`` for each source).</span>
+<span class="sd">    boverlap : numpy.ndarray</span>
+<span class="sd">        The equivalent number of overlaps for each catalogue &quot;b&quot; object.</span>
+<span class="sd">    joint_folder_path : string</span>
+<span class="sd">        Location of top-level folder containing the &quot;group&quot; folder in which</span>
+<span class="sd">        index and overlap arrays are stored.</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    agroup : numpy.ndarray</span>
+<span class="sd">        Array detailing the group number of each catalogue &quot;a&quot; source.</span>
+<span class="sd">    bgroup : numpy.ndarray</span>
+<span class="sd">        Array detailing the group number of each catalogue &quot;b&quot; source.</span>
+<span class="sd">    &#39;&#39;&#39;</span>
+    <span class="n">agroup</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">dtype</span><span class="o">=</span><span class="nb">int</span><span class="p">,</span> <span class="n">shape</span><span class="o">=</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">aoverlap</span><span class="p">),))</span>
+    <span class="n">bgroup</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">dtype</span><span class="o">=</span><span class="nb">int</span><span class="p">,</span> <span class="n">shape</span><span class="o">=</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">boverlap</span><span class="p">),))</span>
+
+    <span class="n">group_num</span> <span class="o">=</span> <span class="mi">0</span>
+    <span class="c1"># First search for catalogue &quot;a&quot; sources that are either lonely, with no</span>
+    <span class="c1"># catalogue &quot;b&quot; object near them, or those with only one corresponding</span>
+    <span class="c1"># object in catalogue &quot;b&quot;, then iteratively group from a -&gt; b -&gt; a -&gt; ...</span>
+    <span class="c1"># any remaining objects.</span>
+    <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">agroup</span><span class="p">)):</span>
+        <span class="k">if</span> <span class="n">aoverlap</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="n">group_num</span> <span class="o">+=</span> <span class="mi">1</span>
+            <span class="n">agroup</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="n">group_num</span>
+        <span class="k">elif</span> <span class="n">aoverlap</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">==</span> <span class="mi">1</span> <span class="ow">and</span> <span class="n">boverlap</span><span class="p">[</span><span class="n">aindices</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="n">i</span><span class="p">]]</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
+            <span class="n">group_num</span> <span class="o">+=</span> <span class="mi">1</span>
+            <span class="n">agroup</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="n">group_num</span>
+            <span class="n">bgroup</span><span class="p">[</span><span class="n">aindices</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="n">i</span><span class="p">]]</span> <span class="o">=</span> <span class="n">group_num</span>
+
+    <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">bgroup</span><span class="p">)):</span>
+        <span class="k">if</span> <span class="n">boverlap</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="n">group_num</span> <span class="o">+=</span> <span class="mi">1</span>
+            <span class="n">bgroup</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="n">group_num</span>
+
+    <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">agroup</span><span class="p">)):</span>
+        <span class="k">if</span> <span class="n">agroup</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="n">group_num</span> <span class="o">+=</span> <span class="mi">1</span>
+            <span class="n">_a_to_b</span><span class="p">(</span><span class="n">i</span><span class="p">,</span> <span class="n">group_num</span><span class="p">,</span> <span class="n">aoverlap</span><span class="p">[</span><span class="n">i</span><span class="p">],</span> <span class="n">aindices</span><span class="p">,</span> <span class="n">bindices</span><span class="p">,</span>
+                    <span class="n">aoverlap</span><span class="p">,</span> <span class="n">boverlap</span><span class="p">,</span> <span class="n">agroup</span><span class="p">,</span> <span class="n">bgroup</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">agroup</span><span class="p">,</span> <span class="n">bgroup</span>
+
+
+<span class="k">def</span> <span class="nf">_a_to_b</span><span class="p">(</span><span class="n">ind</span><span class="p">,</span> <span class="n">grp</span><span class="p">,</span> <span class="n">N</span><span class="p">,</span> <span class="n">aindices</span><span class="p">,</span> <span class="n">bindices</span><span class="p">,</span> <span class="n">aoverlap</span><span class="p">,</span> <span class="n">boverlap</span><span class="p">,</span> <span class="n">agroup</span><span class="p">,</span> <span class="n">bgroup</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&#39;&#39;&#39;</span>
+<span class="sd">    Iterative function, along with ``_b_to_a``, to assign all sources overlapping</span>
+<span class="sd">    this catalogue &quot;a&quot; object in catalogue &quot;b&quot; as being in the same group as it.</span>
+
+<span class="sd">    This subsequently calls ``_b_to_a`` for each of those &quot;b&quot; sources, to</span>
+<span class="sd">    assign any &quot;a&quot; sources that overlap those objects to the same group, until</span>
+<span class="sd">    there are no more overlaps.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    ind : integer</span>
+<span class="sd">        The index into ``agroup``, the specific source in question to be assigned</span>
+<span class="sd">        this group number.</span>
+<span class="sd">    grp : integer</span>
+<span class="sd">        The group number of this &quot;island&quot; to be assigned.</span>
+<span class="sd">    N : integer</span>
+<span class="sd">        The number of sources that overlap this catalogue &quot;a&quot; source.</span>
+<span class="sd">    aindices : numpy.ndarray</span>
+<span class="sd">        The indices into catalogue &quot;b&quot;, for each catalogue &quot;a&quot; source, that have</span>
+<span class="sd">        been determined to be potentially positionally correlated.</span>
+<span class="sd">    bindices : numpy.ndarray</span>
+<span class="sd">        The equivalent to ``aindices``, but mapping the overlaps in catalogue &quot;a&quot;</span>
+<span class="sd">        for each catalogue &quot;b&quot; source.</span>
+<span class="sd">    aoverlap : numpy.ndarray</span>
+<span class="sd">        The number of overlaps for each catalogue &quot;a&quot; source (i.e., the length</span>
+<span class="sd">        of each row in ``aindices`` for each source).</span>
+<span class="sd">    boverlap : numpy.ndarray</span>
+<span class="sd">        The equivalent number of overlaps for each catalogue &quot;b&quot; object.</span>
+<span class="sd">    agroup : numpy.ndarray</span>
+<span class="sd">        Array detailing the group number of each catalogue &quot;a&quot; source.</span>
+<span class="sd">    bgroup : numpy.ndarray</span>
+<span class="sd">        Array detailing the group number of each catalogue &quot;b&quot; source.</span>
+<span class="sd">    &#39;&#39;&#39;</span>
+    <span class="n">agroup</span><span class="p">[</span><span class="n">ind</span><span class="p">]</span> <span class="o">=</span> <span class="n">grp</span>
+    <span class="k">for</span> <span class="n">q</span> <span class="ow">in</span> <span class="n">aindices</span><span class="p">[:</span><span class="n">N</span><span class="p">,</span> <span class="n">ind</span><span class="p">]:</span>
+        <span class="k">if</span> <span class="n">bgroup</span><span class="p">[</span><span class="n">q</span><span class="p">]</span> <span class="o">!=</span> <span class="n">grp</span><span class="p">:</span>
+            <span class="n">_b_to_a</span><span class="p">(</span><span class="n">q</span><span class="p">,</span> <span class="n">grp</span><span class="p">,</span> <span class="n">boverlap</span><span class="p">[</span><span class="n">q</span><span class="p">],</span> <span class="n">aindices</span><span class="p">,</span> <span class="n">bindices</span><span class="p">,</span> <span class="n">aoverlap</span><span class="p">,</span> <span class="n">boverlap</span><span class="p">,</span> <span class="n">agroup</span><span class="p">,</span> <span class="n">bgroup</span><span class="p">)</span>
+    <span class="k">return</span>
+
+
+<span class="k">def</span> <span class="nf">_b_to_a</span><span class="p">(</span><span class="n">ind</span><span class="p">,</span> <span class="n">grp</span><span class="p">,</span> <span class="n">N</span><span class="p">,</span> <span class="n">aindices</span><span class="p">,</span> <span class="n">bindices</span><span class="p">,</span> <span class="n">aoverlap</span><span class="p">,</span> <span class="n">boverlap</span><span class="p">,</span> <span class="n">agroup</span><span class="p">,</span> <span class="n">bgroup</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&#39;&#39;&#39;</span>
+<span class="sd">    Iterative function, equivalent to ``_a_to_b``, to assign all sources</span>
+<span class="sd">    overlapping this catalogue &quot;b&quot; object in catalogue &quot;a&quot; with its group number.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    ind : integer</span>
+<span class="sd">        The index into ``bgroup``, the specific source in question to be assigned</span>
+<span class="sd">        this group number.</span>
+<span class="sd">    grp : integer</span>
+<span class="sd">        The group number of this &quot;island&quot; to be assigned.</span>
+<span class="sd">    N : integer</span>
+<span class="sd">        The number of sources that overlap this catalogue &quot;b&quot; source.</span>
+<span class="sd">    aindices : numpy.ndarray</span>
+<span class="sd">        The indices into catalogue &quot;b&quot;, for each catalogue &quot;a&quot; source, that have</span>
+<span class="sd">        been determined to be potentially positionally correlated.</span>
+<span class="sd">    bindices : numpy.ndarray</span>
+<span class="sd">        The equivalent to ``aindices``, but mapping the overlaps in catalogue &quot;a&quot;</span>
+<span class="sd">        for each catalogue &quot;b&quot; source.</span>
+<span class="sd">    aoverlap : numpy.ndarray</span>
+<span class="sd">        The number of overlaps for each catalogue &quot;a&quot; source (i.e., the length</span>
+<span class="sd">        of each row in ``aindices`` for each source).</span>
+<span class="sd">    boverlap : numpy.ndarray</span>
+<span class="sd">        The equivalent number of overlaps for each catalogue &quot;b&quot; object.</span>
+<span class="sd">    agroup : numpy.ndarray</span>
+<span class="sd">        Array detailing the group number of each catalogue &quot;a&quot; source.</span>
+<span class="sd">    bgroup : numpy.ndarray</span>
+<span class="sd">        Array detailing the group number of each catalogue &quot;b&quot; source.</span>
+<span class="sd">    &#39;&#39;&#39;</span>
+    <span class="n">bgroup</span><span class="p">[</span><span class="n">ind</span><span class="p">]</span> <span class="o">=</span> <span class="n">grp</span>
+    <span class="k">for</span> <span class="n">f</span> <span class="ow">in</span> <span class="n">bindices</span><span class="p">[:</span><span class="n">N</span><span class="p">,</span> <span class="n">ind</span><span class="p">]:</span>
+        <span class="k">if</span> <span class="n">agroup</span><span class="p">[</span><span class="n">f</span><span class="p">]</span> <span class="o">!=</span> <span class="n">grp</span><span class="p">:</span>
+            <span class="n">_a_to_b</span><span class="p">(</span><span class="n">f</span><span class="p">,</span> <span class="n">grp</span><span class="p">,</span> <span class="n">aoverlap</span><span class="p">[</span><span class="n">f</span><span class="p">],</span> <span class="n">aindices</span><span class="p">,</span> <span class="n">bindices</span><span class="p">,</span> <span class="n">aoverlap</span><span class="p">,</span> <span class="n">boverlap</span><span class="p">,</span> <span class="n">agroup</span><span class="p">,</span> <span class="n">bgroup</span><span class="p">)</span>
+    <span class="k">return</span>
+
+
+<span class="k">def</span> <span class="nf">_calc_group_length_exceeded</span><span class="p">(</span><span class="n">iterable</span><span class="p">):</span>
+    <span class="n">i</span><span class="p">,</span> <span class="n">n_a</span><span class="p">,</span> <span class="n">n_b</span><span class="p">,</span> <span class="n">maxiters</span> <span class="o">=</span> <span class="n">iterable</span>
+    <span class="k">if</span> <span class="nb">max</span><span class="p">(</span><span class="n">n_a</span><span class="p">,</span> <span class="n">n_b</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">20</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">i</span><span class="p">,</span> <span class="mi">1</span>
+    <span class="n">counter</span> <span class="o">=</span> <span class="mi">0</span>
+    <span class="k">for</span> <span class="n">k</span> <span class="ow">in</span> <span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="nb">min</span><span class="p">(</span><span class="n">n_a</span><span class="p">,</span> <span class="n">n_b</span><span class="p">)</span><span class="o">+</span><span class="mf">1e-10</span><span class="p">,</span> <span class="mi">1</span><span class="p">):</span>
+        <span class="n">kcomb</span> <span class="o">=</span> <span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">prod</span><span class="p">([</span><span class="n">qq</span> <span class="k">for</span> <span class="n">qq</span> <span class="ow">in</span> <span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="n">n_a</span><span class="o">-</span><span class="n">k</span><span class="o">+</span><span class="mi">1</span><span class="p">,</span> <span class="n">n_a</span><span class="o">+</span><span class="mf">1e-10</span><span class="p">,</span> <span class="mi">1</span><span class="p">)])</span> <span class="o">/</span>
+                 <span class="n">scipy</span><span class="o">.</span><span class="n">special</span><span class="o">.</span><span class="n">factorial</span><span class="p">(</span><span class="n">k</span><span class="p">))</span>
+        <span class="n">kperm</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">prod</span><span class="p">([</span><span class="n">qq</span> <span class="k">for</span> <span class="n">qq</span> <span class="ow">in</span> <span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="n">n_b</span><span class="o">-</span><span class="n">k</span><span class="o">+</span><span class="mi">1</span><span class="p">,</span> <span class="n">n_b</span><span class="o">+</span><span class="mf">1e-10</span><span class="p">,</span> <span class="mi">1</span><span class="p">)])</span>
+        <span class="n">counter</span> <span class="o">+=</span> <span class="n">kcomb</span><span class="o">*</span><span class="n">kperm</span>
+        <span class="k">if</span> <span class="n">counter</span> <span class="o">&gt;</span> <span class="n">maxiters</span><span class="p">:</span>
+            <span class="n">exceed_flag</span> <span class="o">=</span> <span class="mi">1</span>
+            <span class="k">return</span> <span class="n">i</span><span class="p">,</span> <span class="n">exceed_flag</span>
+    <span class="n">exceed_flag</span> <span class="o">=</span> <span class="mi">0</span>
+    <span class="k">return</span> <span class="n">i</span><span class="p">,</span> <span class="n">exceed_flag</span>
+</pre></div>
+
+            <div class="clearer"></div>
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="../../f-modindex.html" title="Fortran Module Index"
+             >fortran modules</a> |</li>
+        <li class="right" >
+          <a href="../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../index.html">macauff</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../index.html" >Module code</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">macauff.make_set_list</a></li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+    &#169; Copyright 2022, Tom J Wilson.
+      Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 7.2.6.
+    </div>
+  </body>
+</html>

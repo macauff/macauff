@@ -1,0 +1,409 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>Perturbation AUF Fortran Subroutines &#8212; macauff</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=4848ba22" />
+    <link rel="stylesheet" type="text/css" href="../_static/pyramid.css?v=a5b9c134" />
+    <link rel="stylesheet" type="text/css" href="../_static/graphviz.css?v=eafc0fe6" />
+    <script src="../_static/documentation_options.js?v=5929fcd5"></script>
+    <script src="../_static/doctools.js?v=888ff710"></script>
+    <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="Group Sources Fortran Subroutines" href="group_sources_docs.html" />
+    <link rel="prev" title="macauff Algorithms" href="../algorithms.html" />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Neuton&amp;subset=latin" type="text/css" media="screen" charset="utf-8" />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Nobile:regular,italic,bold,bolditalic&amp;subset=latin" type="text/css" media="screen" charset="utf-8" />
+<!--[if lte IE 6]>
+<link rel="stylesheet" href="../_static/ie6.css" type="text/css" media="screen" charset="utf-8" />
+<![endif]-->
+
+  </head><body>
+
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="../f-modindex.html" title="Fortran Module Index"
+             >fortran modules</a> |</li>
+        <li class="right" >
+          <a href="../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="right" >
+          <a href="group_sources_docs.html" title="Group Sources Fortran Subroutines"
+             accesskey="N">next</a> |</li>
+        <li class="right" >
+          <a href="../algorithms.html" title="macauff Algorithms"
+             accesskey="P">previous</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../index.html">macauff</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">Perturbation AUF Fortran Subroutines</a></li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <section id="perturbation-auf-fortran-subroutines">
+<h1>Perturbation AUF Fortran Subroutines<a class="headerlink" href="#perturbation-auf-fortran-subroutines" title="Link to this heading">¶</a></h1>
+<p class="rubric" id="f/perturbation_auf_fortran">Description</p>
+<p>This module provides the Fortran code for the handling of the creation of perturbation
+component of the Astrometric Uncertainty Function.</p>
+<p class="rubric">Quick access</p>
+<dl class="field-list simple">
+<dt class="field-odd">Routines<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference internal" href="#f/perturbation_auf_fortran/chord_integral_eval" title="f/perturbation_auf_fortran/chord_integral_eval"><code class="xref f f-func docutils literal notranslate"><span class="pre">chord_integral_eval()</span></code></a>, <a class="reference internal" href="#f/perturbation_auf_fortran/fit_skew" title="f/perturbation_auf_fortran/fit_skew"><code class="xref f f-func docutils literal notranslate"><span class="pre">fit_skew()</span></code></a>, <a class="reference internal" href="#f/perturbation_auf_fortran/fourier_transform" title="f/perturbation_auf_fortran/fourier_transform"><code class="xref f f-func docutils literal notranslate"><span class="pre">fourier_transform()</span></code></a>, <a class="reference internal" href="#f/perturbation_auf_fortran/get_circle_area_overlap" title="f/perturbation_auf_fortran/get_circle_area_overlap"><code class="xref f f-func docutils literal notranslate"><span class="pre">get_circle_area_overlap()</span></code></a>, <a class="reference internal" href="#f/perturbation_auf_fortran/get_density" title="f/perturbation_auf_fortran/get_density"><code class="xref f f-func docutils literal notranslate"><span class="pre">get_density()</span></code></a>, <a class="reference internal" href="#f/perturbation_auf_fortran/get_random_seed_size" title="f/perturbation_auf_fortran/get_random_seed_size"><code class="xref f f-func docutils literal notranslate"><span class="pre">get_random_seed_size()</span></code></a>, <a class="reference internal" href="#f/perturbation_auf_fortran/histogram1d_dp" title="f/perturbation_auf_fortran/histogram1d_dp"><code class="xref f f-func docutils literal notranslate"><span class="pre">histogram1d_dp()</span></code></a>, <a class="reference internal" href="#f/perturbation_auf_fortran/ipos_dp" title="f/perturbation_auf_fortran/ipos_dp"><code class="xref f f-func docutils literal notranslate"><span class="pre">ipos_dp()</span></code></a>, <a class="reference internal" href="#f/perturbation_auf_fortran/perturb_aufs" title="f/perturbation_auf_fortran/perturb_aufs"><code class="xref f f-func docutils literal notranslate"><span class="pre">perturb_aufs()</span></code></a>, <a class="reference internal" href="#f/perturbation_auf_fortran/psf_perturb" title="f/perturbation_auf_fortran/psf_perturb"><code class="xref f f-func docutils literal notranslate"><span class="pre">psf_perturb()</span></code></a>, <a class="reference internal" href="#f/perturbation_auf_fortran/scatter_perturbers" title="f/perturbation_auf_fortran/scatter_perturbers"><code class="xref f f-func docutils literal notranslate"><span class="pre">scatter_perturbers()</span></code></a>, <a class="reference internal" href="#f/perturbation_auf_fortran/xval_dp" title="f/perturbation_auf_fortran/xval_dp"><code class="xref f f-func docutils literal notranslate"><span class="pre">xval_dp()</span></code></a></p>
+</dd>
+</dl>
+<p class="rubric">Variables</p>
+<ul>
+<li><dl class="f variable">
+<dt class="sig sig-object f" id="f/perturbation_auf_fortran/dp">
+<span class="sig-prename descclassname"><span class="pre">perturbation_auf_fortran/</span></span><span class="sig-name descname"><span class="pre">dp</span></span><em> <span class="pre">[</span></em><em><span class="pre">integer</span></em><em><span class="pre">,</span></em><em><span class="pre">parameter=</span></em><span class="pre">kind</span><span class="pre">(</span><span class="pre">0</span><span class="pre">.</span><span class="pre">0d0</span><span class="pre">)</span><em><span class="pre">]</span></em><a class="headerlink" href="#f/perturbation_auf_fortran/dp" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+</li>
+<li><dl class="f variable">
+<dt class="sig sig-object f" id="f/perturbation_auf_fortran/pi">
+<span class="sig-prename descclassname"><span class="pre">perturbation_auf_fortran/</span></span><span class="sig-name descname"><span class="pre">pi</span></span><em> <span class="pre">[</span></em><em><span class="pre">real</span></em><em><span class="pre">,</span></em><em><span class="pre">parameter=</span></em><span class="pre">4</span><span class="pre">.</span><span class="pre">0_dp</span><span class="pre">*</span><span class="pre">atan</span><span class="pre">(</span><span class="pre">1</span><span class="pre">.</span><span class="pre">0_dp</span><span class="pre">)</span><em><span class="pre">]</span></em><a class="headerlink" href="#f/perturbation_auf_fortran/pi" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+</li>
+</ul>
+<p class="rubric">Subroutines and functions</p>
+<dl>
+<dt class="sig sig-object f" id="f/perturbation_auf_fortran/get_density">
+<em class="property"><span class="pre">subroutine</span>&#160; </em><span class="sig-prename descclassname"><span class="pre">perturbation_auf_fortran/</span></span><span class="sig-name descname"><span class="pre">get_density</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="pre">a_ax1</span></em>, <em class="sig-param"><span class="pre">a_ax2</span></em>, <em class="sig-param"><span class="pre">b_ax1</span></em>, <em class="sig-param"><span class="pre">b_ax2</span></em>, <em class="sig-param"><span class="pre">maxdist</span></em>, <em class="sig-param"><span class="pre">counts</span></em><span class="sig-paren">)</span><a class="headerlink" href="#f/perturbation_auf_fortran/get_density" title="Link to this definition">¶</a></dt>
+<dd><p>Calculate the number of sources in a given catalogue within a specified radius of each source.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>a_ax1</strong> (*)<em> [</em><em>real</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>a_ax2</strong> (*)<em> [</em><em>real</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>b_ax1</strong> (*)<em> [</em><em>real</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>b_ax2</strong> (*)<em> [</em><em>real</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>maxdist</strong><em> [</em><em>real</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>counts</strong> (size(a_ax1)<em> [</em><em>integer</em><em>,</em><em>out</em><em>]</em></p></li>
+</ul>
+</dd>
+<dt class="field-even">Call to<span class="colon">:</span></dt>
+<dd class="field-even"><p><a class="reference internal" href="shared_library_docs.html#f/_/haversine" title="f/_/haversine"><code class="xref f f-func docutils literal notranslate"><span class="pre">haversine()</span></code></a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl>
+<dt class="sig sig-object f" id="f/perturbation_auf_fortran/get_circle_area_overlap">
+<em class="property"><span class="pre">subroutine</span>&#160; </em><span class="sig-prename descclassname"><span class="pre">perturbation_auf_fortran/</span></span><span class="sig-name descname"><span class="pre">get_circle_area_overlap</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="pre">cat_ax1</span></em>, <em class="sig-param"><span class="pre">cat_ax2</span></em>, <em class="sig-param"><span class="pre">density_radius</span></em>, <em class="sig-param"><span class="pre">min_lon</span></em>, <em class="sig-param"><span class="pre">max_lon</span></em>, <em class="sig-param"><span class="pre">min_lat</span></em>, <em class="sig-param"><span class="pre">max_lat</span></em>, <em class="sig-param"><span class="pre">circ_overlap_area</span></em><span class="sig-paren">)</span><a class="headerlink" href="#f/perturbation_auf_fortran/get_circle_area_overlap" title="Link to this definition">¶</a></dt>
+<dd><p>Calculates the amount of circle overlap with a rectangle of particular coordinates. Adapted from
+code provided by B. Retter, from Retter, Hatchell &amp; Naylor (2019, MNRAS, 487, 887).</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>cat_ax1</strong> (*)<em> [</em><em>real</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>cat_ax2</strong> (*)<em> [</em><em>real</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>density_radius</strong><em> [</em><em>real</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>min_lon</strong><em> [</em><em>real</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>max_lon</strong><em> [</em><em>real</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>min_lat</strong><em> [</em><em>real</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>max_lat</strong><em> [</em><em>real</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>circ_overlap_area</strong> (size(cat_ax1)<em> [</em><em>real</em><em>,</em><em>out</em><em>]</em></p></li>
+</ul>
+</dd>
+<dt class="field-even">Call to<span class="colon">:</span></dt>
+<dd class="field-even"><p><a class="reference internal" href="#f/perturbation_auf_fortran/chord_integral_eval" title="f/perturbation_auf_fortran/chord_integral_eval"><code class="xref f f-func docutils literal notranslate"><span class="pre">chord_integral_eval()</span></code></a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl>
+<dt class="sig sig-object f" id="f/perturbation_auf_fortran/chord_integral_eval">
+<em class="property"><span class="pre">subroutine</span>&#160; </em><span class="sig-prename descclassname"><span class="pre">perturbation_auf_fortran/</span></span><span class="sig-name descname"><span class="pre">chord_integral_eval</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="pre">x</span></em>, <em class="sig-param"><span class="pre">r</span></em>, <em class="sig-param"><span class="pre">h</span></em>, <em class="sig-param"><span class="pre">integral</span></em><span class="sig-paren">)</span><a class="headerlink" href="#f/perturbation_auf_fortran/chord_integral_eval" title="Link to this definition">¶</a></dt>
+<dd><p>Evaluate the indefinite integral of a chord along its orthogonal axis.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>x</strong><em> [</em><em>real</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>r</strong><em> [</em><em>real</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>h</strong><em> [</em><em>real</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>integral</strong><em> [</em><em>real</em><em>,</em><em>out</em><em>]</em></p></li>
+</ul>
+</dd>
+<dt class="field-even">Called from<span class="colon">:</span></dt>
+<dd class="field-even"><p><a class="reference internal" href="#f/perturbation_auf_fortran/get_circle_area_overlap" title="f/perturbation_auf_fortran/get_circle_area_overlap"><code class="xref f f-func docutils literal notranslate"><span class="pre">get_circle_area_overlap()</span></code></a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl>
+<dt class="sig sig-object f" id="f/perturbation_auf_fortran/perturb_aufs">
+<em class="property"><span class="pre">subroutine</span>&#160; </em><span class="sig-prename descclassname"><span class="pre">perturbation_auf_fortran/</span></span><span class="sig-name descname"><span class="pre">perturb_aufs</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="pre">narray</span></em>, <em class="sig-param"><span class="pre">magarray</span></em>, <em class="sig-param"><span class="pre">r</span></em>, <em class="sig-param"><span class="pre">dr</span></em>, <em class="sig-param"><span class="pre">rbins</span></em>, <em class="sig-param"><span class="pre">j0s</span></em>, <em class="sig-param"><span class="pre">mag_d</span></em>, <em class="sig-param"><span class="pre">dmag_d</span></em>, <em class="sig-param"><span class="pre">ds</span></em>, <em class="sig-param"><span class="pre">n_norm</span></em>, <em class="sig-param"><span class="pre">num_int</span></em>, <em class="sig-param"><span class="pre">dmcut</span></em>, <em class="sig-param"><span class="pre">psfr</span></em>, <em class="sig-param"><span class="pre">psfsig</span></em>, <em class="sig-param"><span class="pre">lentrials</span></em>, <em class="sig-param"><span class="pre">seed</span></em>, <em class="sig-param"><span class="pre">dd_params</span></em>, <em class="sig-param"><span class="pre">l_cut</span></em>, <em class="sig-param"><span class="pre">algorithm_type</span></em>, <em class="sig-param"><span class="pre">fracgrid</span></em>, <em class="sig-param"><span class="pre">fluxav</span></em>, <em class="sig-param"><span class="pre">fouriergrid</span></em>, <em class="sig-param"><span class="pre">rgrid</span></em>, <em class="sig-param"><span class="pre">intrgrid</span></em><span class="sig-paren">)</span><a class="headerlink" href="#f/perturbation_auf_fortran/perturb_aufs" title="Link to this definition">¶</a></dt>
+<dd><p>Fortran wrapper for the perturbation AUF component calculation for a set of density-magnitude
+combinations, creating the various parameters needed to use the distribution of perturbations.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>narray</strong> (*)<em> [</em><em>real</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>magarray</strong> (*)<em> [</em><em>real</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>r</strong> (*)<em> [</em><em>real</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>dr</strong> (*)<em> [</em><em>real</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>rbins</strong> (*)<em> [</em><em>real</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>j0s</strong> (,)<em> [</em><em>real</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>mag_d</strong> (*)<em> [</em><em>real</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>dmag_d</strong> (*)<em> [</em><em>real</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>ds</strong> (*)<em> [</em><em>real</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>n_norm</strong><em> [</em><em>real</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>num_int</strong> (*)<em> [</em><em>integer</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>dmcut</strong> (*)<em> [</em><em>real</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>psfr</strong><em> [</em><em>real</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>psfsig</strong><em> [</em><em>real</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>lentrials</strong><em> [</em><em>integer</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>seed</strong> (,)<em> [</em><em>integer</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>dd_params</strong> (,,*)<em> [</em><em>real</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>l_cut</strong> (*)<em> [</em><em>real</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>algorithm_type</strong><em> [</em><em>character</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>fracgrid</strong> (size(dmcut,size(narray)<em> [</em><em>real</em><em>,</em><em>out</em><em>]</em></p></li>
+<li><p><strong>fluxav</strong> (size(narray)<em> [</em><em>real</em><em>,</em><em>out</em><em>]</em></p></li>
+<li><p><strong>fouriergrid</strong> (size(j0s, 2,size(narray)<em> [</em><em>real</em><em>,</em><em>out</em><em>]</em></p></li>
+<li><p><strong>rgrid</strong> (size(r,size(narray)<em> [</em><em>real</em><em>,</em><em>out</em><em>]</em></p></li>
+<li><p><strong>intrgrid</strong> (size(r,size(narray)<em> [</em><em>real</em><em>,</em><em>out</em><em>]</em></p></li>
+</ul>
+</dd>
+<dt class="field-even">Call to<span class="colon">:</span></dt>
+<dd class="field-even"><p><a class="reference internal" href="#f/perturbation_auf_fortran/scatter_perturbers" title="f/perturbation_auf_fortran/scatter_perturbers"><code class="xref f f-func docutils literal notranslate"><span class="pre">scatter_perturbers()</span></code></a>, <a class="reference internal" href="#f/perturbation_auf_fortran/histogram1d_dp" title="f/perturbation_auf_fortran/histogram1d_dp"><code class="xref f f-func docutils literal notranslate"><span class="pre">histogram1d_dp()</span></code></a>, <a class="reference internal" href="#f/perturbation_auf_fortran/fourier_transform" title="f/perturbation_auf_fortran/fourier_transform"><code class="xref f f-func docutils literal notranslate"><span class="pre">fourier_transform()</span></code></a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl>
+<dt class="sig sig-object f" id="f/perturbation_auf_fortran/scatter_perturbers">
+<em class="property"><span class="pre">subroutine</span>&#160; </em><span class="sig-prename descclassname"><span class="pre">perturbation_auf_fortran/</span></span><span class="sig-name descname"><span class="pre">scatter_perturbers</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="pre">dns</span></em>, <em class="sig-param"><span class="pre">dms</span></em>, <em class="sig-param"><span class="pre">psfr</span></em>, <em class="sig-param"><span class="pre">maxk</span></em>, <em class="sig-param"><span class="pre">dmcut</span></em>, <em class="sig-param"><span class="pre">psfsig</span></em>, <em class="sig-param"><span class="pre">offsets</span></em>, <em class="sig-param"><span class="pre">fraccontam</span></em>, <em class="sig-param"><span class="pre">fluxcontam</span></em>, <em class="sig-param"><span class="pre">dd_params</span></em>, <em class="sig-param"><span class="pre">l_cut</span></em>, <em class="sig-param"><span class="pre">ddms</span></em>, <em class="sig-param"><span class="pre">algorithm_type</span></em>, <em class="sig-param"><span class="pre">lentrials</span></em>, <em class="sig-param"><span class="pre">seed</span></em><span class="sig-paren">)</span><a class="headerlink" href="#f/perturbation_auf_fortran/scatter_perturbers" title="Link to this definition">¶</a></dt>
+<dd><p>Given a set of average numbers of sources per PSF circle for a series of relative fluxes, populate
+a bright, central source’s PSF with randomly placed sources, and calculate the flux brightening
+and expected PSF centroid shift.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>dns</strong> (*)<em> [</em><em>real</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>dms</strong> (*)<em> [</em><em>real</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>psfr</strong><em> [</em><em>real</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>maxk</strong><em> [</em><em>integer</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>dmcut</strong> (*)<em> [</em><em>real</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>psfsig</strong><em> [</em><em>real</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>offsets</strong> (lentrials)<em> [</em><em>real</em><em>,</em><em>out</em><em>]</em></p></li>
+<li><p><strong>fraccontam</strong> (size(dmcut)<em> [</em><em>real</em><em>,</em><em>out</em><em>]</em></p></li>
+<li><p><strong>fluxcontam</strong> (lentrials)<em> [</em><em>real</em><em>,</em><em>out</em><em>]</em></p></li>
+<li><p><strong>dd_params</strong> (,,*)<em> [</em><em>real</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>l_cut</strong> (*)<em> [</em><em>real</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>ddms</strong> (*)<em> [</em><em>real</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>algorithm_type</strong><em> [</em><em>character</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>lentrials</strong><em> [</em><em>integer</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>seed</strong> (*)<em> [</em><em>integer</em><em>,</em><em>in</em><em>]</em></p></li>
+</ul>
+</dd>
+<dt class="field-even">Called from<span class="colon">:</span></dt>
+<dd class="field-even"><p><a class="reference internal" href="#f/perturbation_auf_fortran/perturb_aufs" title="f/perturbation_auf_fortran/perturb_aufs"><code class="xref f f-func docutils literal notranslate"><span class="pre">perturb_aufs()</span></code></a></p>
+</dd>
+<dt class="field-odd">Call to<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference internal" href="#f/perturbation_auf_fortran/psf_perturb" title="f/perturbation_auf_fortran/psf_perturb"><code class="xref f f-func docutils literal notranslate"><span class="pre">psf_perturb()</span></code></a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl>
+<dt class="sig sig-object f" id="f/perturbation_auf_fortran/psf_perturb">
+<em class="property"><span class="pre">subroutine</span>&#160; </em><span class="sig-prename descclassname"><span class="pre">perturbation_auf_fortran/</span></span><span class="sig-name descname"><span class="pre">psf_perturb</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="pre">x</span></em>, <em class="sig-param"><span class="pre">y</span></em>, <em class="sig-param"><span class="pre">r</span></em>, <em class="sig-param"><span class="pre">fs</span></em>, <em class="sig-param"><span class="pre">dd_params</span></em>, <em class="sig-param"><span class="pre">flux</span></em>, <em class="sig-param"><span class="pre">psfsig</span></em>, <em class="sig-param"><span class="pre">l_cut</span></em>, <em class="sig-param"><span class="pre">xav</span></em>, <em class="sig-param"><span class="pre">yav</span></em><span class="sig-paren">)</span><a class="headerlink" href="#f/perturbation_auf_fortran/psf_perturb" title="Link to this definition">¶</a></dt>
+<dd><p>For a set of cartesian coordinates and relative fluxes for perturbers, depending on the flux
+of the objects, calculate different perturbation offsets based on Gaussian PSF model fits with
+constant background noise.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>x</strong> (*)<em> [</em><em>real</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>y</strong> (*)<em> [</em><em>real</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>r</strong> (*)<em> [</em><em>real</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>fs</strong> (*)<em> [</em><em>real</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>dd_params</strong> (,,*)<em> [</em><em>real</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>flux</strong><em> [</em><em>real</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>psfsig</strong><em> [</em><em>real</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>l_cut</strong> (*)<em> [</em><em>real</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>xav</strong><em> [</em><em>real</em><em>,</em><em>out</em><em>]</em></p></li>
+<li><p><strong>yav</strong><em> [</em><em>real</em><em>,</em><em>out</em><em>]</em></p></li>
+</ul>
+</dd>
+<dt class="field-even">Called from<span class="colon">:</span></dt>
+<dd class="field-even"><p><a class="reference internal" href="#f/perturbation_auf_fortran/scatter_perturbers" title="f/perturbation_auf_fortran/scatter_perturbers"><code class="xref f f-func docutils literal notranslate"><span class="pre">scatter_perturbers()</span></code></a></p>
+</dd>
+<dt class="field-odd">Call to<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference internal" href="#f/perturbation_auf_fortran/fit_skew" title="f/perturbation_auf_fortran/fit_skew"><code class="xref f f-func docutils literal notranslate"><span class="pre">fit_skew()</span></code></a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl>
+<dt class="sig sig-object f" id="f/perturbation_auf_fortran/fit_skew">
+<em class="property"><span class="pre">subroutine</span>&#160; </em><span class="sig-prename descclassname"><span class="pre">perturbation_auf_fortran/</span></span><span class="sig-name descname"><span class="pre">fit_skew</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="pre">params</span></em>, <em class="sig-param"><span class="pre">x</span></em>, <em class="sig-param"><span class="pre">l</span></em>, <em class="sig-param"><span class="pre">y</span></em><span class="sig-paren">)</span><a class="headerlink" href="#f/perturbation_auf_fortran/fit_skew" title="Link to this definition">¶</a></dt>
+<dd><p>Calculate the skew-normal perturber effect, evaluated at some perturber separation x.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>params</strong> (*)<em> [</em><em>real</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>x</strong><em> [</em><em>real</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>l</strong><em> [</em><em>real</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>y</strong><em> [</em><em>real</em><em>,</em><em>out</em><em>]</em></p></li>
+</ul>
+</dd>
+<dt class="field-even">Called from<span class="colon">:</span></dt>
+<dd class="field-even"><p><a class="reference internal" href="#f/perturbation_auf_fortran/psf_perturb" title="f/perturbation_auf_fortran/psf_perturb"><code class="xref f f-func docutils literal notranslate"><span class="pre">psf_perturb()</span></code></a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl>
+<dt class="sig sig-object f" id="f/perturbation_auf_fortran/xval_dp">
+<em class="property"><span class="pre">subroutine</span>&#160; </em><span class="sig-prename descclassname"><span class="pre">perturbation_auf_fortran/</span></span><span class="sig-name descname"><span class="pre">xval_dp</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="pre">xmin</span></em>, <em class="sig-param"><span class="pre">xmax</span></em>, <em class="sig-param"><span class="pre">i</span></em>, <em class="sig-param"><span class="pre">nbin</span></em>, <em class="sig-param"><span class="pre">xval</span></em><span class="sig-paren">)</span><a class="headerlink" href="#f/perturbation_auf_fortran/xval_dp" title="Link to this definition">¶</a></dt>
+<dd><p>Find central value of a bin for a regular histogram</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>xmin</strong><em> [</em><em>real</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>xmax</strong><em> [</em><em>real</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>i</strong><em> [</em><em>integer</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>nbin</strong><em> [</em><em>integer</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>xval</strong><em> [</em><em>real</em><em>,</em><em>out</em><em>]</em></p></li>
+</ul>
+</dd>
+<dt class="field-even">Called from<span class="colon">:</span></dt>
+<dd class="field-even"><p><a class="reference internal" href="#f/perturbation_auf_fortran/histogram1d_dp" title="f/perturbation_auf_fortran/histogram1d_dp"><code class="xref f f-func docutils literal notranslate"><span class="pre">histogram1d_dp()</span></code></a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl>
+<dt class="sig sig-object f" id="f/perturbation_auf_fortran/ipos_dp">
+<em class="property"><span class="pre">subroutine</span>&#160; </em><span class="sig-prename descclassname"><span class="pre">perturbation_auf_fortran/</span></span><span class="sig-name descname"><span class="pre">ipos_dp</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="pre">xmin</span></em>, <em class="sig-param"><span class="pre">xmax</span></em>, <em class="sig-param"><span class="pre">x</span></em>, <em class="sig-param"><span class="pre">nbin</span></em>, <em class="sig-param"><span class="pre">ipos</span></em><span class="sig-paren">)</span><a class="headerlink" href="#f/perturbation_auf_fortran/ipos_dp" title="Link to this definition">¶</a></dt>
+<dd><p>Find bin a value falls in for a regular histogram</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>xmin</strong><em> [</em><em>real</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>xmax</strong><em> [</em><em>real</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>x</strong><em> [</em><em>real</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>nbin</strong><em> [</em><em>integer</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>ipos</strong><em> [</em><em>integer</em><em>,</em><em>out</em><em>]</em></p></li>
+</ul>
+</dd>
+<dt class="field-even">Called from<span class="colon">:</span></dt>
+<dd class="field-even"><p><a class="reference internal" href="#f/perturbation_auf_fortran/histogram1d_dp" title="f/perturbation_auf_fortran/histogram1d_dp"><code class="xref f f-func docutils literal notranslate"><span class="pre">histogram1d_dp()</span></code></a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl>
+<dt class="sig sig-object f" id="f/perturbation_auf_fortran/histogram1d_dp">
+<em class="property"><span class="pre">subroutine</span>&#160; </em><span class="sig-prename descclassname"><span class="pre">perturbation_auf_fortran/</span></span><span class="sig-name descname"><span class="pre">histogram1d_dp</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="pre">array</span></em>, <em class="sig-param"><span class="pre">xmin</span></em>, <em class="sig-param"><span class="pre">xmax</span></em>, <em class="sig-param"><span class="pre">nbin</span></em>, <em class="sig-param"><span class="pre">hist_x</span></em>, <em class="sig-param"><span class="pre">hist_y</span></em><span class="optional">[</span>, <em class="sig-param"><span class="pre">mask</span></em><span class="optional">[</span>, <em class="sig-param"><span class="pre">weights</span></em><span class="optional">]</span><span class="optional">]</span><span class="sig-paren">)</span><a class="headerlink" href="#f/perturbation_auf_fortran/histogram1d_dp" title="Link to this definition">¶</a></dt>
+<dd><p>Bin 1D array of values into 1D regular histogram</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>array</strong> (*)<em> [</em><em>real</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>xmin</strong><em> [</em><em>real</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>xmax</strong><em> [</em><em>real</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>nbin</strong><em> [</em><em>integer</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>hist_x</strong> (nbin)<em> [</em><em>real</em><em>,</em><em>out</em><em>]</em></p></li>
+<li><p><strong>hist_y</strong> (nbin)<em> [</em><em>real</em><em>,</em><em>out</em><em>]</em></p></li>
+<li><p><strong>mask</strong> (*)<em> [</em><em>logical</em><em>,</em><em>in,</em><em>]</em></p></li>
+<li><p><strong>weights</strong> (*)<em> [</em><em>real</em><em>,</em><em>in,</em><em>]</em></p></li>
+</ul>
+</dd>
+<dt class="field-even">Called from<span class="colon">:</span></dt>
+<dd class="field-even"><p><a class="reference internal" href="#f/perturbation_auf_fortran/perturb_aufs" title="f/perturbation_auf_fortran/perturb_aufs"><code class="xref f f-func docutils literal notranslate"><span class="pre">perturb_aufs()</span></code></a></p>
+</dd>
+<dt class="field-odd">Call to<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference internal" href="#f/perturbation_auf_fortran/ipos_dp" title="f/perturbation_auf_fortran/ipos_dp"><code class="xref f f-func docutils literal notranslate"><span class="pre">ipos_dp()</span></code></a>, <a class="reference internal" href="#f/perturbation_auf_fortran/xval_dp" title="f/perturbation_auf_fortran/xval_dp"><code class="xref f f-func docutils literal notranslate"><span class="pre">xval_dp()</span></code></a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl>
+<dt class="sig sig-object f" id="f/perturbation_auf_fortran/fourier_transform">
+<em class="property"><span class="pre">subroutine</span>&#160; </em><span class="sig-prename descclassname"><span class="pre">perturbation_auf_fortran/</span></span><span class="sig-name descname"><span class="pre">fourier_transform</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="pre">pr</span></em>, <em class="sig-param"><span class="pre">r</span></em>, <em class="sig-param"><span class="pre">dr</span></em>, <em class="sig-param"><span class="pre">j0s</span></em>, <em class="sig-param"><span class="pre">g</span></em><span class="sig-paren">)</span><a class="headerlink" href="#f/perturbation_auf_fortran/fourier_transform" title="Link to this definition">¶</a></dt>
+<dd><p>Calculates the Fourier-Bessel transform, or Hankel transform of zeroth order, of a function.
+This is equivalent to a two-dimensional Fourier transform in the limiting case of circular
+symmetry.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>pr</strong> (*)<em> [</em><em>real</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>r</strong> (*)<em> [</em><em>real</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>dr</strong> (*)<em> [</em><em>real</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>j0s</strong> (,)<em> [</em><em>real</em><em>,</em><em>in</em><em>]</em></p></li>
+<li><p><strong>g</strong> (size(j0s, 2)<em> [</em><em>real</em><em>,</em><em>out</em><em>]</em></p></li>
+</ul>
+</dd>
+<dt class="field-even">Called from<span class="colon">:</span></dt>
+<dd class="field-even"><p><a class="reference internal" href="#f/perturbation_auf_fortran/perturb_aufs" title="f/perturbation_auf_fortran/perturb_aufs"><code class="xref f f-func docutils literal notranslate"><span class="pre">perturb_aufs()</span></code></a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl>
+<dt class="sig sig-object f" id="f/perturbation_auf_fortran/get_random_seed_size">
+<em class="property"><span class="pre">subroutine</span>&#160; </em><span class="sig-prename descclassname"><span class="pre">perturbation_auf_fortran/</span></span><span class="sig-name descname"><span class="pre">get_random_seed_size</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="pre">size_bn</span></em><span class="sig-paren">)</span><a class="headerlink" href="#f/perturbation_auf_fortran/get_random_seed_size" title="Link to this definition">¶</a></dt>
+<dd><p>Number of initial seeds expected by random_seed, to be initialised for a specified RNG setup.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>size_bn</strong><em> [</em><em>integer</em><em>,</em><em>out</em><em>]</em></p>
+</dd>
+</dl>
+</dd></dl>
+
+</section>
+
+
+            <div class="clearer"></div>
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="../f-modindex.html" title="Fortran Module Index"
+             >fortran modules</a> |</li>
+        <li class="right" >
+          <a href="../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="right" >
+          <a href="group_sources_docs.html" title="Group Sources Fortran Subroutines"
+             >next</a> |</li>
+        <li class="right" >
+          <a href="../algorithms.html" title="macauff Algorithms"
+             >previous</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../index.html">macauff</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">Perturbation AUF Fortran Subroutines</a></li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+    &#169; Copyright 2022, Tom J Wilson.
+      Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 7.2.6.
+    </div>
+  </body>
+</html>

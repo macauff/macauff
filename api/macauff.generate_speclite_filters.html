@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>generate_speclite_filters &#8212; macauff</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=4848ba22" />
+    <link rel="stylesheet" type="text/css" href="../_static/pyramid.css?v=a5b9c134" />
+    <link rel="stylesheet" type="text/css" href="../_static/graphviz.css?v=eafc0fe6" />
+    <script src="../_static/documentation_options.js?v=5929fcd5"></script>
+    <script src="../_static/doctools.js?v=888ff710"></script>
+    <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="make_island_groupings" href="macauff.make_island_groupings.html" />
+    <link rel="prev" title="csv_to_npy" href="macauff.csv_to_npy.html" />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Neuton&amp;subset=latin" type="text/css" media="screen" charset="utf-8" />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Nobile:regular,italic,bold,bolditalic&amp;subset=latin" type="text/css" media="screen" charset="utf-8" />
+<!--[if lte IE 6]>
+<link rel="stylesheet" href="../_static/ie6.css" type="text/css" media="screen" charset="utf-8" />
+<![endif]-->
+
+  </head><body>
+
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="../f-modindex.html" title="Fortran Module Index"
+             >fortran modules</a> |</li>
+        <li class="right" >
+          <a href="../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="right" >
+          <a href="macauff.make_island_groupings.html" title="make_island_groupings"
+             accesskey="N">next</a> |</li>
+        <li class="right" >
+          <a href="macauff.csv_to_npy.html" title="csv_to_npy"
+             accesskey="P">previous</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../index.html">macauff</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../macauff.html" accesskey="U"><code class="docutils literal notranslate"><span class="pre">macauff</span></code> Documentation</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">generate_speclite_filters</a></li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <section id="generate-speclite-filters">
+<h1>generate_speclite_filters<a class="headerlink" href="#generate-speclite-filters" title="Link to this heading">¶</a></h1>
+<dl class="py function">
+<dt class="sig sig-object py" id="macauff.generate_speclite_filters">
+<span class="sig-prename descclassname"><span class="pre">macauff.</span></span><span class="sig-name descname"><span class="pre">generate_speclite_filters</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">group_name</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">filter_names</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">wavelength_list</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">response_list</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">wavelength_unit</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/macauff/galaxy_counts.html#generate_speclite_filters"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#macauff.generate_speclite_filters" title="Link to this definition">¶</a></dt>
+<dd><p>Convenience function to create a new set of <code class="docutils literal notranslate"><span class="pre">speclite</span></code> filters, if bandpasses
+other than those provided in the module already are required. Currently, this
+generates a temporary <code class="docutils literal notranslate"><span class="pre">speclite.filters.FilterResponse</span></code> object that can be
+loaded using the standard <code class="docutils literal notranslate"><span class="pre">speclite</span></code> syntax of <code class="docutils literal notranslate"><span class="pre">group_name-band_name</span></code>.</p>
+<dl class="field-list">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><dl>
+<dt><strong>group_name</strong><span class="classifier">string</span></dt><dd><p>The overall name to be given to the set of filters being generated. For
+example, <code class="docutils literal notranslate"><span class="pre">speclite</span></code> currently provide <code class="docutils literal notranslate"><span class="pre">sdss2010</span></code>.</p>
+</dd>
+<dt><strong>filter_names</strong><span class="classifier">list of string</span></dt><dd><p>The individual names of each filter to be generated. For the above example
+of <code class="docutils literal notranslate"><span class="pre">sdss2010</span></code>, <code class="docutils literal notranslate"><span class="pre">filter_names</span></code> would be <code class="docutils literal notranslate"><span class="pre">[u,</span> <span class="pre">g,</span> <span class="pre">r,</span> <span class="pre">i,</span> <span class="pre">z]</span></code>.</p>
+</dd>
+<dt><strong>wavelength_list</strong><span class="classifier">list of numpy.ndarray</span></dt><dd><p>The wavelengths of the filter response curves being loaded, corresponding
+to each entry in <code class="docutils literal notranslate"><span class="pre">filter_names</span></code>.</p>
+</dd>
+<dt><strong>response_list</strong><span class="classifier">list of numpy.ndarray</span></dt><dd><p>The response curve values of the filters, for each <code class="docutils literal notranslate"><span class="pre">wavelength_list</span></code> item.
+Each element in the list should also match an entry in <code class="docutils literal notranslate"><span class="pre">filter_names</span></code>.</p>
+</dd>
+<dt><strong>wavelength_unit</strong><span class="classifier"><code class="docutils literal notranslate"><span class="pre">astropy.units.Unit</span></code> object</span></dt><dd><p>The relevant <code class="docutils literal notranslate"><span class="pre">astropy</span></code> unit (e.g., <code class="docutils literal notranslate"><span class="pre">u.micron</span></code>, <code class="docutils literal notranslate"><span class="pre">u.angstrom</span></code>) for the
+units all <code class="docutils literal notranslate"><span class="pre">wavelength_list</span></code> entries are given in. All response curves
+currently have to be in common units.</p>
+</dd>
+</dl>
+</dd>
+</dl>
+</dd></dl>
+
+</section>
+
+
+            <div class="clearer"></div>
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="../f-modindex.html" title="Fortran Module Index"
+             >fortran modules</a> |</li>
+        <li class="right" >
+          <a href="../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="right" >
+          <a href="macauff.make_island_groupings.html" title="make_island_groupings"
+             >next</a> |</li>
+        <li class="right" >
+          <a href="macauff.csv_to_npy.html" title="csv_to_npy"
+             >previous</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../index.html">macauff</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../macauff.html" ><code class="docutils literal notranslate"><span class="pre">macauff</span></code> Documentation</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">generate_speclite_filters</a></li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+    &#169; Copyright 2022, Tom J Wilson.
+      Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 7.2.6.
+    </div>
+  </body>
+</html>

@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="./">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>Installation &#8212; macauff</title>
+    <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=4848ba22" />
+    <link rel="stylesheet" type="text/css" href="_static/pyramid.css?v=a5b9c134" />
+    <link rel="stylesheet" type="text/css" href="_static/graphviz.css?v=eafc0fe6" />
+    <script src="_static/documentation_options.js?v=5929fcd5"></script>
+    <script src="_static/doctools.js?v=888ff710"></script>
+    <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Quick Start" href="quickstart.html" />
+    <link rel="prev" title="generate_random_data" href="api/macauff.tests.generate_random_data.html" />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Neuton&amp;subset=latin" type="text/css" media="screen" charset="utf-8" />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Nobile:regular,italic,bold,bolditalic&amp;subset=latin" type="text/css" media="screen" charset="utf-8" />
+<!--[if lte IE 6]>
+<link rel="stylesheet" href="_static/ie6.css" type="text/css" media="screen" charset="utf-8" />
+<![endif]-->
+
+  </head><body>
+
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="f-modindex.html" title="Fortran Module Index"
+             >fortran modules</a> |</li>
+        <li class="right" >
+          <a href="py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="right" >
+          <a href="quickstart.html" title="Quick Start"
+             accesskey="N">next</a> |</li>
+        <li class="right" >
+          <a href="api/macauff.tests.generate_random_data.html" title="generate_random_data"
+             accesskey="P">previous</a> |</li>
+        <li class="nav-item nav-item-0"><a href="index.html">macauff</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">Installation</a></li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <section id="installation">
+<h1>Installation<a class="headerlink" href="#installation" title="Link to this heading">¶</a></h1>
+<section id="package-requirements">
+<h2>Package Requirements<a class="headerlink" href="#package-requirements" title="Link to this heading">¶</a></h2>
+<p>Currently there are no strict criteria for installation; it is suggested that you use the most up-to-date package versions available. The one exception there is that the minimum version of Python is set to 3.8, and development is currently focused on Python 3.9+.</p>
+<p>The current package requirements, and citations to give for use of <code class="docutils literal notranslate"><span class="pre">macauff</span></code> in your work where available, are:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">numpy</span></code> – Harris et al. 2020 (Nature, 585, 357)</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">scipy</span></code> – Virtanen et al. 2020 (Nature Methods, 17, 261)</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">astropy</span></code> – Astropy Collaboration et al. 2013 (A&amp;A, 558, 33); Astropy Collaboration et al. 2018 (ApJ, 156, 123); Astropy Collaboration et al. 2022 (ApJ, 935, 167)</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">matplotlib</span></code> – Hunter 2007 (Computing in Science &amp; Engineering, 9, 90)</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">skypy</span></code> – Amara et al. 2021 (JOSS, 6, 3056)</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">speclite</span></code> – Kirkby et al. 2023 (doi.org/10.5281/zenodo.7734526)</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">pandas</span></code> – The pandas development team 2020 (doi.org/10.5281/zenodo.3509134)</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">dustmaps</span></code> – Schlafly &amp; Finkbeiner 2011 (ApJ, 737, 103); Schlegel, Finkbeiner &amp; Davis 1998 (ApJ, 500, 525; doi 10.7910/DVN/EWCNL5); Green 2018 (JOSS, 3, 695)</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">scikit-build-core</span></code> – Schreiner et al. 2022 (doi.org/10.25080/majora-212e5952-033)</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">cmake</span></code></p></li>
+</ul>
+<p>with an optional dependency of</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">mpi4py</span></code> – Dalcin, Paz, &amp; Storti 2005 (Journal of Parallel and Distributed Computing, 65, 1108); Dalcin &amp; Fang 2021 (Computing in Science &amp; Engineering, 23, 47).</p></li>
+</ul>
+<p>For running the test suite the requirements are:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">tox</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">pytest</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">sphinx-fortran</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">sphinx-astropy</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">pytest-astropy</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">pytest-cov</span></code>.</p></li>
+</ul>
+<p>Additionally, you will need the following to install <code class="docutils literal notranslate"><span class="pre">macauff</span></code>:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">gfortran</span></code> – at least version 8</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">git</span></code></p></li>
+</ul>
+</section>
+<section id="installing-the-package">
+<h2>Installing the Package<a class="headerlink" href="#installing-the-package" title="Link to this heading">¶</a></h2>
+<p>As of now, the only way to install this package is by downloading it from the <a class="reference external" href="https://github.com/Onoddil/macauff">GitHub repository</a>. We recommend using an <a class="reference external" href="https://www.anaconda.com/distribution/">Anaconda Distribution</a>, or <a class="reference external" href="https://docs.conda.io/en/latest/miniconda.html">miniconda</a>, to maintain specific, independent Python installations without the need for root permissions.</p>
+<p>Once you have installed your choice of conda, then you can create an initial conda environment:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">conda</span> <span class="n">create</span> <span class="o">-</span><span class="n">n</span> <span class="n">your_environment_name</span> <span class="o">-</span><span class="n">c</span> <span class="n">conda</span><span class="o">-</span><span class="n">forge</span> <span class="n">python</span><span class="o">=</span><span class="mf">3.9</span> <span class="n">numpy</span> <span class="n">scipy</span> <span class="n">astropy</span> <span class="n">matplotlib</span> <span class="n">skypy</span> <span class="n">speclite</span> <span class="n">pandas</span> <span class="n">dustmaps</span> <span class="n">scikit</span><span class="o">-</span><span class="n">build</span><span class="o">-</span><span class="n">core</span> <span class="n">cmake</span>
+</pre></div>
+</div>
+<p>although you can drop the <code class="docutils literal notranslate"><span class="pre">=3.9</span></code>, or chose another (later) Python version – remembering the minimum version is 3.8 – if you desire to do so. Then activate this as our Python environment:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">conda</span> <span class="n">activate</span> <span class="n">your_environment_name</span>
+</pre></div>
+</div>
+<p>If you require the additional test packages listed above, for running tests, you can install them separately with:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">conda</span> <span class="n">install</span> <span class="o">-</span><span class="n">c</span> <span class="n">conda</span><span class="o">-</span><span class="n">forge</span> <span class="n">tox</span> <span class="n">pytest</span> <span class="n">sphinx</span><span class="o">-</span><span class="n">astropy</span> <span class="n">pytest</span><span class="o">-</span><span class="n">astropy</span> <span class="n">pytest</span><span class="o">-</span><span class="n">cov</span>
+<span class="n">conda</span> <span class="n">install</span> <span class="o">-</span><span class="n">c</span> <span class="n">vacumm</span> <span class="o">-</span><span class="n">c</span> <span class="n">conda</span><span class="o">-</span><span class="n">forge</span> <span class="n">sphinx</span><span class="o">-</span><span class="n">fortran</span>
+</pre></div>
+</div>
+<p>You will also need to install <code class="docutils literal notranslate"><span class="pre">gfortran</span></code> in order to compile the fortran code in this package. Instructions for how to install this for Windows, MacOS, or Linux can be found <a class="reference external" href="https://gcc.gnu.org/wiki/GFortranBinaries">here</a>. Finally, install <code class="docutils literal notranslate"><span class="pre">git</span></code> if you do not have it on your computer; <a class="reference external" href="https://git-scm.com/book/en/v2/Getting-Started-Installing-Git">instructions</a> for installing it on your operating system are available.</p>
+<p>Once you have the required packages installed – whether in a new <code class="docutils literal notranslate"><span class="pre">conda</span></code> environment or otherwise – you can clone the repository:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">git</span> <span class="n">clone</span> <span class="n">git</span><span class="p">:</span><span class="o">//</span><span class="n">github</span><span class="o">.</span><span class="n">com</span><span class="o">/</span><span class="n">onoddil</span><span class="o">/</span><span class="n">macauff</span><span class="o">.</span><span class="n">git</span>
+</pre></div>
+</div>
+<p>which will place the repository in the folder from which you invoked the <code class="docutils literal notranslate"><span class="pre">git</span></code> command. Now, from inside the folder that was just created (<code class="docutils literal notranslate"><span class="pre">cd</span> <span class="pre">macauff</span></code> or equivalent), you can either run:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">pip</span> <span class="n">install</span> <span class="o">.</span>
+</pre></div>
+</div>
+<p>or:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">pip</span> <span class="n">install</span> <span class="o">.</span> <span class="o">--</span><span class="n">config</span><span class="o">-</span><span class="n">settings</span><span class="o">=</span><span class="n">cmake</span><span class="o">.</span><span class="n">build</span><span class="o">-</span><span class="nb">type</span><span class="o">=</span><span class="s2">&quot;Debug&quot;</span>
+</pre></div>
+</div>
+<p>which will install <code class="docutils literal notranslate"><span class="pre">macauff</span></code> such that you can <code class="docutils literal notranslate"><span class="pre">import</span> <span class="pre">macauff</span></code> from other folders on your computer. However, if this is to develop the software, your changes will not be reflected in the installed version of the code (and you must re-install using the above command); if you wish to have <code class="docutils literal notranslate"><span class="pre">Python</span></code> code changes immediately reflected in your <code class="docutils literal notranslate"><span class="pre">pip</span></code>-installed version of the software, you can install <code class="docutils literal notranslate"><span class="pre">macauff</span></code> using:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">pip</span> <span class="n">install</span> <span class="o">-</span><span class="n">e</span> <span class="o">.</span>
+</pre></div>
+</div>
+<p>or:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">pip</span> <span class="n">install</span> <span class="o">-</span><span class="n">e</span> <span class="o">.</span> <span class="o">--</span><span class="n">config</span><span class="o">-</span><span class="n">settings</span><span class="o">=</span><span class="n">cmake</span><span class="o">.</span><span class="n">build</span><span class="o">-</span><span class="nb">type</span><span class="o">=</span><span class="s2">&quot;Debug&quot;</span>
+</pre></div>
+</div>
+<p>where <code class="docutils literal notranslate"><span class="pre">-e</span></code> is the “editable” flag. Note that the <code class="docutils literal notranslate"><span class="pre">config-settings</span></code> parameter passed through <code class="docutils literal notranslate"><span class="pre">pip</span></code> controls the optimisation flag for the compilation of Fortran code. With <code class="docutils literal notranslate"><span class="pre">debug</span></code> set, <code class="docutils literal notranslate"><span class="pre">macauff</span></code> will install with <code class="docutils literal notranslate"><span class="pre">-O0</span></code> optimisation and numerous additional check/debug flags, while by default the software will be installed with compiler optimisation.</p>
+<p>To confirm your installation was successful, you can <code class="docutils literal notranslate"><span class="pre">import</span> <span class="pre">macauff</span></code> in a Python terminal.</p>
+<section id="openmp-setup">
+<h3>OpenMP Setup<a class="headerlink" href="#openmp-setup" title="Link to this heading">¶</a></h3>
+<p>Within the <code class="docutils literal notranslate"><span class="pre">Fortran</span></code> codebase, <code class="docutils literal notranslate"><span class="pre">OpenMP</span></code> is used in numerous places to parallelise independent operations. For these to work, several additional environment variables must be set.</p>
+<p>First, <code class="docutils literal notranslate"><span class="pre">OMP_NUM_THREADS</span></code> must be set; in <code class="docutils literal notranslate"><span class="pre">bash</span></code> for example this would be <code class="docutils literal notranslate"><span class="pre">export</span> <span class="pre">OMP_NUM_THREADS=10</span></code>. This should be set as high as reasonably possible to decrease overall runtime as much as possible.</p>
+<p>Second, if large matches are likely to be used in the future, <code class="docutils literal notranslate"><span class="pre">GOMP_STACKSIZE</span></code> (and possibly <code class="docutils literal notranslate"><span class="pre">OMP_STACKSIZE</span></code>, compiler dependent) should be increased. This should again be set as high as reasonably possible to avoid segmentation faults due to stack size.</p>
+<p>Finally, again in the case of large catalogue runs, <code class="docutils literal notranslate"><span class="pre">ulimit</span> <span class="pre">-s</span></code> should be set to a higher number (in the limit <code class="docutils literal notranslate"><span class="pre">ulimit</span> <span class="pre">-s</span> <span class="pre">unlimited</span></code> can be used to remove the cap entirely) to avoid issues with overall stacksize.</p>
+</section>
+</section>
+<section id="testing">
+<h2>Testing<a class="headerlink" href="#testing" title="Link to this heading">¶</a></h2>
+<p>To run the main unit test suite, assuming you installed it during the above process, you can run:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">tox</span> <span class="o">-</span><span class="n">e</span> <span class="n">test</span>
+</pre></div>
+</div>
+<p>If you wish to locally build the documentation – mostly likely if you are improving or extending the documentation, as the docs are available online – you can run:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">tox</span> <span class="o">-</span><span class="n">e</span> <span class="n">build_docs</span>
+</pre></div>
+</div>
+</section>
+<section id="getting-started">
+<h2>Getting Started<a class="headerlink" href="#getting-started" title="Link to this heading">¶</a></h2>
+<p>Once you have installed the package, check out the <a class="reference internal" href="quickstart.html"><span class="doc">Quick Start</span></a> page.</p>
+</section>
+</section>
+
+
+            <div class="clearer"></div>
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+  <div>
+    <h3><a href="index.html">Table of Contents</a></h3>
+    <ul>
+<li><a class="reference internal" href="#">Installation</a><ul>
+<li><a class="reference internal" href="#package-requirements">Package Requirements</a></li>
+<li><a class="reference internal" href="#installing-the-package">Installing the Package</a><ul>
+<li><a class="reference internal" href="#openmp-setup">OpenMP Setup</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#testing">Testing</a></li>
+<li><a class="reference internal" href="#getting-started">Getting Started</a></li>
+</ul>
+</li>
+</ul>
+
+  </div>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="f-modindex.html" title="Fortran Module Index"
+             >fortran modules</a> |</li>
+        <li class="right" >
+          <a href="py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="right" >
+          <a href="quickstart.html" title="Quick Start"
+             >next</a> |</li>
+        <li class="right" >
+          <a href="api/macauff.tests.generate_random_data.html" title="generate_random_data"
+             >previous</a> |</li>
+        <li class="nav-item nav-item-0"><a href="index.html">macauff</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">Installation</a></li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+    &#169; Copyright 2022, Tom J Wilson.
+      Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 7.2.6.
+    </div>
+  </body>
+</html>
