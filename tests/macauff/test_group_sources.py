@@ -3,17 +3,19 @@
 Tests for the "group_sources" module.
 '''
 
-import pytest
 import os
-from numpy.testing import assert_allclose
-import numpy as np
-from scipy.special import j1
 
-from macauff.matching import CrossMatch
-from macauff.group_sources import make_island_groupings, _load_fourier_grid_cutouts, _clean_overlaps
-from macauff.group_sources_fortran import group_sources_fortran as gsf
-from macauff.misc_functions import create_auf_params_grid
+import numpy as np
+import pytest
+from numpy.testing import assert_allclose
+from scipy.special import j1
 from test_matching import _replace_line
+
+from macauff.group_sources import (_clean_overlaps, _load_fourier_grid_cutouts,
+                                   make_island_groupings)
+from macauff.group_sources_fortran import group_sources_fortran as gsf
+from macauff.matching import CrossMatch
+from macauff.misc_functions import create_auf_params_grid
 
 
 def test_load_fourier_grid_cutouts():

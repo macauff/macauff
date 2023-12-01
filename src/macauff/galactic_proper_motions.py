@@ -5,9 +5,10 @@ motions based on the distance and Galactic coordinates of a set of Galactic
 stars.
 '''
 
-import numpy as np
-import multiprocessing
 import itertools
+import multiprocessing
+
+import numpy as np
 
 __all__ = ['calculate_proper_motions']
 

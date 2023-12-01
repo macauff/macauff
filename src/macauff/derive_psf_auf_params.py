@@ -6,18 +6,19 @@ photometry while in a sky background-dominated regime such that noise is constan
 the detector.
 '''
 
-import numpy as np
-import matplotlib.pyplot as plt
-import matplotlib.gridspec as gridspec
-from scipy.optimize import minimize
-from matplotlib.colors import Normalize
-from matplotlib import cm
 import itertools
 import multiprocessing
-from scipy.special import erf
-from scipy.optimize import basinhopping
 import os
 import shutil
+
+import matplotlib.gridspec as gridspec
+import matplotlib.pyplot as plt
+import numpy as np
+from matplotlib import cm
+from matplotlib.colors import Normalize
+from scipy.optimize import basinhopping, minimize
+from scipy.special import erf
+
 # Assume that usetex = False only applies for tests where no TeX is installed
 # at all, instead of users having half-installed TeX, dvipng et al. somewhere.
 usetex = not not shutil.which("tex")

@@ -3,8 +3,8 @@
 Tests for the "shared_library" module.
 '''
 
-from numpy.testing import assert_allclose
 import numpy as np
+from numpy.testing import assert_allclose
 
 from macauff.misc_functions_fortran import misc_functions_fortran as mff
 

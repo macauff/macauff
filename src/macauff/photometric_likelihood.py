@@ -5,11 +5,13 @@ used in the cross-matching of the two catalogues.
 '''
 
 import sys
+
 import numpy as np
 
 from macauff.misc_functions import StageData
 from macauff.misc_functions_fortran import misc_functions_fortran as mff
-from macauff.photometric_likelihood_fortran import photometric_likelihood_fortran as plf
+from macauff.photometric_likelihood_fortran import \
+    photometric_likelihood_fortran as plf
 
 __all__ = ['compute_photometric_likelihoods']
 

@@ -5,9 +5,10 @@ to the required numpy binary files used within the cross-match process.
 '''
 
 import os
+
 import numpy as np
-from numpy.lib.format import open_memmap
 import pandas as pd
+from numpy.lib.format import open_memmap
 
 from macauff.misc_functions import _load_rectangular_slice
 from macauff.misc_functions_fortran import misc_functions_fortran as mff

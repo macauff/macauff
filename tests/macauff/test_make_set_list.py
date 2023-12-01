@@ -4,8 +4,9 @@ Tests for the "make_set_list" module.
 '''
 
 import os
-import pytest
+
 import numpy as np
+import pytest
 
 from macauff.make_set_list import _initial_group_numbering, set_list
 

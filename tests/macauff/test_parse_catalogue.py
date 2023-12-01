@@ -4,13 +4,15 @@ Tests for the "parse_catalogue" module.
 '''
 
 import os
-import pandas as pd
-import numpy as np
-import pytest
-from numpy.testing import assert_allclose
-from astropy.coordinates import SkyCoord
 
-from macauff.parse_catalogue import csv_to_npy, npy_to_csv, rect_slice_npy, rect_slice_csv
+import numpy as np
+import pandas as pd
+import pytest
+from astropy.coordinates import SkyCoord
+from numpy.testing import assert_allclose
+
+from macauff.parse_catalogue import (csv_to_npy, npy_to_csv, rect_slice_csv,
+                                     rect_slice_npy)
 
 
 class TestParseCatalogue:

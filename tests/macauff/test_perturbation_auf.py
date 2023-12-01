@@ -3,20 +3,21 @@
 Tests for the "perturbation_auf" module.
 '''
 
-import pytest
 import os
+
 import numpy as np
+import pytest
 from numpy.testing import assert_allclose
 from scipy.special import j0, j1
 from scipy.stats import skewnorm
+from test_matching import _replace_line
 
 from macauff.matching import CrossMatch
 from macauff.misc_functions_fortran import misc_functions_fortran as mff
-from macauff.perturbation_auf import (make_perturb_aufs, download_trilegal_simulation,
-                                _calculate_magnitude_offsets, make_tri_counts)
+from macauff.perturbation_auf import (_calculate_magnitude_offsets,
+                                      download_trilegal_simulation,
+                                      make_perturb_aufs, make_tri_counts)
 from macauff.perturbation_auf_fortran import perturbation_auf_fortran as paf
-
-from test_matching import _replace_line
 
 
 class TestCreatePerturbAUF:

@@ -5,10 +5,11 @@ objects, astrometrically in common based on relative sky separation compared to
 their respective uncertainties across two catalogues.
 '''
 
+import itertools
+import multiprocessing
 import sys
 import warnings
-import multiprocessing
-import itertools
+
 import numpy as np
 import scipy.special
 

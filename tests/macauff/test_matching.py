@@ -3,14 +3,15 @@
 Tests for the "matching" module.
 '''
 
-import pytest
 import os
 from configparser import ConfigParser
-from numpy.testing import assert_allclose
-import pandas as pd
-import numpy as np
 
+import numpy as np
+import pandas as pd
+import pytest
+from numpy.testing import assert_allclose
 from test_fit_astrometry import TestAstroCorrection as TAC
+
 from macauff.matching import CrossMatch
 
 

@@ -5,15 +5,17 @@ distinct "islands" of sources, along with calculating whether they are within ov
 various photometric integral purposes.
 '''
 
-import sys
-import multiprocessing
 import itertools
+import multiprocessing
+import sys
+
 import numpy as np
 
-from macauff.misc_functions import (load_small_ref_auf_grid, hav_dist_constant_lat,
-                             _load_rectangular_slice, StageData)
 from macauff.group_sources_fortran import group_sources_fortran as gsf
 from macauff.make_set_list import set_list
+from macauff.misc_functions import (StageData, _load_rectangular_slice,
+                                    hav_dist_constant_lat,
+                                    load_small_ref_auf_grid)
 
 __all__ = ['make_island_groupings']
 

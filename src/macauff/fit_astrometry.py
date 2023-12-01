@@ -5,20 +5,22 @@ fitting their AUFs and centroid uncertainties across ensembles of matches betwee
 catalogue and one for which precisions are less well known.
 '''
 
-import numpy as np
-from numpy.lib.format import open_memmap
-import matplotlib.pyplot as plt
-from scipy.stats import binned_statistic
-import multiprocessing
 import itertools
+import multiprocessing
 import os
-from scipy.optimize import minimize
-import matplotlib.gridspec as gridspec
-from astropy.coordinates import SkyCoord, match_coordinates_sky, Angle, UnitSphericalRepresentation
-from astropy import units as u
-from scipy import spatial
-from scipy.stats import chi2
 import shutil
+
+import matplotlib.gridspec as gridspec
+import matplotlib.pyplot as plt
+import numpy as np
+from astropy import units as u
+from astropy.coordinates import (Angle, SkyCoord, UnitSphericalRepresentation,
+                                 match_coordinates_sky)
+from numpy.lib.format import open_memmap
+from scipy import spatial
+from scipy.optimize import minimize
+from scipy.stats import binned_statistic, chi2
+
 # Assume that usetex = False only applies for tests where no TeX is installed
 # at all, instead of users having half-installed TeX, dvipng et al. somewhere.
 usetex = not not shutil.which("tex")
@@ -26,13 +28,13 @@ if usetex:
     plt.rcParams.update({"text.usetex": True, "text.latex.preamble": r"\usepackage{amsmath}"})
 
 from macauff.galaxy_counts import create_galaxy_counts
-from macauff.perturbation_auf import (download_trilegal_simulation, _calculate_magnitude_offsets,
-                               make_tri_counts)
+from macauff.get_trilegal_wrapper import get_AV_infinity
 from macauff.misc_functions import min_max_lon
 from macauff.misc_functions_fortran import misc_functions_fortran as mff
+from macauff.perturbation_auf import (_calculate_magnitude_offsets,
+                                      download_trilegal_simulation,
+                                      make_tri_counts)
 from macauff.perturbation_auf_fortran import perturbation_auf_fortran as paf
-from macauff.get_trilegal_wrapper import get_AV_infinity
-
 
 __all__ = ['AstrometricCorrections']
 

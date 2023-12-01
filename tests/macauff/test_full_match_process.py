@@ -4,12 +4,13 @@ Tests of full, end-to-end runs of the crossmatch process.
 '''
 
 import os
+
 import numpy as np
 import pytest
+from test_matching import _replace_line
 
 from macauff.matching import CrossMatch
 from macauff.utils import generate_random_data
-from test_matching import _replace_line
 
 
 @pytest.mark.parametrize("x,y", [(131, 0), (0, 0)])

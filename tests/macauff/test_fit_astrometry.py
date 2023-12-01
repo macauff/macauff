@@ -4,12 +4,14 @@ Tests for the "fit_astrometry" module.
 '''
 
 
-import pytest
-import numpy as np
-from numpy.testing import assert_allclose
 import os
 
-from macauff.fit_astrometry import AstrometricCorrections, SNRMagnitudeRelationship
+import numpy as np
+import pytest
+from numpy.testing import assert_allclose
+
+from macauff.fit_astrometry import (AstrometricCorrections,
+                                    SNRMagnitudeRelationship)
 
 
 class TestAstroCorrection:

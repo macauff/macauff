@@ -3,17 +3,19 @@
 Tests for the "counterpart_pairing" module.
 '''
 
-import os
 import itertools
-from numpy.testing import assert_allclose
+import os
+
 import numpy as np
 import pytest
+from numpy.testing import assert_allclose
+from test_matching import _replace_line
 
+from macauff.counterpart_pairing import source_pairing
+from macauff.counterpart_pairing_fortran import \
+    counterpart_pairing_fortran as cpf
 from macauff.matching import CrossMatch
 from macauff.misc_functions import StageData
-from macauff.counterpart_pairing import source_pairing
-from macauff.counterpart_pairing_fortran import counterpart_pairing_fortran as cpf
-from test_matching import _replace_line
 
 
 def test_calculate_contamination_probabilities():

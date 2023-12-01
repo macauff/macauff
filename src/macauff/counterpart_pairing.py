@@ -5,10 +5,12 @@ act of actually pairing sources across the two catalogues as counterparts.
 '''
 
 import sys
-import numpy as np
 import warnings
 
-from macauff.counterpart_pairing_fortran import counterpart_pairing_fortran as cpf
+import numpy as np
+
+from macauff.counterpart_pairing_fortran import \
+    counterpart_pairing_fortran as cpf
 
 __all__ = ['source_pairing']
 

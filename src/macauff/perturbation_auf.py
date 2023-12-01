@@ -4,18 +4,20 @@ This module provides the framework to handle the creation of the perturbation
 component of the astrometric uncertainty function.
 '''
 
-import requests
 import os
-import sys
 import signal
+import sys
+
 import numpy as np
+import requests
 from astropy.coordinates import SkyCoord
 
-from macauff.misc_functions import (create_auf_params_grid, _load_rectangular_slice, min_max_lon)
-from macauff.misc_functions_fortran import misc_functions_fortran as mff
-from macauff.get_trilegal_wrapper import get_trilegal, get_AV_infinity
-from macauff.perturbation_auf_fortran import perturbation_auf_fortran as paf
 from macauff.galaxy_counts import create_galaxy_counts
+from macauff.get_trilegal_wrapper import get_AV_infinity, get_trilegal
+from macauff.misc_functions import (_load_rectangular_slice,
+                                    create_auf_params_grid, min_max_lon)
+from macauff.misc_functions_fortran import misc_functions_fortran as mff
+from macauff.perturbation_auf_fortran import perturbation_auf_fortran as paf
 
 __all__ = ['make_perturb_aufs', 'create_single_perturb_auf']
 

@@ -3,11 +3,13 @@
 Tests for the "galaxy_counts" module.
 '''
 
+import astropy.units as u
 import numpy as np
 from numpy.testing import assert_allclose
-import astropy.units as u
-from macauff.galaxy_counts import create_galaxy_counts, generate_speclite_filters
 from test_perturbation_auf import GalCountValues
+
+from macauff.galaxy_counts import (create_galaxy_counts,
+                                   generate_speclite_filters)
 
 gal_values = GalCountValues()
 

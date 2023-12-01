@@ -3,11 +3,12 @@
 This module provides the high-level framework for performing catalogue-catalogue cross-matches.
 '''
 
+import datetime
 import os
 import sys
-import datetime
 from configparser import ConfigParser
 from time import sleep
+
 import numpy as np
 
 try:
@@ -15,14 +16,15 @@ try:
 except:
     MPI = None
 
-from macauff.perturbation_auf import make_perturb_aufs
+from macauff.counterpart_pairing import source_pairing
+from macauff.fit_astrometry import (AstrometricCorrections,
+                                    SNRMagnitudeRelationship)
 from macauff.group_sources import make_island_groupings
 from macauff.group_sources_fortran import group_sources_fortran as gsf
 from macauff.misc_functions_fortran import misc_functions_fortran as mff
+from macauff.parse_catalogue import csv_to_npy, npy_to_csv
+from macauff.perturbation_auf import make_perturb_aufs
 from macauff.photometric_likelihood import compute_photometric_likelihoods
-from macauff.counterpart_pairing import source_pairing
-from macauff.parse_catalogue import npy_to_csv, csv_to_npy
-from macauff.fit_astrometry import AstrometricCorrections, SNRMagnitudeRelationship
 
 __all__ = ['CrossMatch']
 

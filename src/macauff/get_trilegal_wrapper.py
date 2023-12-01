@@ -19,16 +19,15 @@ Provides the code to query the online TRILEGAL API and download the results.
 '''
 
 
-import subprocess as sp
 import os
 import re
+import subprocess as sp
 import time
 
-from astropy.units import UnitsError
-from astropy.coordinates import SkyCoord
-import numpy as np
 import dustmaps.sfd
-
+import numpy as np
+from astropy.coordinates import SkyCoord
+from astropy.units import UnitsError
 
 __all__ = []
 

@@ -5,9 +5,9 @@ in any chosen filterset by parameterised double Schechter functions.
 '''
 
 import numpy as np
-from astropy.modeling.models import Linear1D, Exponential1D
-from astropy.cosmology import default_cosmology
 import skypy.galaxies as skygal
+from astropy.cosmology import default_cosmology
+from astropy.modeling.models import Exponential1D, Linear1D
 from speclite.filters import FilterResponse, load_filters
 
 __all__ = ['create_galaxy_counts', 'generate_speclite_filters']
