@@ -1,6 +1,8 @@
 # macauff
 
-![Actions Status](https://github.com/macauff/macauff/actions/workflows/python-package.yaml/badge.svg)
+![Actions Status](https://github.com/macauff/macauff/actions/workflows/testing-and-coverage.yml/badge.svg)
+![Documentation Status](https://github.com/macauff/macauff/actions/workflows/build-documentation.yml/badge.svg)
+![Linter Status](https://github.com/macauff/macauff/actions/workflows/linting.yml/badge.svg)
 ![Coverage Status](https://codecov.io/gh/macauff/macauff/branch/main/graph/badge.svg)
 
 macauff, the python package for Matching Across Catalogues using the Astrometric Uncertainty Function and Flux, is a package for cross-matching photometric catalogues. Using the positions, uncertainties, and flux measurements of sources, as well as modelling of the level to which objects are affected by hidden, blended contaminants, macauff provides posterior probabilities of "many-to-many" matches and non-matches between the two catalogues being counterparts to one another.
