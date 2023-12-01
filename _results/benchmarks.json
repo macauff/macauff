@@ -1,0 +1,27 @@
+{
+    "benchmarks.peakmem_list": {
+        "code": "def peakmem_list():\n    \"\"\"Memory computations are prefixed with 'mem' or 'peakmem'.\"\"\"\n    test_calculate_contamination_probabilities()",
+        "name": "benchmarks.peakmem_list",
+        "param_names": [],
+        "params": [],
+        "type": "peakmemory",
+        "unit": "bytes",
+        "version": "452d9f876909e415c690f2d7167c8fb6d97ee31fc671a51788b9bca0f58f5d59"
+    },
+    "benchmarks.time_computation": {
+        "code": "def time_computation():\n    \"\"\"Time computations are prefixed with 'time'.\"\"\"\n    test_calculate_contamination_probabilities()",
+        "min_run_count": 2,
+        "name": "benchmarks.time_computation",
+        "number": 0,
+        "param_names": [],
+        "params": [],
+        "repeat": 0,
+        "rounds": 2,
+        "sample_time": 0.01,
+        "type": "time",
+        "unit": "seconds",
+        "version": "4ed0cff6914e34fd88b9f37a3d84bbd1a8acbc4f9933f48cc7036ac6eaacf2e8",
+        "warmup_time": -1
+    },
+    "version": 2
+}
