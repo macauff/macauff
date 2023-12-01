@@ -1656,7 +1656,6 @@ class CrossMatch():
         os.system('rm -r {}/pairing/*'.format(self.joint_folder_path))
         count_pair_func(
             self.joint_folder_path, self.a_cat_folder_path, self.b_cat_folder_path,
-            self.a_filt_names, self.b_filt_names, self.a_auf_region_points,
-            self.b_auf_region_points, self.a_modelrefinds, self.b_modelrefinds, self.rho, self.drho,
-            len(self.delta_mag_cuts), self.group_sources_data,
-            self.phot_like_data, self.a_perturb_auf_outputs, self.b_perturb_auf_outputs)
+            self.a_modelrefinds, self.b_modelrefinds, self.rho, self.drho, len(self.delta_mag_cuts),
+            self.group_sources_data, self.phot_like_data, self.a_perturb_auf_outputs,
+            self.b_perturb_auf_outputs)

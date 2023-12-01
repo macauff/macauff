@@ -9,15 +9,16 @@ import warnings
 
 import numpy as np
 
+# pylint: disable-next=no-name-in-module,import-error
 from macauff.counterpart_pairing_fortran import \
     counterpart_pairing_fortran as cpf
 
 __all__ = ['source_pairing']
 
 
-def source_pairing(joint_folder_path, a_cat_folder_path, b_cat_folder_path, a_filt_names,
-                   b_filt_names, a_auf_pointings, b_auf_pointings, a_modelrefinds, b_modelrefinds,
-                   rho, drho, n_fracs, group_sources_data, phot_like_data,
+# pylint: disable-next=too-many-locals
+def source_pairing(joint_folder_path, a_cat_folder_path, b_cat_folder_path, a_modelrefinds,
+                   b_modelrefinds, rho, drho, n_fracs, group_sources_data, phot_like_data,
                    a_perturb_auf_outputs, b_perturb_auf_outputs):
     '''
     Function to iterate over all grouped islands of sources, calculating the
@@ -32,16 +33,6 @@ def source_pairing(joint_folder_path, a_cat_folder_path, b_cat_folder_path, a_fi
         Folder in which the "a" catalogue input catalogues are stored.
     b_cat_folder_path : string
         Folder where catalogue "b" files are located.
-    a_filt_names : numpy.ndarray or list of strings
-        Array or list containing names of the filters used in catalogue "a".
-    b_filt_names : numpy.ndarray or list of strings
-        Array or list of catalogue "b" filter names.
-    a_auf_pointings : numpy.ndarray
-        Array of celestial coordinates indicating the locations used in the
-        simulations of perturbation AUFs for catalogue "a".
-    b_auf_pointings : numpy.ndarray
-        Sky coordinates of locations of catalogue "b" perturbation AUF
-        component simulations.
     a_modelrefinds : numpy.ndarray
         Catalogue "a" modelrefinds array output from ``create_perturb_auf``.
         TODO Improve description
@@ -95,13 +86,13 @@ def source_pairing(joint_folder_path, a_cat_folder_path, b_cat_folder_path, a_fi
     alist = group_sources_data.alist
     agrplen = group_sources_data.agrplen
 
-    a_astro = np.load('{}/con_cat_astro.npy'.format(a_cat_folder_path))
-    a_photo = np.load('{}/con_cat_photo.npy'.format(a_cat_folder_path))
-    amagref = np.load('{}/magref.npy'.format(a_cat_folder_path))
+    a_astro = np.load(f'{a_cat_folder_path}/con_cat_astro.npy')
+    a_photo = np.load(f'{a_cat_folder_path}/con_cat_photo.npy')
+    amagref = np.load(f'{a_cat_folder_path}/magref.npy')
 
-    b_astro = np.load('{}/con_cat_astro.npy'.format(b_cat_folder_path))
-    b_photo = np.load('{}/con_cat_photo.npy'.format(b_cat_folder_path))
-    bmagref = np.load('{}/magref.npy'.format(b_cat_folder_path))
+    b_astro = np.load(f'{b_cat_folder_path}/con_cat_astro.npy')
+    b_photo = np.load(f'{b_cat_folder_path}/con_cat_photo.npy')
+    bmagref = np.load(f'{b_cat_folder_path}/magref.npy')
 
     big_len_a = len(a_astro)
     big_len_b = len(b_astro)
@@ -147,9 +138,9 @@ def source_pairing(joint_folder_path, a_cat_folder_path, b_cat_folder_path, a_fi
         (acontamflux >= 0) & (bcontamflux >= 0) & (probcarray >= 0) & (etaarray >= -30) &
         (xiarray >= -30))
 
-    afieldfilter = ((afieldinds < large_len+1) & (probfaarray >= 0))
+    afieldfilter = (afieldinds < large_len+1) & (probfaarray >= 0)
 
-    bfieldfilter = ((bfieldinds < large_len+1) & (probfbarray >= 0))
+    bfieldfilter = (bfieldinds < large_len+1) & (probfbarray >= 0)
 
     lenrejecta = group_sources_data.lenrejecta
     lenrejectb = group_sources_data.lenrejectb
@@ -173,28 +164,26 @@ def source_pairing(joint_folder_path, a_cat_folder_path, b_cat_folder_path, a_fi
          bfieldfilter, afieldfilter, bfieldfilter, countfilter, afieldfilter, afieldfilter,
          afieldfilter, bfieldfilter, bfieldfilter, bfieldfilter]):
 
-        if file_name == 'pacontam' or file_name == 'pbcontam':
+        if file_name in ('pacontam', 'pbcontam'):
             temp_variable = variable[:, filter_variable]
         else:
             temp_variable = variable[filter_variable]
-        np.save('{}/pairing/{}.npy'.format(joint_folder_path, file_name), temp_variable)
+        np.save(f'{joint_folder_path}/pairing/{file_name}.npy', temp_variable)
 
     tot = countsum + afieldsum + lenrejecta
     if tot < big_len_a:
-        warnings.warn("{} catalogue a source{} not in either counterpart, field, or rejected "
-                      "source lists.".format(big_len_a - tot, 's' if big_len_a - tot > 1 else ''))
+        warnings.warn(f"{big_len_a - tot} catalogue a source{'s' if big_len_a - tot > 1 else ''} "
+                      "not in either counterpart, field, or rejected source lists")
     if tot > big_len_a:
-        warnings.warn("{} additional catalogue a {} recorded, check results for duplications "
-                      "carefully".format(tot - big_len_a, 'indices' if tot - big_len_a > 1 else
-                                         'index'))
+        warnings.warn(f"{tot - big_len_a} additional catalogue a "
+                      f"{'indices' if tot - big_len_a > 1 else 'index'} recorded, check results "
+                      "for duplications carefully")
     tot = countsum + bfieldsum + lenrejectb
     if tot < big_len_b:
-        warnings.warn("{} catalogue b source{} not in either counterpart, field, or rejected "
-                      "source lists.".format(big_len_b - tot, 's' if big_len_b - tot > 1 else ''))
+        warnings.warn(f"{big_len_b - tot} catalogue b source{'s' if big_len_b - tot > 1 else ''} "
+                      "not in either counterpart, field, or rejected source lists.")
     if tot > big_len_b:
-        warnings.warn("{} additional catalogue b {} recorded, check results for duplications "
-                      "carefully".format(tot - big_len_b, 'indices' if tot - big_len_b > 1 else
-                                         'index'))
+        warnings.warn(f"{tot - big_len_b} additional catalogue b "
+                      f"{'indices' if tot - big_len_b > 1 else 'index'} recorded, check results "
+                      "for duplications carefully")
     sys.stdout.flush()
-
-    return

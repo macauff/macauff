@@ -278,7 +278,7 @@ exclude-too-few-public-methods=
 ignored-parents=
 
 # Maximum number of arguments for function / method.
-max-args=10
+max-args=20
 
 # Maximum number of attributes for a class (see R0902).
 max-attributes=20
@@ -330,7 +330,7 @@ indent-after-paren=4
 indent-string='    '
 
 # Maximum number of characters on a single line.
-max-line-length=110
+max-line-length=100
 
 # Maximum number of lines in a module.
 max-module-lines=1000
