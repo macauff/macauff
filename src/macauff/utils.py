@@ -1,3 +1,8 @@
+# Licensed under a 3-clause BSD style license - see LICENSE
+'''
+This module provides testing utility functionality for the package.
+'''
+
 import os
 
 import numpy as np
