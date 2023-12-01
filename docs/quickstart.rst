@@ -17,9 +17,9 @@ The three input files must be contained within a single folder, with the respect
 
 These files should be present for each catalogue, in separate folders.
 
-An example function to create simple test catalogues is available :func:`here<macauff.tests.generate_random_data>`, and can be imported within Python as::
+An example function to create simple test catalogues is available :func:`here<macauff.utils.generate_random_data>`, and can be imported within Python as::
 
-    from macauff.tests import generate_random_data
+    from macauff.utils import generate_random_data
 
 and called with
 

@@ -1,0 +1,33 @@
+# This workflow will install Python dependencies, build the package and then build the documentation.
+name: Build documentation
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+concurrency:
+   group: ${{ github.workflow }}-${{ github.ref }}
+   cancel-in-progress: true
+
+jobs:
+  build_docs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: 3.9
+      - name: Setup ubuntu gfortran
+        run: sudo ln -sf /usr/bin/gfortran-9 /usr/bin/gfortran
+      - name: Install requirements
+        run: |
+          sudo apt-get update
+          sudo apt-get install pandoc
+          python -m pip install --upgrade pip
+          pip install numpy tox
+      - name: Build documentation
+        run: tox -e build_docs

@@ -12,10 +12,6 @@ Python
     :no-inheritance-diagram:
     :no-heading:
 
-.. automodapi:: macauff.tests
-    :no-inheritance-diagram:
-    :no-heading:
-
 Fortran
 =======
 

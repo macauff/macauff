@@ -1,0 +1,11 @@
+sphinx-astropy
+sphinx-fortran
+sphinx-rtd-theme
+sphinx-autoapi
+nbsphinx
+ipython
+jupytext
+jupyter
+matplotlib
+numpy
+six

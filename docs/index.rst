@@ -59,8 +59,6 @@ How to prepare a particular dataset for cross-matching, initialise certain algor
    Interpreting Cross-Match Results
    ********************************
 
-
-
 *******************
 Algorithmic Details
 *******************
@@ -72,7 +70,11 @@ For specific implementation details and the mathematics used in macauff, see the
    Starting a New Cross-Match
    **************************
 
+*********
+Notebooks
+*********
 
+For specific use cases, see the :doc:`notebooks<notebooks>` page.
 
 ******
 Search
@@ -94,3 +96,4 @@ Search
    f90_docs/pairing_docs
    f90_docs/misc_func_docs
    f90_docs/shared_library_docs
+   notebooks
