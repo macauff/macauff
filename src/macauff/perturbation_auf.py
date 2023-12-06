@@ -13,7 +13,7 @@ import requests
 from astropy.coordinates import SkyCoord
 
 from macauff.galaxy_counts import create_galaxy_counts
-from macauff.get_trilegal_wrapper import get_AV_infinity, get_trilegal
+from macauff.get_trilegal_wrapper import get_av_infinity, get_trilegal
 from macauff.misc_functions import (_load_rectangular_slice,
                                     create_auf_params_grid, min_max_lon)
 from macauff.misc_functions_fortran import misc_functions_fortran as mff
@@ -877,7 +877,7 @@ def create_single_perturb_auf(tri_folder, auf_point, filt, r, dr, rho, drho, j0s
                 l, b = c.galactic.l.degree, c.galactic.b.degree
             else:
                 l, b = ax1, ax2
-            av = get_AV_infinity(l, b, frame='galactic')[0]
+            av = get_av_infinity(l, b, frame='galactic')[0]
             avs[j, k] = av
     avs = avs.flatten()
     (dens_hist_tri, model_mags, model_mag_mids, model_mags_interval, _,

@@ -30,7 +30,7 @@ if usetex:
 
 # pylint: disable=wrong-import-position,import-error,no-name-in-module
 from macauff.galaxy_counts import create_galaxy_counts
-from macauff.get_trilegal_wrapper import get_AV_infinity
+from macauff.get_trilegal_wrapper import get_av_infinity
 from macauff.misc_functions import min_max_lon
 from macauff.misc_functions_fortran import misc_functions_fortran as mff
 from macauff.perturbation_auf import (_calculate_magnitude_offsets,
@@ -912,7 +912,7 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
                     l, b = c.galactic.l.degree, c.galactic.b.degree
                 else:
                     l, b = ax1, ax2
-                av = get_AV_infinity(l, b, frame='galactic')[0]
+                av = get_av_infinity(l, b, frame='galactic')[0]
                 avs[j, k] = av
         avs = avs.flatten()
         tri_hist, tri_mags, _, dtri_mags, tri_uncert, _ = make_tri_counts(
