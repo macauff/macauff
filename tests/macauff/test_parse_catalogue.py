@@ -11,22 +11,25 @@ import pytest
 from astropy.coordinates import SkyCoord
 from numpy.testing import assert_allclose
 
+# pylint: disable=import-error,no-name-in-module
 from macauff.parse_catalogue import (csv_to_npy, npy_to_csv, rect_slice_csv,
                                      rect_slice_npy)
+
+# pylint: enable=import-error,no-name-in-module
 
 
 class TestParseCatalogue:
     def setup_class(self):
         rng = np.random.default_rng(seed=45555)
 
-        self.N = 100000
-        data = rng.standard_normal(size=(self.N, 8))
+        self.n = 100000
+        data = rng.standard_normal(size=(self.n, 8))
         data[:, 6] = np.round(data[:, 6]).astype(int)
-        nan_cols = [rng.choice(self.N, size=(100,), replace=False),
-                    rng.choice(self.N, size=(100,), replace=False)]
+        nan_cols = [rng.choice(self.n, size=(100,), replace=False),
+                    rng.choice(self.n, size=(100,), replace=False)]
         data[nan_cols[0], 4] = np.nan
         data[nan_cols[1], 5] = np.nan
-        data[:, 7] = rng.choice(2, size=(self.N))
+        data[:, 7] = rng.choice(2, size=(self.n,))
         self.data = data
 
     def test_csv_to_npy(self):
@@ -45,13 +48,13 @@ class TestParseCatalogue:
             best_index = np.load('magref.npy')
             chunk_overlaps = np.load('in_chunk_overlap.npy')
 
-            assert np.all(astro.shape == (self.N, 3))
-            assert np.all(photo.shape == (self.N, 2))
-            assert np.all(best_index.shape == (self.N,))
+            assert np.all(astro.shape == (self.n, 3))
+            assert np.all(photo.shape == (self.n, 2))
+            assert np.all(best_index.shape == (self.n,))
             assert_allclose(astro, self.data[:, [0, 1, 2]])
             assert_allclose(photo, self.data[:, [4, 5]])
             assert_allclose(best_index, self.data[:, 6])
-            assert np.all(~chunk_overlaps)
+            assert np.all(~chunk_overlaps)  # pylint: disable=invalid-unary-operand-type
 
     def test_csv_to_npy_chunk_overlap(self):
         # Convert data to string to get expected Pandas-esque .csv formatting where
@@ -69,15 +72,15 @@ class TestParseCatalogue:
             best_index = np.load('magref.npy')
             chunk_overlaps = np.load('in_chunk_overlap.npy')
 
-            assert np.all(astro.shape == (self.N, 3))
-            assert np.all(photo.shape == (self.N, 2))
-            assert np.all(best_index.shape == (self.N,))
+            assert np.all(astro.shape == (self.n, 3))
+            assert np.all(photo.shape == (self.n, 2))
+            assert np.all(best_index.shape == (self.n,))
             assert_allclose(astro, self.data[:, [0, 1, 2]])
             assert_allclose(photo, self.data[:, [4, 5]])
             assert_allclose(best_index, self.data[:, 6])
             assert np.all(chunk_overlaps == self.data[:, 7])
 
-    def test_csv_to_npy_process_uncert(self):
+    def test_csv_to_npy_process_uncert(self):  # pylint: disable=too-many-statements
         # Convert data to string to get expected Pandas-esque .csv formatting where
         # NaN values are empty strings.
         data1 = self.data.astype(str)
@@ -130,9 +133,9 @@ class TestParseCatalogue:
         photo = np.load('con_cat_photo.npy')
         best_index = np.load('magref.npy')
 
-        assert np.all(astro.shape == (self.N, 3))
-        assert np.all(photo.shape == (self.N, 2))
-        assert np.all(best_index.shape == (self.N,))
+        assert np.all(astro.shape == (self.n, 3))
+        assert np.all(photo.shape == (self.n, 2))
+        assert np.all(best_index.shape == (self.n,))
         assert_allclose(astro[:, [0, 1]], self.data[:, [0, 1]])
         assert_allclose(astro[:, 2], np.sqrt((2*self.data[:, 2])**2 + 0.01**2))
         assert_allclose(photo, self.data[:, [4, 5]])
@@ -150,9 +153,9 @@ class TestParseCatalogue:
         photo = np.load('con_cat_photo.npy')
         best_index = np.load('magref.npy')
 
-        assert np.all(astro.shape == (self.N, 3))
-        assert np.all(photo.shape == (self.N, 2))
-        assert np.all(best_index.shape == (self.N,))
+        assert np.all(astro.shape == (self.n, 3))
+        assert np.all(photo.shape == (self.n, 2))
+        assert np.all(best_index.shape == (self.n,))
         assert_allclose(astro[:, [0, 1]], self.data[:, [0, 1]])
         assert_allclose(astro[:, 2], np.sqrt((2*self.data[:, 2])**2 + 0.01**2))
         assert_allclose(photo, self.data[:, [4, 5]])
@@ -169,9 +172,9 @@ class TestParseCatalogue:
         for pad in [0.03, 0]:
             if os.path.isfile('_temporary_sky_slice_1.npy'):
                 for n in ['1', '2', '3', '4', 'combined']:
-                    os.system('rm _temporary_sky_slice_{}.npy'.format(n))
+                    os.system(f'rm _temporary_sky_slice_{n}.npy')
                 for f in ['con_cat_astro', 'con_cat_photo', 'magref']:
-                    os.system('rm dummy_folder/{}.npy'.format(f))
+                    os.system(f'rm dummy_folder/{f}.npy')
 
             rect_slice_npy('.', 'dummy_folder', rc, pad, 10)
 
@@ -193,14 +196,14 @@ class TestParseCatalogue:
             assert_allclose(self.data[q][:, [1, 2, 3]], astro)
             assert_allclose(self.data[q][:, [4, 5]], photo)
             assert_allclose(self.data[q][:, 6], best_index)
-            assert np.all(~chunk_overlaps)
+            assert np.all(~chunk_overlaps)  # pylint: disable=invalid-unary-operand-type
 
     def test_rect_slice_csv(self):
         # Convert data to string to get expected Pandas-esque .csv formatting where
         # NaN values are empty strings.
         data1 = self.data.astype(str)
         data1[data1 == 'nan'] = ''
-        data1[:, 0] = ['Gaia {}'.format(i) for i in data1[:, 0]]
+        data1[:, 0] = [f'Gaia {i}' for i in data1[:, 0]]
         rc = [-0.3, 0.3, -0.1, 0.2]
         col_names = ['A_Designation', 'A_RA', 'A_Dec', 'A_Err', 'G', 'G_RP', 'Best_Index',
                      'Chunk_Overlap_index']
@@ -224,16 +227,16 @@ class TestParseCatalogue:
                                range(np.sum(q))])
 
 
-class TestParseCatalogueNpyToCsv:
-    def setup_class(self):
+class TestParseCatalogueNpyToCsv:  # pylint: disable=too-many-instance-attributes
+    def setup_class(self):  # pylint: disable=too-many-statements
         os.system('rm *.csv')
         rng = np.random.default_rng(seed=45555)
 
-        self.N = 100000
-        data = rng.standard_normal(size=(self.N, 7))
+        self.n = 100000
+        data = rng.standard_normal(size=(self.n, 7))
         data[:, 6] = np.round(data[:, 6]).astype(int)
-        nan_cols = [rng.choice(self.N, size=(100,), replace=False),
-                    rng.choice(self.N, size=(100,), replace=False)]
+        nan_cols = [rng.choice(self.n, size=(100,), replace=False),
+                    rng.choice(self.n, size=(100,), replace=False)]
         data[nan_cols[0], 4] = np.nan
         data[nan_cols[1], 5] = np.nan
         self.data = data
@@ -242,57 +245,57 @@ class TestParseCatalogueNpyToCsv:
         # NaN values are empty strings.
         self.data1 = self.data.astype(str)
         self.data1[self.data1 == 'nan'] = ''
-        self.data1[:, 0] = ['Gaia {}'.format(i) for i in self.data1[:, 0]]
+        self.data1[:, 0] = [f'Gaia {i}' for i in self.data1[:, 0]]
         np.savetxt('test_a_data.csv', self.data1, delimiter=',', fmt='%s', header='')
 
         rng = np.random.default_rng(seed=43587232)
 
-        self.Nb = 70000
-        self.datab = rng.standard_normal(size=(self.Nb, 8))
+        self.nb = 70000
+        self.datab = rng.standard_normal(size=(self.nb, 8))
         self.datab[:, 7] = np.round(self.datab[:, 7]).astype(int)
-        nan_cols = [rng.choice(self.Nb, size=(200,), replace=False),
-                    rng.choice(self.Nb, size=(200,), replace=False)]
+        nan_cols = [rng.choice(self.nb, size=(200,), replace=False),
+                    rng.choice(self.nb, size=(200,), replace=False)]
         self.datab[nan_cols[0], 4] = np.nan
         self.datab[nan_cols[1], 5] = np.nan
         self.data2 = self.datab.astype(str)
         self.data2[self.data2 == 'nan'] = ''
-        self.data2[:, 0] = ['J{}'.format(i) for i in self.data2[:, 0]]
+        self.data2[:, 0] = [f'J{i}' for i in self.data2[:, 0]]
         np.savetxt('test_b_data.csv', self.data2, delimiter=',', fmt='%s', header='')
 
         # Fake 3x match probability, eta/xi/2x contamination/match+non-match
         # index arrays.
         os.system('rm -r test_folder')
         os.makedirs('test_folder/pairing', exist_ok=True)
-        self.N_match = int(0.6*self.N)
-        self.ac = rng.choice(self.N, size=self.N_match, replace=False)
+        self.n_match = int(0.6*self.n)
+        self.ac = rng.choice(self.n, size=self.n_match, replace=False)
         np.save('test_folder/pairing/ac.npy', self.ac)
-        self.bc = rng.choice(self.Nb, size=self.N_match, replace=False)
+        self.bc = rng.choice(self.nb, size=self.n_match, replace=False)
         np.save('test_folder/pairing/bc.npy', self.bc)
-        self.af = np.delete(np.arange(0, self.N), self.ac)
+        self.af = np.delete(np.arange(0, self.n), self.ac)
         np.save('test_folder/pairing/af.npy', self.af)
-        self.bf = np.delete(np.arange(0, self.Nb), self.bc)
+        self.bf = np.delete(np.arange(0, self.nb), self.bc)
         np.save('test_folder/pairing/bf.npy', self.bf)
 
-        self.pc = rng.uniform(0.5, 1, size=self.N_match)
+        self.pc = rng.uniform(0.5, 1, size=self.n_match)
         np.save('test_folder/pairing/pc.npy', self.pc)
         self.pfa = rng.uniform(0.5, 1, size=len(self.af))
         np.save('test_folder/pairing/pfa.npy', self.pfa)
         self.pfb = rng.uniform(0.5, 1, size=len(self.bf))
         np.save('test_folder/pairing/pfb.npy', self.pfb)
 
-        self.eta = rng.uniform(-10, 10, size=self.N_match)
+        self.eta = rng.uniform(-10, 10, size=self.n_match)
         np.save('test_folder/pairing/eta.npy', self.eta)
-        self.xi = rng.uniform(-10, 10, size=self.N_match)
+        self.xi = rng.uniform(-10, 10, size=self.n_match)
         np.save('test_folder/pairing/xi.npy', self.xi)
 
-        self.pac = rng.uniform(0, 1, size=(2, self.N_match))
+        self.pac = rng.uniform(0, 1, size=(2, self.n_match))
         np.save('test_folder/pairing/pacontam.npy', self.pac)
-        self.pbc = rng.uniform(0, 1, size=(2, self.N_match))
+        self.pbc = rng.uniform(0, 1, size=(2, self.n_match))
         np.save('test_folder/pairing/pbcontam.npy', self.pbc)
 
-        self.acf = rng.uniform(0, 0.2, size=self.N_match)
+        self.acf = rng.uniform(0, 0.2, size=self.n_match)
         np.save('test_folder/pairing/acontamflux.npy', self.acf)
-        self.bcf = rng.uniform(0, 3, size=self.N_match)
+        self.bcf = rng.uniform(0, 3, size=self.n_match)
         np.save('test_folder/pairing/bcontamflux.npy', self.bcf)
 
         self.aff = rng.uniform(0, 0.2, size=len(self.af))
@@ -300,7 +303,7 @@ class TestParseCatalogueNpyToCsv:
         self.bff = rng.uniform(0, 3, size=len(self.bf))
         np.save('test_folder/pairing/bfieldflux.npy', self.bff)
 
-        self.csep = rng.uniform(0, 0.5, size=self.N_match)
+        self.csep = rng.uniform(0, 0.5, size=self.n_match)
         np.save('test_folder/pairing/crptseps.npy', self.csep)
 
         self.afs = rng.uniform(0, 0.5, size=len(self.af))

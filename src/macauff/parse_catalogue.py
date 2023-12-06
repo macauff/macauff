@@ -8,10 +8,14 @@ import os
 
 import numpy as np
 import pandas as pd
+from astropy.coordinates import SkyCoord
 from numpy.lib.format import open_memmap
 
+# pylint: disable=import-error,no-name-in-module
 from macauff.misc_functions import _load_rectangular_slice
 from macauff.misc_functions_fortran import misc_functions_fortran as mff
+
+# pylint: enable=import-error,no-name-in-module
 
 __all__ = ['csv_to_npy', 'rect_slice_npy', 'npy_to_csv', 'rect_slice_csv']
 
@@ -93,35 +97,33 @@ def csv_to_npy(input_folder, input_filename, output_folder, astro_cols, photo_co
         raise ValueError("process_uncerts is True but astro_sig_fits_filepath does not exist. "
                          "Please ensure file path is correct.")
     astro_cols, photo_cols = np.array(astro_cols), np.array(photo_cols)
-    with open('{}/{}'.format(input_folder, input_filename)) as fp:
+    with open(f'{input_folder}/{input_filename}', encoding='utf-8') as fp:
         n_rows = 0 if not header else -1
         for _ in fp:
             n_rows += 1
 
-    astro = open_memmap('{}/con_cat_astro.npy'.format(output_folder), mode='w+', dtype=float,
+    astro = open_memmap(f'{output_folder}/con_cat_astro.npy', mode='w+', dtype=float,
                         shape=(n_rows, 3))
-    photo = open_memmap('{}/con_cat_photo.npy'.format(output_folder), mode='w+', dtype=float,
+    photo = open_memmap(f'{output_folder}/con_cat_photo.npy', mode='w+', dtype=float,
                         shape=(n_rows, len(photo_cols)))
-    best_index = open_memmap('{}/magref.npy'.format(output_folder), mode='w+', dtype=int,
+    best_index = open_memmap(f'{output_folder}/magref.npy', mode='w+', dtype=int,
                              shape=(n_rows,))
-    chunk_overlap = open_memmap('{}/in_chunk_overlap.npy'.format(output_folder), mode='w+',
+    chunk_overlap = open_memmap(f'{output_folder}/in_chunk_overlap.npy', mode='w+',
                                 dtype=bool, shape=(n_rows,))
 
     if process_uncerts:
-        m_sigs = np.load('{}/m_sigs_array.npy'.format(astro_sig_fits_filepath))
-        n_sigs = np.load('{}/n_sigs_array.npy'.format(astro_sig_fits_filepath))
+        m_sigs = np.load(f'{astro_sig_fits_filepath}/m_sigs_array.npy')
+        n_sigs = np.load(f'{astro_sig_fits_filepath}/n_sigs_array.npy')
         mn_coords = np.empty((len(m_sigs), 2), float)
-        mn_coords[:, 0] = np.load('{}/ax1_mids.npy'.format(astro_sig_fits_filepath))
-        mn_coords[:, 1] = np.load('{}/ax2_mids.npy'.format(astro_sig_fits_filepath))
+        mn_coords[:, 0] = np.load(f'{astro_sig_fits_filepath}/ax1_mids.npy')
+        mn_coords[:, 1] = np.load(f'{astro_sig_fits_filepath}/ax2_mids.npy')
         if cat_in_radec and not mn_in_radec:
             # Convert mn_coords to RA/Dec if catalogue is in Equatorial coords.
-            from astropy.coordinates import SkyCoord
             a = SkyCoord(l=mn_coords[:, 0], b=mn_coords[:, 1], unit='deg', frame='galactic')
             mn_coords[:, 0] = a.icrs.ra.degree
             mn_coords[:, 1] = a.icrs.dec.degree
         if not cat_in_radec and mn_in_radec:
             # Convert mn_coords to l/b if catalogue is in Galactic coords.
-            from astropy.coordinates import SkyCoord
             a = SkyCoord(ra=mn_coords[:, 0], dec=mn_coords[:, 1], unit='deg', frame='icrs')
             mn_coords[:, 0] = a.galactic.l.degree
             mn_coords[:, 1] = a.galactic.b.degree
@@ -135,7 +137,7 @@ def csv_to_npy(input_folder, input_filename, output_folder, astro_cols, photo_co
     if chunk_overlap_col is not None:
         new_chunk_overlap_col = np.where(used_cols == chunk_overlap_col)[0][0]
     n = 0
-    for chunk in pd.read_csv('{}/{}'.format(input_folder, input_filename), chunksize=100000,
+    for chunk in pd.read_csv(f'{input_folder}/{input_filename}', chunksize=100000,
                              usecols=used_cols, header=None if not header else 0):
         if not process_uncerts:
             astro[n:n+chunk.shape[0]] = chunk.values[:, new_astro_cols]
@@ -157,9 +159,8 @@ def csv_to_npy(input_folder, input_filename, output_folder, astro_cols, photo_co
 
         n += chunk.shape[0]
 
-    return
 
-
+# pylint: disable-next=dangerous-default-value,too-many-locals,too-many-statements
 def npy_to_csv(input_csv_folders, input_match_folder, output_folder, csv_filenames,
                output_filenames, column_name_lists, column_num_lists, extra_col_cat_names,
                input_npy_folders, headers=[False, False], extra_col_name_lists=[None, None],
@@ -227,41 +228,38 @@ def npy_to_csv(input_csv_folders, input_match_folder, output_folder, csv_filenam
     '''
     # Need IDs/coordinates x2, mags (xN), then our columns: match probability, average
     # contaminant flux, eta/xi, and then M contaminant fractions for M relative fluxes.
-    # TODO: un-hardcode number of relative contaminant fractions
-    # TODO: remove photometric likelihood when not used.
+    # TODO: un-hardcode number of relative contaminant fractions.  pylint: disable=fixme
+    # TODO: remove photometric likelihood when not used.  pylint: disable=fixme
     our_columns = ['MATCH_P', 'SEPARATION', 'ETA', 'XI',
-                   '{}_AVG_CONT'.format(extra_col_cat_names[0]),
-                   '{}_AVG_CONT'.format(extra_col_cat_names[1]),
-                   '{}_CONT_F1'.format(extra_col_cat_names[0]),
-                   '{}_CONT_F10'.format(extra_col_cat_names[0]),
-                   '{}_CONT_F1'.format(extra_col_cat_names[1]),
-                   '{}_CONT_F10'.format(extra_col_cat_names[1])]
+                   f'{extra_col_cat_names[0]}_AVG_CONT', f'{extra_col_cat_names[1]}_AVG_CONT',
+                   f'{extra_col_cat_names[0]}_CONT_F1', f'{extra_col_cat_names[0]}_CONT_F10',
+                   f'{extra_col_cat_names[1]}_CONT_F1', f'{extra_col_cat_names[1]}_CONT_F10']
     cols = np.append(np.append(column_name_lists[0], column_name_lists[1]), our_columns)
     for i, entry in zip([0, 1], ['1st', '2nd']):
         if ((extra_col_name_lists[i] is None and extra_col_num_lists[i] is not None) or
                 (extra_col_name_lists[i] is not None and extra_col_num_lists[i] is None)):
             raise UserWarning("extra_col_name_lists and extra_col_num_lists either both "
-                              "need to be None, or both need to not be None, for the {} "
-                              "catalogue.".format(entry))
+                              f"need to be None, or both need to not be None, for the {entry} "
+                              "catalogue.")
         if extra_col_num_lists[i] is not None:
             cols = np.append(cols, extra_col_name_lists[i])
-    ac = np.load('{}/pairing/ac.npy'.format(input_match_folder))
-    bc = np.load('{}/pairing/bc.npy'.format(input_match_folder))
-    p = np.load('{}/pairing/pc.npy'.format(input_match_folder))
-    eta = np.load('{}/pairing/eta.npy'.format(input_match_folder))
-    xi = np.load('{}/pairing/xi.npy'.format(input_match_folder))
-    a_avg_cont = np.load('{}/pairing/acontamflux.npy'.format(input_match_folder))
-    b_avg_cont = np.load('{}/pairing/bcontamflux.npy'.format(input_match_folder))
-    acontprob = np.load('{}/pairing/pacontam.npy'.format(input_match_folder))
-    bcontprob = np.load('{}/pairing/pbcontam.npy'.format(input_match_folder))
-    seps = np.load('{}/pairing/crptseps.npy'.format(input_match_folder))
+    ac = np.load(f'{input_match_folder}/pairing/ac.npy')
+    bc = np.load(f'{input_match_folder}/pairing/bc.npy')
+    p = np.load(f'{input_match_folder}/pairing/pc.npy')
+    eta = np.load(f'{input_match_folder}/pairing/eta.npy')
+    xi = np.load(f'{input_match_folder}/pairing/xi.npy')
+    a_avg_cont = np.load(f'{input_match_folder}/pairing/acontamflux.npy')
+    b_avg_cont = np.load(f'{input_match_folder}/pairing/bcontamflux.npy')
+    acontprob = np.load(f'{input_match_folder}/pairing/pacontam.npy')
+    bcontprob = np.load(f'{input_match_folder}/pairing/pbcontam.npy')
+    seps = np.load(f'{input_match_folder}/pairing/crptseps.npy')
 
     if input_npy_folders[0] is not None:
-        cols = np.append(cols, ['{}_FIT_SIG'.format(extra_col_cat_names[0])])
-        a_concatastro = np.load('{}/con_cat_astro.npy'.format(input_npy_folders[0]))
+        cols = np.append(cols, [f'{extra_col_cat_names[0]}_FIT_SIG'])
+        a_concatastro = np.load(f'{input_npy_folders[0]}/con_cat_astro.npy')
     if input_npy_folders[1] is not None:
-        cols = np.append(cols, ['{}_FIT_SIG'.format(extra_col_cat_names[1])])
-        b_concatastro = np.load('{}/con_cat_astro.npy'.format(input_npy_folders[1]))
+        cols = np.append(cols, [f'{extra_col_cat_names[1]}_FIT_SIG'])
+        b_concatastro = np.load(f'{input_npy_folders[1]}/con_cat_astro.npy')
 
     n_amags, n_bmags = len(column_name_lists[0]) - 3, len(column_name_lists[1]) - 3
     if extra_col_num_lists[0] is None:
@@ -278,12 +276,10 @@ def npy_to_csv(input_csv_folders, input_match_folder, output_folder, csv_filenam
         b_names = np.append(column_name_lists[1], extra_col_name_lists[1])
     a_names, b_names = np.array(a_names)[np.argsort(a_cols)], np.array(b_names)[np.argsort(b_cols)]
 
-    cat_a = pd.read_csv('{}/{}'.format(input_csv_folders[0], csv_filenames[0]),
-                        memory_map=True, header=None if not headers[0] else 0,
-                        usecols=a_cols, names=a_names)
-    cat_b = pd.read_csv('{}/{}'.format(input_csv_folders[1], csv_filenames[1]),
-                        memory_map=True, header=None if not headers[1] else 0,
-                        usecols=b_cols, names=b_names)
+    cat_a = pd.read_csv(f'{input_csv_folders[0]}/{csv_filenames[0]}', memory_map=True,
+                        header=None if not headers[0] else 0, usecols=a_cols, names=a_names)
+    cat_b = pd.read_csv(f'{input_csv_folders[1]}/{csv_filenames[1]}', memory_map=True,
+                        header=None if not headers[1] else 0, usecols=b_cols, names=b_names)
     n_matches = len(ac)
     match_df = pd.DataFrame(columns=cols, index=np.arange(0, n_matches))
 
@@ -323,25 +319,23 @@ def npy_to_csv(input_csv_folders, input_match_folder, output_folder, csv_filenam
                (len(extra_col_name_lists[1]) if extra_col_name_lists[1] is not None else 0)) + _dx
         match_df.iloc[:, ind] = b_concatastro[bc, 2]
 
-    match_df.to_csv('{}/{}'.format(output_folder, output_filenames[0]), encoding='utf-8',
-                    index=False, header=False)
+    match_df.to_csv(f'{output_folder}/{output_filenames[0]}', encoding='utf-8', index=False, header=False)
 
     # For non-match, ID/coordinates/mags, then island probability + average
     # contamination.
-    af = np.load('{}/pairing/af.npy'.format(input_match_folder))
-    a_avg_cont = np.load('{}/pairing/afieldflux.npy'.format(input_match_folder))
-    p = np.load('{}/pairing/pfa.npy'.format(input_match_folder))
-    seps = np.load('{}/pairing/afieldseps.npy'.format(input_match_folder))
-    afeta = np.load('{}/pairing/afieldeta.npy'.format(input_match_folder))
-    afxi = np.load('{}/pairing/afieldxi.npy'.format(input_match_folder))
-    our_columns = ['MATCH_P', 'NNM_SEPARATION', 'NNM_ETA', 'NNM_XI',
-                   '{}_AVG_CONT'.format(extra_col_cat_names[0])]
+    af = np.load(f'{input_match_folder}/pairing/af.npy')
+    a_avg_cont = np.load(f'{input_match_folder}/pairing/afieldflux.npy')
+    p = np.load(f'{input_match_folder}/pairing/pfa.npy')
+    seps = np.load(f'{input_match_folder}/pairing/afieldseps.npy')
+    afeta = np.load(f'{input_match_folder}/pairing/afieldeta.npy')
+    afxi = np.load(f'{input_match_folder}/pairing/afieldxi.npy')
+    our_columns = ['MATCH_P', 'NNM_SEPARATION', 'NNM_ETA', 'NNM_XI', f'{extra_col_cat_names[0]}_AVG_CONT']
     cols = np.append(column_name_lists[0], our_columns)
     if extra_col_num_lists[0] is not None:
         cols = np.append(cols, extra_col_name_lists[0])
     if input_npy_folders[0] is not None:
-        cols = np.append(cols, ['{}_FIT_SIG'.format(extra_col_cat_names[0])])
-        a_concatastro = np.load('{}/con_cat_astro.npy'.format(input_npy_folders[0]))
+        cols = np.append(cols, [f'{extra_col_cat_names[0]}_FIT_SIG'])
+        a_concatastro = np.load(f'{input_npy_folders[0]}/con_cat_astro.npy')
     n_anonmatches = len(af)
     a_nonmatch_df = pd.DataFrame(columns=cols, index=np.arange(0, n_anonmatches))
     for i in column_name_lists[0]:
@@ -360,23 +354,22 @@ def npy_to_csv(input_csv_folders, input_match_folder, output_folder, csv_filenam
                (len(extra_col_name_lists[0]) if extra_col_name_lists[0] is not None else 0))
         a_nonmatch_df.iloc[:, ind] = a_concatastro[af, 2]
 
-    a_nonmatch_df.to_csv('{}/{}'.format(output_folder, output_filenames[1]), encoding='utf-8',
+    a_nonmatch_df.to_csv(f'{output_folder}/{output_filenames[1]}', encoding='utf-8',
                          index=False, header=False)
 
-    bf = np.load('{}/pairing/bf.npy'.format(input_match_folder))
-    b_avg_cont = np.load('{}/pairing/bfieldflux.npy'.format(input_match_folder))
-    p = np.load('{}/pairing/pfb.npy'.format(input_match_folder))
-    seps = np.load('{}/pairing/bfieldseps.npy'.format(input_match_folder))
-    bfeta = np.load('{}/pairing/bfieldeta.npy'.format(input_match_folder))
-    bfxi = np.load('{}/pairing/bfieldxi.npy'.format(input_match_folder))
-    our_columns = ['MATCH_P', 'NNM_SEPARATION', 'NNM_ETA', 'NNM_XI',
-                   '{}_AVG_CONT'.format(extra_col_cat_names[1])]
+    bf = np.load(f'{input_match_folder}/pairing/bf.npy')
+    b_avg_cont = np.load(f'{input_match_folder}/pairing/bfieldflux.npy')
+    p = np.load(f'{input_match_folder}/pairing/pfb.npy')
+    seps = np.load(f'{input_match_folder}/pairing/bfieldseps.npy')
+    bfeta = np.load(f'{input_match_folder}/pairing/bfieldeta.npy')
+    bfxi = np.load(f'{input_match_folder}/pairing/bfieldxi.npy')
+    our_columns = ['MATCH_P', 'NNM_SEPARATION', 'NNM_ETA', 'NNM_XI', f'{extra_col_cat_names[1]}_AVG_CONT']
     cols = np.append(column_name_lists[1], our_columns)
     if extra_col_num_lists[1] is not None:
         cols = np.append(cols, extra_col_name_lists[1])
     if input_npy_folders[1] is not None:
-        cols = np.append(cols, ['{}_FIT_SIG'.format(extra_col_cat_names[1])])
-        b_concatastro = np.load('{}/con_cat_astro.npy'.format(input_npy_folders[1]))
+        cols = np.append(cols, [f'{extra_col_cat_names[1]}_FIT_SIG'])
+        b_concatastro = np.load(f'{input_npy_folders[1]}/con_cat_astro.npy')
     n_bnonmatches = len(bf)
     b_nonmatch_df = pd.DataFrame(columns=cols, index=np.arange(0, n_bnonmatches))
     for i in column_name_lists[1]:
@@ -395,10 +388,8 @@ def npy_to_csv(input_csv_folders, input_match_folder, output_folder, csv_filenam
                (len(extra_col_name_lists[1]) if extra_col_name_lists[1] is not None else 0))
         b_nonmatch_df.iloc[:, ind] = b_concatastro[bf, 2]
 
-    b_nonmatch_df.to_csv('{}/{}'.format(output_folder, output_filenames[2]), encoding='utf-8',
+    b_nonmatch_df.to_csv(f'{output_folder}/{output_filenames[2]}', encoding='utf-8',
                          index=False, header=False)
-
-    return
 
 
 def rect_slice_csv(input_folder, output_folder, input_filename, output_filename, rect_coords,
@@ -437,16 +428,15 @@ def rect_slice_csv(input_folder, output_folder, input_filename, output_filename,
         each column, or if the first line of the file is the first line of the
         dataset.
     '''
-    with open('{}/{}'.format(input_folder, input_filename)) as fp:
+    with open(f'{input_folder}/{input_filename}', encoding='utf-8') as fp:
         n_rows = 0 if not header else -1
         for _ in fp:
             n_rows += 1
-    small_astro = open_memmap('{}/temp_astro.npy'.format(input_folder), mode='w+', dtype=float,
-                              shape=(n_rows, 2))
+    small_astro = open_memmap(f'{input_folder}/temp_astro.npy', mode='w+', dtype=float, shape=(n_rows, 2))
 
     n = 0
-    for chunk in pd.read_csv('{}/{}'.format(input_folder, input_filename), chunksize=100000,
-                             usecols=astro_cols, header=None if not header else 0):
+    for chunk in pd.read_csv(f'{input_folder}/{input_filename}', chunksize=100000, usecols=astro_cols,
+                             header=None if not header else 0):
         small_astro[n:n+chunk.shape[0]] = chunk.values
         n += chunk.shape[0]
 
@@ -458,14 +448,13 @@ def rect_slice_csv(input_folder, output_folder, input_filename, output_filename,
         lowind = np.floor(n_rows*cnum/mem_chunk_num).astype(int)
         highind = np.floor(n_rows*(cnum+1)/mem_chunk_num).astype(int)
         n_inside_rows += np.sum(sky_cut[lowind:highind])
-    df_orig = pd.read_csv('{}/{}'.format(input_folder, input_filename), nrows=1,
-                          header=None if not header else 0)
+    df_orig = pd.read_csv(f'{input_folder}/{input_filename}', nrows=1, header=None if not header else 0)
     df = pd.DataFrame(columns=df_orig.columns, index=np.arange(0, n_inside_rows))
 
     counter = 0
     outer_counter = 0
     chunksize = 100000
-    for chunk in pd.read_csv('{}/{}'.format(input_folder, input_filename), chunksize=chunksize,
+    for chunk in pd.read_csv(f'{input_folder}/{input_filename}', chunksize=chunksize,
                              header=None if not header else 0):
         inside_n = np.sum(sky_cut[outer_counter:outer_counter+chunksize])
         df.iloc[counter:counter+inside_n] = chunk.values[
@@ -473,12 +462,10 @@ def rect_slice_csv(input_folder, output_folder, input_filename, output_filename,
         counter += inside_n
         outer_counter += chunksize
 
-    df.to_csv('{}/{}'.format(output_folder, output_filename), encoding='utf-8', index=False,
+    df.to_csv(f'{output_folder}/{output_filename}', encoding='utf-8', index=False,
               header=False)
 
-    os.remove('{}/temp_astro.npy'.format(input_folder))
-
-    return
+    os.remove(f'{input_folder}/temp_astro.npy')
 
 
 def rect_slice_npy(input_folder, output_folder, rect_coords, padding, mem_chunk_num):
@@ -510,9 +497,9 @@ def rect_slice_npy(input_folder, output_folder, rect_coords, padding, mem_chunk_
         Integer representing the number of sub-slices of the catalogue to load,
         in cases where the larger file is larger than available memory.
     '''
-    astro = np.load('{}/con_cat_astro.npy'.format(input_folder), mmap_mode='r')
-    photo = np.load('{}/con_cat_photo.npy'.format(input_folder), mmap_mode='r')
-    best_index = np.load('{}/magref.npy'.format(input_folder), mmap_mode='r')
+    astro = np.load(f'{input_folder}/con_cat_astro.npy', mmap_mode='r')
+    photo = np.load(f'{input_folder}/con_cat_photo.npy', mmap_mode='r')
+    best_index = np.load(f'{input_folder}/magref.npy', mmap_mode='r')
     n_rows = len(astro)
     sky_cut = _load_rectangular_slice(astro, rect_coords[0], rect_coords[1], rect_coords[2], rect_coords[3],
                                       padding)
@@ -523,13 +510,13 @@ def rect_slice_npy(input_folder, output_folder, rect_coords, padding, mem_chunk_
         highind = np.floor(n_rows*(cnum+1)/mem_chunk_num).astype(int)
         n_inside_rows += np.sum(sky_cut[lowind:highind])
 
-    small_astro = open_memmap('{}/con_cat_astro.npy'.format(output_folder), mode='w+', dtype=float,
+    small_astro = open_memmap(f'{output_folder}/con_cat_astro.npy', mode='w+', dtype=float,
                               shape=(n_inside_rows, 3))
-    small_photo = open_memmap('{}/con_cat_photo.npy'.format(output_folder), mode='w+', dtype=float,
+    small_photo = open_memmap(f'{output_folder}/con_cat_photo.npy', mode='w+', dtype=float,
                               shape=(n_inside_rows, photo.shape[1]))
-    small_best_index = open_memmap('{}/magref.npy'.format(output_folder), mode='w+', dtype=int,
+    small_best_index = open_memmap(f'{output_folder}/magref.npy', mode='w+', dtype=int,
                                    shape=(n_inside_rows,))
-    small_chunk_overlap = open_memmap('{}/in_chunk_overlap.npy'.format(output_folder), mode='w+',
+    small_chunk_overlap = open_memmap(f'{output_folder}/in_chunk_overlap.npy', mode='w+',
                                       dtype=bool, shape=(n_inside_rows,))
 
     counter = 0
@@ -546,5 +533,3 @@ def rect_slice_npy(input_folder, output_folder, rect_coords, padding, mem_chunk_
         # Always assume that a cutout is a single "visit" with no chunk "halo".
         small_chunk_overlap[counter:counter:inside_n] = False
         counter += inside_n
-
-    return
