@@ -13,6 +13,7 @@ from speclite.filters import FilterResponse, load_filters
 __all__ = ['create_galaxy_counts', 'generate_speclite_filters']
 
 
+# pylint: disable-next=too-many-locals
 def create_galaxy_counts(cmau_array, mag_bins, z_array, wav, alpha0, alpha1, weight,
                          ab_offset, filter_name, al_grid):
     r'''
@@ -93,10 +94,10 @@ def create_galaxy_counts(cmau_array, mag_bins, z_array, wav, alpha0, alpha1, wei
 
         # differential_comoving_volume is "per redshift per steradian" at each
         # redshift, so we take the average and "integrate" over z.
-        dV_dOmega = np.sum(cosmology.differential_comoving_volume(
+        dv_domega = np.sum(cosmology.differential_comoving_volume(
             mini_z_array).to_value('Mpc3 / deg2'))/2 * np.diff(mini_z_array)
 
-        model_densities = [phi_model1 * dV_dOmega, phi_model2 * dV_dOmega]
+        model_densities = [phi_model1 * dv_domega, phi_model2 * dv_domega]
 
         # Blanton & Roweis (2007) kcorrect templates, via skypy.
         w = skygal.spectrum.kcorrect.wavelength
@@ -112,23 +113,20 @@ def create_galaxy_counts(cmau_array, mag_bins, z_array, wav, alpha0, alpha1, wei
                 redshift=redshift, alpha0=_alpha0, alpha1=_alpha1, weight=_weight)
 
             kcorr = np.empty_like(redshift)
-            for j in range(len(redshift)):
-                _z = redshift[j]
+            for j, _z in enumerate(redshift):
                 f = load_filters(filter_name)[0]
                 fs = f.create_shifted(_z)
                 non_shift_ab_maggy, shift_ab_maggy = 0, 0
-                for k in range(len(t)):
+                for k, one_t in enumerate(t):
                     try:
-                        non_shift_ab_maggy += spectral_coefficients[j, k] * f.get_ab_maggies(t[k],
-                                                                                             w)
+                        non_shift_ab_maggy += spectral_coefficients[j, k] * f.get_ab_maggies(one_t, w)
                     except ValueError:
-                        _t, _w = fs.pad_spectrum(t[k], w, method='edge')
-                        non_shift_ab_maggy += spectral_coefficients[j, k] * fs.get_ab_maggies(_t,
-                                                                                              _w)
+                        _t, _w = fs.pad_spectrum(one_t, w, method='edge')
+                        non_shift_ab_maggy += spectral_coefficients[j, k] * fs.get_ab_maggies(_t, _w)
                     try:
-                        shift_ab_maggy += spectral_coefficients[j, k] * fs.get_ab_maggies(t[k], w)
+                        shift_ab_maggy += spectral_coefficients[j, k] * fs.get_ab_maggies(one_t, w)
                     except ValueError:
-                        _t, _w = fs.pad_spectrum(t[k], w, method='edge')
+                        _t, _w = fs.pad_spectrum(one_t, w, method='edge')
                         shift_ab_maggy += spectral_coefficients[j, k] * fs.get_ab_maggies(_t, _w)
                 # Backwards to Hogg+ astro-ph/0210394, our "shifted" bandpass is the rest-frame
                 # as opposed to the observer frame.
@@ -175,19 +173,19 @@ def generate_phi(cmau_array, cmau_ind, log_wav, z, abs_mag_bins):
     .. [1] Schechter P. (1976), ApJ, 203, 297
 
     '''
-    M_star0 = function_evaluation_lookup(cmau_array, 0, cmau_ind, log_wav)
+    m_star0 = function_evaluation_lookup(cmau_array, 0, cmau_ind, log_wav)
     phi_star0 = function_evaluation_lookup(cmau_array, 1, cmau_ind, log_wav)
     alpha = function_evaluation_lookup(cmau_array, 2, cmau_ind, log_wav)
-    P = function_evaluation_lookup(cmau_array, 3, cmau_ind, log_wav)
+    p = function_evaluation_lookup(cmau_array, 3, cmau_ind, log_wav)
     # All other parameters are a function of wavelength, but we want Q(P).
-    Q = function_evaluation_lookup(cmau_array, 4, cmau_ind, P)
+    q = function_evaluation_lookup(cmau_array, 4, cmau_ind, p)
     # phi*(z) = phi* * 10**(0.4 P z) = phi* exp(0.4 * ln(10) P z)
     # and thus Exponential1D being of the form exp(x / tau),
-    tau = 1 / (0.4 * np.log(10) * P)
-    m_star = Linear1D(slope=-Q, intercept=M_star0)
+    tau = 1 / (0.4 * np.log(10) * p)
+    m_star = Linear1D(slope=-q, intercept=m_star0)
     phi_star = Exponential1D(amplitude=phi_star0, tau=tau)
-    L = 10**(-0.4 * (abs_mag_bins - m_star(z)))
-    phi_model = 0.4 * np.log(10) * phi_star(z) * L**(alpha+1) * np.exp(-L)
+    l = 10**(-0.4 * (abs_mag_bins - m_star(z)))
+    phi_model = 0.4 * np.log(10) * phi_star(z) * l**(alpha+1) * np.exp(-l)
 
     return phi_model
 
@@ -225,10 +223,10 @@ def function_evaluation_lookup(cmau, ind1, ind2, x):
     c, m, a, u = cmau[ind1, ind2]
     if np.isnan(a) and np.isnan(u):
         return m * x + c
-    elif np.isnan(u):
+    if np.isnan(u):
         return a * np.exp(-x * m) + c
-    else:
-        return a * np.exp(-0.5 * (x - u)**2 * m) + c
+
+    return a * np.exp(-0.5 * (x - u)**2 * m) + c
 
 
 def generate_speclite_filters(group_name, filter_names, wavelength_list, response_list,
@@ -260,4 +258,4 @@ def generate_speclite_filters(group_name, filter_names, wavelength_list, respons
     '''
     for filt_name, wavelength, response in zip(filter_names, wavelength_list, response_list):
         FilterResponse(wavelength=wavelength*wavelength_unit, response=response,
-                       meta=dict(group_name=group_name, band_name=filt_name))
+                       meta={'group_name': group_name, 'band_name': filt_name})
