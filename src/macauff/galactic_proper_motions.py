@@ -13,7 +13,7 @@ import numpy as np
 __all__ = ['calculate_proper_motions']
 
 
-def calculate_proper_motions(d, l, b, temp, N):
+def calculate_proper_motions(d, l, b, temp, n):
     '''
     Calculates the statistical distribution of proper motions of a sightline,
     from a set of theoretical sources within the particular sky area.
@@ -28,7 +28,7 @@ def calculate_proper_motions(d, l, b, temp, N):
         The Galactic latitude of each source.
     temp : numpy.ndarray
         The simulated effective temperature of each object.
-    N : integer
+    n : integer
         The number of realisations of each object's Galactic velocities to draw
         from its dispersion relation.
 
@@ -36,11 +36,11 @@ def calculate_proper_motions(d, l, b, temp, N):
     -------
     pm : numpy.ndarray
         The Galactic and Equatorial proper motions of the ``len(d)`` simulated
-        sources, for the three simulated Galactic components each with ``N``
+        sources, for the three simulated Galactic components each with ``n``
         velocity dispersion realisations.
     type_fracs : numpy.ndarray
         The density-based weightings of each of the three Galactic components
-        for each source in ``d``, broadcast to shape ``(len(d), 3, N)`` to match
+        for each source in ``d``, broadcast to shape ``(len(d), 3, n)`` to match
         the shape of ``pm``.
     '''
     # Height of the Sun above the Galactic plane from Juric et al. (2008, ApJ, 673, 864).
@@ -62,9 +62,9 @@ def calculate_proper_motions(d, l, b, temp, N):
     # so that when we histogram an extra N times as many proper motions we smooth to the same
     # counts as the original data.
     fractions = fraction_density_component(r, z, r_sol, z_sol, l_thin, h_thin, l_thick, h_thick,
-                                           f_thick, f_h, q, n, zeta_b, h_b).T / N
-    # We then tile it to (len(d), len(types), N)
-    type_fracs = np.tile(fractions[:, :, np.newaxis], (1, 1, N))
+                                           f_thick, f_h, q, n, zeta_b, h_b).T / n
+    # We then tile it to (len(d), len(types), n)
+    type_fracs = np.tile(fractions[:, :, np.newaxis], (1, 1, n))
 
     # V_a values come from Robin et al. (2003), A&A, 409, 523; Pasetto et al. (2012), A&A, 547,
     # A70; & (220km/s Halo drift velocity from Reddy (2009), Proc. IAU Symp., 265)
@@ -81,27 +81,26 @@ def calculate_proper_motions(d, l, b, temp, N):
     bv0[temp < 10000] = 5.07836 * np.exp(-0.27083 * temp[temp < 10000] / 1000) - 0.40739
     bv0[temp >= 10000] = 0.69012 * np.exp(-0.08179 * temp[temp >= 10000] / 1000) - 0.35093
     # Next, get A/B from O&D based on intrinsic B-V colour:
-    A = 1.94553 * bv0 + 11.33138
-    B = -2.63360 * bv0 - 13.60611
+    oort_a = 1.94553 * bv0 + 11.33138
+    oort_b = -2.63360 * bv0 - 13.60611
 
     rng = np.random.default_rng()
-    pm = np.empty((len(d), 3, N, 4))
+    pm = np.empty((len(d), 3, n, 4))
     n_pool = 40
-    pool = multiprocessing.Pool(n_pool)
     counter = np.arange(0, len(d))
     iter_group = zip(counter, itertools.repeat(drift_vels), itertools.repeat(rng),
-                     itertools.repeat([l, b, d]), itertools.repeat(N), itertools.repeat([r, z]),
-                     itertools.repeat([r_sol, z_sol]), itertools.repeat([A, B]),
+                     itertools.repeat([l, b, d]), itertools.repeat(n), itertools.repeat([r, z]),
+                     itertools.repeat([r_sol, z_sol]), itertools.repeat([oort_a, oort_b]),
                      itertools.repeat([l_thin, l_thick]))
-    for stuff in pool.imap_unordered(calc_pm, iter_group,
-                                     chunksize=max(1, len(d) // n_pool)):
-        j, mu_a, mu_d, mu_l, mu_b = stuff
-        pm[j, :, :, 0] = mu_a
-        pm[j, :, :, 1] = mu_d
-        pm[j, :, :, 2] = mu_l
-        pm[j, :, :, 3] = mu_b
+    with multiprocessing.Pool(n_pool) as pool:
+        for stuff in pool.imap_unordered(calc_pm, iter_group,
+                                         chunksize=max(1, len(d) // n_pool)):
+            j, mu_a, mu_d, mu_l, mu_b = stuff
+            pm[j, :, :, 0] = mu_a
+            pm[j, :, :, 1] = mu_d
+            pm[j, :, :, 2] = mu_l
+            pm[j, :, :, 3] = mu_b
 
-    pool.close()
     pool.join()
 
     return pm, type_fracs
@@ -142,7 +141,7 @@ def convert_dist_coord_to_cylindrical(d, l, b, r_sol):
 
 
 def fraction_density_component(r, z, r_sol, z_sol, l_thin, h_thin, l_thick, h_thick, f_thick,
-                               f_halo, q, n, zeta_b, h_b):
+                               f_halo, q, n, zeta_b, h_b):  # pylint: disable=unused-argument
     '''
     Calculates the relative densities of each of the Galactic components used
     in simulating potential proper motions of objects. At present, this is the
@@ -354,7 +353,7 @@ def bulge_density(r, z, zeta_b, h_b):
     return zeta_b * np.exp(-x/h_b)
 
 
-def calc_pm(iterable):
+def calc_pm(iterable):  # pylint: disable=too-many-locals
     '''
     Calculate an individual simulated object's distribution of proper motions
     based on its different motions if it were a thin disc, thick disc, or outer
@@ -373,7 +372,7 @@ def calc_pm(iterable):
         The index of the particular simulated source having proper motions
         derived for it.
     mu_a : numpy.ndarray
-        The simulated proper motions for this object, ``N`` simulated velocities
+        The simulated proper motions for this object, ``n`` simulated velocities
         per ``drift_vels`` Galactic component, in right ascension.
     mu_d : numpy.ndarray
         The corresponding declination proper motions to ``mu_a``.
@@ -384,10 +383,10 @@ def calc_pm(iterable):
         Transposed Galactic latitude proper motions for the source's ``mu_a``
         and ``mu_d``.
     '''
-    j, drift_vels, rng, [l, b, d], N, [r, z], [r_sol, z_sol], \
-        [A, B], [l_thin, l_thick] = iterable
-    mu_a, mu_d = np.empty((len(drift_vels), N), float), np.empty((len(drift_vels), N), float)
-    _mu_l, _mu_b = np.empty((len(drift_vels), N), float), np.empty((len(drift_vels), N), float)
+    j, drift_vels, rng, [l, b, d], n, [r, z], [r_sol, _], \
+        [oort_a, oort_b], [l_thin, l_thick] = iterable
+    mu_a, mu_d = np.empty((len(drift_vels), n), float), np.empty((len(drift_vels), n), float)
+    _mu_l, _mu_b = np.empty((len(drift_vels), n), float), np.empty((len(drift_vels), n), float)
 
     sinl, cosl = np.sin(np.radians(l[j])), np.cos(np.radians(l[j]))
     sinb, cosb = np.sin(np.radians(b[j])), np.cos(np.radians(b[j]))
@@ -400,41 +399,41 @@ def calc_pm(iterable):
          [r_sol / r[j] * sinl, -(r[j]**2 + d_ip**2 - r_sol**2) / (2 * r[j] * d_ip), 0],
          [0, 0, 1]])
 
-    Us, Vs, Ws = 0, 0, 0
-    Usol, Vsol, Wsol = 11.1, 12.2, 7.3  # km/s
+    us, vs, ws = 0, 0, 0
+    usol, vsol, wsol = 11.1, 12.2, 7.3  # km/s
     sinbeta = d[j] * sinl / r[j]
     cosbeta = (r_sol**2 + r[j]**2 - d[j]**2) / (2 * r_sol * r[j])
 
-    Theta_sol = 233.6  # km/s
+    theta_sol = 233.6  # km/s
     __b = 0.72
     a1, a2, a3 = 235.0, 0.89, 1.31
     x = (r[j] / r_sol) / a2
     theta_d_sq = a1**2 * __b * 1.97 * x**1.22 / (x**2 + 0.78**2)**1.43
     theta_h_sq = a1**2 * (1 - __b) * x**2 * (1 + a3**2) / (x**2 + a3**2)
-    Theta_r = np.sqrt(theta_d_sq + theta_h_sq)
+    theta_r = np.sqrt(theta_d_sq + theta_h_sq)
 
-    U1 = Us * cosbeta + (Vs + Theta_r) * sinbeta - Usol
-    V1 = -Us*sinbeta + (Vs + Theta_r) * cosbeta - Vsol - Theta_sol
-    W1 = Ws - Wsol
+    u1 = us * cosbeta + (vs + theta_r) * sinbeta - usol
+    v1 = -us*sinbeta + (vs + theta_r) * cosbeta - vsol - theta_sol
+    w1 = ws - wsol
 
     # Based on Mroz et al. (2019), our components of Heliocentric Cylindrical
     # coordinates are:
-    Vr = U1 * cosl + V1 * sinl
-    Vt = V1 * cosl - U1 * sinl
-    Vz = W1
+    vr = u1 * cosl + v1 * sinl
+    vt = v1 * cosl - u1 * sinl
+    vz = w1
 
-    for i in range(len(drift_vels)):
-        drift_vel_rtz = np.matmul(rot, np.array([[0], [-drift_vels[i]], [0]]))
-        mean = np.array([Vr + drift_vel_rtz[0, 0], Vt + drift_vel_rtz[1, 0], Vz])
+    for i, drift_vel in enumerate(drift_vels):
+        drift_vel_rtz = np.matmul(rot, np.array([[0], [-drift_vel], [0]]))
+        mean = np.array([vr + drift_vel_rtz[0, 0], vt + drift_vel_rtz[1, 0], vz])
         if i == 0:
-            cov = find_thin_disc_dispersion(r[j], z[j], l[j], b[j], d[j], A[j], B[j], l_thin,
+            cov = find_thin_disc_dispersion(r[j], z[j], l[j], b[j], d[j], oort_a[j], oort_b[j], l_thin,
                                             r_sol)
         if i == 1:
             cov = find_thick_disc_dispersion(r[j], l[j], b[j], d[j], l_thick, r_sol)
         if i == 2:
             cov = find_halo_dispersion(l[j], b[j], d[j])
 
-        new_uvw = rng.multivariate_normal(mean, cov, N)
+        new_uvw = rng.multivariate_normal(mean, cov, n)
         v_d, v_l, v_z = new_uvw[:, 0], new_uvw[:, 1], new_uvw[:, 2]
 
         # 1 km/s/kpc = 0.2108 mas/year
@@ -449,7 +448,7 @@ def calc_pm(iterable):
     return (j, mu_a, mu_d, _mu_l, _mu_b)
 
 
-def find_thin_disc_dispersion(r, z, l, b, d, A, B, h, r_sol):
+def find_thin_disc_dispersion(r, z, l, b, d, oort_a, oort_b, h, r_sol):
     '''
     Calculate the dispersion in the thin disc as a function of Galactic position.
 
@@ -463,9 +462,9 @@ def find_thin_disc_dispersion(r, z, l, b, d, A, B, h, r_sol):
         Galactic longitude of the star.
     b : float
         Galactic latitude of the star.
-    A : float
+    oort_a : float
         Oort constant.
-    B : float
+    oort_b : float
         Oort constant.
     h : float
         Scale length of the thin disc.
@@ -494,7 +493,7 @@ def find_thin_disc_dispersion(r, z, l, b, d, A, B, h, r_sol):
 
     # Assume that the phi variance sigma can be approximated from the relation with
     # the R sigma:
-    sig_phiphi2 = (-B / (A - B)) * sig_rr2
+    sig_phiphi2 = (-oort_b / (oort_a - oort_b)) * sig_rr2
 
     # We assume the correlation along the R-phi covariance is zero, following Vallenari et al.
     sig_rphi2 = 0
@@ -551,16 +550,12 @@ def find_thick_disc_dispersion(r, l, b, d, h, r_sol):
     ----------
     r : float
         The Galactic Cylindrical radius of the object.
-    z : float
-        The Galactic Cylindrical height of the source.
     l : float
         Galactic longitude of the star.
     b : float
         Galactic latitude of the star.
-    A : float
-        Oort constant.
-    B : float
-        Oort constant.
+    d : float
+        THree-dimensional distance to the star.
     h : float
         Scale length of the thick disc.
     r_sol : float
@@ -658,12 +653,12 @@ def find_halo_dispersion(l, b, d):
     x = d * cosl * cosb
     y = d * sinl * cosb
     z = d * sinb
-    X = x - r_sol
-    Y = y
-    Z = z + z_sol
-    R = np.sqrt(X**2 + Y**2 + Z**2)
+    x_ = x - r_sol
+    y_ = y
+    z_ = z + z_sol
+    r = np.sqrt(x_**2 + y_**2 + z_**2)
 
-    q = np.argmin(np.abs(R - r_vals))
+    q = np.argmin(np.abs(r - r_vals))
 
     cov = np.empty((3, 3), float)
     cov[0, 0] = sig_rr[q]**2
@@ -724,13 +719,13 @@ def galactic_to_equatorial(l, b, mu_l, mu_b):
     '''
     # Rotation frame maths from https://gea.esac.esa.int/archive/documentation/GDR2/
     # Data_processing/chap_cu3ast/sec_cu3ast_intro/ssec_cu3ast_intro_tansforms.html
-    Ag_p = np.array([[-0.0548755604162154, -0.8734370902348850, -0.4838350155487132],
+    ag_p = np.array([[-0.0548755604162154, -0.8734370902348850, -0.4838350155487132],
                      [+0.4941094278755837, -0.4448296299600112, +0.7469822444972189],
                      [-0.8676661490190047, -0.1980763734312015, +0.4559837761750669]])
-    Ag = Ag_p.T
+    ag = ag_p.T
 
     r_gal = np.array([[np.cos(l) * np.cos(b)], [np.sin(l) * np.cos(b)], [np.sin(b)]])
-    r_icrs = np.matmul(Ag, r_gal)
+    r_icrs = np.matmul(ag, r_gal)
 
     a = np.arctan2(r_icrs[1], r_icrs[0])[0]
     d = np.arctan2(r_icrs[2], np.sqrt(r_icrs[0]**2 + r_icrs[1]**2))[0]
@@ -743,7 +738,7 @@ def galactic_to_equatorial(l, b, mu_l, mu_b):
 
     mu_gal = p_gal * mu_l + q_gal * mu_b
 
-    mu_icrs = np.matmul(Ag, mu_gal)
+    mu_icrs = np.matmul(ag, mu_gal)
 
     mu_a = np.matmul(np.transpose(p_icrs), mu_icrs)
     mu_d = np.matmul(np.transpose(q_icrs), mu_icrs)
@@ -778,12 +773,12 @@ def equatorial_to_galactic(a, d, mu_a, mu_d):
     d = np.radians(np.copy(d))
     # Rotation frame maths from https://gea.esac.esa.int/archive/documentation/GDR2/
     # Data_processing/chap_cu3ast/sec_cu3ast_intro/ssec_cu3ast_intro_tansforms.html
-    Ag_p = np.array([[-0.0548755604162154, -0.8734370902348850, -0.4838350155487132],
+    ag_p = np.array([[-0.0548755604162154, -0.8734370902348850, -0.4838350155487132],
                      [+0.4941094278755837, -0.4448296299600112, +0.7469822444972189],
                      [-0.8676661490190047, -0.1980763734312015, +0.4559837761750669]])
 
     r_icrs = np.array([[np.cos(a) * np.cos(d)], [np.sin(a) * np.cos(d)], [np.sin(d)]])
-    r_gal = np.matmul(Ag_p, r_icrs)
+    r_gal = np.matmul(ag_p, r_icrs)
 
     l = np.arctan2(r_gal[1], r_gal[0])[0]
     b = np.arctan2(r_gal[2], np.sqrt(r_gal[0]**2 + r_gal[1]**2))[0]
@@ -796,7 +791,7 @@ def equatorial_to_galactic(a, d, mu_a, mu_d):
 
     mu_icrs = p_icrs * mu_a + q_icrs * mu_d
 
-    mu_gal = np.matmul(Ag_p, mu_icrs)
+    mu_gal = np.matmul(ag_p, mu_icrs)
 
     mu_l = np.matmul(np.transpose(p_gal), mu_gal)
     mu_b = np.matmul(np.transpose(q_gal), mu_gal)
