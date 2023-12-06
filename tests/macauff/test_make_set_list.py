@@ -8,6 +8,7 @@ import os
 import numpy as np
 import pytest
 
+# pylint: disable-next=import-error,no-name-in-module
 from macauff.make_set_list import _initial_group_numbering, set_list
 
 
@@ -26,7 +27,7 @@ def test_initial_group_numbering():
                                [11], [12, 19], [13], [14], [], [], [12], [3]]):
         b_overlaps[:len(_inds), _i] = np.array(_inds)
     os.makedirs('./group', exist_ok=True)
-    agroup, bgroup = _initial_group_numbering(a_overlaps, b_overlaps, a_num, b_num, '.')
+    agroup, bgroup = _initial_group_numbering(a_overlaps, b_overlaps, a_num, b_num)
 
     assert np.all(agroup == np.array(
         [18, 1, 2, 19, 3, 4, 5, 6, 7, 8, 9, 10, 20, 11, 12, 13, 14, 15, 18, 20]))
@@ -36,42 +37,40 @@ def test_initial_group_numbering():
 
 def test_set_list_maximum_exceeded():
     os.makedirs('./group', exist_ok=True)
-    for i, (N_a, N_b) in enumerate(zip([21, 10, 7], [5, 10, 6])):
-        a_overlaps = np.empty((N_b, N_a+2), int)
-        a_overlaps[:, :-2] = np.arange(N_b).reshape(-1, 1)
+    for i, (n_a, n_b) in enumerate(zip([21, 10, 7], [5, 10, 6])):
+        a_overlaps = np.empty((n_b, n_a+2), int)
+        a_overlaps[:, :-2] = np.arange(n_b).reshape(-1, 1)
         a_overlaps[:, -2:] = -1
-        a_overlaps[0, -2] = N_b
-        b_overlaps = np.empty((N_a, N_b+2), int)
-        b_overlaps[:, :-1] = np.arange(N_a).reshape(-1, 1)
+        a_overlaps[0, -2] = n_b
+        b_overlaps = np.empty((n_a, n_b+2), int)
+        b_overlaps[:, :-1] = np.arange(n_a).reshape(-1, 1)
         b_overlaps[:, -2:] = -1
-        b_overlaps[0, -2] = N_a
+        b_overlaps[0, -2] = n_a
 
-        a_num = np.append(np.array([N_b]*N_a), [1, 0])
-        b_num = np.append(np.array([N_a]*N_b), [1, 0])
+        a_num = np.append(np.array([n_b]*n_a), [1, 0])
+        b_num = np.append(np.array([n_a]*n_b), [1, 0])
 
         if i != 2:
-            with pytest.warns(UserWarning, match='1 island, containing {}/{} catalogue a and '
-                              '{}/{} catalogue b stars'.format(N_a, N_a+2, N_b, N_b+2)):
-                alist, blist, agrplen, bgrplen, areject, breject = set_list(
-                    a_overlaps, b_overlaps, a_num, b_num, '.', 2)
+            with pytest.warns(UserWarning, match=f'1 island, containing {n_a}/{n_a+2} catalogue a and '
+                              f'{n_b}/{n_b+2} catalogue b stars'):
+                alist, blist, agrplen, bgrplen, _, _ = set_list(a_overlaps, b_overlaps, a_num, b_num, 2)
         else:
             with pytest.warns(None) as record:
-                alist, blist, agrplen, bgrplen = set_list(
-                    a_overlaps, b_overlaps, a_num, b_num, '.', 2)
+                alist, blist, agrplen, bgrplen = set_list(a_overlaps, b_overlaps, a_num, b_num, 2)
             # Should be empty if no warnings were raised.
             assert not record
         if i != 2:
             assert np.all(agrplen == np.array([1, 1, 0]))
             assert np.all(bgrplen == np.array([1, 0, 1]))
-            assert np.all(alist == np.array([[N_a, N_a+1, -1]]))
-            assert np.all(blist == np.array([[N_b, -1, N_b+1]]))
+            assert np.all(alist == np.array([[n_a, n_a+1, -1]]))
+            assert np.all(blist == np.array([[n_b, -1, n_b+1]]))
         else:
             assert np.all(agrplen == np.array([1, 1, 0, 7]))
             assert np.all(bgrplen == np.array([1, 0, 1, 6]))
             # Here we can assume a hard-coded N_a=7, N_b=6.
             assert np.all(alist == np.array(
-                [[N_a, N_a+1, -1, 0], [-1, -1, -1, 1], [-1, -1, -1, 2], [-1, -1, -1, 3],
+                [[n_a, n_a+1, -1, 0], [-1, -1, -1, 1], [-1, -1, -1, 2], [-1, -1, -1, 3],
                  [-1, -1, -1, 4], [-1, -1, -1, 5], [-1, -1, -1, 6]]))
             assert np.all(blist == np.array(
-                [[N_b, -1, N_b+1, 0], [-1, -1, -1, 1], [-1, -1, -1, 2], [-1, -1, -1, 3],
+                [[n_b, -1, n_b+1, 0], [-1, -1, -1, 1], [-1, -1, -1, 2], [-1, -1, -1, 3],
                  [-1, -1, -1, 4], [-1, -1, -1, 5]]))

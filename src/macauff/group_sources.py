@@ -263,7 +263,7 @@ def make_island_groupings(joint_folder_path, a_cat_folder_path, b_cat_folder_pat
     print("Finding unique sets...")
     sys.stdout.flush()
 
-    set_list_items = set_list(ainds, binds, asize, bsize, joint_folder_path, n_pool)
+    set_list_items = set_list(ainds, binds, asize, bsize, n_pool)
     if len(set_list_items) == 6:
         alist, blist, agrplen, bgrplen, areject, breject = set_list_items
         reject_flag = True
