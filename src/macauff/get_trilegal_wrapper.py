@@ -34,7 +34,7 @@ __all__ = []
 
 def get_trilegal(filename, ra, dec, folder='.', galactic=False,
                  filterset='kepler_2mass', area=1, magnum=1, maglim=27, binaries=False,
-                 trilegal_version='1.7', AV=None, sigma_AV=0.1):
+                 trilegal_version='1.7', av=None, sigma_av=0.1):
     """
     Calls the TRILEGAL web form simulation and downloads the file.
 
@@ -60,17 +60,17 @@ def get_trilegal(filename, ra, dec, folder='.', galactic=False,
         Whether to have TRILEGAL include binary stars. Default ``False``.
     trilegal_version : float, optional
         Version of the TRILEGAL API to call. Default ``'1.7'``.
-    AV : float, optional
+    av : float, optional
         Extinction at infinity in the V band. If not provided, defaults to
         ``None``, in which case it is calculated from the coordinates given.
-    sigma_AV : float, optional
+    sigma_av : float, optional
         Fractional spread in A_V along the line of sight.
 
     Returns
     -------
-    AV : float
+    av : float
         The extinction at infinity of the particular TRILEGAL call, if
-        ``AV`` as passed into the function is ``None``, otherwise just
+        ``av`` as passed into the function is ``None``, otherwise just
         returns the input value.
     result : string
         ``timeout`` or ``good`` depending on whether the run was successful
@@ -93,16 +93,16 @@ def get_trilegal(filename, ra, dec, folder='.', galactic=False,
         outfile = '{}/{}.dat'.format(folder, filename)
     else:
         outfile = '{}/{}'.format(folder, filename)
-    if AV is None:
-        AV = get_AV_infinity(l, b, frame='galactic')[0]
+    if av is None:
+        av = get_AV_infinity(l, b, frame='galactic')[0]
 
-    result = trilegal_webcall(trilegal_version, l, b, area, binaries, AV, sigma_AV, filterset,
+    result = trilegal_webcall(trilegal_version, l, b, area, binaries, av, sigma_av, filterset,
                               magnum, maglim, outfile, outfolder)
 
-    return AV, result
+    return av, result
 
 
-def trilegal_webcall(trilegal_version, l, b, area, binaries, AV, sigma_AV, filterset, magnum,
+def trilegal_webcall(trilegal_version, l, b, area, binaries, av, sigma_av, filterset, magnum,
                      maglim, outfile, outfolder):
     """
     Calls TRILEGAL webserver and downloads results file.
@@ -119,9 +119,9 @@ def trilegal_webcall(trilegal_version, l, b, area, binaries, AV, sigma_AV, filte
         Area of TRILEGAL simulation in square degrees.
     binaries : boolean
         Whether to have TRILEGAL include binary stars.
-    AV : float
+    av : float
         Extinction along the line of sight.
-    sigma_AV : float
+    sigma_av : float
         Fractional spread in A_V along the line of sight.
     filterset : string
         Filter set for which to call TRILEGAL.
@@ -141,7 +141,7 @@ def trilegal_webcall(trilegal_version, l, b, area, binaries, AV, sigma_AV, filte
         or not.
     """
     webserver = 'http://stev.oapd.inaf.it'
-    args = [l, b, area, AV, sigma_AV, filterset, maglim, magnum, binaries]
+    args = [l, b, area, av, sigma_av, filterset, maglim, magnum, binaries]
     mainparams = ('imf_file=tab_imf%2Fimf_chabrier_lognormal.dat&binary_frac=0.3&'
                   'binary_mrinf=0.7&binary_mrsup=1&extinction_h_r=100000&extinction_h_z='
                   '110&extinction_kind=2&extinction_rho_sun=0.00015&extinction_infty={}&'
@@ -160,7 +160,7 @@ def trilegal_webcall(trilegal_version, l, b, area, binaries, AV, sigma_AV, filte
                   'bulge_a=1&bulge_b=-2.0e9&object_kind=0&object_mass=1280&object_dist=1658&'
                   'object_av=1.504&object_avkind=1&object_cutoffmass=0.8&'
                   'object_file=tab_sfr%2Ffile_sfr_m4.dat&object_a=1&object_b=0&'
-                  'output_kind=1').format(AV, sigma_AV)
+                  'output_kind=1').format(av, sigma_av)
     cmdargs = [outfolder, outfolder, trilegal_version, l, b, area, filterset, magnum, maglim,
                binaries, mainparams, webserver, trilegal_version]
     cmd = ("wget -o {}/lixo -O {}/tmpfile --post-data='submit_form=Submit&trilegal_version={}"
@@ -238,7 +238,7 @@ def get_AV_infinity(ra, dec, frame='icrs'):
 
     Returns
     -------
-    AV : numpy.ndarray
+    av : numpy.ndarray
         Extinction at infinity as given by the SFD dust maps for the chosen sky
         coordinates.
     """
@@ -247,6 +247,6 @@ def get_AV_infinity(ra, dec, frame='icrs'):
     coords = SkyCoord(ra, dec, unit='deg', frame=frame).transform_to('galactic')
 
     sfd_ebv = dustmaps.sfd.SFDQuery()
-    AV = 2.742 * sfd_ebv(coords)
+    av = 2.742 * sfd_ebv(coords)
 
-    return AV
+    return av

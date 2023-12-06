@@ -10,6 +10,7 @@ import numpy as np
 import pytest
 from numpy.testing import assert_allclose
 
+# pylint: disable-next=import-error,no-name-in-module
 from macauff.fit_astrometry import (AstrometricCorrections,
                                     SNRMagnitudeRelationship)
 
@@ -17,10 +18,10 @@ from macauff.fit_astrometry import (AstrometricCorrections,
 class TestAstroCorrection:
     def setup_method(self):
         self.rng = np.random.default_rng(seed=43578345)
-        self.N = 5000
-        choice = self.rng.choice(self.N, size=self.N, replace=False)
-        self.true_ra = np.linspace(100, 110, self.N)[choice]
-        self.true_dec = np.linspace(-3, 3, self.N)[choice]
+        self.n = 5000
+        choice = self.rng.choice(self.n, size=self.n, replace=False)
+        self.true_ra = np.linspace(100, 110, self.n)[choice]
+        self.true_dec = np.linspace(-3, 3, self.n)[choice]
 
         os.makedirs('store_data', exist_ok=True)
 
@@ -35,40 +36,40 @@ class TestAstroCorrection:
             text = text + (
                 '1   6.65 -0.39  0.02415 -2.701 3.397  4.057 14.00  8.354 0.00 25.523 25.839 ' +
                 '24.409 23.524 22.583 22.387 22.292 22.015 21.144 19.380 20.878 '
-                '{} 22.391 21.637 21.342  0.024\n '.format(w1))
-        with open('tri_folder/trilegal_sim_105.0_0.0_bright.dat', "w") as f:
+                f'{w1} 22.391 21.637 21.342  0.024\n ')
+        with open('tri_folder/trilegal_sim_105.0_0.0_bright.dat', "w", encoding='utf-8') as f:
             f.write(text)
-        with open('tri_folder/trilegal_sim_105.0_0.0_faint.dat', "w") as f:
+        with open('tri_folder/trilegal_sim_105.0_0.0_faint.dat', "w", encoding='utf-8') as f:
             f.write(text)
 
-    def fake_cata_cutout(self, lmin, lmax, bmin, bmax, *cat_args):
-        astro_uncert = self.rng.uniform(0.001, 0.002, size=self.N)
-        mag = self.rng.uniform(12, 12.1, size=self.N)
-        mag_uncert = self.rng.uniform(0.01, 0.02, size=self.N)
+    def fake_cata_cutout(self, lmin, lmax, bmin, bmax, *cat_args):  # pylint: disable=unused-argument
+        astro_uncert = self.rng.uniform(0.001, 0.002, size=self.n)
+        mag = self.rng.uniform(12, 12.1, size=self.n)
+        mag_uncert = self.rng.uniform(0.01, 0.02, size=self.n)
         a = np.array([self.true_ra, self.true_dec, astro_uncert, mag, mag_uncert]).T
         if self.npy_or_csv == 'npy':
             np.save(self.a_cat_name.format(*cat_args), a)
         else:
             np.savetxt(self.a_cat_name.format(*cat_args), a, delimiter=',')
 
-    def fake_catb_cutout(self, lmin, lmax, bmin, bmax, *cat_args):
-        mag = np.empty(self.N, float)
+    def fake_catb_cutout(self, lmin, lmax, bmin, bmax, *cat_args):  # pylint: disable=unused-argument
+        mag = np.empty(self.n, float)
         # Fake some data to plot SNR(S) = S / sqrt(c S + b (aS)^2)
         mag[:50] = np.linspace(10, 18, 50)
         mag[50:100] = mag[:50] + self.rng.uniform(-0.0001, 0.0001, size=50)
         s = 10**(-1/2.5 * mag[:50])
         snr = s / np.sqrt(3.5e-16 * s + 8e-17 + (1.2e-2 * s)**2)
-        mag_uncert = np.empty(self.N, float)
+        mag_uncert = np.empty(self.n, float)
         mag_uncert[:50] = 2.5 * np.log10(1 + 1/snr)
         mag_uncert[50:100] = mag_uncert[:50] + self.rng.uniform(-0.001, 0.001, size=50)
-        astro_uncert = np.empty(self.N, float)
+        astro_uncert = np.empty(self.n, float)
         astro_uncert[:100] = 0.01
         # Divide the N-100 objects at the 0/16/33/52/75/100 interval, for a
         # 16/17/19/23/25 split.
-        i_list = [100, int((self.N-100)*0.16 + 100),
-                  int((self.N-100)*0.33 + 100), int((self.N-100)*0.52 + 100),
-                  int((self.N-100)*0.75 + 100)]
-        j_list = [i_list[1], i_list[2], i_list[3], i_list[4], self.N]
+        i_list = [100, int((self.n-100)*0.16 + 100),
+                  int((self.n-100)*0.33 + 100), int((self.n-100)*0.52 + 100),
+                  int((self.n-100)*0.75 + 100)]
+        j_list = [i_list[1], i_list[2], i_list[3], i_list[4], self.n]
         for i, j, mag_mid, sig_mid in zip(i_list, j_list,
                                           [14.07, 14.17, 14.27, 14.37, 14.47],
                                           [0.01, 0.02, 0.06, 0.12, 0.4]):
@@ -77,12 +78,12 @@ class TestAstroCorrection:
             dm_mag = 2.5 * np.log10(1 + 1/snr_mag)
             mag_uncert[i:j] = self.rng.uniform(dm_mag-0.005, dm_mag+0.005, size=j-i)
             astro_uncert[i:j] = self.rng.uniform(sig_mid, sig_mid+0.01, size=j-i)
-        angle = self.rng.uniform(0, 2*np.pi, size=self.N)
+        angle = self.rng.uniform(0, 2*np.pi, size=self.n)
         ra_angle, dec_angle = np.cos(angle), np.sin(angle)
         # Key is that objects are distributed over TWICE their quoted uncertainty!
         # Also remember that uncertainty needs to be in arcseconds but
         # offset in deg.
-        dist = self.rng.rayleigh(scale=2*astro_uncert / 3600, size=self.N)
+        dist = self.rng.rayleigh(scale=2*astro_uncert / 3600, size=self.n)
         rand_ra = self.true_ra + dist * ra_angle
         rand_dec = self.true_dec + dist * dec_angle
         b = np.array([rand_ra, rand_dec, astro_uncert, mag, mag_uncert]).T
@@ -91,7 +92,7 @@ class TestAstroCorrection:
         else:
             np.savetxt(self.b_cat_name.format(*cat_args), b, delimiter=',')
 
-    def test_fit_astrometry_load_errors(self):
+    def test_fit_astrometry_load_errors(self):  # pylint: disable=too-many-statements
         dd_params = np.load(os.path.join(os.path.dirname(__file__), 'data/dd_params.npy'))
         l_cut = np.load(os.path.join(os.path.dirname(__file__), 'data/l_cut.npy'))
         ax1_mids, ax2_mids = np.array([105], dtype=float), np.array([0], dtype=float)
@@ -206,15 +207,13 @@ class TestAstroCorrection:
         a_cat_func = None
         b_cat_func = None
         with pytest.raises(ValueError, match="If pregenerate_cutouts is 'True' all files must "
-                           "exist already, but {} does not.".format(
-                               self.a_cat_name.format(*cat_args))):
+                           f"exist already, but {self.a_cat_name.format(*cat_args)} does not."):
             ac(self.a_cat_name, self.b_cat_name, a_cat_func, b_cat_func,
                tri_download=False, make_plots=True, make_summary_plot=True)
         ax1_min, ax1_max, ax2_min, ax2_max = 100, 110, -3, 3
         self.fake_cata_cutout(ax1_min, ax1_max, ax2_min, ax2_max, *cat_args)
         with pytest.raises(ValueError, match="If pregenerate_cutouts is 'True' all files must "
-                           "exist already, but {} does not.".format(
-                               self.b_cat_name.format(*cat_args))):
+                           f"exist already, but {self.b_cat_name.format(*cat_args)} does not."):
             ac(self.a_cat_name, self.b_cat_name, a_cat_func, b_cat_func,
                tri_download=False, make_plots=True, make_summary_plot=True)
 
@@ -223,6 +222,7 @@ class TestAstroCorrection:
                              [("csv", "chunk", "equatorial", True),
                               ("npy", "coord", "galactic", False),
                               ("npy", "chunk", "equatorial", False)])
+    # pylint: disable-next=too-many-statements
     def test_fit_astrometry(self, npy_or_csv, coord_or_chunk, coord_system, pregenerate_cutouts):
         self.npy_or_csv = npy_or_csv
         dd_params = np.load(os.path.join(os.path.dirname(__file__), 'data/dd_params.npy'))
@@ -330,10 +330,10 @@ class TestAstroCorrection:
 class TestSNRMagRelation:
     def setup_method(self):
         self.rng = np.random.default_rng(seed=3478989767)
-        self.N = 5000
-        choice = self.rng.choice(self.N, size=self.N, replace=False)
-        self.true_ra = np.linspace(100, 110, self.N)[choice]
-        self.true_dec = np.linspace(-3, 3, self.N)[choice]
+        self.n = 5000
+        choice = self.rng.choice(self.n, size=self.n, replace=False)
+        self.true_ra = np.linspace(100, 110, self.n)[choice]
+        self.true_dec = np.linspace(-3, 3, self.n)[choice]
 
         os.makedirs('store_data', exist_ok=True)
 
@@ -375,6 +375,7 @@ class TestSNRMagRelation:
     @pytest.mark.parametrize("npy_or_csv,coord_or_chunk,coord_system",
                              [("csv", "chunk", "equatorial"), ("npy", "coord", "galactic"),
                               ("npy", "chunk", "equatorial")])
+    # pylint: disable-next=too-many-statements
     def test_snr_mag_relation_fit(self, npy_or_csv, coord_or_chunk, coord_system):
         self.npy_or_csv = npy_or_csv
         # Flag telling us to test for the non-running of all sightlines,
@@ -416,7 +417,7 @@ class TestSNRMagRelation:
         ax1_min, ax1_max, ax2_min, ax2_max = 100, 110, -3, 3
         t_a_c = TestAstroCorrection()
         t_a_c.npy_or_csv = self.npy_or_csv
-        t_a_c.N = self.N
+        t_a_c.n = self.n
         t_a_c.rng = self.rng
         t_a_c.true_ra = self.true_ra
         t_a_c.true_dec = self.true_dec

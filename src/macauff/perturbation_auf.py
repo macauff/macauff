@@ -329,7 +329,7 @@ def make_perturb_aufs(auf_folder, cat_folder, filters, auf_points, r, dr, rho,
             # Hard-coding the AV=1 trick to allow for using av_grid later.
             download_trilegal_simulation(ax_folder, tri_set_name, ax1, ax2, tri_filt_num,
                                          auf_region_frame, tri_maglim_faint, min_area,
-                                         AV=1, sigma_AV=0, total_objs=tri_num_faint)
+                                         av=1, sigma_av=0, total_objs=tri_num_faint)
             os.system('mv {}/trilegal_auf_simulation.dat {}/trilegal_auf_simulation_faint.dat'
                       .format(ax_folder, ax_folder))
         for j in range(len(filters)):
@@ -501,7 +501,7 @@ def make_perturb_aufs(auf_folder, cat_folder, filters, auf_points, r, dr, rho,
 
 
 def download_trilegal_simulation(tri_folder, tri_filter_set, ax1, ax2, mag_num, region_frame,
-                                 mag_lim, min_area, total_objs=1.5e6, AV=None, sigma_AV=0.1):
+                                 mag_lim, min_area, total_objs=1.5e6, av=None, sigma_av=0.1):
     '''
     Get a single Galactic sightline TRILEGAL simulation of an appropriate sky
     size, and save it in a folder for use in the perturbation AUF simulations.
@@ -534,13 +534,13 @@ def download_trilegal_simulation(tri_folder, tri_filter_set, ax1, ax2, mag_num, 
     total_objs : integer, optional
         The approximate number of objects to simulate in a TRILEGAL sightline,
         affecting how large an area to request a simulated Galactic region of.
-    AV : float, optional
+    av : float, optional
         If specified, pass a pre-determined value of infinite-Av to the simulation
         API; otherwise pass its own "default" value and request it derive one
         internally.
-    sigma_AV : float, optional
+    sigma_av : float, optional
         If given, bypasses the default value specified in ~`macauff.get_trilegal`,
-        setting the fractional scaling around `AV` in which to randomise
+        setting the fractional scaling around `av` in which to randomise
         extinction values.
     '''
     class TimeoutException(Exception):
@@ -574,8 +574,8 @@ def download_trilegal_simulation(tri_folder, tri_filter_set, ax1, ax2, mag_num, 
                 signal.alarm(11*60)
                 av_inf, result = get_trilegal(
                     tri_name, ax1, ax2, folder=tri_folder, galactic=galactic_flag,
-                    filterset=tri_filter_set, area=triarea, maglim=mag_lim, magnum=mag_num, AV=AV,
-                    sigma_AV=sigma_AV)
+                    filterset=tri_filter_set, area=triarea, maglim=mag_lim, magnum=mag_num, av=av,
+                    sigma_av=sigma_av)
                 if result == "nocomm":
                     nocomm_count += 1
                 # 11 minute timer allows for 5 loops of two-minute waits for
@@ -631,8 +631,8 @@ def download_trilegal_simulation(tri_folder, tri_filter_set, ax1, ax2, mag_num, 
         while result == "timeout":
             av_inf, result = get_trilegal(
                 tri_name, ax1, ax2, folder=tri_folder, galactic=galactic_flag,
-                filterset=tri_filter_set, area=triarea, maglim=mag_lim, magnum=mag_num, AV=AV,
-                sigma_AV=sigma_AV)
+                filterset=tri_filter_set, area=triarea, maglim=mag_lim, magnum=mag_num, av=av,
+                sigma_av=sigma_av)
     f = open('{}/{}.dat'.format(tri_folder, tri_name), "r")
     contents = f.readlines()
     f.close()
@@ -877,8 +877,8 @@ def create_single_perturb_auf(tri_folder, auf_point, filt, r, dr, rho, drho, j0s
                 l, b = c.galactic.l.degree, c.galactic.b.degree
             else:
                 l, b = ax1, ax2
-            AV = get_AV_infinity(l, b, frame='galactic')[0]
-            avs[j, k] = AV
+            av = get_AV_infinity(l, b, frame='galactic')[0]
+            avs[j, k] = av
     avs = avs.flatten()
     (dens_hist_tri, model_mags, model_mag_mids, model_mags_interval, _,
      n_bright_sources_star) = make_tri_counts(
