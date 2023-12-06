@@ -1568,9 +1568,7 @@ class CrossMatch():
         os.system('rm -rf {}/reject/*'.format(self.joint_folder_path))
         self.group_sources_data = \
             group_func(self.joint_folder_path, self.a_cat_folder_path, self.b_cat_folder_path,
-                       self.a_auf_region_points, self.b_auf_region_points, self.a_filt_names,
-                       self.b_filt_names, self.a_cat_name, self.b_cat_name, self.a_modelrefinds,
-                       self.b_modelrefinds, self.r, self.dr, self.rho, self.drho,
+                       self.a_modelrefinds, self.b_modelrefinds, self.r, self.dr, self.rho, self.drho,
                        self.j1s, self.pos_corr_dist, self.cross_match_extent, self.int_fracs,
                        self.include_phot_like, self.use_phot_priors,
                        self.n_pool, self.a_perturb_auf_outputs, self.b_perturb_auf_outputs)
