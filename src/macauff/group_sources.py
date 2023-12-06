@@ -132,9 +132,9 @@ def make_island_groupings(joint_folder_path, a_cat_folder_path, b_cat_folder_pat
                                                                ax1_sparse_loops[1:])):
         for j, (ax2_sparse_start, ax2_sparse_end) in enumerate(zip(ax2_sparse_loops[:-1],
                                                                    ax2_sparse_loops[1:])):
-            a_big_sky_cut = _load_rectangular_slice('', a_full, ax1_sparse_start, ax1_sparse_end,
+            a_big_sky_cut = _load_rectangular_slice(a_full, ax1_sparse_start, ax1_sparse_end,
                                                     ax2_sparse_start, ax2_sparse_end, 0)
-            b_big_sky_cut = _load_rectangular_slice('', b_full, ax1_sparse_start, ax1_sparse_end,
+            b_big_sky_cut = _load_rectangular_slice(b_full, ax1_sparse_start, ax1_sparse_end,
                                                     ax2_sparse_start, ax2_sparse_end, max_sep)
             a_cutout = a_full[a_big_sky_cut]
             b_cutout = b_full[b_big_sky_cut]
@@ -147,10 +147,10 @@ def make_island_groupings(joint_folder_path, a_cat_folder_path, b_cat_folder_pat
                                               ax2_loops[j*ax2_skip+1:(j+1)*ax2_skip+1]):
                     ax_cutout = [ax1_start, ax1_end, ax2_start, ax2_end]
                     a, afouriergrid, amodrefindsmall, a_cut = _load_fourier_grid_cutouts(
-                        a_cutout, ax_cutout, a_cat_folder_path, a_perturb_auf_outputs, 0, 'a', a_big_sky_cut,
+                        a_cutout, ax_cutout, a_cat_folder_path, a_perturb_auf_outputs, 0, a_big_sky_cut,
                         a_modelrefinds)
                     b, bfouriergrid, bmodrefindsmall, b_cut = _load_fourier_grid_cutouts(
-                        b_cutout, ax_cutout, b_cat_folder_path, b_perturb_auf_outputs, max_sep, 'b',
+                        b_cutout, ax_cutout, b_cat_folder_path, b_perturb_auf_outputs, max_sep,
                         b_big_sky_cut, b_modelrefinds)
 
                     if len(a) > 0 and len(b) > 0:
@@ -185,9 +185,9 @@ def make_island_groupings(joint_folder_path, a_cat_folder_path, b_cat_folder_pat
                                                                ax1_sparse_loops[1:])):
         for j, (ax2_sparse_start, ax2_sparse_end) in enumerate(zip(ax2_sparse_loops[:-1],
                                                                    ax2_sparse_loops[1:])):
-            a_big_sky_cut = _load_rectangular_slice('', a_full, ax1_sparse_start, ax1_sparse_end,
+            a_big_sky_cut = _load_rectangular_slice(a_full, ax1_sparse_start, ax1_sparse_end,
                                                     ax2_sparse_start, ax2_sparse_end, 0)
-            b_big_sky_cut = _load_rectangular_slice('', b_full, ax1_sparse_start, ax1_sparse_end,
+            b_big_sky_cut = _load_rectangular_slice(b_full, ax1_sparse_start, ax1_sparse_end,
                                                     ax2_sparse_start, ax2_sparse_end, max_sep)
             a_cutout = a_full[a_big_sky_cut]
             b_cutout = b_full[b_big_sky_cut]
@@ -200,10 +200,10 @@ def make_island_groupings(joint_folder_path, a_cat_folder_path, b_cat_folder_pat
                                               ax2_loops[j*ax2_skip+1:(j+1)*ax2_skip+1]):
                     ax_cutout = [ax1_start, ax1_end, ax2_start, ax2_end]
                     a, afouriergrid, amodrefindsmall, a_cut = _load_fourier_grid_cutouts(
-                        a_cutout, ax_cutout, a_cat_folder_path, a_perturb_auf_outputs, 0, 'a', a_big_sky_cut,
+                        a_cutout, ax_cutout, a_cat_folder_path, a_perturb_auf_outputs, 0, a_big_sky_cut,
                         a_modelrefinds)
                     b, bfouriergrid, bmodrefindsmall, b_cut = _load_fourier_grid_cutouts(
-                        b_cutout, ax_cutout, b_cat_folder_path, b_perturb_auf_outputs, max_sep, 'b',
+                        b_cutout, ax_cutout, b_cat_folder_path, b_perturb_auf_outputs, max_sep,
                         b_big_sky_cut, b_modelrefinds)
 
                     if len(a) > 0 and len(b) > 0:
@@ -369,7 +369,7 @@ def make_island_groupings(joint_folder_path, a_cat_folder_path, b_cat_folder_pat
     return group_sources_data
 
 
-def _load_fourier_grid_cutouts(a, sky_rect_coords, cat_folder_path, perturb_auf_outputs, padding, cat_name,
+def _load_fourier_grid_cutouts(a, sky_rect_coords, cat_folder_path, perturb_auf_outputs, padding,
                                large_sky_slice, modelrefinds):
     '''
     Function to load a sub-set of a given catalogue's astrometry, slicing it
@@ -393,9 +393,6 @@ def _load_fourier_grid_cutouts(a, sky_rect_coords, cat_folder_path, perturb_auf_
         Maximum allowed sky separation the "wrong" side of ``sky_rect_coords``,
         allowing for an increase in sky box size which ensures that all overlaps
         get caught in ``get_max_overlap`` and ``get_max_indices``.
-    cat_name : string
-        String indicating whether we are loading cutouts from catalogue "a" or
-        "b".
     large_sky_slice : boolean
         Slice array containing the ``True`` and ``False`` elements of which
         elements of the full catalogue, in ``con_cat_astro.npy``, are in ``a``.
@@ -406,7 +403,7 @@ def _load_fourier_grid_cutouts(a, sky_rect_coords, cat_folder_path, perturb_auf_
 
     lon1, lon2, lat1, lat2 = sky_rect_coords
 
-    sky_cut = _load_rectangular_slice(cat_name, a, lon1, lon2, lat1, lat2, padding)
+    sky_cut = _load_rectangular_slice(a, lon1, lon2, lat1, lat2, padding)
 
     a_cutout = np.load(f'{cat_folder_path}/con_cat_astro.npy')[large_sky_slice][sky_cut]
 

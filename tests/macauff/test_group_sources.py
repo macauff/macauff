@@ -57,8 +57,8 @@ def test_load_fourier_grid_cutouts():  # pylint:disable=too-many-statements
 
     padding = 0.1
     p_a_o = {'fourier_grid': grid}
-    _a, _b, _c, _ = _load_fourier_grid_cutouts(a, rect, '.', p_a_o, padding, 'check',
-                                               np.array([True]*lena), modelrefinds=m)
+    _a, _b, _c, _ = _load_fourier_grid_cutouts(a, rect, '.', p_a_o, padding, np.array([True]*lena),
+                                               modelrefinds=m)
     assert np.all(_a.shape == (4, 3))
     assert np.all(_a ==
                   np.array([[50, 50, 0.1], [48, 60.02, 0.5], [39.98, 43, 0.2], [45, 45, 0.2]]))
@@ -80,8 +80,8 @@ def test_load_fourier_grid_cutouts():  # pylint:disable=too-many-statements
     # This should not return sources 123 and 555 above, removing a potential
     # reference index. Hence we only have one unique grid reference now.
     padding = 0
-    _a, _b, _c, _ = _load_fourier_grid_cutouts(a, rect, '.', p_a_o, padding, 'check',
-                                               np.array([True]*lena), modelrefinds=m)
+    _a, _b, _c, _ = _load_fourier_grid_cutouts(a, rect, '.', p_a_o, padding, np.array([True]*lena),
+                                               modelrefinds=m)
     assert np.all(_a.shape == (2, 3))
     assert np.all(_a == np.array([[50, 50, 0.1], [45, 45, 0.2]]))
     assert np.all(_b.shape == (100, 1, 1, 1))

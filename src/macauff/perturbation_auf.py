@@ -682,8 +682,7 @@ def calculate_local_density(a_astro, a_tot_astro, a_tot_photo, auf_folder, cat_f
     min_lon, max_lon = min_max_lon(a_astro[:, 0])
     min_lat, max_lat = np.amin(a_astro[:, 1]), np.amax(a_astro[:, 1])
 
-    overlap_sky_cut = _load_rectangular_slice('', a_tot_astro, min_lon, max_lon, min_lat, max_lat,
-                                              density_radius)
+    overlap_sky_cut = _load_rectangular_slice(a_tot_astro, min_lon, max_lon, min_lat, max_lat, density_radius)
     cut = overlap_sky_cut & (a_tot_photo <= density_mag)
     a_astro_overlap_cut = a_tot_astro[cut]
     a_photo_overlap_cut = a_tot_photo[cut]
@@ -701,14 +700,13 @@ def calculate_local_density(a_astro, a_tot_astro, a_tot_photo, auf_folder, cat_f
     full_counts = np.empty(len(a_astro), float)
     for ax1_start, ax1_end in zip(ax1_loops[:-1], ax1_loops[1:]):
         for ax2_start, ax2_end in zip(ax2_loops[:-1], ax2_loops[1:]):
-            small_sky_cut = _load_rectangular_slice('small_', a_astro, ax1_start, ax1_end,
-                                                    ax2_start, ax2_end, 0)
+            small_sky_cut = _load_rectangular_slice(a_astro, ax1_start, ax1_end, ax2_start, ax2_end, 0)
             a_astro_small = a_astro[small_sky_cut]
             if len(a_astro_small) == 0:
                 continue
 
-            overlap_sky_cut = _load_rectangular_slice('', a_astro_overlap_cut, ax1_start, ax1_end,
-                                                      ax2_start, ax2_end, density_radius)
+            overlap_sky_cut = _load_rectangular_slice(a_astro_overlap_cut, ax1_start, ax1_end, ax2_start,
+                                                      ax2_end, density_radius)
             cut = (overlap_sky_cut & (a_photo_overlap_cut <= density_mag))
             a_astro_overlap_cut_small = a_astro_overlap_cut[cut]
 
