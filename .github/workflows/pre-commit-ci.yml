@@ -25,6 +25,7 @@ jobs:
           - name: macOS, Python 3.10
             os: macOS-11
             python-version: "3.10"
+            gfortran-version: 11
     env: 
       SKIP: "check-lincc-frameworks-template-version,no-commit-to-branch,check-added-large-files,pytest-check,sphinx-build"
     steps:
