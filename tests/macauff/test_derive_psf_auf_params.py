@@ -8,8 +8,8 @@ import os
 import numpy as np
 from numpy.testing import assert_allclose
 
-from macauff.derive_psf_auf_params import (
-    FitPSFPerturbations,  # pylint: disable=no-name-in-module,import-error
+from macauff.derive_psf_auf_params import (  # pylint: disable=no-name-in-module,import-error
+    FitPSFPerturbations,
 )
 
 
