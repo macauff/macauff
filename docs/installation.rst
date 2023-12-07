@@ -31,7 +31,10 @@ For running the test suite the requirements are:
 * ``sphinx-fortran``
 * ``sphinx-astropy``
 * ``pytest-astropy``
-* ``pytest-cov``.
+* ``pytest-cov``
+* ``isort``
+* ``pylint``
+* ``pre-commmit``.
 
 Additionally, you will need the following to install ``macauff``:
 
@@ -53,7 +56,7 @@ although you can drop the ``=3.9``, or chose another (later) Python version -- r
 
 If you require the additional test packages listed above, for running tests, you can install them separately with::
 
-    conda install -c conda-forge tox pytest sphinx-astropy pytest-astropy pytest-cov
+    conda install -c conda-forge tox pytest sphinx-astropy pytest-astropy pytest-cov isort pylint pre_commit
     conda install -c vacumm -c conda-forge sphinx-fortran
 
 You will also need to install ``gfortran`` in order to compile the fortran code in this package. Instructions for how to install this for Windows, MacOS, or Linux can be found `here <https://gcc.gnu.org/wiki/GFortranBinaries>`_. Finally, install ``git`` if you do not have it on your computer; `instructions <https://git-scm.com/book/en/v2/Getting-Started-Installing-Git>`_ for installing it on your operating system are available.
@@ -104,6 +107,11 @@ If you wish to locally build the documentation -- mostly likely if you are impro
 
     tox -e build_docs
 
+To match the github actions ``pre-commit`` workflow, locally you can run::
+
+    SKIP=check-lincc-frameworks-template-version,no-commit-to-branch,check-added-large-files,pytest-check,sphinx-build pre-commit run --show-diff-on-failure --color=always --all-files
+
+which will run ``isort`` and ``pylint`` and report any issues with the formatting prior to code being merged into the main codebase.
 
 Getting Started
 ===============
