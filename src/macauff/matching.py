@@ -1450,8 +1450,7 @@ class CrossMatch():
         if self.include_perturb_auf:
             _kwargs = {'psf_fwhms': self.a_psf_fwhms, 'tri_download_flag': self.a_download_tri,
                        'delta_mag_cuts': self.delta_mag_cuts, 'num_trials': self.num_trials,
-                       'j0s': self.j0s, 'd_mag': self.d_mag,
-                       'density_radius': self.a_dens_dist,
+                       'd_mag': self.d_mag, 'density_radius': self.a_dens_dist,
                        'tri_filt_names': self.a_tri_filt_names,
                        'run_fw': self.a_run_fw_auf, 'run_psf': self.a_run_psf_auf,
                        'snr_mag_params': self.a_snr_mag_params,
@@ -1478,8 +1477,7 @@ class CrossMatch():
             _kwargs = {}
         self.a_modelrefinds, self.a_perturb_auf_outputs = perturb_auf_func(
             self.a_auf_folder_path, self.a_cat_folder_path, self.a_filt_names,
-            self.a_auf_region_points, self.r, self.dr, self.rho, self.drho, 'a',
-            self.include_perturb_auf, **_kwargs)
+            self.a_auf_region_points, self.r, self.dr, self.j0s, 'a', self.include_perturb_auf, **_kwargs)
 
         t = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         print(f'{t} Rank {self.rank}, chunk {self.chunk_id}: Creating empirical perturbation AUFs '
@@ -1490,8 +1488,7 @@ class CrossMatch():
         if self.include_perturb_auf:
             _kwargs = {'psf_fwhms': self.b_psf_fwhms, 'tri_download_flag': self.b_download_tri,
                        'delta_mag_cuts': self.delta_mag_cuts, 'num_trials': self.num_trials,
-                       'j0s': self.j0s, 'd_mag': self.d_mag,
-                       'density_radius': self.b_dens_dist,
+                       'd_mag': self.d_mag, 'density_radius': self.b_dens_dist,
                        'tri_filt_names': self.b_tri_filt_names,
                        'run_fw': self.b_run_fw_auf, 'run_psf': self.b_run_psf_auf,
                        'snr_mag_params': self.b_snr_mag_params,
@@ -1519,8 +1516,7 @@ class CrossMatch():
             _kwargs = {}
         self.b_modelrefinds, self.b_perturb_auf_outputs = perturb_auf_func(
             self.b_auf_folder_path, self.b_cat_folder_path, self.b_filt_names,
-            self.b_auf_region_points, self.r, self.dr, self.rho, self.drho, 'b',
-            self.include_perturb_auf, **_kwargs)
+            self.b_auf_region_points, self.r, self.dr, self.j0s, 'b', self.include_perturb_auf, **_kwargs)
 
     def group_sources(self, group_func=make_island_groupings):
         '''
