@@ -6,6 +6,7 @@ Tests for the "shared_library" module.
 import numpy as np
 from numpy.testing import assert_allclose
 
+# pylint: disable-next=import-error,no-name-in-module
 from macauff.misc_functions_fortran import misc_functions_fortran as mff
 
 
