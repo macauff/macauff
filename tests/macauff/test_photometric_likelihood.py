@@ -469,7 +469,7 @@ class TestFullPhotometricLikelihood:
         fake_fa_l = np.zeros((len(abins) - 1, 1, 1, 1), float)
         h, _ = np.histogram(a[q], bins=abins, density=True)
         fake_fa_l[:, 0, 0, 0] = h
-        fake_abins = pld.abinsarray[:, 0, 0]
+        fake_abins = pld.abinsarray[:, 0, 0]  # pylint: disable=no-member
         assert np.all(abins == fake_abins)
         assert np.all(fake_fa_l.shape == fa_l.shape)
         assert_allclose(fa_l, fake_fa_l, atol=0.02)
@@ -518,13 +518,13 @@ class TestFullPhotometricLikelihood:
         bbins = make_bins(self.b_photo[~np.isnan(self.b_photo[:, 0]), 0])
 
         fake_fa_l = np.ones((len(abins) - 1, 1, 1, 1), float)
-        fake_abins = pld.abinsarray[:, 0, 0]
+        fake_abins = pld.abinsarray[:, 0, 0]  # pylint: disable=no-member
         assert np.all(abins == fake_abins)
         assert np.all(fake_fa_l.shape == fa_l.shape)
         assert_allclose(fa_l, fake_fa_l)
 
         fake_fb_l = np.ones((len(bbins) - 1, 1, 1, 1), float)
-        fake_bbins = pld.bbinsarray[:, 0, 0]
+        fake_bbins = pld.bbinsarray[:, 0, 0]  # pylint: disable=no-member
         assert np.all(bbins == fake_bbins)
         assert np.all(fake_fb_l.shape == fb_l.shape)
         assert_allclose(fb_l, fake_fb_l)
