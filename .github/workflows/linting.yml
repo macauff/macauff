@@ -27,13 +27,13 @@ jobs:
         python -m pip install --upgrade pip
         pip install .[dev]
     - name: Analyze src code with linter
-      continue-on-error: true
       run: |
         pylint -rn -sn --recursive=y ./src --rcfile=./src/.pylintrc
     - name: Analyze tests code with linter
-      continue-on-error: true
+      if: success() || failure()
       run: |
         pylint -rn -sn --recursive=y ./tests --rcfile=./tests/.pylintrc
     - name: Analyze benchmarks code with linter
+      if: success() || failure()
       run: |
         pylint -rn -sn --recursive=y ./benchmarks --rcfile=./tests/.pylintrc
