@@ -45,7 +45,7 @@ Additionally, you will need the following to install ``macauff``:
 Installing the Package
 ======================
 
-As of now, the only way to install this package is by downloading it from the `GitHub repository <https://github.com/Onoddil/macauff>`_. We recommend using an `Anaconda Distribution <https://www.anaconda.com/distribution/>`_, or `miniconda <https://docs.conda.io/en/latest/miniconda.html>`_, to maintain specific, independent Python installations without the need for root permissions.
+As of now, the main way to install this package is by downloading it from the `GitHub repository <https://github.com/macauff/macauff>`_. We recommend using an `Anaconda Distribution <https://www.anaconda.com/distribution/>`_, or `miniconda <https://docs.conda.io/en/latest/miniconda.html>`_, to maintain specific, independent Python installations without the need for root permissions. However, you can also ``pip install macauff``, but note that this version may be behind the latest development version available through GitHub.
 
 Once you have installed your choice of conda, then you can create an initial conda environment::
 
