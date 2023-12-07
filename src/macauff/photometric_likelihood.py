@@ -11,8 +11,7 @@ import numpy as np
 # pylint: disable=import-error,no-name-in-module
 from macauff.misc_functions import StageData
 from macauff.misc_functions_fortran import misc_functions_fortran as mff
-from macauff.photometric_likelihood_fortran import \
-    photometric_likelihood_fortran as plf
+from macauff.photometric_likelihood_fortran import photometric_likelihood_fortran as plf
 
 # pylint: enable=import-error,no-name-in-module
 

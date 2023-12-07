@@ -14,8 +14,7 @@ import shutil
 import matplotlib.pyplot as plt
 import numpy as np
 from astropy import units as u
-from astropy.coordinates import (Angle, SkyCoord, UnitSphericalRepresentation,
-                                 match_coordinates_sky)
+from astropy.coordinates import Angle, SkyCoord, UnitSphericalRepresentation, match_coordinates_sky
 from matplotlib import gridspec
 from numpy.lib.format import open_memmap
 from scipy import spatial
@@ -33,9 +32,11 @@ from macauff.galaxy_counts import create_galaxy_counts
 from macauff.get_trilegal_wrapper import get_av_infinity
 from macauff.misc_functions import min_max_lon
 from macauff.misc_functions_fortran import misc_functions_fortran as mff
-from macauff.perturbation_auf import (_calculate_magnitude_offsets,
-                                      download_trilegal_simulation,
-                                      make_tri_counts)
+from macauff.perturbation_auf import (
+    _calculate_magnitude_offsets,
+    download_trilegal_simulation,
+    make_tri_counts,
+)
 from macauff.perturbation_auf_fortran import perturbation_auf_fortran as paf
 
 # pylint: enable=wrong-import-position,import-error,no-name-in-module

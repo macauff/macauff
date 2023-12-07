@@ -8,10 +8,13 @@ import scipy.special
 from numpy.testing import assert_allclose
 
 # pylint: disable=import-error,no-name-in-module
-from macauff.misc_functions import (_load_rectangular_slice,
-                                    create_auf_params_grid,
-                                    hav_dist_constant_lat,
-                                    load_small_ref_auf_grid, min_max_lon)
+from macauff.misc_functions import (
+    _load_rectangular_slice,
+    create_auf_params_grid,
+    hav_dist_constant_lat,
+    load_small_ref_auf_grid,
+    min_max_lon,
+)
 from macauff.misc_functions_fortran import misc_functions_fortran as mff
 
 # pylint: enable=import-error,no-name-in-module

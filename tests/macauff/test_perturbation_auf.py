@@ -17,9 +17,12 @@ from test_matching import _replace_line
 # pylint: disable=import-error,no-name-in-module
 from macauff.matching import CrossMatch
 from macauff.misc_functions_fortran import misc_functions_fortran as mff
-from macauff.perturbation_auf import (_calculate_magnitude_offsets,
-                                      download_trilegal_simulation,
-                                      make_perturb_aufs, make_tri_counts)
+from macauff.perturbation_auf import (
+    _calculate_magnitude_offsets,
+    download_trilegal_simulation,
+    make_perturb_aufs,
+    make_tri_counts,
+)
 from macauff.perturbation_auf_fortran import perturbation_auf_fortran as paf
 
 # pylint: enable=import-error,no-name-in-module

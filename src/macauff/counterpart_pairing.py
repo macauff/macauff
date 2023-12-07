@@ -10,8 +10,7 @@ import warnings
 import numpy as np
 
 # pylint: disable-next=no-name-in-module,import-error
-from macauff.counterpart_pairing_fortran import \
-    counterpart_pairing_fortran as cpf
+from macauff.counterpart_pairing_fortran import counterpart_pairing_fortran as cpf
 
 __all__ = ['source_pairing']
 

@@ -12,8 +12,7 @@ from astropy.coordinates import SkyCoord
 from numpy.testing import assert_allclose
 
 # pylint: disable=import-error,no-name-in-module
-from macauff.parse_catalogue import (csv_to_npy, npy_to_csv, rect_slice_csv,
-                                     rect_slice_npy)
+from macauff.parse_catalogue import csv_to_npy, npy_to_csv, rect_slice_csv, rect_slice_npy
 
 # pylint: enable=import-error,no-name-in-module
 

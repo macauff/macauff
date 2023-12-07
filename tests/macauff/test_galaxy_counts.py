@@ -9,8 +9,7 @@ from numpy.testing import assert_allclose
 from test_perturbation_auf import GalCountValues
 
 # pylint: disable=import-error,no-name-in-module
-from macauff.galaxy_counts import (create_galaxy_counts,
-                                   generate_speclite_filters)
+from macauff.galaxy_counts import create_galaxy_counts, generate_speclite_filters
 
 # pylint: enable=import-error,no-name-in-module
 

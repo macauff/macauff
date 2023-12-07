@@ -19,8 +19,7 @@ except ModuleNotFoundError:
 
 # pylint: disable=import-error,no-name-in-module
 from macauff.counterpart_pairing import source_pairing
-from macauff.fit_astrometry import (AstrometricCorrections,
-                                    SNRMagnitudeRelationship)
+from macauff.fit_astrometry import AstrometricCorrections, SNRMagnitudeRelationship
 from macauff.group_sources import make_island_groupings
 from macauff.group_sources_fortran import group_sources_fortran as gsf
 from macauff.misc_functions_fortran import misc_functions_fortran as mff

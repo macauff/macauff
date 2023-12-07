@@ -5,8 +5,7 @@ https://asv.readthedocs.io/en/stable/writing_benchmarks.html."""
 import numpy as np
 
 # pylint: disable-next=no-name-in-module
-from macauff.counterpart_pairing_fortran import \
-    counterpart_pairing_fortran as cpf
+from macauff.counterpart_pairing_fortran import counterpart_pairing_fortran as cpf
 
 
 def test_calculate_contamination_probabilities():
