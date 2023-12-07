@@ -22,7 +22,7 @@ def test_derive_psf_auf_params():
 
     assert os.path.isfile('auf_plot/dd_params_visualisation.pdf')
     psf_sig = 6.1 / (2 * np.sqrt(2 * np.log(2)))
-    dd = np.load(f'{data_save_folder}/dd_Ld.npy')
+    dd = np.load(f'{data_save_folder}/dd_ld.npy')
     x_div_sig = dd[0, :, 1] / psf_sig
     y_div_sig = dd[0, :, 0] / psf_sig
     # At small enough relative perturber fluxes, dx ~ f x exp(-0.25 d^2/sig^2)
