@@ -32,7 +32,7 @@ For running the test suite the requirements are:
 * ``sphinx-astropy``
 * ``pytest-astropy``
 * ``pytest-cov``
-* ``jupyter``
+* ``jupyter`` -- Kluyver et al. 2016 (IOS Press, 87, doi.org/10.3233/978-1-61499-649-1-87)
 * ``isort``
 * ``pylint``
 * ``pre-commmit``.
