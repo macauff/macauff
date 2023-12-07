@@ -1567,10 +1567,9 @@ class CrossMatch():
             bright_frac = None
             field_frac = None
         self.phot_like_data = phot_like_func(
-            self.joint_folder_path, self.a_cat_folder_path, self.b_cat_folder_path,
-            self.a_filt_names, self.b_filt_names, self.cf_region_points, self.cf_areas,
-            self.include_phot_like, self.use_phot_priors, self.group_sources_data, bright_frac,
-            field_frac)
+            self.a_cat_folder_path, self.b_cat_folder_path, self.a_filt_names, self.b_filt_names,
+            self.cf_region_points, self.cf_areas, self.include_phot_like, self.use_phot_priors,
+            self.group_sources_data, bright_frac, field_frac)
 
     def _calculate_cf_areas(self):
         '''

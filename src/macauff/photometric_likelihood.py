@@ -8,17 +8,20 @@ import sys
 
 import numpy as np
 
+# pylint: disable=import-error,no-name-in-module
 from macauff.misc_functions import StageData
 from macauff.misc_functions_fortran import misc_functions_fortran as mff
 from macauff.photometric_likelihood_fortran import \
     photometric_likelihood_fortran as plf
 
+# pylint: enable=import-error,no-name-in-module
+
 __all__ = ['compute_photometric_likelihoods']
 
 
-def compute_photometric_likelihoods(joint_folder_path, a_cat_folder_path, b_cat_folder_path,
-                                    afilts, bfilts, cf_points, cf_areas, include_phot_like,
-                                    use_phot_priors, group_sources_data, bright_frac=None,
+# pylint: disable-next=too-many-locals
+def compute_photometric_likelihoods(a_cat_folder_path, b_cat_folder_path, afilts, bfilts, cf_points, cf_areas,
+                                    include_phot_like, use_phot_priors, group_sources_data, bright_frac=None,
                                     field_frac=None):
     '''
     Derives the photometric likelihoods and priors for use in the catalogue
@@ -78,10 +81,10 @@ def compute_photometric_likelihoods(joint_folder_path, a_cat_folder_path, b_cat_
     print("Distributing sources into sky slices...")
     sys.stdout.flush()
 
-    a_astro = np.load('{}/con_cat_astro.npy'.format(a_cat_folder_path))
-    b_astro = np.load('{}/con_cat_astro.npy'.format(b_cat_folder_path))
-    a_photo = np.load('{}/con_cat_photo.npy'.format(a_cat_folder_path))
-    b_photo = np.load('{}/con_cat_photo.npy'.format(b_cat_folder_path))
+    a_astro = np.load(f'{a_cat_folder_path}/con_cat_astro.npy')
+    b_astro = np.load(f'{b_cat_folder_path}/con_cat_astro.npy')
+    a_photo = np.load(f'{a_cat_folder_path}/con_cat_photo.npy')
+    b_photo = np.load(f'{b_cat_folder_path}/con_cat_photo.npy')
 
     a_sky_inds = mff.find_nearest_point(a_astro[:, 0], a_astro[:, 1], cf_points[:, 0],
                                         cf_points[:, 1])
@@ -91,14 +94,8 @@ def compute_photometric_likelihoods(joint_folder_path, a_cat_folder_path, b_cat_
     print("Making bins...")
     sys.stdout.flush()
 
-    abinlengths, abinsarray, longabinlen = create_magnitude_bins(
-        cf_points, afilts, a_photo, joint_folder_path, a_cat_folder_path, 'a', a_sky_inds,
-        include_phot_like or use_phot_priors, group_sources_data.ablen,
-        group_sources_data.ainds, group_sources_data.asize)
-    bbinlengths, bbinsarray, longbbinlen = create_magnitude_bins(
-        cf_points, bfilts, b_photo, joint_folder_path, b_cat_folder_path, 'b', b_sky_inds,
-        include_phot_like or use_phot_priors, group_sources_data.bblen,
-        group_sources_data.binds, group_sources_data.bsize)
+    abinlengths, abinsarray, longabinlen = create_magnitude_bins(cf_points, afilts, a_photo, a_sky_inds)
+    bbinlengths, bbinsarray, longbbinlen = create_magnitude_bins(cf_points, bfilts, b_photo, b_sky_inds)
 
     print("Calculating PDFs...")
     sys.stdout.flush()
@@ -138,7 +135,7 @@ def compute_photometric_likelihoods(joint_folder_path, a_cat_folder_path, b_cat_
         for i in range(0, len(afilts)):
             if not include_phot_like and not use_phot_priors:
                 a_num_photo_cut = np.sum(~np.isnan(a_photo_cut[:, i]))
-                Na = a_num_photo_cut / area
+                na = a_num_photo_cut / area
             else:
                 a_bins = abinsarray[:abinlengths[i, m], i, m]
                 a_mag = a_photo[:, i]
@@ -146,7 +143,7 @@ def compute_photometric_likelihoods(joint_folder_path, a_cat_folder_path, b_cat_
             for j in range(0, len(bfilts)):
                 if not include_phot_like and not use_phot_priors:
                     b_num_photo_cut = np.sum(~np.isnan(b_photo_cut[:, j]))
-                    Nb = b_num_photo_cut / area
+                    nb = b_num_photo_cut / area
                     # Without using photometric-based priors, all we can
                     # do is set the prior on one catalogue to 0.5 -- that
                     # is, equal chance of match or non-match; for this we
@@ -155,9 +152,9 @@ def compute_photometric_likelihoods(joint_folder_path, a_cat_folder_path, b_cat_
                     # "field" source density of the more dense catalogue
                     # with its corresponding density, based on the input
                     # density and the counterpart density calculated.
-                    c_prior = min(Na, Nb) / 2
-                    fa_prior = Na - c_prior
-                    fb_prior = Nb - c_prior
+                    c_prior = min(na, nb) / 2
+                    fa_prior = na - c_prior
+                    fb_prior = nb - c_prior
                     # To fake no photometric likelihoods, simply set all
                     # values to one, to cancel in the ratio later.
                     c_like, fa_like, fb_like = (1-1e-10)**2, 1-1e-10, 1-1e-10
@@ -198,9 +195,7 @@ def compute_photometric_likelihoods(joint_folder_path, a_cat_folder_path, b_cat_
     return phot_like_data
 
 
-def create_magnitude_bins(cf_points, filts, a_photo, joint_folder_path,
-                          cat_folder_path, cat_type, sky_inds, load_extra_arrays,
-                          blen_cutout, inds_cutout, size_cutout):
+def create_magnitude_bins(cf_points, filts, a_photo, sky_inds):
     '''
     Creates the N-dimensional arrays of single-band photometric bins, and
     corresponding array lengths.
@@ -215,26 +210,9 @@ def create_magnitude_bins(cf_points, filts, a_photo, joint_folder_path,
         List of the filters to create magnitude bins for in this catalogue.
     a_photo : numpy.ndarray
         Photometric detections from which to create magnitude bins.
-    joint_folder_path : string
-        Location of top-level folder into which all intermediate files are
-        saved for the cross-match process.
-    cat_folder_path : string
-        Location of the input data for this catalogue.
-    cat_type : string
-        String to indicate which catalogue we are creating bins for, either
-        "a", or "b".
     sky_inds : numpy.ndarray
          Array of indices, showing which on-sky photometric point, from
         ``cf_points``, each source in the catalogue is closest to.
-    load_extra_arrays : boolean
-        Flag to indicate whether the photometric information is being used in
-        the cross-match process, and whether to load additional arrays accordingly.
-    blen_cutout : numpy.ndarray
-        Output from ``group_sources``. Used only when ``load_extra_arrays`` is True.
-    inds_cutout : numpy.ndarray
-        Output from ``group_sources``. Used only when ``load_extra_arrays`` is True.
-    size_cutout : numpy.ndarray
-        Output from ``group_sources``. Used only when ``load_extra_arrays`` is True.
 
     Returns
     -------
@@ -324,16 +302,17 @@ def make_bins(input_mags):
                 flag = 0
                 for j in range(i+1, len(output_bins)-1):
                     if np.sum(hist[i:j+1]) > minnum:
-                        dellist.extend([k for k in range(i+1, j+1)])
+                        dellist.extend(list(range(i+1, j+1)))
                         flag = 1
                         break
                 if flag == 0:
-                    dellist.extend([k for k in range(i+1, len(output_bins)-1)])
+                    dellist.extend(list(range(i+1, len(output_bins)-1)))
     output_bins = np.delete(output_bins, dellist)
 
     return output_bins
 
 
+# pylint: disable-next=too-many-locals
 def create_c_and_f(a_astro, b_astro, a_mag, b_mag, a_inds, a_size, b_inds, b_size, a_blen,
                    a_flen, b_flen, a_bins, b_bins, bright_frac, field_frac, a_flags, b_flags, area):
     '''
@@ -397,16 +376,16 @@ def create_c_and_f(a_astro, b_astro, a_mag, b_mag, a_inds, a_size, b_inds, b_siz
 
     Returns
     -------
-    Nc : float
+    nc : float
         The prior density of counterpart sources between the catalogues.
     cdmdm : numpy.ndarray
         Two-dimensional array of the photometric likelihood of counterpart between
         the two catalogues.
-    Nfa : float
+    nfa : float
         So-called "field" source density in catalogue "a".
     fa : numpy.ndarray
         Probability density array of field sources for catalogue "a".
-    Nfb : float
+    nfb : float
         Field source density prior for catalogue "b".
     fb : numpy.ndarray
         Field source PDF for catalogue "b".
@@ -429,17 +408,17 @@ def create_c_and_f(a_astro, b_astro, a_mag, b_mag, a_inds, a_size, b_inds, b_siz
     a_left = a_mag[a_mask]
     b_left = b_mag[b_mask]
     hist, a_bins = np.histogram(a_left, bins=a_bins)
-    Num_fa = np.sum(a_mask)
+    num_fa = np.sum(a_mask)
 
     fa = hist / (np.sum(hist)*np.diff(a_bins))
 
     hist, b_bins = np.histogram(b_left, bins=b_bins)
-    Num_fb = np.sum(b_mask)
+    num_fb = np.sum(b_mask)
 
     fb = hist / (np.sum(hist)*np.diff(b_bins))
 
-    Nfa = Num_fa/(area - a_area)
-    Nfb = Num_fb/(area - b_area)
+    nfa = num_fa/(area - a_area)
+    nfb = num_fb/(area - b_area)
 
     bm = np.empty((len(b_bins)-1, len(a_bins)-1), float, order='F')
     z = np.empty(len(a_bins)-1, float)
@@ -464,19 +443,19 @@ def create_c_and_f(a_astro, b_astro, a_mag, b_mag, a_inds, a_size, b_inds, b_siz
         bmask = bmask.astype(bool)
         b_left = b_mag[bmask]
         hist, b_bins = np.histogram(b_left, bins=b_bins)
-        _Num_fb = np.sum(b_mask)
+        _num_fb = np.sum(b_mask)
 
         _fb = hist / (np.sum(hist)*np.diff(b_bins))
-        _Nfb = _Num_fb/(area - barea)
-        Fm = np.append(0, np.cumsum(_fb[:-1] * np.diff(b_bins[:-1])))
+        _nfb = _num_fb/(area - barea)
+        fm = np.append(0, np.cumsum(_fb[:-1] * np.diff(b_bins[:-1])))
         for j in range(0, len(b_bins)-1):
-            Cm = np.sum(cdmdm[:j, i]*np.diff(b_bins[:j+1]))
-            cdmdm[j, i] = max(0, z[i]*bm[j, i]*np.exp(aa[i]*_Nfb*Fm[j]) - (1-Cm)*aa[i]*_Nfb*_fb[j])
+            cm = np.sum(cdmdm[:j, i]*np.diff(b_bins[:j+1]))
+            cdmdm[j, i] = max(0, z[i]*bm[j, i]*np.exp(aa[i]*_nfb*fm[j]) - (1-cm)*aa[i]*_nfb*_fb[j])
 
     zc = np.sum(cdmdm*np.diff(b_bins).reshape(-1, 1), axis=0)
     frac = zc/bright_frac
     density_of_inputs = np.sum(a_cuts, axis=1)/area
-    Nc = np.sum(frac*density_of_inputs)
+    nc = np.sum(frac*density_of_inputs)
 
     integral = 0
     for i in range(0, len(a_bins)-1):
@@ -487,7 +466,7 @@ def create_c_and_f(a_astro, b_astro, a_mag, b_mag, a_inds, a_size, b_inds, b_siz
 
     # Correct the field priors for the fraction of counterparts that get left
     # in their "cutout" circle, by the fact that we don't use the entire integral:
-    Nfa = Nfa - (1 - field_frac)*Nc
-    Nfb = Nfb - (1 - field_frac)*Nc
+    nfa = nfa - (1 - field_frac)*nc
+    nfb = nfb - (1 - field_frac)*nc
 
-    return Nc, cdmdm, Nfa, fa, Nfb, fb
+    return nc, cdmdm, nfa, fa, nfb, fb
