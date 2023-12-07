@@ -1,3 +1,4 @@
+# pylint: disable=missing-module-docstring
 from .counterpart_pairing import *
 from .derive_psf_auf_params import *
 from .fit_astrometry import *
