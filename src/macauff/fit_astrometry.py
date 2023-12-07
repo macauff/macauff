@@ -5,6 +5,7 @@ fitting their AUFs and centroid uncertainties across ensembles of matches betwee
 catalogue and one for which precisions are less well known.
 '''
 # pylint: disable=too-many-lines
+# pylint: disable=duplicate-code
 
 import itertools
 import multiprocessing

@@ -99,7 +99,7 @@ class TestInputs:
         cm._initialise_chunk(os.path.join(os.path.dirname(__file__), 'data/crossmatch_params.txt'),
                              os.path.join(os.path.dirname(__file__), 'data/cat_a_params.txt'),
                              os.path.join(os.path.dirname(__file__), 'data/cat_b_params.txt'))
-        assert cm.cf_region_frame == 'equatorial'
+        assert cm.cf_region_frame == 'equatorial'  # pylint: disable=no-member
         assert_allclose(cm.cf_region_points,
                         np.array([[131, -1], [132, -1], [133, -1], [134, -1],
                                   [131, 0], [132, 0], [133, 0], [134, 0],
@@ -117,7 +117,7 @@ class TestInputs:
         cm._initialise_chunk(os.path.join(os.path.dirname(__file__), 'data/crossmatch_params_.txt'),
                              os.path.join(os.path.dirname(__file__), 'data/cat_a_params.txt'),
                              os.path.join(os.path.dirname(__file__), 'data/cat_b_params.txt'))
-        assert cm.a_auf_region_frame == 'equatorial'
+        assert cm.a_auf_region_frame == 'equatorial'  # pylint: disable=no-member
         assert_allclose(cm.a_auf_region_points,
                         np.array([[131, -1], [132, -1], [133, -1], [134, -1],
                                   [131, 0], [132, 0], [133, 0], [134, 0],
@@ -300,10 +300,10 @@ class TestInputs:
         cm._initialise_chunk(os.path.join(os.path.dirname(__file__), 'data/crossmatch_params_.txt'),
                              os.path.join(os.path.dirname(__file__), 'data/cat_a_params.txt'),
                              os.path.join(os.path.dirname(__file__), 'data/cat_b_params.txt'))
-        assert cm.a_tri_set_name == 'gaiaDR2'
-        assert np.all(cm.b_tri_filt_names == np.array(['W1', 'W2', 'W3', 'W4']))
-        assert cm.a_tri_filt_num == 1
-        assert not cm.b_download_tri
+        assert cm.a_tri_set_name == 'gaiaDR2'  # pylint: disable=no-member
+        assert np.all(cm.b_tri_filt_names == np.array(['W1', 'W2', 'W3', 'W4']))  # pylint: disable=no-member
+        assert cm.a_tri_filt_num == 1  # pylint: disable=no-member
+        assert not cm.b_download_tri  # pylint: disable=no-member
 
         # List of simple one line config file replacements for error message checking
         for old_line, new_line, match_text, in_file in zip(
@@ -366,7 +366,7 @@ class TestInputs:
         cm._initialise_chunk(os.path.join(os.path.dirname(__file__), 'data/crossmatch_params_.txt'),
                              os.path.join(os.path.dirname(__file__), 'data/cat_a_params.txt'),
                              os.path.join(os.path.dirname(__file__), 'data/cat_b_params.txt'))
-        assert np.all(cm.a_psf_fwhms == np.array([0.12, 0.12, 0.12]))
+        assert np.all(cm.a_psf_fwhms == np.array([0.12, 0.12, 0.12]))  # pylint: disable=no-member
 
         # List of simple one line config file replacements for error message checking
         for old_line, new_line, match_text, in_file in zip(
@@ -443,7 +443,7 @@ class TestInputs:
         cm._initialise_chunk(os.path.join(os.path.dirname(__file__), 'data/crossmatch_params_.txt'),
                              os.path.join(os.path.dirname(__file__), 'data/cat_a_params.txt'),
                              os.path.join(os.path.dirname(__file__), 'data/cat_b_params.txt'))
-        assert np.all(cm.a_psf_fwhms == np.array([0.12, 0.12, 0.12]))
+        assert np.all(cm.a_psf_fwhms == np.array([0.12, 0.12, 0.12]))  # pylint: disable=no-member
         assert cm.b_dens_dist == 0.25
 
         # List of simple one line config file replacements for error message checking
@@ -487,7 +487,7 @@ class TestInputs:
                              os.path.join(os.path.dirname(__file__), 'data/cat_a_params.txt'),
                              os.path.join(os.path.dirname(__file__), 'data/cat_b_params.txt'))
         assert cm.num_trials == 10000
-        assert cm.d_mag == 0.1
+        assert cm.d_mag == 0.1  # pylint: disable=no-member
 
         for old_line, new_line, match_text in zip(
                 ['num_trials = 10000', 'num_trials = 10000', 'num_trials = 10000',
@@ -755,9 +755,9 @@ class TestInputs:
         cm._initialise_chunk(os.path.join(os.path.dirname(__file__), 'data/crossmatch_params.txt'),
                              os.path.join(os.path.dirname(__file__), 'data/cat_a_params.txt'),
                              os.path.join(os.path.dirname(__file__), 'data/cat_b_params.txt'))
-        assert cm.real_hankel_points == 10000
-        assert cm.four_hankel_points == 10000
-        assert cm.four_max_rho == 100
+        assert cm.real_hankel_points == 10000  # pylint: disable=no-member
+        assert cm.four_hankel_points == 10000  # pylint: disable=no-member
+        assert cm.four_max_rho == 100  # pylint: disable=no-member
 
         # List of simple one line config file replacements for error message checking
         for old_line, new_line, match_text in zip(
@@ -786,9 +786,9 @@ class TestInputs:
         cm._initialise_chunk(os.path.join(os.path.dirname(__file__), 'data/crossmatch_params.txt'),
                              os.path.join(os.path.dirname(__file__), 'data/cat_a_params.txt'),
                              os.path.join(os.path.dirname(__file__), 'data/cat_b_params.txt'))
-        assert cm.a_auf_region_frame == 'equatorial'
-        assert cm.b_auf_region_frame == 'equatorial'
-        assert cm.cf_region_frame == 'equatorial'
+        assert cm.a_auf_region_frame == 'equatorial'  # pylint: disable=no-member
+        assert cm.b_auf_region_frame == 'equatorial'  # pylint: disable=no-member
+        assert cm.cf_region_frame == 'equatorial'  # pylint: disable=no-member
 
         # List of simple one line config file replacements for error message checking
         match_text = 'Region frames for c/f and AUF creation must all be the same.'
@@ -1456,6 +1456,7 @@ class TestInputs:
                              'data/cat_a_params.txt'),
                              os.path.join(os.path.dirname(__file__),
                              'data/cat_b_params_2.txt'))
+        # pylint: disable=no-member
         assert cm.b_best_mag_index == 0
         assert_allclose(cm.b_nn_radius, 30)
         assert cm.b_correct_astro_save_folder == os.path.abspath('ac_folder')
@@ -1470,6 +1471,7 @@ class TestInputs:
         marray = np.load('ac_folder/npy/m_sigs_array.npy')
         narray = np.load('ac_folder/npy/n_sigs_array.npy')
         assert_allclose([marray[0], narray[0]], [2, 0], rtol=0.1, atol=0.01)
+        # pylint: enable=no-member
 
         assert np.all(np.load('wise_folder/in_chunk_overlap.npy') == y[:, 12].astype(int))
 
@@ -1493,6 +1495,7 @@ class TestInputs:
                              'data/cat_b_params_2.txt'),
                              os.path.join(os.path.dirname(__file__),
                              'data/cat_a_params.txt'))
+        # pylint: disable=no-member
         assert cm.a_best_mag_index == 0
         assert_allclose(cm.a_nn_radius, 30)
         assert cm.a_correct_astro_save_folder == os.path.abspath('ac_folder')
@@ -1507,6 +1510,7 @@ class TestInputs:
         marray = np.load('ac_folder/npy/m_sigs_array.npy')
         narray = np.load('ac_folder/npy/n_sigs_array.npy')
         assert_allclose([marray[0], narray[0]], [2, 0], rtol=0.1, atol=0.01)
+        # pylint: enable=no-member
 
         assert np.all(np.load('wise_folder/in_chunk_overlap.npy') == 0)
 
@@ -1542,6 +1546,7 @@ class TestInputs:
                              'data/cat_a_params.txt'),
                              os.path.join(os.path.dirname(__file__),
                              'data/cat_b_params_2b.txt'))
+        # pylint: disable=no-member
         assert cm.b_compute_snr_mag_relation is True
         assert not hasattr(cm, 'b_correct_mag_slice')
         assert cm.b_correct_astro_save_folder == os.path.abspath('ac_folder')
@@ -1572,6 +1577,7 @@ class TestInputs:
         marray = np.load('ac_folder/npy/m_sigs_array.npy')
         narray = np.load('ac_folder/npy/n_sigs_array.npy')
         assert_allclose([marray[0], narray[0]], [2, 0], rtol=0.1, atol=0.01)
+        # pylint: enable=no-member
 
         # Dummy folder that won't contain l_cut.npy
         os.makedirs('./l_cut_dummy_folder', exist_ok=True)

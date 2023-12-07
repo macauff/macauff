@@ -14,6 +14,7 @@ from macauff.matching import CrossMatch
 from macauff.utils import generate_random_data
 
 # pylint: enable=import-error,no-name-in-module
+# pylint: disable=duplicate-code
 
 
 @pytest.mark.parametrize("x,y", [(131, 0), (0, 0)])

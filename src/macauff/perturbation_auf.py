@@ -5,6 +5,7 @@ component of the astrometric uncertainty function.
 '''
 
 # pylint: disable=too-many-lines
+# pylint: disable=duplicate-code
 
 import os
 import signal

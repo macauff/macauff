@@ -18,6 +18,7 @@ from macauff.matching import CrossMatch
 from macauff.misc_functions import StageData
 
 # pylint: enable=no-name-in-module,import-error
+# pylint: disable=duplicate-code
 
 
 def test_calculate_contamination_probabilities():

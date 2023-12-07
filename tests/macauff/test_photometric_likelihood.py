@@ -444,12 +444,14 @@ class TestFullPhotometricLikelihood:
             self.cf_areas, self.include_phot_like, self.use_phot_priors, self.group_sources_data,
             bright_frac=self.y_b, field_frac=self.y_f)
 
+        # pylint: disable=no-member
         c_p = pld.c_priors
         c_l = pld.c_array
         fa_p = pld.fa_priors
         fa_l = pld.fa_array
         fb_p = pld.fb_priors
         fb_l = pld.fb_array
+        # pylint: enable=no-member
 
         fake_c_p = self.nc / self.area
         fake_fa_p = (self.ntot - self.nc) / self.area
@@ -475,7 +477,7 @@ class TestFullPhotometricLikelihood:
         fake_fb_l = np.zeros((len(bbins) - 1, 1, 1, 1), float)
         h, _ = np.histogram(b[q], bins=bbins, density=True)
         fake_fb_l[:, 0, 0, 0] = h
-        fake_bbins = pld.bbinsarray[:, 0, 0]
+        fake_bbins = pld.bbinsarray[:, 0, 0]  # pylint: disable=no-member
         assert np.all(bbins == fake_bbins)
         assert np.all(fake_fb_l.shape == fb_l.shape)
         assert_allclose(fb_l, fake_fb_l, atol=0.02)
@@ -496,12 +498,14 @@ class TestFullPhotometricLikelihood:
             self.cf_areas, include_phot_like, self.use_phot_priors, self.group_sources_data,
             bright_frac=self.y_b, field_frac=self.y_f)
 
+        # pylint: disable=no-member
         c_p = pld.c_priors
         c_l = pld.c_array
         fa_p = pld.fa_priors
         fa_l = pld.fa_array
         fb_p = pld.fb_priors
         fb_l = pld.fb_array
+        # pylint: enable=no-member
 
         fake_c_p = self.nc / self.area
         fake_fa_p = (self.ntot - self.nc) / self.area

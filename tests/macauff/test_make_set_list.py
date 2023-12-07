@@ -56,6 +56,7 @@ def test_set_list_maximum_exceeded():
                 alist, blist, agrplen, bgrplen, _, _ = set_list(a_overlaps, b_overlaps, a_num, b_num, 2)
         else:
             with pytest.warns(None) as record:
+                # pylint: disable-next=unbalanced-tuple-unpacking
                 alist, blist, agrplen, bgrplen = set_list(a_overlaps, b_overlaps, a_num, b_num, 2)
             # Should be empty if no warnings were raised.
             assert not record

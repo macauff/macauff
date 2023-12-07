@@ -494,8 +494,8 @@ class TestMakeIslandGroupings():  # pylint: disable=too-many-instance-attributes
             self.max_sep, ax_lims, self.int_fracs, self.include_phot_like, self.use_phot_prior, self.n_pool,
             self.a_perturb_auf_outputs, self.b_perturb_auf_outputs)
 
-        alist, blist = gsd.alist, gsd.blist
-        agrplen, bgrplen = gsd.agrplen, gsd.bgrplen
+        alist, blist = gsd.alist, gsd.blist  # pylint: disable=no-member
+        agrplen, bgrplen = gsd.agrplen, gsd.bgrplen  # pylint: disable=no-member
         # We removed 3 extra sources this time around, which should all be 1:1 islands.
         assert np.all(alist.shape == (2, n_a - 4 + n_b - n_c))
         assert np.all(blist.shape == (1, n_a - 4 + n_b - n_c))
@@ -565,8 +565,8 @@ class TestMakeIslandGroupings():  # pylint: disable=too-many-instance-attributes
             self.max_sep, ax_lims, self.int_fracs, self.include_phot_like, self.use_phot_prior, self.n_pool,
             self.a_perturb_auf_outputs, self.b_perturb_auf_outputs)
 
-        alist, blist = gsd.alist, gsd.blist
-        agrplen, bgrplen = gsd.agrplen, gsd.bgrplen
+        alist, blist = gsd.alist, gsd.blist  # pylint: disable=no-member
+        agrplen, bgrplen = gsd.agrplen, gsd.bgrplen  # pylint: disable=no-member
         # The same tests that were ran in make_island_groupings should pass here.
         self._comparisons_in_islands(alist, blist, agrplen, bgrplen, n_a, n_b, n_c)
         areject = np.load('joint/reject/reject_a.npy')
@@ -591,8 +591,8 @@ class TestMakeIslandGroupings():  # pylint: disable=too-many-instance-attributes
 
         # Verify that make_island_groupings doesn't change when the extra arrays
         # are calculated, as an initial test.
-        alist, blist = gsd.alist, gsd.blist
-        agrplen, bgrplen = gsd.agrplen, gsd.bgrplen
+        alist, blist = gsd.alist, gsd.blist  # pylint: disable=no-member
+        agrplen, bgrplen = gsd.agrplen, gsd.bgrplen  # pylint: disable=no-member
         self._comparisons_in_islands(alist, blist, agrplen, bgrplen, self.n_a, self.n_b,
                                      self.n_com)
 
@@ -601,6 +601,7 @@ class TestMakeIslandGroupings():  # pylint: disable=too-many-instance-attributes
         aerr = np.load(f'{self.a_cat_folder_path}/con_cat_astro.npy')[:, 2]
         berr = np.load(f'{self.b_cat_folder_path}/con_cat_astro.npy')[:, 2]
 
+        # pylint: disable=no-member
         ablen = gsd.ablen
         aflen = gsd.aflen
         bblen = gsd.bblen
@@ -610,6 +611,7 @@ class TestMakeIslandGroupings():  # pylint: disable=too-many-instance-attributes
         ainds = gsd.ainds
         bsize = gsd.bsize
         binds = gsd.binds
+        # pylint: enable=no-member
 
         for i, _ablen in enumerate(ablen):
             d = _ablen*3600

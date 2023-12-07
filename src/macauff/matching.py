@@ -3,6 +3,7 @@
 This module provides the high-level framework for performing catalogue-catalogue cross-matches.
 '''
 # pylint: disable=too-many-lines
+# pylint: disable=duplicate-code
 
 import datetime
 import os
