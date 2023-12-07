@@ -32,6 +32,7 @@ For running the test suite the requirements are:
 * ``sphinx-astropy``
 * ``pytest-astropy``
 * ``pytest-cov``
+* ``jupyter``
 * ``isort``
 * ``pylint``
 * ``pre-commmit``.
@@ -56,10 +57,10 @@ although you can drop the ``=3.9``, or chose another (later) Python version -- r
 
 If you require the additional test packages listed above, for running tests, you can install them separately with::
 
-    conda install -c conda-forge tox pytest sphinx-astropy pytest-astropy pytest-cov isort pylint pre_commit
+    conda install -c conda-forge tox pytest sphinx-astropy pytest-astropy pytest-cov jupyter isort pylint pre_commit
     conda install -c vacumm -c conda-forge sphinx-fortran
 
-You will also need to install ``gfortran`` in order to compile the fortran code in this package. Instructions for how to install this for Windows, MacOS, or Linux can be found `here <https://gcc.gnu.org/wiki/GFortranBinaries>`_. Finally, install ``git`` if you do not have it on your computer; `instructions <https://git-scm.com/book/en/v2/Getting-Started-Installing-Git>`_ for installing it on your operating system are available.
+To build the ``jupyter`` notebooks you will require `Pandoc <https://pandoc.org/installing.html>`_. You will also need to install ``gfortran`` in order to compile the fortran code in this package. Instructions for how to install this for Windows, MacOS, or Linux can be found `here <https://gcc.gnu.org/wiki/GFortranBinaries>`_. Finally, install ``git`` if you do not have it on your computer; `instructions <https://git-scm.com/book/en/v2/Getting-Started-Installing-Git>`_ for installing it on your operating system are available.
 
 Once you have the required packages installed -- whether in a new ``conda`` environment or otherwise -- you can clone the repository::
 
