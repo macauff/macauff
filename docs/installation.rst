@@ -110,9 +110,17 @@ If you wish to locally build the documentation -- mostly likely if you are impro
 
 To match the github actions ``pre-commit`` workflow, locally you can run::
 
-    SKIP=check-lincc-frameworks-template-version,no-commit-to-branch,check-added-large-files,pytest-check,sphinx-build pre-commit run --show-diff-on-failure --color=always --all-files
+    SKIP=check-lincc-frameworks-template-version,no-commit-to-branch,check-added-large-files,pytest-check,sphinx-build,pylint pre-commit run --show-diff-on-failure --color=always --all-files
 
-which will run ``isort`` and ``pylint`` and report any issues with the formatting prior to code being merged into the main codebase.
+which will run ``isort`` and report any issues with the formatting prior to code being merged into the main codebase.
+
+Additionally, ``pylint`` can be invoked directly using::
+
+    pylint -rn -sn --recursive=y ./src --rcfile=./src/.pylintrc
+    pylint -rn -sn --recursive=y ./tests --rcfile=./tests/.pylintrc
+    pylint -rn -sn --recursive=y ./benchmarks --rcfile=./tests/.pylintrc
+
+to run the linter on each folder, with changes being manually made to comply with the reporting.
 
 Getting Started
 ===============
