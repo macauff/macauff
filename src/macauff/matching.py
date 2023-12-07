@@ -2,31 +2,41 @@
 '''
 This module provides the high-level framework for performing catalogue-catalogue cross-matches.
 '''
+# pylint: disable=too-many-lines
+# pylint: disable=duplicate-code
 
+import datetime
 import os
 import sys
-import datetime
 from configparser import ConfigParser
 from time import sleep
+
 import numpy as np
 
 try:
-    from mpi4py import MPI
-except:
+    from mpi4py import MPI  # pylint:disable=import-error
+except ModuleNotFoundError:
     MPI = None
 
-from macauff.perturbation_auf import make_perturb_aufs
+# pylint: disable=import-error,no-name-in-module
+from macauff.counterpart_pairing import source_pairing
+from macauff.fit_astrometry import AstrometricCorrections, SNRMagnitudeRelationship
 from macauff.group_sources import make_island_groupings
 from macauff.group_sources_fortran import group_sources_fortran as gsf
 from macauff.misc_functions_fortran import misc_functions_fortran as mff
+from macauff.parse_catalogue import csv_to_npy, npy_to_csv
+from macauff.perturbation_auf import make_perturb_aufs
 from macauff.photometric_likelihood import compute_photometric_likelihoods
-from macauff.counterpart_pairing import source_pairing
-from macauff.parse_catalogue import npy_to_csv, csv_to_npy
-from macauff.fit_astrometry import AstrometricCorrections, SNRMagnitudeRelationship
+
+# pylint: enable=import-error,no-name-in-module
 
 __all__ = ['CrossMatch']
 
 
+# Dynamic attribute assignment causes pylint some headaches, so just disable it.
+# This means that attribute use and/or assignment should be checked carefully!
+# pylint: disable=no-member
+# pylint: disable-next=too-many-instance-attributes
 class CrossMatch():
     '''
     A class to cross-match two photometric catalogues with one another, producing
@@ -60,7 +70,7 @@ class CrossMatch():
         self.chunks_folder_path = chunks_folder_path
 
         # Initialise MPI if available and enabled
-        if MPI != None and use_mpi:
+        if MPI is not None and use_mpi:
             self.comm = MPI.COMM_WORLD
             self.rank = self.comm.Get_rank()
             self.comm_size = self.comm.Get_size()
@@ -69,7 +79,8 @@ class CrossMatch():
             self.comm.Set_errhandler(MPI.ERRORS_RETURN)
         else:
             if use_mpi:
-                print("Warning: MPI initialisation failed. Check mpi4py is correctly installed. Falling back to serial mode.")
+                print("Warning: MPI initialisation failed. Check mpi4py is correctly installed. "
+                      "Falling back to serial mode.")
             self.rank = 0
             self.comm_size = 1
 
@@ -79,21 +90,23 @@ class CrossMatch():
         #                    worker uses to request initial chunk from manager.
         #   'WORK_COMPLETE' - worker uses to report successfully processed given chunk
         #   'WORK_ERROR' - worker uses to report failed processing of given chunk
-        self.worker_signals = { 'NO_MORE_WORK': 0,
-                                'WORK_REQUEST': 1,
-                                'WORK_COMPLETE': 2,
-                                'WORK_ERROR': 3 }
+        self.worker_signals = {'NO_MORE_WORK': 0,
+                               'WORK_REQUEST': 1,
+                               'WORK_COMPLETE': 2,
+                               'WORK_ERROR': 3}
         # Only manager process needs to set up the resume file and queue
         if self.rank == 0:
             completed_chunks = set()
             try:
                 # Open and read existing resume file
-                self.resume_file = open(resume_file_path, 'r+')
+                # pylint: disable-next=consider-using-with
+                self.resume_file = open(resume_file_path, 'r+', encoding='utf-8')
                 for line in self.resume_file:
                     completed_chunks.add(line.rstrip())
             except FileNotFoundError:
                 # Resume file specified but does not exist. Create new one.
-                self.resume_file = open(resume_file_path, 'w')
+                # pylint: disable-next=consider-using-with
+                self.resume_file = open(resume_file_path, 'w', encoding='utf-8')
             except TypeError:
                 # Resume file was not specified. Disable checkpointing
                 self.resume_file = None
@@ -106,7 +119,7 @@ class CrossMatch():
             # In seconds, how often the manager checks for new work requests
             self.polling_rate = polling_rate
 
-            if walltime != None:
+            if walltime is not None:
                 # Expect job walltime and "end within" time in Hours:Minutes:Seconds (%H:%M:%S)
                 # format, e.g. 02:44:12 for 2 hours, 44 minutes, 12 seconds
                 # Calculate job end time from start time + walltime
@@ -120,7 +133,6 @@ class CrossMatch():
             else:
                 self.end_time = None
                 self.end_within = None
-
 
     def _initialise_chunk(self, joint_file_path, cat_a_file_path, cat_b_file_path):
         '''
@@ -144,7 +156,7 @@ class CrossMatch():
         '''
         for f in [joint_file_path, cat_a_file_path, cat_b_file_path]:
             if not os.path.isfile(f):
-                raise FileNotFoundError("Input parameter file {} could not be found.".format(f))
+                raise FileNotFoundError(f"Input parameter file {f} could not be found.")
 
         self.joint_file_path = joint_file_path
         self.cat_a_file_path = cat_a_file_path
@@ -167,8 +179,8 @@ class CrossMatch():
             acbi = self.a_best_mag_index
             a_correct_astro_tri_name = '{}/{}/trilegal_auf_simulation'
             t = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            print("{} Rank {}, chunk {}: Calculating catalogue 'a' uncertainty corrections..."
-                  .format(t, self.rank, self.chunk_id))
+            print("{t} Rank {self.rank}, chunk {self.chunk_id}: Calculating catalogue 'a' "
+                  "uncertainty corrections...")
             ac = AstrometricCorrections(
                 self.a_psf_fwhms[acbi], self.num_trials, self.a_nn_radius,
                 self.a_dens_dist, self.a_correct_astro_save_folder, self.a_auf_folder_path,
@@ -192,13 +204,13 @@ class CrossMatch():
             csv_to_npy(csv_folder, csv_filename, self.a_cat_folder_path,
                        self.a_pos_and_err_indices[1], self.a_mag_indices, self.a_best_mag_index_col,
                        self.a_chunk_overlap_col, header=False, process_uncerts=True,
-                       astro_sig_fits_filepath='{}/npy'.format(self.a_correct_astro_save_folder),
+                       astro_sig_fits_filepath=f'{self.a_correct_astro_save_folder}/npy',
                        cat_in_radec=self.a_auf_region_frame == 'equatorial',
                        mn_in_radec=self.a_auf_region_frame == 'equatorial')
         if self.a_compute_snr_mag_relation:
             t = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            print("{} Rank {}, chunk {}: Calculating catalogue 'a' SNR-mag relations..."
-                  .format(t, self.rank, self.chunk_id))
+            print(f"{t} Rank {self.rank}, chunk {self.chunk_id}: Calculating catalogue 'a' "
+                  "SNR-mag relations...")
             smr = SNRMagnitudeRelationship(
                 self.a_correct_astro_save_folder, ax1_mids, ax2_mids, ax_dimension, a_npy_or_csv,
                 a_coord_or_chunk, self.a_pos_and_err_indices, self.a_mag_indices,
@@ -208,14 +220,13 @@ class CrossMatch():
         if self.a_correct_astrometry or self.a_compute_snr_mag_relation:
             # If we re-made either side's astrometry then we need to load its
             # SNR-mag relation now.
-            os.system('cp {}/npy/snr_mag_params.npy {}'.format(self.a_correct_astro_save_folder,
-                      self.a_snr_mag_params_path))
+            os.system(f'cp {self.a_correct_astro_save_folder}/npy/snr_mag_params.npy '
+                      f'{self.a_snr_mag_params_path}')
             f = 'snr_mag_params'
-            if not os.path.isfile('{}/{}.npy'.format(self.a_snr_mag_params_path, f)):
-                raise FileNotFoundError('{} file not found in catalogue {} path. '
-                                        'Please ensure {} are pre-generated.'
-                                        .format(f, "a", 'astrometry corrections'))
-            a = np.load('{}/snr_mag_params.npy'.format(self.a_snr_mag_params_path))
+            if not os.path.isfile(f'{self.a_snr_mag_params_path}/{f}.npy'):
+                raise FileNotFoundError(f'{f} file not found in catalogue "a" path. '
+                                        'Please ensure astrometry corrections are pre-generated.')
+            a = np.load(f'{self.a_snr_mag_params_path}/snr_mag_params.npy')
             if not (len(a.shape) == 3 and a.shape[2] == 5 and
                     a.shape[0] == len(self.a_filt_names)):
                 raise ValueError('a_snr_mag_params should be of shape (X, Y, 5)')
@@ -235,8 +246,8 @@ class CrossMatch():
             bcbi = self.b_best_mag_index
             b_correct_astro_tri_name = '{}/{}/trilegal_auf_simulation'
             t = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            print("{} Rank {}, chunk {}: Calculating catalogue 'b' uncertainty corrections..."
-                  .format(t, self.rank, self.chunk_id))
+            print(f"{t} Rank {self.rank}, chunk {self.chunk_id}: Calculating catalogue 'b' "
+                  "uncertainty corrections...")
             ac = AstrometricCorrections(
                 self.b_psf_fwhms[bcbi], self.num_trials, self.b_nn_radius,
                 self.b_dens_dist, self.b_correct_astro_save_folder, self.b_auf_folder_path,
@@ -258,13 +269,13 @@ class CrossMatch():
             csv_to_npy(csv_folder, csv_filename, self.b_cat_folder_path,
                        self.b_pos_and_err_indices[1], self.b_mag_indices, self.b_best_mag_index_col,
                        self.b_chunk_overlap_col, header=False, process_uncerts=True,
-                       astro_sig_fits_filepath='{}/npy'.format(self.b_correct_astro_save_folder),
+                       astro_sig_fits_filepath=f'{self.b_correct_astro_save_folder}/npy',
                        cat_in_radec=self.b_auf_region_frame == 'equatorial',
                        mn_in_radec=self.b_auf_region_frame == 'equatorial')
         if self.b_compute_snr_mag_relation:
             t = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            print("{} Rank {}, chunk {}: Calculating catalogue 'b' SNR-mag relations..."
-                  .format(t, self.rank, self.chunk_id))
+            print(f"{t} Rank {self.rank}, chunk {self.chunk_id}: Calculating catalogue 'b' "
+                  "SNR-mag relations...")
             smr = SNRMagnitudeRelationship(
                 self.b_correct_astro_save_folder, ax1_mids, ax2_mids, ax_dimension, b_npy_or_csv,
                 b_coord_or_chunk, self.b_pos_and_err_indices, self.b_mag_indices,
@@ -272,14 +283,13 @@ class CrossMatch():
                 chunks=[self.chunk_id])
             smr(self.b_csv_cat_file_string, make_plots=True, overwrite_all_sightlines=True)
         if self.b_correct_astrometry or self.b_compute_snr_mag_relation:
-            os.system('cp {}/npy/snr_mag_params.npy {}'.format(self.b_correct_astro_save_folder,
-                      self.b_snr_mag_params_path))
+            os.system(f'cp {self.b_correct_astro_save_folder}/npy/snr_mag_params.npy '
+                      f'{self.b_snr_mag_params_path}')
             f = 'snr_mag_params'
-            if not os.path.isfile('{}/{}.npy'.format(self.b_snr_mag_params_path, f)):
-                raise FileNotFoundError('{} file not found in catalogue {} path. '
-                                        'Please ensure {} are pre-generated.'
-                                        .format(f, "b", 'astrometry corrections'))
-            a = np.load('{}/snr_mag_params.npy'.format(self.b_snr_mag_params_path))
+            if not os.path.isfile(f'{self.b_snr_mag_params_path}/{f}.npy'):
+                raise FileNotFoundError(f'{f} file not found in catalogue "b" path. '
+                                        'Please ensure astrometry corrections are pre-generated.')
+            a = np.load(f'{self.b_snr_mag_params_path}/snr_mag_params.npy')
             if not (len(a.shape) == 3 and a.shape[2] == 5 and
                     a.shape[0] == len(self.b_filt_names)):
                 raise ValueError('b_snr_mag_params should be of shape (X, Y, 5)')
@@ -288,19 +298,18 @@ class CrossMatch():
         # Ensure that we can create the folders for outputs.
         for path in ['reject', 'pairing']:
             try:
-                os.makedirs('{}/{}'.format(self.joint_folder_path, path), exist_ok=True)
-            except OSError:
+                os.makedirs(f'{self.joint_folder_path}/{path}', exist_ok=True)
+            except OSError as exc:
                 raise OSError("Error when trying to create temporary folder for joint outputs. "
-                              "Please ensure that joint_folder_path is correct.")
+                              "Please ensure that joint_folder_path is correct.") from exc
 
         for path, catname, flag in zip([self.a_auf_folder_path, self.b_auf_folder_path],
                                        ['"a"', '"b"'], ['a_', 'b_']):
             try:
                 os.makedirs(path, exist_ok=True)
-            except OSError:
-                raise OSError("Error when trying to create temporary folder for catalogue {} AUF "
-                              "outputs. Please ensure that {}auf_folder_path is correct."
-                              .format(catname, flag))
+            except OSError as exc:
+                raise OSError(f"Error when trying to create temporary folder for catalogue {catname} AUF "
+                              f"outputs. Please ensure that {flag}auf_folder_path is correct.") from exc
 
         # Unlike the AUF folder paths, which are allowed to not exist at
         # runtime, we simply check that cat_folder_path exists for both
@@ -309,36 +318,34 @@ class CrossMatch():
         for path, catname, flag in zip([self.a_cat_folder_path, self.b_cat_folder_path],
                                        ['"a"', '"b"'], ['a_', 'b_']):
             if not os.path.exists(path):
-                raise OSError('{}cat_folder_path does not exist. Please ensure that '
-                              'path for catalogue {} is correct.'.format(flag, catname))
-            else:
-                # Currently forcing hard-coded three-part numpy array names,
-                # to come out of "skinny table" consolidated catalogue
-                # generation.
-                for file_name in ['con_cat_astro', 'con_cat_photo', 'magref']:
-                    if not os.path.isfile('{}/{}.npy'.format(path, file_name)):
-                        raise FileNotFoundError('{} file not found in catalogue {} path. '
-                                                'Please run catalogue consolidation'.format(
-                                                    file_name, catname))
-                # Shape, mapped to each of astro/photo/magref respectively,
-                # should map to 3, number of magnitudes, and 1, where magref is
-                # a 1-D array but the other two are 2-D.
-                fn_a = np.load('{}/con_cat_astro.npy'.format(path))
-                fn_p = np.load('{}/con_cat_photo.npy'.format(path))
-                fn_m = np.load('{}/magref.npy'.format(path))
-                if len(fn_a.shape) != 2 or len(fn_p.shape) != 2 or len(fn_m.shape) != 1:
-                    raise ValueError("Incorrect number of dimensions in consolidated "
-                                     "catalogue {} files.".format(catname))
-                if fn_a.shape[1] != 3:
-                    raise ValueError("Second dimension of con_cat_astro in catalogue {} "
-                                     "should be 3.".format(catname))
-                if fn_p.shape[1] != len(getattr(self, '{}filt_names'.format(flag))):
-                    raise ValueError("Second dimension of con_cat_photo in catalogue {} "
-                                     "should be the same as the number of filters listed "
-                                     "in {}filt_names.".format(catname, flag))
-                if fn_m.shape[0] != fn_a.shape[0] or fn_p.shape[0] != fn_a.shape[0]:
-                    raise ValueError("Consolidated catalogue arrays for catalogue {} should "
-                                     "all be consistent lengths.".format(catname))
+                raise OSError(f'{flag}cat_folder_path does not exist. Please ensure that '
+                              f'path for catalogue {catname} is correct.')
+            # Currently forcing hard-coded three-part numpy array names,
+            # to come out of "skinny table" consolidated catalogue
+            # generation.
+            for file_name in ['con_cat_astro', 'con_cat_photo', 'magref']:
+                if not os.path.isfile(f'{path}/{file_name}.npy'):
+                    raise FileNotFoundError(f'{file_name} file not found in catalogue {catname} path. '
+                                            'Please run catalogue consolidation')
+            # Shape, mapped to each of astro/photo/magref respectively,
+            # should map to 3, number of magnitudes, and 1, where magref is
+            # a 1-D array but the other two are 2-D.
+            fn_a = np.load(f'{path}/con_cat_astro.npy')
+            fn_p = np.load(f'{path}/con_cat_photo.npy')
+            fn_m = np.load(f'{path}/magref.npy')
+            if len(fn_a.shape) != 2 or len(fn_p.shape) != 2 or len(fn_m.shape) != 1:
+                raise ValueError("Incorrect number of dimensions in consolidated "
+                                 f"catalogue {catname} files.")
+            if fn_a.shape[1] != 3:
+                raise ValueError(f"Second dimension of con_cat_astro in catalogue {catname} "
+                                 "should be 3.")
+            if fn_p.shape[1] != len(getattr(self, f'{flag}filt_names')):
+                raise ValueError(f"Second dimension of con_cat_photo in catalogue {catname} "
+                                 "should be the same as the number of filters listed "
+                                 f"in {flag}filt_names.")
+            if fn_m.shape[0] != fn_a.shape[0] or fn_p.shape[0] != fn_a.shape[0]:
+                raise ValueError(f"Consolidated catalogue arrays for catalogue {catname} should "
+                                 "all be consistent lengths.")
 
         self.make_shared_data()
 
@@ -349,13 +356,13 @@ class CrossMatch():
 
         # Special case for single process, i.e. serial version of code.
         # Do not use manager-worker pattern. Instead, one process loops over all chunks
-        if self.comm_size == 1:
+        if self.comm_size == 1:  # pylint: disable=too-many-nested-blocks
             for (chunk_id, joint_file_path, cat_a_file_path, cat_b_file_path) in self.chunk_queue:
                 t = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                print('{} Rank {} processing chunk {}'.format(t, self.rank, chunk_id))
+                print(f'{t} Rank {self.rank} processing chunk {chunk_id}')
                 self.chunk_id = chunk_id
                 self._process_chunk(joint_file_path, cat_a_file_path, cat_b_file_path)
-                if self.resume_file != None:
+                if self.resume_file is not None:
                     self.resume_file.write(chunk_id+'\n')
         else:
             # Manager process:
@@ -371,11 +378,10 @@ class CrossMatch():
                 active_workers = self.comm_size - 1
 
                 # Loop until all workers have been instructed there is no more work
-                out_of_walltime = False
                 while active_workers > 0:
                     # If checkpointing disabled, simply wait for any worker to
                     # request a chunk and report completion of any previous chunk
-                    if self.end_time == None:
+                    if self.end_time is None:
                         (signal, worker_id, chunk_id) = self.comm.recv()
                     # Otherwise, use non-blocking recv to allow manager to keep
                     # track of job time via polling loop
@@ -389,9 +395,8 @@ class CrossMatch():
                             # empty the queue so no further work is issued
                             if self.end_time - datetime.datetime.now() < self.end_within:
                                 t = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                                print('{} Rank {}: reaching job walltime. Cancelling all further '
-                                      'work. {} chunks remain unprocessed.'
-                                      .format(t, self.rank, self.num_chunks_to_process))
+                                print(f'{t} Rank {self.rank}: reaching job walltime. Cancelling all further '
+                                      f'work. {self.num_chunks_to_process} chunks remain unprocessed.')
                                 self.chunk_queue.clear()
                                 # Blank end time so we don't re-enter polling loop
                                 self.end_time = None
@@ -404,10 +409,10 @@ class CrossMatch():
 
                     # Record completed chunk
                     if signal == self.worker_signals['WORK_COMPLETE'] \
-                    and self.resume_file != None:
+                    and self.resume_file is not None:
                         t = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                        print('{} Rank {}: chunk {} processed by rank {}. Adding to resume file.'
-                              .format(t, self.rank, chunk_id, worker_id))
+                        print(f'{t} Rank {self.rank}: chunk {chunk_id} processed by rank {worker_id}. '
+                              'Adding to resume file.')
                         self.resume_file.write(chunk_id+'\n')
                         # Do not buffer. Immediately commit to disk for
                         # resilience against crashes and overrunning walltime
@@ -420,8 +425,7 @@ class CrossMatch():
                     # Handle failed chunk
                     elif signal == self.worker_signals['WORK_ERROR']:
                         t = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                        print('{} Rank {}: rank {} failed to process chunk {}.'
-                              .format(t, self.rank, worker_id, chunk_id))
+                        print(f'{t} Rank {self.rank}: rank {worker_id} failed to process chunk {chunk_id}.')
 
                     # Assign chunks until no more work.
                     # Then count "no more work" signals until no more workers.
@@ -429,8 +433,7 @@ class CrossMatch():
                         new_chunk = self.chunk_queue.pop(0)
                         signal = self.worker_signals['WORK_REQUEST']
                         t = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                        print('{} Rank {}: sending rank {} chunk {}'.format(
-                              t, self.rank, worker_id, new_chunk[0]))
+                        print(f'{t} Rank {self.rank}: sending rank {worker_id} chunk {new_chunk[0]}')
                     except IndexError:
                         new_chunk = None
                         signal = self.worker_signals['NO_MORE_WORK']
@@ -458,24 +461,24 @@ class CrossMatch():
                     if signal == self.worker_signals['NO_MORE_WORK']:
                         break
                     # ...or process the given chunk
-                    else:
-                        (chunk_id, joint_file_path, cat_a_file_path, cat_b_file_path) = chunk
-                        self.chunk_id = chunk_id
+                    (chunk_id, joint_file_path, cat_a_file_path, cat_b_file_path) = chunk
+                    self.chunk_id = chunk_id
+                    t = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                    print(f'{t} Rank {self.rank}: processing chunk {chunk_id}')
+
+                    try:
+                        self._process_chunk(joint_file_path, cat_a_file_path, cat_b_file_path)
+                        signal = self.worker_signals['WORK_COMPLETE']
+                    except Exception as e:  # pylint: disable=broad-exception-caught
+                        # Recover worker on chunk processing error
+                        signal = self.worker_signals['WORK_ERROR']
+                        # pylint: disable-next=fixme
+                        # TODO More granular error handling
                         t = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                        print('{} Rank {}: processing chunk {}'.format(t, self.rank, chunk_id))
+                        print(f"{t} Rank {self.rank}: failed to process chunk {chunk_id}. "
+                              f"Exception: {e}")
 
-                        try:
-                            self._process_chunk(joint_file_path, cat_a_file_path, cat_b_file_path)
-                            signal = self.worker_signals['WORK_COMPLETE']
-                        except Exception as e:
-                            # Recover worker on chunk processing error
-                            signal = self.worker_signals['WORK_ERROR']
-                            # TODO More granular error handling
-                            t = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                            print("{} Rank {}: failed to process chunk {}. Exception: {}"
-                                  .format(t, self.rank, chunk_id, e))
-
-                        completed_chunk_id = chunk_id
+                    completed_chunk_id = chunk_id
 
                     sys.stdout.flush()
 
@@ -488,7 +491,9 @@ class CrossMatch():
         Runs the various stages of cross-matching two photometric catalogues
         '''
         # Initialise using the current chunk data
+        # pylint: disable-next=fixme
         # TODO Move some initialisation into class constructor?
+        # pylint: disable-next=fixme
         # TODO Have manager perform file loads and broadcast result to reduce I/O
         self._initialise_chunk(joint_file_path, cat_a_file_path, cat_b_file_path)
 
@@ -523,39 +528,36 @@ class CrossMatch():
         larger region), then ``in_chunk_overlap`` should all be set to ``False``.
         '''
         t = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        print("{} Rank {}, chunk {}: Removing halo matches and non-matches..."
-              .format(t, self.rank, self.chunk_id))
+        print(f"{t} Rank {self.rank}, chunk {self.chunk_id}: Removing halo matches and non-matches...")
 
-        ac = np.load('{}/pairing/ac.npy'.format(self.joint_folder_path))
-        bc = np.load('{}/pairing/bc.npy'.format(self.joint_folder_path))
+        ac = np.load(f'{self.joint_folder_path}/pairing/ac.npy')
+        bc = np.load(f'{self.joint_folder_path}/pairing/bc.npy')
 
-        af = np.load('{}/pairing/af.npy'.format(self.joint_folder_path))
-        bf = np.load('{}/pairing/bf.npy'.format(self.joint_folder_path))
+        af = np.load(f'{self.joint_folder_path}/pairing/af.npy')
+        bf = np.load(f'{self.joint_folder_path}/pairing/bf.npy')
 
-        a_in_overlaps = np.load('{}/in_chunk_overlap.npy'.format(self.a_cat_folder_path))
-        b_in_overlaps = np.load('{}/in_chunk_overlap.npy'.format(self.b_cat_folder_path))
+        a_in_overlaps = np.load(f'{self.a_cat_folder_path}/in_chunk_overlap.npy')
+        b_in_overlaps = np.load(f'{self.b_cat_folder_path}/in_chunk_overlap.npy')
 
         core_matches = ~a_in_overlaps[ac] | ~b_in_overlaps[bc]
-        np.save('{}/pairing/ac.npy'.format(self.joint_folder_path), ac[core_matches])
-        np.save('{}/pairing/bc.npy'.format(self.joint_folder_path), bc[core_matches])
+        np.save(f'{self.joint_folder_path}/pairing/ac.npy', ac[core_matches])
+        np.save(f'{self.joint_folder_path}/pairing/bc.npy', bc[core_matches])
         for fname in ['pc', 'eta', 'xi', 'crptseps', 'acontamflux', 'bcontamflux']:
-            np.save('{}/pairing/{}.npy'.format(self.joint_folder_path, fname),
-                    np.load('{}/pairing/{}.npy'.format(self.joint_folder_path, fname))[
-                        core_matches])
+            np.save(f'{self.joint_folder_path}/pairing/{fname}.npy',
+                    np.load(f'{self.joint_folder_path}/pairing/{fname}.npy')[core_matches])
         for fname in ['pacontam', 'pbcontam']:
-            np.save('{}/pairing/{}.npy'.format(self.joint_folder_path, fname),
-                    np.load('{}/pairing/{}.npy'.format(self.joint_folder_path, fname))[
-                        :, core_matches])
+            np.save(f'{self.joint_folder_path}/pairing/{fname}.npy',
+                    np.load(f'{self.joint_folder_path}/pairing/{fname}.npy')[:, core_matches])
 
         a_core_nonmatches = ~a_in_overlaps[af]
         b_core_nonmatches = ~b_in_overlaps[bf]
-        np.save('{}/pairing/af.npy'.format(self.joint_folder_path), af[a_core_nonmatches])
-        np.save('{}/pairing/bf.npy'.format(self.joint_folder_path), bf[b_core_nonmatches])
+        np.save(f'{self.joint_folder_path}/pairing/af.npy', af[a_core_nonmatches])
+        np.save(f'{self.joint_folder_path}/pairing/bf.npy', bf[b_core_nonmatches])
         for fnametype, cnm in zip(['a', 'b'], [a_core_nonmatches, b_core_nonmatches]):
             for fname_ in ['{}fieldflux', 'pf{}', '{}fieldeta', '{}fieldxi', '{}fieldseps']:
                 fname = fname_.format(fnametype)
-                np.save('{}/pairing/{}.npy'.format(self.joint_folder_path, fname),
-                        np.load('{}/pairing/{}.npy'.format(self.joint_folder_path, fname))[cnm])
+                np.save(f'{self.joint_folder_path}/pairing/{fname}.npy',
+                        np.load(f'{self.joint_folder_path}/pairing/{fname}.npy')[cnm])
 
         if self.make_output_csv:
             npy_to_csv(
@@ -609,6 +611,7 @@ class CrossMatch():
             for filename in os.listdir(folder_path):
                 # Ignore non-txt files
                 if filename.endswith(".txt"):
+                    # pylint: disable-next=fixme
                     # TODO Relying on particular naming convention for metadata files
                     if filename.startswith("crossmatch_params"):
                         joint_file_path = os.path.join(folder_path, filename)
@@ -619,22 +622,23 @@ class CrossMatch():
 
             # Check results
             if joint_file_path == "":
-                raise FileNotFoundError('Cross-match metadata file for chunk {} not found in directory {}'
-                                        .format(chunk_id, folder_path))
+                raise FileNotFoundError(f'Cross-match metadata file for chunk {chunk_id} not found '
+                                        f'in directory {folder_path}')
             if cat_a_file_path == "":
-                raise FileNotFoundError('Catalogue "a" metadata file for chunk {} not found in directory {}'
-                                        .format(chunk_id, folder_path))
+                raise FileNotFoundError(f'Catalogue "a" metadata file for chunk {chunk_id} not found '
+                                        f'in directory {folder_path}')
             if cat_b_file_path == "":
-                raise FileNotFoundError('Catalogue "b" metadata file for chunk {} not found in directory {}'
-                                        .format(chunk_id, folder_path))
+                raise FileNotFoundError(f'Catalogue "b" metadata file for chunk {chunk_id} not found '
+                                        f'in directory {folder_path}')
 
             # Determine combined input file size for catalogues "a" and "b"
             # Used to sort queue
             chunk_size = 0
             for file_path in [cat_a_file_path, cat_b_file_path]:
                 # Read input folder path from metadata file.
+                # pylint: disable-next=fixme
                 # TODO: Use ConfigParser here?
-                with open(file_path, 'r') as param_file:
+                with open(file_path, 'r', encoding='utf-8') as param_file:
                     cat_folder_path = ""
                     for line in param_file:
                         if line.startswith("cat_folder_path"):
@@ -642,11 +646,11 @@ class CrossMatch():
                             break
 
                 if not os.path.isdir(cat_folder_path):
-                    raise FileNotFoundError('Catalogue directory {} not found'.format(cat_folder_path))
+                    raise FileNotFoundError(f'Catalogue directory {cat_folder_path} not found')
 
                 # Get size of all files in input folder
                 # Expected to be con_cat_astro.npy, con_cat_photo.npy and magref.npy
-                for path, dirs, files in os.walk(cat_folder_path):
+                for path, _, files in os.walk(cat_folder_path):
                     for f in files:
                         file_path = os.path.join(path, f)
                         chunk_size += os.path.getsize(file_path)
@@ -667,7 +671,7 @@ class CrossMatch():
         '''
         Final clean up operations before application shut down
         '''
-        if self.rank == 0 and self.resume_file != None:
+        if self.rank == 0 and self.resume_file is not None:
             self.resume_file.close()
 
     def _str2bool(self, v):
@@ -687,9 +691,8 @@ class CrossMatch():
         val = v.lower()
         if val not in ("yes", "true", "t", "1", "no", "false", "f", "0"):
             raise ValueError('Boolean flag key not set to allowed value.')
-        else:
-            flag_val = v.lower() in ("yes", "true", "t", "1")
-            return flag_val
+        flag_val = v.lower() in ("yes", "true", "t", "1")
+        return flag_val
 
     def _make_regions_points(self, region_type, region_frame, region_points):
         '''
@@ -717,19 +720,17 @@ class CrossMatch():
             try:
                 a = region_points[1].split()
                 a = [float(point) for point in a]
-            except ValueError:
-                raise ValueError("{} should be 6 numbers separated "
-                                 "by spaces.".format(region_points[0]))
+            except ValueError as exc:
+                raise ValueError(f"{region_points[0]} should be 6 numbers separated by spaces.") from exc
             if len(a) == 6:
                 if not a[2].is_integer() or not a[5].is_integer():
                     raise ValueError("Number of steps between start and stop values for "
-                                     "{} should be integers.".format(region_points[0]))
+                                     f"{region_points[0]} should be integers.")
                 ax1_p = np.linspace(a[0], a[1], int(a[2]))
                 ax2_p = np.linspace(a[3], a[4], int(a[5]))
                 points = np.stack(np.meshgrid(ax1_p, ax2_p), -1).reshape(-1, 2)
             else:
-                raise ValueError("{} should be 6 numbers separated "
-                                 "by spaces.".format(region_points[0]))
+                raise ValueError(f"{region_points[0]} should be 6 numbers separated by spaces.")
         elif rt == 'points':
             try:
                 a = region_points[1].replace('(', ')').split('), )')
@@ -738,35 +739,35 @@ class CrossMatch():
                 a[-1] = a[-1][:-1]
                 b = [q.split(', ') for q in a]
                 points = np.array(b, dtype=float)
-            except ValueError:
-                raise ValueError("{} should be a list of '(a, b), (c, d)' tuples, "
-                                 "separated by a comma.".format(region_points[0]))
+            except ValueError as exc:
+                raise ValueError(f"{region_points[0]} should be a list of '(a, b), (c, d)' tuples, "
+                                 "separated by a comma.") from exc
         else:
-            raise ValueError("{} should either be 'rectangle' or 'points'.".format(region_type[0]))
+            raise ValueError(f"{region_type[0]} should either be 'rectangle' or 'points'.")
 
         setattr(self, region_points[0], points)
 
         rf = region_frame[1].lower()
-        if rf == 'equatorial' or rf == 'galactic':
+        if rf in ('equatorial', 'galactic'):
             setattr(self, region_frame[0], region_frame[1])
         else:
-            raise ValueError("{} should either be 'equatorial' or 'galactic'.".format(
-                             region_frame[0]))
+            raise ValueError(f"{region_frame[0]} should either be 'equatorial' or 'galactic'.")
 
+    # pylint: disable=too-many-statements,too-many-branches
     def read_metadata(self):
         '''
         Helper function to read in metadata and set various class attributes.
         '''
         joint_config = ConfigParser()
-        with open(self.joint_file_path) as f:
+        with open(self.joint_file_path, encoding='utf-8') as f:
             joint_config.read_string('[config]\n' + f.read())
         joint_config = joint_config['config']
         cat_a_config = ConfigParser()
-        with open(self.cat_a_file_path) as f:
+        with open(self.cat_a_file_path, encoding='utf-8') as f:
             cat_a_config.read_string('[config]\n' + f.read())
         cat_a_config = cat_a_config['config']
         cat_b_config = ConfigParser()
-        with open(self.cat_b_file_path) as f:
+        with open(self.cat_b_file_path, encoding='utf-8') as f:
             cat_b_config.read_string('[config]\n' + f.read())
         cat_b_config = cat_b_config['config']
 
@@ -776,26 +777,22 @@ class CrossMatch():
                            'four_hankel_points', 'four_max_rho', 'cross_match_extent',
                            'int_fracs', 'make_output_csv', 'n_pool']:
             if check_flag not in joint_config:
-                raise ValueError("Missing key {} from joint metadata file.".format(check_flag))
+                raise ValueError(f"Missing key {check_flag} from joint metadata file.")
 
         for config, catname in zip([cat_a_config, cat_b_config], ['"a"', '"b"']):
             for check_flag in ['auf_region_type', 'auf_region_frame', 'auf_region_points',
                                'filt_names', 'cat_name', 'auf_folder_path', 'cat_folder_path',
                                'correct_astrometry']:
                 if check_flag not in config:
-                    raise ValueError("Missing key {} from catalogue {} metadata file.".format(
-                                     check_flag, catname))
+                    raise ValueError(f"Missing key {check_flag} from catalogue {catname} metadata file.")
 
         for run_flag in ['include_perturb_auf', 'include_phot_like', 'use_phot_priors']:
             setattr(self, run_flag, self._str2bool(joint_config[run_flag]))
 
         for config, catname in zip([cat_a_config, cat_b_config], ['a_', 'b_']):
-            self._make_regions_points(['{}auf_region_type'.format(catname),
-                                       config['auf_region_type']],
-                                      ['{}auf_region_frame'.format(catname),
-                                       config['auf_region_frame']],
-                                      ['{}auf_region_points'.format(catname),
-                                       config['auf_region_points']])
+            self._make_regions_points([f'{catname}auf_region_type', config['auf_region_type']],
+                                      [f'{catname}auf_region_frame', config['auf_region_frame']],
+                                      [f'{catname}auf_region_points', config['auf_region_points']])
 
         self._make_regions_points(['cf_region_type', joint_config['cf_region_type']],
                                   ['cf_region_frame', joint_config['cf_region_frame']],
@@ -840,13 +837,13 @@ class CrossMatch():
         if self.include_perturb_auf or self.a_correct_astrometry or self.b_correct_astrometry:
             for check_flag in ['num_trials', 'd_mag']:
                 if check_flag not in joint_config:
-                    raise ValueError("Missing key {} from joint metadata file.".format(check_flag))
+                    raise ValueError(f"Missing key {check_flag} from joint metadata file.")
 
             a = joint_config['num_trials']
             try:
                 a = float(a)
-            except ValueError:
-                raise ValueError("num_trials should be an integer.")
+            except ValueError as exc:
+                raise ValueError("num_trials should be an integer.") from exc
             if not a.is_integer():
                 raise ValueError("num_trials should be an integer.")
             self.num_trials = int(a)
@@ -854,14 +851,15 @@ class CrossMatch():
             for flag in ['d_mag']:
                 try:
                     setattr(self, flag, float(joint_config[flag]))
-                except ValueError:
-                    raise ValueError("{} must be a float.".format(flag))
+                except ValueError as exc:
+                    raise ValueError(f"{flag} must be a float.") from exc
 
         # Nominally these are all of the parameters required if include_perturb_auf
         # is True, but for the minute they're also forced if correct_astrometry
         # is also True instead of those aligning, so we bypass the if statement
         # if self.a_correct_astrometry or self.b_correct_astrometry respectively
         # have been set.
+        # pylint: disable-next=too-many-nested-blocks
         for correct_astro, compute_snr_mag_relation, config, catname, flag in zip(
                 [self.a_correct_astrometry, self.b_correct_astrometry],
                 [self.a_compute_snr_mag_relation, self.b_compute_snr_mag_relation],
@@ -869,158 +867,147 @@ class CrossMatch():
             if self.include_perturb_auf or correct_astro:
                 for check_flag in ['dens_dist']:
                     if check_flag not in config:
-                        raise ValueError("Missing key {} from catalogue {} metadata file."
-                                         .format(check_flag, catname))
+                        raise ValueError(f"Missing key {check_flag} from catalogue {catname} metadata file.")
                 try:
-                    setattr(self, '{}dens_dist'.format(flag), float(config['dens_dist']))
-                except ValueError:
-                    raise ValueError("dens_dist in catalogue {} must be a float."
-                                     .format(catname))
+                    setattr(self, f'{flag}dens_dist', float(config['dens_dist']))
+                except ValueError as exc:
+                    raise ValueError(f"dens_dist in catalogue {catname} must be a float.") from exc
 
             if self.include_perturb_auf:
                 for check_flag in ['fit_gal_flag']:
                     if check_flag not in config:
-                        raise ValueError("Missing key {} from catalogue {} metadata file.".format(
-                                         check_flag, catname))
-                setattr(self, '{}fit_gal_flag'.format(flag), self._str2bool(config['fit_gal_flag']))
+                        raise ValueError(f"Missing key {check_flag} from catalogue {catname} metadata file.")
+                setattr(self, f'{flag}fit_gal_flag', self._str2bool(config['fit_gal_flag']))
 
             # snr_mag_params_path is needed in any one of these three cases:
             if self.include_perturb_auf or correct_astro or compute_snr_mag_relation:
                 for check_flag in ['snr_mag_params_path']:
                     if check_flag not in config:
-                        raise ValueError("Missing key {} from catalogue {} metadata file.".format(
-                                         check_flag, catname))
+                        raise ValueError(f"Missing key {check_flag} from catalogue {catname} metadata file.")
 
                 if not os.path.exists(config['snr_mag_params_path']):
-                    raise OSError('{}snr_mag_params_path does not exist. Please ensure that '
-                                  'path for catalogue {} is correct.'.format(flag, catname))
+                    raise OSError(f'{flag}snr_mag_params_path does not exist. Please ensure that '
+                                  f'path for catalogue {catname} is correct.')
 
                 # If we are correcting the astrometry, we will be
                 # re-making the SNR-mag relations so skip loading, and hence
                 # checking the existence of, that for now.
                 if not (correct_astro or compute_snr_mag_relation):
-                    if not os.path.isfile('{}/snr_mag_params.npy'.format(
-                                          config['snr_mag_params_path'])):
+                    smpp = config['snr_mag_params_path']
+                    if not os.path.isfile(f'{smpp}/snr_mag_params.npy'):
                         raise FileNotFoundError('snr_mag_params file not found in catalogue '
-                                                '{} path. Please ensure astrometry corrections '
-                                                'are pre-generated.'.format(catname))
+                                                f'{catname} path. Please ensure astrometry corrections '
+                                                'are pre-generated.')
 
-                    a = np.load('{}/snr_mag_params.npy'.format(
-                                config['snr_mag_params_path']))
+                    a = np.load(f'{smpp}/snr_mag_params.npy')
                     if not (len(a.shape) == 3 and a.shape[2] == 5 and
-                            a.shape[0] == len(getattr(self, '{}filt_names'.format(flag)))):
-                        raise ValueError('{}snr_mag_params should be of shape (X, Y, 5).'
-                                         .format(flag))
-                    setattr(self, '{}snr_mag_params'.format(flag), a)
+                            a.shape[0] == len(getattr(self, f'{flag}filt_names'))):
+                        raise ValueError(f'{flag}snr_mag_params should be of shape (X, Y, 5).')
+                    setattr(self, f'{flag}snr_mag_params', a)
                 else:
-                    setattr(self, '{}snr_mag_params_path'.format(flag),
-                            config['snr_mag_params_path'])
+                    setattr(self, f'{flag}snr_mag_params_path', config['snr_mag_params_path'])
             if self.include_perturb_auf or correct_astro:
                 for check_flag in ['tri_set_name', 'tri_filt_names', 'tri_filt_num',
                                    'download_tri', 'psf_fwhms', 'run_fw_auf', 'run_psf_auf',
                                    'tri_maglim_faint', 'tri_num_faint', 'gal_al_avs']:
                     if check_flag not in config:
-                        raise ValueError("Missing key {} from catalogue {} metadata file.".format(
-                                         check_flag, catname))
+                        raise ValueError(f"Missing key {check_flag} from catalogue {catname} metadata file.")
 
                 # Set as a list of floats
                 for var in ['gal_al_avs']:
                     a = config[var].split(' ')
                     try:
                         b = np.array([float(f) for f in a])
-                    except ValueError:
-                        raise ValueError('{} should be a list of floats in catalogue '
-                                         '{} metadata file'.format(var, catname))
-                    if len(b) != len(getattr(self, '{}filt_names'.format(flag))):
-                        raise ValueError('{}{} and {}filt_names should contain the same '
-                                         'number of entries.'.format(flag, var, flag))
-                    setattr(self, '{}{}'.format(flag, var), b)
+                    except ValueError as exc:
+                        raise ValueError(f'{var} should be a list of floats in catalogue '
+                                         f'{catname} metadata file') from exc
+                    if len(b) != len(getattr(self, f'{flag}filt_names')):
+                        raise ValueError(f'{flag}{var} and {flag}filt_names should contain the same '
+                                         'number of entries.')
+                    setattr(self, f'{flag}{var}', b)
 
-                setattr(self, '{}download_tri'.format(flag), self._str2bool(config['download_tri']))
-                setattr(self, '{}tri_set_name'.format(flag), config['tri_set_name'])
+                setattr(self, f'{flag}download_tri', self._str2bool(config['download_tri']))
+                setattr(self, f'{flag}tri_set_name', config['tri_set_name'])
                 a = config['tri_filt_names'].split()
-                if len(a) != len(getattr(self, '{}filt_names'.format(flag))):
-                    raise ValueError('{}tri_filt_names and {}filt_names should contain the '
-                                     'same number of entries.'.format(flag, flag))
-                setattr(self, '{}tri_filt_names'.format(flag),
-                        np.array(config['tri_filt_names'].split()))
+                if len(a) != len(getattr(self, f'{flag}filt_names')):
+                    raise ValueError(f'{flag}tri_filt_names and {flag}filt_names should contain the '
+                                     'same number of entries.')
+                setattr(self, f'{flag}tri_filt_names', np.array(config['tri_filt_names'].split()))
 
                 a = config['psf_fwhms'].split()
                 try:
                     b = np.array([float(f) for f in a])
-                except ValueError:
-                    raise ValueError('psf_fwhms should be a list of floats in catalogue {} '
-                                     'metadata file.'.format(catname))
-                if len(b) != len(getattr(self, '{}filt_names'.format(flag))):
-                    raise ValueError('{}psf_fwhms and {}filt_names should contain the '
-                                     'same number of entries.'.format(flag, flag))
-                setattr(self, '{}psf_fwhms'.format(flag), b)
+                except ValueError as exc:
+                    raise ValueError(f'psf_fwhms should be a list of floats in catalogue {catname} '
+                                     'metadata file.') from exc
+                if len(b) != len(getattr(self, f'{flag}filt_names')):
+                    raise ValueError(f'{flag}psf_fwhms and {flag}filt_names should contain the '
+                                     'same number of entries.')
+                setattr(self, f'{flag}psf_fwhms', b)
 
-                setattr(self, '{}run_fw_auf'.format(flag), self._str2bool(config['run_fw_auf']))
-                setattr(self, '{}run_psf_auf'.format(flag), self._str2bool(config['run_psf_auf']))
+                setattr(self, f'{flag}run_fw_auf', self._str2bool(config['run_fw_auf']))
+                setattr(self, f'{flag}run_psf_auf', self._str2bool(config['run_psf_auf']))
 
                 # Only need dd_params or l_cut if we're using run_psf_auf or
                 # correct_astrometry is True.
-                if getattr(self, '{}run_psf_auf'.format(flag)) or correct_astro:
+                if getattr(self, f'{flag}run_psf_auf') or correct_astro:
                     for check_flag, f in zip(['dd_params_path', 'l_cut_path'],
                                              ['dd_params', 'l_cut']):
                         if check_flag not in config:
-                            raise ValueError("Missing key {} from catalogue {} metadata file."
-                                             .format(check_flag, catname))
+                            raise ValueError(f"Missing key {check_flag} from catalogue {catname} "
+                                             "metadata file.")
 
                     for check_flag, f in zip(['dd_params_path', 'l_cut_path'],
                                              ['dd_params', 'l_cut']):
                         if not os.path.exists(config[check_flag]):
-                            raise OSError('{}{} does not exist. Please ensure that path for '
-                                          'catalogue {} is correct.'.format(flag, check_flag,
-                                                                            catname))
+                            raise OSError(f'{flag}{check_flag} does not exist. Please ensure that path for '
+                                          f'catalogue {catname} is correct.')
 
-                        if not os.path.isfile('{}/{}.npy'.format(config[check_flag], f)):
-                            raise FileNotFoundError('{} file not found in catalogue {} path. '
+                        if not os.path.isfile(f'{config[check_flag]}/{f}.npy'):
+                            raise FileNotFoundError(f'{f} file not found in catalogue {catname} path. '
                                                     'Please ensure PSF photometry perturbations '
-                                                    'are pre-generated.'.format(f, catname))
+                                                    'are pre-generated.')
 
                         if 'dd_params' in check_flag:
-                            a = np.load('{}/dd_params.npy'.format(config['dd_params_path']))
+                            dpp = config['dd_params_path']
+                            a = np.load(f'{dpp}/dd_params.npy')
                             if not (len(a.shape) == 3 and a.shape[0] == 5 and a.shape[2] == 2):
-                                raise ValueError('{}dd_params should be of shape (5, X, 2).'
-                                                 .format(flag))
+                                raise ValueError(f'{flag}dd_params should be of shape (5, X, 2).')
                         if 'l_cut' in check_flag:
-                            a = np.load('{}/l_cut.npy'.format(config['l_cut_path']))
+                            lcp = config['l_cut_path']
+                            a = np.load(f'{lcp}/l_cut.npy')
                             if not (len(a.shape) == 1 and a.shape[0] == 3):
-                                raise ValueError('{}l_cut should be of shape (3,) only.'
-                                                 .format(flag))
-                        setattr(self, '{}{}'.format(flag, f), a)
+                                raise ValueError(f'{flag}l_cut should be of shape (3,) only.')
+                        setattr(self, f'{flag}{f}', a)
 
                 try:
                     a = config['tri_filt_num']
                     if float(a).is_integer():
-                        setattr(self, '{}tri_filt_num'.format(flag), int(a))
+                        setattr(self, f'{flag}tri_filt_num', int(a))
                     else:
                         raise ValueError("tri_filt_num should be a single integer number in "
-                                         "catalogue {} metadata file.".format(catname))
-                except ValueError:
+                                         f"catalogue {catname} metadata file.")
+                except ValueError as exc:
                     raise ValueError("tri_filt_num should be a single integer number in "
-                                     "catalogue {} metadata file.".format(catname))
+                                     f"catalogue {catname} metadata file.") from exc
 
                 for suffix in ['_faint']:
                     try:
-                        a = config['tri_num{}'.format(suffix)]
+                        a = config[f'tri_num{suffix}']
                         if float(a).is_integer():
-                            setattr(self, '{}tri_num{}'.format(flag, suffix), int(a))
+                            setattr(self, f'{flag}tri_num{suffix}', int(a))
                         else:
-                            raise ValueError("tri_num{} should be a single integer number in "
-                                             "catalogue {} metadata file.".format(suffix, catname))
-                    except ValueError:
-                        raise ValueError("tri_num{} should be a single integer number in "
-                                         "catalogue {} metadata file.".format(suffix, catname))
+                            raise ValueError(f"tri_num{suffix} should be a single integer number in "
+                                             f"catalogue {catname} metadata file.")
+                    except ValueError as exc:
+                        raise ValueError(f"tri_num{suffix} should be a single integer number in "
+                                         f"catalogue {catname} metadata file.") from exc
 
                     try:
-                        setattr(self, '{}tri_maglim{}'.format(flag, suffix),
-                                float(config['tri_maglim{}'.format(suffix)]))
-                    except ValueError:
-                        raise ValueError("tri_maglim{} in catalogue {} must be a float."
-                                         .format(suffix, catname))
+                        setattr(self, f'{flag}tri_maglim{suffix}', float(config[f'tri_maglim{suffix}']))
+                    except ValueError as exc:
+                        raise ValueError(f"tri_maglim{suffix} in catalogue {catname} must be a "
+                                         "float.") from exc
 
                 if not correct_astro:
                     if flag == "a_":
@@ -1031,64 +1018,63 @@ class CrossMatch():
                     for check_flag in ['gal_wavs', 'gal_zmax', 'gal_nzs',
                                        'gal_aboffsets', 'gal_filternames']:
                         if check_flag not in config:
-                            raise ValueError("Missing key {} from catalogue {} metadata file."
-                                             .format(check_flag, catname))
+                            raise ValueError(f"Missing key {check_flag} from catalogue {catname} "
+                                             "metadata file.")
                     # Set all lists of floats
                     for var in ['gal_wavs', 'gal_zmax', 'gal_aboffsets']:
                         a = config[var].split(' ')
                         try:
                             b = np.array([float(f) for f in a])
-                        except ValueError:
-                            raise ValueError('{} should be a list of floats in catalogue '
-                                             '{} metadata file'.format(var, catname))
-                        if len(b) != len(getattr(self, '{}filt_names'.format(flag))):
-                            raise ValueError('{}{} and {}filt_names should contain the same '
-                                             'number of entries.'.format(flag, var, flag))
-                        setattr(self, '{}{}'.format(flag, var), b)
+                        except ValueError as exc:
+                            raise ValueError(f'{var} should be a list of floats in catalogue '
+                                             f'{catname} metadata file') from exc
+                        if len(b) != len(getattr(self, f'{flag}filt_names')):
+                            raise ValueError(f'{flag}{var} and {flag}filt_names should contain the same '
+                                             'number of entries.')
+                        setattr(self, f'{flag}{var}', b)
                     # galaxy_nzs should be a list of integers.
                     a = config['gal_nzs'].split(' ')
                     try:
                         b = np.array([float(f) for f in a])
-                    except ValueError:
+                    except ValueError as exc:
                         raise ValueError('gal_nzs should be a list of integers '
-                                         'in catalogue {} metadata file'.format(catname))
-                    if len(b) != len(getattr(self, '{}filt_names'.format(flag))):
-                        raise ValueError('{}gal_nzs and {}filt_names should contain the same '
-                                         'number of entries.'.format(flag, flag))
+                                         f'in catalogue {catname} metadata file') from exc
+                    if len(b) != len(getattr(self, f'{flag}filt_names')):
+                        raise ValueError(f'{flag}gal_nzs and {flag}filt_names should contain the same '
+                                         'number of entries.')
                     if not np.all([c.is_integer() for c in b]):
-                        raise ValueError('All elements of {}gal_nzs should be '
-                                         'integers.'.format(flag))
-                    setattr(self, '{}gal_nzs'.format(flag), np.array([int(c) for c in b]))
+                        raise ValueError(f'All elements of {flag}gal_nzs should be integers.')
+                    setattr(self, f'{flag}gal_nzs', np.array([int(c) for c in b]))
                     # Filter names are simple lists of strings
                     b = config['gal_filternames'].split(' ')
-                    if len(b) != len(getattr(self, '{}filt_names'.format(flag))):
-                        raise ValueError('{}gal_filternames and {}filt_names should contain the '
-                                         'same number of entries.'.format(flag, flag))
-                    setattr(self, '{}gal_filternames'.format(flag), np.array(b))
+                    if len(b) != len(getattr(self, f'{flag}filt_names')):
+                        raise ValueError(f'{flag}gal_filternames and {flag}filt_names should contain the '
+                                         'same number of entries.')
+                    setattr(self, f'{flag}gal_filternames', np.array(b))
 
         self.a_cat_name = cat_a_config['cat_name']
         self.b_cat_name = cat_b_config['cat_name']
 
         try:
             self.pos_corr_dist = float(joint_config['pos_corr_dist'])
-        except ValueError:
-            raise ValueError("pos_corr_dist must be a float.")
+        except ValueError as exc:
+            raise ValueError("pos_corr_dist must be a float.") from exc
 
         for flag in ['real_hankel_points', 'four_hankel_points', 'four_max_rho']:
             a = joint_config[flag]
             try:
                 a = float(a)
-            except ValueError:
-                raise ValueError("{} should be an integer.".format(flag))
+            except ValueError as exc:
+                raise ValueError(f"{flag} should be an integer.") from exc
             if not a.is_integer():
-                raise ValueError("{} should be an integer.".format(flag))
+                raise ValueError(f"{flag} should be an integer.")
             setattr(self, flag, int(a))
 
         a = joint_config['cross_match_extent'].split()
         try:
             b = np.array([float(f) for f in a])
-        except ValueError:
-            raise ValueError("All elements of cross_match_extent should be floats.")
+        except ValueError as exc:
+            raise ValueError("All elements of cross_match_extent should be floats.") from exc
         if len(b) != 4:
             raise ValueError("cross_match_extent should contain four elements.")
         self.cross_match_extent = b
@@ -1096,8 +1082,8 @@ class CrossMatch():
         a = joint_config['int_fracs'].split()
         try:
             b = np.array([float(f) for f in a])
-        except ValueError:
-            raise ValueError("All elements of int_fracs should be floats.")
+        except ValueError as exc:
+            raise ValueError("All elements of int_fracs should be floats.") from exc
         if len(b) != 3:
             raise ValueError("int_fracs should contain three elements.")
         self.int_fracs = b
@@ -1113,8 +1099,8 @@ class CrossMatch():
                 self.n_pool = int(a)
             else:
                 raise ValueError("n_pool should be a single integer number.")
-        except ValueError:
-            raise ValueError("n_pool should be a single integer number.")
+        except ValueError as exc:
+            raise ValueError("n_pool should be a single integer number.") from exc
 
         for correct_astro, compute_snr_mag_relation, config, catname, flag in zip(
                 [self.a_correct_astrometry, self.b_correct_astrometry],
@@ -1127,42 +1113,40 @@ class CrossMatch():
                 for check_flag in ['correct_astro_save_folder', 'csv_cat_file_string',
                                    'pos_and_err_indices', 'mag_indices', 'mag_unc_indices']:
                     if check_flag not in config:
-                        raise ValueError("Missing key {} from catalogue {} metadata file.".format(
-                                         check_flag, catname))
+                        raise ValueError(f"Missing key {check_flag} from catalogue {catname} metadata file.")
 
-                setattr(self, '{}correct_astro_save_folder'.format(flag),
+                setattr(self, f'{flag}correct_astro_save_folder',
                         os.path.abspath(config['correct_astro_save_folder']))
 
-                setattr(self, '{}csv_cat_file_string'.format(flag),
+                setattr(self, f'{flag}csv_cat_file_string',
                         os.path.abspath(config['csv_cat_file_string']))
 
                 a = config['mag_indices'].split(' ')
                 try:
                     b = np.array([float(f) for f in a])
-                except ValueError:
+                except ValueError as exc:
                     raise ValueError('mag_indices should be a list of integers '
-                                     'in the catalogue {} metadata file'.format(catname))
-                if len(b) != len(getattr(self, '{}filt_names'.format(flag))):
-                    raise ValueError('{}filt_names and {}mag_indices should contain the '
-                                     'same number of entries.'.format(flag, flag))
+                                     f'in the catalogue {catname} metadata file') from exc
+                if len(b) != len(getattr(self, f'{flag}filt_names')):
+                    raise ValueError(f'{flag}filt_names and {flag}mag_indices should contain the '
+                                     'same number of entries.')
                 if not np.all([c.is_integer() for c in b]):
-                    raise ValueError('All elements of {}mag_indices should be '
-                                     'integers.'.format(flag))
-                setattr(self, '{}mag_indices'.format(flag), np.array([int(c) for c in b]))
+                    raise ValueError(f'All elements of {flag}mag_indices should be '
+                                     'integers.')
+                setattr(self, f'{flag}mag_indices', np.array([int(c) for c in b]))
 
                 a = config['mag_unc_indices'].split(' ')
                 try:
                     b = np.array([float(f) for f in a])
-                except ValueError:
+                except ValueError as exc:
                     raise ValueError('mag_unc_indices should be a list of integers '
-                                     'in the catalogue {} metadata file'.format(catname))
-                if len(b) != len(getattr(self, '{}mag_indices'.format(flag))):
-                    raise ValueError('{}mag_unc_indices and {}mag_indices should contain the '
-                                     'same number of entries.'.format(flag, flag))
+                                     f'in the catalogue {catname} metadata file') from exc
+                if len(b) != len(getattr(self, f'{flag}mag_indices')):
+                    raise ValueError(f'{flag}mag_unc_indices and {flag}mag_indices should contain the '
+                                     'same number of entries.')
                 if not np.all([c.is_integer() for c in b]):
-                    raise ValueError('All elements of {}mag_unc_indices should be '
-                                     'integers.'.format(flag))
-                setattr(self, '{}mag_unc_indices'.format(flag), np.array([int(c) for c in b]))
+                    raise ValueError(f'All elements of {flag}mag_unc_indices should be integers.')
+                setattr(self, f'{flag}mag_unc_indices', np.array([int(c) for c in b]))
 
                 # pos_and_err_indices should be a three- or six-integer list that
                 # we then transform into [reference_cat_inds, this_cat_inds]
@@ -1172,28 +1156,27 @@ class CrossMatch():
                 a = config['pos_and_err_indices'].split(' ')
                 try:
                     b = np.array([float(f) for f in a])
-                except ValueError:
+                except ValueError as exc:
                     raise ValueError('pos_and_err_indices should be a list of integers '
-                                     'in the catalogue {} metadata file'.format(catname))
+                                     f'in the catalogue {catname} metadata file') from exc
                 if len(b) != 6 and correct_astro:
-                    raise ValueError('{}pos_and_err_indices should contain six elements '
-                                     'when correct_astrometry is True.'.format(flag))
+                    raise ValueError(f'{flag}pos_and_err_indices should contain six elements '
+                                     'when correct_astrometry is True.')
                 if len(b) != 3 and compute_snr_mag_relation:
-                    raise ValueError('{}pos_and_err_indices should contain three elements '
-                                     'when compute_snr_mag_relation is True.'.format(flag))
+                    raise ValueError(f'{flag}pos_and_err_indices should contain three elements '
+                                     'when compute_snr_mag_relation is True.')
                 if not np.all([c.is_integer() for c in b]):
-                    raise ValueError('All elements of {}pos_and_err_indices should be '
-                                     'integers.'.format(flag))
+                    raise ValueError(f'All elements of {flag}pos_and_err_indices should be integers.')
                 d = np.array([int(c) for c in b])
                 if correct_astro:
                     # The reshape puts the first three elements in a[0], and hence
                     # those are ref_cat_inds, with a[1] this_cat_inds.
-                    setattr(self, '{}pos_and_err_indices'.format(flag), d.reshape(2, 3))
+                    setattr(self, f'{flag}pos_and_err_indices', d.reshape(2, 3))
                 else:
                     # If we only want to compute the SNR-mag relation, then we've
                     # only got three elements, so we just store them in a (3,)
                     # shape array.
-                    setattr(self, '{}pos_and_err_indices'.format(flag), d)
+                    setattr(self, f'{flag}pos_and_err_indices', d)
 
             if correct_astro:
                 # If this particular catalogue requires a systematic correction
@@ -1206,89 +1189,88 @@ class CrossMatch():
                                    'chunk_overlap_col', 'best_mag_index_col',
                                    'use_photometric_uncertainties']:
                     if check_flag not in config:
-                        raise ValueError("Missing key {} from catalogue {} metadata file.".format(
-                                         check_flag, catname))
+                        raise ValueError(f"Missing key {check_flag} from catalogue {catname} metadata file.")
 
-                setattr(self, '{}use_photometric_uncertainties'.format(flag),
+                setattr(self, f'{flag}use_photometric_uncertainties',
                         self._str2bool(config['use_photometric_uncertainties']))
 
                 a = config['best_mag_index']
                 try:
                     a = float(a)
-                except ValueError:
-                    raise ValueError("best_mag_index should be an integer in the catalogue {} "
-                                     "metadata file.".format(catname))
+                except ValueError as exc:
+                    raise ValueError(f"best_mag_index should be an integer in the catalogue {catname} "
+                                     "metadata file.") from exc
                 if not a.is_integer():
-                    raise ValueError("best_mag_index should be an integer in the catalogue {} "
-                                     "metadata file.".format(catname))
-                if int(a) >= len(getattr(self, '{}filt_names'.format(flag))):
+                    raise ValueError(f"best_mag_index should be an integer in the catalogue {catname} "
+                                     "metadata file.")
+                if int(a) >= len(getattr(self, f'{flag}filt_names')):
                     raise ValueError("best_mag_index cannot be a larger index than the list of "
-                                     "filters in the catalogue {} metadata file.".format(catname))
-                setattr(self, '{}best_mag_index'.format(flag), int(a))
+                                     f"filters in the catalogue {catname} metadata file.")
+                setattr(self, f'{flag}best_mag_index', int(a))
 
                 a = config['best_mag_index_col']
                 try:
                     a = float(a)
-                except ValueError:
-                    raise ValueError("best_mag_index_col should be an integer in the catalogue {} "
-                                     "metadata file.".format(catname))
+                except ValueError as exc:
+                    raise ValueError(f"best_mag_index_col should be an integer in the catalogue {catname} "
+                                     "metadata file.") from exc
                 if not a.is_integer():
-                    raise ValueError("best_mag_index_col should be an integer in the catalogue {} "
-                                     "metadata file.".format(catname))
-                setattr(self, '{}best_mag_index_col'.format(flag), int(a))
+                    raise ValueError(f"best_mag_index_col should be an integer in the catalogue {catname} "
+                                     "metadata file.")
+                setattr(self, f'{flag}best_mag_index_col', int(a))
 
                 a = config['chunk_overlap_col']
                 if a == "None":
-                    setattr(self, '{}chunk_overlap_col'.format(flag), None)
+                    setattr(self, f'{flag}chunk_overlap_col', None)
                 else:
                     try:
                         a = float(a)
-                    except ValueError:
+                    except ValueError as exc:
                         raise ValueError("chunk_overlap_col should be an integer in the "
-                                         "catalogue {} metadata file.".format(catname))
+                                         f"catalogue {catname} metadata file.") from exc
                     if not a.is_integer():
                         raise ValueError("chunk_overlap_col should be an integer in the "
-                                         "catalogue {} metadata file.".format(catname))
-                    setattr(self, '{}chunk_overlap_col'.format(flag), int(a))
+                                         f"catalogue {catname} metadata file.")
+                    setattr(self, f'{flag}chunk_overlap_col', int(a))
 
                 try:
-                    setattr(self, '{}nn_radius'.format(flag), float(config['nn_radius']))
-                except ValueError:
-                    raise ValueError("nn_radius must be a float in the catalogue {} "
-                                     "metadata file.".format(catname))
+                    setattr(self, f'{flag}nn_radius', float(config['nn_radius']))
+                except ValueError as exc:
+                    raise ValueError(f"nn_radius must be a float in the catalogue {catname} metadata "
+                                     "file.") from exc
 
-                setattr(self, '{}ref_csv_cat_file_string'.format(flag),
+                setattr(self, f'{flag}ref_csv_cat_file_string',
                         os.path.abspath(config['ref_csv_cat_file_string']))
 
                 a = config['correct_mag_array'].split()
                 try:
                     b = np.array([float(f) for f in a])
-                except ValueError:
+                except ValueError as exc:
                     raise ValueError('correct_mag_array should be a list of floats in the '
-                                     'catalogue {} metadata file.'.format(catname))
-                setattr(self, '{}correct_mag_array'.format(flag), b)
+                                     f'catalogue {catname} metadata file.') from exc
+                setattr(self, f'{flag}correct_mag_array', b)
 
                 a = config['correct_mag_slice'].split()
                 try:
                     b = np.array([float(f) for f in a])
-                except ValueError:
+                except ValueError as exc:
                     raise ValueError('correct_mag_slice should be a list of floats in the '
-                                     'catalogue {} metadata file.'.format(catname))
-                if len(b) != len(getattr(self, '{}correct_mag_array'.format(flag))):
-                    raise ValueError('{}correct_mag_array and {}correct_mag_slice should contain '
-                                     'the same number of entries.'.format(flag, flag))
-                setattr(self, '{}correct_mag_slice'.format(flag), b)
+                                     f'catalogue {catname} metadata file.') from exc
+                if len(b) != len(getattr(self, f'{flag}correct_mag_array')):
+                    raise ValueError(f'{flag}correct_mag_array and {flag}correct_mag_slice should contain '
+                                     'the same number of entries.')
+                setattr(self, f'{flag}correct_mag_slice', b)
 
                 a = config['correct_sig_slice'].split()
                 try:
                     b = np.array([float(f) for f in a])
-                except ValueError:
+                except ValueError as exc:
                     raise ValueError('correct_sig_slice should be a list of floats in the '
-                                     'catalogue {} metadata file.'.format(catname))
-                if len(b) != len(getattr(self, '{}correct_mag_array'.format(flag))):
-                    raise ValueError('{}correct_mag_array and {}correct_sig_slice should contain '
-                                     'the same number of entries.'.format(flag, flag))
-                setattr(self, '{}correct_sig_slice'.format(flag), b)
+                                     f'catalogue {catname} metadata file.') from exc
+                if len(b) != len(getattr(self, f'{flag}correct_mag_array')):
+                    raise ValueError(f'{flag}correct_mag_array and {flag}correct_sig_slice should contain '
+                                     'the same number of entries.')
+                setattr(self, f'{flag}correct_sig_slice', b)
 
     def _read_metadata_csv(self, joint_config, cat_a_config, cat_b_config):
         """
@@ -1308,22 +1290,21 @@ class CrossMatch():
 
         for check_flag in ['output_csv_folder', 'match_out_csv_name', 'nonmatch_out_csv_name']:
             if check_flag not in joint_config:
-                raise ValueError("Missing key {} from joint metadata file.".format(check_flag))
+                raise ValueError(f"Missing key {check_flag} from joint metadata file.")
 
         for config, catname in zip([cat_a_config, cat_b_config], ['"a"', '"b"']):
             for check_flag in ['input_csv_folder', 'cat_csv_name', 'cat_col_names', 'cat_col_nums',
                                'input_npy_folder', 'csv_has_header', 'extra_col_names',
                                'extra_col_nums']:
                 if check_flag not in config:
-                    raise ValueError("Missing key {} from catalogue {} metadata file.".format(
-                                     check_flag, catname))
+                    raise ValueError(f"Missing key {check_flag} from catalogue {catname} metadata file.")
 
         self.output_csv_folder = os.path.abspath(joint_config['output_csv_folder'])
         try:
             os.makedirs(self.output_csv_folder, exist_ok=True)
-        except OSError:
+        except OSError as exc:
             raise OSError("Error when trying to create folder to store output csv files in. "
-                          "Please ensure that output_csv_folder is correct in joint config file.")
+                          "Please ensure that output_csv_folder is correct in joint config file.") from exc
 
         self.match_out_csv_name = joint_config['match_out_csv_name']
         for config, catname in zip([cat_a_config, cat_b_config], ['a_', 'b_']):
@@ -1332,53 +1313,50 @@ class CrossMatch():
             # this is defined in joint_config, not each individual
             # catalogue config!
             nonmatch_out_name = joint_config['nonmatch_out_csv_name']
-            setattr(self, '{}nonmatch_out_csv_name'.format(catname),
-                    '{}_{}'.format(getattr(self, '{}cat_name'.format(catname)), nonmatch_out_name))
+            ccn = getattr(self, f'{catname}cat_name')
+            setattr(self, f'{catname}nonmatch_out_csv_name', f'{ccn}_{nonmatch_out_name}')
 
             input_csv_folder = os.path.abspath(config['input_csv_folder'])
             if not os.path.exists(input_csv_folder):
-                raise OSError('input_csv_folder from catalogue "{}" does not exist.'
-                              .format(catname[0]))
-            setattr(self, '{}input_csv_folder'.format(catname), input_csv_folder)
+                raise OSError(f'input_csv_folder from catalogue "{catname[0]}" does not exist.')
+            setattr(self, f'{catname}input_csv_folder', input_csv_folder)
 
-            setattr(self, '{}cat_csv_name'.format(catname), config['cat_csv_name'])
+            setattr(self, f'{catname}cat_csv_name', config['cat_csv_name'])
 
             # cat_col_names is simply a list/array of strings. However, to
             # avoid any issues with generic names like "RA" being added to the
             # output .csv file twice, we prepend the catalogue name to the front
             # of them all.
             catcolnames = config['cat_col_names'].split()
-            setattr(self, '{}cat_col_names'.format(catname),
-                    np.array(['{}_{}'.format(getattr(self, '{}cat_name'.format(catname)),
-                              q) for q in catcolnames]))
+            setattr(self, f'{catname}cat_col_names',
+                    np.array([f'{ccn}_{q}' for q in catcolnames]))
 
             # But cat_col_nums is a list/array of integers, and should be of the
             # same length as cat_col_names.
             a = config['cat_col_nums'].split(' ')
             try:
                 b = np.array([float(f) for f in a])
-            except ValueError:
+            except ValueError as exc:
                 raise ValueError('cat_col_nums should be a list of integers '
-                                 'in catalogue "{}" metadata file'.format(catname[0]))
-            if len(b) != len(getattr(self, '{}cat_col_names'.format(catname))):
-                raise ValueError('{}cat_col_names and {}cat_col_nums should contain the same '
-                                 'number of entries.'.format(catname, catname))
+                                 f'in catalogue "{catname[0]}" metadata file') from exc
+            if len(b) != len(getattr(self, f'{catname}cat_col_names')):
+                raise ValueError(f'{catname}cat_col_names and {catname}cat_col_nums should contain the same '
+                                 'number of entries.')
             if not np.all([c.is_integer() for c in b]):
-                raise ValueError('All elements of {}cat_col_nums should be '
-                                 'integers.'.format(catname))
-            setattr(self, '{}cat_col_nums'.format(catname), np.array([int(c) for c in b]))
+                raise ValueError(f'All elements of {catname}cat_col_nums should be '
+                                 'integers.')
+            setattr(self, f'{catname}cat_col_nums', np.array([int(c) for c in b]))
 
             input_npy_folder = config['input_npy_folder']
             if input_npy_folder != 'None' and not os.path.exists(input_npy_folder):
-                raise OSError('input_npy_folder from catalogue "{}" does not exist.'
-                              .format(catname[0]))
+                raise OSError(f'input_npy_folder from catalogue "{catname[0]}" does not exist.')
             if input_npy_folder == 'None':
-                setattr(self, '{}input_npy_folder'.format(catname), None)
+                setattr(self, f'{catname}input_npy_folder', None)
             else:
-                setattr(self, '{}input_npy_folder'.format(catname),
+                setattr(self, f'{catname}input_npy_folder',
                         os.path.abspath(input_npy_folder))
 
-            setattr(self, '{}csv_has_header'.format(catname),
+            setattr(self, f'{catname}csv_has_header',
                     self._str2bool(config['csv_has_header']))
 
             # As above, extra_col_names is just strings but extra_col_names
@@ -1388,29 +1366,27 @@ class CrossMatch():
             a = config['extra_col_names']
             b = config['extra_col_nums']
             if a == 'None' and b == 'None':
-                setattr(self, '{}extra_col_names'.format(catname), None)
-                setattr(self, '{}extra_col_nums'.format(catname), None)
+                setattr(self, f'{catname}extra_col_names', None)
+                setattr(self, f'{catname}extra_col_nums', None)
             else:
                 if a == 'None' and b != 'None' or a != 'None' and b == 'None':
                     raise ValueError('Both extra_col_names and extra_col_nums must be None if '
-                                     'either is None in catalogue "{}".'.format(catname[0]))
+                                     f'either is None in catalogue "{catname[0]}".')
                 catcolnames = config['extra_col_names'].split()
-                setattr(self, '{}extra_col_names'.format(catname),
-                        np.array(['{}_{}'.format(getattr(self, '{}cat_name'.format(catname)),
-                                  q) for q in catcolnames]))
+                setattr(self, f'{catname}extra_col_names',
+                        np.array([f'{ccn}_{q}' for q in catcolnames]))
                 a = config['extra_col_nums'].split(' ')
                 try:
                     b = np.array([float(f) for f in a])
-                except ValueError:
+                except ValueError as exc:
                     raise ValueError('extra_col_nums should be a list of integers '
-                                     'in catalogue "{}" metadata file'.format(catname[0]))
-                if len(b) != len(getattr(self, '{}extra_col_names'.format(catname))):
-                    raise ValueError('{}extra_col_names and {}extra_col_nums should contain the '
-                                     'same number of entries.'.format(catname, catname))
+                                     f'in catalogue "{catname[0]}" metadata file') from exc
+                if len(b) != len(getattr(self, f'{catname}extra_col_names')):
+                    raise ValueError(f'{catname}extra_col_names and {catname}extra_col_nums should '
+                                     'contain the same number of entries.')
                 if not np.all([c.is_integer() for c in b]):
-                    raise ValueError('All elements of {}extra_col_nums should be '
-                                     'integers.'.format(catname))
-                setattr(self, '{}extra_col_nums'.format(catname), np.array([int(c) for c in b]))
+                    raise ValueError(f'All elements of {catname}extra_col_nums should be integers.')
+                setattr(self, f'{catname}extra_col_nums', np.array([int(c) for c in b]))
 
     def make_shared_data(self):
         """
@@ -1440,9 +1416,11 @@ class CrossMatch():
         # dm of 2.5 is 10% relative flux and dm = 5 corresponds to 1% relative flux. Used
         # to inform the fraction of simulations with a contaminant above these relative
         # fluxes.
+        # pylint: disable-next=fixme
         # TODO: allow as user input.
         self.delta_mag_cuts = np.array([2.5, 5])
 
+        # pylint: disable-next=fixme
         # TODO: allow as user input.
         self.gal_cmau_array = np.empty((5, 2, 4), float)
         # See Wilson (2022, RNAAS, 6, 60) for the meanings of the variables c, m,
@@ -1464,16 +1442,15 @@ class CrossMatch():
                                 [3.84e+09, 1.57e+06, 3.91e+08, 4.66e+10, 3.03e+07]]
 
         t = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        print('{} Rank {}, chunk {}: Creating empirical perturbation AUFs for catalogue "a"...'
-              .format(t, self.rank, self.chunk_id))
+        print(f'{t} Rank {self.rank}, chunk {self.chunk_id}: Creating empirical perturbation AUFs '
+              'for catalogue "a"...')
         sys.stdout.flush()
         if self.j0s is None:
             self.j0s = mff.calc_j0(self.rho[:-1]+self.drho/2, self.r[:-1]+self.dr/2)
         if self.include_perturb_auf:
             _kwargs = {'psf_fwhms': self.a_psf_fwhms, 'tri_download_flag': self.a_download_tri,
                        'delta_mag_cuts': self.delta_mag_cuts, 'num_trials': self.num_trials,
-                       'j0s': self.j0s, 'd_mag': self.d_mag,
-                       'density_radius': self.a_dens_dist,
+                       'd_mag': self.d_mag, 'density_radius': self.a_dens_dist,
                        'tri_filt_names': self.a_tri_filt_names,
                        'run_fw': self.a_run_fw_auf, 'run_psf': self.a_run_psf_auf,
                        'snr_mag_params': self.a_snr_mag_params,
@@ -1500,20 +1477,18 @@ class CrossMatch():
             _kwargs = {}
         self.a_modelrefinds, self.a_perturb_auf_outputs = perturb_auf_func(
             self.a_auf_folder_path, self.a_cat_folder_path, self.a_filt_names,
-            self.a_auf_region_points, self.r, self.dr, self.rho, self.drho, 'a',
-            self.include_perturb_auf, **_kwargs)
+            self.a_auf_region_points, self.r, self.dr, self.j0s, 'a', self.include_perturb_auf, **_kwargs)
 
         t = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        print('{} Rank {}, chunk {}: Creating empirical perturbation AUFs for catalogue "b"...'
-              .format(t, self.rank, self.chunk_id))
+        print(f'{t} Rank {self.rank}, chunk {self.chunk_id}: Creating empirical perturbation AUFs '
+              'for catalogue "b"...')
         sys.stdout.flush()
         if self.j0s is None:
             self.j0s = mff.calc_j0(self.rho[:-1]+self.drho/2, self.r[:-1]+self.dr/2)
         if self.include_perturb_auf:
             _kwargs = {'psf_fwhms': self.b_psf_fwhms, 'tri_download_flag': self.b_download_tri,
                        'delta_mag_cuts': self.delta_mag_cuts, 'num_trials': self.num_trials,
-                       'j0s': self.j0s, 'd_mag': self.d_mag,
-                       'density_radius': self.b_dens_dist,
+                       'd_mag': self.d_mag, 'density_radius': self.b_dens_dist,
                        'tri_filt_names': self.b_tri_filt_names,
                        'run_fw': self.b_run_fw_auf, 'run_psf': self.b_run_psf_auf,
                        'snr_mag_params': self.b_snr_mag_params,
@@ -1541,8 +1516,7 @@ class CrossMatch():
             _kwargs = {}
         self.b_modelrefinds, self.b_perturb_auf_outputs = perturb_auf_func(
             self.b_auf_folder_path, self.b_cat_folder_path, self.b_filt_names,
-            self.b_auf_region_points, self.r, self.dr, self.rho, self.drho, 'b',
-            self.include_perturb_auf, **_kwargs)
+            self.b_auf_region_points, self.r, self.dr, self.j0s, 'b', self.include_perturb_auf, **_kwargs)
 
     def group_sources(self, group_func=make_island_groupings):
         '''
@@ -1558,17 +1532,14 @@ class CrossMatch():
         '''
 
         t = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        print('{} Rank {}, chunk {}: Creating catalogue islands and overlaps...'
-              .format(t, self.rank, self.chunk_id))
+        print(f'{t} Rank {self.rank}, chunk {self.chunk_id}: Creating catalogue islands and overlaps...')
         sys.stdout.flush()
         if self.j1s is None:
             self.j1s = gsf.calc_j1s(self.rho[:-1]+self.drho/2, self.r[:-1]+self.dr/2)
-        os.system('rm -rf {}/reject/*'.format(self.joint_folder_path))
+        os.system(f'rm -rf {self.joint_folder_path}/reject/*')
         self.group_sources_data = \
             group_func(self.joint_folder_path, self.a_cat_folder_path, self.b_cat_folder_path,
-                       self.a_auf_region_points, self.b_auf_region_points, self.a_filt_names,
-                       self.b_filt_names, self.a_cat_name, self.b_cat_name, self.a_modelrefinds,
-                       self.b_modelrefinds, self.r, self.dr, self.rho, self.drho,
+                       self.a_modelrefinds, self.b_modelrefinds, self.r, self.dr, self.rho, self.drho,
                        self.j1s, self.pos_corr_dist, self.cross_match_extent, self.int_fracs,
                        self.include_phot_like, self.use_phot_priors,
                        self.n_pool, self.a_perturb_auf_outputs, self.b_perturb_auf_outputs)
@@ -1586,8 +1557,7 @@ class CrossMatch():
         '''
 
         t = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        print('{} Rank {}, chunk {}: Creating photometric priors and likelihoods...'
-              .format(t, self.rank, self.chunk_id))
+        print(f'{t} Rank {self.rank}, chunk {self.chunk_id}: Creating photometric priors and likelihoods...')
         sys.stdout.flush()
         self._calculate_cf_areas()
         if self.use_phot_priors or self.include_phot_like:
@@ -1597,10 +1567,9 @@ class CrossMatch():
             bright_frac = None
             field_frac = None
         self.phot_like_data = phot_like_func(
-            self.joint_folder_path, self.a_cat_folder_path, self.b_cat_folder_path,
-            self.a_filt_names, self.b_filt_names, self.cf_region_points, self.cf_areas,
-            self.include_phot_like, self.use_phot_priors, self.group_sources_data, bright_frac,
-            field_frac)
+            self.a_cat_folder_path, self.b_cat_folder_path, self.a_filt_names, self.b_filt_names,
+            self.cf_region_points, self.cf_areas, self.include_phot_like, self.use_phot_priors,
+            self.group_sources_data, bright_frac, field_frac)
 
     def _calculate_cf_areas(self):
         '''
@@ -1609,8 +1578,7 @@ class CrossMatch():
         smallest on-sky separation.
         '''
         t = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        print("{} Rank {}, chunk {}: Calculating photometric region areas..."
-              .format(t, self.rank, self.chunk_id))
+        print(f'{t} Rank {self.rank}, chunk {self.chunk_id}: Calculating photometric region areas...')
         dlon, dlat = 0.01, 0.01
         test_lons = np.arange(self.cross_match_extent[0], self.cross_match_extent[1], dlon)
         test_lats = np.arange(self.cross_match_extent[2], self.cross_match_extent[3], dlat)
@@ -1634,8 +1602,6 @@ class CrossMatch():
 
         self.cf_areas = cf_areas
 
-        return
-
     def pair_sources(self, count_pair_func=source_pairing):
         '''
         Assign sources in the two catalogues as either counterparts to one another
@@ -1648,13 +1614,11 @@ class CrossMatch():
         '''
 
         t = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        print('{} Rank {}, chunk {}: Determining counterparts...'
-              .format(t, self.rank, self.chunk_id))
+        print(f'{t} Rank {self.rank}, chunk {self.chunk_id}: Determining counterparts...')
         sys.stdout.flush()
-        os.system('rm -r {}/pairing/*'.format(self.joint_folder_path))
+        os.system(f'rm -r {self.joint_folder_path}/pairing/*')
         count_pair_func(
             self.joint_folder_path, self.a_cat_folder_path, self.b_cat_folder_path,
-            self.a_filt_names, self.b_filt_names, self.a_auf_region_points,
-            self.b_auf_region_points, self.a_modelrefinds, self.b_modelrefinds, self.rho, self.drho,
-            len(self.delta_mag_cuts), self.group_sources_data,
-            self.phot_like_data, self.a_perturb_auf_outputs, self.b_perturb_auf_outputs)
+            self.a_modelrefinds, self.b_modelrefinds, self.rho, self.drho, len(self.delta_mag_cuts),
+            self.group_sources_data, self.phot_like_data, self.a_perturb_auf_outputs,
+            self.b_perturb_auf_outputs)

@@ -1,20 +1,25 @@
+# Licensed under a 3-clause BSD style license - see LICENSE
+'''
+This module provides testing utility functionality for the package.
+'''
+
 import os
 
 import numpy as np
 
 
-def generate_random_data(N_a, N_b, N_c, extent, n_a_filts, n_b_filts, a_astro_sig, b_astro_sig,
+def generate_random_data(n_a, n_b, n_c, extent, n_a_filts, n_b_filts, a_astro_sig, b_astro_sig,
                          a_cat, b_cat, seed=None):
     '''
     Convenience function to allow for the generation of two test datasets.
 
     Parameters
     ----------
-    N_a : integer
+    n_a : integer
         The number of sources to be generated in catalogue "a".
-    N_b : integer
+    n_b : integer
         The number of catalogue "b" fake sources.
-    N_c : integer
+    n_c : integer
         The number of common, overlapping sources, in both catalogues.
     extent : list of integers
         The on-sky coordinates that mark out the rectangular limits over which
@@ -38,17 +43,17 @@ def generate_random_data(N_a, N_b, N_c, extent, n_a_filts, n_b_filts, a_astro_si
         ``np.random.default_rng`` as such, and a seed will be generated
         as per ``default_rng``'s documentation.
     '''
-    if N_a > N_b:
-        raise ValueError("N_a must be smaller or equal to N_b.")
-    if N_c > N_a:
-        raise ValueError("N_c must be smaller or equal to N_a.")
+    if n_a > n_b:
+        raise ValueError("n_a must be smaller or equal to n_b.")
+    if n_c > n_a:
+        raise ValueError("n_c must be smaller or equal to n_a.")
 
-    a_astro = np.empty((N_a, 3), float)
-    b_astro = np.empty((N_b, 3), float)
+    a_astro = np.empty((n_a, 3), float)
+    b_astro = np.empty((n_b, 3), float)
 
     rng = np.random.default_rng(seed)
-    a_astro[:, 0] = rng.uniform(extent[0], extent[1], size=N_a)
-    a_astro[:, 1] = rng.uniform(extent[2], extent[3], size=N_a)
+    a_astro[:, 0] = rng.uniform(extent[0], extent[1], size=n_a)
+    a_astro[:, 1] = rng.uniform(extent[2], extent[3], size=n_a)
     if np.isscalar(a_astro_sig):
         a_astro[:, 2] = a_astro_sig
     else:
@@ -56,13 +61,13 @@ def generate_random_data(N_a, N_b, N_c, extent, n_a_filts, n_b_filts, a_astro_si
         # with magnitude
         raise ValueError("a_sig currently has to be an integer for all generated data.")
 
-    a_pair_indices = np.arange(N_c)
-    b_pair_indices = rng.choice(N_b, N_c, replace=False)
+    a_pair_indices = np.arange(n_c)
+    b_pair_indices = rng.choice(n_b, n_c, replace=False)
     b_astro[b_pair_indices, 0] = a_astro[a_pair_indices, 0]
     b_astro[b_pair_indices, 1] = a_astro[a_pair_indices, 1]
-    inv_b_pair = np.delete(np.arange(N_b), b_pair_indices)
-    b_astro[inv_b_pair, 0] = rng.uniform(extent[0], extent[1], size=N_b - N_c)
-    b_astro[inv_b_pair, 1] = rng.uniform(extent[2], extent[3], size=N_b - N_c)
+    inv_b_pair = np.delete(np.arange(n_b), b_pair_indices)
+    b_astro[inv_b_pair, 0] = rng.uniform(extent[0], extent[1], size=n_b - n_c)
+    b_astro[inv_b_pair, 1] = rng.uniform(extent[2], extent[3], size=n_b - n_c)
     if np.isscalar(b_astro_sig):
         b_astro[:, 2] = b_astro_sig
     else:
@@ -70,37 +75,37 @@ def generate_random_data(N_a, N_b, N_c, extent, n_a_filts, n_b_filts, a_astro_si
         # with magnitude
         raise ValueError("b_sig currently has to be an integer for all generated data.")
 
-    a_circ_dist = rng.normal(loc=0, scale=a_astro[:, 2], size=N_a) / 3600
-    a_circ_angle = rng.uniform(0, 2 * np.pi, size=N_a)
+    a_circ_dist = rng.normal(loc=0, scale=a_astro[:, 2], size=n_a) / 3600
+    a_circ_angle = rng.uniform(0, 2 * np.pi, size=n_a)
     a_astro[:, 0] = a_astro[:, 0] + a_circ_dist * np.cos(a_circ_angle)
     a_astro[:, 1] = a_astro[:, 1] + a_circ_dist * np.sin(a_circ_angle)
-    b_circ_dist = rng.normal(loc=0, scale=b_astro[:, 2], size=N_b) / 3600
-    b_circ_angle = rng.uniform(0, 2 * np.pi, size=N_b)
+    b_circ_dist = rng.normal(loc=0, scale=b_astro[:, 2], size=n_b) / 3600
+    b_circ_angle = rng.uniform(0, 2 * np.pi, size=n_b)
     b_astro[:, 0] = b_astro[:, 0] + b_circ_dist * np.cos(b_circ_angle)
     b_astro[:, 1] = b_astro[:, 1] + b_circ_dist * np.sin(b_circ_angle)
 
     # Currently all we do, given the only option available is a naive Bayes match,
     # is ignore the photometry -- but we still require its file to be present.
-    a_photo = rng.uniform(0.9, 1.1, size=(N_a, n_a_filts))
-    b_photo = rng.uniform(0.9, 1.1, size=(N_b, n_b_filts))
+    a_photo = rng.uniform(0.9, 1.1, size=(n_a, n_a_filts))
+    b_photo = rng.uniform(0.9, 1.1, size=(n_b, n_b_filts))
 
     # Similarly, we need magref for each catalogue, but don't care what's in it.
-    amagref = rng.choice(n_a_filts, size=N_a)
-    bmagref = rng.choice(n_b_filts, size=N_b)
+    amagref = rng.choice(n_a_filts, size=n_a)
+    bmagref = rng.choice(n_b_filts, size=n_b)
 
     for f in [a_cat, b_cat]:
         os.makedirs(f, exist_ok=True)
-    np.save('{}/con_cat_astro.npy'.format(a_cat), a_astro)
-    np.save('{}/con_cat_astro.npy'.format(b_cat), b_astro)
-    np.save('{}/con_cat_photo.npy'.format(a_cat), a_photo)
-    np.save('{}/con_cat_photo.npy'.format(b_cat), b_photo)
-    np.save('{}/magref.npy'.format(a_cat), amagref)
-    np.save('{}/magref.npy'.format(b_cat), bmagref)
+    np.save(f'{a_cat}/con_cat_astro.npy', a_astro)
+    np.save(f'{b_cat}/con_cat_astro.npy', b_astro)
+    np.save(f'{a_cat}/con_cat_photo.npy', a_photo)
+    np.save(f'{b_cat}/con_cat_photo.npy', b_photo)
+    np.save(f'{a_cat}/magref.npy', amagref)
+    np.save(f'{b_cat}/magref.npy', bmagref)
 
     # Fake uninformative "overlap" flag data, where no sources are in the
     # halo of the chunk.
-    np.save('{}/in_chunk_overlap.npy'.format(a_cat), np.zeros(N_a, bool))
-    np.save('{}/in_chunk_overlap.npy'.format(b_cat), np.zeros(N_b, bool))
+    np.save(f'{a_cat}/in_chunk_overlap.npy', np.zeros(n_a, bool))
+    np.save(f'{b_cat}/in_chunk_overlap.npy', np.zeros(n_b, bool))
 
-    np.save('{}/test_match_indices.npy'.format(a_cat), a_pair_indices)
-    np.save('{}/test_match_indices.npy'.format(b_cat), b_pair_indices)
+    np.save(f'{a_cat}/test_match_indices.npy', a_pair_indices)
+    np.save(f'{b_cat}/test_match_indices.npy', b_pair_indices)

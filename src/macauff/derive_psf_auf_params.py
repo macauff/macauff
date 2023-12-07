@@ -6,21 +6,21 @@ photometry while in a sky background-dominated regime such that noise is constan
 the detector.
 '''
 
-import numpy as np
-import matplotlib.pyplot as plt
-import matplotlib.gridspec as gridspec
-from scipy.optimize import minimize
-from matplotlib.colors import Normalize
-from matplotlib import cm
 import itertools
 import multiprocessing
-from scipy.special import erf
-from scipy.optimize import basinhopping
 import os
 import shutil
+
+import matplotlib.pyplot as plt
+import numpy as np
+from matplotlib import cm, gridspec
+from matplotlib.colors import Normalize
+from scipy.optimize import basinhopping, minimize
+from scipy.special import erf  # pylint: disable=no-name-in-module
+
 # Assume that usetex = False only applies for tests where no TeX is installed
 # at all, instead of users having half-installed TeX, dvipng et al. somewhere.
-usetex = not not shutil.which("tex")
+usetex = not not shutil.which("tex")  # pylint: disable=unnecessary-negation
 if usetex:
     plt.rcParams.update({"text.usetex": True, "text.latex.preamble": r"\usepackage{amsmath}"})
 
@@ -35,7 +35,7 @@ class FitPSFPerturbations:
     fitting the composite object with a single Gaussian PSF in the limit that
     sky background dominates and noise is constant across the image.
     """
-    def __init__(self, psf_fwhm, d_di, d_Li, n_pool, data_save_folder, plot_save_folder=None):
+    def __init__(self, psf_fwhm, d_di, d_li, n_pool, data_save_folder, plot_save_folder=None):
         """
         Initialise FitPSFPerturbations with necessary parameters.
 
@@ -47,7 +47,7 @@ class FitPSFPerturbations:
         d_di : float
             Separation between perturber offsets, setting the precision of the
             simulated perturbations.
-        d_Li : float
+        d_li : float
             Separation between relative perturber fluxes, affecting the
             precision of the derived offset relations.
         n_pool : integer
@@ -64,8 +64,8 @@ class FitPSFPerturbations:
         # Set the maximum offset to be the Rayleigh criterion, assuming
         # we would resolve the blended object outside of this all of the time.
         self.di = np.arange(0, 1.185*self.psf_fwhm, d_di)
-        # Handle L=1 separately
-        self.Li = np.arange(0.15, 1-d_Li+1e-10, d_Li)
+        # Handle l=1 separately
+        self.li = np.arange(0.15, 1-d_li+1e-10, d_li)
         self.n_pool = n_pool
 
         self.data_save_folder = data_save_folder
@@ -76,14 +76,14 @@ class FitPSFPerturbations:
         if self.plot_save_folder is not None and not os.path.exists(self.plot_save_folder):
             os.makedirs(self.plot_save_folder)
 
-    def __call__(self, run_initial_Ld, run_skew_fit, run_polynomial_fit, make_fit_plots,
+    def __call__(self, run_initial_ld, run_skew_fit, run_polynomial_fit, make_fit_plots,
                  draw_sim_num=500000):
         """
         Call function for FitPSFPerturbations.
 
         Parameters
         ----------
-        run_initial_Ld : boolean
+        run_initial_ld : boolean
             Flag for whether to run the initial fitting of perturbation at
             various relative flux-distance combinations if data already exist.
         run_skew_fit : boolean
@@ -103,47 +103,45 @@ class FitPSFPerturbations:
             raise ValueError("plot_save_folder cannot be None if plots are "
                              "to be made. Please specify a folder for plots "
                              "to be saved into.")
-        self.run_initial_Ld = run_initial_Ld
+        self.run_initial_ld = run_initial_ld
         self.run_skew_fit = run_skew_fit
         self.run_polynomial_fit = run_polynomial_fit
         self.make_fit_plots = make_fit_plots
         self.draw_sim_num = draw_sim_num
 
-        if self.run_initial_Ld or not os.path.exists('{}/dd_Ld.npy'.format(self.data_save_folder)):
-            self.make_initial_Ld_perturbations()
-        if self.run_skew_fit or not os.path.exists(
-                '{}/dd_skew_pars.npy'.format(self.data_save_folder)):
+        if self.run_initial_ld or not os.path.exists(f'{self.data_save_folder}/dd_ld.npy'):
+            self.make_initial_ld_perturbations()
+        if self.run_skew_fit or not os.path.exists(f'{self.data_save_folder}/dd_skew_pars.npy'):
             self.fit_skew_distributions()
         if self.run_polynomial_fit or not np.all(
-                [os.path.exists('{}/{}.npy'.format(self.data_save_folder, q)) for q in
-                 ['Ns', 'dd_ic', 'dd_params', 'dd_params_full', 'l_cut']]):
+                [os.path.exists(f'{self.data_save_folder}/{q}.npy') for q in
+                 ['ns', 'dd_ic', 'dd_params', 'dd_params_full', 'l_cut']]):
             self.fit_polynomial_parameterisations()
 
         if self.make_fit_plots:
             self.plot_fits()
 
-    def make_initial_Ld_perturbations(self):
+    def make_initial_ld_perturbations(self):
         """
         Derive full perturbations due to additional blended object within PSF
         for a matrix of relative flux-positional offset combinations.
         """
-        # Save d and delta-d, derived "properly", for each L/d combo
-        dd = np.empty((len(self.Li), len(self.di), 2), float)
+        # Save d and delta-d, derived "properly", for each l/d combo
+        dd = np.empty((len(self.li), len(self.di), 2), float)
 
-        ij = itertools.product(np.arange(len(self.Li)), np.arange(len(self.di)))
-        iter_array = zip(ij, itertools.repeat([self.Li, self.di, self.psf_sig]))
-        pool = multiprocessing.Pool(self.n_pool)
-        for return_values in pool.imap_unordered(
-                self.min_parallel_dd_fit, iter_array,
-                chunksize=int(len(self.Li) * len(self.di)/self.n_pool)):
-            (i, j), res_xy = return_values
-            res = res_xy.x
-            dd[i, j, 0] = np.sqrt(res[0]**2 + res[1]**2)
-            dd[i, j, 1] = self.di[j]
+        ij = itertools.product(np.arange(len(self.li)), np.arange(len(self.di)))
+        iter_array = zip(ij, itertools.repeat([self.li, self.di, self.psf_sig]))
+        with multiprocessing.Pool(self.n_pool) as pool:
+            for return_values in pool.imap_unordered(
+                    self.min_parallel_dd_fit, iter_array,
+                    chunksize=int(len(self.li) * len(self.di)/self.n_pool)):
+                (i, j), res_xy = return_values
+                res = res_xy.x
+                dd[i, j, 0] = np.sqrt(res[0]**2 + res[1]**2)
+                dd[i, j, 1] = self.di[j]
 
-        pool.close()
         pool.join()
-        np.save('{}/dd_Ld.npy'.format(self.data_save_folder), dd)
+        np.save(f'{self.data_save_folder}/dd_ld.npy', dd)
 
     def min_parallel_dd_fit(self, iterable):
         """
@@ -166,16 +164,16 @@ class FitPSFPerturbations:
         res : ~`scipy.optimize.OptimizeResult`
             The `scipy` optimisation output.
         """
-        (i, j), (Li, di, c) = iterable
-        L, d = Li[i], di[j]
-        res = minimize(self.min_dd_fit_xy, x0=np.array([L, d * L / (1 + L), 0]),
-                       args=(1, [d], [1e-4], [L], c),
+        (i, j), (l, di, c) = iterable
+        l, d = l[i], di[j]
+        res = minimize(self.min_dd_fit_xy, x0=np.array([l, d * l / (1 + l), 0]),
+                       args=(1, [d], [1e-4], [l], c),
                        jac=True, method='newton-cg', hess=self.hess_dd_fit_xy,
                        options={'xtol': 1e-15})
 
         return (i, j), res
 
-    def min_dd_fit_xy(self, p, L, xis, yis, Lis, sig):
+    def min_dd_fit_xy(self, p, l, xis, yis, lis, sig):
         """
         Minimisation function for fitting one PSF model to two or more simulated
         sources, including the first-order derivatives with respect to position
@@ -187,14 +185,14 @@ class FitPSFPerturbations:
             List of the current values of perturbation offset and
             flux brightening caused by all perturbers hidden within the
             central object's PSF.
-        L : float
+        l : float
             Flux of the central object.
         xis : numpy.ndarray
             x-axis positions of all perturbers being fit with a single PSF.
         yis : numpy.ndarray
             Positions of perturbers in the opposing orthogonal axis.
-        Lis : numpy.ndarray
-            Flux of perturbers relative to the central source flux ``L``.
+        lis : numpy.ndarray
+            Flux of perturbers relative to the central source flux ``l``.
         sig : float
             The Gaussian sigma of the PSFs being fit.
 
@@ -207,17 +205,17 @@ class FitPSFPerturbations:
         dx, dy, dl = p
         di_dd = np.array([xis - dx, yis - dy])
         dd = np.array([dx, dy])
-        fx = ((L+dl) * np.sum(Lis * self.psi(di_dd, sig)) +
-              L * (L+dl) * self.psi(dd, sig) - 0.5*(L+dl)**2)
-        dfx = np.array([(L+dl) * np.sum(Lis * (xis - dx)/2/sig**2 * self.psi(di_dd, sig)) -
-                        L * (L+dl) * dx/2/sig**2 * self.psi(dd, sig),
-                        (L+dl) * np.sum(Lis * (yis - dy)/2/sig**2 * self.psi(di_dd, sig)) -
-                        L * (L+dl) * dy/2/sig**2 * self.psi(dd, sig),
-                        -(L + dl) + np.sum(Lis * self.psi(di_dd, sig)) + L * self.psi(dd, sig)])
+        fx = ((l+dl) * np.sum(lis * self.psi(di_dd, sig)) +
+              l * (l+dl) * self.psi(dd, sig) - 0.5*(l+dl)**2)
+        dfx = np.array([(l+dl) * np.sum(lis * (xis - dx)/2/sig**2 * self.psi(di_dd, sig)) -
+                        l * (l+dl) * dx/2/sig**2 * self.psi(dd, sig),
+                        (l+dl) * np.sum(lis * (yis - dy)/2/sig**2 * self.psi(di_dd, sig)) -
+                        l * (l+dl) * dy/2/sig**2 * self.psi(dd, sig),
+                        -(l + dl) + np.sum(lis * self.psi(di_dd, sig)) + l * self.psi(dd, sig)])
 
         return -1*fx, -1*dfx
 
-    def hess_dd_fit_xy(self, p, L, xis, yis, Lis, sig):
+    def hess_dd_fit_xy(self, p, l, xis, yis, lis, sig):
         """
         Second-order derivatives of the fit of one PSF model to two or more
         simulated sources, following the minimisation routine ``min_dd_fit_xy``.
@@ -228,14 +226,14 @@ class FitPSFPerturbations:
             List of the current values of perturbation offset and
             flux brightening caused by all perturbers hidden within the
             central object's PSF.
-        L : float
+        l : float
             Flux of the central object.
         xis : numpy.ndarray
             x-axis positions of all perturbers being fit with a single PSF.
         yis : numpy.ndarray
             Positions of perturbers in the opposing orthogonal axis.
-        Lis : numpy.ndarray
-            Flux of perturbers relative to the central source flux ``L``.
+        lis : numpy.ndarray
+            Flux of perturbers relative to the central source flux ``l``.
         sig : float
             The Gaussian sigma of the PSFs being fit.
 
@@ -248,16 +246,16 @@ class FitPSFPerturbations:
         dx, dy, dl = p
         di_dd = np.array([xis - dx, yis - dy])
         dd = np.array([dx, dy])
-        dx2 = ((L+dl) * np.sum(Lis * self.psi(di_dd, sig) * ((xis - dx)**2/2/sig**2 - 1)) / 2 /
-               sig**2 + L * (L+dl) * self.psi(dd, sig) * (dx**2 / 2 / sig**2 - 1) / 2 / sig**2)
-        dxdy = ((L+dl) * np.sum(Lis * self.psi(di_dd, sig) * (xis - dx) * (yis - dy)/4/sig**4) +
-                L * (L+dl) * self.psi(dd, sig) * dx*dy / 4 / sig**4)
-        dy2 = ((L+dl) * np.sum(Lis * self.psi(di_dd, sig) * ((yis - dy)**2/2/sig**2 - 1)) / 2 /
-               sig**2 + L * (L+dl) * self.psi(dd, sig) * (dy**2 / 2 / sig**2 - 1) / 2 / sig**2)
-        dxdl = np.sum(Lis*(xis - dx)/2/sig**2 *
-                      self.psi(di_dd, sig)) - L * dx/2/sig**2 * self.psi(dd, sig)
-        dydl = np.sum(Lis*(yis - dy)/2/sig**2 *
-                      self.psi(di_dd, sig)) - L * dy/2/sig**2 * self.psi(dd, sig)
+        dx2 = ((l+dl) * np.sum(lis * self.psi(di_dd, sig) * ((xis - dx)**2/2/sig**2 - 1)) / 2 /
+               sig**2 + l * (l+dl) * self.psi(dd, sig) * (dx**2 / 2 / sig**2 - 1) / 2 / sig**2)
+        dxdy = ((l+dl) * np.sum(lis * self.psi(di_dd, sig) * (xis - dx) * (yis - dy)/4/sig**4) +
+                l * (l+dl) * self.psi(dd, sig) * dx*dy / 4 / sig**4)
+        dy2 = ((l+dl) * np.sum(lis * self.psi(di_dd, sig) * ((yis - dy)**2/2/sig**2 - 1)) / 2 /
+               sig**2 + l * (l+dl) * self.psi(dd, sig) * (dy**2 / 2 / sig**2 - 1) / 2 / sig**2)
+        dxdl = np.sum(lis*(xis - dx)/2/sig**2 *
+                      self.psi(di_dd, sig)) - l * dx/2/sig**2 * self.psi(dd, sig)
+        dydl = np.sum(lis*(yis - dy)/2/sig**2 *
+                      self.psi(di_dd, sig)) - l * dy/2/sig**2 * self.psi(dd, sig)
         dl2 = -1
 
         return -1*np.array([[dx2, dxdy, dxdl], [dxdy, dy2, dydl], [dxdl, dydl, dl2]])
@@ -290,18 +288,18 @@ class FitPSFPerturbations:
         offsets where relationship becomes linear, for each value of perturber
         relative flux.
         """
-        dd = np.load('{}/dd_Ld.npy'.format(self.data_save_folder))
-        dd_skew_pars = np.empty((len(self.Li), 5), float)
+        dd = np.load(f'{self.data_save_folder}/dd_ld.npy')
+        dd_skew_pars = np.empty((len(self.li), 5), float)
 
-        # Fit each L distribution for its parameters as a function of D
-        for i in range(len(self.Li)):
+        # Fit each l distribution for its parameters as a function of d.
+        for i, li in enumerate(self.li):
             _x, _y = dd[i, 1:, 1] / self.psf_sig, dd[i, 1:, 0] / self.psf_sig
-            slices = np.where(np.abs((_y - _x * self.Li[i]/(1 + self.Li[i]))/_y) > 0.01)[0]
+            slices = np.where(np.abs((_y - _x * li/(1 + li))/_y) > 0.01)[0]
             if len(slices) == 0:
                 dd_skew_pars[i, :-1] = 0
                 dd_skew_pars[i, -1] = _x[-1] + 0.1
                 print(r'All derived perturbations within 1% of linear fit for '
-                      r'relative flux of {}. No skew-normal fit needed.'.format(self.Li[i]))
+                      rf'relative flux of {li[i]}. No skew-normal fit needed.')
                 continue
             cutr = _x[slices[0]]
 
@@ -311,26 +309,25 @@ class FitPSFPerturbations:
             w = np.ones_like(x)
             w[:10] = 100
 
-            N_pools = self.n_pool
-            N_overloop = 2
+            n_pools = self.n_pool
+            n_overloop = 2
             niters = 150
-            pool = multiprocessing.Pool(N_pools)
-            counter = np.arange(0, N_pools*N_overloop)
+            counter = np.arange(0, n_pools*n_overloop)
             xy_step = 0.1
             temp = 0.01
             x0 = None
             method = 'L-BFGS-B'
-            min_kwarg = {'method': method, 'args': (x, y, w, self.Li[i]), 'jac': True}
+            min_kwarg = {'method': method, 'args': (x, y, w, self.li[i]), 'jac': True}
             iter_rep = itertools.repeat([min_kwarg, niters, x0, xy_step, temp])
             iter_group = zip(counter, iter_rep)
             res = None
             min_val = None
-            for return_res in pool.imap_unordered(self.dd_fitting_wrapper, iter_group,
-                                                  chunksize=N_overloop):
-                if min_val is None or return_res.fun < min_val:
-                    res = return_res
-                    min_val = return_res.fun
-            pool.close()
+            with multiprocessing.Pool(n_pools) as pool:
+                for return_res in pool.imap_unordered(self.dd_fitting_wrapper, iter_group,
+                                                      chunksize=n_overloop):
+                    if min_val is None or return_res.fun < min_val:
+                        res = return_res
+                        min_val = return_res.fun
             pool.join()
 
             dd_skew_pars[i, :-1] = res.x
@@ -347,7 +344,7 @@ class FitPSFPerturbations:
         dd_skew_pars[q, 2] *= -1
         dd_skew_pars[q, 3] *= -1
 
-        np.save('{}/dd_skew_pars.npy'.format(self.data_save_folder), dd_skew_pars)
+        np.save(f'{self.data_save_folder}/dd_skew_pars.npy', dd_skew_pars)
 
     def dd_fitting_wrapper(self, iterable):
         """
@@ -371,7 +368,7 @@ class FitPSFPerturbations:
             The `scipy` optimisation output containing the best-fit
             skew-normal parameters from all basins.
         """
-        def sum_one_skew(p, x, y, w, L):
+        def sum_one_skew(p, x, y, w, l):
             """
             Calculate the weighted sum-of-square-residuals between the
             skew-normal and input data values, as well as its derivative
@@ -389,7 +386,7 @@ class FitPSFPerturbations:
                 fitting.
             w : numpy.ndarray
                 Weights for each data point.
-            L : numpy.ndarray
+            l : numpy.ndarray
                 The relative flux of the perturber.
 
             Returns
@@ -398,11 +395,11 @@ class FitPSFPerturbations:
                 Weighted sum of data-model fits and derivatives of the
                 goodness-of-fit parameter.
             """
-            f, df = self.fit_one_skew(p, x, L)
+            f, df = self.fit_one_skew(p, x, l)
             return np.sum((y - f)**2 * w), np.array([np.sum(-2 * w * (y - f) * q) for q in df])
 
         rng = np.random.default_rng()
-        i, (min_kwarg, niters, x0, s, t) = iterable
+        _, (min_kwarg, niters, x0, s, t) = iterable
         if x0 is None:
             # sigma, mu, alpha, T
             x0 = [rng.uniform(0, 3), rng.uniform(0, 4), rng.uniform(-1, 1), rng.uniform(0, 1)]
@@ -411,7 +408,7 @@ class FitPSFPerturbations:
 
         return res
 
-    def fit_one_skew(self, p, x, L):
+    def fit_one_skew(self, p, x, l):
         """
         Function used in the fitting of a skew-normal distribution, calculating
         the value of the skew-normal and its derivative with respect to its
@@ -424,7 +421,7 @@ class FitPSFPerturbations:
             and amplitude respectively.
         x : numpy.ndarray
             Input values at which to evaluate the skew-normal distribution.
-        L : float
+        l : float
             Relative flux of perturber for which perturbation-position relations
             are being fit with the skew-normal distribution.
 
@@ -482,12 +479,12 @@ class FitPSFPerturbations:
         psi_cdf_skew = calc_psi_cdf(a * x_)
         dx_dc = -(x - u) / c**2
         dx_du = -1 / c
-        f = 2 * t / c * L * psi_pdf * psi_cdf_skew
-        dfdc = (2 * t / c * L * psi_pdf * (dx_dc * (-x_ * psi_cdf_skew +
+        f = 2 * t / c * l * psi_pdf * psi_cdf_skew
+        dfdc = (2 * t / c * l * psi_pdf * (dx_dc * (-x_ * psi_cdf_skew +
                                                     psi_pdf_skew * a) - psi_cdf_skew/c))
-        dfdu = 2 * t / c * L * psi_pdf * dx_du * (-psi_cdf_skew * x_ + a * psi_pdf_skew)
-        dfda = 2 * t / c * L * psi_pdf * psi_pdf_skew * x_
-        dfdt = 2 / c * L * psi_pdf * psi_cdf_skew
+        dfdu = 2 * t / c * l * psi_pdf * dx_du * (-psi_cdf_skew * x_ + a * psi_pdf_skew)
+        dfda = 2 * t / c * l * psi_pdf * psi_pdf_skew * x_
+        dfdt = 2 / c * l * psi_pdf * psi_cdf_skew
 
         df = np.array([dfdc, dfdu, dfda, dfdt])
 
@@ -499,63 +496,61 @@ class FitPSFPerturbations:
         skew-normal distribution parameters as a function of the relative flux
         of the perturber.
         """
-        dd = np.load('{}/dd_Ld.npy'.format(self.data_save_folder))
-        dd_skew_pars = np.load('{}/dd_skew_pars.npy'.format(self.data_save_folder))
+        dd = np.load(f'{self.data_save_folder}/dd_ld.npy')
+        dd_skew_pars = np.load(f'{self.data_save_folder}/dd_skew_pars.npy')
 
-        l_cut = [0.15, self.Li[self.Li < 0.75][np.argmin(dd_skew_pars[self.Li < 0.75, 0])],
-                 self.Li[np.argmin(dd_skew_pars[:, 2])]]
+        l_cut = [0.15, self.li[self.li < 0.75][np.argmin(dd_skew_pars[self.li < 0.75, 0])],
+                 self.li[np.argmin(dd_skew_pars[:, 2])]]
 
-        Ns = np.arange(4, 25)
-        dd_params = np.empty((len(Ns), dd_skew_pars.shape[1], np.amax(Ns), 2), float)
+        ns = np.arange(4, 25)
+        dd_params = np.empty((len(ns), dd_skew_pars.shape[1], np.amax(ns), 2), float)
 
-        for k, q in enumerate([self.Li <= l_cut[1], (self.Li > l_cut[1]) & (self.Li < l_cut[2])]):
-            ij = np.arange(len(Ns))
-            iter_array = zip(ij, itertools.repeat([Ns, dd_skew_pars[q, :], self.Li[q],
+        for k, q in enumerate([self.li <= l_cut[1], (self.li > l_cut[1]) & (self.li < l_cut[2])]):
+            ij = np.arange(len(ns))
+            iter_array = zip(ij, itertools.repeat([ns, dd_skew_pars[q, :], self.li[q],
                                                    self.di[-1]/self.psf_sig]))
-            pool = multiprocessing.Pool(self.n_pool)
-            for results in pool.imap_unordered(self.min_parallel_dd_param_fit, iter_array,
-                                               chunksize=max(1, int(len(Ns)/self.n_pool))):
-                j, N, resses = results
-                for i, res in enumerate(resses):
-                    dd_params[j, i, :N, k] = res
+            with multiprocessing.Pool(self.n_pool) as pool:
+                for results in pool.imap_unordered(self.min_parallel_dd_param_fit, iter_array,
+                                                   chunksize=max(1, int(len(ns)/self.n_pool))):
+                    j, n, resses = results
+                    for i, res in enumerate(resses):
+                        dd_params[j, i, :n, k] = res
 
-            pool.close()
             pool.join()
 
-        # Keep track of the total goodness-of-fit values across all di-Li
+        # Keep track of the total goodness-of-fit values across all di-li
         # combinations, as well as the goodness-of-fits just for individual
-        # Lis, across di.
-        dd_ic = np.zeros((len(Ns), 2), float)
-        dd_x2s = np.empty((len(Ns), len(self.Li), 2), float)
+        # lis, across di.
+        dd_ic = np.zeros((len(ns), 2), float)
+        dd_x2s = np.empty((len(ns), len(self.li), 2), float)
 
-        for j, N in enumerate(Ns):
+        for j, n in enumerate(ns):
             dd_x2 = [0, 0]
-            for i in range(len(self.Li)):
+            for i, li in enumerate(self.li):
                 x = dd[i, :, 1] / self.psf_sig
                 y = dd[i, :, 0] / self.psf_sig
-                ddparams = self.return_ddparams(self.Li[i], l_cut, dd_params, Ns[j], j)
+                ddparams = self.return_ddparams(li, l_cut, dd_params, n, j)
                 q = (~np.isnan(x)) & (~np.isnan(y))
-                x2_w = np.sum((y[q] - self.dd_combined_fit(ddparams, x[q], self.Li[i],
+                x2_w = np.sum((y[q] - self.dd_combined_fit(ddparams, x[q], li,
                                                            l_cut[2]))**2 / y[q]**2)
-                x2_nw = np.sum((y[q] - self.dd_combined_fit(ddparams, x[q], self.Li[i],
-                                                            l_cut[2]))**2)
+                x2_nw = np.sum((y[q] - self.dd_combined_fit(ddparams, x[q], li, l_cut[2]))**2)
                 dd_x2[0] += x2_w
                 dd_x2[1] += x2_nw
                 dd_x2s[j, i, :] = [x2_w, x2_nw]
 
             dd_ic[j, :] = dd_x2
 
-        np.save('{}/Ns.npy'.format(self.data_save_folder), Ns)
-        np.save('{}/dd_ic.npy'.format(self.data_save_folder), dd_ic)
-        np.save('{}/dd_x2s.npy'.format(self.data_save_folder), dd_x2s)
-        np.save('{}/dd_params_full.npy'.format(self.data_save_folder), dd_params)
-        np.save('{}/l_cut.npy'.format(self.data_save_folder), l_cut)
+        np.save(f'{self.data_save_folder}/ns.npy', ns)
+        np.save(f'{self.data_save_folder}/dd_ic.npy', dd_ic)
+        np.save(f'{self.data_save_folder}/dd_x2s.npy', dd_x2s)
+        np.save(f'{self.data_save_folder}/dd_params_full.npy', dd_params)
+        np.save(f'{self.data_save_folder}/l_cut.npy', l_cut)
 
         # Use the relative sum-of-square-residuals as the metric for deciding
         # which polynomial order is the best, but with an AIC complexity factor.
-        N_ind = np.unravel_index(np.argmin(dd_ic[:, 0] + 2*Ns), dd_ic[:, 1].shape)[0]
-        dd_params_final = dd_params[N_ind, :, :Ns[N_ind]]
-        np.save('{}/dd_params.npy'.format(self.data_save_folder), dd_params_final)
+        n_ind = np.unravel_index(np.argmin(dd_ic[:, 0] + 2*ns), dd_ic[:, 1].shape)[0]
+        dd_params_final = dd_params[n_ind, :, :ns[n_ind]]
+        np.save(f'{self.data_save_folder}/dd_params.npy', dd_params_final)
 
     def min_parallel_dd_param_fit(self, iterable):
         """
@@ -576,7 +571,7 @@ class FitPSFPerturbations:
         -------
         j : integer
             The index into the polynomial order array.
-        N : integer
+        n : integer
             The polynomial order being fit.
         resses : list
             A list containing the best-fit polynomial weights for each
@@ -609,19 +604,19 @@ class FitPSFPerturbations:
             f, df = self.fit_poly(p, x)
             return np.sum((y - f)**2), np.array([np.sum(-2 * (y - f) * q) for q in df])
 
-        j, (Ns, dd_skew_pars, Li, dcut) = iterable
-        N = Ns[j]
+        j, (ns, dd_skew_pars, li, dcut) = iterable
+        n = ns[j]
         resses = []
         for i in range(dd_skew_pars.shape[1]):
             # Filter for any "non-fit" fluxes, which are indicated by having
             # a linear-regime cutoff radius larger than the maximum extent
             # of dd probed.
             q = dd_skew_pars[:, -1] < dcut
-            resses.append(minimize(sum_poly, x0=[0.5]*N,
-                                   args=(Li[q], dd_skew_pars[q, i]),
+            resses.append(minimize(sum_poly, x0=[0.5]*n,
+                                   args=(li[q], dd_skew_pars[q, i]),
                                    jac=True, method='L-BFGS-B', options={'ftol': 1e-12}).x)
 
-        return j, N, resses
+        return j, n, resses
 
     def fit_poly(self, p, x):
         r"""
@@ -659,14 +654,14 @@ class FitPSFPerturbations:
 
         return y, dy
 
-    def return_ddparams(self, Li, l_cut, dd_params, N, N_ind):
+    def return_ddparams(self, li, l_cut, dd_params, n, n_ind):
         """
         Convenience function for deriving skew-normal distribution parameters
         as a function of perturber flux from fit polynomial distributions.
 
         Parameters
         ----------
-        Li : float
+        li : float
             The flux of the perturber relative to the flux of the central source.
         l_cut : list or numpy.ndarray
             List of key cut-off relative fluxes, at which parameterisations of
@@ -675,26 +670,26 @@ class FitPSFPerturbations:
             Array of polynomial weights for each skew-normal distribution
             parameter, for multiple polynomial orders, for parameterisations
             above and below ``l_cut[1]``.
-        N : integer
+        n : integer
             Number of polynomial terms being used to calculate the skew-normal
             distribution values.
-        N_ind : integer
+        n_ind : integer
             Index of the chosen number of polynomial terms in ``dd_params``.
 
         Returns
         -------
         dd_skew_params : numpy.ndarray
             Values of the skew-normal sigma, mean, skewness, and amplitude,
-            evaluated at `Li`, from a polynomial of order `N+1`.
+            evaluated at `li`, from a polynomial of order `N+1`.
         """
         dd_skew_params = []
-        p = 0 if Li <= l_cut[1] else 1
+        p = 0 if li <= l_cut[1] else 1
         for q in range(dd_params.shape[1]):
-            dd_skew_params.append(self.fit_poly(dd_params[N_ind, q, :N, p], Li)[0])
+            dd_skew_params.append(self.fit_poly(dd_params[n_ind, q, :n, p], li)[0])
         dd_skew_params = np.array(dd_skew_params)
         return dd_skew_params
 
-    def dd_combined_fit(self, p, x, L, l_cut):
+    def dd_combined_fit(self, p, x, l, l_cut):
         """
         Wrapper function for calculating the combined description of the
         perturber offsets as a linear relation up to a particular offset
@@ -708,7 +703,7 @@ class FitPSFPerturbations:
             a linear relation.
         x : numpy.ndarray
             Values at which to evaluate the offset due to a blended perturber.
-        L : float
+        l : float
             Relative flux of the perturber as compared with the central object.
         l_cut : float
             Cutoff relative flux, above which no skew-normal distribution is
@@ -720,45 +715,45 @@ class FitPSFPerturbations:
             The composite perturbation function, linear within ``p[-1]`` and
             a skew-normal distribution outside.
         """
-        if L >= l_cut:
-            return x * L / (L + 1)
+        if l >= l_cut:
+            return x * l / (l + 1)
         y = np.empty_like(x)
         q = np.where(x <= p[-1])
-        y[q] = x[q] * L / (L + 1)
+        y[q] = x[q] * l / (l + 1)
         q = np.where(x > p[-1])
-        y[q] = self.fit_one_skew(p[:-1], x[q], L)[0]
+        y[q] = self.fit_one_skew(p[:-1], x[q], l)[0]
         return y
 
-    def plot_fits(self):
+    def plot_fits(self):  # pylint: disable=too-many-statements
         """
         Visualisation function, plotting the various parameterisations fit in
         FitPSFPerturbations, enabling quality checks to be carried out.
         """
-        dd = np.load('{}/dd_Ld.npy'.format(self.data_save_folder))
-        dd_skew_pars = np.load('{}/dd_skew_pars.npy'.format(self.data_save_folder))
-        Ns = np.load('{}/Ns.npy'.format(self.data_save_folder))
-        dd_ic = np.load('{}/dd_ic.npy'.format(self.data_save_folder))
-        dd_x2s = np.load('{}/dd_x2s.npy'.format(self.data_save_folder))
-        l_cut = np.load('{}/l_cut.npy'.format(self.data_save_folder))
-        dd_params_full = np.load('{}/dd_params_full.npy'.format(self.data_save_folder))
-        N_ind = np.unravel_index(np.argmin(dd_ic[:, 0] + 2*Ns), dd_ic[:, 1].shape)[0]
+        dd = np.load(f'{self.data_save_folder}/dd_ld.npy')
+        dd_skew_pars = np.load(f'{self.data_save_folder}/dd_skew_pars.npy')
+        ns = np.load(f'{self.data_save_folder}/ns.npy')
+        dd_ic = np.load(f'{self.data_save_folder}/dd_ic.npy')
+        dd_x2s = np.load(f'{self.data_save_folder}/dd_x2s.npy')
+        l_cut = np.load(f'{self.data_save_folder}/l_cut.npy')
+        dd_params_full = np.load(f'{self.data_save_folder}/dd_params_full.npy')
+        n_ind = np.unravel_index(np.argmin(dd_ic[:, 0] + 2*ns), dd_ic[:, 1].shape)[0]
 
         plt.figure('figure', figsize=(40, 16))
         gs = gridspec.GridSpec(2, 4)
-        norm = Normalize(vmin=self.Li[0], vmax=self.Li[len(self.Li)-1])
+        norm = Normalize(vmin=self.li[0], vmax=self.li[len(self.li)-1])
         ax = plt.subplot(gs[0, 0])
-        # Work backwards from maximum Li to minimum in 0.05 Li steps.
-        for i in range(len(self.Li)-1, -1, -int(np.ceil(0.05/(self.Li[1] - self.Li[0])))):
+        # Work backwards from maximum li to minimum in 0.05 li steps.
+        for i in range(len(self.li)-1, -1, -int(np.ceil(0.05/(self.li[1] - self.li[0])))):
             x = dd[i, :, 1] / self.psf_sig
             y = dd[i, :, 0] / self.psf_sig
             q = (~np.isnan(x)) & (~np.isnan(y))
             x, y = x[q], y[q]
-            ax.plot(x, y, ls='-', c=cm.viridis(norm(self.Li[i])))
+            ax.plot(x, y, ls='-', c=cm.viridis(norm(self.li[i])))  # pylint: disable=no-member
 
-            ddparams = self.return_ddparams(self.Li[i], l_cut, dd_params_full,
-                                            Ns[N_ind], N_ind)
-            ax.plot(x, self.dd_combined_fit(ddparams, x, self.Li[i], l_cut[2]), ls='--',
-                    c=cm.viridis(norm(self.Li[i])))
+            ddparams = self.return_ddparams(self.li[i], l_cut, dd_params_full,
+                                            ns[n_ind], n_ind)
+            ax.plot(x, self.dd_combined_fit(ddparams, x, self.li[i], l_cut[2]), ls='--',
+                    c=cm.viridis(norm(self.li[i])))  # pylint: disable=no-member
 
         if usetex:
             ax.set_xlabel(r'$x / \sigma_\mathrm{PSF}$')
@@ -774,13 +769,13 @@ class FitPSFPerturbations:
             label_list = [r'sigma', r'mu', r'alpha', r'T', r'r_c']
         for i, (label, c, c2) in enumerate(zip(label_list, ['k', 'r', 'b', 'g', 'purple'],
                                            ['gray', 'orange', 'aquamarine', 'olive', 'violet'])):
-            ax.plot(self.Li, dd_skew_pars[:, i], ls='-', c=c, label='{}'.format(label))
-            q = self.Li <= l_cut[1]
-            ax.plot(self.Li[q], self.fit_poly(dd_params_full[N_ind, i, :Ns[N_ind], 0],
-                                              self.Li[q])[0], ls='--', c=c2, lw=4)
-            q = (self.Li > l_cut[1]) & (self.Li < l_cut[2])
-            ax.plot(self.Li[q], self.fit_poly(dd_params_full[N_ind, i, :Ns[N_ind], 1],
-                                              self.Li[q])[0], ls='-.', c=c2, lw=4)
+            ax.plot(self.li, dd_skew_pars[:, i], ls='-', c=c, label=label)
+            q = self.li <= l_cut[1]
+            ax.plot(self.li[q], self.fit_poly(dd_params_full[n_ind, i, :ns[n_ind], 0],
+                                              self.li[q])[0], ls='--', c=c2, lw=4)
+            q = (self.li > l_cut[1]) & (self.li < l_cut[2])
+            ax.plot(self.li[q], self.fit_poly(dd_params_full[n_ind, i, :ns[n_ind], 1],
+                                              self.li[q])[0], ls='-.', c=c2, lw=4)
 
         ax.legend(fontsize=14, ncol=2)
         ax.set_xlabel('Relative perturber flux')
@@ -788,9 +783,9 @@ class FitPSFPerturbations:
 
         ax = plt.subplot(gs[0, 2])
         ax1 = ax.twinx()
-        ax.plot(Ns, np.log10(dd_ic[:, 1]), ls='-', c='k')
-        ax.axvline(Ns[N_ind], ls='-', c='k')
-        ax1.plot(Ns, np.log10(dd_ic[:, 0]), ls='-', c='r')
+        ax.plot(ns, np.log10(dd_ic[:, 1]), ls='-', c='k')
+        ax.axvline(ns[n_ind], ls='-', c='k')
+        ax1.plot(ns, np.log10(dd_ic[:, 0]), ls='-', c='r')
 
         ax.set_xlabel('Order of polynomial fit')
         if usetex:
@@ -802,8 +797,8 @@ class FitPSFPerturbations:
 
         ax = plt.subplot(gs[1, 0])
         ax1 = ax.twinx()
-        ax.plot(self.Li, np.log10(dd_x2s[N_ind, :, 1]), ls='-', c='k')
-        ax.plot(self.Li, np.log10(dd_x2s[N_ind, :, 0]), ls='-', c='r')
+        ax.plot(self.li, np.log10(dd_x2s[n_ind, :, 1]), ls='-', c='k')
+        ax.plot(self.li, np.log10(dd_x2s[n_ind, :, 0]), ls='-', c='r')
 
         ax.set_xlabel('Relative perturber flux')
         if usetex:
@@ -814,16 +809,16 @@ class FitPSFPerturbations:
             ax1.set_ylabel(r'log10(sum_i (y_i - f(x_i))**2 / y_i**2)', c='r')
 
         ax = plt.subplot(gs[1, 1])
-        max_perc_diff = np.empty_like(self.Li)
-        for i in range(len(self.Li)):
+        max_perc_diff = np.empty_like(self.li)
+        for i, li in enumerate(self.li):
             x = dd[i, 1:, 1] / self.psf_sig
             y = dd[i, 1:, 0] / self.psf_sig
             q = (~np.isnan(x)) & (~np.isnan(y))
             x, y = x[q], y[q]
-            ddparams = self.return_ddparams(self.Li[i], l_cut, dd_params_full, Ns[N_ind], N_ind)
-            max_perc_diff[i] = np.amax(np.abs((self.dd_combined_fit(ddparams, x, self.Li[i],
+            ddparams = self.return_ddparams(li, l_cut, dd_params_full, ns[n_ind], n_ind)
+            max_perc_diff[i] = np.amax(np.abs((self.dd_combined_fit(ddparams, x, li,
                                                l_cut[2]) - y) / (y + 1e-5)))
-        ax.plot(self.Li, max_perc_diff, ls='-', c='k')
+        ax.plot(self.li, max_perc_diff, ls='-', c='k')
 
         ax.set_xlabel('Relative perturber flux')
         if usetex:
@@ -835,16 +830,15 @@ class FitPSFPerturbations:
                           r'(Delta x_t / sigma_PSF))')
 
         ax = plt.subplot(gs[1, 2])
-        max_abs_diff = np.empty_like(self.Li)
-        for i in range(len(self.Li)):
+        max_abs_diff = np.empty_like(self.li)
+        for i, li in enumerate(self.li):
             x = dd[i, 1:, 1] / self.psf_sig
             y = dd[i, 1:, 0] / self.psf_sig
             q = (~np.isnan(x)) & (~np.isnan(y))
             x, y = x[q], y[q]
-            ddparams = self.return_ddparams(self.Li[i], l_cut, dd_params_full, Ns[N_ind], N_ind)
-            max_abs_diff[i] = np.amax(np.abs(self.dd_combined_fit(ddparams, x, self.Li[i],
-                                                                  l_cut[2]) - y))
-        ax.plot(self.Li, max_abs_diff, ls='-', c='k')
+            ddparams = self.return_ddparams(li, l_cut, dd_params_full, ns[n_ind], n_ind)
+            max_abs_diff[i] = np.amax(np.abs(self.dd_combined_fit(ddparams, x, li, l_cut[2]) - y))
+        ax.plot(self.li, max_abs_diff, ls='-', c='k')
 
         ax.set_xlabel('Relative perturber flux')
         if usetex:
@@ -856,20 +850,19 @@ class FitPSFPerturbations:
         diff = np.empty((self.draw_sim_num, 6), float)
         ij = np.arange(diff.shape[0])
         iter_array = zip(ij, itertools.repeat([self.psf_fwhm, self.psf_sig, l_cut,
-                                               dd_params_full, Ns[N_ind], N_ind]))
-        pool = multiprocessing.Pool(self.n_pool)
-        for results in pool.imap_unordered(self.loop_ind_fit, iter_array,
-                                           chunksize=int(diff.shape[0]/self.n_pool)):
-            i, dx, _Li, x, ddparams = results
-            dx_fit = self.dd_combined_fit(ddparams, np.array([x]), _Li, l_cut[2])
-            diff[i, 0] = np.amax(np.abs((dx_fit - dx)/(dx + 1e-3)))
-            diff[i, 1] = np.amax(np.abs(dx_fit - dx))
-            diff[i, 2] = _Li
-            diff[i, 3] = x
-            diff[i, 4] = dx
-            diff[i, 5] = dx_fit
+                                               dd_params_full, ns[n_ind], n_ind]))
+        with multiprocessing.Pool(self.n_pool) as pool:
+            for results in pool.imap_unordered(self.loop_ind_fit, iter_array,
+                                               chunksize=int(diff.shape[0]/self.n_pool)):
+                i, dx, _li, x, ddparams = results
+                dx_fit = self.dd_combined_fit(ddparams, np.array([x]), _li, l_cut[2])
+                diff[i, 0] = np.amax(np.abs((dx_fit - dx)/(dx + 1e-3)))
+                diff[i, 1] = np.amax(np.abs(dx_fit - dx))
+                diff[i, 2] = _li
+                diff[i, 3] = x
+                diff[i, 4] = dx
+                diff[i, 5] = dx_fit
 
-        pool.close()
         pool.join()
 
         ax = plt.subplot(gs[0, 3])
@@ -895,7 +888,7 @@ class FitPSFPerturbations:
         ax.set_ylabel('N')
 
         plt.tight_layout()
-        plt.savefig('{}/dd_params_visualisation.pdf'.format(self.plot_save_folder))
+        plt.savefig(f'{self.plot_save_folder}/dd_params_visualisation.pdf')
 
     def loop_ind_fit(self, iterable):
         """
@@ -920,27 +913,27 @@ class FitPSFPerturbations:
             to draw.
         dx : float
             The derived perturbation offset, normalised to the PSF sigma.
-        Li : float
+        li : float
             The randomly drawn relative flux of the perturbing object.
         x : float
             Position of the perturbing object relative to the central source.
         ddparams : numpy.ndarray
             The calculated skew-normal distribution parameters evaluated at
-            the simulated `Li` for the chosen polynomial order.
+            the simulated `li` for the chosen polynomial order.
         """
         rng = np.random.default_rng()
-        i, (psf_fwhm, psf_sig, t_cut, dd_params, N, N_ind) = iterable
-        Li = rng.uniform(0.15, 1)
+        i, (psf_fwhm, psf_sig, t_cut, dd_params, n, n_ind) = iterable
+        li = rng.uniform(0.15, 1)
         x_ = 2 * psf_fwhm
         while x_ > 1.185*psf_fwhm:
             x_ = rng.rayleigh(scale=psf_sig)
-        res = minimize(self.min_dd_fit_xy, x0=np.array([Li, x_ * Li / (1 + Li), 0]),
-                       args=(1, [x_], [1e-4], [Li], psf_sig),
+        res = minimize(self.min_dd_fit_xy, x0=np.array([li, x_ * li / (1 + li), 0]),
+                       args=(1, [x_], [1e-4], [li], psf_sig),
                        jac=True, method='newton-cg', hess=self.hess_dd_fit_xy,
                        options={'xtol': 1e-15})
         dx = np.sqrt(res.x[0]**2 + res.x[1]**2) / psf_sig
         x = x_ / psf_sig
 
-        ddparams = self.return_ddparams(Li, t_cut, dd_params, N, N_ind)
+        ddparams = self.return_ddparams(li, t_cut, dd_params, n, n_ind)
 
-        return i, dx, Li, x, ddparams
+        return i, dx, li, x, ddparams

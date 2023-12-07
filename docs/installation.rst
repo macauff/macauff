@@ -31,7 +31,11 @@ For running the test suite the requirements are:
 * ``sphinx-fortran``
 * ``sphinx-astropy``
 * ``pytest-astropy``
-* ``pytest-cov``.
+* ``pytest-cov``
+* ``jupyter`` -- Kluyver et al. 2016 (IOS Press, 87, doi.org/10.3233/978-1-61499-649-1-87)
+* ``isort``
+* ``pylint``
+* ``pre-commmit``.
 
 Additionally, you will need the following to install ``macauff``:
 
@@ -41,7 +45,7 @@ Additionally, you will need the following to install ``macauff``:
 Installing the Package
 ======================
 
-As of now, the only way to install this package is by downloading it from the `GitHub repository <https://github.com/Onoddil/macauff>`_. We recommend using an `Anaconda Distribution <https://www.anaconda.com/distribution/>`_, or `miniconda <https://docs.conda.io/en/latest/miniconda.html>`_, to maintain specific, independent Python installations without the need for root permissions.
+As of now, the main way to install this package is by downloading it from the `GitHub repository <https://github.com/macauff/macauff>`_. We recommend using an `Anaconda Distribution <https://www.anaconda.com/distribution/>`_, or `miniconda <https://docs.conda.io/en/latest/miniconda.html>`_, to maintain specific, independent Python installations without the need for root permissions. However, you can also ``pip install macauff``, but note that this version may be behind the latest development version available through GitHub.
 
 Once you have installed your choice of conda, then you can create an initial conda environment::
 
@@ -53,10 +57,10 @@ although you can drop the ``=3.9``, or chose another (later) Python version -- r
 
 If you require the additional test packages listed above, for running tests, you can install them separately with::
 
-    conda install -c conda-forge tox pytest sphinx-astropy pytest-astropy pytest-cov
+    conda install -c conda-forge tox pytest sphinx-astropy pytest-astropy pytest-cov jupyter isort pylint pre_commit
     conda install -c vacumm -c conda-forge sphinx-fortran
 
-You will also need to install ``gfortran`` in order to compile the fortran code in this package. Instructions for how to install this for Windows, MacOS, or Linux can be found `here <https://gcc.gnu.org/wiki/GFortranBinaries>`_. Finally, install ``git`` if you do not have it on your computer; `instructions <https://git-scm.com/book/en/v2/Getting-Started-Installing-Git>`_ for installing it on your operating system are available.
+To build the ``jupyter`` notebooks you will require `Pandoc <https://pandoc.org/installing.html>`_. You will also need to install ``gfortran`` in order to compile the fortran code in this package. Instructions for how to install this for Windows, MacOS, or Linux can be found `here <https://gcc.gnu.org/wiki/GFortranBinaries>`_. Finally, install ``git`` if you do not have it on your computer; `instructions <https://git-scm.com/book/en/v2/Getting-Started-Installing-Git>`_ for installing it on your operating system are available.
 
 Once you have the required packages installed -- whether in a new ``conda`` environment or otherwise -- you can clone the repository::
 
@@ -104,6 +108,19 @@ If you wish to locally build the documentation -- mostly likely if you are impro
 
     tox -e build_docs
 
+To match the github actions ``pre-commit`` workflow, locally you can run::
+
+    SKIP=check-lincc-frameworks-template-version,no-commit-to-branch,check-added-large-files,pytest-check,sphinx-build,pylint pre-commit run --show-diff-on-failure --color=always --all-files
+
+which will run ``isort`` and report any issues with the formatting prior to code being merged into the main codebase.
+
+Additionally, ``pylint`` can be invoked directly using::
+
+    pylint -rn -sn --recursive=y ./src --rcfile=./src/.pylintrc
+    pylint -rn -sn --recursive=y ./tests --rcfile=./tests/.pylintrc
+    pylint -rn -sn --recursive=y ./benchmarks --rcfile=./tests/.pylintrc
+
+to run the linter on each folder, with changes being manually made to comply with the reporting.
 
 Getting Started
 ===============

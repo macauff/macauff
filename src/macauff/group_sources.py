@@ -5,22 +5,30 @@ distinct "islands" of sources, along with calculating whether they are within ov
 various photometric integral purposes.
 '''
 
-import sys
-import multiprocessing
 import itertools
+import multiprocessing
+import sys
+
 import numpy as np
 
-from macauff.misc_functions import (load_small_ref_auf_grid, hav_dist_constant_lat,
-                             _load_rectangular_slice, StageData)
+# pylint: disable=import-error,no-name-in-module
 from macauff.group_sources_fortran import group_sources_fortran as gsf
 from macauff.make_set_list import set_list
+from macauff.misc_functions import (
+    StageData,
+    _load_rectangular_slice,
+    hav_dist_constant_lat,
+    load_small_ref_auf_grid,
+)
+
+# pylint: enable=import-error,no-name-in-module
 
 __all__ = ['make_island_groupings']
 
 
+# pylint: disable-next=too-many-arguments,too-many-locals,too-many-statements
 def make_island_groupings(joint_folder_path, a_cat_folder_path, b_cat_folder_path,
-                          a_auf_pointings, b_auf_pointings, a_filt_names, b_filt_names, a_title,
-                          b_title, a_modelrefinds, b_modelrefinds, r, dr, rho, drho, j1s, max_sep,
+                          a_modelrefinds, b_modelrefinds, r, dr, rho, drho, j1s, max_sep,
                           ax_lims, int_fracs, include_phot_like, use_phot_priors,
                           n_pool, a_perturb_auf_outputs, b_perturb_auf_outputs):
     '''
@@ -37,20 +45,6 @@ def make_island_groupings(joint_folder_path, a_cat_folder_path, b_cat_folder_pat
         Folder on disk where catalogue "a" files have been stored.
     b_cat_folder_path : string
         Folder on disk where catalogue "b" files are saved.
-    a_auf_pointings : 2-D numpy.ndarray
-        Array containing the listings of longitude, latitude pointings at which
-        the perturbation AUF components were computed for catalogue "a".
-    b_auf_pointings : 2-D numpy.ndarray
-        Array containing the listings of longitude, latitude pointings at which
-        the perturbation AUF components were computed for catalogue "b".
-    a_filt_names : list of string
-        List of ordered names for filters used in catalogue "a" cross-match.
-    b_filt_names : list of string
-        List of filters in catalogue "b" matching.
-    a_title : string
-        Name used to describe catalogue "a" in the cross-match.
-    b_title : string
-        Catalogue "b" description, for identifying its given folder.
     a_modelrefinds : numpy.ndarray
         Catalogue "a" modelrefinds array output from ``create_perturb_auf``.
         TODO Improve description
@@ -131,8 +125,8 @@ def make_island_groupings(joint_folder_path, a_cat_folder_path, b_cat_folder_pat
         ax2_sparse_loops = np.append(ax2_sparse_loops, ax2_loops[-1])
 
     # Load the astrometry of each catalogue for slicing.
-    a_full = np.load('{}/con_cat_astro.npy'.format(a_cat_folder_path))
-    b_full = np.load('{}/con_cat_astro.npy'.format(b_cat_folder_path))
+    a_full = np.load(f'{a_cat_folder_path}/con_cat_astro.npy')
+    b_full = np.load(f'{b_cat_folder_path}/con_cat_astro.npy')
 
     asize = np.zeros(dtype=int, shape=(len(a_full),))
     bsize = np.zeros(dtype=int, shape=(len(b_full),))
@@ -141,9 +135,9 @@ def make_island_groupings(joint_folder_path, a_cat_folder_path, b_cat_folder_pat
                                                                ax1_sparse_loops[1:])):
         for j, (ax2_sparse_start, ax2_sparse_end) in enumerate(zip(ax2_sparse_loops[:-1],
                                                                    ax2_sparse_loops[1:])):
-            a_big_sky_cut = _load_rectangular_slice('', a_full, ax1_sparse_start, ax1_sparse_end,
+            a_big_sky_cut = _load_rectangular_slice(a_full, ax1_sparse_start, ax1_sparse_end,
                                                     ax2_sparse_start, ax2_sparse_end, 0)
-            b_big_sky_cut = _load_rectangular_slice('', b_full, ax1_sparse_start, ax1_sparse_end,
+            b_big_sky_cut = _load_rectangular_slice(b_full, ax1_sparse_start, ax1_sparse_end,
                                                     ax2_sparse_start, ax2_sparse_end, max_sep)
             a_cutout = a_full[a_big_sky_cut]
             b_cutout = b_full[b_big_sky_cut]
@@ -156,11 +150,11 @@ def make_island_groupings(joint_folder_path, a_cat_folder_path, b_cat_folder_pat
                                               ax2_loops[j*ax2_skip+1:(j+1)*ax2_skip+1]):
                     ax_cutout = [ax1_start, ax1_end, ax2_start, ax2_end]
                     a, afouriergrid, amodrefindsmall, a_cut = _load_fourier_grid_cutouts(
-                        a_cutout, ax_cutout, joint_folder_path, a_cat_folder_path,
-                        a_perturb_auf_outputs, 0, 'a', a_big_sky_cut, a_modelrefinds)
+                        a_cutout, ax_cutout, a_cat_folder_path, a_perturb_auf_outputs, 0, a_big_sky_cut,
+                        a_modelrefinds)
                     b, bfouriergrid, bmodrefindsmall, b_cut = _load_fourier_grid_cutouts(
-                        b_cutout, ax_cutout, joint_folder_path, b_cat_folder_path,
-                        b_perturb_auf_outputs, max_sep, 'b', b_big_sky_cut, b_modelrefinds)
+                        b_cutout, ax_cutout, b_cat_folder_path, b_perturb_auf_outputs, max_sep,
+                        b_big_sky_cut, b_modelrefinds)
 
                     if len(a) > 0 and len(b) > 0:
                         overlapa, overlapb = gsf.get_max_overlap(
@@ -189,13 +183,14 @@ def make_island_groupings(joint_folder_path, a_cat_folder_path, b_cat_folder_pat
     asize[:] = 0
     bsize[:] = 0
 
+    # pylint: disable-next=too-many-nested-blocks
     for i, (ax1_sparse_start, ax1_sparse_end) in enumerate(zip(ax1_sparse_loops[:-1],
                                                                ax1_sparse_loops[1:])):
         for j, (ax2_sparse_start, ax2_sparse_end) in enumerate(zip(ax2_sparse_loops[:-1],
                                                                    ax2_sparse_loops[1:])):
-            a_big_sky_cut = _load_rectangular_slice('', a_full, ax1_sparse_start, ax1_sparse_end,
+            a_big_sky_cut = _load_rectangular_slice(a_full, ax1_sparse_start, ax1_sparse_end,
                                                     ax2_sparse_start, ax2_sparse_end, 0)
-            b_big_sky_cut = _load_rectangular_slice('', b_full, ax1_sparse_start, ax1_sparse_end,
+            b_big_sky_cut = _load_rectangular_slice(b_full, ax1_sparse_start, ax1_sparse_end,
                                                     ax2_sparse_start, ax2_sparse_end, max_sep)
             a_cutout = a_full[a_big_sky_cut]
             b_cutout = b_full[b_big_sky_cut]
@@ -208,11 +203,11 @@ def make_island_groupings(joint_folder_path, a_cat_folder_path, b_cat_folder_pat
                                               ax2_loops[j*ax2_skip+1:(j+1)*ax2_skip+1]):
                     ax_cutout = [ax1_start, ax1_end, ax2_start, ax2_end]
                     a, afouriergrid, amodrefindsmall, a_cut = _load_fourier_grid_cutouts(
-                        a_cutout, ax_cutout, joint_folder_path, a_cat_folder_path,
-                        a_perturb_auf_outputs, 0, 'a', a_big_sky_cut, a_modelrefinds)
+                        a_cutout, ax_cutout, a_cat_folder_path, a_perturb_auf_outputs, 0, a_big_sky_cut,
+                        a_modelrefinds)
                     b, bfouriergrid, bmodrefindsmall, b_cut = _load_fourier_grid_cutouts(
-                        b_cutout, ax_cutout, joint_folder_path, b_cat_folder_path,
-                        b_perturb_auf_outputs, max_sep, 'b', b_big_sky_cut, b_modelrefinds)
+                        b_cutout, ax_cutout, b_cat_folder_path, b_perturb_auf_outputs, max_sep,
+                        b_big_sky_cut, b_modelrefinds)
 
                     if len(a) > 0 and len(b) > 0:
                         indicesa, indicesb, overlapa, overlapb = gsf.get_overlap_indices(
@@ -223,11 +218,11 @@ def make_island_groupings(joint_folder_path, a_cat_folder_path, b_cat_folder_pat
                         a_cut2 = a_sky_inds[a_cut]
                         b_cut2 = b_sky_inds[b_cut]
 
-                        for k in range(0, len(a_cut2)):
-                            ainds[asize[a_cut2[k]]:asize[a_cut2[k]]+overlapa[k], a_cut2[k]] = \
+                        for k, _acut2 in enumerate(a_cut2):
+                            ainds[asize[_acut2]:asize[_acut2]+overlapa[k], _acut2] = \
                                 b_cut2[indicesa[:overlapa[k], k] - 1]
-                        for k in range(0, len(b_cut2)):
-                            binds[bsize[b_cut2[k]]:bsize[b_cut2[k]]+overlapb[k], b_cut2[k]] = \
+                        for k, _bcut2 in enumerate(b_cut2):
+                            binds[bsize[_bcut2]:bsize[_bcut2]+overlapb[k], _bcut2] = \
                                 a_cut2[indicesb[:overlapb[k], k] - 1]
 
                         asize[a_cut2] = asize[a_cut2] + overlapa
@@ -271,16 +266,17 @@ def make_island_groupings(joint_folder_path, a_cat_folder_path, b_cat_folder_pat
     print("Finding unique sets...")
     sys.stdout.flush()
 
-    set_list_items = set_list(ainds, binds, asize, bsize, joint_folder_path, n_pool)
+    set_list_items = set_list(ainds, binds, asize, bsize, n_pool)
     if len(set_list_items) == 6:
         alist, blist, agrplen, bgrplen, areject, breject = set_list_items
         reject_flag = True
     else:
-        alist, blist, agrplen, bgrplen = set_list_items
+        alist, blist, agrplen, bgrplen = set_list_items  # pylint: disable=unbalanced-tuple-unpacking
         reject_flag = False
 
     # The final act of creating island groups is to clear out any sources too
     # close to the edge of the catalogue -- defined by its rectangular extend.
+    # pylint: disable-next=fixme
     # TODO: add flag for allowing the keeping of potentially incomplete islands
     # in the main catalogue; here we default to, and only allow, their removal.
 
@@ -298,21 +294,20 @@ def make_island_groupings(joint_folder_path, a_cat_folder_path, b_cat_folder_pat
         a_full, b_full, alist, blist, agrplen, bgrplen, ax_lims, max_sep]]
     iter_group = zip(counter, *expand_constants)
     # Initialise the multiprocessing loop setup:
-    pool = multiprocessing.Pool(n_pool)
-    for return_items in pool.imap_unordered(_distance_check, iter_group,
-                                            chunksize=max(1, len(counter) // n_pool)):
-        i, dist_check, a, b = return_items
-        if dist_check:
-            passed_check[i] = 1
-            failed_check[i] = 0
-        else:
-            # While "good" islands just need their total number incrementing
-            # for the group, "failed" islands we need to track the number of
-            # sources in each catalogue for.
-            num_a_failed_checks += len(a)
-            num_b_failed_checks += len(b)
+    with multiprocessing.Pool(n_pool) as pool:
+        for return_items in pool.imap_unordered(_distance_check, iter_group,
+                                                chunksize=max(1, len(counter) // n_pool)):
+            i, dist_check, a, b = return_items
+            if dist_check:
+                passed_check[i] = 1
+                failed_check[i] = 0
+            else:
+                # While "good" islands just need their total number incrementing
+                # for the group, "failed" islands we need to track the number of
+                # sources in each catalogue for.
+                num_a_failed_checks += len(a)
+                num_b_failed_checks += len(b)
 
-    pool.close()
     pool.join()
 
     # If set_list returned any rejected sources, then add any sources too close
@@ -361,12 +356,12 @@ def make_island_groupings(joint_folder_path, a_cat_folder_path, b_cat_folder_pat
     if num_a_failed_checks + a_first_rejected_len > 0:
         lenrejecta = len(reject_a)
         # Save rejects output files.
-        np.save('{}/reject/reject_a.npy'.format(joint_folder_path), reject_a)
+        np.save(f'{joint_folder_path}/reject/reject_a.npy', reject_a)
     else:
         lenrejecta = 0
     if num_b_failed_checks + b_first_rejected_len > 0:
         lenrejectb = len(reject_b)
-        np.save('{}/reject/reject_b.npy'.format(joint_folder_path), reject_b)
+        np.save(f'{joint_folder_path}/reject/reject_b.npy', reject_b)
     else:
         lenrejectb = 0
 
@@ -377,9 +372,8 @@ def make_island_groupings(joint_folder_path, a_cat_folder_path, b_cat_folder_pat
     return group_sources_data
 
 
-def _load_fourier_grid_cutouts(a, sky_rect_coords, joint_folder_path, cat_folder_path,
-                               perturb_auf_outputs, padding, cat_name, large_sky_slice,
-                               modelrefinds):
+def _load_fourier_grid_cutouts(a, sky_rect_coords, cat_folder_path, perturb_auf_outputs, padding,
+                               large_sky_slice, modelrefinds):
     '''
     Function to load a sub-set of a given catalogue's astrometry, slicing it
     in a given sky coordinate rectangle, and load the appropriate sub-array
@@ -393,9 +387,6 @@ def _load_fourier_grid_cutouts(a, sky_rect_coords, joint_folder_path, cat_folder
         Array with the rectangular extents of the cutout to be performed, in the
         order lower longitudinal coordinate, upper longitudinal coordinate,
         lower latitudinal coordinate, and upper latitudinal coordinate.
-    joint_folder_path : string
-        Folder on disk indicating where to store files related to the joint
-        cross-match being performed.
     cat_folder_path : string
         Location on disk where catalogues for the same dataset given in ``a``
         are stored.
@@ -405,9 +396,6 @@ def _load_fourier_grid_cutouts(a, sky_rect_coords, joint_folder_path, cat_folder
         Maximum allowed sky separation the "wrong" side of ``sky_rect_coords``,
         allowing for an increase in sky box size which ensures that all overlaps
         get caught in ``get_max_overlap`` and ``get_max_indices``.
-    cat_name : string
-        String indicating whether we are loading cutouts from catalogue "a" or
-        "b".
     large_sky_slice : boolean
         Slice array containing the ``True`` and ``False`` elements of which
         elements of the full catalogue, in ``con_cat_astro.npy``, are in ``a``.
@@ -418,9 +406,9 @@ def _load_fourier_grid_cutouts(a, sky_rect_coords, joint_folder_path, cat_folder
 
     lon1, lon2, lat1, lat2 = sky_rect_coords
 
-    sky_cut = _load_rectangular_slice(cat_name, a, lon1, lon2, lat1, lat2, padding)
+    sky_cut = _load_rectangular_slice(a, lon1, lon2, lat1, lat2, padding)
 
-    a_cutout = np.load('{}/con_cat_astro.npy'.format(cat_folder_path))[large_sky_slice][sky_cut]
+    a_cutout = np.load(f'{cat_folder_path}/con_cat_astro.npy')[large_sky_slice][sky_cut]
 
     modrefind = modelrefinds[:, large_sky_slice][:, sky_cut]
 
@@ -458,20 +446,19 @@ def _clean_overlaps(inds, size, n_pool):
     '''
     maxsize = 0
     size[:] = 0
-    pool = multiprocessing.Pool(n_pool)
     counter = np.arange(0, inds.shape[1])
     iter_group = zip(counter, itertools.repeat(inds))
-    for return_items in pool.imap_unordered(_calc_unique_inds, iter_group,
-                                            chunksize=max(1, len(counter) // n_pool)):
-        i, unique_inds = return_items
-        y = len(unique_inds)
-        inds[:y, i] = unique_inds
-        inds[y:, i] = -1
-        if y > maxsize:
-            maxsize = y
-        size[i] = y
+    with multiprocessing.Pool(n_pool) as pool:
+        for return_items in pool.imap_unordered(_calc_unique_inds, iter_group,
+                                                chunksize=max(1, len(counter) // n_pool)):
+            i, unique_inds = return_items
+            y = len(unique_inds)
+            inds[:y, i] = unique_inds
+            inds[y:, i] = -1
+            if y > maxsize:
+                maxsize = y
+            size[i] = y
 
-    pool.close()
     pool.join()
 
     inds = np.asfortranarray(inds[:maxsize, :])
@@ -514,7 +501,7 @@ def _distance_check(iterable):
     # time) for whether we should skip this check.
     for lat in ax_lims[2:]:
         if np.abs(lat) < 90:
-            is_within_dist_of_lat = (np.abs(a[:, 1] - lat) <= max_sep)
+            is_within_dist_of_lat = np.abs(a[:, 1] - lat) <= max_sep
             meets_min_distance[:len(a)] = (meets_min_distance[:len(a)] |
                                            is_within_dist_of_lat)
 
@@ -528,7 +515,7 @@ def _distance_check(iterable):
                                            is_within_dist_of_lon)
     for lat in ax_lims[2:]:
         if np.abs(lat) < 90:
-            is_within_dist_of_lat = (np.abs(b[:, 1] - lat) <= max_sep)
+            is_within_dist_of_lat = np.abs(b[:, 1] - lat) <= max_sep
             meets_min_distance[len(a):] = (meets_min_distance[len(a):] |
                                            is_within_dist_of_lat)
 

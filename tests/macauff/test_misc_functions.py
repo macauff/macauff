@@ -4,12 +4,20 @@ Tests for the "misc_functions" module.
 '''
 
 import numpy as np
-from numpy.testing import assert_allclose
 import scipy.special
+from numpy.testing import assert_allclose
 
-from macauff.misc_functions import (create_auf_params_grid, load_small_ref_auf_grid,
-                              hav_dist_constant_lat, _load_rectangular_slice, min_max_lon)
+# pylint: disable=import-error,no-name-in-module
+from macauff.misc_functions import (
+    _load_rectangular_slice,
+    create_auf_params_grid,
+    hav_dist_constant_lat,
+    load_small_ref_auf_grid,
+    min_max_lon,
+)
 from macauff.misc_functions_fortran import misc_functions_fortran as mff
+
+# pylint: enable=import-error,no-name-in-module
 
 
 def test_closest_auf_point():
@@ -24,6 +32,7 @@ def test_calc_j0():
     r = np.linspace(0, 5, 5000)
     rho = np.linspace(0, 100, 5000)
     j0 = mff.calc_j0(r, rho)
+    # pylint: disable-next=no-member
     assert_allclose(j0, scipy.special.j0(2 * np.pi * r.reshape(-1, 1) * rho.reshape(1, -1)),
                     rtol=1e-5)
 
@@ -34,10 +43,10 @@ def test_create_fourier_offsets_grid():
     filt_names = ['W1', 'W2']
     r = np.linspace(0, 5, 10)
     p_a_o = {}
-    for j in range(0, len(auf_pointings)):
-        ax1, ax2 = auf_pointings[j]
-        for i in range(0, len(filt_names)):
-            perturb_auf_combo = '{}-{}-{}'.format(ax1, ax2, filt_names[i])
+    for j, auf_pointing in enumerate(auf_pointings):
+        ax1, ax2 = auf_pointing
+        for i, filt in enumerate(filt_names):
+            perturb_auf_combo = f'{ax1}-{ax2}-{filt}'
             s_p_a_o = {}
             s_p_a_o['fourier'] = (i + len(filt_names)*j)*np.ones((len(r[:-1]), a_len[i, j]), float)
             p_a_o[perturb_auf_combo] = s_p_a_o
@@ -100,7 +109,7 @@ def test_load_rectangular_slice():
         if x < 0:
             a[a[:, 0] < 0, 0] = a[a[:, 0] < 0, 0] + 360
         lon1, lon2, lat1, lat2 = x+0.2, x+0.4, x+0.1, x+0.3
-        sky_cut = _load_rectangular_slice('', a, lon1, lon2, lat1, lat2, padding)
+        sky_cut = _load_rectangular_slice(a, lon1, lon2, lat1, lat2, padding)
         for i in range(len(a)):
             within_range = np.empty(4, bool)
             if x > 0:

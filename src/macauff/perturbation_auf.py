@@ -4,31 +4,38 @@ This module provides the framework to handle the creation of the perturbation
 component of the astrometric uncertainty function.
 '''
 
-import requests
+# pylint: disable=too-many-lines
+# pylint: disable=duplicate-code
+
 import os
-import sys
 import signal
+import sys
+import timeit
+
 import numpy as np
+import requests
 from astropy.coordinates import SkyCoord
 
-from macauff.misc_functions import (create_auf_params_grid, _load_rectangular_slice, min_max_lon)
-from macauff.misc_functions_fortran import misc_functions_fortran as mff
-from macauff.get_trilegal_wrapper import get_trilegal, get_AV_infinity
-from macauff.perturbation_auf_fortran import perturbation_auf_fortran as paf
+# pylint: disable=import-error,no-name-in-module
 from macauff.galaxy_counts import create_galaxy_counts
+from macauff.get_trilegal_wrapper import get_av_infinity, get_trilegal
+from macauff.misc_functions import _load_rectangular_slice, create_auf_params_grid, min_max_lon
+from macauff.misc_functions_fortran import misc_functions_fortran as mff
+from macauff.perturbation_auf_fortran import perturbation_auf_fortran as paf
+
+# pylint: enable=import-error,no-name-in-module
 
 __all__ = ['make_perturb_aufs', 'create_single_perturb_auf']
 
 
-def make_perturb_aufs(auf_folder, cat_folder, filters, auf_points, r, dr, rho,
-                      drho, which_cat, include_perturb_auf, tri_download_flag=False,
-                      delta_mag_cuts=None, psf_fwhms=None, tri_set_name=None, tri_filt_num=None,
-                      tri_filt_names=None, tri_maglim_faint=None, tri_num_faint=None,
-                      auf_region_frame=None, num_trials=None, j0s=None, d_mag=None,
-                      density_radius=None, run_fw=None, run_psf=None, dd_params=None, l_cut=None,
-                      snr_mag_params=None, al_avs=None, fit_gal_flag=None, cmau_array=None,
-                      wavs=None, z_maxs=None, nzs=None, ab_offsets=None, filter_names=None,
-                      alpha0=None, alpha1=None, alpha_weight=None):
+# pylint: disable-next=too-many-locals,too-many-arguments,too-many-branches,too-many-statements
+def make_perturb_aufs(auf_folder, cat_folder, filters, auf_points, r, dr, j0s, which_cat, include_perturb_auf,
+                      tri_download_flag=False, delta_mag_cuts=None, psf_fwhms=None, tri_set_name=None,
+                      tri_filt_num=None, tri_filt_names=None, tri_maglim_faint=None, tri_num_faint=None,
+                      auf_region_frame=None, num_trials=None, d_mag=None, density_radius=None, run_fw=None,
+                      run_psf=None, dd_params=None, l_cut=None, snr_mag_params=None, al_avs=None,
+                      fit_gal_flag=None, cmau_array=None, wavs=None, z_maxs=None, nzs=None, ab_offsets=None,
+                      filter_names=None, alpha0=None, alpha1=None, alpha_weight=None):
     r"""
     Function to perform the creation of the blended object perturbation component
     of the AUF.
@@ -52,10 +59,11 @@ def make_perturb_aufs(auf_folder, cat_folder, filters, auf_points, r, dr, rho,
         convolution.
     dr : numpy.ndarray
         The spacings between ``r`` elements.
-    rho : numpy.ndarray
-        The fourier-space coordinates for Hankel transformations.
-    drho : numpy.ndarray
-        The spacings between ``rho`` elements.
+    j0s : numpy.ndarray, optional
+        The Bessel Function of First Kind of Zeroth Order evaluated at each
+        ``r``-``rho`` combination. Must always be given with the correct shape,
+        but is only used for evaluations of Bessel Functions if
+        ``include_perturb_auf`` is ``True``.
     which_cat : string
         Indicator as to whether these perturbation AUFs are for catalogue "a"
         or catalogue "b" within the cross-match process.
@@ -101,10 +109,6 @@ def make_perturb_aufs(auf_folder, cat_folder, filters, auf_points, r, dr, rho,
     num_trials : integer, optional
         The number of simulated PSFs to compute in the derivation of the
         perturbation component of the AUF. Must be given if ``include_perturb_auf``
-        is ``True``.
-    j0s : numpy.ndarray, optional
-        The Bessel Function of First Kind of Zeroth Order evaluated at each
-        ``r``-``rho`` combination. Must be given if ``include_perturb_auf``
         is ``True``.
     d_mag : float, optional
         The resolution at which to create the TRILEGAL source density distribution.
@@ -216,12 +220,12 @@ def make_perturb_aufs(auf_folder, cat_folder, filters, auf_points, r, dr, rho,
         raise ValueError("run_psf must be given if include_perturb_auf is True.")
     if include_perturb_auf and run_psf and dd_params is None:
         raise ValueError("dd_params must be given if include_perturb_auf and run_psf are True.")
-    elif include_perturb_auf and dd_params is None:
+    if include_perturb_auf and dd_params is None:
         # Fake an array to pass only to run_fw that fortran will accept:
         dd_params = np.zeros((1, 1), float)
     if include_perturb_auf and run_psf and l_cut is None:
         raise ValueError("l_cut must be given if include_perturb_auf and run_psf are True.")
-    elif include_perturb_auf and l_cut is None:
+    if include_perturb_auf and l_cut is None:
         # Fake an array to pass only to run_fw that fortran will accept:
         l_cut = np.zeros((1), float)
     if include_perturb_auf and snr_mag_params is None:
@@ -252,12 +256,12 @@ def make_perturb_aufs(auf_folder, cat_folder, filters, auf_points, r, dr, rho,
     if include_perturb_auf and fit_gal_flag and alpha_weight is None:
         raise ValueError("alpha_weight must be given if fit_gal_flag is True.")
 
-    print('Creating perturbation AUFs sky indices for catalogue "{}"...'.format(which_cat))
+    print(f'Creating perturbation AUFs sky indices for catalogue "{which_cat}"...')
     sys.stdout.flush()
 
-    a_tot_astro = np.load('{}/con_cat_astro.npy'.format(cat_folder))
+    a_tot_astro = np.load(f'{cat_folder}/con_cat_astro.npy')
     if include_perturb_auf:
-        a_tot_photo = np.load('{}/con_cat_photo.npy'.format(cat_folder))
+        a_tot_photo = np.load(f'{cat_folder}/con_cat_photo.npy')
 
     n_sources = len(a_tot_astro)
 
@@ -269,7 +273,7 @@ def make_perturb_aufs(auf_folder, cat_folder, filters, auf_points, r, dr, rho,
     modelrefinds[2, :] = mff.find_nearest_point(a_tot_astro[:, 0], a_tot_astro[:, 1],
                                                 auf_points[:, 0], auf_points[:, 1])
 
-    print('Creating empirical perturbation AUFs for catalogue "{}"...'.format(which_cat))
+    print(f'Creating empirical perturbation AUFs for catalogue "{which_cat}"...')
     sys.stdout.flush()
 
     # Store the length of the density-magnitude combinations in each sky/filter
@@ -277,19 +281,19 @@ def make_perturb_aufs(auf_folder, cat_folder, filters, auf_points, r, dr, rho,
     arraylengths = np.zeros(dtype=int, shape=(len(filters), len(auf_points)), order='f')
 
     if include_perturb_auf:
-        local_N = np.zeros(dtype=float, shape=(len(a_tot_astro), len(filters)))
+        local_n = np.zeros(dtype=float, shape=(len(a_tot_astro), len(filters)))
 
     perturb_auf_outputs = {}
 
-    for i in range(len(auf_points)):
-        ax1, ax2 = auf_points[i]
-        ax_folder = '{}/{}/{}'.format(auf_folder, ax1, ax2)
+    for i, auf_point in enumerate(auf_points):
+        ax1, ax2 = auf_point
+        ax_folder = f'{auf_folder}/{ax1}/{ax2}'
         if not os.path.exists(ax_folder):
             os.makedirs(ax_folder, exist_ok=True)
 
         if include_perturb_auf:
             sky_cut = modelrefinds[2, :] == i
-            med_index_slice = np.arange(0, len(local_N))[sky_cut]
+            med_index_slice = np.arange(0, len(local_n))[sky_cut]
             a_photo_cut = a_tot_photo[sky_cut]
             a_astro_cut = a_tot_astro[sky_cut]
 
@@ -298,20 +302,19 @@ def make_perturb_aufs(auf_folder, cat_folder, filters, auf_points, r, dr, rho,
                 ax2_min, ax2_max = np.amin(a_astro_cut[:, 1]), np.amax(a_astro_cut[:, 1])
 
                 dens_mags = np.empty(len(filters), float)
-                for j in range(len(dens_mags)):
+                for j in range(len(dens_mags)):  # pylint: disable=consider-using-enumerate
                     # Take the "density" magnitude (i.e., the faint limit down to
                     # which to integrate counts per square degree per magnitude) from
                     # the data, with a small allowance for completeness limit turnover.
                     hist, bins = np.histogram(a_photo_cut[~np.isnan(a_photo_cut)], bins='auto')
-                    # TODO: relax half-mag cut, make input parameter
+                    # TODO: relax half-mag cut, make input parameter  pylint: disable=fixme
                     dens_mags[j] = (bins[:-1]+np.diff(bins)/2)[np.argmax(hist)] - 0.5
 
         # If there are no sources in this entire section of sky, we don't need
         # to bother downloading any TRILEGAL simulations since we'll auto-fill
         # dummy data (and never use it) in the filter loop.
         if include_perturb_auf and len(a_astro_cut) > 0 and (
-                tri_download_flag or not os.path.isfile('{}/trilegal_auf_simulation_faint.dat'
-                                                        .format(ax_folder))):
+                tri_download_flag or not os.path.isfile(f'{ax_folder}/trilegal_auf_simulation_faint.dat')):
             # Currently assume that the area of each small patch is a rectangle
             # on the sky, implicitly assuming that the large region is also a
             # rectangle, after any spherical projection cos(delta) effects.
@@ -321,17 +324,17 @@ def make_perturb_aufs(auf_folder, cat_folder, filters, auf_points, r, dr, rho,
             data_bright_dens = np.array([np.sum(~np.isnan(a_photo_cut[:, q]) &
                                          (a_photo_cut[:, q] <= dens_mags[q])) / rect_area
                                         for q in range(len(dens_mags))])
-            # TODO: un-hardcode min_bright_tri_number
+            # TODO: un-hardcode min_bright_tri_number  pylint: disable=fixme
             min_bright_tri_number = 1000
             min_area = max(min_bright_tri_number / data_bright_dens)
             # Hard-coding the AV=1 trick to allow for using av_grid later.
             download_trilegal_simulation(ax_folder, tri_set_name, ax1, ax2, tri_filt_num,
                                          auf_region_frame, tri_maglim_faint, min_area,
-                                         AV=1, sigma_AV=0, total_objs=tri_num_faint)
-            os.system('mv {}/trilegal_auf_simulation.dat {}/trilegal_auf_simulation_faint.dat'
-                      .format(ax_folder, ax_folder))
-        for j in range(len(filters)):
-            perturb_auf_combo = '{}-{}-{}'.format(ax1, ax2, filters[j])
+                                         av=1, sigma_av=0, total_objs=tri_num_faint)
+            os.system(f'mv {ax_folder}/trilegal_auf_simulation.dat '
+                      f'{ax_folder}/trilegal_auf_simulation_faint.dat')
+        for j, filt in enumerate(filters):
+            perturb_auf_combo = f'{ax1}-{ax2}-{filt}'
 
             if include_perturb_auf:
                 good_mag_slice = ~np.isnan(a_photo_cut[:, j])
@@ -341,132 +344,130 @@ def make_perturb_aufs(auf_folder, cat_folder, filters, auf_points, r, dr, rho,
                     # If no sources in this AUF-filter combination, we need to
                     # fake some dummy variables for use in the 3/4-D grids below.
                     # See below, in include_perturb_auf is False, for meanings.
-                    num_N_mag = 1
-                    Frac = np.zeros((1, num_N_mag), float, order='F')
-                    Flux = np.zeros(num_N_mag, float, order='F')
-                    offset = np.zeros((len(r)-1, num_N_mag), float, order='F')
+                    num_n_mag = 1
+                    frac = np.zeros((1, num_n_mag), float, order='F')
+                    flux = np.zeros(num_n_mag, float, order='F')
+                    offset = np.zeros((len(r)-1, num_n_mag), float, order='F')
                     offset[0, :] = 1 / (2 * np.pi * (r[0] + dr[0]/2) * dr[0])
-                    cumulative = np.ones((len(r)-1, num_N_mag), float, order='F')
-                    fourieroffset = np.ones((len(rho)-1, num_N_mag), float, order='F')
-                    Narray = np.array([[1]], float)
+                    cumulative = np.ones((len(r)-1, num_n_mag), float, order='F')
+                    fourieroffset = np.ones((j0s.shape[0], num_n_mag), float, order='F')
+                    narray = np.array([[1]], float)
                     magarray = np.array([[1]], float)
                     # Make a second dictionary with the single pointing-filter
                     # combination in it.
                     single_perturb_auf_output = {}
                     for name, entry in zip(
                             ['frac', 'flux', 'offset', 'cumulative', 'fourier', 'Narray',
-                             'magarray'], [Frac, Flux, offset, cumulative, fourieroffset, Narray,
+                             'magarray'], [frac, flux, offset, cumulative, fourieroffset, narray,
                                            magarray]):
                         single_perturb_auf_output[name] = entry
                     perturb_auf_outputs[perturb_auf_combo] = single_perturb_auf_output
                     continue
-                localN = calculate_local_density(
-                    a_astro_cut[good_mag_slice], a_tot_astro, a_tot_photo[:, j],
-                    auf_folder, cat_folder, density_radius, dens_mags[j])
+                localn = calculate_local_density(
+                    a_astro_cut[good_mag_slice], a_tot_astro, a_tot_photo[:, j], density_radius, dens_mags[j])
                 # Because we always calculate the density from the full
                 # catalogue, using just the astrometry, we should be able
                 # to just over-write this N times if there happen to be N
                 # good detections of a source.
                 index_slice = med_index_slice[good_mag_slice]
-                for ii in range(len(index_slice)):
-                    local_N[index_slice[ii], j] = localN[ii]
+                for ii, ind_slice in enumerate(index_slice):
+                    local_n[ind_slice, j] = localn[ii]
                 ax1_list = np.linspace(ax1_min, ax1_max, 7)
                 ax2_list = np.linspace(ax2_min, ax2_max, 7)
                 if fit_gal_flag:
                     single_perturb_auf_output = create_single_perturb_auf(
-                        ax_folder, auf_points[i], filters[j], r, dr, rho, drho, j0s, num_trials,
-                        psf_fwhms[j], tri_filt_names[j], dens_mags[j], a_photo, localN, d_mag,
-                        delta_mag_cuts, dd_params, l_cut, run_fw, run_psf, snr_mag_params[j],
-                        al_avs[j], auf_region_frame, ax1_list, ax2_list, fit_gal_flag, cmau_array,
-                        wavs[j], z_maxs[j], nzs[j], alpha0, alpha1, alpha_weight, ab_offsets[j],
-                        filter_names[j])
+                        ax_folder, auf_points[i], r, dr, j0s, num_trials, psf_fwhms[j], tri_filt_names[j],
+                        dens_mags[j], a_photo, localn, d_mag, delta_mag_cuts, dd_params, l_cut, run_fw,
+                        run_psf, snr_mag_params[j], al_avs[j], auf_region_frame, ax1_list, ax2_list,
+                        fit_gal_flag, cmau_array, wavs[j], z_maxs[j], nzs[j], alpha0, alpha1, alpha_weight,
+                        ab_offsets[j], filter_names[j])
                 else:
                     single_perturb_auf_output = create_single_perturb_auf(
-                        ax_folder, auf_points[i], filters[j], r, dr, rho, drho, j0s, num_trials,
-                        psf_fwhms[j], tri_filt_names[j], dens_mags[j], a_photo, localN, d_mag,
-                        delta_mag_cuts, dd_params, l_cut, run_fw, run_psf, snr_mag_params[j],
-                        al_avs[j], auf_region_frame, ax1_list, ax2_list, fit_gal_flag)
+                        ax_folder, auf_points[i], r, dr, j0s, num_trials, psf_fwhms[j], tri_filt_names[j],
+                        dens_mags[j], a_photo, localn, d_mag, delta_mag_cuts, dd_params, l_cut, run_fw,
+                        run_psf, snr_mag_params[j], al_avs[j], auf_region_frame, ax1_list, ax2_list,
+                        fit_gal_flag)
                 perturb_auf_outputs[perturb_auf_combo] = single_perturb_auf_output
             else:
                 # Without the simulations to force local normalising density N or
                 # individual source brightness magnitudes, we can simply combine
                 # all data into a single "bin".
-                num_N_mag = 1
+                num_n_mag = 1
                 # In cases where we do not want to use the perturbation AUF component,
                 # we currently don't have separate functions, but instead set up dummy
                 # functions and variables to pass what mathematically amounts to
                 # "nothing" through the cross-match. Here we would use fortran
                 # subroutines to create the perturbation simulations, so we make
                 # f-ordered dummy parameters.
-                Frac = np.zeros((1, num_N_mag), float, order='F')
-                Flux = np.zeros(num_N_mag, float, order='F')
+                frac = np.zeros((1, num_n_mag), float, order='F')
+                flux = np.zeros(num_n_mag, float, order='F')
                 # Remember that r is bins, so the evaluations at bin middle are one
                 # shorter in length.
-                offset = np.zeros((len(r)-1, num_N_mag), float, order='F')
+                offset = np.zeros((len(r)-1, num_n_mag), float, order='F')
                 # Fix offsets such that the probability density function looks like
                 # a delta function, such that a two-dimensional circular coordinate
                 # integral would evaluate to one at every point, cf. ``cumulative``.
                 offset[0, :] = 1 / (2 * np.pi * (r[0] + dr[0]/2) * dr[0])
                 # The cumulative integral of a delta function is always unity.
-                cumulative = np.ones((len(r)-1, num_N_mag), float, order='F')
+                cumulative = np.ones((len(r)-1, num_n_mag), float, order='F')
                 # The Hankel transform of a delta function is a flat line; this
                 # then preserves the convolution being multiplication in fourier
                 # space, as F(x) x 1 = F(x), similar to how f(x) * d(0) = f(x).
-                fourieroffset = np.ones((len(rho)-1, num_N_mag), float, order='F')
+                fourieroffset = np.ones((j0s.shape[0], num_n_mag), float, order='F')
                 # Both normalising density and magnitude arrays can be proxied
                 # with a dummy parameter, as any minimisation of N-m distance
                 # must pick the single value anyway.
-                Narray = np.array([[1]], float)
+                narray = np.array([[1]], float)
                 magarray = np.array([[1]], float)
                 single_perturb_auf_output = {}
                 for name, entry in zip(
                         ['frac', 'flux', 'offset', 'cumulative', 'fourier', 'Narray', 'magarray'],
-                        [Frac, Flux, offset, cumulative, fourieroffset, Narray, magarray]):
+                        [frac, flux, offset, cumulative, fourieroffset, narray, magarray]):
                     single_perturb_auf_output[name] = entry
                 perturb_auf_outputs[perturb_auf_combo] = single_perturb_auf_output
             arraylengths[j, i] = len(perturb_auf_outputs[perturb_auf_combo]['Narray'])
 
     if include_perturb_auf:
-        longestNm = np.amax(arraylengths)
+        longestnm = np.amax(arraylengths)
 
-        Narrays = np.full(dtype=float, shape=(longestNm, len(filters), len(auf_points)),
+        narrays = np.full(dtype=float, shape=(longestnm, len(filters), len(auf_points)),
                           order='F', fill_value=-1)
 
-        magarrays = np.full(dtype=float, shape=(longestNm, len(filters), len(auf_points)),
+        magarrays = np.full(dtype=float, shape=(longestnm, len(filters), len(auf_points)),
                             order='F', fill_value=-1)
 
-        for i in range(len(auf_points)):
-            ax1, ax2 = auf_points[i]
-            for j in range(len(filters)):
+        for i, auf_point in enumerate(auf_points):
+            ax1, ax2 = auf_point
+            for j, filt in enumerate(filters):
                 if arraylengths[j, i] == 0:
                     continue
-                perturb_auf_combo = '{}-{}-{}'.format(ax1, ax2, filters[j])
-                Narray = perturb_auf_outputs[perturb_auf_combo]['Narray']
+                perturb_auf_combo = f'{ax1}-{ax2}-{filt}'
+                narray = perturb_auf_outputs[perturb_auf_combo]['Narray']
                 magarray = perturb_auf_outputs[perturb_auf_combo]['magarray']
-                Narrays[:arraylengths[j, i], j, i] = Narray
+                narrays[:arraylengths[j, i], j, i] = narray
                 magarrays[:arraylengths[j, i], j, i] = magarray
 
     # Once the individual AUF simulations are saved, we also need to calculate
     # the indices each source references when slicing into the 4-D cubes
     # created by [1-D array] x N-m combination x filter x sky position iteration.
 
-    print('Creating perturbation AUFs filter indices for catalogue "{}"...'.format(which_cat))
+    print(f'Creating perturbation AUFs filter indices for catalogue "{which_cat}"...')
     sys.stdout.flush()
 
     if include_perturb_auf:
-        a = np.load('{}/con_cat_photo.npy'.format(cat_folder))
-        localN = local_N
-    magref = np.load('{}/magref.npy'.format(cat_folder))
+        a = np.load(f'{cat_folder}/con_cat_photo.npy')
+        localn = local_n
+    magref = np.load(f'{cat_folder}/magref.npy')
 
     if include_perturb_auf:
         for i in range(0, len(a)):
             axind = modelrefinds[2, i]
             filterind = magref[i]
-            Nmind = np.argmin((localN[i, filterind] - Narrays[:arraylengths[filterind, axind],
+            nmind = np.argmin((localn[i, filterind] - narrays[:arraylengths[filterind, axind],
                                                               filterind, axind])**2 +
                               (a[i, filterind] - magarrays[:arraylengths[filterind, axind],
                                                            filterind, axind])**2)
-            modelrefinds[0, i] = Nmind
+            modelrefinds[0, i] = nmind
     else:
         # For the case that we do not use the perturbation AUF component,
         # our dummy N-m files are all one-length arrays, so we can
@@ -478,13 +479,13 @@ def make_perturb_aufs(auf_folder, cat_folder, filters, auf_points, r, dr, rho,
     modelrefinds[1, :] = magref
 
     if delta_mag_cuts is None:
-        n_fracs = 2  # TODO: generalise once delta_mag_cuts is user-inputtable.
+        n_fracs = 2  # TODO: generalise once delta_mag_cuts is user-inputtable.  pylint: disable=fixme
     else:
         n_fracs = len(delta_mag_cuts)
     # Create the 4-D grids that house the perturbation AUF fourier-space
     # representation.
     perturb_auf_outputs['fourier_grid'] = create_auf_params_grid(
-        perturb_auf_outputs, auf_points, filters, 'fourier', arraylengths, len(rho)-1)
+        perturb_auf_outputs, auf_points, filters, 'fourier', arraylengths, j0s.shape[0])
     # Create the estimated levels of flux contamination and fraction of
     # contaminated source grids.
     perturb_auf_outputs['frac_grid'] = create_auf_params_grid(
@@ -493,13 +494,13 @@ def make_perturb_aufs(auf_folder, cat_folder, filters, auf_points, r, dr, rho,
         perturb_auf_outputs, auf_points, filters, 'flux', arraylengths)
 
     if include_perturb_auf:
-        del Narrays, magarrays
+        del narrays, magarrays
 
     return modelrefinds, perturb_auf_outputs
 
 
 def download_trilegal_simulation(tri_folder, tri_filter_set, ax1, ax2, mag_num, region_frame,
-                                 mag_lim, min_area, total_objs=1.5e6, AV=None, sigma_AV=0.1):
+                                 mag_lim, min_area, total_objs=1.5e6, av=None, sigma_av=0.1):
     '''
     Get a single Galactic sightline TRILEGAL simulation of an appropriate sky
     size, and save it in a folder for use in the perturbation AUF simulations.
@@ -532,16 +533,16 @@ def download_trilegal_simulation(tri_folder, tri_filter_set, ax1, ax2, mag_num, 
     total_objs : integer, optional
         The approximate number of objects to simulate in a TRILEGAL sightline,
         affecting how large an area to request a simulated Galactic region of.
-    AV : float, optional
+    av : float, optional
         If specified, pass a pre-determined value of infinite-Av to the simulation
         API; otherwise pass its own "default" value and request it derive one
         internally.
-    sigma_AV : float, optional
+    sigma_av : float, optional
         If given, bypasses the default value specified in ~`macauff.get_trilegal`,
-        setting the fractional scaling around `AV` in which to randomise
+        setting the fractional scaling around `av` in which to randomise
         extinction values.
     '''
-    class TimeoutException(Exception):
+    class TimeoutException(Exception):  # pylint: disable=missing-class-docstring
         pass
 
     def timeout_handler(signum, frame):
@@ -550,19 +551,18 @@ def download_trilegal_simulation(tri_folder, tri_filter_set, ax1, ax2, mag_num, 
     areaflag = 0
     triarea = min(10, min_area)
     tri_name = 'trilegal_auf_simulation'
-    galactic_flag = True if region_frame == 'galactic' else False
+    galactic_flag = region_frame == 'galactic'
     # To avoid a loop where we start at some area, halve repeatedly until
     # the API call limit is satisfied, but then get nobjs < total_objs and
     # try to scale back up again only to time out, only allow that to happen
     # if we haven't halved our area within the loop at all.
     area_halved = False
     while areaflag == 0:
-        import timeit
         start = timeit.default_timer()
         result = "timeout"
         try:
             nocomm_count = 0
-            while result == "timeout" or result == "nocomm":
+            while result in ("timeout", "nocomm"):
                 signal.signal(signal.SIGALRM, timeout_handler)
                 # Set a 11 minute "timer" to raise an error if get_trilegal takes
                 # longer than, as this indicates the API call has run out of CPU
@@ -572,29 +572,28 @@ def download_trilegal_simulation(tri_folder, tri_filter_set, ax1, ax2, mag_num, 
                 signal.alarm(11*60)
                 av_inf, result = get_trilegal(
                     tri_name, ax1, ax2, folder=tri_folder, galactic=galactic_flag,
-                    filterset=tri_filter_set, area=triarea, maglim=mag_lim, magnum=mag_num, AV=AV,
-                    sigma_AV=sigma_AV)
+                    filterset=tri_filter_set, area=triarea, maglim=mag_lim, magnum=mag_num, av=av,
+                    sigma_av=sigma_av)
                 if result == "nocomm":
                     nocomm_count += 1
                 # 11 minute timer allows for 5 loops of two-minute waits for
                 # a response from the server.
                 if nocomm_count >= 5:
                     raise requests.exceptions.HTTPError("TRILEGAL server has not communicated "
-                                                        "in {} attempts.".format(nocomm_count))
+                                                        f"in {nocomm_count} attempts.")
         except TimeoutException:
             triarea /= 2
             area_halved = True
             end = timeit.default_timer()
-            print('TRILEGAL call time: {:.2f}'.format(end-start))
+            print(f'TRILEGAL call time: {end-start:.2f}')
             print("Timed out, halving area")
             continue
         else:
             end = timeit.default_timer()
-            print('TRILEGAL call time: {:.2f}'.format(end-start))
+            print(f'TRILEGAL call time: {end-start:.2f}')
             signal.alarm(0)
-        f = open('{}/{}.dat'.format(tri_folder, tri_name), "r")
-        contents = f.readlines()
-        f.close()
+        with open(f'{tri_folder}/{tri_name}.dat', "r", encoding='utf-8') as f:
+            contents = f.readlines()
         # Two comment lines; one at the top and one at the bottom - we add a
         # third in a moment, however
         nobjs = len(contents) - 2
@@ -623,26 +622,23 @@ def download_trilegal_simulation(tri_folder, tri_filter_set, ax1, ax2, mag_num, 
             areaflag = 1
             accept_results = True
         if not accept_results:
-            os.system('rm {}/{}.dat'.format(tri_folder, tri_name))
+            os.system(f'rm {tri_folder}/{tri_name}.dat')
     if not accept_results:
         result = "timeout"
         while result == "timeout":
             av_inf, result = get_trilegal(
                 tri_name, ax1, ax2, folder=tri_folder, galactic=galactic_flag,
-                filterset=tri_filter_set, area=triarea, maglim=mag_lim, magnum=mag_num, AV=AV,
-                sigma_AV=sigma_AV)
-    f = open('{}/{}.dat'.format(tri_folder, tri_name), "r")
-    contents = f.readlines()
-    f.close()
-    contents.insert(0, '#area = {} sq deg\n#Av at infinity = {}\n'.format(triarea, av_inf))
-    f = open('{}/{}.dat'.format(tri_folder, tri_name), "w")
-    contents = "".join(contents)
-    f.write(contents)
-    f.close()
+                filterset=tri_filter_set, area=triarea, maglim=mag_lim, magnum=mag_num, av=av,
+                sigma_av=sigma_av)
+    with open(f'{tri_folder}/{tri_name}.dat', "r", encoding='utf-8') as f:
+        contents = f.readlines()
+    contents.insert(0, f'#area = {triarea} sq deg\n#Av at infinity = {av_inf}\n')
+    with open(f'{tri_folder}/{tri_name}.dat', "w", encoding='utf-8') as f:
+        contents = "".join(contents)
+        f.write(contents)
 
 
-def calculate_local_density(a_astro, a_tot_astro, a_tot_photo, auf_folder, cat_folder,
-                            density_radius, density_mag):
+def calculate_local_density(a_astro, a_tot_astro, a_tot_photo, density_radius, density_mag):
     '''
     Calculates the number of sources above a given brightness within a specified
     radius of each source in a catalogue, to provide a local density for
@@ -658,11 +654,6 @@ def calculate_local_density(a_astro, a_tot_astro, a_tot_photo, auf_folder, cat_f
         ``density_mag`` and coeval with ``a_astro`` sources are to be extracted.
     a_tot_photo : numpy.ndarray
         The photometry of the full catalogue, matching ``a_tot_astro``.
-    auf_folder : string
-        The folder designated to contain the perturbation AUF component related
-        data for this catalogue.
-    cat_folder : string
-        The location of the catalogue files for this dataset.
     density_radius : float
         The radius, in degrees, out to which to consider the number of sources
         for the normalising density.
@@ -680,8 +671,7 @@ def calculate_local_density(a_astro, a_tot_astro, a_tot_photo, auf_folder, cat_f
     min_lon, max_lon = min_max_lon(a_astro[:, 0])
     min_lat, max_lat = np.amin(a_astro[:, 1]), np.amax(a_astro[:, 1])
 
-    overlap_sky_cut = _load_rectangular_slice('', a_tot_astro, min_lon, max_lon, min_lat, max_lat,
-                                              density_radius)
+    overlap_sky_cut = _load_rectangular_slice(a_tot_astro, min_lon, max_lon, min_lat, max_lat, density_radius)
     cut = overlap_sky_cut & (a_tot_photo <= density_mag)
     a_astro_overlap_cut = a_tot_astro[cut]
     a_photo_overlap_cut = a_tot_photo[cut]
@@ -699,15 +689,14 @@ def calculate_local_density(a_astro, a_tot_astro, a_tot_photo, auf_folder, cat_f
     full_counts = np.empty(len(a_astro), float)
     for ax1_start, ax1_end in zip(ax1_loops[:-1], ax1_loops[1:]):
         for ax2_start, ax2_end in zip(ax2_loops[:-1], ax2_loops[1:]):
-            small_sky_cut = _load_rectangular_slice('small_', a_astro, ax1_start, ax1_end,
-                                                    ax2_start, ax2_end, 0)
+            small_sky_cut = _load_rectangular_slice(a_astro, ax1_start, ax1_end, ax2_start, ax2_end, 0)
             a_astro_small = a_astro[small_sky_cut]
             if len(a_astro_small) == 0:
                 continue
 
-            overlap_sky_cut = _load_rectangular_slice('', a_astro_overlap_cut, ax1_start, ax1_end,
-                                                      ax2_start, ax2_end, density_radius)
-            cut = (overlap_sky_cut & (a_photo_overlap_cut <= density_mag))
+            overlap_sky_cut = _load_rectangular_slice(a_astro_overlap_cut, ax1_start, ax1_end, ax2_start,
+                                                      ax2_end, density_radius)
+            cut = overlap_sky_cut & (a_photo_overlap_cut <= density_mag)
             a_astro_overlap_cut_small = a_astro_overlap_cut[cut]
 
             if len(a_astro_overlap_cut_small) > 0:
@@ -739,11 +728,11 @@ def calculate_local_density(a_astro, a_tot_astro, a_tot_photo, auf_folder, cat_f
     return count_density
 
 
-def create_single_perturb_auf(tri_folder, auf_point, filt, r, dr, rho, drho, j0s, num_trials,
-                              psf_fwhm, header, density_mag, a_photo, localN, d_mag, mag_cut,
-                              dd_params, l_cut, run_fw, run_psf, snr_mag_params, al_av,
-                              region_frame, ax1s, ax2s, fit_gal_flag, cmau_array=None, wav=None,
-                              z_max=None, nz=None, alpha0=None, alpha1=None, alpha_weight=None,
+# pylint: disable=too-many-locals,too-many-arguments
+def create_single_perturb_auf(tri_folder, auf_point, r, dr, j0s, num_trials, psf_fwhm, filt_header,
+                              density_mag, a_photo, localn, d_mag, mag_cut, dd_params, l_cut, run_fw, run_psf,
+                              snr_mag_params, al_av, region_frame, ax1s, ax2s, fit_gal_flag, cmau_array=None,
+                              wav=None, z_max=None, nz=None, alpha0=None, alpha1=None, alpha_weight=None,
                               ab_offset=None, filter_name=None):
     r'''
     Creates the associated parameters for describing a single perturbation AUF
@@ -756,17 +745,10 @@ def create_single_perturb_auf(tri_folder, auf_point, filt, r, dr, rho, drho, j0s
         filter-specific perturbation AUF simulations should be saved.
     auf_point : numpy.ndarray
         The orthogonal sky coordinates of the simulated AUF component.
-    filt : float
-        Filter for which to simulate the AUF component.
     r : numpy.ndarray
         Array of real-space positions.
     dr : numpy.ndarray
         Array of the bin sizes of each ``r`` position.
-    rho : numpy.ndarray
-        Fourier-space coordinates at which to sample the fourier transformation
-        of the distribution of perturbations due to blended sources.
-    drho : numpy.ndarray
-        Bin widths of each ``rho`` coordinate.
     j0s : numpy.ndarray
         The Bessel Function of First Kind of Zeroth Order, evaluated at all
         ``r``-``rho`` combinations.
@@ -783,7 +765,7 @@ def create_single_perturb_auf(tri_folder, auf_point, filt, r, dr, rho, drho, j0s
     a_photo : numpy.ndarray
         The photometry of each source for which simulated perturbations should be
         made.
-    localN : numpy.ndarray
+    localn : numpy.ndarray
         The local normalising densities for each source.
     d_mag : float
         The interval at which to bin the magnitudes of a given set of objects,
@@ -865,7 +847,7 @@ def create_single_perturb_auf(tri_folder, auf_point, filt, r, dr, rho, drho, j0s
     .. [3] Blanton M. R., Roweis S. (2007), AJ, 133, 734
 
     '''
-    # TODO: extend to allow a Galactic source model that doesn't depend on TRILEGAL
+    # TODO: extend to allow a Galactic source model that doesn't depend on TRILEGAL  pylint: disable=fixme
     tri_name = 'trilegal_auf_simulation'
     avs = np.empty((len(ax1s), len(ax2s)), float)
     for j, ax1 in enumerate(ax1s):
@@ -875,18 +857,18 @@ def create_single_perturb_auf(tri_folder, auf_point, filt, r, dr, rho, drho, j0s
                 l, b = c.galactic.l.degree, c.galactic.b.degree
             else:
                 l, b = ax1, ax2
-            AV = get_AV_infinity(l, b, frame='galactic')[0]
-            avs[j, k] = AV
+            av = get_av_infinity(l, b, frame='galactic')[0]
+            avs[j, k] = av
     avs = avs.flatten()
     (dens_hist_tri, model_mags, model_mag_mids, model_mags_interval, _,
      n_bright_sources_star) = make_tri_counts(
-        tri_folder, tri_name, header, d_mag, np.amin(a_photo), density_mag, al_av=al_av,
+        tri_folder, tri_name, filt_header, d_mag, np.amin(a_photo), density_mag, al_av=al_av,
         av_grid=avs)
 
     log10y_tri = -np.inf * np.ones_like(dens_hist_tri)
     log10y_tri[dens_hist_tri > 0] = np.log10(dens_hist_tri[dens_hist_tri > 0])
 
-    mag_slice = (model_mags+model_mags_interval <= density_mag)
+    mag_slice = model_mags+model_mags_interval <= density_mag
     tri_count = np.sum(10**log10y_tri[mag_slice] * model_mags_interval[mag_slice])
 
     if fit_gal_flag:
@@ -937,18 +919,18 @@ def create_single_perturb_auf(tri_folder, auf_point, filt, r, dr, rho, drho, j0s
     # For local densities, we want a percentage offset, given that we're in
     # logarithmic bins, accepting a log-difference maximum. This is slightly
     # lop-sided, but for 20% results in +18%/-22% limits, which is fine.
-    dlogN = 0.2
-    logNvals = np.log(localN)
-    logN_min = dlogN * np.floor(np.amin(logNvals)/dlogN)
-    logN_max = dlogN * np.ceil(np.amax(logNvals)/dlogN)
-    logNbins = np.arange(logN_min, logN_max+1e-10, dlogN)
+    dlogn = 0.2
+    lognvals = np.log(localn)
+    logn_min = dlogn * np.floor(np.amin(lognvals)/dlogn)
+    logn_max = dlogn * np.ceil(np.amax(lognvals)/dlogn)
+    lognbins = np.arange(logn_min, logn_max+1e-10, dlogn)
 
-    counts, logNbins, magbins = np.histogram2d(logNvals, a_photo, bins=[logNbins, magbins])
-    Ni, magi = np.where(counts > 0)
+    counts, lognbins, magbins = np.histogram2d(lognvals, a_photo, bins=[lognbins, magbins])
+    ni, magi = np.where(counts > 0)
     mag_array = 0.5*(magbins[1:]+magbins[:-1])[magi]
-    count_array = np.exp(0.5*(logNbins[1:]+logNbins[:-1])[Ni])
+    count_array = np.exp(0.5*(lognbins[1:]+lognbins[:-1])[ni])
 
-    R = 1.185 * psf_fwhm
+    psf_r = 1.185 * psf_fwhm
 
     s_flux = 10**(-1/2.5 * mag_array)
     lb_ind = mff.find_nearest_point(auf_point[0], auf_point[1],
@@ -958,9 +940,9 @@ def create_single_perturb_auf(tri_folder, auf_point, filt, r, dr, rho, drho, j0s
     c_snr = snr_mag_params[lb_ind, 2]
     snr = s_flux / np.sqrt(c_snr * s_flux + b_snr + (a_snr * s_flux)**2)
 
-    B = 0.05
-    dm_max = _calculate_magnitude_offsets(count_array, mag_array, B, snr, model_mag_mids, log10y,
-                                          model_mags_interval, R, model_count)
+    b = 0.05
+    dm_max = _calculate_magnitude_offsets(count_array, mag_array, b, snr, model_mag_mids, log10y,
+                                          model_mags_interval, psf_r, model_count)
 
     seed = np.random.default_rng().choice(100000, size=(paf.get_random_seed_size(),
                                                         len(count_array)))
@@ -968,35 +950,35 @@ def create_single_perturb_auf(tri_folder, auf_point, filt, r, dr, rho, drho, j0s
     psf_sig = psf_fwhm / (2 * np.sqrt(2 * np.log(2)))
 
     if run_fw:
-        Frac_fw, Flux_fw, fourieroffset_fw, offset_fw, cumulative_fw = paf.perturb_aufs(
+        frac_fw, flux_fw, fourieroffset_fw, offset_fw, cumulative_fw = paf.perturb_aufs(
             count_array, mag_array, r[:-1]+dr/2, dr, r, j0s.T,
             model_mag_mids, model_mags_interval, log10y, model_count,
-            (dm_max/d_mag).astype(int), mag_cut, R, psf_sig, num_trials, seed, dd_params,
+            (dm_max/d_mag).astype(int), mag_cut, psf_r, psf_sig, num_trials, seed, dd_params,
             l_cut, 'fw')
     if run_psf:
-        Frac_psf, Flux_psf, fourieroffset_psf, offset_psf, cumulative_psf = paf.perturb_aufs(
+        frac_psf, flux_psf, fourieroffset_psf, offset_psf, cumulative_psf = paf.perturb_aufs(
             count_array, mag_array, r[:-1]+dr/2, dr, r, j0s.T,
             model_mag_mids, model_mags_interval, log10y, model_count,
-            (dm_max/d_mag).astype(int), mag_cut, R, psf_sig, num_trials, seed, dd_params,
+            (dm_max/d_mag).astype(int), mag_cut, psf_r, psf_sig, num_trials, seed, dd_params,
             l_cut, 'psf')
 
     if run_fw and run_psf:
         h = 1 - np.sqrt(1 - np.minimum(np.ones_like(snr), a_snr**2 * snr**2))
-        Flux = h * Flux_fw + (1 - h) * Flux_psf
+        flux = h * flux_fw + (1 - h) * flux_psf
         h = h.reshape(1, -1)
-        Frac = h * Frac_fw + (1 - h) * Frac_psf
+        frac = h * frac_fw + (1 - h) * frac_psf
         offset = h * offset_fw + (1 - h) * offset_psf
         cumulative = h * cumulative_fw + (1 - h) * cumulative_psf
         fourieroffset = h * fourieroffset_fw + (1 - h) * fourieroffset_psf
     elif run_fw:
-        Flux = Flux_fw
-        Frac = Frac_fw
+        flux = flux_fw
+        frac = frac_fw
         offset = offset_fw
         cumulative = cumulative_fw
         fourieroffset = fourieroffset_fw
     else:
-        Flux = Flux_psf
-        Frac = Frac_psf
+        flux = flux_psf
+        frac = frac_psf
         offset = offset_psf
         cumulative = cumulative_psf
         fourieroffset = fourieroffset_psf
@@ -1004,12 +986,13 @@ def create_single_perturb_auf(tri_folder, auf_point, filt, r, dr, rho, drho, j0s
     single_perturb_auf_output = {}
     for name, entry in zip(
             ['frac', 'flux', 'offset', 'cumulative', 'fourier', 'Narray', 'magarray'],
-            [Frac, Flux, offset, cumulative, fourieroffset, count_array, mag_array]):
+            [frac, flux, offset, cumulative, fourieroffset, count_array, mag_array]):
         single_perturb_auf_output[name] = entry
 
     return single_perturb_auf_output
 
 
+# pylint: disable=too-many-locals,too-many-statements
 def make_tri_counts(trifolder, trifilename, trifiltname, dm, brightest_source_mag,
                     density_mag, use_bright=False, use_faint=True, al_av=None, av_grid=None):
     """
@@ -1077,10 +1060,9 @@ def make_tri_counts(trifolder, trifilename, trifiltname, dm, brightest_source_ma
     if (al_av is None and av_grid is not None) or (al_av is not None and av_grid is None):
         raise ValueError("If one of al_av or av_grid is provided the other must be given as well.")
     if use_faint:
-        f = open('{}/{}_faint.dat'.format(trifolder, trifilename), "r")
-        area_line = f.readline()
-        av_line = f.readline()
-        f.close()
+        with open(f'{trifolder}/{trifilename}_faint.dat', "r", encoding='utf-8') as f:
+            area_line = f.readline()
+            av_line = f.readline()
         # #area = {} sq deg, #Av at infinity = {} should be the first two lines, so
         # just split that by whitespace
         bits = area_line.split(' ')
@@ -1089,22 +1071,21 @@ def make_tri_counts(trifolder, trifilename, trifiltname, dm, brightest_source_ma
         tri_av_inf_faint = float(bits[4])
         if tri_av_inf_faint < 0.1 and av_grid is not None:
             raise ValueError("tri_av_inf_faint cannot be smaller than 0.1 while using av_grid.")
-        tri_faint = np.genfromtxt('{}/{}_faint.dat'.format(trifolder, trifilename), delimiter=None,
+        tri_faint = np.genfromtxt(f'{trifolder}/{trifilename}_faint.dat', delimiter=None,
                                   names=True, comments='#', skip_header=2,
                                   usecols=[trifiltname, 'Av'])
 
     if use_bright:
-        f = open('{}/{}_bright.dat'.format(trifolder, trifilename), "r")
-        area_line = f.readline()
-        av_line = f.readline()
-        f.close()
+        with open(f'{trifolder}/{trifilename}_bright.dat', "r", encoding='utf-8') as f:
+            area_line = f.readline()
+            av_line = f.readline()
         bits = area_line.split(' ')
         tri_area_bright = float(bits[2])
         bits = av_line.split(' ')
         tri_av_inf_bright = float(bits[4])
         if tri_av_inf_bright < 0.1 and av_grid is not None:
             raise ValueError("tri_av_inf_bright cannot be smaller than 0.1 while using av_grid.")
-        tri_bright = np.genfromtxt('{}/{}_bright.dat'.format(trifolder, trifilename),
+        tri_bright = np.genfromtxt(f'{trifolder}/{trifilename}_bright.dat',
                                    delimiter=None, names=True, comments='#', skip_header=2,
                                    usecols=[trifiltname, 'Av'])
 
@@ -1139,7 +1120,7 @@ def make_tri_counts(trifolder, trifilename, trifiltname, dm, brightest_source_ma
             tri_mags = np.arange(minmag-al_av*tri_av_bright, maxmag+1e-10, dm)
         elif use_faint:
             tri_mags = np.arange(minmag-al_av*tri_av_faint, maxmag+1e-10, dm)
-    tri_mags_mids = (tri_mags[:-1]+np.diff(tri_mags)/2)
+    tri_mags_mids = tri_mags[:-1]+np.diff(tri_mags)/2
     if use_faint:
         if al_av is None:
             hist, tri_mags = np.histogram(tridata_faint, bins=tri_mags)
@@ -1230,8 +1211,8 @@ def make_tri_counts(trifolder, trifilename, trifiltname, dm, brightest_source_ma
     return dens, tri_mags, tri_mags_mids, dtri_mags, uncert, num_bright_obj
 
 
-def _calculate_magnitude_offsets(count_array, mag_array, B, snr, model_mag_mids, log10y,
-                                 model_mags_interval, R, N_norm):
+def _calculate_magnitude_offsets(count_array, mag_array, b, snr, model_mag_mids, log10y,
+                                 model_mags_interval, r, n_norm):
     '''
     Derive minimum relative fluxes, or largest magnitude offsets, down to which
     simulated perturbers need to be simulated, based on both considerations of
@@ -1244,7 +1225,7 @@ def _calculate_magnitude_offsets(count_array, mag_array, B, snr, model_mag_mids,
         Local normalising densities of simulations.
     mag_array : numpy.ndarray
         Magnitudes of central objects to have perturbations simulated for.
-    B : float
+    b : float
         Fraction of ``snr`` the flux of the perturber should be; e.g. for
         1/20th ``B`` should be 0.05.
     snr : numpy.ndarray
@@ -1255,9 +1236,9 @@ def _calculate_magnitude_offsets(count_array, mag_array, B, snr, model_mag_mids,
         log-10 source densities of simulated objects in the given line of sight.
     model_mags_interval : numpy.ndarray
         Widths of the bins for each ``log10y``.
-    R : float
+    r : float
         Radius of the PSF of the given simulation, in arcseconds.
-    N_norm : float
+    n_norm : float
         Normalising local density of simulations, to scale to each
         ``count_array``.
 
@@ -1267,14 +1248,14 @@ def _calculate_magnitude_offsets(count_array, mag_array, B, snr, model_mag_mids,
         Maximum magnitude offset required for simulations, based on SNR and
         empty simulation fraction.
     '''
-    Flim = B / snr
-    dm_max_snr = -2.5 * np.log10(Flim)
+    flim = b / snr
+    dm_max_snr = -2.5 * np.log10(flim)
 
     dm_max_no_perturb = np.empty_like(mag_array)
-    for i in range(len(mag_array)):
-        q = model_mag_mids >= mag_array[i]
+    for i, mag in enumerate(mag_array):
+        q = model_mag_mids >= mag
         _x = model_mag_mids[q]
-        _y = 10**log10y[q] * model_mags_interval[q] * np.pi * (R/3600)**2 * count_array[i] / N_norm
+        _y = 10**log10y[q] * model_mags_interval[q] * np.pi * (r/3600)**2 * count_array[i] / n_norm
 
         # Convolution of Poissonian distributions each with l_i is a Poissonian
         # with mean of sum_i l_i.
@@ -1287,11 +1268,11 @@ def _calculate_magnitude_offsets(count_array, mag_array, B, snr, model_mag_mids,
         # lambda = -ln(0.01).
         q = np.where(lamb >= -np.log(0.01))[0]
         if len(q) > 0:
-            dm_max_no_perturb[i] = _x[q[0]] - mag_array[i]
+            dm_max_no_perturb[i] = _x[q[0]] - mag
         else:
             # In the case that we can't go deep enough in our simulated counts to
             # get <1% chance of no perturber, just do the best we can.
-            dm_max_no_perturb[i] = _x[-1] - mag_array[i]
+            dm_max_no_perturb[i] = _x[-1] - mag
 
     dm = np.maximum(dm_max_snr, dm_max_no_perturb)
 

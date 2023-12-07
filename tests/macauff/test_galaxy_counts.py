@@ -3,11 +3,15 @@
 Tests for the "galaxy_counts" module.
 '''
 
+import astropy.units as u
 import numpy as np
 from numpy.testing import assert_allclose
-import astropy.units as u
-from macauff.galaxy_counts import create_galaxy_counts, generate_speclite_filters
 from test_perturbation_auf import GalCountValues
+
+# pylint: disable=import-error,no-name-in-module
+from macauff.galaxy_counts import create_galaxy_counts, generate_speclite_filters
+
+# pylint: enable=import-error,no-name-in-module
 
 gal_values = GalCountValues()
 
@@ -26,21 +30,21 @@ class TestCreateGalaxyCounts():
         # da = dm / (1 + z); dm = dc for Omega_k = 0; dc = dh \int_0^z dz' / E(z')
         # dV = dh**3 * (\int_0^z dz' / E(z'))**2 / E(z) dOdz
         # E(z) = sqrt(Om (1+z)^3 + Ok (1 + z)^2 + Ol) = sqrt(Om (1+z)^3 + Ol)
-        Om, Ol = 0.31, 0.69
+        om, ol = 0.31, 0.69
         hubble_distance = 3000/0.677  # 3000/h Mpc
         __z = np.linspace(self.z_array[0], self.z_array[1], 1001)
-        E__z = np.sqrt(Om * (1 + __z)**3 + Ol)
-        int_ez = np.sum(1/E__z) * (__z[1] - __z[0])
-        _dV_dOmega_dz_1 = 0  # at exactly z = 0 \int_0^z dz' / E(z') = 0
+        e__z = np.sqrt(om * (1 + __z)**3 + ol)
+        int_ez = np.sum(1/e__z) * (__z[1] - __z[0])
+        _dv_domega_dz_1 = 0  # at exactly z = 0 \int_0^z dz' / E(z') = 0
         sterad_per_sq_deg = (np.pi/180)**2
-        _dV_dOmega_dz_2 = hubble_distance**3 * int_ez**2 / E__z[-1] * sterad_per_sq_deg
-        self.dV_dOmega = 0.5 * (_dV_dOmega_dz_1 + _dV_dOmega_dz_2) * np.diff(self.z_array)
+        _dv_domega_dz_2 = hubble_distance**3 * int_ez**2 / e__z[-1] * sterad_per_sq_deg
+        self.dv_domega = 0.5 * (_dv_domega_dz_1 + _dv_domega_dz_2) * np.diff(self.z_array)
 
         self.fake_mags = np.linspace(-60, 50, 1101)
         # m ~= M + 5 log10(dl(z)) + 25; dl = (1 + z) * dm = (1 + z) * dh \int_0^z dz' / E(z')
         __z = np.linspace(self.z_array[0], 0.5 * np.sum(self.z_array), 1001)
-        E__z = np.sqrt(Om * (1 + __z)**3 + Ol)
-        int_ez = np.sum(1/E__z) * (__z[1] - __z[0])
+        e__z = np.sqrt(om * (1 + __z)**3 + ol)
+        int_ez = np.sum(1/e__z) * (__z[1] - __z[0])
         dl = (1 + 0.5 * np.sum(self.z_array)) * hubble_distance * int_ez
         self.fake_app_mags = self.fake_mags + 5 * np.log10(dl) + 25
 
@@ -70,14 +74,14 @@ class TestCreateGalaxyCounts():
                               (10**(-0.4 * (self.fake_mags - fake_m)))**(fake_alpha+1) *
                               np.exp(-10**(-0.4 * (self.fake_mags - fake_m))))
             tot_fake_sch += np.interp(self.mag_bins, self.fake_app_mags,
-                                      fake_schechter) * self.dV_dOmega
+                                      fake_schechter) * self.dv_domega
 
         assert_allclose(tot_fake_sch, gal_dens, rtol=0.01, atol=1e-4)
 
     def test_create_filter_and_galaxy_counts(self):
         wav = 0.16  # microns
         f, n = 'filter', 'uuu'
-        filter_name = '{}-{}'.format(f, n)
+        filter_name = f'{f}-{n}'
 
         generate_speclite_filters(f, [n], [np.array([0.159, 0.16, 0.161])], [np.array([0, 1, 0])],
                                   u.micron)
@@ -92,6 +96,6 @@ class TestCreateGalaxyCounts():
                               (10**(-0.4 * (self.fake_mags - fake_m)))**(fake_alpha+1) *
                               np.exp(-10**(-0.4 * (self.fake_mags - fake_m))))
             tot_fake_sch += np.interp(self.mag_bins, self.fake_app_mags + 1.5,
-                                      fake_schechter) * self.dV_dOmega
+                                      fake_schechter) * self.dv_domega
 
         assert_allclose(tot_fake_sch, gal_dens, rtol=0.01, atol=1e-4)

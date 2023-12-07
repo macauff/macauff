@@ -10,8 +10,8 @@ __all__ = []
 
 # "Anemic" class for holding outputs to pass into later pipeline stages
 # Takes any number of arguments in constructor, each becoming an attribute
-# TODO: Move to own file?
-class StageData:
+# TODO: Move to own file?  pylint:disable=fixme
+class StageData:  # pylint:disable=missing-class-docstring,too-few-public-methods
     def __init__(self, **kwargs):
         self.__dict__.update(kwargs)
 
@@ -46,17 +46,17 @@ def create_auf_params_grid(perturb_auf_outputs, auf_pointings, filt_names, array
     grid : numpy.ndarray
         The populated grid of ``array_name`` individual 1-D arrays.
     '''
-    longestNm = np.amax(arraylengths)
+    longestnm = np.amax(arraylengths)
     if len_first_axis is None:
         grid = np.full(fill_value=-1, dtype=float, order='F',
-                       shape=(longestNm, len(filt_names), len(auf_pointings)))
+                       shape=(longestnm, len(filt_names), len(auf_pointings)))
     else:
         grid = np.full(fill_value=-1, dtype=float, order='F',
-                       shape=(len_first_axis, longestNm, len(filt_names), len(auf_pointings)))
-    for j in range(0, len(auf_pointings)):
-        ax1, ax2 = auf_pointings[j]
-        for i in range(0, len(filt_names)):
-            perturb_auf_combo = '{}-{}-{}'.format(ax1, ax2, filt_names[i])
+                       shape=(len_first_axis, longestnm, len(filt_names), len(auf_pointings)))
+    for j, auf_pointing in enumerate(auf_pointings):
+        ax1, ax2 = auf_pointing
+        for i, filt in enumerate(filt_names):
+            perturb_auf_combo = f'{ax1}-{ax2}-{filt}'
             single_array = perturb_auf_outputs[perturb_auf_combo][array_name]
             if len_first_axis is None:
                 grid[:arraylengths[i, j], i, j] = single_array
@@ -102,12 +102,12 @@ def load_small_ref_auf_grid(modrefind, perturb_auf_outputs, file_name_prefixes):
 
     small_grids = []
     for name in file_name_prefixes:
-        if len(perturb_auf_outputs['{}_grid'.format(name)].shape) == 4:
+        if len(perturb_auf_outputs[f'{name}_grid'].shape) == 4:
             small_grids.append(np.asfortranarray(
-                perturb_auf_outputs['{}_grid'.format(name)][:, x, y, z]))
+                perturb_auf_outputs[f'{name}_grid'][:, x, y, z]))
         else:
             small_grids.append(np.asfortranarray(
-                perturb_auf_outputs['{}_grid'.format(name)][x, y, z]))
+                perturb_auf_outputs[f'{name}_grid'][x, y, z]))
     modrefindsmall = np.empty((3, modrefind.shape[1]), int, order='F')
     del modrefind
     modrefindsmall[0, :] = nmnewind
@@ -144,7 +144,7 @@ def hav_dist_constant_lat(x_lon, x_lat, lon):
     return dist
 
 
-def _load_rectangular_slice(cat_name, a, lon1, lon2, lat1, lat2, padding):
+def _load_rectangular_slice(a, lon1, lon2, lat1, lat2, padding):
     '''
     Loads all sources in a catalogue within a given separation of a rectangle
     in sky coordinates, allowing for the search for all sources within a given
@@ -152,9 +152,6 @@ def _load_rectangular_slice(cat_name, a, lon1, lon2, lat1, lat2, padding):
 
     Parameters
     ----------
-    cat_name : string
-        Indication of whether we are loading catalogue "a" or catalogue "b",
-        for separation within a given folder.
     a : numpy.ndarray
         Full astrometric catalogue from which the subset of sources within
         ``padding`` distance of the sky rectangle are to be drawn.
@@ -312,14 +309,13 @@ def min_max_lon(a):
         # If there is data both either side of 0/360 and at 180 degrees,
         # return the entire longitudinal circle as the limits.
         return 0, 360
-    elif min_lon <= 1 and max_lon >= 359:
+    if min_lon <= 1 and max_lon >= 359:
         # If there's no data around the anti-longitude but data either
         # side of zero degrees exists, return the [-pi, +pi] wrapped
         # values.
         min_lon = np.amin(a[a > 180] - 360)
         max_lon = np.amax(a[a < 180])
         return min_lon, max_lon
-    else:
-        # Otherwise, the limits are inside [0, 360] and should be returned
-        # as the "normal" minimum and maximum values.
-        return min_lon, max_lon
+    # Otherwise, the limits are inside [0, 360] and should be returned
+    # as the "normal" minimum and maximum values.
+    return min_lon, max_lon

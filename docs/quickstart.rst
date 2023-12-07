@@ -39,7 +39,7 @@ This will save the appropriate three files -- ``con_cat_astro``, ``con_cat_photo
 Input Parameters
 ================
 
-Once you have your catalogue files, you will next require the files containing the input parameters. Examples of these files can be found in the ``macauff`` test data folder, for `catalogue "a" <https://raw.githubusercontent.com/Onoddil/macauff/main/macauff/tests/data/cat_a_params.txt>`_, `catalogue "b" <https://raw.githubusercontent.com/Onoddil/macauff/main/macauff/tests/data/cat_b_params.txt>`_, and the `common cross-match <https://raw.githubusercontent.com/Onoddil/macauff/main/macauff/tests/data/crossmatch_params.txt>`_ parameters.
+Once you have your catalogue files, you will next require the files containing the input parameters. Examples of these files can be found in the ``macauff`` test data folder, for `catalogue "a" <https://raw.githubusercontent.com/macauff/macauff/main/tests/macauff/data/cat_a_params.txt>`_, `catalogue "b" <https://raw.githubusercontent.com/macauff/macauff/main/tests/macauff/data/cat_b_params.txt>`_, and the `common cross-match <https://raw.githubusercontent.com/macauff/macauff/main/tests/macauff/data/crossmatch_params.txt>`_ parameters.
 
 These files contain all of the inputs to `~macauff.CrossMatch`, the main class for performing a cross-match between the two catalogues.
 

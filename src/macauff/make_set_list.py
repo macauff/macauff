@@ -5,17 +5,18 @@ objects, astrometrically in common based on relative sky separation compared to
 their respective uncertainties across two catalogues.
 '''
 
+import itertools
+import multiprocessing
 import sys
 import warnings
-import multiprocessing
-import itertools
+
 import numpy as np
 import scipy.special
 
 __all__ = ['set_list']
 
 
-def set_list(aindices, bindices, aoverlap, boverlap, joint_folder_path, n_pool):
+def set_list(aindices, bindices, aoverlap, boverlap, n_pool):
     '''
     Creates the inter-catalogue groupings between catalogues "a" and "b", based
     on previously determined individual source "overlaps" in astrometry.
@@ -33,9 +34,6 @@ def set_list(aindices, bindices, aoverlap, boverlap, joint_folder_path, n_pool):
         of each row in ``aindices`` for each source).
     boverlap : numpy.ndarray
         The equivalent number of overlaps for each catalogue "b" object.
-    joint_folder_path : string
-        Location of top-level folder containing the "group" folder in which
-        index and overlap arrays are stored.
     n_pool : integer
         Number of multiprocessing pools to use when parallelising.
 
@@ -53,17 +51,16 @@ def set_list(aindices, bindices, aoverlap, boverlap, joint_folder_path, n_pool):
     bgrouplengths : numpy.ndarray
         The number of catalogue "b" sources in each island grouping.
     '''
-    agroup, bgroup = _initial_group_numbering(aindices, bindices, aoverlap, boverlap,
-                                              joint_folder_path)
+    agroup, bgroup = _initial_group_numbering(aindices, bindices, aoverlap, boverlap)
     groupmax = max(np.amax(agroup), np.amax(bgroup))
 
     agrouplengths = np.zeros(dtype=int, shape=(groupmax,))
     bgrouplengths = np.zeros(dtype=int, shape=(groupmax,))
 
-    for i in range(0, len(agroup)):
-        agrouplengths[agroup[i]-1] += 1
-    for i in range(0, len(bgroup)):
-        bgrouplengths[bgroup[i]-1] += 1
+    for agrp in agroup:
+        agrouplengths[agrp-1] += 1
+    for bgrp in bgroup:
+        bgrouplengths[bgrp-1] += 1
 
     # Search for any island groupings which are too large to calculate the
     # permutations of reasonably (limiting at 50,000). When considering a set,
@@ -81,27 +78,24 @@ def set_list(aindices, bindices, aoverlap, boverlap, joint_folder_path, n_pool):
     # _calc_group_length_exceeded.
     maxiters = 5000000
     grouplengthexceeded = np.zeros(dtype=bool, shape=(len(agrouplengths),))
-    pool = multiprocessing.Pool(n_pool)
     counter = np.arange(0, len(agrouplengths))
     iter_group = zip(counter, agrouplengths, bgrouplengths, itertools.repeat(maxiters))
-    for return_items in pool.imap_unordered(_calc_group_length_exceeded, iter_group,
-                                            chunksize=max(1, len(counter) // n_pool)):
-        i, len_exceeded_flag = return_items
-        grouplengthexceeded[i] = len_exceeded_flag
+    with multiprocessing.Pool(n_pool) as pool:
+        for return_items in pool.imap_unordered(_calc_group_length_exceeded, iter_group,
+                                                chunksize=max(1, len(counter) // n_pool)):
+            i, len_exceeded_flag = return_items
+            grouplengthexceeded[i] = len_exceeded_flag
 
-    pool.close()
     pool.join()
 
     if np.any(grouplengthexceeded):
         nremoveisland = np.sum(grouplengthexceeded)
         nacatremove = np.sum(agrouplengths[grouplengthexceeded])
         nbcatremove = np.sum(bgrouplengths[grouplengthexceeded])
-        warnings.warn("{} island{}, containing {}/{} catalogue a and {}/{} catalogue b stars, "
-                      "{} removed for having more than {} possible iterations. Please check any "
-                      "results carefully.".format(nremoveisland, '' if nremoveisland == 1 else 's',
-                                                  nacatremove, len(aoverlap), nbcatremove,
-                                                  len(boverlap), 'was' if nremoveisland == 1 else
-                                                  'were', maxiters))
+        warnings.warn(f"{nremoveisland} island{'' if nremoveisland == 1 else 's'}, containing "
+                      f"{nacatremove}/{len(aoverlap)} catalogue a and {nbcatremove}/{len(boverlap)} "
+                      f"catalogue b stars, {'was' if nremoveisland == 1 else 'were'} removed for having "
+                      f"more than {maxiters} possible iterations. Please check any results carefully.")
         sys.stdout.flush()
         rejectgroupnum = np.arange(1, groupmax+1)[grouplengthexceeded]
         areject = np.arange(0, len(aoverlap))[np.in1d(agroup, rejectgroupnum)]
@@ -124,14 +118,14 @@ def set_list(aindices, bindices, aoverlap, boverlap, joint_folder_path, n_pool):
     # Loop over each source in turn, skipping any which belong to an island
     # too large to run, updating alist or blist with the corresponding island
     # number the source belongs to.
-    for i in range(0, len(agroup)):
-        if goodlength[agroup[i]-1]:
-            alist[acounters[agroup[i]-1], agroup[i]-1] = i
-            acounters[agroup[i]-1] += 1
-    for i in range(0, len(bgroup)):
-        if goodlength[bgroup[i]-1]:
-            blist[bcounters[bgroup[i]-1], bgroup[i]-1] = i
-            bcounters[bgroup[i]-1] += 1
+    for i, agrp in enumerate(agroup):
+        if goodlength[agrp-1]:
+            alist[acounters[agrp-1], agrp-1] = i
+            acounters[agrp-1] += 1
+    for i, bgrp in enumerate(bgroup):
+        if goodlength[bgrp-1]:
+            blist[bcounters[bgrp-1], bgrp-1] = i
+            bcounters[bgrp-1] += 1
 
     # Now, we simply want to remove any sources from the list with islands too
     # large to run.
@@ -142,11 +136,10 @@ def set_list(aindices, bindices, aoverlap, boverlap, joint_folder_path, n_pool):
 
     if reject_flag:
         return alist, blist, agrouplengths, bgrouplengths, areject, breject
-    else:
-        return alist, blist, agrouplengths, bgrouplengths
+    return alist, blist, agrouplengths, bgrouplengths
 
 
-def _initial_group_numbering(aindices, bindices, aoverlap, boverlap, joint_folder_path):
+def _initial_group_numbering(aindices, bindices, aoverlap, boverlap):
     '''
     Iterates over the indices mapping overlaps between the two catalogues,
     assigning initial group numbers to sources to be placed in "islands".
@@ -168,9 +161,6 @@ def _initial_group_numbering(aindices, bindices, aoverlap, boverlap, joint_folde
         of each row in ``aindices`` for each source).
     boverlap : numpy.ndarray
         The equivalent number of overlaps for each catalogue "b" object.
-    joint_folder_path : string
-        Location of top-level folder containing the "group" folder in which
-        index and overlap arrays are stored.
 
     Returns
     -------
@@ -187,7 +177,7 @@ def _initial_group_numbering(aindices, bindices, aoverlap, boverlap, joint_folde
     # catalogue "b" object near them, or those with only one corresponding
     # object in catalogue "b", then iteratively group from a -> b -> a -> ...
     # any remaining objects.
-    for i in range(0, len(agroup)):
+    for i in range(0, len(agroup)):  # pylint: disable=consider-using-enumerate
         if aoverlap[i] == 0:
             group_num += 1
             agroup[i] = group_num
@@ -196,13 +186,13 @@ def _initial_group_numbering(aindices, bindices, aoverlap, boverlap, joint_folde
             agroup[i] = group_num
             bgroup[aindices[0, i]] = group_num
 
-    for i in range(0, len(bgroup)):
+    for i in range(0, len(bgroup)):  # pylint: disable=consider-using-enumerate
         if boverlap[i] == 0:
             group_num += 1
             bgroup[i] = group_num
 
-    for i in range(0, len(agroup)):
-        if agroup[i] == 0:
+    for i, agrp in enumerate(agroup):
+        if agrp == 0:
             group_num += 1
             _a_to_b(i, group_num, aoverlap[i], aindices, bindices,
                     aoverlap, boverlap, agroup, bgroup)
@@ -210,7 +200,7 @@ def _initial_group_numbering(aindices, bindices, aoverlap, boverlap, joint_folde
     return agroup, bgroup
 
 
-def _a_to_b(ind, grp, N, aindices, bindices, aoverlap, boverlap, agroup, bgroup):
+def _a_to_b(ind, grp, n, aindices, bindices, aoverlap, boverlap, agroup, bgroup):
     '''
     Iterative function, along with ``_b_to_a``, to assign all sources overlapping
     this catalogue "a" object in catalogue "b" as being in the same group as it.
@@ -226,7 +216,7 @@ def _a_to_b(ind, grp, N, aindices, bindices, aoverlap, boverlap, agroup, bgroup)
         this group number.
     grp : integer
         The group number of this "island" to be assigned.
-    N : integer
+    n : integer
         The number of sources that overlap this catalogue "a" source.
     aindices : numpy.ndarray
         The indices into catalogue "b", for each catalogue "a" source, that have
@@ -245,13 +235,12 @@ def _a_to_b(ind, grp, N, aindices, bindices, aoverlap, boverlap, agroup, bgroup)
         Array detailing the group number of each catalogue "b" source.
     '''
     agroup[ind] = grp
-    for q in aindices[:N, ind]:
+    for q in aindices[:n, ind]:
         if bgroup[q] != grp:
             _b_to_a(q, grp, boverlap[q], aindices, bindices, aoverlap, boverlap, agroup, bgroup)
-    return
 
 
-def _b_to_a(ind, grp, N, aindices, bindices, aoverlap, boverlap, agroup, bgroup):
+def _b_to_a(ind, grp, n, aindices, bindices, aoverlap, boverlap, agroup, bgroup):
     '''
     Iterative function, equivalent to ``_a_to_b``, to assign all sources
     overlapping this catalogue "b" object in catalogue "a" with its group number.
@@ -263,7 +252,7 @@ def _b_to_a(ind, grp, N, aindices, bindices, aoverlap, boverlap, agroup, bgroup)
         this group number.
     grp : integer
         The group number of this "island" to be assigned.
-    N : integer
+    n : integer
         The number of sources that overlap this catalogue "b" source.
     aindices : numpy.ndarray
         The indices into catalogue "b", for each catalogue "a" source, that have
@@ -282,10 +271,9 @@ def _b_to_a(ind, grp, N, aindices, bindices, aoverlap, boverlap, agroup, bgroup)
         Array detailing the group number of each catalogue "b" source.
     '''
     bgroup[ind] = grp
-    for f in bindices[:N, ind]:
+    for f in bindices[:n, ind]:
         if agroup[f] != grp:
             _a_to_b(f, grp, aoverlap[f], aindices, bindices, aoverlap, boverlap, agroup, bgroup)
-    return
 
 
 def _calc_group_length_exceeded(iterable):
@@ -294,9 +282,8 @@ def _calc_group_length_exceeded(iterable):
         return i, 1
     counter = 0
     for k in np.arange(0, min(n_a, n_b)+1e-10, 1):
-        kcomb = (np.prod([qq for qq in np.arange(n_a-k+1, n_a+1e-10, 1)]) /
-                 scipy.special.factorial(k))
-        kperm = np.prod([qq for qq in np.arange(n_b-k+1, n_b+1e-10, 1)])
+        kcomb = np.prod(np.arange(n_a-k+1, n_a+1e-10, 1)) / scipy.special.factorial(k)
+        kperm = np.prod(np.arange(n_b-k+1, n_b+1e-10, 1))
         counter += kcomb*kperm
         if counter > maxiters:
             exceed_flag = 1
