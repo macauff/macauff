@@ -4,6 +4,7 @@ This module provides the functionality for the final cross-match process, the
 act of actually pairing sources across the two catalogues as counterparts.
 '''
 
+import datetime
 import sys
 import warnings
 
@@ -16,9 +17,7 @@ __all__ = ['source_pairing']
 
 
 # pylint: disable-next=too-many-locals
-def source_pairing(joint_folder_path, a_cat_folder_path, b_cat_folder_path, a_modelrefinds,
-                   b_modelrefinds, rho, drho, n_fracs, group_sources_data, phot_like_data,
-                   a_perturb_auf_outputs, b_perturb_auf_outputs):
+def source_pairing(cm):
     '''
     Function to iterate over all grouped islands of sources, calculating the
     probabilities of all permutations of matches and deriving the most likely
@@ -26,72 +25,41 @@ def source_pairing(joint_folder_path, a_cat_folder_path, b_cat_folder_path, a_mo
 
     Parameters
     ----------
-    joint_folder_path : string
-        Folder in which all common match files are stored for this crossmatch.
-    a_cat_folder_path : string
-        Folder in which the "a" catalogue input catalogues are stored.
-    b_cat_folder_path : string
-        Folder where catalogue "b" files are located.
-    a_modelrefinds : numpy.ndarray
-        Catalogue "a" modelrefinds array output from ``create_perturb_auf``.
-        TODO Improve description
-    b_modelrefinds : numpy.ndarray
-        Catalogue "b" modelrefinds array output from ``create_perturb_auf``.
-        TODO Improve description
-    rho : numpy.ndarray
-        Array of fourier-space values, used in the convolution of PDFs.
-    drho : numpy.ndarray
-        The spacings between the `rho` array elements.
-    n_fracs : integer
-        The number of relative contamination fluxes previously considered
-        when calculating the probability of a source being contaminated by
-        a perturbing source brighter than a given flux.
-    group_sources_data : class.StageData
-        Object containing all outputs from ``make_island_groupings``
-        TODO Improve description
-    phot_like_data : class.StageData
-        Object containing all outputs from ``compute_photometric_likelihoods``
-        TODO Improve description
-    a_perturb_auf_outputs : dictionary
-        Dict containing the results from the previous step of the cross-match,
-        the simulations of the perturbation component of catalogue a's AUF.
-    b_perturb_auf_outputs : dictionary
-        Dict containing the results from the previous step of the cross-match,
-        the simulations of the perturbation component of catalogue b's AUF.
+    cm : Class
+        The cross-match wrapper, containing all of the necessary metadata to
+        perform the cross-match and determine match islands.
     '''
-    print("Creating catalogue matches...")
+    t = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    print(f"{t} Rank {cm.rank}, chunk {cm.chunk_id}: Pairing sources...")
     sys.stdout.flush()
 
-    print("Pairing sources...")
-    sys.stdout.flush()
-
-    agrplen = group_sources_data.agrplen
-    bgrplen = group_sources_data.bgrplen
+    agrplen = cm.group_sources_data.agrplen
+    bgrplen = cm.group_sources_data.bgrplen
 
     len_a, len_b = np.sum(agrplen), np.sum(bgrplen)
 
-    abinsarray = phot_like_data.abinsarray
-    abinlengths = phot_like_data.abinlengths
-    bbinsarray = phot_like_data.bbinsarray
-    bbinlengths = phot_like_data.bbinlengths
+    abinsarray = cm.phot_like_data.abinsarray
+    abinlengths = cm.phot_like_data.abinlengths
+    bbinsarray = cm.phot_like_data.bbinsarray
+    bbinlengths = cm.phot_like_data.bbinlengths
 
-    c_priors = phot_like_data.c_priors
-    c_array = phot_like_data.c_array
-    fa_priors = phot_like_data.fa_priors
-    fa_array = phot_like_data.fa_array
-    fb_priors = phot_like_data.fb_priors
-    fb_array = phot_like_data.fb_array
+    c_priors = cm.phot_like_data.c_priors
+    c_array = cm.phot_like_data.c_array
+    fa_priors = cm.phot_like_data.fa_priors
+    fa_array = cm.phot_like_data.fa_array
+    fb_priors = cm.phot_like_data.fb_priors
+    fb_array = cm.phot_like_data.fb_array
 
-    alist = group_sources_data.alist
-    agrplen = group_sources_data.agrplen
+    alist = cm.group_sources_data.alist
+    agrplen = cm.group_sources_data.agrplen
 
-    a_astro = np.load(f'{a_cat_folder_path}/con_cat_astro.npy')
-    a_photo = np.load(f'{a_cat_folder_path}/con_cat_photo.npy')
-    amagref = np.load(f'{a_cat_folder_path}/magref.npy')
+    a_astro = np.load(f'{cm.a_cat_folder_path}/con_cat_astro.npy')
+    a_photo = np.load(f'{cm.a_cat_folder_path}/con_cat_photo.npy')
+    amagref = np.load(f'{cm.a_cat_folder_path}/magref.npy')
 
-    b_astro = np.load(f'{b_cat_folder_path}/con_cat_astro.npy')
-    b_photo = np.load(f'{b_cat_folder_path}/con_cat_photo.npy')
-    bmagref = np.load(f'{b_cat_folder_path}/magref.npy')
+    b_astro = np.load(f'{cm.b_cat_folder_path}/con_cat_astro.npy')
+    b_photo = np.load(f'{cm.b_cat_folder_path}/con_cat_photo.npy')
+    bmagref = np.load(f'{cm.b_cat_folder_path}/magref.npy')
 
     big_len_a = len(a_astro)
     big_len_b = len(b_astro)
@@ -99,19 +67,19 @@ def source_pairing(joint_folder_path, a_cat_folder_path, b_cat_folder_path, a_mo
     # can ever reach this value.
     large_len = max(big_len_a, big_len_b)
 
-    a_sky_inds = phot_like_data.a_sky_inds
+    a_sky_inds = cm.phot_like_data.a_sky_inds
 
-    blist = group_sources_data.blist
-    bgrplen = group_sources_data.bgrplen
+    blist = cm.group_sources_data.blist
+    bgrplen = cm.group_sources_data.bgrplen
 
-    b_sky_inds = phot_like_data.b_sky_inds
+    b_sky_inds = cm.phot_like_data.b_sky_inds
 
-    afourier_grids = a_perturb_auf_outputs['fourier_grid']
-    afrac_grids = a_perturb_auf_outputs['frac_grid']
-    aflux_grids = a_perturb_auf_outputs['flux_grid']
-    bfourier_grids = b_perturb_auf_outputs['fourier_grid']
-    bfrac_grids = b_perturb_auf_outputs['frac_grid']
-    bflux_grids = b_perturb_auf_outputs['flux_grid']
+    afourier_grids = cm.a_perturb_auf_outputs['fourier_grid']
+    afrac_grids = cm.a_perturb_auf_outputs['frac_grid']
+    aflux_grids = cm.a_perturb_auf_outputs['flux_grid']
+    bfourier_grids = cm.b_perturb_auf_outputs['fourier_grid']
+    bfrac_grids = cm.b_perturb_auf_outputs['frac_grid']
+    bflux_grids = cm.b_perturb_auf_outputs['flux_grid']
 
     # crpts_max_len is the maximum number of counterparts at 100% match rate.
     cprt_max_len = np.sum(np.minimum(agrplen, bgrplen))
@@ -122,9 +90,9 @@ def source_pairing(joint_folder_path, a_cat_folder_path, b_cat_folder_path, a_mo
      bfieldxis) = cpf.find_island_probabilities(
         a_astro, a_photo, b_astro, b_photo, alist, blist, agrplen, bgrplen,
         c_array, fa_array, fb_array, c_priors, fa_priors, fb_priors, amagref, bmagref,
-        a_modelrefinds, b_modelrefinds, abinsarray, abinlengths, bbinsarray, bbinlengths,
+        cm.a_modelrefinds, cm.b_modelrefinds, abinsarray, abinlengths, bbinsarray, bbinlengths,
         afrac_grids, aflux_grids, bfrac_grids, bflux_grids, afourier_grids, bfourier_grids,
-        a_sky_inds, b_sky_inds, rho, drho, n_fracs, large_len, cprt_max_len)
+        a_sky_inds, b_sky_inds, cm.rho, cm.drho, len(cm.delta_mag_cuts), large_len, cprt_max_len)
 
     afieldfilter = np.zeros(dtype=bool, shape=(len_a,))
     bfieldfilter = np.zeros(dtype=bool, shape=(len_b,))
@@ -141,8 +109,8 @@ def source_pairing(joint_folder_path, a_cat_folder_path, b_cat_folder_path, a_mo
 
     bfieldfilter = (bfieldinds < large_len+1) & (probfbarray >= 0)
 
-    lenrejecta = group_sources_data.lenrejecta
-    lenrejectb = group_sources_data.lenrejectb
+    lenrejecta = cm.group_sources_data.lenrejecta
+    lenrejectb = cm.group_sources_data.lenrejectb
 
     countsum = int(np.sum(countfilter))
     afieldsum = int(np.sum(afieldfilter))
@@ -167,7 +135,7 @@ def source_pairing(joint_folder_path, a_cat_folder_path, b_cat_folder_path, a_mo
             temp_variable = variable[:, filter_variable]
         else:
             temp_variable = variable[filter_variable]
-        np.save(f'{joint_folder_path}/pairing/{file_name}.npy', temp_variable)
+        np.save(f'{cm.joint_folder_path}/pairing/{file_name}.npy', temp_variable)
 
     tot = countsum + afieldsum + lenrejecta
     if tot < big_len_a:

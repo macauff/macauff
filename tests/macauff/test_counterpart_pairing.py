@@ -15,6 +15,7 @@ from test_matching import _replace_line
 from macauff.counterpart_pairing import source_pairing
 from macauff.counterpart_pairing_fortran import counterpart_pairing_fortran as cpf
 from macauff.matching import CrossMatch
+from macauff.macauff import Macauff
 from macauff.misc_functions import StageData
 
 # pylint: enable=no-name-in-module,import-error
@@ -159,6 +160,29 @@ class TestCounterpartPairing:  # pylint: disable=too-many-instance-attributes
 
         self.large_len = max(len(self.a_astro), len(self.b_astro))
 
+    def make_class(self):
+        class A():
+            def __init__(self):
+                pass
+
+        a = A()
+        a.delta_mag_cuts = np.array([2.5, 5])
+        a.a_modelrefinds = self.amodelrefinds
+        a.b_modelrefinds = self.bmodelrefinds
+        a.group_sources_data = self.group_sources_data
+        a.phot_like_data = self.phot_like_data
+        a.a_perturb_auf_outputs = self.a_perturb_auf_outputs
+        a.b_perturb_auf_outputs = self.b_perturb_auf_outputs
+        a.joint_folder_path = self.joint_folder_path
+        a.a_cat_folder_path = self.a_cat_folder_path
+        a.b_cat_folder_path = self.b_cat_folder_path
+        a.rho = self.rho
+        a.drho = self.drho
+        a.rank = 0
+        a.chunk_id = 1
+
+        return a
+
     def _calculate_prob_integral(self):
         self.o = np.sqrt(self.a_sig**2 + self.b_sig**2) / 3600
         self.sep = np.sqrt(((self.a_astro[0, 0] -
@@ -273,12 +297,8 @@ class TestCounterpartPairing:  # pylint: disable=too-many-instance-attributes
     def test_source_pairing(self):  # pylint: disable=too-many-statements
         os.system(f'rm -r {self.joint_folder_path}/pairing')
         os.makedirs(f'{self.joint_folder_path}/pairing', exist_ok=True)
-        source_pairing(
-            self.joint_folder_path, self.a_cat_folder_path, self.b_cat_folder_path,
-            self.amodelrefinds, self.bmodelrefinds, self.rho, self.drho, self.n_fracs,
-            group_sources_data=self.group_sources_data,
-            phot_like_data=self.phot_like_data, a_perturb_auf_outputs=self.a_perturb_auf_outputs,
-            b_perturb_auf_outputs=self.b_perturb_auf_outputs)
+        fake_cm = self.make_class()
+        source_pairing(fake_cm)
 
         bflux = np.load(f'{self.joint_folder_path}/pairing/bcontamflux.npy')
         assert np.all(bflux == np.zeros((2), float))
@@ -364,12 +384,9 @@ class TestCounterpartPairing:  # pylint: disable=too-many-instance-attributes
         os.system(f'rm -r {self.joint_folder_path}/reject')
         os.makedirs(f'{self.joint_folder_path}/reject', exist_ok=True)
 
-        source_pairing(
-            self.joint_folder_path, self.a_cat_folder_path, self.b_cat_folder_path,
-            self.amodelrefinds, self.bmodelrefinds, self.rho, self.drho, self.n_fracs,
-            group_sources_data=group_sources_data,
-            phot_like_data=self.phot_like_data, a_perturb_auf_outputs=self.a_perturb_auf_outputs,
-            b_perturb_auf_outputs=self.b_perturb_auf_outputs)
+        fake_cm = self.make_class()
+        fake_cm.group_sources_data = group_sources_data
+        source_pairing(fake_cm)
 
         bflux = np.load(f'{self.joint_folder_path}/pairing/bcontamflux.npy')
         assert np.all(bflux == np.zeros((2), float))
@@ -433,14 +450,10 @@ class TestCounterpartPairing:  # pylint: disable=too-many-instance-attributes
             alist=alist, blist=blist, agrplen=agrplen, bgrplen=bgrplen,
             lenrejecta=len(a_reject), lenrejectb=0)
 
+        fake_cm = self.make_class()
+        fake_cm.group_sources_data = group_sources_data
         with pytest.warns(UserWarning) as record:
-            source_pairing(
-                self.joint_folder_path, self.a_cat_folder_path, self.b_cat_folder_path,
-                self.amodelrefinds, self.bmodelrefinds, self.rho, self.drho, self.n_fracs,
-                group_sources_data=group_sources_data,
-                phot_like_data=self.phot_like_data,
-                a_perturb_auf_outputs=self.a_perturb_auf_outputs,
-                b_perturb_auf_outputs=self.b_perturb_auf_outputs)
+            source_pairing(fake_cm)
         assert len(record) == 2
         assert '2 catalogue a sources not in either counterpart, f' in record[0].message.args[0]
         assert '1 catalogue b source not in either counterpart, f' in record[1].message.args[0]
@@ -484,14 +497,10 @@ class TestCounterpartPairing:  # pylint: disable=too-many-instance-attributes
             alist=alist, blist=blist, agrplen=agrplen, bgrplen=bgrplen,
             lenrejecta=len(a_reject), lenrejectb=len(b_reject))
 
+        fake_cm = self.make_class()
+        fake_cm.group_sources_data = group_sources_data
         with pytest.warns(UserWarning) as record:
-            source_pairing(
-                self.joint_folder_path, self.a_cat_folder_path, self.b_cat_folder_path,
-                self.amodelrefinds, self.bmodelrefinds, self.rho, self.drho, self.n_fracs,
-                group_sources_data=group_sources_data,
-                phot_like_data=self.phot_like_data,
-                a_perturb_auf_outputs=self.a_perturb_auf_outputs,
-                b_perturb_auf_outputs=self.b_perturb_auf_outputs)
+            source_pairing(fake_cm)
         assert len(record) == 2
         assert '2 additional catalogue a indices recorded' in record[0].message.args[0]
         assert '1 additional catalogue b index recorded' in record[1].message.args[0]
@@ -563,7 +572,9 @@ class TestCounterpartPairing:  # pylint: disable=too-many-instance-attributes
                                                'data/chunk0/cat_a_params_.txt'),
                                   os.path.join(os.path.dirname(__file__),
                                                'data/chunk0/cat_b_params_.txt'))
-        self.cm.pair_sources()
+        self.cm.count_pair_func = source_pairing
+        mcff = Macauff(self.cm)
+        mcff.pair_sources()
 
         bflux = np.load(f'{self.joint_folder_path}/pairing/bcontamflux.npy')
         assert np.all(bflux == np.zeros((2), float))
