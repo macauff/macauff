@@ -353,7 +353,7 @@ def test_make_bins():
     assert np.all(h[:-1] == 3*124) & (h[-1] == 2*124)
 
 
-class TestFullPhotometricLikelihood:
+class TestFullPhotometricLikelihood:  # pylint: disable=too-many-instance-attributes
     def setup_class(self):  # pylint: disable=too-many-statements
         self.cf_points = np.array([[131.5, -0.5]])
         self.cf_areas = 0.25 * np.ones((1), float)

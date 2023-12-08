@@ -15,11 +15,7 @@ import numpy as np
 # pylint: disable=import-error,no-name-in-module
 from macauff.group_sources_fortran import group_sources_fortran as gsf
 from macauff.make_set_list import set_list
-from macauff.misc_functions import (
-    _load_rectangular_slice,
-    hav_dist_constant_lat,
-    load_small_ref_auf_grid,
-)
+from macauff.misc_functions import _load_rectangular_slice, hav_dist_constant_lat, load_small_ref_auf_grid
 
 # pylint: enable=import-error,no-name-in-module
 
