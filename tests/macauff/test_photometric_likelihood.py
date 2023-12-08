@@ -12,6 +12,7 @@ from test_matching import _replace_line
 
 # pylint: disable=import-error,no-name-in-module
 from macauff.matching import CrossMatch
+from macauff.macauff import Macauff
 from macauff.misc_functions import StageData
 from macauff.photometric_likelihood import compute_photometric_likelihoods, make_bins
 from macauff.photometric_likelihood_fortran import photometric_likelihood_fortran as plf
@@ -78,14 +79,31 @@ class TestOneSidedPhotometricLikelihood:
         _replace_line(os.path.join(os.path.dirname(__file__), 'data/crossmatch_params_.txt'),
                       idx, new_line)
 
+    def make_class(self):
+        class A():
+            def __init__(self):
+                pass
+
+        a = A()
+        a.a_cat_folder_path = self.a_cat_folder_path
+        a.b_cat_folder_path = self.b_cat_folder_path
+        a.a_filt_names = self.afilts
+        a.b_filt_names = self.bfilts
+        a.cf_region_points = self.cf_points
+        a.cf_region_areas = self.cf_areas
+        a.include_phot_like = self.include_phot_like
+        a.use_phot_priors = self.include_phot_like
+        a.group_sources_data = self.group_sources_data
+
+        return a
+
     def test_compute_photometric_likelihoods(self):
         na, nb, area = self.na, self.nb, self.area
         for folder, name in zip([self.a_cat_folder_path, self.b_cat_folder_path], ['a', 'b']):
             np.save(f'{folder}/con_cat_astro.npy', getattr(self, f'{name}_astro'))
             np.save(f'{folder}/con_cat_photo.npy', getattr(self, f'{name}_photo'))
-        pld = compute_photometric_likelihoods(
-            self.a_cat_folder_path, self.b_cat_folder_path, self.afilts, self.bfilts, self.cf_points,
-            self.cf_areas, self.include_phot_like, self.use_phot_priors, self.group_sources_data)
+        fake_cm = self.make_class()
+        pld = compute_photometric_likelihoods(fake_cm)
 
         for a, shape, value in zip([pld.c_priors, pld.fa_priors, pld.fb_priors],
                                    [(4, 3, 6), (4, 3, 6), (4, 3, 6)],
@@ -134,9 +152,8 @@ class TestOneSidedPhotometricLikelihood:
             np.save(f'{folder}/con_cat_astro.npy', obj[0])
             np.save(f'{folder}/con_cat_photo.npy', obj[1])
 
-        pld = compute_photometric_likelihoods(
-            self.a_cat_folder_path, self.b_cat_folder_path, self.afilts, self.bfilts, self.cf_points,
-            self.cf_areas, self.include_phot_like, self.use_phot_priors, self.group_sources_data)
+        fake_cm = self.make_class()
+        pld = compute_photometric_likelihoods(fake_cm)
 
         abinlen = pld.abinlengths
         assert np.all(abinlen == 51*np.ones((3, 6), int))
@@ -168,9 +185,8 @@ class TestOneSidedPhotometricLikelihood:
             np.save(f'{folder}/con_cat_astro.npy', obj[0])
             np.save(f'{folder}/con_cat_photo.npy', obj[1])
 
-        pld = compute_photometric_likelihoods(
-            self.a_cat_folder_path, self.b_cat_folder_path, self.afilts, self.bfilts, self.cf_points,
-            self.cf_areas, self.include_phot_like, self.use_phot_priors, self.group_sources_data)
+        fake_cm = self.make_class()
+        pld = compute_photometric_likelihoods(fake_cm)
 
         abinlen = pld.abinlengths
         assert np.all(abinlen == 51*np.ones((3, 6), int))
@@ -200,7 +216,10 @@ class TestOneSidedPhotometricLikelihood:
                                   os.path.join(os.path.dirname(__file__), 'data/cat_b_params.txt'))
         self.cm.group_sources_data = self.group_sources_data
         self.cm.chunk_id = 1
-        self.cm.calculate_phot_like()
+        self.cm.phot_like_func = compute_photometric_likelihoods
+        self.cm.cf_region_areas = self.cf_areas
+        mcff = Macauff(self.cm)
+        mcff.calculate_phot_like()
 
         abinlen = self.cm.phot_like_data.abinlengths
         bbinlen = self.cm.phot_like_data.bbinlengths
@@ -425,24 +444,31 @@ class TestFullPhotometricLikelihood:
         self.group_sources_data = StageData(ablen=ablen, aflen=aflen, ainds=ainds, asize=asize,
                                             bblen=bblen, bflen=bflen, binds=binds, bsize=bsize)
 
-    def test_phot_like_prior_frac_inclusion(self):
-        for ipl, upp in zip([False, True, True], [True, False, True]):
-            for bf, ff in zip([None, 0.5, None], [0.5, None, None]):
-                msg = 'bright_frac' if bf is None else 'field_frac'
-                with pytest.raises(ValueError, match=f'{msg} must be supplied if '):
-                    compute_photometric_likelihoods(
-                        self.a_cat_folder_path, self.b_cat_folder_path, self.afilts, self.bfilts,
-                        self.cf_points, self.cf_areas, ipl, upp, self.group_sources_data,
-                        bright_frac=bf, field_frac=ff)
+    def make_class(self):
+        class A():
+            def __init__(self):
+                pass
+
+        a = A()
+        a.a_cat_folder_path = self.a_cat_folder_path
+        a.b_cat_folder_path = self.b_cat_folder_path
+        a.a_filt_names = self.afilts
+        a.b_filt_names = self.bfilts
+        a.cf_region_points = self.cf_points
+        a.cf_region_areas = self.cf_areas
+        a.include_phot_like = self.include_phot_like
+        a.use_phot_priors = self.include_phot_like
+        a.group_sources_data = self.group_sources_data
+        a.int_fracs = np.array([self.y_b, self.y_f])
+
+        return a
 
     def test_compute_phot_like(self):
         for folder, name in zip([self.a_cat_folder_path, self.b_cat_folder_path], ['a', 'b']):
             np.save(f'{folder}/con_cat_astro.npy', getattr(self, f'{name}_astro'))
             np.save(f'{folder}/con_cat_photo.npy', getattr(self, f'{name}_photo'))
-        pld = compute_photometric_likelihoods(
-            self.a_cat_folder_path, self.b_cat_folder_path, self.afilts, self.bfilts, self.cf_points,
-            self.cf_areas, self.include_phot_like, self.use_phot_priors, self.group_sources_data,
-            bright_frac=self.y_b, field_frac=self.y_f)
+        fake_cm = self.make_class()
+        pld = compute_photometric_likelihoods(fake_cm)
 
         # pylint: disable=no-member
         c_p = pld.c_priors
@@ -492,11 +518,9 @@ class TestFullPhotometricLikelihood:
         for folder, name in zip([self.a_cat_folder_path, self.b_cat_folder_path], ['a', 'b']):
             np.save(f'{folder}/con_cat_astro.npy', getattr(self, f'{name}_astro'))
             np.save(f'{folder}/con_cat_photo.npy', getattr(self, f'{name}_photo'))
-        include_phot_like = False
-        pld = compute_photometric_likelihoods(
-            self.a_cat_folder_path, self.b_cat_folder_path, self.afilts, self.bfilts, self.cf_points,
-            self.cf_areas, include_phot_like, self.use_phot_priors, self.group_sources_data,
-            bright_frac=self.y_b, field_frac=self.y_f)
+        fake_cm = self.make_class()
+        fake_cm.include_phot_like = False
+        pld = compute_photometric_likelihoods(fake_cm)
 
         # pylint: disable=no-member
         c_p = pld.c_priors
