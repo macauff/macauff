@@ -15,8 +15,8 @@ from scipy.stats import skewnorm
 from test_matching import _replace_line
 
 # pylint: disable=import-error,no-name-in-module
-from macauff.matching import CrossMatch
 from macauff.macauff import Macauff
+from macauff.matching import CrossMatch
 from macauff.misc_functions_fortran import misc_functions_fortran as mff
 from macauff.perturbation_auf import (
     _calculate_magnitude_offsets,

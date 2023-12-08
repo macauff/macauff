@@ -15,8 +15,8 @@ from numpy.testing import assert_allclose
 from test_fit_astrometry import TestAstroCorrection as TAC
 
 # pylint: disable=import-error,no-name-in-module
-from macauff.matching import CrossMatch
 from macauff.macauff import Macauff
+from macauff.matching import CrossMatch
 
 # pylint: enable=import-error,no-name-in-module
 

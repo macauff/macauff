@@ -11,8 +11,8 @@ from numpy.testing import assert_allclose
 from test_matching import _replace_line
 
 # pylint: disable=import-error,no-name-in-module
-from macauff.matching import CrossMatch
 from macauff.macauff import Macauff
+from macauff.matching import CrossMatch
 from macauff.misc_functions import StageData
 from macauff.photometric_likelihood import compute_photometric_likelihoods, make_bins
 from macauff.photometric_likelihood_fortran import photometric_likelihood_fortran as plf

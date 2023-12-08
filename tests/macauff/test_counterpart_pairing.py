@@ -14,8 +14,8 @@ from test_matching import _replace_line
 # pylint: disable=no-name-in-module,import-error
 from macauff.counterpart_pairing import source_pairing
 from macauff.counterpart_pairing_fortran import counterpart_pairing_fortran as cpf
-from macauff.matching import CrossMatch
 from macauff.macauff import Macauff
+from macauff.matching import CrossMatch
 from macauff.misc_functions import StageData
 
 # pylint: enable=no-name-in-module,import-error

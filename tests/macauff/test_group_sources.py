@@ -14,8 +14,8 @@ from test_matching import _replace_line
 # pylint: disable=no-name-in-module,import-error
 from macauff.group_sources import _clean_overlaps, _load_fourier_grid_cutouts, make_island_groupings
 from macauff.group_sources_fortran import group_sources_fortran as gsf
-from macauff.matching import CrossMatch
 from macauff.macauff import Macauff
+from macauff.matching import CrossMatch
 from macauff.misc_functions import create_auf_params_grid
 
 # pylint: enable=no-name-in-module,import-error
