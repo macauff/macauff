@@ -7,6 +7,7 @@ component of the astrometric uncertainty function.
 # pylint: disable=too-many-lines
 # pylint: disable=duplicate-code
 
+import datetime
 import os
 import signal
 import sys
@@ -29,238 +30,65 @@ __all__ = ['make_perturb_aufs', 'create_single_perturb_auf']
 
 
 # pylint: disable-next=too-many-locals,too-many-arguments,too-many-branches,too-many-statements
-def make_perturb_aufs(auf_folder, cat_folder, filters, auf_points, r, dr, j0s, which_cat, include_perturb_auf,
-                      tri_download_flag=False, delta_mag_cuts=None, psf_fwhms=None, tri_set_name=None,
-                      tri_filt_num=None, tri_filt_names=None, tri_maglim_faint=None, tri_num_faint=None,
-                      auf_region_frame=None, num_trials=None, d_mag=None, density_radius=None, run_fw=None,
-                      run_psf=None, dd_params=None, l_cut=None, snr_mag_params=None, al_avs=None,
-                      fit_gal_flag=None, cmau_array=None, wavs=None, z_maxs=None, nzs=None, ab_offsets=None,
-                      filter_names=None, alpha0=None, alpha1=None, alpha_weight=None):
+def make_perturb_aufs(cm, which_cat):
     r"""
-    Function to perform the creation of the blended object perturbation component
-    of the AUF.
-
-    Parameters
-    ----------
-    auf_folder : string
-        The overall folder into which to create filter-pointing folders and save
-        individual simulation files.
-    cat_folder : string
-        The folder that the photometric catalogue being simulated for perturbation
-        AUF component is stored in.
-    filters : list of strings or numpy.ndarray of strings
-        An array containing the list of filters in this catalogue to create
-        simulated AUF components for.
-    auf_points : numpy.ndarray
-        Two-dimensional array containing pairs of coordinates at which to evaluate
-        the perturbation AUF components.
-    r : numpy.ndarray
-        The real-space coordinates for the Hankel transformations used in AUF-AUF
-        convolution.
-    dr : numpy.ndarray
-        The spacings between ``r`` elements.
-    j0s : numpy.ndarray, optional
-        The Bessel Function of First Kind of Zeroth Order evaluated at each
-        ``r``-``rho`` combination. Must always be given with the correct shape,
-        but is only used for evaluations of Bessel Functions if
-        ``include_perturb_auf`` is ``True``.
+    cm : Class
+        The cross-match wrapper, containing all of the necessary metadata to
+        perform the cross-match and determine photometric likelihoods.
     which_cat : string
         Indicator as to whether these perturbation AUFs are for catalogue "a"
-        or catalogue "b" within the cross-match process.
-    include_perturb_auf : boolean
-        ``True`` or ``False`` flag indicating whether perturbation component of the
-        AUF should be used or not within the cross-match process.
-    tri_download_flag : boolean, optional
-        A ``True``/``False`` flag, whether to re-download TRILEGAL simulated star
-        counts or not if a simulation already exists in a given folder. Only
-        needed if ``include_perturb_auf`` is True.
-    delta_mag_cuts : numpy.ndarray, optional
-        Array of magnitude offsets corresponding to relative fluxes of perturbing
-        sources, for consideration of relative contamination chances. Must be given
-        if ``include_perturb_auf`` is ``True``.
-    psf_fwhms : numpy.ndarray, optional
-        Array of full width at half-maximums for each filter in ``filters``. Only
-        required if ``include_perturb_auf`` is True; defaults to ``None``.
-    tri_set_name : string, optional
-        Name of the filter set to generate simulated TRILEGAL Galactic source
-        counts from. If ``include_perturb_auf`` is ``True``, this must be set.
-    tri_filt_num : string, optional
-        Column number of the filter defining the magnitude limit of simulated
-        TRILEGAL Galactic sources. If ``include_perturb_auf`` is ``True``, this
-        must be set.
-    tri_filt_names : list or array of strings, optional
-        List of filter names in the TRILEGAL filterset defined in ``tri_set_name``,
-        in the same order as provided in ``psf_fwhms``. If ``include_perturb_auf``
-        is ``True``, this must be set.
-    tri_maglim_faint : float
-        Magnitude in the primary TRILEGAL filter to simulate sources down to for
-        the main, "faint" simulation, used to capture the differential source
-        counts at all appropriate magnitudes. If ``include_perturb_auf`` is
-        ``True``, this must be set.
-    tri_num_faint : integer
-        Number of objects to simulate in the main TRILEGAL simulation. Should
-        capture sufficient numbers to be accurate without overrunning simulation
-        times. If ``include_perturb_auf`` is ``True``, this must be set.
-    auf_region_frame : string, optional
-        Coordinate reference frame in which sky coordinates are defined, either
-        ``equatorial`` or ``galactic``, used to define the coordinates TRILEGAL
-        simulations are generated in. If ``include_perturb_auf`` is ``True``,
-        this must be set.
-    num_trials : integer, optional
-        The number of simulated PSFs to compute in the derivation of the
-        perturbation component of the AUF. Must be given if ``include_perturb_auf``
-        is ``True``.
-    d_mag : float, optional
-        The resolution at which to create the TRILEGAL source density distribution.
-        Must be provided if ``include_perturb_auf`` is ``True``.
-    density_radius : float, optional
-        The astrometric distance, in degrees, within which to consider numbers
-        of internal catalogue sources, from which to calculate local density.
-        Must be given if ``include_perturb_auf`` is ``True``.
-    run_fw : bool, optional
-        Flag indicating whether to run the "flux-weighted" version of the
-        perturbation algorithm. Must be given if ``include_perturb_auf`` is
-        ``True``.
-    run_psf : bool, optional
-        Flag indicating whether to run the "background-dominated PSF" version
-        of the perturbation algorithm. Must be given if ``include_perturb_auf``
-        is ``True``.
-    dd_params : numpy.ndarray, optional
-        Polynomial fits for the various parameters controlling the background
-        limited PSF-fit algorithm for centroid perturbations. Must be given if
-        ``include_perturb_auf`` is ``True`` and ``run_psf`` is ``True``.
-    l_cut : numpy.ndarray or list, optional
-        Relative flux cutoffs for which algorithm to use in the background
-        limited PSF-fit algorithm case. Must be given if ``include_perturb_auf``
-        is ``True`` and ``run_psf`` is ``True``.
-    snr_mag_params : numpy.ndarray, optional
-        Array, of shape ``(X, Y, 5)``, containing the pre-determined values of the
-        magnitude-perturbation weighting relationship for a series of Galactic
-        sightlines for each ``filters`` filter. Must be given if
-        ``include_perturb_auf`` is ``True``.
-    al_avs : list of numpy.ndarray or numpy.ndarray, optional
-        Relative extinction curve vectors for each filter in ``filters``,
-        :math:`\frac{A_\lambda}{A_V}`, to convert exinction in the V-band
-        to extinction in the relevant filter. Must be given if
-        ``include_perturb_auf`` is ``True``.
-    fit_gal_flag : boolean, optional
-        Flag indicating whether to include galaxy counts in derivations of
-        perturbation component of the AUF. Must be given if
-        ``include_perturb_auf`` is ``True``.
-    cmau_array : numpy.ndarray, optional
-        Array of shape ``(5, 2, 4)`` holding the Wilson (2022, RNAAS, 6, 60) [1]_
-        c, m, a, and u values that describe the Schechter parameterisation with
-        wavelength.
-    wavs : list of floats or numpy.ndarray, optional
-        List of central wavelengths of each filter in ``filters``, used to
-        compute appropriate Schechter function parameters for fitting galaxy
-        counts. Must be given if ``include_perturb_auf`` and ``fit_gal_flag``
-        are ``True``.
-    z_maxs : list of floats or numpy.ndarray, optional
-        List of maximum redshifts to compute galaxy densities out to when
-        deriving Schechter functions. Must be given if ``include_perturb_auf``
-        and ``fit_gal_flag`` are ``True``.
-    nzs : list of integers or numpy.ndarray, optional
-        Resolution of redshift grid, in the sense of ``np.linspace(0, z_max, nz)``,
-        to evaluate Schechter functions on. Must be given if
-        ``include_perturb_auf`` and ``fit_gal_flag`` are ``True``.
-    ab_offsets : list of floats or numpy.ndarray, optional
-        For filters in a non-AB magnitude system, the given offset between
-        the chosen filter system and AB magnitudes, in the sense of m = m_AB -
-        ab_offset. Must be given if ``include_perturb_auf`` and ``fit_gal_flag``
-        are ``True``.
-    filter_names : list of string, optional
-        Names for each filter in ``filters`` in a ``speclite``-appropriate
-        naming scheme (``group_name``-``band_name``), for loading response
-        curves to calculate galaxy k-corrections. Must be given if
-        ``include_perturb_auf`` and ``fit_gal_flag`` are ``True``.
-    alpha0 : list of numpy.ndarray or numpy.ndarray, optional
-        Indices used to calculate parameters :math:`\alpha_i`, used in deriving
-        Dirichlet-distributed SED coefficients. :math:`\alpha{i, 0}` are the
-        zero-redshift parameters; see [2]_ and [3]_ for more details.
-    alpha1 : list of numpy.ndarray or numpy.ndarray, optional
-        :math:`\alpha_{i, 1}`, indices at redshift z=1 used to derive
-        Dirichlet-distributed SED coefficient values :math:`\alpha_i`.
-    alpha_weight : list of numpy.ndarray or numpy.ndarray, optional
-        Weights for use in calculating :math:`\alpha_i` from ``alpha0`` and
-        ``alpha1``.
-
-    References
-    ----------
-    .. [1] Wilson T. J. (2022), RNAAS, 6, 60
-    .. [2] Herbel J., Kacprzak T., Amara A., et al. (2017), JCAP, 8, 35
-    .. [3] Blanton M. R., Roweis S. (2007), AJ, 133, 734
-
+        or catalogue "b" within the cross-match process, to ensure the correct
+        attributes are accessed.
     """
-    if include_perturb_auf and tri_set_name is None:
-        raise ValueError("tri_set_name must be given if include_perturb_auf is True.")
-    if include_perturb_auf and tri_filt_num is None:
-        raise ValueError("tri_filt_num must be given if include_perturb_auf is True.")
-    if include_perturb_auf and tri_filt_names is None:
-        raise ValueError("tri_filt_names must be given if include_perturb_auf is True.")
-    if include_perturb_auf and tri_maglim_faint is None:
-        raise ValueError("tri_maglim_faint must be given if include_perturb_auf is True.")
-    if include_perturb_auf and tri_num_faint is None:
-        raise ValueError("tri_num_faint must be given if include_perturb_auf is True.")
-    if include_perturb_auf and auf_region_frame is None:
-        raise ValueError("auf_region_frame must be given if include_perturb_auf is True.")
-    if include_perturb_auf and delta_mag_cuts is None:
-        raise ValueError("delta_mag_cuts must be given if include_perturb_auf is True.")
-    if include_perturb_auf and psf_fwhms is None:
-        raise ValueError("psf_fwhms must be given if include_perturb_auf is True.")
-    if include_perturb_auf and num_trials is None:
-        raise ValueError("num_trials must be given if include_perturb_auf is True.")
-    if include_perturb_auf and j0s is None:
-        raise ValueError("j0s must be given if include_perturb_auf is True.")
-    if include_perturb_auf and d_mag is None:
-        raise ValueError("d_mag must be given if include_perturb_auf is True.")
-    if include_perturb_auf and run_fw is None:
-        raise ValueError("run_fw must be given if include_perturb_auf is True.")
-    if include_perturb_auf and run_psf is None:
-        raise ValueError("run_psf must be given if include_perturb_auf is True.")
-    if include_perturb_auf and run_psf and dd_params is None:
-        raise ValueError("dd_params must be given if include_perturb_auf and run_psf are True.")
-    if include_perturb_auf and dd_params is None:
-        # Fake an array to pass only to run_fw that fortran will accept:
-        dd_params = np.zeros((1, 1), float)
-    if include_perturb_auf and run_psf and l_cut is None:
-        raise ValueError("l_cut must be given if include_perturb_auf and run_psf are True.")
-    if include_perturb_auf and l_cut is None:
-        # Fake an array to pass only to run_fw that fortran will accept:
-        l_cut = np.zeros((1), float)
-    if include_perturb_auf and snr_mag_params is None:
-        raise ValueError("snr_mag_params must be given if include_perturb_auf is True.")
-    if include_perturb_auf and al_avs is None:
-        raise ValueError("al_avs must be given if include_perturb_auf is True.")
-    if include_perturb_auf and density_radius is None:
-        raise ValueError("density_radius must be given if include_perturb_auf is True.")
-
-    if include_perturb_auf and fit_gal_flag is None:
-        raise ValueError("fit_gal_flag must not be None if include_perturb_auf is True.")
-    if include_perturb_auf and fit_gal_flag and cmau_array is None:
-        raise ValueError("cmau_array must be given if fit_gal_flag is True.")
-    if include_perturb_auf and fit_gal_flag and wavs is None:
-        raise ValueError("wavs must be given if fit_gal_flag is True.")
-    if include_perturb_auf and fit_gal_flag and z_maxs is None:
-        raise ValueError("z_maxs must be given if fit_gal_flag is True.")
-    if include_perturb_auf and fit_gal_flag and nzs is None:
-        raise ValueError("nzs must be given if fit_gal_flag is True.")
-    if include_perturb_auf and fit_gal_flag and ab_offsets is None:
-        raise ValueError("ab_offsets must be given if fit_gal_flag is True.")
-    if include_perturb_auf and fit_gal_flag and filter_names is None:
-        raise ValueError("filter_names must be given if fit_gal_flag is True.")
-    if include_perturb_auf and fit_gal_flag and alpha0 is None:
-        raise ValueError("alpha0 must be given if fit_gal_flag is True.")
-    if include_perturb_auf and fit_gal_flag and alpha1 is None:
-        raise ValueError("alpha1 must be given if fit_gal_flag is True.")
-    if include_perturb_auf and fit_gal_flag and alpha_weight is None:
-        raise ValueError("alpha_weight must be given if fit_gal_flag is True.")
-
-    print(f'Creating perturbation AUFs sky indices for catalogue "{which_cat}"...')
+    t = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    print(f'{t} Rank {cm.rank}, chunk {cm.chunk_id}: Creating perturbation AUFs sky indices for '
+          f'catalogue "{which_cat}"...')
     sys.stdout.flush()
 
+    # Extract the single-catalogue values for determining the perturbation
+    # component of the AUF.
+    cat_folder = getattr(cm, f'{which_cat}_cat_folder_path')
+    auf_folder = getattr(cm, f'{which_cat}_auf_folder_path')
+    auf_points = getattr(cm, f'{which_cat}_auf_region_points')
+    filters = getattr(cm, f'{which_cat}_filt_names')
+    if cm.include_perturb_auf:
+        auf_region_frame = getattr(cm, f'{which_cat}_auf_region_frame')
+        density_radius = getattr(cm, f'{which_cat}_dens_dist')
+        tri_download_flag = getattr(cm, f'{which_cat}_download_tri')
+        tri_set_name = getattr(cm, f'{which_cat}_tri_set_name')
+        tri_filt_num = getattr(cm, f'{which_cat}_tri_filt_num')
+        tri_maglim_faint = getattr(cm, f'{which_cat}_tri_maglim_faint')
+        tri_num_faint = getattr(cm, f'{which_cat}_tri_num_faint')
+        fit_gal_flag = getattr(cm, f'{which_cat}_fit_gal_flag')
+        num_trials = cm.num_trials
+        psf_fwhms = getattr(cm, f'{which_cat}_psf_fwhms')
+        tri_filt_names = getattr(cm, f'{which_cat}_tri_filt_names')
+        d_mag = cm.d_mag
+        delta_mag_cuts = cm.delta_mag_cuts
+        run_fw = getattr(cm, f'{which_cat}_run_fw_auf')
+        run_psf = getattr(cm, f'{which_cat}_run_psf_auf')
+        snr_mag_params = getattr(cm, f'{which_cat}_snr_mag_params')
+        al_avs = getattr(cm, f'{which_cat}_gal_al_avs')
+        if run_psf:
+            dd_params = getattr(cm, f'{which_cat}_dd_params')
+            l_cut = getattr(cm, f'{which_cat}_l_cut')
+        else:
+            # Fake arrays to pass only to run_fw that fortran will accept:
+            dd_params = np.zeros((1, 1), float)
+            l_cut = np.zeros((1), float)
+        if fit_gal_flag:
+            cmau_array = cm.gal_cmau_array
+            wavs = getattr(cm, f'{which_cat}_gal_wavs')
+            z_maxs = getattr(cm, f'{which_cat}_gal_zmax')
+            nzs = getattr(cm, f'{which_cat}_gal_nzs')
+            alpha0 = cm.gal_alpha0
+            alpha1 = cm.gal_alpha1
+            alpha_weight = cm.gal_alphaweight
+            ab_offsets = getattr(cm, f'{which_cat}_gal_aboffsets')
+            filter_names = getattr(cm, f'{which_cat}_gal_filternames')
+
     a_tot_astro = np.load(f'{cat_folder}/con_cat_astro.npy')
-    if include_perturb_auf:
+    if cm.include_perturb_auf:
         a_tot_photo = np.load(f'{cat_folder}/con_cat_photo.npy')
 
     n_sources = len(a_tot_astro)
@@ -273,14 +101,16 @@ def make_perturb_aufs(auf_folder, cat_folder, filters, auf_points, r, dr, j0s, w
     modelrefinds[2, :] = mff.find_nearest_point(a_tot_astro[:, 0], a_tot_astro[:, 1],
                                                 auf_points[:, 0], auf_points[:, 1])
 
-    print(f'Creating empirical perturbation AUFs for catalogue "{which_cat}"...')
+    t = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    print(f'{t} Rank {cm.rank}, chunk {cm.chunk_id}: Creating empirical perturbation AUFs for '
+          f'catalogue "{which_cat}"...')
     sys.stdout.flush()
 
     # Store the length of the density-magnitude combinations in each sky/filter
     # combination for future loading purposes.
     arraylengths = np.zeros(dtype=int, shape=(len(filters), len(auf_points)), order='f')
 
-    if include_perturb_auf:
+    if cm.include_perturb_auf:
         local_n = np.zeros(dtype=float, shape=(len(a_tot_astro), len(filters)))
 
     perturb_auf_outputs = {}
@@ -291,7 +121,7 @@ def make_perturb_aufs(auf_folder, cat_folder, filters, auf_points, r, dr, j0s, w
         if not os.path.exists(ax_folder):
             os.makedirs(ax_folder, exist_ok=True)
 
-        if include_perturb_auf:
+        if cm.include_perturb_auf:
             sky_cut = modelrefinds[2, :] == i
             med_index_slice = np.arange(0, len(local_n))[sky_cut]
             a_photo_cut = a_tot_photo[sky_cut]
@@ -313,7 +143,7 @@ def make_perturb_aufs(auf_folder, cat_folder, filters, auf_points, r, dr, j0s, w
         # If there are no sources in this entire section of sky, we don't need
         # to bother downloading any TRILEGAL simulations since we'll auto-fill
         # dummy data (and never use it) in the filter loop.
-        if include_perturb_auf and len(a_astro_cut) > 0 and (
+        if cm.include_perturb_auf and len(a_astro_cut) > 0 and (
                 tri_download_flag or not os.path.isfile(f'{ax_folder}/trilegal_auf_simulation_faint.dat')):
             # Currently assume that the area of each small patch is a rectangle
             # on the sky, implicitly assuming that the large region is also a
@@ -336,7 +166,7 @@ def make_perturb_aufs(auf_folder, cat_folder, filters, auf_points, r, dr, j0s, w
         for j, filt in enumerate(filters):
             perturb_auf_combo = f'{ax1}-{ax2}-{filt}'
 
-            if include_perturb_auf:
+            if cm.include_perturb_auf:
                 good_mag_slice = ~np.isnan(a_photo_cut[:, j])
                 a_photo = a_photo_cut[good_mag_slice, j]
                 if len(a_photo) == 0:
@@ -347,10 +177,10 @@ def make_perturb_aufs(auf_folder, cat_folder, filters, auf_points, r, dr, j0s, w
                     num_n_mag = 1
                     frac = np.zeros((1, num_n_mag), float, order='F')
                     flux = np.zeros(num_n_mag, float, order='F')
-                    offset = np.zeros((len(r)-1, num_n_mag), float, order='F')
-                    offset[0, :] = 1 / (2 * np.pi * (r[0] + dr[0]/2) * dr[0])
-                    cumulative = np.ones((len(r)-1, num_n_mag), float, order='F')
-                    fourieroffset = np.ones((j0s.shape[0], num_n_mag), float, order='F')
+                    offset = np.zeros((len(cm.r)-1, num_n_mag), float, order='F')
+                    offset[0, :] = 1 / (2 * np.pi * (cm.r[0] + cm.dr[0]/2) * cm.dr[0])
+                    cumulative = np.ones((len(cm.r)-1, num_n_mag), float, order='F')
+                    fourieroffset = np.ones((len(cm.rho)-1, num_n_mag), float, order='F')
                     narray = np.array([[1]], float)
                     magarray = np.array([[1]], float)
                     # Make a second dictionary with the single pointing-filter
@@ -376,14 +206,14 @@ def make_perturb_aufs(auf_folder, cat_folder, filters, auf_points, r, dr, j0s, w
                 ax2_list = np.linspace(ax2_min, ax2_max, 7)
                 if fit_gal_flag:
                     single_perturb_auf_output = create_single_perturb_auf(
-                        ax_folder, auf_points[i], r, dr, j0s, num_trials, psf_fwhms[j], tri_filt_names[j],
+                        ax_folder, auf_points[i], cm.r, cm.dr, cm.j0s, num_trials, psf_fwhms[j], tri_filt_names[j],
                         dens_mags[j], a_photo, localn, d_mag, delta_mag_cuts, dd_params, l_cut, run_fw,
                         run_psf, snr_mag_params[j], al_avs[j], auf_region_frame, ax1_list, ax2_list,
                         fit_gal_flag, cmau_array, wavs[j], z_maxs[j], nzs[j], alpha0, alpha1, alpha_weight,
                         ab_offsets[j], filter_names[j])
                 else:
                     single_perturb_auf_output = create_single_perturb_auf(
-                        ax_folder, auf_points[i], r, dr, j0s, num_trials, psf_fwhms[j], tri_filt_names[j],
+                        ax_folder, auf_points[i], cm.r, cm.dr, cm.j0s, num_trials, psf_fwhms[j], tri_filt_names[j],
                         dens_mags[j], a_photo, localn, d_mag, delta_mag_cuts, dd_params, l_cut, run_fw,
                         run_psf, snr_mag_params[j], al_avs[j], auf_region_frame, ax1_list, ax2_list,
                         fit_gal_flag)
@@ -403,17 +233,17 @@ def make_perturb_aufs(auf_folder, cat_folder, filters, auf_points, r, dr, j0s, w
                 flux = np.zeros(num_n_mag, float, order='F')
                 # Remember that r is bins, so the evaluations at bin middle are one
                 # shorter in length.
-                offset = np.zeros((len(r)-1, num_n_mag), float, order='F')
+                offset = np.zeros((len(cm.r)-1, num_n_mag), float, order='F')
                 # Fix offsets such that the probability density function looks like
                 # a delta function, such that a two-dimensional circular coordinate
                 # integral would evaluate to one at every point, cf. ``cumulative``.
-                offset[0, :] = 1 / (2 * np.pi * (r[0] + dr[0]/2) * dr[0])
+                offset[0, :] = 1 / (2 * np.pi * (cm.r[0] + cm.dr[0]/2) * cm.dr[0])
                 # The cumulative integral of a delta function is always unity.
-                cumulative = np.ones((len(r)-1, num_n_mag), float, order='F')
+                cumulative = np.ones((len(cm.r)-1, num_n_mag), float, order='F')
                 # The Hankel transform of a delta function is a flat line; this
                 # then preserves the convolution being multiplication in fourier
                 # space, as F(x) x 1 = F(x), similar to how f(x) * d(0) = f(x).
-                fourieroffset = np.ones((j0s.shape[0], num_n_mag), float, order='F')
+                fourieroffset = np.ones((len(cm.rho)-1, num_n_mag), float, order='F')
                 # Both normalising density and magnitude arrays can be proxied
                 # with a dummy parameter, as any minimisation of N-m distance
                 # must pick the single value anyway.
@@ -427,7 +257,7 @@ def make_perturb_aufs(auf_folder, cat_folder, filters, auf_points, r, dr, j0s, w
                 perturb_auf_outputs[perturb_auf_combo] = single_perturb_auf_output
             arraylengths[j, i] = len(perturb_auf_outputs[perturb_auf_combo]['Narray'])
 
-    if include_perturb_auf:
+    if cm.include_perturb_auf:
         longestnm = np.amax(arraylengths)
 
         narrays = np.full(dtype=float, shape=(longestnm, len(filters), len(auf_points)),
@@ -451,15 +281,17 @@ def make_perturb_aufs(auf_folder, cat_folder, filters, auf_points, r, dr, j0s, w
     # the indices each source references when slicing into the 4-D cubes
     # created by [1-D array] x N-m combination x filter x sky position iteration.
 
-    print(f'Creating perturbation AUFs filter indices for catalogue "{which_cat}"...')
+    t = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    print(f'{t} Rank {cm.rank}, chunk {cm.chunk_id}: Creating perturbation AUFs filter indices for '
+          f'catalogue "{which_cat}"...')
     sys.stdout.flush()
 
-    if include_perturb_auf:
+    if cm.include_perturb_auf:
         a = np.load(f'{cat_folder}/con_cat_photo.npy')
         localn = local_n
     magref = np.load(f'{cat_folder}/magref.npy')
 
-    if include_perturb_auf:
+    if cm.include_perturb_auf:
         for i in range(0, len(a)):
             axind = modelrefinds[2, i]
             filterind = magref[i]
@@ -478,14 +310,14 @@ def make_perturb_aufs(auf_folder, cat_folder, filters, auf_points, r, dr, j0s, w
     # the filter index of the "best" filter for each source, from magref.
     modelrefinds[1, :] = magref
 
-    if delta_mag_cuts is None:
-        n_fracs = 2  # TODO: generalise once delta_mag_cuts is user-inputtable.  pylint: disable=fixme
+    if not cm.include_perturb_auf:
+        n_fracs = 1  # TODO: generalise once delta_mag_cuts is user-inputtable.  pylint: disable=fixme
     else:
         n_fracs = len(delta_mag_cuts)
     # Create the 4-D grids that house the perturbation AUF fourier-space
     # representation.
     perturb_auf_outputs['fourier_grid'] = create_auf_params_grid(
-        perturb_auf_outputs, auf_points, filters, 'fourier', arraylengths, j0s.shape[0])
+        perturb_auf_outputs, auf_points, filters, 'fourier', arraylengths, len(cm.rho)-1)
     # Create the estimated levels of flux contamination and fraction of
     # contaminated source grids.
     perturb_auf_outputs['frac_grid'] = create_auf_params_grid(
@@ -493,14 +325,15 @@ def make_perturb_aufs(auf_folder, cat_folder, filters, auf_points, r, dr, j0s, w
     perturb_auf_outputs['flux_grid'] = create_auf_params_grid(
         perturb_auf_outputs, auf_points, filters, 'flux', arraylengths)
 
-    if include_perturb_auf:
+    if cm.include_perturb_auf:
         del narrays, magarrays
 
     return modelrefinds, perturb_auf_outputs
 
 
 def download_trilegal_simulation(tri_folder, tri_filter_set, ax1, ax2, mag_num, region_frame,
-                                 mag_lim, min_area, total_objs=1.5e6, av=None, sigma_av=0.1):
+                                 mag_lim, min_area, total_objs=1.5e6, av=None, sigma_av=0.1,
+                                 rank=None, chunk_id=None):
     '''
     Get a single Galactic sightline TRILEGAL simulation of an appropriate sky
     size, and save it in a folder for use in the perturbation AUF simulations.
@@ -541,6 +374,12 @@ def download_trilegal_simulation(tri_folder, tri_filter_set, ax1, ax2, mag_num, 
         If given, bypasses the default value specified in ~`macauff.get_trilegal`,
         setting the fractional scaling around `av` in which to randomise
         extinction values.
+    rank: string, optional
+        If running a parallelised cross-match, pass through the appropriate MPI
+        worker rank for print statements. Otherwise defaults to ``None``.
+    chunk_id: string, optional
+        If running a parallelised cross-match, pass through the appropriate
+        "chunk" ID for print statements. Otherwise defaults to ``None``.
     '''
     class TimeoutException(Exception):  # pylint: disable=missing-class-docstring
         pass
@@ -585,12 +424,15 @@ def download_trilegal_simulation(tri_folder, tri_filter_set, ax1, ax2, mag_num, 
             triarea /= 2
             area_halved = True
             end = timeit.default_timer()
-            print(f'TRILEGAL call time: {end-start:.2f}')
-            print("Timed out, halving area")
+            t = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            print(f'{t} Rank {rank}, chunk {chunk_id}: TRILEGAL call time: {end-start:.2f}')
+            t = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            print(f"{t} Rank {rank}, chunk {chunk_id}: Timed out, halving area")
             continue
         else:
             end = timeit.default_timer()
-            print(f'TRILEGAL call time: {end-start:.2f}')
+            t = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            print(f'{t} Rank {rank}, chunk {chunk_id}: TRILEGAL call time: {end-start:.2f}')
             signal.alarm(0)
         with open(f'{tri_folder}/{tri_name}.dat', "r", encoding='utf-8') as f:
             contents = f.readlines()
@@ -602,7 +444,8 @@ def download_trilegal_simulation(tri_folder, tri_filter_set, ax1, ax2, mag_num, 
         # simulations can't be more than 10 sq deg, so accept if that's as large
         # as we can go.
         if nobjs < 10000 and not area_halved:
-            print("Too few numbers, increasing area...")
+            t = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            print(f"{t} Rank {rank}, chunk {chunk_id}: Too few numbers, increasing area...")
             triarea = min(10, triarea*10)
             accept_results = False
             # If we can't multiple by 10 since we get to 10 sq deg area, then
@@ -613,12 +456,15 @@ def download_trilegal_simulation(tri_folder, tri_filter_set, ax1, ax2, mag_num, 
         # the area had to be reduced by 50% previously, just accept the area
         # we got, since it's basically the best the TRILEGAL API will provide.
         elif nobjs < total_objs and not area_halved:
-            print("Scaling area to total_objs counts...")
+            t = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            print(f"{t} Rank {rank}, chunk {chunk_id}: Scaling area to total_objs counts...")
             triarea = min(10, triarea / nobjs * total_objs)
             areaflag = 1
             accept_results = False
         else:
-            print("Sufficient counts or area halved, accepting run...")
+            t = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            print(f"{t} Rank {rank}, chunk {chunk_id}: Sufficient counts or area halved, "
+                  "accepting run...")
             areaflag = 1
             accept_results = True
         if not accept_results:
