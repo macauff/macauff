@@ -5,6 +5,7 @@ distinct "islands" of sources, along with calculating whether they are within ov
 various photometric integral purposes.
 '''
 
+import datetime
 import itertools
 import multiprocessing
 import sys
@@ -42,10 +43,12 @@ def make_island_groupings(cm):
 
     # Convert from arcseconds to degrees internally.
     max_sep = np.copy(cm.pos_corr_dist) / 3600
-    print("Creating catalogue islands and overlaps...")
+    t = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    print(f"{t} Rank {cm.rank}, chunk {cm.chunk_id}: Creating catalogue islands and overlaps...")
     sys.stdout.flush()
 
-    print("Calculating maximum overlap...")
+    t = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    print(f"{t} Rank {cm.rank}, chunk {cm.chunk_id}: Calculating maximum overlap...")
     sys.stdout.flush()
 
     # The initial step to create island groupings is to find the largest number
@@ -119,7 +122,8 @@ def make_island_groupings(cm):
     del (overlapa, overlapb, a, b, a_cut, b_cut, amodrefindsmall, bmodrefindsmall,
          afouriergrid, bfouriergrid)
 
-    print("Truncating star overlaps by AUF integral...")
+    t = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    print(f"{t} Rank {cm.rank}, chunk {cm.chunk_id}: Truncating star overlaps by AUF integral...")
     sys.stdout.flush()
 
     ainds = np.zeros(dtype=int, shape=(amaxsize, len(a_full)), order='F')
@@ -178,13 +182,15 @@ def make_island_groupings(cm):
     del (a_cut, a_cut2, b_cut, b_cut2, indicesa, indicesb, overlapa, overlapb, a, b,
          amodrefindsmall, bmodrefindsmall, afouriergrid, bfouriergrid)
 
-    print("Cleaning overlaps...")
+    t = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    print(f"{t} Rank {cm.rank}, chunk {cm.chunk_id}: Cleaning overlaps...")
     sys.stdout.flush()
 
     ainds, asize = _clean_overlaps(ainds, asize, cm.n_pool)
     binds, bsize = _clean_overlaps(binds, bsize, cm.n_pool)
 
-    print("Calculating integral lengths...")
+    t = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    print(f"{t} Rank {cm.rank}, chunk {cm.chunk_id}: Calculating integral lengths...")
     sys.stdout.flush()
 
     if cm.include_phot_like or cm.use_phot_priors:
@@ -207,10 +213,12 @@ def make_island_groupings(cm):
         bblen = b_int_lens[:, 0]
         bflen = b_int_lens[:, 1]
 
-    print("Maximum overlaps are:", amaxsize, bmaxsize)
+    t = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    print(f"{t} Rank {cm.rank}, chunk {cm.chunk_id}: Maximum overlaps are:", amaxsize, bmaxsize)
     sys.stdout.flush()
 
-    print("Finding unique sets...")
+    t = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    print(f"{t} Rank {cm.rank}, chunk {cm.chunk_id}: Finding unique sets...")
     sys.stdout.flush()
 
     set_list_items = set_list(ainds, binds, asize, bsize, cm.n_pool)
