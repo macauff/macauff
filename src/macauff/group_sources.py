@@ -16,7 +16,6 @@ import numpy as np
 from macauff.group_sources_fortran import group_sources_fortran as gsf
 from macauff.make_set_list import set_list
 from macauff.misc_functions import (
-    StageData,
     _load_rectangular_slice,
     hav_dist_constant_lat,
     load_small_ref_auf_grid,
@@ -320,11 +319,20 @@ def make_island_groupings(cm):
     else:
         lenrejectb = 0
 
-    group_sources_data = StageData(ablen=ablen, bblen=bblen, ainds=ainds, binds=binds,
-                                   asize=asize, bsize=bsize, aflen=aflen, bflen=bflen,
-                                   alist=alist, blist=blist, agrplen=agrplen, bgrplen=bgrplen,
-                                   lenrejecta=lenrejecta, lenrejectb=lenrejectb)
-    return group_sources_data
+    cm.ablen = ablen
+    cm.bblen = bblen
+    cm.ainds = ainds
+    cm.binds = binds
+    cm.asize = asize
+    cm.bsize = bsize
+    cm.aflen = aflen
+    cm.bflen = bflen
+    cm.alist = alist
+    cm.blist = blist
+    cm.agrplen = agrplen
+    cm.bgrplen = bgrplen
+    cm.lenrejecta = lenrejecta
+    cm.lenrejectb = lenrejectb
 
 
 def _load_fourier_grid_cutouts(a, sky_rect_coords, cat_folder_path, perturb_auf_outputs, padding,

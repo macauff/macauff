@@ -116,7 +116,7 @@ class Macauff():
         if self.cm.j1s is None:
             self.cm.j1s = gsf.calc_j1s(self.cm.rho[:-1]+self.cm.drho/2, self.cm.r[:-1]+self.cm.dr/2)
         os.system(f'rm -rf {self.cm.joint_folder_path}/reject/*')
-        self.cm.group_sources_data = self.cm.group_func(self.cm)
+        self.cm.group_func(self.cm)
 
     def calculate_phot_like(self):
         '''
@@ -129,7 +129,7 @@ class Macauff():
               'and likelihoods...')
         sys.stdout.flush()
         self._calculate_cf_areas()
-        self.cm.phot_like_data = self.cm.phot_like_func(self.cm)
+        self.cm.phot_like_func(self.cm)
 
     def _calculate_cf_areas(self):
         '''

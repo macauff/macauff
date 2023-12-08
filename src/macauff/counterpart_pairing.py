@@ -33,25 +33,7 @@ def source_pairing(cm):
     print(f"{t} Rank {cm.rank}, chunk {cm.chunk_id}: Pairing sources...")
     sys.stdout.flush()
 
-    agrplen = cm.group_sources_data.agrplen
-    bgrplen = cm.group_sources_data.bgrplen
-
-    len_a, len_b = np.sum(agrplen), np.sum(bgrplen)
-
-    abinsarray = cm.phot_like_data.abinsarray
-    abinlengths = cm.phot_like_data.abinlengths
-    bbinsarray = cm.phot_like_data.bbinsarray
-    bbinlengths = cm.phot_like_data.bbinlengths
-
-    c_priors = cm.phot_like_data.c_priors
-    c_array = cm.phot_like_data.c_array
-    fa_priors = cm.phot_like_data.fa_priors
-    fa_array = cm.phot_like_data.fa_array
-    fb_priors = cm.phot_like_data.fb_priors
-    fb_array = cm.phot_like_data.fb_array
-
-    alist = cm.group_sources_data.alist
-    agrplen = cm.group_sources_data.agrplen
+    len_a, len_b = np.sum(cm.agrplen), np.sum(cm.bgrplen)
 
     a_astro = np.load(f'{cm.a_cat_folder_path}/con_cat_astro.npy')
     a_photo = np.load(f'{cm.a_cat_folder_path}/con_cat_photo.npy')
@@ -67,13 +49,6 @@ def source_pairing(cm):
     # can ever reach this value.
     large_len = max(big_len_a, big_len_b)
 
-    a_sky_inds = cm.phot_like_data.a_sky_inds
-
-    blist = cm.group_sources_data.blist
-    bgrplen = cm.group_sources_data.bgrplen
-
-    b_sky_inds = cm.phot_like_data.b_sky_inds
-
     afourier_grids = cm.a_perturb_auf_outputs['fourier_grid']
     afrac_grids = cm.a_perturb_auf_outputs['frac_grid']
     aflux_grids = cm.a_perturb_auf_outputs['flux_grid']
@@ -82,17 +57,17 @@ def source_pairing(cm):
     bflux_grids = cm.b_perturb_auf_outputs['flux_grid']
 
     # crpts_max_len is the maximum number of counterparts at 100% match rate.
-    cprt_max_len = np.sum(np.minimum(agrplen, bgrplen))
+    cprt_max_len = np.sum(np.minimum(cm.agrplen, cm.bgrplen))
 
     (acountinds, bcountinds, afieldinds, bfieldinds, acontamprob, bcontamprob, etaarray,
      xiarray, acontamflux, bcontamflux, probcarray, crptseps, probfaarray, afieldfluxs,
      afieldseps, afieldetas, afieldxis, probfbarray, bfieldfluxs, bfieldseps, bfieldetas,
      bfieldxis) = cpf.find_island_probabilities(
-        a_astro, a_photo, b_astro, b_photo, alist, blist, agrplen, bgrplen,
-        c_array, fa_array, fb_array, c_priors, fa_priors, fb_priors, amagref, bmagref,
-        cm.a_modelrefinds, cm.b_modelrefinds, abinsarray, abinlengths, bbinsarray, bbinlengths,
+        a_astro, a_photo, b_astro, b_photo, cm.alist, cm.blist, cm.agrplen, cm.bgrplen,
+        cm.c_array, cm.fa_array, cm.fb_array, cm.c_priors, cm.fa_priors, cm.fb_priors, amagref, bmagref,
+        cm.a_modelrefinds, cm.b_modelrefinds, cm.abinsarray, cm.abinlengths, cm.bbinsarray, cm.bbinlengths,
         afrac_grids, aflux_grids, bfrac_grids, bflux_grids, afourier_grids, bfourier_grids,
-        a_sky_inds, b_sky_inds, cm.rho, cm.drho, len(cm.delta_mag_cuts), large_len, cprt_max_len)
+        cm.a_sky_inds, cm.b_sky_inds, cm.rho, cm.drho, len(cm.delta_mag_cuts), large_len, cprt_max_len)
 
     afieldfilter = np.zeros(dtype=bool, shape=(len_a,))
     bfieldfilter = np.zeros(dtype=bool, shape=(len_b,))
@@ -108,9 +83,6 @@ def source_pairing(cm):
     afieldfilter = (afieldinds < large_len+1) & (probfaarray >= 0)
 
     bfieldfilter = (bfieldinds < large_len+1) & (probfbarray >= 0)
-
-    lenrejecta = cm.group_sources_data.lenrejecta
-    lenrejectb = cm.group_sources_data.lenrejectb
 
     countsum = int(np.sum(countfilter))
     afieldsum = int(np.sum(afieldfilter))
@@ -137,7 +109,7 @@ def source_pairing(cm):
             temp_variable = variable[filter_variable]
         np.save(f'{cm.joint_folder_path}/pairing/{file_name}.npy', temp_variable)
 
-    tot = countsum + afieldsum + lenrejecta
+    tot = countsum + afieldsum + cm.lenrejecta
     if tot < big_len_a:
         warnings.warn(f"{big_len_a - tot} catalogue a source{'s' if big_len_a - tot > 1 else ''} "
                       "not in either counterpart, field, or rejected source lists")
@@ -145,7 +117,7 @@ def source_pairing(cm):
         warnings.warn(f"{tot - big_len_a} additional catalogue a "
                       f"{'indices' if tot - big_len_a > 1 else 'index'} recorded, check results "
                       "for duplications carefully")
-    tot = countsum + bfieldsum + lenrejectb
+    tot = countsum + bfieldsum + cm.lenrejectb
     if tot < big_len_b:
         warnings.warn(f"{big_len_b - tot} catalogue b source{'s' if big_len_b - tot > 1 else ''} "
                       "not in either counterpart, field, or rejected source lists.")

@@ -12,7 +12,6 @@ from test_matching import _replace_line
 # pylint: disable=import-error,no-name-in-module
 from macauff.macauff import Macauff
 from macauff.matching import CrossMatch
-from macauff.misc_functions import StageData
 from macauff.photometric_likelihood import compute_photometric_likelihoods, make_bins
 from macauff.photometric_likelihood_fortran import photometric_likelihood_fortran as plf
 
@@ -27,8 +26,6 @@ class TestOneSidedPhotometricLikelihood:
         self.joint_folder_path = 'test_path'
         self.a_cat_folder_path = 'gaia_folder'
         self.b_cat_folder_path = 'wise_folder'
-        self.group_sources_data = StageData(ablen=None, aflen=None, ainds=None, asize=None,
-                                            bblen=None, bflen=None, binds=None, bsize=None)
 
         self.area = (134-131)*(1--1)
 
@@ -92,7 +89,6 @@ class TestOneSidedPhotometricLikelihood:
         a.cf_areas = self.cf_areas
         a.include_phot_like = self.include_phot_like
         a.use_phot_priors = self.include_phot_like
-        a.group_sources_data = self.group_sources_data
         a.rank = 0
         a.chunk_id = 1
 
@@ -104,9 +100,9 @@ class TestOneSidedPhotometricLikelihood:
             np.save(f'{folder}/con_cat_astro.npy', getattr(self, f'{name}_astro'))
             np.save(f'{folder}/con_cat_photo.npy', getattr(self, f'{name}_photo'))
         fake_cm = self.make_class()
-        pld = compute_photometric_likelihoods(fake_cm)
+        compute_photometric_likelihoods(fake_cm)
 
-        for a, shape, value in zip([pld.c_priors, pld.fa_priors, pld.fb_priors],
+        for a, shape, value in zip([fake_cm.c_priors, fake_cm.fa_priors, fake_cm.fb_priors],
                                    [(4, 3, 6), (4, 3, 6), (4, 3, 6)],
                                    [0.75*nb/area/2, 0.75/area*(na-nb/2), 0.75/area*(nb-nb/2)]):
             assert np.all(a.shape == shape)
@@ -114,20 +110,20 @@ class TestOneSidedPhotometricLikelihood:
             # caused by the rng.choice removal of objects in each filter.
             assert_allclose(a, value, rtol=0.03)
 
-        abinlen = pld.abinlengths
-        bbinlen = pld.bbinlengths
+        abinlen = fake_cm.abinlengths
+        bbinlen = fake_cm.bbinlengths
 
         assert np.all(abinlen == 51*np.ones((3, 6), int))
         assert np.all(bbinlen == 26*np.ones((4, 6), int))
 
         for a, shape in zip(
-            [pld.c_array, pld.fa_array, pld.fb_array], [(25, 50, 4, 3, 6), (50, 4, 3, 6),
-                                                        (25, 4, 3, 6)]):
+            [fake_cm.c_array, fake_cm.fa_array, fake_cm.fb_array], [(25, 50, 4, 3, 6), (50, 4, 3, 6),
+                                                                    (25, 4, 3, 6)]):
             assert np.all(a.shape == shape)
             assert_allclose(a, np.ones(shape, float), atol=1e-30)
 
-        abins = pld.abinsarray
-        bbins = pld.bbinsarray
+        abins = fake_cm.abinsarray
+        bbins = fake_cm.bbinsarray
         for folder, filts, _bins in zip([self.a_cat_folder_path, self.b_cat_folder_path],
                                         [self.afilts, self.bfilts], [abins, bbins]):
             a = np.load(f'{folder}/con_cat_astro.npy')
@@ -154,17 +150,17 @@ class TestOneSidedPhotometricLikelihood:
             np.save(f'{folder}/con_cat_photo.npy', obj[1])
 
         fake_cm = self.make_class()
-        pld = compute_photometric_likelihoods(fake_cm)
+        compute_photometric_likelihoods(fake_cm)
 
-        abinlen = pld.abinlengths
+        abinlen = fake_cm.abinlengths
         assert np.all(abinlen == 51*np.ones((3, 6), int))
 
-        bbinlen = pld.bbinlengths
+        bbinlen = fake_cm.bbinlengths
         b_check = 26*np.ones((4, 6), int)
         b_check[2, 2] = 1
         assert np.all(bbinlen == b_check)
 
-        c_array = pld.c_array
+        c_array = fake_cm.c_array
         c_check = np.ones((25, 50, 4, 3, 6), float)
         c_check[:, :, 2, :, 2] = 0
         assert_allclose(c_array, c_check, atol=1e-30)
@@ -187,17 +183,17 @@ class TestOneSidedPhotometricLikelihood:
             np.save(f'{folder}/con_cat_photo.npy', obj[1])
 
         fake_cm = self.make_class()
-        pld = compute_photometric_likelihoods(fake_cm)
+        compute_photometric_likelihoods(fake_cm)
 
-        abinlen = pld.abinlengths
+        abinlen = fake_cm.abinlengths
         assert np.all(abinlen == 51*np.ones((3, 6), int))
 
-        bbinlen = pld.bbinlengths
+        bbinlen = fake_cm.bbinlengths
         b_check = 26*np.ones((4, 6), int)
         b_check[2, 2] = 2
         assert np.all(bbinlen == b_check)
 
-        c_array = pld.c_array
+        c_array = fake_cm.c_array
         c_check = np.ones((25, 50, 4, 3, 6), float)
         c_check[1:, :, 2, :, 2] = 0
         assert_allclose(c_array, c_check, atol=1e-30)
@@ -215,28 +211,26 @@ class TestOneSidedPhotometricLikelihood:
                                                'data/crossmatch_params_.txt'),
                                   os.path.join(os.path.dirname(__file__), 'data/cat_a_params.txt'),
                                   os.path.join(os.path.dirname(__file__), 'data/cat_b_params.txt'))
-        self.cm.group_sources_data = self.group_sources_data
         self.cm.chunk_id = 1
         self.cm.phot_like_func = compute_photometric_likelihoods
         self.cm.cf_areas = self.cf_areas
         mcff = Macauff(self.cm)
         mcff.calculate_phot_like()
 
-        abinlen = self.cm.phot_like_data.abinlengths
-        bbinlen = self.cm.phot_like_data.bbinlengths
+        abinlen = self.cm.abinlengths
+        bbinlen = self.cm.bbinlengths
 
         assert np.all(abinlen == 51*np.ones((3, 6), int))
         assert np.all(bbinlen == 26*np.ones((4, 6), int))
 
         for a, shape in zip(
-            [self.cm.phot_like_data.c_array, self.cm.phot_like_data.fa_array,
-             self.cm.phot_like_data.fb_array], [(25, 50, 4, 3, 6), (50, 4, 3, 6),
-                                                (25, 4, 3, 6)]):
+            [self.cm.c_array, self.cm.fa_array,
+             self.cm.fb_array], [(25, 50, 4, 3, 6), (50, 4, 3, 6), (25, 4, 3, 6)]):
             assert np.all(a.shape == shape)
             assert_allclose(a, np.ones(shape, float), atol=1e-30)
 
-        abins = self.cm.phot_like_data.abinsarray
-        bbins = self.cm.phot_like_data.bbinsarray
+        abins = self.cm.abinsarray
+        bbins = self.cm.bbinsarray
         for folder, filts, _bins in zip([self.a_cat_folder_path, self.b_cat_folder_path],
                                         [self.afilts, self.bfilts], [abins, bbins]):
             a = np.load(f'{folder}/con_cat_astro.npy')
@@ -416,16 +410,16 @@ class TestFullPhotometricLikelihood:
         self.b_photo = bp
 
         # Have to pre-create the various overlap arrays, and integral lengths:
-        asize = np.ones(self.ntot, int)
-        asize[~a_cut] = 0
-        ainds = -1*np.ones((1, self.ntot), int, order='F')
-        ainds[0, :] = np.arange(0, self.ntot)
-        ainds[0, ~a_cut] = -1
-        bsize = np.ones(self.ntot, int)
-        bsize[~b_cut] = 0
-        binds = -1*np.ones((1, self.ntot), int, order='F')
-        binds[0, :] = np.arange(0, self.ntot)
-        binds[0, ~b_cut] = -1
+        self.asize = np.ones(self.ntot, int)
+        self.asize[~a_cut] = 0
+        self.ainds = -1*np.ones((1, self.ntot), int, order='F')
+        self.ainds[0, :] = np.arange(0, self.ntot)
+        self.ainds[0, ~a_cut] = -1
+        self.bsize = np.ones(self.ntot, int)
+        self.bsize[~b_cut] = 0
+        self.binds = -1*np.ones((1, self.ntot), int, order='F')
+        self.binds[0, :] = np.arange(0, self.ntot)
+        self.binds[0, ~b_cut] = -1
 
         # Integrate 2-D Gaussian to N*sigma radius gives probability Y of
         # 1 - exp(-0.5 N^2 sigma^2 / sigma^2) = 1 - exp(-0.5 N^2).
@@ -433,17 +427,14 @@ class TestFullPhotometricLikelihood:
         self.y_f, self.y_b = 0.99, 0.63
         n_b = np.sqrt(-2 * np.log(1 - self.y_b))
         n_f = np.sqrt(-2 * np.log(1 - self.y_f))
-        ablen = n_b * np.sqrt(asig**2 + bsig**2) * np.ones(self.ntot, float) / 3600
-        ablen[~a_cut] = 0
-        aflen = n_f * np.sqrt(asig**2 + bsig**2) * np.ones(self.ntot, float) / 3600
-        aflen[~a_cut] = 0
-        bblen = n_b * np.sqrt(asig**2 + bsig**2) * np.ones(self.ntot, float) / 3600
-        bblen[~b_cut] = 0
-        bflen = n_f * np.sqrt(asig**2 + bsig**2) * np.ones(self.ntot, float) / 3600
-        bflen[~b_cut] = 0
-
-        self.group_sources_data = StageData(ablen=ablen, aflen=aflen, ainds=ainds, asize=asize,
-                                            bblen=bblen, bflen=bflen, binds=binds, bsize=bsize)
+        self.ablen = n_b * np.sqrt(asig**2 + bsig**2) * np.ones(self.ntot, float) / 3600
+        self.ablen[~a_cut] = 0
+        self.aflen = n_f * np.sqrt(asig**2 + bsig**2) * np.ones(self.ntot, float) / 3600
+        self.aflen[~a_cut] = 0
+        self.bblen = n_b * np.sqrt(asig**2 + bsig**2) * np.ones(self.ntot, float) / 3600
+        self.bblen[~b_cut] = 0
+        self.bflen = n_f * np.sqrt(asig**2 + bsig**2) * np.ones(self.ntot, float) / 3600
+        self.bflen[~b_cut] = 0
 
     def make_class(self):
         class A():  # pylint: disable=too-few-public-methods
@@ -459,10 +450,17 @@ class TestFullPhotometricLikelihood:
         a.cf_areas = self.cf_areas
         a.include_phot_like = self.include_phot_like
         a.use_phot_priors = self.include_phot_like
-        a.group_sources_data = self.group_sources_data
         a.int_fracs = np.array([self.y_b, self.y_f])
         a.rank = 0
         a.chunk_id = 1
+        a.ablen = self.ablen
+        a.aflen = self.aflen
+        a.bblen = self.bblen
+        a.bflen = self.bflen
+        a.ainds = self.ainds
+        a.asize = self.asize
+        a.binds = self.binds
+        a.bsize = self.bsize
 
         return a
 
@@ -471,15 +469,15 @@ class TestFullPhotometricLikelihood:
             np.save(f'{folder}/con_cat_astro.npy', getattr(self, f'{name}_astro'))
             np.save(f'{folder}/con_cat_photo.npy', getattr(self, f'{name}_photo'))
         fake_cm = self.make_class()
-        pld = compute_photometric_likelihoods(fake_cm)
+        compute_photometric_likelihoods(fake_cm)
 
         # pylint: disable=no-member
-        c_p = pld.c_priors
-        c_l = pld.c_array
-        fa_p = pld.fa_priors
-        fa_l = pld.fa_array
-        fb_p = pld.fb_priors
-        fb_l = pld.fb_array
+        c_p = fake_cm.c_priors
+        c_l = fake_cm.c_array
+        fa_p = fake_cm.fa_priors
+        fa_l = fake_cm.fa_array
+        fb_p = fake_cm.fb_priors
+        fb_l = fake_cm.fb_array
         # pylint: enable=no-member
 
         fake_c_p = self.nc / self.area
@@ -498,7 +496,7 @@ class TestFullPhotometricLikelihood:
         fake_fa_l = np.zeros((len(abins) - 1, 1, 1, 1), float)
         h, _ = np.histogram(a[q], bins=abins, density=True)
         fake_fa_l[:, 0, 0, 0] = h
-        fake_abins = pld.abinsarray[:, 0, 0]  # pylint: disable=no-member
+        fake_abins = fake_cm.abinsarray[:, 0, 0]  # pylint: disable=no-member
         assert np.all(abins == fake_abins)
         assert np.all(fake_fa_l.shape == fa_l.shape)
         assert_allclose(fa_l, fake_fa_l, atol=0.02)
@@ -506,7 +504,7 @@ class TestFullPhotometricLikelihood:
         fake_fb_l = np.zeros((len(bbins) - 1, 1, 1, 1), float)
         h, _ = np.histogram(b[q], bins=bbins, density=True)
         fake_fb_l[:, 0, 0, 0] = h
-        fake_bbins = pld.bbinsarray[:, 0, 0]  # pylint: disable=no-member
+        fake_bbins = fake_cm.bbinsarray[:, 0, 0]  # pylint: disable=no-member
         assert np.all(bbins == fake_bbins)
         assert np.all(fake_fb_l.shape == fb_l.shape)
         assert_allclose(fb_l, fake_fb_l, atol=0.02)
@@ -523,15 +521,15 @@ class TestFullPhotometricLikelihood:
             np.save(f'{folder}/con_cat_photo.npy', getattr(self, f'{name}_photo'))
         fake_cm = self.make_class()
         fake_cm.include_phot_like = False
-        pld = compute_photometric_likelihoods(fake_cm)
+        compute_photometric_likelihoods(fake_cm)
 
         # pylint: disable=no-member
-        c_p = pld.c_priors
-        c_l = pld.c_array
-        fa_p = pld.fa_priors
-        fa_l = pld.fa_array
-        fb_p = pld.fb_priors
-        fb_l = pld.fb_array
+        c_p = fake_cm.c_priors
+        c_l = fake_cm.c_array
+        fa_p = fake_cm.fa_priors
+        fa_l = fake_cm.fa_array
+        fb_p = fake_cm.fb_priors
+        fb_l = fake_cm.fb_array
         # pylint: enable=no-member
 
         fake_c_p = self.nc / self.area
@@ -545,13 +543,13 @@ class TestFullPhotometricLikelihood:
         bbins = make_bins(self.b_photo[~np.isnan(self.b_photo[:, 0]), 0])
 
         fake_fa_l = np.ones((len(abins) - 1, 1, 1, 1), float)
-        fake_abins = pld.abinsarray[:, 0, 0]  # pylint: disable=no-member
+        fake_abins = fake_cm.abinsarray[:, 0, 0]  # pylint: disable=no-member
         assert np.all(abins == fake_abins)
         assert np.all(fake_fa_l.shape == fa_l.shape)
         assert_allclose(fa_l, fake_fa_l)
 
         fake_fb_l = np.ones((len(bbins) - 1, 1, 1, 1), float)
-        fake_bbins = pld.bbinsarray[:, 0, 0]  # pylint: disable=no-member
+        fake_bbins = fake_cm.bbinsarray[:, 0, 0]  # pylint: disable=no-member
         assert np.all(bbins == fake_bbins)
         assert np.all(fake_fb_l.shape == fb_l.shape)
         assert_allclose(fb_l, fake_fb_l)

@@ -10,7 +10,6 @@ import sys
 import numpy as np
 
 # pylint: disable=import-error,no-name-in-module
-from macauff.misc_functions import StageData
 from macauff.misc_functions_fortran import misc_functions_fortran as mff
 from macauff.photometric_likelihood_fortran import photometric_likelihood_fortran as plf
 
@@ -75,27 +74,19 @@ def compute_photometric_likelihoods(cm):
     fb_array = np.zeros(dtype=float, shape=(longbbinlen-1, len(cm.b_filt_names), len(cm.a_filt_names),
                                             len(cm.cf_region_points)), order='F')
 
-    ablen = cm.group_sources_data.ablen
-    aflen = cm.group_sources_data.aflen
-    bflen = cm.group_sources_data.bflen
-    ainds = cm.group_sources_data.ainds
-    binds = cm.group_sources_data.binds
-    asize = cm.group_sources_data.asize
-    bsize = cm.group_sources_data.bsize
-
     for m in range(0, len(cm.cf_region_points)):
         area = cm.cf_areas[m]
         a_sky_cut = a_sky_inds == m
         a_photo_cut = a_photo[a_sky_cut]
         if cm.include_phot_like or cm.use_phot_priors:
             a_blen_cut, a_flen_cut, a_inds_cut, a_size_cut = (
-                ablen[a_sky_cut], aflen[a_sky_cut], ainds[:, a_sky_cut], asize[a_sky_cut])
+                cm.ablen[a_sky_cut], cm.aflen[a_sky_cut], cm.ainds[:, a_sky_cut], cm.asize[a_sky_cut])
 
         b_sky_cut = b_sky_inds == m
         b_photo_cut = b_photo[b_sky_cut]
         if cm.include_phot_like or cm.use_phot_priors:
             b_flen_cut, b_inds_cut, b_size_cut = (
-                bflen[b_sky_cut], binds[:, b_sky_cut], bsize[b_sky_cut])
+                cm.bflen[b_sky_cut], cm.binds[:, b_sky_cut], cm.bsize[b_sky_cut])
 
         for i in range(0, len(cm.a_filt_names)):
             if not cm.include_phot_like and not cm.use_phot_priors:
@@ -151,14 +142,18 @@ def compute_photometric_likelihoods(cm):
                         :abinlengths[i, m]-1, j, i, m] = c_like + 1e-100
                 fa_array[:abinlengths[i, m]-1, j, i, m] = fa_like + 1e-10
                 fb_array[:bbinlengths[j, m]-1, j, i, m] = fb_like + 1e-10
-
-    phot_like_data = StageData(abinsarray=abinsarray, abinlengths=abinlengths,
-                               bbinsarray=bbinsarray, bbinlengths=bbinlengths,
-                               a_sky_inds=a_sky_inds, b_sky_inds=b_sky_inds,
-                               c_priors=c_priors, c_array=c_array,
-                               fa_priors=fa_priors, fa_array=fa_array,
-                               fb_priors=fb_priors, fb_array=fb_array)
-    return phot_like_data
+    cm.abinsarray = abinsarray
+    cm.abinlengths = abinlengths
+    cm.bbinsarray = bbinsarray
+    cm.bbinlengths = bbinlengths
+    cm.a_sky_inds = a_sky_inds
+    cm.b_sky_inds = b_sky_inds
+    cm.c_priors = c_priors
+    cm.c_array = c_array
+    cm.fa_priors = fa_priors
+    cm.fa_array = fa_array
+    cm.fb_priors = fb_priors
+    cm.fb_array = fb_array
 
 
 def create_magnitude_bins(cf_points, filts, a_photo, sky_inds):

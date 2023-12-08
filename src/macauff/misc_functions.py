@@ -8,13 +8,6 @@ import numpy as np
 
 __all__ = []
 
-# "Anemic" class for holding outputs to pass into later pipeline stages
-# Takes any number of arguments in constructor, each becoming an attribute
-# TODO: Move to own file?  pylint:disable=fixme
-class StageData:  # pylint:disable=missing-class-docstring,too-few-public-methods
-    def __init__(self, **kwargs):
-        self.__dict__.update(kwargs)
-
 
 def create_auf_params_grid(perturb_auf_outputs, auf_pointings, filt_names, array_name,
                            arraylengths, len_first_axis=None):
