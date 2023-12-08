@@ -16,6 +16,7 @@ from test_fit_astrometry import TestAstroCorrection as TAC
 
 # pylint: disable=import-error,no-name-in-module
 from macauff.matching import CrossMatch
+from macauff.macauff import Macauff
 
 # pylint: enable=import-error,no-name-in-module
 
@@ -955,13 +956,15 @@ class TestInputs:
         cm.cf_region_points = np.array([[a, b] for a in [131.5, 132.5, 133.5]
                                         for b in [-0.5, 0.5]])
         cm.chunk_id = 1
-        cm._calculate_cf_areas()
+        mcff = Macauff(cm)
+        mcff._calculate_cf_areas()
         assert_allclose(cm.cf_areas, np.ones((6), float), rtol=0.02)
 
         cm.cross_match_extent = np.array([50, 55, 85, 90])
         cm.cf_region_points = np.array([[a, b] for a in 0.5+np.arange(50, 55, 1)
                                         for b in 0.5+np.arange(85, 90, 1)])
-        cm._calculate_cf_areas()
+        mcff = Macauff(cm)
+        mcff._calculate_cf_areas()
         calculated_areas = np.array(
             [(c[0]+0.5 - (c[0]-0.5))*180/np.pi * (np.sin(np.radians(c[1]+0.5)) -
              np.sin(np.radians(c[1]-0.5))) for c in cm.cf_region_points])

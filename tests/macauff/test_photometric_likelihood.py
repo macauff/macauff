@@ -90,10 +90,12 @@ class TestOneSidedPhotometricLikelihood:
         a.a_filt_names = self.afilts
         a.b_filt_names = self.bfilts
         a.cf_region_points = self.cf_points
-        a.cf_region_areas = self.cf_areas
+        a.cf_areas = self.cf_areas
         a.include_phot_like = self.include_phot_like
         a.use_phot_priors = self.include_phot_like
         a.group_sources_data = self.group_sources_data
+        a.rank = 0
+        a.chunk_id = 1
 
         return a
 
@@ -217,7 +219,7 @@ class TestOneSidedPhotometricLikelihood:
         self.cm.group_sources_data = self.group_sources_data
         self.cm.chunk_id = 1
         self.cm.phot_like_func = compute_photometric_likelihoods
-        self.cm.cf_region_areas = self.cf_areas
+        self.cm.cf_areas = self.cf_areas
         mcff = Macauff(self.cm)
         mcff.calculate_phot_like()
 
@@ -455,11 +457,13 @@ class TestFullPhotometricLikelihood:
         a.a_filt_names = self.afilts
         a.b_filt_names = self.bfilts
         a.cf_region_points = self.cf_points
-        a.cf_region_areas = self.cf_areas
+        a.cf_areas = self.cf_areas
         a.include_phot_like = self.include_phot_like
         a.use_phot_priors = self.include_phot_like
         a.group_sources_data = self.group_sources_data
         a.int_fracs = np.array([self.y_b, self.y_f])
+        a.rank = 0
+        a.chunk_id = 1
 
         return a
 

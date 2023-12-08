@@ -311,7 +311,7 @@ def make_perturb_aufs(cm, which_cat):
     modelrefinds[1, :] = magref
 
     if not cm.include_perturb_auf:
-        n_fracs = 1  # TODO: generalise once delta_mag_cuts is user-inputtable.  pylint: disable=fixme
+        n_fracs = 2  # TODO: generalise once delta_mag_cuts is user-inputtable.  pylint: disable=fixme
     else:
         n_fracs = len(delta_mag_cuts)
     # Create the 4-D grids that house the perturbation AUF fourier-space

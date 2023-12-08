@@ -84,7 +84,7 @@ def compute_photometric_likelihoods(cm):
     bsize = cm.group_sources_data.bsize
 
     for m in range(0, len(cm.cf_region_points)):
-        area = cm.cf_region_areas[m]
+        area = cm.cf_areas[m]
         a_sky_cut = a_sky_inds == m
         a_photo_cut = a_photo[a_sky_cut]
         if cm.include_phot_like or cm.use_phot_priors:
