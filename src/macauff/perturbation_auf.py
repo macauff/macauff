@@ -206,17 +206,17 @@ def make_perturb_aufs(cm, which_cat):
                 ax2_list = np.linspace(ax2_min, ax2_max, 7)
                 if fit_gal_flag:
                     single_perturb_auf_output = create_single_perturb_auf(
-                        ax_folder, auf_points[i], cm.r, cm.dr, cm.j0s, num_trials, psf_fwhms[j], tri_filt_names[j],
-                        dens_mags[j], a_photo, localn, d_mag, delta_mag_cuts, dd_params, l_cut, run_fw,
-                        run_psf, snr_mag_params[j], al_avs[j], auf_region_frame, ax1_list, ax2_list,
-                        fit_gal_flag, cmau_array, wavs[j], z_maxs[j], nzs[j], alpha0, alpha1, alpha_weight,
-                        ab_offsets[j], filter_names[j])
+                        ax_folder, auf_points[i], cm.r, cm.dr, cm.j0s, num_trials, psf_fwhms[j],
+                        tri_filt_names[j], dens_mags[j], a_photo, localn, d_mag, delta_mag_cuts, dd_params,
+                        l_cut, run_fw, run_psf, snr_mag_params[j], al_avs[j], auf_region_frame, ax1_list,
+                        ax2_list, fit_gal_flag, cmau_array, wavs[j], z_maxs[j], nzs[j], alpha0, alpha1,
+                        alpha_weight, ab_offsets[j], filter_names[j])
                 else:
                     single_perturb_auf_output = create_single_perturb_auf(
-                        ax_folder, auf_points[i], cm.r, cm.dr, cm.j0s, num_trials, psf_fwhms[j], tri_filt_names[j],
-                        dens_mags[j], a_photo, localn, d_mag, delta_mag_cuts, dd_params, l_cut, run_fw,
-                        run_psf, snr_mag_params[j], al_avs[j], auf_region_frame, ax1_list, ax2_list,
-                        fit_gal_flag)
+                        ax_folder, auf_points[i], cm.r, cm.dr, cm.j0s, num_trials, psf_fwhms[j],
+                        tri_filt_names[j], dens_mags[j], a_photo, localn, d_mag, delta_mag_cuts, dd_params,
+                        l_cut, run_fw, run_psf, snr_mag_params[j], al_avs[j], auf_region_frame, ax1_list,
+                        ax2_list, fit_gal_flag)
                 perturb_auf_outputs[perturb_auf_combo] = single_perturb_auf_output
             else:
                 # Without the simulations to force local normalising density N or

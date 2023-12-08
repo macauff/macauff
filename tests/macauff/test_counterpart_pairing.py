@@ -161,7 +161,7 @@ class TestCounterpartPairing:  # pylint: disable=too-many-instance-attributes
         self.large_len = max(len(self.a_astro), len(self.b_astro))
 
     def make_class(self):
-        class A():
+        class A():  # pylint: disable=too-few-public-methods
             def __init__(self):
                 pass
 

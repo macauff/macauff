@@ -432,7 +432,7 @@ class TestMakePerturbAUFs():
         self.delta_mag_cuts = np.array([10])
 
     def make_class(self):
-        class A():
+        class A():  # pylint: disable=too-few-public-methods,too-many-instance-attributes
             def __init__(self):
                 pass
 

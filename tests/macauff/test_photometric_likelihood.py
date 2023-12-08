@@ -6,7 +6,6 @@ Tests for the "photometric_likelihood" module.
 import os
 
 import numpy as np
-import pytest
 from numpy.testing import assert_allclose
 from test_matching import _replace_line
 
@@ -80,7 +79,7 @@ class TestOneSidedPhotometricLikelihood:
                       idx, new_line)
 
     def make_class(self):
-        class A():
+        class A():  # pylint: disable=too-few-public-methods
             def __init__(self):
                 pass
 
@@ -447,7 +446,7 @@ class TestFullPhotometricLikelihood:
                                             bblen=bblen, bflen=bflen, binds=binds, bsize=bsize)
 
     def make_class(self):
-        class A():
+        class A():  # pylint: disable=too-few-public-methods
             def __init__(self):
                 pass
 

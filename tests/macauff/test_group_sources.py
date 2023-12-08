@@ -462,7 +462,7 @@ class TestMakeIslandGroupings():  # pylint: disable=too-many-instance-attributes
         assert len(os.listdir(f'{self.joint_folder_path}/reject')) == 0
 
     @pytest.mark.filterwarnings("ignore:.*island, containing.*")
-    def test_mig_extra_reject(self):
+    def test_mig_extra_reject(self):  # pylint: disable=too-many-statements
         os.system(f'rm -rf {self.joint_folder_path}/reject/*')
         self._fake_fourier_grid(self.n_a+10, self.n_b+11)
         n_a, n_b, n_c = self.n_a, self.n_b, self.n_com
@@ -583,7 +583,7 @@ class TestMakeIslandGroupings():  # pylint: disable=too-many-instance-attributes
         assert np.all(breject == np.arange(n_b, n_b+11))
         assert len(os.listdir(f'{self.joint_folder_path}/reject')) == 2
 
-    def test_make_island_groupings_include_phot_like(self):
+    def test_make_island_groupings_include_phot_like(self):  # pylint: disable=too-many-statements
         os.system(f'rm -rf {self.joint_folder_path}/reject/*')
         self._fake_fourier_grid(self.n_a, self.n_b)
         np.save(f'{self.a_cat_folder_path}/con_cat_astro.npy', self.a_coords)
