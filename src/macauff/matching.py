@@ -178,7 +178,7 @@ class CrossMatch():
             acbi = self.a_best_mag_index
             a_correct_astro_tri_name = '{}/{}/trilegal_auf_simulation'
             t = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            print("{t} Rank {self.rank}, chunk {self.chunk_id}: Calculating catalogue 'a' "
+            print(f"{t} Rank {self.rank}, chunk {self.chunk_id}: Calculating catalogue 'a' "
                   "uncertainty corrections...")
             ac = AstrometricCorrections(
                 self.a_psf_fwhms[acbi], self.num_trials, self.a_nn_radius,
