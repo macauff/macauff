@@ -109,7 +109,8 @@ class TestAstroCorrection:
             'ax2_mids': ax2_mids, 'cutout_area': 60, 'cutout_height': 6, 'mag_array': magarray,
             'mag_slice': magslice, 'sig_slice': sigslice, 'n_pool': 1,
             'pos_and_err_indices': [[0, 1, 2], [0, 1, 2]], 'mag_indices': [3],
-            'mag_unc_indices': [4], 'mag_names': ['W1'], 'best_mag_index': 0}
+            'mag_unc_indices': [4], 'mag_names': ['W1'], 'best_mag_index': 0,
+            'n_r': 5000, 'n_rho': 5000, 'max_rho': 100}
 
         with pytest.raises(ValueError, match='single_sided_auf must be True.'):
             AstrometricCorrections(
@@ -196,7 +197,7 @@ class TestAstroCorrection:
             mag_array=magarray, mag_slice=magslice, sig_slice=sigslice, n_pool=1, npy_or_csv='npy',
             coord_or_chunk='coord', pos_and_err_indices=[[0, 1, 2], [0, 1, 2]], mag_indices=[3],
             mag_unc_indices=[4], mag_names=['W1'], best_mag_index=0, coord_system='equatorial',
-            chunks=chunks, pregenerate_cutouts=True)
+            chunks=chunks, pregenerate_cutouts=True, n_r=2000, n_rho=2000, max_rho=40)
         self.npy_or_csv = 'npy'
         cat_args = (105.0, 0.0)
         if os.path.isfile(self.a_cat_name.format(*cat_args)):
@@ -258,7 +259,7 @@ class TestAstroCorrection:
             mag_names=['W1'], best_mag_index=0, coord_system=coord_system, chunks=chunks,
             pregenerate_cutouts=pregenerate_cutouts,
             cutout_area=60 if not pregenerate_cutouts else None,
-            cutout_height=6 if not pregenerate_cutouts else None)
+            cutout_height=6 if not pregenerate_cutouts else None, n_r=2000, n_rho=2000, max_rho=40)
 
         if coord_or_chunk == 'coord':
             self.a_cat_name = 'store_data/a_cat{}{}' + ('.csv' if npy_or_csv == 'csv' else '.npy')

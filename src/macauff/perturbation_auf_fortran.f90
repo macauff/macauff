@@ -668,6 +668,9 @@ subroutine fourier_transform(pr, r, dr, j0s, G)
     real(dp), intent(out) :: G(size(j0s, 2))
     ! Loop counters.
     integer :: i, j
+    ! Temporary variables
+    real(dp) :: r_pr_dr(size(r))
+    r_pr_dr = r * pr * dr
     G(:) = 0.0_dp
     ! Following notation of J. W. Goodman, Introduction to Fourier Optics (1996), equation 2-31,
     ! G0 is the Hankel transform of gR, and the inverse is the opposite.
@@ -677,7 +680,7 @@ subroutine fourier_transform(pr, r, dr, j0s, G)
     
     do i = 1, size(j0s, 2)
         do j = 1, size(j0s, 1)
-            G(i) = G(i) + r(j) * pr(j) * j0s(j, i) * dr(j)
+            G(i) = G(i) + r_pr_dr(j) * j0s(j, i)
         end do
         G(i) = G(i) * 2.0_dp * pi
     end do

@@ -192,7 +192,8 @@ class CrossMatch():
                 self.a_pos_and_err_indices, self.a_mag_indices, self.a_mag_unc_indices,
                 self.a_filt_names, self.a_best_mag_index, self.a_auf_region_frame,
                 use_photometric_uncertainties=self.a_use_photometric_uncertainties,
-                pregenerate_cutouts=True, chunks=[self.chunk_id])
+                pregenerate_cutouts=True, chunks=[self.chunk_id],
+                n_r=self.real_hankel_points, n_rho=self.four_hankel_points, max_rho=self.four_max_rho)
             ac(self.a_ref_csv_cat_file_string, self.a_csv_cat_file_string,
                tri_download=self.a_download_tri, make_plots=True, overwrite_all_sightlines=True)
 
@@ -259,7 +260,8 @@ class CrossMatch():
                 self.b_pos_and_err_indices, self.b_mag_indices, self.b_mag_unc_indices,
                 self.b_filt_names, self.b_best_mag_index, self.b_auf_region_frame,
                 use_photometric_uncertainties=self.b_use_photometric_uncertainties,
-                pregenerate_cutouts=True, chunks=[self.chunk_id])
+                pregenerate_cutouts=True, chunks=[self.chunk_id],
+                n_r=self.real_hankel_points, n_rho=self.four_hankel_points, max_rho=self.four_max_rho)
             ac(self.b_ref_csv_cat_file_string, self.b_csv_cat_file_string,
                tri_download=self.b_download_tri, make_plots=True, overwrite_all_sightlines=True)
 

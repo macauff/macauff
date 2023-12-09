@@ -1453,8 +1453,36 @@ class TestInputs:
         # to catalogue 'a'.
         cm = CrossMatch(os.path.join(os.path.dirname(__file__), 'data'))
         cm.chunk_id = 1
+
+        old_line = 'real_hankel_points = 10000'
+        new_line = 'real_hankel_points = 1000\n'
+        with open(os.path.join(os.path.dirname(__file__), 'data/crossmatch_params.txt'),
+                  encoding='utf-8') as file:
+            f = file.readlines()
+        idx = np.where([old_line in line for line in f])[0][0]
+        _replace_line(os.path.join(os.path.dirname(__file__),
+                      'data/crossmatch_params.txt'), idx, new_line,
+                      out_file=os.path.join(os.path.dirname(__file__),
+                                            'data/crossmatch_params_v2.txt'))
+        old_line = 'four_max_rho = 100'
+        new_line = 'four_max_rho = 30\n'
+        with open(os.path.join(os.path.dirname(__file__), 'data/crossmatch_params_v2.txt'),
+                  encoding='utf-8') as file:
+            f = file.readlines()
+        idx = np.where([old_line in line for line in f])[0][0]
+        _replace_line(os.path.join(os.path.dirname(__file__),
+                      'data/crossmatch_params_v2.txt'), idx, new_line)
+        old_line = 'four_hankel_points = 10000'
+        new_line = 'four_hankel_points = 1000\n'
+        with open(os.path.join(os.path.dirname(__file__), 'data/crossmatch_params_v2.txt'),
+                  encoding='utf-8') as file:
+            f = file.readlines()
+        idx = np.where([old_line in line for line in f])[0][0]
+        _replace_line(os.path.join(os.path.dirname(__file__),
+                      'data/crossmatch_params_v2.txt'), idx, new_line)
+
         cm._initialise_chunk(os.path.join(os.path.dirname(__file__),
-                             'data/crossmatch_params.txt'),
+                             'data/crossmatch_params_v2.txt'),
                              os.path.join(os.path.dirname(__file__),
                              'data/cat_a_params.txt'),
                              os.path.join(os.path.dirname(__file__),
@@ -1493,7 +1521,7 @@ class TestInputs:
         cm = CrossMatch(os.path.join(os.path.dirname(__file__), 'data'))
         cm.chunk_id = 1
         cm._initialise_chunk(os.path.join(os.path.dirname(__file__),
-                             'data/crossmatch_params.txt'),
+                             'data/crossmatch_params_v2.txt'),
                              os.path.join(os.path.dirname(__file__),
                              'data/cat_b_params_2.txt'),
                              os.path.join(os.path.dirname(__file__),
@@ -1544,7 +1572,7 @@ class TestInputs:
         cm = CrossMatch(os.path.join(os.path.dirname(__file__), 'data'))
         cm.chunk_id = 1
         cm._initialise_chunk(os.path.join(os.path.dirname(__file__),
-                             'data/crossmatch_params.txt'),
+                             'data/crossmatch_params_v2.txt'),
                              os.path.join(os.path.dirname(__file__),
                              'data/cat_a_params.txt'),
                              os.path.join(os.path.dirname(__file__),
@@ -1565,7 +1593,7 @@ class TestInputs:
         cm = CrossMatch(os.path.join(os.path.dirname(__file__), 'data'))
         cm.chunk_id = 1
         cm._initialise_chunk(os.path.join(os.path.dirname(__file__),
-                             'data/crossmatch_params.txt'),
+                             'data/crossmatch_params_v2.txt'),
                              os.path.join(os.path.dirname(__file__),
                              'data/cat_a_params_2b.txt'),
                              os.path.join(os.path.dirname(__file__),
