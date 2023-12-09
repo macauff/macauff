@@ -5,6 +5,7 @@ distinct "islands" of sources, along with calculating whether they are within ov
 various photometric integral purposes.
 '''
 
+import datetime
 import itertools
 import multiprocessing
 import sys
@@ -14,12 +15,7 @@ import numpy as np
 # pylint: disable=import-error,no-name-in-module
 from macauff.group_sources_fortran import group_sources_fortran as gsf
 from macauff.make_set_list import set_list
-from macauff.misc_functions import (
-    StageData,
-    _load_rectangular_slice,
-    hav_dist_constant_lat,
-    load_small_ref_auf_grid,
-)
+from macauff.misc_functions import _load_rectangular_slice, hav_dist_constant_lat, load_small_ref_auf_grid
 
 # pylint: enable=import-error,no-name-in-module
 
@@ -27,10 +23,7 @@ __all__ = ['make_island_groupings']
 
 
 # pylint: disable-next=too-many-arguments,too-many-locals,too-many-statements
-def make_island_groupings(joint_folder_path, a_cat_folder_path, b_cat_folder_path,
-                          a_modelrefinds, b_modelrefinds, r, dr, rho, drho, j1s, max_sep,
-                          ax_lims, int_fracs, include_phot_like, use_phot_priors,
-                          n_pool, a_perturb_auf_outputs, b_perturb_auf_outputs):
+def make_island_groupings(cm):
     '''
     Function to handle the creation of "islands" of astrometrically coeval
     sources, and identify which overlap to some probability based on their
@@ -38,66 +31,19 @@ def make_island_groupings(joint_folder_path, a_cat_folder_path, b_cat_folder_pat
 
     Parameters
     ----------
-    joint_folder_path : string
-        Folder on disk containing the files related to the cross-match between
-        the two catalogues.
-    a_cat_folder_path : string
-        Folder on disk where catalogue "a" files have been stored.
-    b_cat_folder_path : string
-        Folder on disk where catalogue "b" files are saved.
-    a_modelrefinds : numpy.ndarray
-        Catalogue "a" modelrefinds array output from ``create_perturb_auf``.
-        TODO Improve description
-    b_modelrefinds : numpy.ndarray
-        Catalogue "b" modelrefinds array output from ``create_perturb_auf``.
-        TODO Improve description
-    r : numpy.ndarray
-        Array of real-space distances, in arcseconds, used in the evaluation of
-        convolved AUF integrals; represent bin edges.
-    dr : numpy.ndarray
-        Widths of real-space bins in ``r``. Will have shape one shorter than ``r``,
-        due to ``r`` requiring an additional right-hand bin edge.
-    rho : numpy.ndarray
-        Fourier-space array, used in handling the Hankel transformation for
-        convolution of AUFs. As with ``r``, represents bin edges.
-    drho : numpy.ndarray
-        Array representing the bin widths of ``rho``. As with ``dr``, is one
-        shorter than ``rho`` due to its additional bin edge.
-    j1s : 2-D numpy.ndarray
-        Array holding the evaluations of the Bessel Function of First kind of
-        First Order, evaluated at all ``r`` and ``rho`` bin-middle combination.
-    max_sep : float
-        The maximum allowed sky separation between two sources in opposing
-        catalogues for consideration as potential counterparts.
-    ax_lims : list of floats, or numpy.ndarray
-        The four limits of the cross-match between catalogues "a" and "b",
-        as lower and upper longitudinal coordinate, lower and upper latitudinal
-        coordinates respectively.
-    int_fracs : list of floats, or numpy.ndarray
-        List of integral limits used in evaluating probability of match based on
-        separation distance.
-    include_phot_like : boolean
-        Flag indicating whether to perform additional computations required for
-        the future calculation of photometric likelihoods.
-    use_phot_priors : boolean
-        Flag indicating whether to calcualte additional parameters needed to
-        calculate photometric-information dependent priors for cross-matching.
-    n_pool : integer
-        Number of multiprocessing pools to use when parallelising.
-    a_perturb_auf_outputs : dictionary
-        Dict containing the results from the previous step of the cross-match,
-        the simulations of the perturbation component of catalogue a's AUF.
-    b_perturb_auf_outputs : dictionary
-        Dict containing the results from the previous step of the cross-match,
-        the simulations of the perturbation component of catalogue b's AUF.
+    cm : Class
+        The cross-match wrapper, containing all of the necessary metadata to
+        perform the cross-match and determine match islands.
     '''
 
     # Convert from arcseconds to degrees internally.
-    max_sep = np.copy(max_sep) / 3600
-    print("Creating catalogue islands and overlaps...")
+    max_sep = np.copy(cm.pos_corr_dist) / 3600
+    t = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    print(f"{t} Rank {cm.rank}, chunk {cm.chunk_id}: Creating catalogue islands and overlaps...")
     sys.stdout.flush()
 
-    print("Calculating maximum overlap...")
+    t = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    print(f"{t} Rank {cm.rank}, chunk {cm.chunk_id}: Calculating maximum overlap...")
     sys.stdout.flush()
 
     # The initial step to create island groupings is to find the largest number
@@ -107,16 +53,16 @@ def make_island_groupings(joint_folder_path, a_cat_folder_path, b_cat_folder_pat
     # the number of overlaps for each object across all sky slices.
 
     ax1_skip, ax2_skip = 8, 8
-    ax1_loops = np.linspace(ax_lims[0], ax_lims[1], 41)
+    ax1_loops = np.linspace(cm.cross_match_extent[0], cm.cross_match_extent[1], 41)
     # Force the sub-division of the sky area in question to be 1600 chunks, or
     # roughly quarter square degree chunks, whichever is larger in area.
     if ax1_loops[1] - ax1_loops[0] < 0.25:
-        ax1_loops = np.linspace(ax_lims[0], ax_lims[1],
-                                int(np.ceil((ax_lims[1] - ax_lims[0])/0.25) + 1))
-    ax2_loops = np.linspace(ax_lims[2], ax_lims[3], 41)
+        ax1_loops = np.linspace(cm.cross_match_extent[0], cm.cross_match_extent[1],
+                                int(np.ceil((cm.cross_match_extent[1] - cm.cross_match_extent[0])/0.25) + 1))
+    ax2_loops = np.linspace(cm.cross_match_extent[2], cm.cross_match_extent[3], 41)
     if ax2_loops[1] - ax2_loops[0] < 0.25:
-        ax2_loops = np.linspace(ax_lims[2], ax_lims[3],
-                                int(np.ceil((ax_lims[3] - ax_lims[2])/0.25) + 1))
+        ax2_loops = np.linspace(cm.cross_match_extent[2], cm.cross_match_extent[3],
+                                int(np.ceil((cm.cross_match_extent[3] - cm.cross_match_extent[2])/0.25) + 1))
     ax1_sparse_loops = ax1_loops[::ax1_skip]
     if ax1_sparse_loops[-1] != ax1_loops[-1]:
         ax1_sparse_loops = np.append(ax1_sparse_loops, ax1_loops[-1])
@@ -125,8 +71,8 @@ def make_island_groupings(joint_folder_path, a_cat_folder_path, b_cat_folder_pat
         ax2_sparse_loops = np.append(ax2_sparse_loops, ax2_loops[-1])
 
     # Load the astrometry of each catalogue for slicing.
-    a_full = np.load(f'{a_cat_folder_path}/con_cat_astro.npy')
-    b_full = np.load(f'{b_cat_folder_path}/con_cat_astro.npy')
+    a_full = np.load(f'{cm.a_cat_folder_path}/con_cat_astro.npy')
+    b_full = np.load(f'{cm.b_cat_folder_path}/con_cat_astro.npy')
 
     asize = np.zeros(dtype=int, shape=(len(a_full),))
     bsize = np.zeros(dtype=int, shape=(len(b_full),))
@@ -150,17 +96,16 @@ def make_island_groupings(joint_folder_path, a_cat_folder_path, b_cat_folder_pat
                                               ax2_loops[j*ax2_skip+1:(j+1)*ax2_skip+1]):
                     ax_cutout = [ax1_start, ax1_end, ax2_start, ax2_end]
                     a, afouriergrid, amodrefindsmall, a_cut = _load_fourier_grid_cutouts(
-                        a_cutout, ax_cutout, a_cat_folder_path, a_perturb_auf_outputs, 0, a_big_sky_cut,
-                        a_modelrefinds)
+                        a_cutout, ax_cutout, cm.a_cat_folder_path, cm.a_perturb_auf_outputs, 0, a_big_sky_cut,
+                        cm.a_modelrefinds)
                     b, bfouriergrid, bmodrefindsmall, b_cut = _load_fourier_grid_cutouts(
-                        b_cutout, ax_cutout, b_cat_folder_path, b_perturb_auf_outputs, max_sep,
-                        b_big_sky_cut, b_modelrefinds)
-
+                        b_cutout, ax_cutout, cm.b_cat_folder_path, cm.b_perturb_auf_outputs, max_sep,
+                        b_big_sky_cut, cm.b_modelrefinds)
                     if len(a) > 0 and len(b) > 0:
                         overlapa, overlapb = gsf.get_max_overlap(
                             a[:, 0], a[:, 1], b[:, 0], b[:, 1], max_sep, a[:, 2], b[:, 2],
-                            r[:-1]+dr/2, rho[:-1], drho, j1s, afouriergrid, bfouriergrid,
-                            amodrefindsmall, bmodrefindsmall, int_fracs[2])
+                            cm.r[:-1]+cm.dr/2, cm.rho[:-1], cm.drho, cm.j1s, afouriergrid, bfouriergrid,
+                            amodrefindsmall, bmodrefindsmall, cm.int_fracs[2])
                         a_cut2 = a_sky_inds[a_cut]
                         b_cut2 = b_sky_inds[b_cut]
 
@@ -172,7 +117,8 @@ def make_island_groupings(joint_folder_path, a_cat_folder_path, b_cat_folder_pat
     del (overlapa, overlapb, a, b, a_cut, b_cut, amodrefindsmall, bmodrefindsmall,
          afouriergrid, bfouriergrid)
 
-    print("Truncating star overlaps by AUF integral...")
+    t = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    print(f"{t} Rank {cm.rank}, chunk {cm.chunk_id}: Truncating star overlaps by AUF integral...")
     sys.stdout.flush()
 
     ainds = np.zeros(dtype=int, shape=(amaxsize, len(a_full)), order='F')
@@ -203,17 +149,17 @@ def make_island_groupings(joint_folder_path, a_cat_folder_path, b_cat_folder_pat
                                               ax2_loops[j*ax2_skip+1:(j+1)*ax2_skip+1]):
                     ax_cutout = [ax1_start, ax1_end, ax2_start, ax2_end]
                     a, afouriergrid, amodrefindsmall, a_cut = _load_fourier_grid_cutouts(
-                        a_cutout, ax_cutout, a_cat_folder_path, a_perturb_auf_outputs, 0, a_big_sky_cut,
-                        a_modelrefinds)
+                        a_cutout, ax_cutout, cm.a_cat_folder_path, cm.a_perturb_auf_outputs, 0, a_big_sky_cut,
+                        cm.a_modelrefinds)
                     b, bfouriergrid, bmodrefindsmall, b_cut = _load_fourier_grid_cutouts(
-                        b_cutout, ax_cutout, b_cat_folder_path, b_perturb_auf_outputs, max_sep,
-                        b_big_sky_cut, b_modelrefinds)
+                        b_cutout, ax_cutout, cm.b_cat_folder_path, cm.b_perturb_auf_outputs, max_sep,
+                        b_big_sky_cut, cm.b_modelrefinds)
 
                     if len(a) > 0 and len(b) > 0:
                         indicesa, indicesb, overlapa, overlapb = gsf.get_overlap_indices(
                             a[:, 0], a[:, 1], b[:, 0], b[:, 1], max_sep, amaxsize, bmaxsize,
-                            a[:, 2], b[:, 2], r[:-1]+dr/2, rho[:-1], drho, j1s, afouriergrid,
-                            bfouriergrid, amodrefindsmall, bmodrefindsmall, int_fracs[2])
+                            a[:, 2], b[:, 2], cm.r[:-1]+cm.dr/2, cm.rho[:-1], cm.drho, cm.j1s, afouriergrid,
+                            bfouriergrid, amodrefindsmall, bmodrefindsmall, cm.int_fracs[2])
 
                         a_cut2 = a_sky_inds[a_cut]
                         b_cut2 = b_sky_inds[b_cut]
@@ -231,42 +177,46 @@ def make_island_groupings(joint_folder_path, a_cat_folder_path, b_cat_folder_pat
     del (a_cut, a_cut2, b_cut, b_cut2, indicesa, indicesb, overlapa, overlapb, a, b,
          amodrefindsmall, bmodrefindsmall, afouriergrid, bfouriergrid)
 
-    print("Cleaning overlaps...")
+    t = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    print(f"{t} Rank {cm.rank}, chunk {cm.chunk_id}: Cleaning overlaps...")
     sys.stdout.flush()
 
-    ainds, asize = _clean_overlaps(ainds, asize, n_pool)
-    binds, bsize = _clean_overlaps(binds, bsize, n_pool)
+    ainds, asize = _clean_overlaps(ainds, asize, cm.n_pool)
+    binds, bsize = _clean_overlaps(binds, bsize, cm.n_pool)
 
-    print("Calculating integral lengths...")
+    t = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    print(f"{t} Rank {cm.rank}, chunk {cm.chunk_id}: Calculating integral lengths...")
     sys.stdout.flush()
 
-    if include_phot_like or use_phot_priors:
+    if cm.include_phot_like or cm.use_phot_priors:
         a_err = a_full[:, 2]
 
         b_err = b_full[:, 2]
 
-        a_fouriergrid = a_perturb_auf_outputs['fourier_grid']
-        b_fouriergrid = b_perturb_auf_outputs['fourier_grid']
+        a_fouriergrid = cm.a_perturb_auf_outputs['fourier_grid']
+        b_fouriergrid = cm.b_perturb_auf_outputs['fourier_grid']
 
         a_int_lens = gsf.get_integral_length(
-            a_err, b_err, r[:-1]+dr/2, rho[:-1], drho, j1s, a_fouriergrid, b_fouriergrid,
-            a_modelrefinds, b_modelrefinds, ainds, asize, int_fracs[0:2])
+            a_err, b_err, cm.r[:-1]+cm.dr/2, cm.rho[:-1], cm.drho, cm.j1s, a_fouriergrid, b_fouriergrid,
+            cm.a_modelrefinds, cm.b_modelrefinds, ainds, asize, cm.int_fracs[0:2])
         ablen = a_int_lens[:, 0]
         aflen = a_int_lens[:, 1]
 
         b_int_lens = gsf.get_integral_length(
-            b_err, a_err, r[:-1]+dr/2, rho[:-1], drho, j1s, b_fouriergrid, a_fouriergrid,
-            b_modelrefinds, a_modelrefinds, binds, bsize, int_fracs[0:2])
+            b_err, a_err, cm.r[:-1]+cm.dr/2, cm.rho[:-1], cm.drho, cm.j1s, b_fouriergrid, a_fouriergrid,
+            cm.b_modelrefinds, cm.a_modelrefinds, binds, bsize, cm.int_fracs[0:2])
         bblen = b_int_lens[:, 0]
         bflen = b_int_lens[:, 1]
 
-    print("Maximum overlaps are:", amaxsize, bmaxsize)
+    t = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    print(f"{t} Rank {cm.rank}, chunk {cm.chunk_id}: Maximum overlaps are:", amaxsize, bmaxsize)
     sys.stdout.flush()
 
-    print("Finding unique sets...")
+    t = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    print(f"{t} Rank {cm.rank}, chunk {cm.chunk_id}: Finding unique sets...")
     sys.stdout.flush()
 
-    set_list_items = set_list(ainds, binds, asize, bsize, n_pool)
+    set_list_items = set_list(ainds, binds, asize, bsize, cm.n_pool)
     if len(set_list_items) == 6:
         alist, blist, agrplen, bgrplen, areject, breject = set_list_items
         reject_flag = True
@@ -291,12 +241,12 @@ def make_island_groupings(joint_folder_path, a_cat_folder_path, b_cat_folder_pat
     # from any of the four lines defining extent in orthogonal sky axes.
     counter = np.arange(0, alist.shape[1])
     expand_constants = [itertools.repeat(item) for item in [
-        a_full, b_full, alist, blist, agrplen, bgrplen, ax_lims, max_sep]]
+        a_full, b_full, alist, blist, agrplen, bgrplen, cm.cross_match_extent, max_sep]]
     iter_group = zip(counter, *expand_constants)
     # Initialise the multiprocessing loop setup:
-    with multiprocessing.Pool(n_pool) as pool:
+    with multiprocessing.Pool(cm.n_pool) as pool:
         for return_items in pool.imap_unordered(_distance_check, iter_group,
-                                                chunksize=max(1, len(counter) // n_pool)):
+                                                chunksize=max(1, len(counter) // cm.n_pool)):
             i, dist_check, a, b = return_items
             if dist_check:
                 passed_check[i] = 1
@@ -349,27 +299,36 @@ def make_island_groupings(joint_folder_path, a_cat_folder_path, b_cat_folder_pat
     blist = blist[:, passed_check]
     bgrplen = bgrplen[passed_check]
     # Only return aflen and bflen if they were created
-    if not (include_phot_like or use_phot_priors):
+    if not (cm.include_phot_like or cm.use_phot_priors):
         ablen = bblen = None
         aflen = bflen = None
     # Only return reject counts if they were created
     if num_a_failed_checks + a_first_rejected_len > 0:
         lenrejecta = len(reject_a)
         # Save rejects output files.
-        np.save(f'{joint_folder_path}/reject/reject_a.npy', reject_a)
+        np.save(f'{cm.joint_folder_path}/reject/reject_a.npy', reject_a)
     else:
         lenrejecta = 0
     if num_b_failed_checks + b_first_rejected_len > 0:
         lenrejectb = len(reject_b)
-        np.save(f'{joint_folder_path}/reject/reject_b.npy', reject_b)
+        np.save(f'{cm.joint_folder_path}/reject/reject_b.npy', reject_b)
     else:
         lenrejectb = 0
 
-    group_sources_data = StageData(ablen=ablen, bblen=bblen, ainds=ainds, binds=binds,
-                                   asize=asize, bsize=bsize, aflen=aflen, bflen=bflen,
-                                   alist=alist, blist=blist, agrplen=agrplen, bgrplen=bgrplen,
-                                   lenrejecta=lenrejecta, lenrejectb=lenrejectb)
-    return group_sources_data
+    cm.ablen = ablen
+    cm.bblen = bblen
+    cm.ainds = ainds
+    cm.binds = binds
+    cm.asize = asize
+    cm.bsize = bsize
+    cm.aflen = aflen
+    cm.bflen = bflen
+    cm.alist = alist
+    cm.blist = blist
+    cm.agrplen = agrplen
+    cm.bgrplen = bgrplen
+    cm.lenrejecta = lenrejecta
+    cm.lenrejectb = lenrejectb
 
 
 def _load_fourier_grid_cutouts(a, sky_rect_coords, cat_folder_path, perturb_auf_outputs, padding,

@@ -4,12 +4,12 @@ This module provides the framework for the creation of the photometric likelihoo
 used in the cross-matching of the two catalogues.
 '''
 
+import datetime
 import sys
 
 import numpy as np
 
 # pylint: disable=import-error,no-name-in-module
-from macauff.misc_functions import StageData
 from macauff.misc_functions_fortran import misc_functions_fortran as mff
 from macauff.photometric_likelihood_fortran import photometric_likelihood_fortran as plf
 
@@ -19,128 +19,85 @@ __all__ = ['compute_photometric_likelihoods']
 
 
 # pylint: disable-next=too-many-locals
-def compute_photometric_likelihoods(a_cat_folder_path, b_cat_folder_path, afilts, bfilts, cf_points, cf_areas,
-                                    include_phot_like, use_phot_priors, group_sources_data, bright_frac=None,
-                                    field_frac=None):
+def compute_photometric_likelihoods(cm):
     '''
     Derives the photometric likelihoods and priors for use in the catalogue
     cross-match process.
 
     Parameters
     ----------
-    joint_folder_path : string
-        The folder where all folders and files created during the cross-match
-        process are stored.
-    a_cat_folder_path : string
-        The folder where the input data for catalogue "a" are located.
-    b_cat_folder_path : string
-        The location of catalogue "b"'s input data.
-    afilts : list of string
-        A list of the filters in catalogue "a"'s photometric data file.
-    bfilts : list of string
-        List of catalogue "b"'s filters.
-    cf_points : numpy.ndarray
-        The on-sky coordinates that define the locations of each small
-        set of sources to be used to derive the relative match and non-match
-        photometric likelihoods.
-    cf_areas : numpy.ndarray
-        The areas of closest on-sky separation surrounding each point in
-        ``cf_points``, used to normalise numbers of sources to sky densities.
-    include_phot_like : boolean
-        Flag to indicate whether to derive astrophysical likelihoods ``c`` and
-        ``f``, based on the common coevality of sources of given magnitudes.
-    use_phot_priors : boolean
-        Indicator as to whether to use astrophysical priors, based on the common
-        number of likely matches and non-matches in each ``cf_points`` area, or
-        use naive, asymmetric priors solely based on number density of sources.
-    group_sources_data : class.StageData
-        Object containing all outputs from ``make_island_groupings``
-        TODO Improve description
-    bright_frac : float, optional
-        Expected fraction of sources inside the "bright" error circles used to
-        construct the counterpart distribution, to correct for missing numbers.
-        If ``include_phot_like`` or ``use_phot_prior`` is True then this must
-        be supplied, otherwise it can be omitted.
-    field_frac : float, optional
-        Expected fraction of sources inside the "field" error circles used to
-        construct the counterpart distribution, to correct for missing numbers.
-        If ``include_phot_like`` or ``use_phot_prior`` is True then this must
-        be supplied, otherwise it can be omitted.
+    cm : Class
+        The cross-match wrapper, containing all of the necessary metadata to
+        perform the cross-match and determine photometric likelihoods.
     '''
 
-    if bright_frac is None and (include_phot_like or use_phot_priors):
-        raise ValueError("bright_frac must be supplied if include_phot_like or use_phot_priors "
-                         "is set to True. Please supply an appropriate fraction.")
-    if field_frac is None and (include_phot_like or use_phot_priors):
-        raise ValueError("field_frac must be supplied if include_phot_like or use_phot_priors "
-                         "is set to True. Please supply an appropriate fraction.")
+    t = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    print(f"{t} Rank {cm.rank}, chunk {cm.chunk_id}: Creating c(m, m) and f(m)...")
 
-    print("Creating c(m, m) and f(m)...")
-
-    print("Distributing sources into sky slices...")
+    t = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    print(f"{t} Rank {cm.rank}, chunk {cm.chunk_id}: Distributing sources into sky slices...")
     sys.stdout.flush()
 
-    a_astro = np.load(f'{a_cat_folder_path}/con_cat_astro.npy')
-    b_astro = np.load(f'{b_cat_folder_path}/con_cat_astro.npy')
-    a_photo = np.load(f'{a_cat_folder_path}/con_cat_photo.npy')
-    b_photo = np.load(f'{b_cat_folder_path}/con_cat_photo.npy')
+    a_astro = np.load(f'{cm.a_cat_folder_path}/con_cat_astro.npy')
+    b_astro = np.load(f'{cm.b_cat_folder_path}/con_cat_astro.npy')
+    a_photo = np.load(f'{cm.a_cat_folder_path}/con_cat_photo.npy')
+    b_photo = np.load(f'{cm.b_cat_folder_path}/con_cat_photo.npy')
 
-    a_sky_inds = mff.find_nearest_point(a_astro[:, 0], a_astro[:, 1], cf_points[:, 0],
-                                        cf_points[:, 1])
-    b_sky_inds = mff.find_nearest_point(b_astro[:, 0], b_astro[:, 1], cf_points[:, 0],
-                                        cf_points[:, 1])
+    a_sky_inds = mff.find_nearest_point(a_astro[:, 0], a_astro[:, 1], cm.cf_region_points[:, 0],
+                                        cm.cf_region_points[:, 1])
+    b_sky_inds = mff.find_nearest_point(b_astro[:, 0], b_astro[:, 1], cm.cf_region_points[:, 0],
+                                        cm.cf_region_points[:, 1])
 
-    print("Making bins...")
+    t = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    print(f"{t} Rank {cm.rank}, chunk {cm.chunk_id}: Making bins...")
     sys.stdout.flush()
 
-    abinlengths, abinsarray, longabinlen = create_magnitude_bins(cf_points, afilts, a_photo, a_sky_inds)
-    bbinlengths, bbinsarray, longbbinlen = create_magnitude_bins(cf_points, bfilts, b_photo, b_sky_inds)
+    abinlengths, abinsarray, longabinlen = create_magnitude_bins(cm.cf_region_points, cm.a_filt_names,
+                                                                 a_photo, a_sky_inds)
+    bbinlengths, bbinsarray, longbbinlen = create_magnitude_bins(cm.cf_region_points, cm.b_filt_names,
+                                                                 b_photo, b_sky_inds)
 
-    print("Calculating PDFs...")
+    t = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    print(f"{t} Rank {cm.rank}, chunk {cm.chunk_id}: Calculating PDFs...")
     sys.stdout.flush()
 
-    c_priors = np.zeros(dtype=float, shape=(len(bfilts), len(afilts), len(cf_points)), order='F')
-    fa_priors = np.zeros(dtype=float, shape=(len(bfilts), len(afilts), len(cf_points)), order='F')
-    fb_priors = np.zeros(dtype=float, shape=(len(bfilts), len(afilts), len(cf_points)), order='F')
-    c_array = np.zeros(dtype=float, shape=(longbbinlen-1, longabinlen-1, len(bfilts), len(afilts),
-                       len(cf_points)), order='F')
-    fa_array = np.zeros(dtype=float, shape=(longabinlen-1, len(bfilts), len(afilts),
-                                            len(cf_points)), order='F')
-    fb_array = np.zeros(dtype=float, shape=(longbbinlen-1, len(bfilts), len(afilts),
-                                            len(cf_points)), order='F')
+    c_priors = np.zeros(dtype=float, shape=(len(cm.b_filt_names), len(cm.a_filt_names),
+                                            len(cm.cf_region_points)), order='F')
+    fa_priors = np.zeros(dtype=float, shape=(len(cm.b_filt_names), len(cm.a_filt_names),
+                                             len(cm.cf_region_points)), order='F')
+    fb_priors = np.zeros(dtype=float, shape=(len(cm.b_filt_names), len(cm.a_filt_names),
+                                             len(cm.cf_region_points)), order='F')
+    c_array = np.zeros(dtype=float, shape=(longbbinlen-1, longabinlen-1, len(cm.b_filt_names),
+                                           len(cm.a_filt_names), len(cm.cf_region_points)), order='F')
+    fa_array = np.zeros(dtype=float, shape=(longabinlen-1, len(cm.b_filt_names), len(cm.a_filt_names),
+                                            len(cm.cf_region_points)), order='F')
+    fb_array = np.zeros(dtype=float, shape=(longbbinlen-1, len(cm.b_filt_names), len(cm.a_filt_names),
+                                            len(cm.cf_region_points)), order='F')
 
-    ablen = group_sources_data.ablen
-    aflen = group_sources_data.aflen
-    bflen = group_sources_data.bflen
-    ainds = group_sources_data.ainds
-    binds = group_sources_data.binds
-    asize = group_sources_data.asize
-    bsize = group_sources_data.bsize
-
-    for m in range(0, len(cf_points)):
-        area = cf_areas[m]
+    for m in range(0, len(cm.cf_region_points)):
+        area = cm.cf_areas[m]
         a_sky_cut = a_sky_inds == m
         a_photo_cut = a_photo[a_sky_cut]
-        if include_phot_like or use_phot_priors:
+        if cm.include_phot_like or cm.use_phot_priors:
             a_blen_cut, a_flen_cut, a_inds_cut, a_size_cut = (
-                ablen[a_sky_cut], aflen[a_sky_cut], ainds[:, a_sky_cut], asize[a_sky_cut])
+                cm.ablen[a_sky_cut], cm.aflen[a_sky_cut], cm.ainds[:, a_sky_cut], cm.asize[a_sky_cut])
 
         b_sky_cut = b_sky_inds == m
         b_photo_cut = b_photo[b_sky_cut]
-        if include_phot_like or use_phot_priors:
+        if cm.include_phot_like or cm.use_phot_priors:
             b_flen_cut, b_inds_cut, b_size_cut = (
-                bflen[b_sky_cut], binds[:, b_sky_cut], bsize[b_sky_cut])
+                cm.bflen[b_sky_cut], cm.binds[:, b_sky_cut], cm.bsize[b_sky_cut])
 
-        for i in range(0, len(afilts)):
-            if not include_phot_like and not use_phot_priors:
+        for i in range(0, len(cm.a_filt_names)):
+            if not cm.include_phot_like and not cm.use_phot_priors:
                 a_num_photo_cut = np.sum(~np.isnan(a_photo_cut[:, i]))
                 na = a_num_photo_cut / area
             else:
                 a_bins = abinsarray[:abinlengths[i, m], i, m]
                 a_mag = a_photo[:, i]
                 a_flags = ~np.isnan(a_mag)
-            for j in range(0, len(bfilts)):
-                if not include_phot_like and not use_phot_priors:
+            for j in range(0, len(cm.b_filt_names)):
+                if not cm.include_phot_like and not cm.use_phot_priors:
                     b_num_photo_cut = np.sum(~np.isnan(b_photo_cut[:, j]))
                     nb = b_num_photo_cut / area
                     # Without using photometric-based priors, all we can
@@ -162,11 +119,12 @@ def compute_photometric_likelihoods(a_cat_folder_path, b_cat_folder_path, afilts
                     b_mag = b_photo[:, j]
                     b_flags = ~np.isnan(b_mag)
 
+                    bright_frac, field_frac = cm.int_fracs[[0, 1]]
                     c_prior, c_like, fa_prior, fa_like, fb_prior, fb_like = create_c_and_f(
                         a_astro, b_astro, a_mag, b_mag, a_inds_cut, a_size_cut,
                         b_inds_cut, b_size_cut, a_blen_cut, a_flen_cut, b_flen_cut,
                         a_bins, b_bins, bright_frac, field_frac, a_flags, b_flags, area)
-                if use_phot_priors and not include_phot_like:
+                if cm.use_phot_priors and not cm.include_phot_like:
                     # If we only used the create_c_and_f routine to derive
                     # priors, then quickly update likelihoods here.
                     c_like, fa_like, fb_like = (1-1e-10)**2, 1-1e-10, 1-1e-10
@@ -184,14 +142,18 @@ def compute_photometric_likelihoods(a_cat_folder_path, b_cat_folder_path, afilts
                         :abinlengths[i, m]-1, j, i, m] = c_like + 1e-100
                 fa_array[:abinlengths[i, m]-1, j, i, m] = fa_like + 1e-10
                 fb_array[:bbinlengths[j, m]-1, j, i, m] = fb_like + 1e-10
-
-    phot_like_data = StageData(abinsarray=abinsarray, abinlengths=abinlengths,
-                               bbinsarray=bbinsarray, bbinlengths=bbinlengths,
-                               a_sky_inds=a_sky_inds, b_sky_inds=b_sky_inds,
-                               c_priors=c_priors, c_array=c_array,
-                               fa_priors=fa_priors, fa_array=fa_array,
-                               fb_priors=fb_priors, fb_array=fb_array)
-    return phot_like_data
+    cm.abinsarray = abinsarray
+    cm.abinlengths = abinlengths
+    cm.bbinsarray = bbinsarray
+    cm.bbinlengths = bbinlengths
+    cm.a_sky_inds = a_sky_inds
+    cm.b_sky_inds = b_sky_inds
+    cm.c_priors = c_priors
+    cm.c_array = c_array
+    cm.fa_priors = fa_priors
+    cm.fa_array = fa_array
+    cm.fb_priors = fb_priors
+    cm.fb_array = fb_array
 
 
 def create_magnitude_bins(cf_points, filts, a_photo, sky_inds):

@@ -14,8 +14,8 @@ from test_matching import _replace_line
 # pylint: disable=no-name-in-module,import-error
 from macauff.counterpart_pairing import source_pairing
 from macauff.counterpart_pairing_fortran import counterpart_pairing_fortran as cpf
+from macauff.macauff import Macauff
 from macauff.matching import CrossMatch
-from macauff.misc_functions import StageData
 
 # pylint: enable=no-name-in-module,import-error
 # pylint: disable=duplicate-code
@@ -121,19 +121,6 @@ class TestCounterpartPairing:  # pylint: disable=too-many-instance-attributes
         self.a_auf_folder_path = 'gaia_auf_folder'
         self.b_auf_folder_path = 'wise_auf_folder'
 
-        self.group_sources_data = StageData(
-            alist=self.alist, blist=self.blist,
-            agrplen=self.agrplen, bgrplen=self.bgrplen,
-            lenrejecta=0, lenrejectb=0)
-
-        self.phot_like_data = StageData(
-            abinsarray=self.abinsarray, abinlengths=self.abinlengths,
-            bbinsarray=self.bbinsarray, bbinlengths=self.bbinlengths,
-            a_sky_inds=self.a_sky_inds, b_sky_inds=self.b_sky_inds,
-            c_priors=self.c_priors, c_array=self.c_array,
-            fa_priors=self.fa_priors, fa_array=self.fa_array,
-            fb_priors=self.fb_priors, fb_array=self.fb_array)
-
         os.system(f'rm -r {self.joint_folder_path}')
         os.makedirs(f'{self.joint_folder_path}/pairing', exist_ok=True)
         for f in [self.a_cat_folder_path, self.b_cat_folder_path,
@@ -158,6 +145,45 @@ class TestCounterpartPairing:  # pylint: disable=too-many-instance-attributes
         self.b_perturb_auf_outputs['flux_grid'] = self.bflux_grids
 
         self.large_len = max(len(self.a_astro), len(self.b_astro))
+
+    def make_class(self):
+        class A():  # pylint: disable=too-few-public-methods
+            def __init__(self):
+                pass
+
+        a = A()
+        a.delta_mag_cuts = np.array([2.5, 5])
+        a.a_modelrefinds = self.amodelrefinds
+        a.b_modelrefinds = self.bmodelrefinds
+        a.a_perturb_auf_outputs = self.a_perturb_auf_outputs
+        a.b_perturb_auf_outputs = self.b_perturb_auf_outputs
+        a.joint_folder_path = self.joint_folder_path
+        a.a_cat_folder_path = self.a_cat_folder_path
+        a.b_cat_folder_path = self.b_cat_folder_path
+        a.rho = self.rho
+        a.drho = self.drho
+        a.rank = 0
+        a.chunk_id = 1
+        a.abinsarray = self.abinsarray
+        a.abinlengths = self.abinlengths
+        a.bbinsarray = self.bbinsarray
+        a.bbinlengths = self.bbinlengths
+        a.a_sky_inds = self.a_sky_inds
+        a.b_sky_inds = self.b_sky_inds
+        a.c_priors = self.c_priors
+        a.c_array = self.c_array
+        a.fa_priors = self.fa_priors
+        a.fa_array = self.fa_array
+        a.fb_priors = self.fb_priors
+        a.fb_array = self.fb_array
+        a.alist = self.alist
+        a.blist = self.blist
+        a.agrplen = self.agrplen
+        a.bgrplen = self.bgrplen
+        a.lenrejecta = 0
+        a.lenrejectb = 0
+
+        return a
 
     def _calculate_prob_integral(self):
         self.o = np.sqrt(self.a_sig**2 + self.b_sig**2) / 3600
@@ -273,12 +299,8 @@ class TestCounterpartPairing:  # pylint: disable=too-many-instance-attributes
     def test_source_pairing(self):  # pylint: disable=too-many-statements
         os.system(f'rm -r {self.joint_folder_path}/pairing')
         os.makedirs(f'{self.joint_folder_path}/pairing', exist_ok=True)
-        source_pairing(
-            self.joint_folder_path, self.a_cat_folder_path, self.b_cat_folder_path,
-            self.amodelrefinds, self.bmodelrefinds, self.rho, self.drho, self.n_fracs,
-            group_sources_data=self.group_sources_data,
-            phot_like_data=self.phot_like_data, a_perturb_auf_outputs=self.a_perturb_auf_outputs,
-            b_perturb_auf_outputs=self.b_perturb_auf_outputs)
+        fake_cm = self.make_class()
+        source_pairing(fake_cm)
 
         bflux = np.load(f'{self.joint_folder_path}/pairing/bcontamflux.npy')
         assert np.all(bflux == np.zeros((2), float))
@@ -357,19 +379,17 @@ class TestCounterpartPairing:  # pylint: disable=too-many-instance-attributes
         a_reject = np.array([2, 5])
         b_reject = np.array([3])
 
-        group_sources_data = StageData(
-            alist=alist, blist=blist, agrplen=agrplen, bgrplen=bgrplen,
-            lenrejecta=len(a_reject), lenrejectb=len(b_reject))
-
         os.system(f'rm -r {self.joint_folder_path}/reject')
         os.makedirs(f'{self.joint_folder_path}/reject', exist_ok=True)
 
-        source_pairing(
-            self.joint_folder_path, self.a_cat_folder_path, self.b_cat_folder_path,
-            self.amodelrefinds, self.bmodelrefinds, self.rho, self.drho, self.n_fracs,
-            group_sources_data=group_sources_data,
-            phot_like_data=self.phot_like_data, a_perturb_auf_outputs=self.a_perturb_auf_outputs,
-            b_perturb_auf_outputs=self.b_perturb_auf_outputs)
+        fake_cm = self.make_class()
+        fake_cm.alist = alist
+        fake_cm.blist = blist
+        fake_cm.agrplen = agrplen
+        fake_cm.bgrplen = bgrplen
+        fake_cm.lenrejecta = len(a_reject)
+        fake_cm.lenrejectb = len(b_reject)
+        source_pairing(fake_cm)
 
         bflux = np.load(f'{self.joint_folder_path}/pairing/bcontamflux.npy')
         assert np.all(bflux == np.zeros((2), float))
@@ -429,18 +449,15 @@ class TestCounterpartPairing:  # pylint: disable=too-many-instance-attributes
         # out of alist.
         a_reject = np.array([6])
 
-        group_sources_data = StageData(
-            alist=alist, blist=blist, agrplen=agrplen, bgrplen=bgrplen,
-            lenrejecta=len(a_reject), lenrejectb=0)
-
+        fake_cm = self.make_class()
+        fake_cm.alist = alist
+        fake_cm.blist = blist
+        fake_cm.agrplen = agrplen
+        fake_cm.bgrplen = bgrplen
+        fake_cm.lenrejecta = len(a_reject)
+        fake_cm.lenrejectb = 0
         with pytest.warns(UserWarning) as record:
-            source_pairing(
-                self.joint_folder_path, self.a_cat_folder_path, self.b_cat_folder_path,
-                self.amodelrefinds, self.bmodelrefinds, self.rho, self.drho, self.n_fracs,
-                group_sources_data=group_sources_data,
-                phot_like_data=self.phot_like_data,
-                a_perturb_auf_outputs=self.a_perturb_auf_outputs,
-                b_perturb_auf_outputs=self.b_perturb_auf_outputs)
+            source_pairing(fake_cm)
         assert len(record) == 2
         assert '2 catalogue a sources not in either counterpart, f' in record[0].message.args[0]
         assert '1 catalogue b source not in either counterpart, f' in record[1].message.args[0]
@@ -480,18 +497,15 @@ class TestCounterpartPairing:  # pylint: disable=too-many-instance-attributes
         a_reject = np.array([2, 3, 4, 5, 6])
         b_reject = np.array([1, 3])
 
-        group_sources_data = StageData(
-            alist=alist, blist=blist, agrplen=agrplen, bgrplen=bgrplen,
-            lenrejecta=len(a_reject), lenrejectb=len(b_reject))
-
+        fake_cm = self.make_class()
+        fake_cm.alist = alist
+        fake_cm.blist = blist
+        fake_cm.agrplen = agrplen
+        fake_cm.bgrplen = bgrplen
+        fake_cm.lenrejecta = len(a_reject)
+        fake_cm.lenrejectb = len(b_reject)
         with pytest.warns(UserWarning) as record:
-            source_pairing(
-                self.joint_folder_path, self.a_cat_folder_path, self.b_cat_folder_path,
-                self.amodelrefinds, self.bmodelrefinds, self.rho, self.drho, self.n_fracs,
-                group_sources_data=group_sources_data,
-                phot_like_data=self.phot_like_data,
-                a_perturb_auf_outputs=self.a_perturb_auf_outputs,
-                b_perturb_auf_outputs=self.b_perturb_auf_outputs)
+            source_pairing(fake_cm)
         assert len(record) == 2
         assert '2 additional catalogue a indices recorded' in record[0].message.args[0]
         assert '1 additional catalogue b index recorded' in record[1].message.args[0]
@@ -552,8 +566,6 @@ class TestCounterpartPairing:  # pylint: disable=too-many-instance-attributes
         self.cm.delta_mag_cuts = np.array([2.5, 5])
         self.cm.a_modelrefinds = self.amodelrefinds
         self.cm.b_modelrefinds = self.bmodelrefinds
-        self.cm.group_sources_data = self.group_sources_data
-        self.cm.phot_like_data = self.phot_like_data
         self.cm.chunk_id = 1
         self.cm.a_perturb_auf_outputs = self.a_perturb_auf_outputs
         self.cm.b_perturb_auf_outputs = self.b_perturb_auf_outputs
@@ -563,7 +575,29 @@ class TestCounterpartPairing:  # pylint: disable=too-many-instance-attributes
                                                'data/chunk0/cat_a_params_.txt'),
                                   os.path.join(os.path.dirname(__file__),
                                                'data/chunk0/cat_b_params_.txt'))
-        self.cm.pair_sources()
+        self.cm.count_pair_func = source_pairing
+
+        self.cm.abinsarray = self.abinsarray
+        self.cm.abinlengths = self.abinlengths
+        self.cm.bbinsarray = self.bbinsarray
+        self.cm.bbinlengths = self.bbinlengths
+        self.cm.a_sky_inds = self.a_sky_inds
+        self.cm.b_sky_inds = self.b_sky_inds
+        self.cm.c_priors = self.c_priors
+        self.cm.c_array = self.c_array
+        self.cm.fa_priors = self.fa_priors
+        self.cm.fa_array = self.fa_array
+        self.cm.fb_priors = self.fb_priors
+        self.cm.fb_array = self.fb_array
+        self.cm.alist = self.alist
+        self.cm.blist = self.blist
+        self.cm.agrplen = self.agrplen
+        self.cm.bgrplen = self.bgrplen
+        self.cm.lenrejecta = 0
+        self.cm.lenrejectb = 0
+
+        mcff = Macauff(self.cm)
+        mcff.pair_sources()
 
         bflux = np.load(f'{self.joint_folder_path}/pairing/bcontamflux.npy')
         assert np.all(bflux == np.zeros((2), float))

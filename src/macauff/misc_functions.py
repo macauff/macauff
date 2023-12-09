@@ -8,13 +8,6 @@ import numpy as np
 
 __all__ = []
 
-# "Anemic" class for holding outputs to pass into later pipeline stages
-# Takes any number of arguments in constructor, each becoming an attribute
-# TODO: Move to own file?  pylint:disable=fixme
-class StageData:  # pylint:disable=missing-class-docstring,too-few-public-methods
-    def __init__(self, **kwargs):
-        self.__dict__.update(kwargs)
-
 
 def create_auf_params_grid(perturb_auf_outputs, auf_pointings, filt_names, array_name,
                            arraylengths, len_first_axis=None):
@@ -303,7 +296,7 @@ def min_max_lon(a):
         The longitude furthest around the other way from 0 degrees, with the
         largest longitude in the first quadrant of the Galaxy.
     """
-    # TODO: can this be simplified with a lon_shift like lon_cut above?
+    # TODO: can this be simplified with a lon_shift like lon_cut above?  pylint: disable=fixme
     min_lon, max_lon = np.amin(a), np.amax(a)
     if min_lon <= 1 and max_lon >= 359 and np.any(np.abs(a - 180) < 1):
         # If there is data both either side of 0/360 and at 180 degrees,

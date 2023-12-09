@@ -7,11 +7,16 @@ General
 New Features
 ^^^^^^^^^^^^
 
+- Split new class ``Macauff`` out from ``CrossMatch``, with the latter now handling
+  the I/O and the former a smaller class to run the actual cross-match. [#76]
+
 Bug Fixes
 ^^^^^^^^^
 
 API Changes
 ^^^^^^^^^^^
+
+- Removed ``StageData``. [#76]
 
 - Removed ``use_memmap_files`` as an input into ``CrossMatch``, along with
   ``run_auf``, ``run_group``, ``run_cf``, and ``run_source`` from parameters

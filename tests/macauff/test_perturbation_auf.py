@@ -15,6 +15,7 @@ from scipy.stats import skewnorm
 from test_matching import _replace_line
 
 # pylint: disable=import-error,no-name-in-module
+from macauff.macauff import Macauff
 from macauff.matching import CrossMatch
 from macauff.misc_functions_fortran import misc_functions_fortran as mff
 from macauff.perturbation_auf import (
@@ -45,6 +46,7 @@ class TestCreatePerturbAUF:
                                   os.path.join(os.path.dirname(__file__), 'data/cat_b_params.txt'))
         self.cm.a_auf_region_points = np.array([[0, 0], [50, 50]], dtype=float)
         self.cm.b_auf_region_points = np.array([[0, 0], [50, 50]], dtype=float)
+        self.cm.perturb_auf_func = make_perturb_aufs
 
     def test_no_perturb_outputs(self):
         # Randomly generate two catalogues (x3 files) between coordinates
@@ -67,7 +69,8 @@ class TestCreatePerturbAUF:
 
         self.cm.include_perturb_auf = False
         self.cm.chunk_id = 1
-        self.cm.create_perturb_auf()
+        mcff = Macauff(self.cm)
+        mcff.create_perturb_auf()
         p_a_o = self.cm.b_perturb_auf_outputs
         lenr = len(self.cm.r)
         lenrho = len(self.cm.rho)
@@ -422,161 +425,32 @@ class TestMakePerturbAUFs():
         self.dr = np.diff(self.r)
         self.rho = np.linspace(0, 100, 5000)
         self.drho = np.diff(self.rho)
-        self.which_cat = 'b'
         self.include_perturb_auf = True
         self.num_trials = 50000
         self.j0s = mff.calc_j0(self.rho[:-1]+self.drho/2, self.r[:-1]+self.dr/2)
 
         self.delta_mag_cuts = np.array([10])
 
-        self.args = [self.auf_folder, self.cat_folder, self.filters, self.auf_points,
-                     self.r, self.dr, self.j0s, self.which_cat, self.include_perturb_auf]
+    def make_class(self):
+        class A():  # pylint: disable=too-few-public-methods,too-many-instance-attributes
+            def __init__(self):
+                pass
 
-    def test_raise_value_errors(self):  # pylint: disable=too-many-statements
-        with pytest.raises(ValueError, match='tri_set_name must be given if include_perturb_auf ' +
-                           'is True'):
-            make_perturb_aufs(*self.args)
-        with pytest.raises(ValueError, match='tri_filt_num must be given if include_perturb_auf ' +
-                           'is True'):
-            make_perturb_aufs(*self.args, tri_set_name='WISE')
-        with pytest.raises(ValueError, match='tri_filt_names must be given if ' +
-                           'include_perturb_auf is True'):
-            make_perturb_aufs(*self.args, tri_set_name='WISE', tri_filt_num=1)
-        with pytest.raises(ValueError, match='tri_maglim_faint must be given if ' +
-                           'include_perturb_auf is True'):
-            make_perturb_aufs(*self.args, tri_set_name='WISE', tri_filt_num=1, tri_filt_names=1)
-        with pytest.raises(ValueError, match='tri_num_faint must be given if ' +
-                           'include_perturb_auf is True'):
-            make_perturb_aufs(*self.args, tri_set_name='WISE', tri_filt_num=1, tri_filt_names=1,
-                              tri_maglim_faint=1)
-        with pytest.raises(ValueError, match='auf_region_frame must be given if ' +
-                           'include_perturb_auf is True'):
-            make_perturb_aufs(*self.args, tri_set_name='WISE', tri_filt_num=1, tri_filt_names=1,
-                              tri_maglim_faint=1, tri_num_faint=1)
-        with pytest.raises(ValueError, match='delta_mag_cuts must be given if ' +
-                           'include_perturb_auf is True'):
-            make_perturb_aufs(*self.args, tri_set_name='WISE', tri_filt_num=1, tri_filt_names=1,
-                              tri_maglim_faint=1, tri_num_faint=1, auf_region_frame=1)
-        with pytest.raises(ValueError, match='psf_fwhms must be given if ' +
-                           'include_perturb_auf is True'):
-            make_perturb_aufs(*self.args, tri_set_name='WISE', tri_filt_num=1, tri_filt_names=1,
-                              tri_maglim_faint=1, tri_num_faint=1, auf_region_frame=1,
-                              delta_mag_cuts=1)
-        with pytest.raises(ValueError, match='num_trials must be given if ' +
-                           'include_perturb_auf is True'):
-            make_perturb_aufs(*self.args, tri_set_name='WISE', tri_filt_num=1, tri_filt_names=1,
-                              tri_maglim_faint=1, tri_num_faint=1, auf_region_frame=1,
-                              delta_mag_cuts=1, psf_fwhms=1)
-        with pytest.raises(ValueError, match='d_mag must be given if ' +
-                           'include_perturb_auf is True'):
-            make_perturb_aufs(*self.args, tri_set_name='WISE', tri_filt_num=1, tri_filt_names=1,
-                              tri_maglim_faint=1, tri_num_faint=1, auf_region_frame=1,
-                              delta_mag_cuts=1, psf_fwhms=1, num_trials=1)
-        with pytest.raises(ValueError, match='run_fw must be given if ' +
-                           'include_perturb_auf is True'):
-            make_perturb_aufs(*self.args, tri_set_name='WISE', tri_filt_num=1, tri_filt_names=1,
-                              tri_maglim_faint=1, tri_num_faint=1, auf_region_frame=1,
-                              delta_mag_cuts=1, psf_fwhms=1, num_trials=1, d_mag=1)
-        with pytest.raises(ValueError, match='run_psf must be given if ' +
-                           'include_perturb_auf is True'):
-            make_perturb_aufs(*self.args, tri_set_name='WISE', tri_filt_num=1, tri_filt_names=1,
-                              tri_maglim_faint=1, tri_num_faint=1, auf_region_frame=1,
-                              delta_mag_cuts=1, psf_fwhms=1, num_trials=1, d_mag=1, run_fw=1)
-        with pytest.raises(ValueError, match='dd_params must be given if ' +
-                           'include_perturb_auf and run_psf are True'):
-            make_perturb_aufs(*self.args, tri_set_name='WISE', tri_filt_num=1, tri_filt_names=1,
-                              tri_maglim_faint=1, tri_num_faint=1, auf_region_frame=1,
-                              delta_mag_cuts=1, psf_fwhms=1, num_trials=1, d_mag=1, run_fw=1,
-                              run_psf=1)
-        with pytest.raises(ValueError, match='l_cut must be given if ' +
-                           'include_perturb_auf and run_psf are True'):
-            make_perturb_aufs(*self.args, tri_set_name='WISE', tri_filt_num=1, tri_filt_names=1,
-                              tri_maglim_faint=1, tri_num_faint=1, auf_region_frame=1,
-                              delta_mag_cuts=1, psf_fwhms=1, num_trials=1, d_mag=1, run_fw=1,
-                              run_psf=1, dd_params=1)
-        with pytest.raises(ValueError, match='snr_mag_params must be given if ' +
-                           'include_perturb_auf is True'):
-            make_perturb_aufs(*self.args, tri_set_name='WISE', tri_filt_num=1, tri_filt_names=1,
-                              tri_maglim_faint=1, tri_num_faint=1, auf_region_frame=1,
-                              delta_mag_cuts=1, psf_fwhms=1, num_trials=1, d_mag=1, run_fw=1,
-                              run_psf=1, dd_params=1, l_cut=1)
-        with pytest.raises(ValueError, match='al_avs must be given if include_perturb_auf is Tru'):
-            make_perturb_aufs(*self.args, tri_set_name='WISE', tri_filt_num=1, tri_filt_names=1,
-                              tri_maglim_faint=1, tri_num_faint=1, auf_region_frame=1,
-                              delta_mag_cuts=1, psf_fwhms=1, num_trials=1, d_mag=1, run_fw=1,
-                              run_psf=1, dd_params=1, l_cut=1, snr_mag_params=1)
-        with pytest.raises(ValueError, match='density_radius must be given if ' +
-                           'include_perturb_auf is True'):
-            make_perturb_aufs(*self.args, tri_set_name='WISE', tri_filt_num=1, tri_filt_names=1,
-                              tri_maglim_faint=1, tri_num_faint=1, auf_region_frame=1,
-                              delta_mag_cuts=1, psf_fwhms=1, num_trials=1, d_mag=1, run_fw=1,
-                              run_psf=1, dd_params=1, l_cut=1, snr_mag_params=1, al_avs=1)
-        with pytest.raises(ValueError, match='fit_gal_flag must not be None if include_'):
-            make_perturb_aufs(*self.args, tri_set_name='WISE', tri_filt_num=1, tri_filt_names=1,
-                              tri_maglim_faint=1, tri_num_faint=1, auf_region_frame=1,
-                              delta_mag_cuts=1, psf_fwhms=1, num_trials=1, d_mag=1, run_fw=1,
-                              run_psf=1, dd_params=1, l_cut=1, snr_mag_params=1, al_avs=1,
-                              density_radius=1)
-        with pytest.raises(ValueError, match='cmau_array must be given if fit_gal_flag is True.'):
-            make_perturb_aufs(*self.args, tri_set_name='WISE', tri_filt_num=1, tri_filt_names=1,
-                              tri_maglim_faint=1, tri_num_faint=1, auf_region_frame=1,
-                              delta_mag_cuts=1, psf_fwhms=1, num_trials=1, d_mag=1, run_fw=1,
-                              run_psf=1, dd_params=1, l_cut=1, snr_mag_params=1, fit_gal_flag=True,
-                              al_avs=1, density_radius=1)
-        with pytest.raises(ValueError, match='wavs must be given if fit_gal_flag is True.'):
-            make_perturb_aufs(*self.args, tri_set_name='WISE', tri_filt_num=1, tri_filt_names=1,
-                              tri_maglim_faint=1, tri_num_faint=1, auf_region_frame=1,
-                              delta_mag_cuts=1, psf_fwhms=1, num_trials=1, d_mag=1,
-                              fit_gal_flag=True, cmau_array=1, run_fw=1, run_psf=1, dd_params=1,
-                              l_cut=1, snr_mag_params=1, al_avs=1, density_radius=1)
-        with pytest.raises(ValueError, match='z_maxs must be given if fit_gal_flag is True.'):
-            make_perturb_aufs(*self.args, tri_set_name='WISE', tri_filt_num=1, tri_filt_names=1,
-                              tri_maglim_faint=1, tri_num_faint=1, auf_region_frame=1,
-                              delta_mag_cuts=1, psf_fwhms=1, num_trials=1, d_mag=1,
-                              fit_gal_flag=True, cmau_array=1, wavs=1, run_fw=1, run_psf=1,
-                              dd_params=1, l_cut=1, snr_mag_params=1, al_avs=1, density_radius=1)
-        with pytest.raises(ValueError, match='nzs must be given if fit_gal_flag is True.'):
-            make_perturb_aufs(*self.args, tri_set_name='WISE', tri_filt_num=1, tri_filt_names=1,
-                              tri_maglim_faint=1, tri_num_faint=1, auf_region_frame=1,
-                              delta_mag_cuts=1, psf_fwhms=1, num_trials=1, d_mag=1,
-                              fit_gal_flag=True, cmau_array=1, wavs=1, z_maxs=1, run_fw=1,
-                              run_psf=1, dd_params=1, l_cut=1, snr_mag_params=1, al_avs=1,
-                              density_radius=1)
-        with pytest.raises(ValueError, match='ab_offsets must be given if fit_gal_flag is True.'):
-            make_perturb_aufs(*self.args, tri_set_name='WISE', tri_filt_num=1, tri_filt_names=1,
-                              tri_maglim_faint=1, tri_num_faint=1, auf_region_frame=1,
-                              delta_mag_cuts=1, psf_fwhms=1, num_trials=1, d_mag=1,
-                              fit_gal_flag=True, cmau_array=1, wavs=1, z_maxs=1, nzs=1, run_fw=1,
-                              run_psf=1, dd_params=1, l_cut=1, snr_mag_params=1, al_avs=1,
-                              density_radius=1)
-        with pytest.raises(ValueError, match='filter_names must be given if fit_gal_flag is True.'):
-            make_perturb_aufs(*self.args, tri_set_name='WISE', tri_filt_num=1, tri_filt_names=1,
-                              tri_maglim_faint=1, tri_num_faint=1, auf_region_frame=1,
-                              delta_mag_cuts=1, psf_fwhms=1, num_trials=1, d_mag=1,
-                              fit_gal_flag=True, cmau_array=1, wavs=1, z_maxs=1, nzs=1,
-                              ab_offsets=1, run_fw=1, run_psf=1, dd_params=1, l_cut=1,
-                              snr_mag_params=1, al_avs=1, density_radius=1)
-        with pytest.raises(ValueError, match='alpha0 must be given if fit_gal_flag is True.'):
-            make_perturb_aufs(*self.args, tri_set_name='WISE', tri_filt_num=1, tri_filt_names=1,
-                              tri_maglim_faint=1, tri_num_faint=1, auf_region_frame=1,
-                              delta_mag_cuts=1, psf_fwhms=1, num_trials=1, d_mag=1,
-                              fit_gal_flag=True, cmau_array=1, wavs=1, z_maxs=1, nzs=1,
-                              ab_offsets=1, filter_names=1, al_avs=1, run_fw=1, run_psf=1,
-                              dd_params=1, l_cut=1, snr_mag_params=1, density_radius=1)
-        with pytest.raises(ValueError, match='alpha1 must be given if fit_gal_flag is True.'):
-            make_perturb_aufs(*self.args, tri_set_name='WISE', tri_filt_num=1, tri_filt_names=1,
-                              tri_maglim_faint=1, tri_num_faint=1, auf_region_frame=1,
-                              delta_mag_cuts=1, psf_fwhms=1, num_trials=1, d_mag=1,
-                              fit_gal_flag=True, cmau_array=1, wavs=1, z_maxs=1, nzs=1,
-                              ab_offsets=1, filter_names=1, al_avs=1, alpha0=1, run_fw=1, run_psf=1,
-                              dd_params=1, l_cut=1, snr_mag_params=1, density_radius=1)
-        with pytest.raises(ValueError, match='alpha_weight must be given if fit_gal_flag is True.'):
-            make_perturb_aufs(*self.args, tri_set_name='WISE', tri_filt_num=1, tri_filt_names=1,
-                              tri_maglim_faint=1, tri_num_faint=1, auf_region_frame=1,
-                              delta_mag_cuts=1, psf_fwhms=1, num_trials=1, d_mag=1,
-                              fit_gal_flag=True, cmau_array=1, wavs=1, z_maxs=1, nzs=1,
-                              ab_offsets=1, filter_names=1, al_avs=1, alpha0=1, alpha1=1, run_fw=1,
-                              run_psf=1, dd_params=1, l_cut=1, snr_mag_params=1, density_radius=1)
+        a = A()
+        a.b_cat_folder_path = self.cat_folder
+        a.b_auf_folder_path = self.auf_folder
+        a.b_filt_names = self.filters
+        a.b_auf_region_points = self.auf_points
+        a.r = self.r
+        a.dr = self.dr
+        a.rho = self.rho
+        a.drho = self.drho
+        a.j0s = self.j0s
+        a.include_perturb_auf = self.include_perturb_auf
+        a.rank = None
+        a.chunk_id = None
+
+        return a
 
     @pytest.mark.remote_data
     def test_create_single_low_numbers(self):
@@ -617,14 +491,27 @@ class TestMakePerturbAUFs():
 
         snr_mag_params = np.array([[[0.0109, 46.08, 0.119, 130, 0]]])
 
+        self.fake_cm = self.make_class()
+        self.fake_cm.b_tri_set_name = 'WISE'
+        self.fake_cm.b_tri_filt_num = 11
+        self.fake_cm.b_tri_filt_names = self.tri_filt_names
+        self.fake_cm.b_tri_maglim_faint = 32
+        self.fake_cm.b_tri_num_faint = 1000000
+        self.fake_cm.b_auf_region_frame = 'galactic'
+        self.fake_cm.b_psf_fwhms = self.psf_fwhms
+        self.fake_cm.num_trials = self.num_trials
+        self.fake_cm.d_mag = d_mag
+        self.fake_cm.delta_mag_cuts = self.delta_mag_cuts
+        self.fake_cm.b_fit_gal_flag = False
+        self.fake_cm.b_dens_dist = density_radius
+        self.fake_cm.b_run_fw_auf = True
+        self.fake_cm.b_run_psf_auf = False
+        self.fake_cm.b_snr_mag_params = snr_mag_params
+        self.fake_cm.b_gal_al_avs = [0]
+        self.fake_cm.b_download_tri = False
+
         with pytest.raises(ValueError, match="The number of simulated objects in this sky patch "):
-            make_perturb_aufs(
-                *self.args, tri_set_name='WISE', tri_filt_num=11,
-                tri_filt_names=self.tri_filt_names, tri_maglim_faint=32, tri_num_faint=1000000,
-                auf_region_frame='galactic', psf_fwhms=self.psf_fwhms, num_trials=self.num_trials,
-                d_mag=d_mag, delta_mag_cuts=self.delta_mag_cuts, fit_gal_flag=False,
-                density_radius=density_radius, run_fw=True, run_psf=False, snr_mag_params=snr_mag_params,
-                al_avs=[0])
+            make_perturb_aufs(self.fake_cm, 'b')
 
     @pytest.mark.remote_data
     def test_psf_algorithm(self):  # pylint: disable=too-many-locals
@@ -707,13 +594,28 @@ class TestMakePerturbAUFs():
             l_cut = np.load(os.path.join(os.path.dirname(__file__), 'data/l_cut.npy'))
             dd_params = np.load(os.path.join(os.path.dirname(__file__), 'data/dd_params.npy'))
             run_fw = mag >= 19
-            _, p_a_o = make_perturb_aufs(
-                *self.args[:3], new_auf_points, *self.args[4:], tri_set_name='WISE',
-                tri_filt_num=11, tri_filt_names=self.tri_filt_names, tri_maglim_faint=32,
-                tri_num_faint=1000000, auf_region_frame='galactic', psf_fwhms=self.psf_fwhms,
-                num_trials=self.num_trials, d_mag=d_mag, delta_mag_cuts=self.delta_mag_cuts,
-                fit_gal_flag=False, density_radius=density_radius, run_fw=run_fw, run_psf=True,
-                snr_mag_params=snr_mag_params, dd_params=dd_params, l_cut=l_cut, al_avs=[0])
+            self.fake_cm = self.make_class()
+            self.fake_cm.b_auf_region_points = new_auf_points
+            self.fake_cm.b_tri_set_name = 'WISE'
+            self.fake_cm.b_tri_filt_num = 11
+            self.fake_cm.b_tri_filt_names = self.tri_filt_names
+            self.fake_cm.b_tri_maglim_faint = 32
+            self.fake_cm.b_tri_num_faint = 1000000
+            self.fake_cm.b_auf_region_frame = 'galactic'
+            self.fake_cm.b_psf_fwhms = self.psf_fwhms
+            self.fake_cm.num_trials = self.num_trials
+            self.fake_cm.d_mag = d_mag
+            self.fake_cm.delta_mag_cuts = self.delta_mag_cuts
+            self.fake_cm.b_fit_gal_flag = False
+            self.fake_cm.b_dens_dist = density_radius
+            self.fake_cm.b_run_fw_auf = run_fw
+            self.fake_cm.b_run_psf_auf = True
+            self.fake_cm.b_snr_mag_params = snr_mag_params
+            self.fake_cm.b_dd_params = dd_params
+            self.fake_cm.b_l_cut = l_cut
+            self.fake_cm.b_gal_al_avs = [0]
+            self.fake_cm.b_download_tri = False
+            _, p_a_o = make_perturb_aufs(self.fake_cm, 'b')
 
             perturb_auf_combo = f'{ax1}-{ax2}-{self.filters[0]}'
             for name, size in zip(
@@ -902,7 +804,10 @@ class TestMakePerturbAUFs():
 
         cm.chunk_id = 1
 
-        cm.create_perturb_auf()
+        cm.perturb_auf_func = make_perturb_aufs
+
+        mcff = Macauff(cm)
+        mcff.create_perturb_auf()
 
         perturb_auf_combo = f'{ax1}-{ax2}-{self.filters[0]}'
         fracs = cm.b_perturb_auf_outputs[perturb_auf_combo]['frac']
@@ -1086,7 +991,10 @@ class TestMakePerturbAUFs():
         cm.a_dens_dist = density_radius
         cm.b_dens_dist = density_radius
 
-        cm.create_perturb_auf()
+        cm.perturb_auf_func = make_perturb_aufs
+
+        mcff = Macauff(cm)
+        mcff.create_perturb_auf()
 
         perturb_auf_combo = f'{ax1}-{ax2}-{self.filters[0]}'
         fracs = cm.b_perturb_auf_outputs[perturb_auf_combo]['frac']

@@ -14,6 +14,7 @@ from test_matching import _replace_line
 # pylint: disable=no-name-in-module,import-error
 from macauff.group_sources import _clean_overlaps, _load_fourier_grid_cutouts, make_island_groupings
 from macauff.group_sources_fortran import group_sources_fortran as gsf
+from macauff.macauff import Macauff
 from macauff.matching import CrossMatch
 from macauff.misc_functions import create_auf_params_grid
 
@@ -382,6 +383,7 @@ class TestMakeIslandGroupings():  # pylint: disable=too-many-instance-attributes
         self.cm.include_phot_like = self.include_phot_like
         self.cm.use_phot_prior = self.use_phot_prior
         self.cm.j1s = self.j1s
+        self.cm.group_func = make_island_groupings
 
         self.n_pool = 5
 
@@ -451,15 +453,16 @@ class TestMakeIslandGroupings():  # pylint: disable=too-many-instance-attributes
         self.cm.b_perturb_auf_outputs = self.b_perturb_auf_outputs
         self.cm.a_modelrefinds = self.a_modelrefinds
         self.cm.b_modelrefinds = self.b_modelrefinds
-        self.cm.group_sources()
+        mcff = Macauff(self.cm)
+        mcff.group_sources()
 
-        alist, blist = self.cm.group_sources_data.alist, self.cm.group_sources_data.blist
-        agrplen, bgrplen = self.cm.group_sources_data.agrplen, self.cm.group_sources_data.bgrplen
+        alist, blist = self.cm.alist, self.cm.blist
+        agrplen, bgrplen = self.cm.agrplen, self.cm.bgrplen
         self._comparisons_in_islands(alist, blist, agrplen, bgrplen, n_a, n_b, n_c)
         assert len(os.listdir(f'{self.joint_folder_path}/reject')) == 0
 
     @pytest.mark.filterwarnings("ignore:.*island, containing.*")
-    def test_mig_extra_reject(self):
+    def test_mig_extra_reject(self):  # pylint: disable=too-many-statements
         os.system(f'rm -rf {self.joint_folder_path}/reject/*')
         self._fake_fourier_grid(self.n_a+10, self.n_b+11)
         n_a, n_b, n_c = self.n_a, self.n_b, self.n_com
@@ -488,14 +491,15 @@ class TestMakeIslandGroupings():  # pylint: disable=too-many-instance-attributes
         np.save(f'{self.a_cat_folder_path}/con_cat_astro.npy', a_coords)
         np.save(f'{self.b_cat_folder_path}/con_cat_astro.npy', b_coords)
 
-        gsd = make_island_groupings(
-            self.joint_folder_path, self.a_cat_folder_path, self.b_cat_folder_path,
-            self.a_modelrefinds, self.b_modelrefinds, self.r, self.dr, self.rho, self.drho, self.j1s,
-            self.max_sep, ax_lims, self.int_fracs, self.include_phot_like, self.use_phot_prior, self.n_pool,
-            self.a_perturb_auf_outputs, self.b_perturb_auf_outputs)
+        self.cm.a_perturb_auf_outputs = self.a_perturb_auf_outputs
+        self.cm.b_perturb_auf_outputs = self.b_perturb_auf_outputs
+        self.cm.a_modelrefinds = self.a_modelrefinds
+        self.cm.b_modelrefinds = self.b_modelrefinds
 
-        alist, blist = gsd.alist, gsd.blist  # pylint: disable=no-member
-        agrplen, bgrplen = gsd.agrplen, gsd.bgrplen  # pylint: disable=no-member
+        make_island_groupings(self.cm)
+
+        alist, blist = self.cm.alist, self.cm.blist  # pylint: disable=no-member
+        agrplen, bgrplen = self.cm.agrplen, self.cm.bgrplen  # pylint: disable=no-member
         # We removed 3 extra sources this time around, which should all be 1:1 islands.
         assert np.all(alist.shape == (2, n_a - 4 + n_b - n_c))
         assert np.all(blist.shape == (1, n_a - 4 + n_b - n_c))
@@ -559,14 +563,16 @@ class TestMakeIslandGroupings():  # pylint: disable=too-many-instance-attributes
         np.save(f'{self.a_cat_folder_path}/con_cat_astro.npy', a_coords)
         np.save(f'{self.b_cat_folder_path}/con_cat_astro.npy', b_coords)
 
-        gsd = make_island_groupings(
-            self.joint_folder_path, self.a_cat_folder_path, self.b_cat_folder_path,
-            self.a_modelrefinds, self.b_modelrefinds, self.r, self.dr, self.rho, self.drho, self.j1s,
-            self.max_sep, ax_lims, self.int_fracs, self.include_phot_like, self.use_phot_prior, self.n_pool,
-            self.a_perturb_auf_outputs, self.b_perturb_auf_outputs)
+        self.cm.cross_match_extent = ax_lims
+        self.cm.a_perturb_auf_outputs = self.a_perturb_auf_outputs
+        self.cm.b_perturb_auf_outputs = self.b_perturb_auf_outputs
+        self.cm.a_modelrefinds = self.a_modelrefinds
+        self.cm.b_modelrefinds = self.b_modelrefinds
 
-        alist, blist = gsd.alist, gsd.blist  # pylint: disable=no-member
-        agrplen, bgrplen = gsd.agrplen, gsd.bgrplen  # pylint: disable=no-member
+        make_island_groupings(self.cm)
+
+        alist, blist = self.cm.alist, self.cm.blist  # pylint: disable=no-member
+        agrplen, bgrplen = self.cm.agrplen, self.cm.bgrplen  # pylint: disable=no-member
         # The same tests that were ran in make_island_groupings should pass here.
         self._comparisons_in_islands(alist, blist, agrplen, bgrplen, n_a, n_b, n_c)
         areject = np.load('joint/reject/reject_a.npy')
@@ -577,22 +583,23 @@ class TestMakeIslandGroupings():  # pylint: disable=too-many-instance-attributes
         assert np.all(breject == np.arange(n_b, n_b+11))
         assert len(os.listdir(f'{self.joint_folder_path}/reject')) == 2
 
-    def test_make_island_groupings_include_phot_like(self):
+    def test_make_island_groupings_include_phot_like(self):  # pylint: disable=too-many-statements
         os.system(f'rm -rf {self.joint_folder_path}/reject/*')
         self._fake_fourier_grid(self.n_a, self.n_b)
         np.save(f'{self.a_cat_folder_path}/con_cat_astro.npy', self.a_coords)
         np.save(f'{self.b_cat_folder_path}/con_cat_astro.npy', self.b_coords)
-        include_phot_like = True
-        gsd = make_island_groupings(
-            self.joint_folder_path, self.a_cat_folder_path, self.b_cat_folder_path,
-            self.a_modelrefinds, self.b_modelrefinds, self.r, self.dr, self.rho, self.drho, self.j1s,
-            self.max_sep, self.ax_lims, self.int_fracs, include_phot_like, self.use_phot_prior, self.n_pool,
-            self.a_perturb_auf_outputs, self.b_perturb_auf_outputs)
+        self.cm.include_phot_like = True
+        self.cm.cross_match_extent = self.ax_lims
+        self.cm.a_perturb_auf_outputs = self.a_perturb_auf_outputs
+        self.cm.b_perturb_auf_outputs = self.b_perturb_auf_outputs
+        self.cm.a_modelrefinds = self.a_modelrefinds
+        self.cm.b_modelrefinds = self.b_modelrefinds
+        make_island_groupings(self.cm)
 
         # Verify that make_island_groupings doesn't change when the extra arrays
         # are calculated, as an initial test.
-        alist, blist = gsd.alist, gsd.blist  # pylint: disable=no-member
-        agrplen, bgrplen = gsd.agrplen, gsd.bgrplen  # pylint: disable=no-member
+        alist, blist = self.cm.alist, self.cm.blist  # pylint: disable=no-member
+        agrplen, bgrplen = self.cm.agrplen, self.cm.bgrplen  # pylint: disable=no-member
         self._comparisons_in_islands(alist, blist, agrplen, bgrplen, self.n_a, self.n_b,
                                      self.n_com)
 
@@ -602,15 +609,15 @@ class TestMakeIslandGroupings():  # pylint: disable=too-many-instance-attributes
         berr = np.load(f'{self.b_cat_folder_path}/con_cat_astro.npy')[:, 2]
 
         # pylint: disable=no-member
-        ablen = gsd.ablen
-        aflen = gsd.aflen
-        bblen = gsd.bblen
-        bflen = gsd.bflen
+        ablen = self.cm.ablen
+        aflen = self.cm.aflen
+        bblen = self.cm.bblen
+        bflen = self.cm.bflen
 
-        asize = gsd.asize
-        ainds = gsd.ainds
-        bsize = gsd.bsize
-        binds = gsd.binds
+        asize = self.cm.asize
+        ainds = self.cm.ainds
+        bsize = self.cm.bsize
+        binds = self.cm.binds
         # pylint: enable=no-member
 
         for i, _ablen in enumerate(ablen):

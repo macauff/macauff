@@ -22,8 +22,7 @@ except ModuleNotFoundError:
 from macauff.counterpart_pairing import source_pairing
 from macauff.fit_astrometry import AstrometricCorrections, SNRMagnitudeRelationship
 from macauff.group_sources import make_island_groupings
-from macauff.group_sources_fortran import group_sources_fortran as gsf
-from macauff.misc_functions_fortran import misc_functions_fortran as mff
+from macauff.macauff import Macauff
 from macauff.parse_catalogue import csv_to_npy, npy_to_csv
 from macauff.perturbation_auf import make_perturb_aufs
 from macauff.photometric_likelihood import compute_photometric_likelihoods
@@ -179,7 +178,7 @@ class CrossMatch():
             acbi = self.a_best_mag_index
             a_correct_astro_tri_name = '{}/{}/trilegal_auf_simulation'
             t = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            print("{t} Rank {self.rank}, chunk {self.chunk_id}: Calculating catalogue 'a' "
+            print(f"{t} Rank {self.rank}, chunk {self.chunk_id}: Calculating catalogue 'a' "
                   "uncertainty corrections...")
             ac = AstrometricCorrections(
                 self.a_psf_fwhms[acbi], self.num_trials, self.a_nn_radius,
@@ -408,8 +407,7 @@ class CrossMatch():
                         (signal, worker_id, chunk_id) = req.wait()
 
                     # Record completed chunk
-                    if signal == self.worker_signals['WORK_COMPLETE'] \
-                    and self.resume_file is not None:
+                    if signal == self.worker_signals['WORK_COMPLETE'] and self.resume_file is not None:
                         t = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                         print(f'{t} Rank {self.rank}: chunk {chunk_id} processed by rank {worker_id}. '
                               'Adding to resume file.')
@@ -485,7 +483,6 @@ class CrossMatch():
         # Clean up and shut down
         self._cleanup()
 
-
     def _process_chunk(self, joint_file_path, cat_a_file_path, cat_b_file_path):
         '''
         Runs the various stages of cross-matching two photometric catalogues
@@ -497,21 +494,15 @@ class CrossMatch():
         # TODO Have manager perform file loads and broadcast result to reduce I/O
         self._initialise_chunk(joint_file_path, cat_a_file_path, cat_b_file_path)
 
-        # The first step is to create the perturbation AUF components, if needed.
-        self.create_perturb_auf()
+        # pylint: disable-next=fixme
+        # TODO: more correctly pass these into CrossMatch as arguments later on.
+        self.perturb_auf_func = make_perturb_aufs
+        self.group_func = make_island_groupings
+        self.phot_like_func = compute_photometric_likelihoods
+        self.count_pair_func = source_pairing
 
-        # Once AUF components are assembled, we now group sources based on
-        # convolved AUF integration lengths, to get "common overlap" sources
-        # and merge such overlaps into distinct "islands" of sources to match.
-        self.group_sources()
-
-        # The third step in this process is to, to some level, calculate the
-        # photometry-related information necessary for the cross-match.
-        self.calculate_phot_like()
-
-        # The final stage of the cross-match process is that of putting together
-        # the previous stages, and calculating the cross-match probabilities.
-        self.pair_sources()
+        mcff = Macauff(self)
+        mcff()
 
         # Following cross-match completion, perform post-processing
         self._postprocess_chunk()
@@ -661,9 +652,9 @@ class CrossMatch():
         # Sort chunk list by size, largest to smallest
         chunk_queue.sort(key=lambda x: x[0], reverse=True)
         # Remove chunk size from output list
-        chunk_queue_sorted = [ (chunk_id, joint_file_path, cat_a_file_path, cat_b_file_path) for
-                               (chunk_size, chunk_id, joint_file_path, cat_a_file_path, cat_b_file_path) in
-                               chunk_queue ]
+        chunk_queue_sorted = [(chunk_id, joint_file_path, cat_a_file_path, cat_b_file_path) for
+                              (chunk_size, chunk_id, joint_file_path, cat_a_file_path, cat_b_file_path) in
+                              chunk_queue]
 
         return chunk_queue_sorted
 
@@ -1400,225 +1391,3 @@ class CrossMatch():
         # Only need to calculate these the first time we need them, so buffer for now.
         self.j0s = None
         self.j1s = None
-
-    def create_perturb_auf(self, perturb_auf_func=make_perturb_aufs):
-        '''
-        Function wrapping the main perturbation AUF component creation routines.
-
-        Parameters
-        ----------
-        perturb_auf_func : callable, optional
-            ``perturb_auf_func`` should create the perturbation AUF output files
-            for each filter-pointing combination.
-        '''
-
-        # Magnitude offsets corresponding to relative fluxes of perturbing sources; here
-        # dm of 2.5 is 10% relative flux and dm = 5 corresponds to 1% relative flux. Used
-        # to inform the fraction of simulations with a contaminant above these relative
-        # fluxes.
-        # pylint: disable-next=fixme
-        # TODO: allow as user input.
-        self.delta_mag_cuts = np.array([2.5, 5])
-
-        # pylint: disable-next=fixme
-        # TODO: allow as user input.
-        self.gal_cmau_array = np.empty((5, 2, 4), float)
-        # See Wilson (2022, RNAAS, 6, 60) for the meanings of the variables c, m,
-        # a, and u. For each of M*/phi*/alpha/P/Q, for blue+red galaxies, 2-4
-        # variables are derived as a function of wavelength, or Q(P).
-        self.gal_cmau_array[0, :, :] = [[-24.286513, 1.141760, 2.655846, np.nan],
-                                        [-23.192520, 1.778718, 1.668292, np.nan]]
-        self.gal_cmau_array[1, :, :] = [[0.001487, 2.918841, 0.000510, np.nan],
-                                        [0.000560, 7.691261, 0.003330, -0.065565]]
-        self.gal_cmau_array[2, :, :] = [[-1.257761, 0.021362, np.nan, np.nan],
-                                        [-0.309077, -0.067411, np.nan, np.nan]]
-        self.gal_cmau_array[3, :, :] = [[-0.302018, 0.034203, np.nan, np.nan],
-                                        [-0.713062, 0.233366, np.nan, np.nan]]
-        self.gal_cmau_array[4, :, :] = [[1.233627, -0.322347, np.nan, np.nan],
-                                        [1.068926, -0.385984, np.nan, np.nan]]
-        self.gal_alpha0 = [[2.079, 3.524, 1.917, 1.992, 2.536], [2.461, 2.358, 2.568, 2.268, 2.402]]
-        self.gal_alpha1 = [[2.265, 3.862, 1.921, 1.685, 2.480], [2.410, 2.340, 2.200, 2.540, 2.464]]
-        self.gal_alphaweight = [[3.47e+09, 3.31e+06, 2.13e+09, 1.64e+10, 1.01e+09],
-                                [3.84e+09, 1.57e+06, 3.91e+08, 4.66e+10, 3.03e+07]]
-
-        t = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        print(f'{t} Rank {self.rank}, chunk {self.chunk_id}: Creating empirical perturbation AUFs '
-              'for catalogue "a"...')
-        sys.stdout.flush()
-        if self.j0s is None:
-            self.j0s = mff.calc_j0(self.rho[:-1]+self.drho/2, self.r[:-1]+self.dr/2)
-        if self.include_perturb_auf:
-            _kwargs = {'psf_fwhms': self.a_psf_fwhms, 'tri_download_flag': self.a_download_tri,
-                       'delta_mag_cuts': self.delta_mag_cuts, 'num_trials': self.num_trials,
-                       'd_mag': self.d_mag, 'density_radius': self.a_dens_dist,
-                       'tri_filt_names': self.a_tri_filt_names,
-                       'run_fw': self.a_run_fw_auf, 'run_psf': self.a_run_psf_auf,
-                       'snr_mag_params': self.a_snr_mag_params,
-                       'tri_maglim_faint': self.a_tri_maglim_faint,
-                       'tri_num_faint': self.a_tri_num_faint,
-                       'tri_set_name': self.a_tri_set_name,
-                       'tri_filt_num': self.a_tri_filt_num,
-                       'auf_region_frame': self.a_auf_region_frame,
-                       'al_avs': self.a_gal_al_avs, 'fit_gal_flag': self.a_fit_gal_flag}
-            if self.a_run_psf_auf:
-                _kwargs = dict(_kwargs, **{'dd_params': self.a_dd_params,
-                                           'l_cut': self.a_l_cut})
-            if self.a_fit_gal_flag:
-                _kwargs = dict(_kwargs,
-                               **{'cmau_array': self.gal_cmau_array, 'wavs': self.a_gal_wavs,
-                                  'z_maxs': self.a_gal_zmax, 'nzs': self.a_gal_nzs,
-                                  'ab_offsets': self.a_gal_aboffsets,
-                                  'filter_names': self.a_gal_filternames,
-                                  'alpha0': self.gal_alpha0, 'alpha1': self.gal_alpha1,
-                                  'alpha_weight': self.gal_alphaweight})
-            else:
-                _kwargs = dict(_kwargs, **{'fit_gal_flag': self.a_fit_gal_flag})
-        else:
-            _kwargs = {}
-        self.a_modelrefinds, self.a_perturb_auf_outputs = perturb_auf_func(
-            self.a_auf_folder_path, self.a_cat_folder_path, self.a_filt_names,
-            self.a_auf_region_points, self.r, self.dr, self.j0s, 'a', self.include_perturb_auf, **_kwargs)
-
-        t = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        print(f'{t} Rank {self.rank}, chunk {self.chunk_id}: Creating empirical perturbation AUFs '
-              'for catalogue "b"...')
-        sys.stdout.flush()
-        if self.j0s is None:
-            self.j0s = mff.calc_j0(self.rho[:-1]+self.drho/2, self.r[:-1]+self.dr/2)
-        if self.include_perturb_auf:
-            _kwargs = {'psf_fwhms': self.b_psf_fwhms, 'tri_download_flag': self.b_download_tri,
-                       'delta_mag_cuts': self.delta_mag_cuts, 'num_trials': self.num_trials,
-                       'd_mag': self.d_mag, 'density_radius': self.b_dens_dist,
-                       'tri_filt_names': self.b_tri_filt_names,
-                       'run_fw': self.b_run_fw_auf, 'run_psf': self.b_run_psf_auf,
-                       'snr_mag_params': self.b_snr_mag_params,
-                       'tri_maglim_faint': self.b_tri_maglim_faint,
-                       'tri_num_faint': self.b_tri_num_faint,
-                       'tri_set_name': self.b_tri_set_name,
-                       'tri_filt_num': self.b_tri_filt_num,
-                       'auf_region_frame': self.b_auf_region_frame,
-                       'al_avs': self.b_gal_al_avs, 'fit_gal_flag': self.b_fit_gal_flag}
-            if self.b_run_psf_auf:
-                _kwargs = dict(_kwargs, **{'dd_params': self.b_dd_params,
-                                           'l_cut': self.b_l_cut})
-
-            if self.b_fit_gal_flag:
-                _kwargs = dict(_kwargs,
-                               **{'cmau_array': self.gal_cmau_array, 'wavs': self.b_gal_wavs,
-                                  'z_maxs': self.b_gal_zmax, 'nzs': self.b_gal_nzs,
-                                  'ab_offsets': self.b_gal_aboffsets,
-                                  'filter_names': self.b_gal_filternames,
-                                  'alpha0': self.gal_alpha0, 'alpha1': self.gal_alpha1,
-                                  'alpha_weight': self.gal_alphaweight})
-            else:
-                _kwargs = dict(_kwargs, **{'fit_gal_flag': self.b_fit_gal_flag})
-        else:
-            _kwargs = {}
-        self.b_modelrefinds, self.b_perturb_auf_outputs = perturb_auf_func(
-            self.b_auf_folder_path, self.b_cat_folder_path, self.b_filt_names,
-            self.b_auf_region_points, self.r, self.dr, self.j0s, 'b', self.include_perturb_auf, **_kwargs)
-
-    def group_sources(self, group_func=make_island_groupings):
-        '''
-        Function to handle the creation of catalogue "islands" and potential
-        astrometrically related sources across the two catalogues.
-
-        Parameters
-        ----------
-        group_func : callable, optional
-            ``group_func`` should create the various island- and overlap-related
-            files by which objects across the two catalogues are assigned as
-            potentially counterparts to one another.
-        '''
-
-        t = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        print(f'{t} Rank {self.rank}, chunk {self.chunk_id}: Creating catalogue islands and overlaps...')
-        sys.stdout.flush()
-        if self.j1s is None:
-            self.j1s = gsf.calc_j1s(self.rho[:-1]+self.drho/2, self.r[:-1]+self.dr/2)
-        os.system(f'rm -rf {self.joint_folder_path}/reject/*')
-        self.group_sources_data = \
-            group_func(self.joint_folder_path, self.a_cat_folder_path, self.b_cat_folder_path,
-                       self.a_modelrefinds, self.b_modelrefinds, self.r, self.dr, self.rho, self.drho,
-                       self.j1s, self.pos_corr_dist, self.cross_match_extent, self.int_fracs,
-                       self.include_phot_like, self.use_phot_priors,
-                       self.n_pool, self.a_perturb_auf_outputs, self.b_perturb_auf_outputs)
-
-    def calculate_phot_like(self, phot_like_func=compute_photometric_likelihoods):
-        '''
-        Create the photometric likelihood information used in the cross-match
-        process.
-
-        Parameters
-        ----------
-        phot_like_func : callable, optional
-            The function that calls the overall computation of the counterpart
-            and "field" star photometric likelihood-related information.
-        '''
-
-        t = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        print(f'{t} Rank {self.rank}, chunk {self.chunk_id}: Creating photometric priors and likelihoods...')
-        sys.stdout.flush()
-        self._calculate_cf_areas()
-        if self.use_phot_priors or self.include_phot_like:
-            bright_frac = self.int_fracs[0]
-            field_frac = self.int_fracs[1]
-        else:
-            bright_frac = None
-            field_frac = None
-        self.phot_like_data = phot_like_func(
-            self.a_cat_folder_path, self.b_cat_folder_path, self.a_filt_names, self.b_filt_names,
-            self.cf_region_points, self.cf_areas, self.include_phot_like, self.use_phot_priors,
-            self.group_sources_data, bright_frac, field_frac)
-
-    def _calculate_cf_areas(self):
-        '''
-        Convenience function to calculate the area around each
-        ``cross_match_extent`` sky coordinate where it is defined as having the
-        smallest on-sky separation.
-        '''
-        t = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        print(f'{t} Rank {self.rank}, chunk {self.chunk_id}: Calculating photometric region areas...')
-        dlon, dlat = 0.01, 0.01
-        test_lons = np.arange(self.cross_match_extent[0], self.cross_match_extent[1], dlon)
-        test_lats = np.arange(self.cross_match_extent[2], self.cross_match_extent[3], dlat)
-
-        test_coords = np.array([[a, b] for a in test_lons for b in test_lats])
-
-        inds = mff.find_nearest_point(test_coords[:, 0], test_coords[:, 1],
-                                      self.cf_region_points[:, 0], self.cf_region_points[:, 1])
-
-        cf_areas = np.zeros((len(self.cf_region_points)), float)
-
-        # Unit area of a sphere is cos(theta) dtheta dphi if theta goes from -90
-        # to +90 degrees (sin(theta) for 0 to 180 degrees). Note, however, that
-        # dtheta and dphi have to be in radians, so we have to convert the entire
-        # thing from degrees and re-convert at the end. Hence:
-        for i, ind in enumerate(inds):
-            theta = np.radians(test_coords[i, 1])
-            dtheta, dphi = dlat / 180 * np.pi, dlon / 180 * np.pi
-            # Remember to convert back to square degrees:
-            cf_areas[ind] += (np.cos(theta) * dtheta * dphi) * (180 / np.pi)**2
-
-        self.cf_areas = cf_areas
-
-    def pair_sources(self, count_pair_func=source_pairing):
-        '''
-        Assign sources in the two catalogues as either counterparts to one another
-        or singly detected "field" sources.
-
-        Parameters
-        ----------
-        count_pair_func : callable, optional
-            The function that calls the counterpart determination routine.
-        '''
-
-        t = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        print(f'{t} Rank {self.rank}, chunk {self.chunk_id}: Determining counterparts...')
-        sys.stdout.flush()
-        os.system(f'rm -r {self.joint_folder_path}/pairing/*')
-        count_pair_func(
-            self.joint_folder_path, self.a_cat_folder_path, self.b_cat_folder_path,
-            self.a_modelrefinds, self.b_modelrefinds, self.rho, self.drho, len(self.delta_mag_cuts),
-            self.group_sources_data, self.phot_like_data, self.a_perturb_auf_outputs,
-            self.b_perturb_auf_outputs)
