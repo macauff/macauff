@@ -5,6 +5,7 @@ framework.
 '''
 
 import numpy as np
+from scipy.spatial import ConvexHull
 
 __all__ = []
 
@@ -312,3 +313,58 @@ def min_max_lon(a):
     # Otherwise, the limits are inside [0, 360] and should be returned
     # as the "normal" minimum and maximum values.
     return min_lon, max_lon
+
+
+def convex_hull_area(x, y):
+    """
+    Function to calculate the convex hull vertices and the area enclosed by
+    those verticies.
+
+    Parameters
+    ----------
+    x : list or numpy.ndarray
+        Coordinates in the longitudinal, or RA, sky axis, in degrees.
+    y : list or numpy.ndarray
+        Latitudinal, or Declination, sky axis coordinates, in degrees.
+
+    Returns
+    -------
+    area : float
+        The sky area, in square degrees, of the convex hull enclosing the
+        points.
+    """
+    # min_max_lon returns negative minimum longitude for cases where area sits
+    # either side of the 0/360 degree boundary but doesn't fully wrap around
+    # the entire longitudinal ring.
+    x_shift = 180 - np.sum(min_max_lon(x))/2
+    new_x = x + x_shift
+    new_x[new_x > 360] = new_x[new_x > 360] - 360
+    new_x[new_x < 0] = new_x[new_x < 0] + 360
+    new_x *= np.cos(np.radians(y))
+    hull = ConvexHull(np.array([new_x, y]).T)
+    area = shoelace_formula_area(new_x[hull.vertices], y[hull.vertices])
+
+    return area
+
+
+def shoelace_formula_area(x, y):
+    """
+    Performs the calculation of an area defined by a set of vertices as per the
+    Shoelace formula.
+
+    Parameters
+    ----------
+    x : list or numpy.ndarray
+        Coordinates in the longitudinal, or RA, sky axis, in degrees.
+    y : list or numpy.ndarray
+        Latitudinal, or Declination, sky axis coordinates, in degrees.
+
+    Returns
+    -------
+    area : float
+        The sky area, in square degrees, of the region defined by the set of
+        vertices.
+    """
+    area = abs(0.5 * np.array(np.dot(x, np.roll(y, 1)) - np.dot(y, np.roll(x, 1))))
+
+    return area
