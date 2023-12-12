@@ -31,7 +31,7 @@ if usetex:
 # pylint: disable=wrong-import-position,import-error,no-name-in-module
 from macauff.galaxy_counts import create_galaxy_counts
 from macauff.get_trilegal_wrapper import get_av_infinity
-from macauff.misc_functions import min_max_lon
+from macauff.misc_functions import convex_hull_area, min_max_lon
 from macauff.misc_functions_fortran import misc_functions_fortran as mff
 from macauff.perturbation_auf import (
     _calculate_magnitude_offsets,
@@ -555,6 +555,8 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
                 self.a = self.load_catalogue('a', self.cat_args)
                 self.b = self.load_catalogue('b', self.cat_args)
 
+            self.area = convex_hull_area(self.b[:, 0], self.b[:, 1])
+
             self.a_array, self.b_array, self.c_array = self.make_snr_model()
             abc_array[:, index_, 0] = self.a_array
             abc_array[:, index_, 1] = self.b_array
@@ -1001,10 +1003,7 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
             if not os.path.exists(base_auf_folder):
                 os.makedirs(base_auf_folder, exist_ok=True)
 
-            rect_area = (ax1_max - (ax1_min)) * (
-                np.sin(np.radians(ax2_max)) - np.sin(np.radians(ax2_min))) * 180/np.pi
-
-            data_bright_dens = np.sum(~np.isnan(b_mag_data) & (b_mag_data <= maxmag)) / rect_area
+            data_bright_dens = np.sum(~np.isnan(b_mag_data) & (b_mag_data <= maxmag)) / self.area
             # pylint: disable-next=fixme
             # TODO: un-hardcode min_bright_tri_number
             min_bright_tri_number = 1000
@@ -1067,18 +1066,12 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
         else:
             ax1_mid, ax2_mid, ax1_min, ax1_max, ax2_min, ax2_max, _ = self.list_of_things
 
-        # Unit area is cos(t) dt dx for 0 <= t <= 90deg, 0 <= x <= 360 deg,
-        # integrated between ax2_min < t < ax2_max, ax1_min < x < ax1_max, converted
-        # to degrees.
-        rect_area = (ax1_max - (ax1_min)) * (
-            np.sin(np.radians(ax2_max)) - np.sin(np.radians(ax2_min))) * 180/np.pi
-
         mag_ind = self.mag_indices[self.best_mag_index]
         data_mags = self.b[~np.isnan(self.b[:, mag_ind]), mag_ind]
         # Correction to model is the ratio of data counts per unit area
         # to model source density.
         correction = np.sum((data_mags >= self.minmag) &
-                            (data_mags <= self.maxmag)) / rect_area / self.n_norm
+                            (data_mags <= self.maxmag)) / self.area / self.n_norm
 
         ax = plt.subplot(gs[0])
         ax1_name = 'l' if self.coord_system == 'galactic' else 'RA'
@@ -1093,8 +1086,8 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
         data_dbins = np.diff(data_bins)[d_hc]
         data_bins = data_bins[d_hc]
 
-        data_uncert = np.sqrt(data_hist) / data_dbins / rect_area
-        data_hist = data_hist / data_dbins / rect_area
+        data_uncert = np.sqrt(data_hist) / data_dbins / self.area
+        data_hist = data_hist / data_dbins / self.area
         data_loghist = np.log10(data_hist)
         data_dloghist = 1/np.log(10) * data_uncert / data_hist
         ax.errorbar(data_bins+data_dbins/2, data_loghist, yerr=data_dloghist, c='r',
@@ -1394,12 +1387,7 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
             # of a and b, being of the form 2 pi r N exp(-pi r^2 N) are
             # 1 - exp(-pi r^2 N), and hence the survival integrals multiplied
             # together form N' = N_a + N_b, and then you use f(r) = dF/dr.
-            # Unit area is cos(t) dt dx for 0 <= t <= 90deg, 0 <= x <= 360 deg,
-            # integrated between ax2_min < t < ax2_max, ax1_min < x < ax1_max, converted
-            # to degrees.
-            rect_area = (ax1_max - (ax1_min)) * (
-                np.sin(np.radians(ax2_max)) - np.sin(np.radians(ax2_min))) * 180/np.pi
-            avg_a_dens = len(self.a) / rect_area
+            avg_a_dens = len(self.a) / self.area
             density = (self.moden + avg_a_dens) / 3600**2
             nn_model = 2 * np.pi * (self.r[:-1]+self.dr/2) * density * np.exp(
                 -np.pi * (self.r[:-1]+self.dr/2)**2 * density)
@@ -1500,9 +1488,7 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
                 final_slice = sig_cut & mag_cut & n_cut & (self.dists <= 20*self.psfsig*bsig)
             bm = b_matches[final_slice]
 
-            rect_area = (ax1_max - (ax1_min)) * (
-                np.sin(np.radians(ax2_max)) - np.sin(np.radians(ax2_min))) * 180/np.pi
-            avg_a_dens = len(self.a) / rect_area
+            avg_a_dens = len(self.a) / self.area
             density = (np.percentile(self.narray[self.bmatch][final_slice], 50) +
                        avg_a_dens) / 3600**2
             nn_model = 2 * np.pi * (self.r[:-1]+self.dr/2) * density * np.exp(
