@@ -22,6 +22,7 @@ from macauff.galaxy_counts import create_galaxy_counts
 from macauff.get_trilegal_wrapper import get_av_infinity, get_trilegal
 from macauff.misc_functions import (
     _load_rectangular_slice,
+    convex_hull_area,
     create_auf_params_grid,
     find_model_counts_corrections,
     min_max_lon,
@@ -160,14 +161,12 @@ def make_perturb_aufs(cm, which_cat):
         # dummy data (and never use it) in the filter loop.
         if auf_folder is not None and cm.include_perturb_auf and len(a_astro_cut) > 0 and (
                 tri_download_flag or not os.path.isfile(f'{ax_folder}/trilegal_auf_simulation_faint.dat')):
-            # Currently assume that the area of each small patch is a rectangle
-            # on the sky, implicitly assuming that the large region is also a
-            # rectangle, after any spherical projection cos(delta) effects.
-            rect_area = (ax1_max - ax1_min) * (
-                np.sin(np.radians(ax2_max)) - np.sin(np.radians(ax2_min))) * 180/np.pi
+            # Calculate the area of the current patch, assuming it is
+            # sufficiently convex to be defineable by its convex hull.
+            sky_area = convex_hull_area(a_astro_cut[:, 0], a_astro_cut[:, 1])
 
             data_bright_dens = np.array([np.sum(~np.isnan(a_photo_cut[:, q]) &
-                                         (a_photo_cut[:, q] <= dens_mags[q])) / rect_area
+                                         (a_photo_cut[:, q] <= dens_mags[q])) / sky_area
                                         for q in range(len(dens_mags))])
             # TODO: un-hardcode min_bright_tri_number  pylint: disable=fixme
             min_bright_tri_number = 1000
