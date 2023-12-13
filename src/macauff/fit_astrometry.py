@@ -59,7 +59,7 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
                  npy_or_csv, coord_or_chunk, pos_and_err_indices, mag_indices, mag_unc_indices,
                  mag_names, best_mag_index, coord_system, pregenerate_cutouts, n_r, n_rho, max_rho,
                  use_photometric_uncertainties=False, cutout_area=None, cutout_height=None,
-                 single_sided_auf=True, chunks=None):
+                 single_sided_auf=True, chunks=None, return_nm=False):
         """
         Initialisation of AstrometricCorrections, accepting inputs required for
         the running of the optimisation and parameterisation of astrometry of
@@ -226,6 +226,9 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
             List of IDs for each unique set of data if ``coord_or_chunk`` is
             ``chunk``. In this case, ``ax_dimension`` must be ``2`` and each
             ``chunk`` must correspond to its ``ax1_mids``-``ax2_mids`` coordinate.
+        return_nm : boolean, optional
+            Flag for whether the output correction arrays ``m`` and ``n`` should
+            be saved to disk (``False``) or returned by the function (``True``).
         """
         if single_sided_auf is not True:
             raise ValueError("single_sided_auf must be True.")
@@ -254,6 +257,9 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
             raise ValueError("cutout_height must be given if pregenerate_cutouts is 'False'.")
         if use_photometric_uncertainties is not True and use_photometric_uncertainties is not False:
             raise ValueError("use_photometric_uncertainties must either be True or False.")
+        if return_nm is not True and return_nm is not False:
+            raise ValueError("return_nm must either be True or False.")
+        self.return_nm = return_nm
         self.psf_fwhm = psf_fwhm
         self.numtrials = numtrials
         self.nn_radius = nn_radius
@@ -343,8 +349,9 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
         self.n_filt_rows = np.ceil(len(self.mag_indices) / self.n_filt_cols).astype(int)
 
         for folder in [self.save_folder, f'{self.save_folder}/npy', f'{self.save_folder}/pdf']:
-            if not os.path.exists(folder):
-                os.makedirs(folder)
+            if not (return_nm and 'npy' in folder):
+                if not os.path.exists(folder):
+                    os.makedirs(folder)
 
     def __call__(self, a_cat_name, b_cat_name, a_cat_func=None, b_cat_func=None, tri_download=True,
                  overwrite_all_sightlines=False, make_plots=False, make_summary_plot=True):
@@ -409,19 +416,28 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
             zip_list = (self.ax1_mids, self.ax2_mids, self.ax1_mins, self.ax1_maxs, self.ax2_mins,
                         self.ax2_maxs, self.chunks)
 
-        if (overwrite_all_sightlines or
+        if (self.return_nm or overwrite_all_sightlines or
                 not os.path.isfile(f'{self.save_folder}/npy/snr_mag_params.npy') or
                 not os.path.isfile(f'{self.save_folder}/npy/m_sigs_array.npy') or
                 not os.path.isfile(f'{self.save_folder}/npy/n_sigs_array.npy')):
-            abc_array = open_memmap(f'{self.save_folder}/npy/snr_mag_params.npy', mode='w+',
-                                    dtype=float,
-                                    shape=(len(self.mag_indices), len(self.ax1_mids), 5))
+            if self.return_nm:
+                abc_array = np.empty(dtype=float, shape=(len(self.mag_indices), len(self.ax1_mids), 5))
+            else:
+                abc_array = open_memmap(f'{self.save_folder}/npy/snr_mag_params.npy', mode='w+',
+                                        dtype=float,
+                                        shape=(len(self.mag_indices), len(self.ax1_mids), 5))
             abc_array[:, :, :] = -1
-            m_sigs = open_memmap(f'{self.save_folder}/npy/m_sigs_array.npy', mode='w+',
-                                 dtype=float, shape=(len(self.ax1_mids),))
+            if not self.return_nm:
+                m_sigs = open_memmap(f'{self.save_folder}/npy/m_sigs_array.npy', mode='w+',
+                                     dtype=float, shape=(len(self.ax1_mids),))
+            else:
+                m_sigs = np.empty(dtype=float, shape=(len(self.ax1_mids),))
             m_sigs[:] = -1
-            n_sigs = open_memmap(f'{self.save_folder}/npy/n_sigs_array.npy', mode='w+',
-                                 dtype=float, shape=(len(self.ax1_mids),))
+            if not self.return_nm:
+                n_sigs = open_memmap(f'{self.save_folder}/npy/n_sigs_array.npy', mode='w+',
+                                     dtype=float, shape=(len(self.ax1_mids),))
+            else:
+                n_sigs = np.empty(dtype=float, shape=(len(self.ax1_mids),))
             n_sigs[:] = -1
         else:
             abc_array = open_memmap(f'{self.save_folder}/npy/snr_mag_params.npy', mode='r+')
@@ -504,6 +520,9 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
                     self.ax_b.set_xlabel(r'Input photometric sigma / "')
                 self.ax_b.set_ylabel(r'Fit astrometric sigma / "')
             self.finalise_summary_plot()
+
+        if self.return_nm:
+            return m_sigs, n_sigs, abc_array, self.ax1_mids, self.ax2_mids
 
     def make_ax_coords(self, check_b_only=False):
         """
@@ -600,8 +619,9 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
                 self.ax2_mins[i] = np.amin(b[:, self.pos_and_err_indices[1][1]])
                 self.ax2_maxs[i] = np.amax(b[:, self.pos_and_err_indices[1][1]])
 
-        np.save(f'{self.save_folder}/npy/ax1_mids.npy', self.ax1_mids)
-        np.save(f'{self.save_folder}/npy/ax2_mids.npy', self.ax2_mids)
+        if not self.return_nm:
+            np.save(f'{self.save_folder}/npy/ax1_mids.npy', self.ax1_mids)
+            np.save(f'{self.save_folder}/npy/ax2_mids.npy', self.ax2_mids)
 
     def make_catalogue_cutouts(self):
         """
@@ -1702,8 +1722,6 @@ def create_densities(ax1_mid, ax2_mid, b, minmag, maxmag, ax1_min, ax1_max, ax2_
 
     narray = overlap_number / area
 
-    np.save(f'{save_folder}/npy/narray_sky_{ax1_mid}_{ax2_mid}.npy', narray)
-
     return narray
 
 
@@ -1810,10 +1828,6 @@ def create_distances(a, b, ax1_mid, ax2_mid, nn_radius, save_folder, a_ax1_ind, 
     amatch = _ainds[found_match_slice][found_match_slice2]
     dists = adists[found_match_slice][found_match_slice2]
 
-    np.save(f'{save_folder}/npy/a_matchind_{ax1_mid}_{ax2_mid}.npy', amatch)
-    np.save(f'{save_folder}/npy/b_matchind_{ax1_mid}_{ax2_mid}.npy', bmatch)
-    np.save(f'{save_folder}/npy/ab_dists_{ax1_mid}_{ax2_mid}.npy', dists)
-
     return amatch, bmatch, dists
 
 
@@ -1825,7 +1839,7 @@ class SNRMagnitudeRelationship(AstrometricCorrections):  # pylint: disable=too-m
     # pylint: disable-next=super-init-not-called
     def __init__(self, save_folder, ax1_mids, ax2_mids, ax_dimension, npy_or_csv, coord_or_chunk,
                  pos_and_err_indices, mag_indices, mag_unc_indices, mag_names, coord_system,
-                 chunks=None):
+                 chunks=None, return_nm=False):
         """
         Initialisation of AstrometricCorrections, accepting inputs required for
         the running of the optimisation and parameterisation of astrometry of
@@ -1892,6 +1906,9 @@ class SNRMagnitudeRelationship(AstrometricCorrections):  # pylint: disable=too-m
             List of IDs for each unique set of data if ``coord_or_chunk`` is
             ``chunk``. In this case, ``ax_dimension`` must be ``2`` and each
             ``chunk`` must correspond to its ``ax1_mids``-``ax2_mids`` coordinate.
+        return_nm : boolean, optional
+            Flag for whether the output correction arrays ``m`` and ``n`` should
+            be saved to disk (``False``) or returned by the function (``True``).
         """
         if ax_dimension not in (1, 2):
             raise ValueError("ax_dimension must either be '1' or '2'.")
@@ -1910,6 +1927,8 @@ class SNRMagnitudeRelationship(AstrometricCorrections):  # pylint: disable=too-m
                              "coord_or_chunk is 'chunk'.")
         if coord_system not in ("equatorial", "galactic"):
             raise ValueError("coord_system must either be 'equatorial' or 'galactic'.")
+        if return_nm is not True and return_nm is not False:
+            raise ValueError("return_nm must either be True or False.")
 
         self.save_folder = save_folder
 
@@ -1922,6 +1941,8 @@ class SNRMagnitudeRelationship(AstrometricCorrections):  # pylint: disable=too-m
         self.chunks = chunks
 
         self.coord_system = coord_system
+
+        self.return_nm = return_nm
 
         if npy_or_csv == 'npy':
             self.pos_and_err_indices = [None, pos_and_err_indices]
@@ -2022,3 +2043,6 @@ class SNRMagnitudeRelationship(AstrometricCorrections):  # pylint: disable=too-m
             abc_array[:, index_, 2] = self.c_array
             abc_array[:, index_, 3] = ax1_mid
             abc_array[:, index_, 4] = ax2_mid
+
+        if self.return_nm:
+            return abc_array, self.ax1_mids, self.ax2_mids

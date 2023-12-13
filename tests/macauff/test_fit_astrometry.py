@@ -168,6 +168,11 @@ class TestAstroCorrection:
                 **_kwargs, ax_dimension=1, npy_or_csv='csv', pregenerate_cutouts=False,
                 coord_or_chunk='coord', coord_system='equatorial', cutout_area=60, cutout_height=6,
                 use_photometric_uncertainties='yes')
+        with pytest.raises(ValueError, match="return_nm must either be True "):
+            ac = AstrometricCorrections(
+                **_kwargs, ax_dimension=1, npy_or_csv='csv', pregenerate_cutouts=False,
+                coord_or_chunk='coord', coord_system='equatorial', cutout_area=60, cutout_height=6,
+                use_photometric_uncertainties=True, return_nm='f')
         ac = AstrometricCorrections(
             **_kwargs, ax_dimension=1, npy_or_csv='csv', pregenerate_cutouts=False,
             coord_or_chunk='coord', coord_system='equatorial', cutout_area=60, cutout_height=6)
@@ -218,12 +223,12 @@ class TestAstroCorrection:
                tri_download=False, make_plots=True, make_summary_plot=True)
 
     @pytest.mark.remote_data
-    @pytest.mark.parametrize("npy_or_csv,coord_or_chunk,coord_system,pregenerate_cutouts",
-                             [("csv", "chunk", "equatorial", True),
-                              ("npy", "coord", "galactic", False),
-                              ("npy", "chunk", "equatorial", False)])
+    @pytest.mark.parametrize("npy_or_csv,coord_or_chunk,coord_system,pregenerate_cutouts,return_nm",
+                             [("csv", "chunk", "equatorial", True, False),
+                              ("npy", "coord", "galactic", False, True),
+                              ("npy", "chunk", "equatorial", False, False)])
     # pylint: disable-next=too-many-statements
-    def test_fit_astrometry(self, npy_or_csv, coord_or_chunk, coord_system, pregenerate_cutouts):
+    def test_fit_astrometry(self, npy_or_csv, coord_or_chunk, coord_system, pregenerate_cutouts, return_nm):
         self.npy_or_csv = npy_or_csv
         dd_params = np.load(os.path.join(os.path.dirname(__file__), 'data/dd_params.npy'))
         l_cut = np.load(os.path.join(os.path.dirname(__file__), 'data/l_cut.npy'))
@@ -259,7 +264,8 @@ class TestAstroCorrection:
             mag_names=['W1'], best_mag_index=0, coord_system=coord_system, chunks=chunks,
             pregenerate_cutouts=pregenerate_cutouts,
             cutout_area=60 if not pregenerate_cutouts else None,
-            cutout_height=6 if not pregenerate_cutouts else None, n_r=2000, n_rho=2000, max_rho=40)
+            cutout_height=6 if not pregenerate_cutouts else None, n_r=2000, n_rho=2000, max_rho=40,
+            return_nm=return_nm)
 
         if coord_or_chunk == 'coord':
             self.a_cat_name = 'store_data/a_cat{}{}' + ('.csv' if npy_or_csv == 'csv' else '.npy')
@@ -280,14 +286,23 @@ class TestAstroCorrection:
             b_cat_func = self.fake_catb_cutout
         if os.path.isfile('ac_save_folder/npy/snr_mag_params.npy'):
             os.remove('ac_save_folder/npy/snr_mag_params.npy')
+        if os.path.isfile('ac_save_folder/npy/m_sigs_array.npy'):
+            os.remove('ac_save_folder/npy/m_sigs_array.npy')
+        if os.path.isfile('ac_save_folder/npy/n_sigs_array.npy'):
+            os.remove('ac_save_folder/npy/n_sigs_array.npy')
 
         if half_run_flag:
             np.save('ac_save_folder/npy/snr_mag_params.npy',
                     np.array([[[-1, -1, -1, -1, -1], [-1, -2, -3, -4, -5]]], dtype=float))
             np.save('ac_save_folder/npy/m_sigs_array.npy', np.array([-1, 12], dtype=float))
             np.save('ac_save_folder/npy/n_sigs_array.npy', np.array([-1, 15], dtype=float))
-        ac(self.a_cat_name, self.b_cat_name, a_cat_func, b_cat_func,
-           tri_download=False, make_plots=True, make_summary_plot=True)
+        if return_nm:
+            marray, narray, abc_array, ax1_mids, ax2_mids = ac(
+                self.a_cat_name, self.b_cat_name, a_cat_func, b_cat_func,
+                tri_download=False, make_plots=True, make_summary_plot=True)
+        else:
+            ac(self.a_cat_name, self.b_cat_name, a_cat_func, b_cat_func,
+               tri_download=False, make_plots=True, make_summary_plot=True)
 
         if coord_or_chunk == 'coord':
             assert os.path.isfile('ac_save_folder/pdf/auf_fits_105.0_0.0.pdf')
@@ -300,15 +315,18 @@ class TestAstroCorrection:
 
         assert os.path.isfile('ac_save_folder/pdf/sig_h_stats.pdf')
 
-        marray = np.load('ac_save_folder/npy/m_sigs_array.npy')
-        narray = np.load('ac_save_folder/npy/n_sigs_array.npy')
+        if not return_nm:
+            marray = np.load('ac_save_folder/npy/m_sigs_array.npy')
+            narray = np.load('ac_save_folder/npy/n_sigs_array.npy')
         assert_allclose([marray[0], narray[0]], [2, 0], rtol=0.1, atol=0.01)
 
-        lmids = np.load('ac_save_folder/npy/ax1_mids.npy')
-        bmids = np.load('ac_save_folder/npy/ax2_mids.npy')
-        assert_allclose([lmids[0], bmids[0]], [105, 0], atol=0.001)
+        if not return_nm:
+            ax1_mids = np.load('ac_save_folder/npy/ax1_mids.npy')
+            ax2_mids = np.load('ac_save_folder/npy/ax2_mids.npy')
+        assert_allclose([ax1_mids[0], ax2_mids[0]], [105, 0], atol=0.001)
 
-        abc_array = np.load('ac_save_folder/npy/snr_mag_params.npy')
+        if not return_nm:
+            abc_array = np.load('ac_save_folder/npy/snr_mag_params.npy')
         assert_allclose(abc_array[0, 0, 0], 1.2e-2, rtol=0.05, atol=0.001)
         assert_allclose(abc_array[0, 0, 1], 8e-17, rtol=0.05, atol=5e-19)
 
@@ -371,12 +389,15 @@ class TestSNRMagRelation:
             with pytest.raises(ValueError, match="coord_system must either be 'equatorial'"):
                 SNRMagnitudeRelationship(**_kwargs, ax_dimension=1, npy_or_csv='csv',
                                          coord_or_chunk='coord', coord_system=e_or_g)
+        with pytest.raises(ValueError, match="return_nm must either be True "):
+            SNRMagnitudeRelationship(**_kwargs, ax_dimension=1, npy_or_csv='csv',
+                                     coord_or_chunk='coord', coord_system='equatorial', return_nm='f')
 
-    @pytest.mark.parametrize("npy_or_csv,coord_or_chunk,coord_system",
-                             [("csv", "chunk", "equatorial"), ("npy", "coord", "galactic"),
-                              ("npy", "chunk", "equatorial")])
+    @pytest.mark.parametrize("npy_or_csv,coord_or_chunk,coord_system,return_nm",
+                             [("csv", "chunk", "equatorial", True), ("npy", "coord", "galactic", False),
+                              ("npy", "chunk", "equatorial", False)])
     # pylint: disable-next=too-many-statements
-    def test_snr_mag_relation_fit(self, npy_or_csv, coord_or_chunk, coord_system):
+    def test_snr_mag_relation_fit(self, npy_or_csv, coord_or_chunk, coord_system, return_nm):
         self.npy_or_csv = npy_or_csv
         # Flag telling us to test for the non-running of all sightlines,
         # but to leave pre-generated ones alone
@@ -400,7 +421,7 @@ class TestSNRMagRelation:
             save_folder='ac_save_folder', ax1_mids=ax1_mids, ax2_mids=ax2_mids,
             ax_dimension=ax_dimension, npy_or_csv=npy_or_csv, coord_or_chunk=coord_or_chunk,
             pos_and_err_indices=[0, 1, 2], mag_indices=[3], mag_unc_indices=[4], mag_names=['W1'],
-            coord_system=coord_system, chunks=chunks)
+            coord_system=coord_system, chunks=chunks, return_nm=return_nm)
 
         if coord_or_chunk == 'coord':
             self.a_cat_name = 'store_data/a_cat{}{}' + ('.csv' if npy_or_csv == 'csv' else '.npy')
@@ -428,24 +449,33 @@ class TestSNRMagRelation:
 
         if os.path.isfile('ac_save_folder/npy/snr_mag_params.npy'):
             os.remove('ac_save_folder/npy/snr_mag_params.npy')
+        if os.path.isfile('ac_save_folder/npy/m_sigs_array.npy'):
+            os.remove('ac_save_folder/npy/m_sigs_array.npy')
+        if os.path.isfile('ac_save_folder/npy/n_sigs_array.npy'):
+            os.remove('ac_save_folder/npy/n_sigs_array.npy')
 
         if half_run_flag:
             np.save('ac_save_folder/npy/snr_mag_params.npy',
                     np.array([[[-1, -1, -1, -1, -1], [-1, -2, -3, -4, -5]]], dtype=float))
             np.save('ac_save_folder/npy/m_sigs_array.npy', np.array([-1, 12], dtype=float))
             np.save('ac_save_folder/npy/n_sigs_array.npy', np.array([-1, 15], dtype=float))
-        smr(self.b_cat_name, make_plots=True)
+        if return_nm:
+            abc_array, ax1_mids, ax2_mids = smr(self.b_cat_name, make_plots=True)
+        else:
+            smr(self.b_cat_name, make_plots=True)
 
         if coord_or_chunk == 'coord':
             assert os.path.isfile('ac_save_folder/pdf/s_vs_snr_105.0_0.0.pdf')
         else:
             assert os.path.isfile('ac_save_folder/pdf/s_vs_snr_2017.pdf')
 
-        lmids = np.load('ac_save_folder/npy/ax1_mids.npy')
-        bmids = np.load('ac_save_folder/npy/ax2_mids.npy')
-        assert_allclose([lmids[0], bmids[0]], [105, 0], atol=0.001)
+        if not return_nm:
+            ax1_mids = np.load('ac_save_folder/npy/ax1_mids.npy')
+            ax2_mids = np.load('ac_save_folder/npy/ax2_mids.npy')
+        assert_allclose([ax1_mids[0], ax2_mids[0]], [105, 0], atol=0.001)
 
-        abc_array = np.load('ac_save_folder/npy/snr_mag_params.npy')
+        if not return_nm:
+            abc_array = np.load('ac_save_folder/npy/snr_mag_params.npy')
         assert_allclose(abc_array[0, 0, 0], 1.2e-2, rtol=0.05, atol=0.001)
         assert_allclose(abc_array[0, 0, 1], 8e-17, rtol=0.05, atol=5e-19)
 

@@ -16,6 +16,10 @@ Bug Fixes
 API Changes
 ^^^^^^^^^^^
 
+- ``AstrometricCorrections`` and ``SNRMagnitudeRelationship`` accept ``return_nm``
+  as an optional keyword, allowing for the non-saving of arrays to disk, instead
+  returning the arrays after calling. [#78]
+
 - ``Macauff`` expects input IO wrapper ``CrossMatch`` class to have pre-loaded
   datasets in the form of astrometry, photometry, and reference magnitude
   respectively. [#78]
