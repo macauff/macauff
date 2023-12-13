@@ -182,6 +182,12 @@ class TestCounterpartPairing:  # pylint: disable=too-many-instance-attributes
         a.bgrplen = self.bgrplen
         a.lenrejecta = 0
         a.lenrejectb = 0
+        a.a_astro = self.a_astro
+        a.a_photo = self.a_photo
+        a.b_astro = self.b_astro
+        a.b_photo = self.b_photo
+        a.a_magref = self.amagref
+        a.b_magref = self.bmagref
 
         return a
 

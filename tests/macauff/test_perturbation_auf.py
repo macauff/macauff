@@ -36,10 +36,6 @@ class TestCreatePerturbAUF:
         os.makedirs('gaia_folder', exist_ok=True)
         os.makedirs('wise_folder', exist_ok=True)
         os.makedirs('test_path', exist_ok=True)
-        for path, n in zip(['gaia_folder', 'wise_folder'], [3, 4]):
-            np.save(f'{path}/con_cat_astro.npy', np.array([[1, 1, 1]]))
-            np.save(f'{path}/con_cat_photo.npy', np.array([[1] * n]))
-            np.save(f'{path}/magref.npy', np.array([1]))
         self.cm = CrossMatch(os.path.join(os.path.dirname(__file__), 'data'))
         self.cm._initialise_chunk(os.path.join(os.path.dirname(__file__), 'data/crossmatch_params.txt'),
                                   os.path.join(os.path.dirname(__file__), 'data/cat_a_params.txt'),
@@ -59,13 +55,13 @@ class TestCreatePerturbAUF:
             cat[rand_inds, 0] = 50
             cat[rand_inds, 1] = 50
             cat += rng.uniform(-0.1, 0.1, cat.shape)
-            np.save(f'{path}/con_cat_astro.npy', cat)
+            setattr(self.cm, f"{'a' if size == 25 else 'b'}_astro", cat)
 
             cat = rng.uniform(10, 20, (size, nf))
-            np.save(f'{path}/con_cat_photo.npy', cat)
+            setattr(self.cm, f"{'a' if size == 25 else 'b'}_photo", cat)
 
             cat = rng.choice(nf, size=(size,))
-            np.save(f'{path}/magref.npy', cat)
+            setattr(self.cm, f"{'a' if size == 25 else 'b'}_magref", cat)
 
         self.cm.include_perturb_auf = False
         self.cm.chunk_id = 1
@@ -93,10 +89,10 @@ class TestCreatePerturbAUF:
 
         file = self.cm.a_modelrefinds
         assert np.all(file[0, :] == 0)
-        assert np.all(file[1, :] == np.load(f'{self.cm.a_cat_folder_path}/magref.npy'))
+        assert np.all(file[1, :] == self.cm.a_magref)
 
         # Select AUF pointing index based on a 0 vs 50 cut in longitude.
-        cat = np.load(f'{self.cm.a_cat_folder_path}/con_cat_astro.npy')
+        cat = self.cm.a_astro
         inds = np.ones(file.shape[1], int)
         inds[np.where(cat[:, 0] < 1)[0]] = 0
         assert np.all(file[2, :] == inds)
@@ -456,11 +452,6 @@ class TestMakePerturbAUFs():
     def test_create_single_low_numbers(self):
         density_radius = np.sqrt(1 / np.pi / np.exp(8.7))
 
-        np.save(f'{self.cat_folder}/con_cat_astro.npy', np.array([[0.3, 0.3, 0.1]] * 101))
-        np.save(f'{self.cat_folder}/con_cat_photo.npy',
-                np.array([np.concatenate(([14.99], [100]*100))]).T)
-        np.save(f'{self.cat_folder}/magref.npy', np.array([0] * 101))
-
         d_mag = 0.1
 
         # Fake up a TRILEGAL simulation data file.
@@ -509,6 +500,9 @@ class TestMakePerturbAUFs():
         self.fake_cm.b_snr_mag_params = snr_mag_params
         self.fake_cm.b_gal_al_avs = [0]
         self.fake_cm.b_download_tri = False
+        self.fake_cm.b_astro = np.array([[0.3, 0.3, 0.1]] * 101)
+        self.fake_cm.b_photo = np.array([np.concatenate(([14.99], [100]*100))]).T
+        self.fake_cm.b_magref = np.array([0] * 101)
 
         with pytest.raises(ValueError, match="The number of simulated objects in this sky patch "):
             make_perturb_aufs(self.fake_cm, 'b')
@@ -523,14 +517,6 @@ class TestMakePerturbAUFs():
         density_radius = np.sqrt(1 / np.pi / np.exp(9.38))
 
         new_auf_points = np.vstack((self.auf_points, np.array([[10, 10]])))
-
-        # Have to fudge extra sources to keep our 15th mag source in the local
-        # density cutout.
-        np.save(f'{self.cat_folder}/con_cat_astro.npy',
-                np.concatenate(([0.3, 0.3, 0.1] * 101, [0.1, 0.1, 0.1], [0.9, 0.9, 0.1])).reshape(-1, 3))
-        np.save(f'{self.cat_folder}/con_cat_photo.npy',
-                np.array([np.concatenate(([14.99], [100]*100, [10], [10]))]).T)
-        np.save(f'{self.cat_folder}/magref.npy', np.array([0] * 103))
 
         d_mag = 0.1
 
@@ -572,8 +558,9 @@ class TestMakePerturbAUFs():
             if mag > 17:
                 keep_flux = np.zeros((1,), float)
 
+            photo_array = np.array([np.concatenate(([14.99], [100]*100, [10], [10]))]).T
             # Catalogue bins for the source:
-            a_photo = np.load(f'{self.cat_folder}/con_cat_photo.npy')[0, :]
+            a_photo = photo_array[0, :]
             dmag = 0.25
             mag_min = dmag * np.floor(np.amin(a_photo[0])/dmag)
             mag_max = dmag * np.ceil(np.amax(a_photo[0])/dmag)
@@ -615,6 +602,12 @@ class TestMakePerturbAUFs():
             self.fake_cm.b_l_cut = l_cut
             self.fake_cm.b_gal_al_avs = [0]
             self.fake_cm.b_download_tri = False
+            # Have to fudge extra sources to keep our 15th mag source in the local
+            # density cutout.
+            self.fake_cm.b_astro = np.concatenate(
+                ([0.3, 0.3, 0.1] * 101, [0.1, 0.1, 0.1], [0.9, 0.9, 0.1])).reshape(-1, 3)
+            self.fake_cm.b_photo = photo_array
+            self.fake_cm.b_magref = np.array([0] * 103)
             _, p_a_o = make_perturb_aufs(self.fake_cm, 'b')
 
             perturb_auf_combo = f'{ax1}-{ax2}-{self.filters[0]}'
@@ -806,6 +799,13 @@ class TestMakePerturbAUFs():
 
         cm.perturb_auf_func = make_perturb_aufs
 
+        # cm.a_astro = np.concatenate(([0.3, 0.3, 0.1] * 101, [0.1, 0.1, 0.1], [0.9, 0.9, 0.1])).reshape(-1, 3)
+        # cm.a_photo = np.array([np.concatenate(([14.99], [100]*100, [10], [10]))]).T
+        # cm.a_magref = np.array([0] * 103)
+        # cm.b_astro = np.concatenate(([0.3, 0.3, 0.1] * 101, [0.1, 0.1, 0.1], [0.9, 0.9, 0.1])).reshape(-1, 3)
+        # cm.b_photo = np.array([np.concatenate(([14.99], [100]*100, [10], [10]))]).T
+        # cm.b_magref = np.array([0] * 103)
+
         mcff = Macauff(cm)
         mcff.create_perturb_auf()
 
@@ -992,6 +992,13 @@ class TestMakePerturbAUFs():
         cm.b_dens_dist = density_radius
 
         cm.perturb_auf_func = make_perturb_aufs
+
+        # cm.a_astro = np.concatenate(([0.3, 0.3, 0.1] * 101, [0.1, 0.1, 0.1], [0.9, 0.9, 0.1])).reshape(-1, 3)
+        # cm.a_photo = np.array([np.concatenate(([14.99], [25]*100, [10], [10]))]).T
+        # cm.a_magref = np.array([0] * 103)
+        # cm.b_astro = np.concatenate(([0.3, 0.3, 0.1] * 101, [0.1, 0.1, 0.1], [0.9, 0.9, 0.1])).reshape(-1, 3)
+        # cm.b_photo = np.array([np.concatenate(([14.99], [25]*100, [10], [10]))]).T
+        # cm.b_magref = np.array([0] * 103)
 
         mcff = Macauff(cm)
         mcff.create_perturb_auf()

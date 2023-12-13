@@ -87,9 +87,9 @@ def make_perturb_aufs(cm, which_cat):
             ab_offsets = getattr(cm, f'{which_cat}_gal_aboffsets')
             filter_names = getattr(cm, f'{which_cat}_gal_filternames')
 
-    a_tot_astro = np.load(f'{cat_folder}/con_cat_astro.npy')
+    a_tot_astro = getattr(cm, f'{which_cat}_astro')
     if cm.include_perturb_auf:
-        a_tot_photo = np.load(f'{cat_folder}/con_cat_photo.npy')
+        a_tot_photo = getattr(cm, f'{which_cat}_photo')
 
     n_sources = len(a_tot_astro)
 
@@ -287,9 +287,9 @@ def make_perturb_aufs(cm, which_cat):
     sys.stdout.flush()
 
     if cm.include_perturb_auf:
-        a = np.load(f'{cat_folder}/con_cat_photo.npy')
+        a = getattr(cm, f'{which_cat}_photo')
         localn = local_n
-    magref = np.load(f'{cat_folder}/magref.npy')
+    magref = getattr(cm, f'{which_cat}_magref')
 
     if cm.include_perturb_auf:
         for i in range(0, len(a)):

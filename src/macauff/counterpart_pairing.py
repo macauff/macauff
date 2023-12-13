@@ -35,13 +35,13 @@ def source_pairing(cm):
 
     len_a, len_b = np.sum(cm.agrplen), np.sum(cm.bgrplen)
 
-    a_astro = np.load(f'{cm.a_cat_folder_path}/con_cat_astro.npy')
-    a_photo = np.load(f'{cm.a_cat_folder_path}/con_cat_photo.npy')
-    amagref = np.load(f'{cm.a_cat_folder_path}/magref.npy')
+    a_astro = cm.a_astro
+    a_photo = cm.a_photo
+    amagref = cm.a_magref
 
-    b_astro = np.load(f'{cm.b_cat_folder_path}/con_cat_astro.npy')
-    b_photo = np.load(f'{cm.b_cat_folder_path}/con_cat_photo.npy')
-    bmagref = np.load(f'{cm.b_cat_folder_path}/magref.npy')
+    b_astro = cm.b_astro
+    b_photo = cm.b_photo
+    bmagref = cm.b_magref
 
     big_len_a = len(a_astro)
     big_len_b = len(b_astro)

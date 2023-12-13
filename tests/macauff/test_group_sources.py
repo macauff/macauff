@@ -57,7 +57,7 @@ def test_load_fourier_grid_cutouts():  # pylint:disable=too-many-statements
 
     padding = 0.1
     p_a_o = {'fourier_grid': grid}
-    _a, _b, _c, _ = _load_fourier_grid_cutouts(a, rect, '.', p_a_o, padding, np.array([True]*lena),
+    _a, _b, _c, _ = _load_fourier_grid_cutouts(a, rect, p_a_o, padding, np.array([True]*lena),
                                                modelrefinds=m)
     assert np.all(_a.shape == (4, 3))
     assert np.all(_a ==
@@ -80,7 +80,7 @@ def test_load_fourier_grid_cutouts():  # pylint:disable=too-many-statements
     # This should not return sources 123 and 555 above, removing a potential
     # reference index. Hence we only have one unique grid reference now.
     padding = 0
-    _a, _b, _c, _ = _load_fourier_grid_cutouts(a, rect, '.', p_a_o, padding, np.array([True]*lena),
+    _a, _b, _c, _ = _load_fourier_grid_cutouts(a, rect, p_a_o, padding, np.array([True]*lena),
                                                modelrefinds=m)
     assert np.all(_a.shape == (2, 3))
     assert np.all(_a == np.array([[50, 50, 0.1], [45, 45, 0.2]]))
@@ -453,6 +453,8 @@ class TestMakeIslandGroupings():  # pylint: disable=too-many-instance-attributes
         self.cm.b_perturb_auf_outputs = self.b_perturb_auf_outputs
         self.cm.a_modelrefinds = self.a_modelrefinds
         self.cm.b_modelrefinds = self.b_modelrefinds
+        self.cm.a_astro = self.a_coords
+        self.cm.b_astro = self.b_coords
         mcff = Macauff(self.cm)
         mcff.group_sources()
 
@@ -495,6 +497,8 @@ class TestMakeIslandGroupings():  # pylint: disable=too-many-instance-attributes
         self.cm.b_perturb_auf_outputs = self.b_perturb_auf_outputs
         self.cm.a_modelrefinds = self.a_modelrefinds
         self.cm.b_modelrefinds = self.b_modelrefinds
+        self.cm.a_astro = a_coords
+        self.cm.b_astro = b_coords
 
         make_island_groupings(self.cm)
 
@@ -568,6 +572,8 @@ class TestMakeIslandGroupings():  # pylint: disable=too-many-instance-attributes
         self.cm.b_perturb_auf_outputs = self.b_perturb_auf_outputs
         self.cm.a_modelrefinds = self.a_modelrefinds
         self.cm.b_modelrefinds = self.b_modelrefinds
+        self.cm.a_astro = a_coords
+        self.cm.b_astro = b_coords
 
         make_island_groupings(self.cm)
 
@@ -594,6 +600,8 @@ class TestMakeIslandGroupings():  # pylint: disable=too-many-instance-attributes
         self.cm.b_perturb_auf_outputs = self.b_perturb_auf_outputs
         self.cm.a_modelrefinds = self.a_modelrefinds
         self.cm.b_modelrefinds = self.b_modelrefinds
+        self.cm.a_astro = self.a_coords
+        self.cm.b_astro = self.b_coords
         make_island_groupings(self.cm)
 
         # Verify that make_island_groupings doesn't change when the extra arrays

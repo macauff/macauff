@@ -38,10 +38,10 @@ def compute_photometric_likelihoods(cm):
     print(f"{t} Rank {cm.rank}, chunk {cm.chunk_id}: Distributing sources into sky slices...")
     sys.stdout.flush()
 
-    a_astro = np.load(f'{cm.a_cat_folder_path}/con_cat_astro.npy')
-    b_astro = np.load(f'{cm.b_cat_folder_path}/con_cat_astro.npy')
-    a_photo = np.load(f'{cm.a_cat_folder_path}/con_cat_photo.npy')
-    b_photo = np.load(f'{cm.b_cat_folder_path}/con_cat_photo.npy')
+    a_astro = cm.a_astro
+    b_astro = cm.b_astro
+    a_photo = cm.a_photo
+    b_photo = cm.b_photo
 
     a_sky_inds = mff.find_nearest_point(a_astro[:, 0], a_astro[:, 1], cm.cf_region_points[:, 0],
                                         cm.cf_region_points[:, 1])

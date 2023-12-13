@@ -347,6 +347,9 @@ class CrossMatch():
             if fn_m.shape[0] != fn_a.shape[0] or fn_p.shape[0] != fn_a.shape[0]:
                 raise ValueError(f"Consolidated catalogue arrays for catalogue {catname} should "
                                  "all be consistent lengths.")
+            setattr(self, f'{flag}astro', fn_a)
+            setattr(self, f'{flag}photo', fn_p)
+            setattr(self, f'{flag}magref', fn_m)
 
         self.make_shared_data()
 

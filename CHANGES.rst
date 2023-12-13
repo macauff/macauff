@@ -16,6 +16,10 @@ Bug Fixes
 API Changes
 ^^^^^^^^^^^
 
+- ``Macauff`` expects input IO wrapper ``CrossMatch`` class to have pre-loaded
+  datasets in the form of astrometry, photometry, and reference magnitude
+  respectively. [#78]
+
 - Removed ``StageData``. [#76]
 
 - Removed ``use_memmap_files`` as an input into ``CrossMatch``, along with
