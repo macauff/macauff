@@ -353,6 +353,7 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
                 if not os.path.exists(folder):
                     os.makedirs(folder)
 
+    # pylint: disable-next=too-many-statements
     def __call__(self, a_cat_name, b_cat_name, a_cat_func=None, b_cat_func=None, tri_download=True,
                  overwrite_all_sightlines=False, make_plots=False, make_summary_plot=True):
         """
@@ -523,6 +524,7 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
 
         if self.return_nm:
             return m_sigs, n_sigs, abc_array, self.ax1_mids, self.ax2_mids
+        return None
 
     def make_ax_coords(self, check_b_only=False):
         """
@@ -1041,18 +1043,17 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
         print('Creating local densities and nearest neighbour matches...')
 
         if self.coord_or_chunk == 'coord':
-            ax1_mid, ax2_mid, ax1_min, ax1_max, ax2_min, ax2_max = self.list_of_things
+            _, _, ax1_min, ax1_max, ax2_min, ax2_max = self.list_of_things
         else:
-            ax1_mid, ax2_mid, ax1_min, ax1_max, ax2_min, ax2_max, _ = self.list_of_things
+            _, _, ax1_min, ax1_max, ax2_min, ax2_max, _ = self.list_of_things
 
         narray = create_densities(
-            ax1_mid, ax2_mid, self.b, self.minmag, self.maxmag, ax1_min, ax1_max, ax2_min, ax2_max,
-            self.dens_search_radius, self.n_pool, self.save_folder, self.mag_indices[self.best_mag_index],
+            self.b, self.minmag, self.maxmag, ax1_min, ax1_max, ax2_min, ax2_max,
+            self.dens_search_radius, self.n_pool, self.mag_indices[self.best_mag_index],
             self.pos_and_err_indices[1][0], self.pos_and_err_indices[1][1], self.coord_system)
 
         _, bmatch, dists = create_distances(
-            self.a, self.b, ax1_mid, ax2_mid, self.nn_radius, self.save_folder,
-            self.pos_and_err_indices[0][0], self.pos_and_err_indices[0][1],
+            self.a, self.b, self.nn_radius, self.pos_and_err_indices[0][0], self.pos_and_err_indices[0][1],
             self.pos_and_err_indices[1][0], self.pos_and_err_indices[1][1], self.coord_system)
 
         # pylint: disable-next=fixme
@@ -1610,17 +1611,13 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
         return x
 
 
-def create_densities(ax1_mid, ax2_mid, b, minmag, maxmag, ax1_min, ax1_max, ax2_min, ax2_max, search_radius,
-                     n_pool, save_folder, mag_ind, ax1_ind, ax2_ind, coord_system):
+def create_densities(b, minmag, maxmag, ax1_min, ax1_max, ax2_min, ax2_max, search_radius,
+                     n_pool, mag_ind, ax1_ind, ax2_ind, coord_system):
     """
     Generate local normalising densities for all sources in catalogue "b".
 
     Parameters
     ----------
-    ax1_mid : float
-        Longitude of the center of the cutout region.
-    ax2_mid : float
-        Latitude of the middle of the cutout region.
     b : numpy.ndarray
         Catalogue of the sources for which astrometric corrections should be
         determined.
@@ -1645,8 +1642,6 @@ def create_densities(ax1_mid, ax2_mid, b, minmag, maxmag, ax1_min, ax1_max, ax2_
     n_pool : integer
         Number of parallel threads to run when calculating densities via
         ``multiprocessing``.
-    save_folder : string
-        Location on disk into which to save densities.
     mag_ind : integer
         Index in ``b`` where the magnitude being used is stored.
     ax1_ind : integer
@@ -1754,8 +1749,7 @@ def ball_point_query(iterable):
     return i, len(kdt_query)
 
 
-def create_distances(a, b, ax1_mid, ax2_mid, nn_radius, save_folder, a_ax1_ind, a_ax2_ind,
-                     b_ax1_ind, b_ax2_ind, coord_system):
+def create_distances(a, b, nn_radius, a_ax1_ind, a_ax2_ind, b_ax1_ind, b_ax2_ind, coord_system):
     """
     Calculate nearest neighbour matches between two catalogues.
 
@@ -1767,15 +1761,9 @@ def create_distances(a, b, ax1_mid, ax2_mid, nn_radius, save_folder, a_ax1_ind, 
     b : numpy.ndarray
         Catalogue "b"'s object array. Longitude and latitude must be its first
         two axes respectively.
-    ax1_mid : float
-        Center of the cutout region in longitude.
-    ax2_mid : float
-        Latitude of the cutout region's central coordinate.
     nn_radius : float
         Maximum match radius within which to consider potential counterpart
         assignments, in arcseconds.
-    save_folder : string
-        Location on disk where matches should be saved.
     a_ax1_ind : integer
         Index into ``a`` of the longitude data.
     a_ax2_ind : integer
@@ -2046,3 +2034,4 @@ class SNRMagnitudeRelationship(AstrometricCorrections):  # pylint: disable=too-m
 
         if self.return_nm:
             return abc_array, self.ax1_mids, self.ax2_mids
+        return None

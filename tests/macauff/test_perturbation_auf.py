@@ -3,7 +3,7 @@
 Tests for the "perturbation_auf" module.
 '''
 
-# pylint: disable=too-many-lines
+# pylint: disable=too-many-lines,duplicate-code
 
 import os
 
@@ -48,8 +48,7 @@ class TestCreatePerturbAUF:
         # Randomly generate two catalogues (x3 files) between coordinates
         # 0, 0 and 50, 50.
         rng = np.random.default_rng()
-        for path, nf, size in zip([self.cm.a_cat_folder_path, self.cm.b_cat_folder_path], [3, 4],
-                                  [25, 54]):
+        for nf, size in zip([3, 4], [25, 54]):
             cat = np.zeros((size, 3), float)
             rand_inds = rng.permutation(cat.shape[0])[:size // 2 - 1]
             cat[rand_inds, 0] = 50
@@ -813,9 +812,10 @@ class TestMakePerturbAUFs():
                 _a_photo = np.load(f'{self.cat_folder}/con_cat_photo.npy')
                 hist, bins = np.histogram(_a_photo[~np.isnan(_a_photo)], bins='auto')
                 dens_mag = (bins[:-1]+np.diff(bins)/2)[np.argmax(hist)] - 0.5
-                dens, tri_mags, tri_mags_mids, dtri_mags, uncert, num_bright_obj = make_tri_counts(
-                    f'{self.auf_folder}/{new_auf_point[0]}/{new_auf_point[1]}/', 'trilegal_auf_simulation',
-                    getattr(cm, f'{flag}tri_filt_names')[0], cm.d_mag, np.amin(a_photo), dens_mag)
+                dens, tri_mags, tri_mags_mids, dtri_mags, _, num_bright_obj = make_tri_counts(
+                    f'{self.auf_folder}/{new_auf_points[0][0]}/{new_auf_points[0][1]}/',
+                    'trilegal_auf_simulation', getattr(cm, f'{flag}tri_filt_names')[0], cm.d_mag,
+                    np.amin(a_photo), dens_mag)
                 setattr(cm, f'{flag}dens_hist_tri_list', [dens])
                 setattr(cm, f'{flag}tri_model_mags_list', [tri_mags])
                 setattr(cm, f'{flag}tri_model_mag_mids_list', [tri_mags_mids])
@@ -831,7 +831,7 @@ class TestMakePerturbAUFs():
             cm.a_tri_num_faint = None
             cm.b_tri_num_faint = None
             cm.a_download_tri = None
-            cm.b_download_tri
+            cm.b_download_tri = None
             cm.a_tri_filt_num = None
             cm.b_tri_filt_num = None
             cm.a_tri_filt_names = [None] * len(cm.a_tri_filt_names)
@@ -859,13 +859,6 @@ class TestMakePerturbAUFs():
         cm.chunk_id = 1
 
         cm.perturb_auf_func = make_perturb_aufs
-
-        # cm.a_astro = np.concatenate(([0.3, 0.3, 0.1] * 101, [0.1, 0.1, 0.1], [0.9, 0.9, 0.1])).reshape(-1, 3)
-        # cm.a_photo = np.array([np.concatenate(([14.99], [100]*100, [10], [10]))]).T
-        # cm.a_magref = np.array([0] * 103)
-        # cm.b_astro = np.concatenate(([0.3, 0.3, 0.1] * 101, [0.1, 0.1, 0.1], [0.9, 0.9, 0.1])).reshape(-1, 3)
-        # cm.b_photo = np.array([np.concatenate(([14.99], [100]*100, [10], [10]))]).T
-        # cm.b_magref = np.array([0] * 103)
 
         mcff = Macauff(cm)
         mcff.create_perturb_auf()

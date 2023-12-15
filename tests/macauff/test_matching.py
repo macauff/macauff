@@ -3,7 +3,7 @@
 Tests for the "matching" module.
 '''
 
-# pylint: disable=too-many-lines
+# pylint: disable=too-many-lines,duplicate-code
 
 import os
 from configparser import ConfigParser
@@ -269,7 +269,7 @@ class TestInputs:
                                       [131, 0], [132, 0], [133, 0], [134, 0],
                                       [131, 1], [132, 1], [133, 1], [134, 1]]))
 
-    def test_crossmatch_load_tri_hists(self):
+    def test_crossmatch_load_tri_hists(self):  # pylint: disable=too-many-statements
         with open(os.path.join(os.path.dirname(__file__), 'data/crossmatch_params.txt'),
                   encoding='utf-8') as file:
             f = file.readlines()
@@ -315,7 +315,7 @@ class TestInputs:
                           encoding='utf-8') as file:
                     f = file.readlines()
                 old_line = f'{name} = '
-                new_line = (f'{name} = None\n')
+                new_line = f'{name} = None\n'
                 idx = np.where([old_line in line for line in f])[0][0]
                 _replace_line(os.path.join(os.path.dirname(__file__), f'data/cat_{flag}_params_new.txt'),
                               idx, new_line)

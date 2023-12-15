@@ -1047,25 +1047,24 @@ class CrossMatch():
                         if not os.path.isfile(f):
                             raise FileNotFoundError(f"File not found for {name}. Please verify "
                                                     "the input location on disk.")
+                        try:
+                            g = np.load(f)
+                        except Exception as exc:
+                            raise ValueError(f"File could not be loaded from {name}.") from exc
+                        if name == "dens_hist_tri":
+                            shape_dht = g.shape
+                            if g.shape[0] != len(getattr(self, f'{flag}filt_names')):
+                                raise ValueError(f"The number of filters in {flag}filt_names and "
+                                                 f"{flag}dens_hist_tri do not match.")
                         else:
-                            try:
-                                g = np.load(f)
-                            except Exception as exc:
-                                raise ValueError(f"File could not be loaded from {name}.") from exc
-                            if name == "dens_hist_tri":
-                                shape_dht = g.shape
-                                if g.shape[0] != len(getattr(self, f'{flag}filt_names')):
-                                    raise ValueError(f"The number of filters in {flag}filt_names and "
-                                                     f"{flag}dens_hist_tri do not match.")
-                            else:
-                                if g.shape[0] != shape_dht[0]:
-                                    raise ValueError("The number of filter-elements in dens_hist_tri "
-                                                     f"and {name} do not match.")
-                                if name != "tri_n_bright_sources_star":
-                                    if len(g.shape) < 2 or len(shape_dht) < 2 or g.shape[1] != shape_dht[1]:
-                                        raise ValueError("The number of magnitude-elements in "
-                                                         f"dens_hist_tri and {name} do not match.")
-                            setattr(self, f'{flag}{name}_list', g)
+                            if g.shape[0] != shape_dht[0]:
+                                raise ValueError("The number of filter-elements in dens_hist_tri "
+                                                 f"and {name} do not match.")
+                            if name != "tri_n_bright_sources_star":
+                                if len(g.shape) < 2 or len(shape_dht) < 2 or g.shape[1] != shape_dht[1]:
+                                    raise ValueError("The number of magnitude-elements in "
+                                                     f"dens_hist_tri and {name} do not match.")
+                        setattr(self, f'{flag}{name}_list', g)
                 # Check for inter- and intra-TRILEGAL parameter compatibility.
                 # If any one parameter from option A or B is None, they all
                 # should be; and if any (all) options from A are None, zero

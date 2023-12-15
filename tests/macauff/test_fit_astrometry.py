@@ -227,7 +227,7 @@ class TestAstroCorrection:
                              [("csv", "chunk", "equatorial", True, False),
                               ("npy", "coord", "galactic", False, True),
                               ("npy", "chunk", "equatorial", False, False)])
-    # pylint: disable-next=too-many-statements
+    # pylint: disable-next=too-many-statements,too-many-branches
     def test_fit_astrometry(self, npy_or_csv, coord_or_chunk, coord_system, pregenerate_cutouts, return_nm):
         self.npy_or_csv = npy_or_csv
         dd_params = np.load(os.path.join(os.path.dirname(__file__), 'data/dd_params.npy'))
@@ -396,7 +396,7 @@ class TestSNRMagRelation:
     @pytest.mark.parametrize("npy_or_csv,coord_or_chunk,coord_system,return_nm",
                              [("csv", "chunk", "equatorial", True), ("npy", "coord", "galactic", False),
                               ("npy", "chunk", "equatorial", False)])
-    # pylint: disable-next=too-many-statements
+    # pylint: disable-next=too-many-statements,too-many-branches
     def test_snr_mag_relation_fit(self, npy_or_csv, coord_or_chunk, coord_system, return_nm):
         self.npy_or_csv = npy_or_csv
         # Flag telling us to test for the non-running of all sightlines,
