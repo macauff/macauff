@@ -16,13 +16,22 @@ Bug Fixes
 API Changes
 ^^^^^^^^^^^
 
+- Added ``dens_hist_tri_location``, ``tri_model_mags_location``,
+  ``ntri_model_mag_mids_location``, ``tri_model_mags_interval_location``,
+  and ``tri_n_bright_sources_star_location`` as input parameters into catalogue
+  configuration files. These must be provided, and should be ``None`` if previous
+  TRILEGAL histogram-generation parameters (``auf_folder_path``,
+  ``tri_set_name``,  ``tri_filt_names``, ``tri_filt_num``, ``download_tri``,
+  ``tri_maglim_faint``, ``tri_num_faint``) are provided, while those parameters
+  must be ``None`` if the new set are given. [#79]
+
 - ``AstrometricCorrections`` and ``SNRMagnitudeRelationship`` accept ``return_nm``
   as an optional keyword, allowing for the non-saving of arrays to disk, instead
-  returning the arrays after calling. [#78]
+  returning the arrays after calling. [#79]
 
 - ``Macauff`` expects input IO wrapper ``CrossMatch`` class to have pre-loaded
   datasets in the form of astrometry, photometry, and reference magnitude
-  respectively. [#78]
+  respectively. [#79]
 
 - Removed ``StageData``. [#76]
 
