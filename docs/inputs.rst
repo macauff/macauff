@@ -164,7 +164,7 @@ These can be divided into those inputs that are always required:
 
 those that are only required if the `Joint Parameters`_ option ``include_perturb_auf`` is ``True``:
 
-``fit_gal_flag``, ``run_fw_auf``, ``run_psf_auf``, ``psf_fwhms``, ``snr_mag_params_path``, ``download_tri``, ``tri_set_name``, ``tri_filt_names``, ``tri_filt_num``, ``tri_maglim_faint``, ``tri_num_faint``, ``gal_al_avs``, and ``dens_dist``;
+``fit_gal_flag``, ``run_fw_auf``, ``run_psf_auf``, ``psf_fwhms``, ``snr_mag_params_path``, ``download_tri``, ``tri_set_name``, ``tri_filt_names``, ``tri_filt_num``, ``tri_maglim_faint``, ``tri_num_faint``, ``gal_al_avs``, ``dens_dist``, ``dens_hist_tri_location``, ``tri_model_mags_location``, ``tri_model_mag_mids_location``, ``tri_model_mags_interval_location``, and ``tri_n_bright_sources_star_location``;
 
 parameters required if ``run_psf_auf`` is ``True``:
 
@@ -210,7 +210,7 @@ The filter names of the photometric bandpasses used in this catalogue, in the or
 
 ``auf_folder_path``
 
-The folder into which the Astrometric Uncertainty Function (AUF) related files will be, or have been, saved. Can also either be an absolute or relative path, like ``cat_folder_path``.
+The folder into which the Astrometric Uncertainty Function (AUF) related files will be, or have been, saved. Can also either be an absolute or relative path, like ``cat_folder_path``. Alternatively, this can (and must) be ``None`` if all parameters related to loading pre-computed TRILEGAL histograms (``dens_hist_tri_location`` et al.) are provided.
 
 ``auf_region_type``
 
@@ -260,27 +260,47 @@ File path, either absolute or relative to the location of the script the cross-m
 
 ``download_tri``
 
-Boolean flag, indicating whether to re-download a TRILEGAL simulation in a given ``auf_region_points`` sky coordinate, once it has successfully been run, and to overwrite the original simulation data or not. Optional if ``include_perturb_aufs`` is ``False``.
-
+Boolean flag, indicating whether to re-download a TRILEGAL simulation in a given ``auf_region_points`` sky coordinate, once it has successfully been run, and to overwrite the original simulation data or not. Optional if ``include_perturb_aufs`` is ``False``. Alternatively, this can (and must) be ``None`` if all parameters related to loading pre-computed TRILEGAL histograms (``dens_hist_tri_location`` et al.) are provided.
 
 ``tri_set_name``
-The name of the filter set used to simulate the catalogue's sources in TRILEGAL [#]_. Used to interact with the TRILEGAL API; optional if ``include_perturb_aufs`` is ``False``.
+
+The name of the filter set used to simulate the catalogue's sources in TRILEGAL [#]_. Used to interact with the TRILEGAL API; optional if ``include_perturb_aufs`` is ``False``. Alternatively, this can (and must) be ``None`` if all parameters related to loading pre-computed TRILEGAL histograms (``dens_hist_tri_location`` et al.) are provided.
 
 ``tri_filt_names``
 
-The names of the filters, in the same order as ``filt_names``, as given in the data ``tri_set_name`` calls. Optional if ``include_perturb_aufs`` is ``False``.
+The names of the filters, in the same order as ``filt_names``, as given in the data ``tri_set_name`` calls. Optional if ``include_perturb_aufs`` is ``False``. Alternatively, this can (and must) be ``None`` if all parameters related to loading pre-computed TRILEGAL histograms (``dens_hist_tri_location`` et al.) are provided.
 
 ``tri_filt_num``
 
-The one-indexed column number of the magnitude, as determined by the column order of the saved data returned by the TRILEGAL API, to which to set the maximum magnitude limit for the simulation. Optional if ``include_perturb_aufs`` is ``False``.
+The one-indexed column number of the magnitude, as determined by the column order of the saved data returned by the TRILEGAL API, to which to set the maximum magnitude limit for the simulation. Optional if ``include_perturb_aufs`` is ``False``. Alternatively, this can (and must) be ``None`` if all parameters related to loading pre-computed TRILEGAL histograms (``dens_hist_tri_location`` et al.) are provided.
 
 ``tri_maglim_faint``
 
-This is the float that represents the magnitude down to which to simulate TRILEGAL sources in the full-scale simulation, bearing in mind the limiting magnitude cut of the public API but also making sure this value is sufficiently faint that it contains all potentially perturbing objects for the dynamic range of this catalogue (approximately 10 magnitudes fainter than the limiting magnitude of the survey)
+This is the float that represents the magnitude down to which to simulate TRILEGAL sources in the full-scale simulation, bearing in mind the limiting magnitude cut of the public API but also making sure this value is sufficiently faint that it contains all potentially perturbing objects for the dynamic range of this catalogue (approximately 10 magnitudes fainter than the limiting magnitude of the survey). Alternatively, this can (and must) be ``None`` if all parameters related to loading pre-computed TRILEGAL histograms (``dens_hist_tri_location`` et al.) are provided.
 
 ``tri_num_faint``
 
-Integer number of objects to draw from the TRILEGAL simulation -- affecting the area of simulation, up to the limit imposed by TRILEGAL -- down to the full ``tri_maglim_faint`` magnitude.
+Integer number of objects to draw from the TRILEGAL simulation -- affecting the area of simulation, up to the limit imposed by TRILEGAL -- down to the full ``tri_maglim_faint`` magnitude. Alternatively, this can (and must) be ``None`` if all parameters related to loading pre-computed TRILEGAL histograms (``dens_hist_tri_location`` et al.) are provided.
+
+``dens_hist_tri_location``
+
+The location on disk of a numpy array, shape ``(len(filt_names), M)`` where ``M`` is a consistent number of magnitude bins, of differential source counts for a given TRILEGAL simulation, in each filter for a specific catalogue. Alternatively, should be ``None`` if ``auf_folder_path`` and associated parameters for the running of TRILEGAL histogram generation within the cross-match run are given.
+
+``tri_model_mags_location``
+
+The location on disk of a numpy array, shape ``(len(filt_names), M)`` where ``M`` is a consistent number of magnitude bins, of the left-hand magnitude bin edges of differential source counts for a given TRILEGAL simulation, in each filter for a specific catalogue. Alternatively, should be ``None`` if ``auf_folder_path`` and associated parameters for the running of TRILEGAL histogram generation within the cross-match run are given.
+
+``tri_model_mag_mids_location``
+
+The location on disk of a numpy array, shape ``(len(filt_names), M)`` where ``M`` is a consistent number of magnitude bins, of magnitude bin-middles of differential source counts for a given TRILEGAL simulation, in each filter for a specific catalogue. Alternatively, should be ``None`` if ``auf_folder_path`` and associated parameters for the running of TRILEGAL histogram generation within the cross-match run are given.
+
+``tri_model_mags_interval_location``
+
+The location on disk of a numpy array, shape ``(len(filt_names), M)`` where ``M`` is a consistent number of magnitude bins, of magnitude bin widths of differential source counts for a given TRILEGAL simulation, in each filter for a specific catalogue. Alternatively, should be ``None`` if ``auf_folder_path`` and associated parameters for the running of TRILEGAL histogram generation within the cross-match run are given.
+
+``tri_n_bright_sources_star_location``
+
+The location on disk of a ``.npy`` file containing the number of simulated bright TRILEGAL objects in the input simulation, one per filter. Should be a 1-D numpy array of shape ``(len(filt_names),)``. Alternatively, should be ``None`` if ``auf_folder_path`` and associated parameters for the running of TRILEGAL histogram generation within the cross-match run are given.
 
 ``dd_params_path``
 
@@ -316,7 +336,7 @@ Name of each filter as appropriate for providing to ``speclite`` for each filter
 
 ``gal_al_avs``
 
-Differential extinction relative to the V-band for each filter, a set of space-separated floats. Must be provided if ``fit_gal_flag`` is ``True``.
+Differential extinction relative to the V-band for each filter, a set of space-separated floats. Must be provided if ``include_perturb_auf`` is ``True``.
 
 ``input_csv_folder``
 
@@ -402,6 +422,103 @@ Column number in the original csv file for the column containing the boolean fla
 
 The zero-indexed integer column number in the original input csv file used in ``AstrometricCorrections`` that corresponds to the column containing the highest quality detection for each source in the catalogue, used when calling ``csv_to_npy``.
 
+``use_photometric_uncertainties``
+
+Boolean flag indicating whether the astrometric or photometric uncertainties of the input catalogue should be used to derive the astrometric uncertainties from ensemble statistics in ``AstrometricCorrections``.
+
+
+Parameter Dependency Graph
+==========================
+
+The inter-dependency of input parameters on one another, and the output ``CrossMatch`` attribute if different, are given below::
+
+    ├─> include_perturb_auf
+    │                     ├─> num_trials
+    │                     ├─> d_mag
+    │                     ├─* dens_dist
+    │                     ├─* fit_gal_flag
+    │                     │             ├─* gal_wavs
+    │                     │             ├─* gal_zmax
+    │                     │             ├─* gal_nzs
+    │                     │             ├─* gal_aboffsets
+    │                     │             └─* gal_filternames
+    │                     ├─* snr_mag_params_path -> snr_mag_params
+    │                     ├─* tri_set_name[3a]
+    │                     ├─* tri_filt_names[3a]
+    │                     ├─* tri_filt_num[3a]
+    │                     ├─* download_tri[3a]
+    │                     ├─* psf_fwhms
+    │                     ├─* run_fw_auf
+    │                     ├─* run_psf_auf
+    │                     │             ├─* dd_params_path -> dd_params
+    │                     │             └─* l_cut_path -> l_cut
+    │                     ├─* tri_maglim_faint[3a]
+    │                     ├─* tri_num_faint[3a]
+    │                     ├─* gal_al_avs
+    │                     ├─* dens_hist_tri_location[3b] -> dens_hist_tri_list
+    │                     ├─* tri_model_mags_location[3b] -> tri_model_mags_list
+    │                     ├─* tri_model_mag_mids_location[3b] -> tri_model_mag_mids_list
+    │                     ├─* tri_model_mags_interval_location[3b] -> tri_model_mags_interval_list
+    │                     └─* tri_n_bright_sources_star_location[3b] -> tri_n_bright_sources_star_list
+    ├─> include_phot_like
+    ├─> use_phot_priors
+    ├─> cf_region_type
+    ├─> cf_region_frame[2]
+    ├─> cf_region_points
+    ├─> joint_folder_path
+    ├─> pos_corr_dist
+    ├─> real_hankel_points
+    ├─> four_hankel_points
+    ├─> four_max_rho
+    ├─> cross_match_extent
+    ├─> int_fracs
+    ├─> make_output_csv
+    │                 ├─> output_csv_folder
+    │                 ├─> match_out_csv_name
+    │                 ├─> nonmatch_out_csv_name
+    │                 ├─* input_csv_folder
+    │                 ├─* cat_csv_name
+    │                 ├─* cat_col_names
+    │                 ├─* cat_col_nums
+    │                 ├─* input_npy_folder
+    │                 ├─* csv_has_header
+    │                 ├─* extra_col_names
+    │                 └─* extra_col_nums
+    ├─> n_pool
+    ├─* auf_region_type
+    ├─* auf_region_frame[2]
+    ├─* auf_region_points
+    ├─* filt_names
+    ├─* cat_name
+    ├─* auf_folder_path[3a]
+    ├─* cat_folder_path
+    ├─* correct_astrometry[1]
+    │                    ├─* correct_astro_save_folder
+    │                    ├─* csv_cat_file_string
+    │                    ├─* pos_and_err_indices
+    │                    ├─* mag_indices
+    │                    ├─* mag_unc_indices
+    │                    ├─* best_mag_index
+    │                    ├─* nn_radius
+    │                    ├─* ref_csv_cat_file_string
+    │                    ├─* correct_mag_array
+    │                    ├─* correct_mag_slice
+    │                    ├─* correct_sig_slice
+    │                    ├─* chunk_overlap_col
+    │                    ├─* best_mag_index_col
+    │                    └─* use_photometric_uncertainties
+    ├─* compute_snr_mag_relation[1]
+    │                          ├─* correct_astro_save_folder
+    │                          ├─* csv_cat_file_string
+    │                          ├─* pos_and_err_indices
+    │                          ├─* mag_indices
+                               └─* mag_unc_indices
+
+List directories end in ``->`` for ``joint`` parameters, ``-*`` for ``catalogue`` parameters. ``catalogue`` level items will have ``a_`` or ``b_`` prepended, depending on which "side" of the cross-match they are from. Items with a second keyword after an arrow ``->`` are the names of the attributes that are saved to ``CrossMatch``, usually when the input parameter is a location on disk.
+
+| [1] - cannot both be ``True``
+| [2] - must be the same
+| [3] - only one set of [3a] and [3b] should be given, the others should be passed as ``None``
 
 .. rubric:: Footnotes
 

@@ -779,7 +779,7 @@ class CrossMatch():
         for config, catname in zip([cat_a_config, cat_b_config], ['"a"', '"b"']):
             for check_flag in ['auf_region_type', 'auf_region_frame', 'auf_region_points',
                                'filt_names', 'cat_name', 'auf_folder_path', 'cat_folder_path',
-                               'correct_astrometry']:
+                               'correct_astrometry', 'compute_snr_mag_relation']:
                 if check_flag not in config:
                     raise ValueError(f"Missing key {check_flag} from catalogue {catname} metadata file.")
 
