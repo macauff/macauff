@@ -115,8 +115,8 @@ def csv_to_npy(input_folder, input_filename, output_folder, astro_cols, photo_co
         m_sigs = np.load(f'{astro_sig_fits_filepath}/m_sigs_array.npy')
         n_sigs = np.load(f'{astro_sig_fits_filepath}/n_sigs_array.npy')
         mn_coords = np.empty((len(m_sigs), 2), float)
-        mn_coords[:, 0] = np.load(f'{astro_sig_fits_filepath}/ax1_mids.npy')
-        mn_coords[:, 1] = np.load(f'{astro_sig_fits_filepath}/ax2_mids.npy')
+        mn_coords[:, 0] = np.load(f'{astro_sig_fits_filepath}/snr_mag_params.npy')[:, 3]
+        mn_coords[:, 1] = np.load(f'{astro_sig_fits_filepath}/snr_mag_params.npy')[:, 4]
         if cat_in_radec and not mn_in_radec:
             # Convert mn_coords to RA/Dec if catalogue is in Equatorial coords.
             a = SkyCoord(l=mn_coords[:, 0], b=mn_coords[:, 1], unit='deg', frame='galactic')

@@ -523,7 +523,7 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
             self.finalise_summary_plot()
 
         if self.return_nm:
-            return m_sigs, n_sigs, abc_array, self.ax1_mids, self.ax2_mids
+            return m_sigs, n_sigs, abc_array
         return None
 
     def make_ax_coords(self, check_b_only=False):
@@ -620,10 +620,6 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
                     b[:, self.pos_and_err_indices[1][0]])
                 self.ax2_mins[i] = np.amin(b[:, self.pos_and_err_indices[1][1]])
                 self.ax2_maxs[i] = np.amax(b[:, self.pos_and_err_indices[1][1]])
-
-        if not self.return_nm:
-            np.save(f'{self.save_folder}/npy/ax1_mids.npy', self.ax1_mids)
-            np.save(f'{self.save_folder}/npy/ax2_mids.npy', self.ax2_mids)
 
     def make_catalogue_cutouts(self):
         """
