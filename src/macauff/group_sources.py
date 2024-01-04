@@ -304,14 +304,16 @@ def make_island_groupings(cm):
     if num_a_failed_checks + a_first_rejected_len > 0:
         lenrejecta = len(reject_a)
         # Save rejects output files.
-        np.save(f'{cm.joint_folder_path}/reject/reject_a.npy', reject_a)
+        cm.reject_a = reject_a
     else:
         lenrejecta = 0
+        cm.reject_a = None
     if num_b_failed_checks + b_first_rejected_len > 0:
         lenrejectb = len(reject_b)
-        np.save(f'{cm.joint_folder_path}/reject/reject_b.npy', reject_b)
+        cm.reject_b = reject_b
     else:
         lenrejectb = 0
+        cm.reject_b = None
 
     cm.ablen = ablen
     cm.bblen = bblen

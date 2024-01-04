@@ -84,8 +84,8 @@ def test_naive_bayes_match(x, y):
     cm = CrossMatch(os.path.join(os.path.dirname(__file__), 'data'))
     cm()
 
-    ac = np.load(f'{cm.joint_folder_path}/pairing/ac.npy')
-    bc = np.load(f'{cm.joint_folder_path}/pairing/bc.npy')
+    ac = np.load(f'{cm.joint_folder_path}/ac.npy')
+    bc = np.load(f'{cm.joint_folder_path}/bc.npy')
     assert len(ac) == n_c
     assert len(bc) == n_c
 

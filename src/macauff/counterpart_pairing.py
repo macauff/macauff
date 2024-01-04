@@ -107,7 +107,7 @@ def source_pairing(cm):
             temp_variable = variable[:, filter_variable]
         else:
             temp_variable = variable[filter_variable]
-        np.save(f'{cm.joint_folder_path}/pairing/{file_name}.npy', temp_variable)
+        setattr(cm, file_name, temp_variable)
 
     tot = countsum + afieldsum + cm.lenrejecta
     if tot < big_len_a:

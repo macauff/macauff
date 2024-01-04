@@ -415,7 +415,7 @@ class TestInputs:
                  'auf_folder_path = gaia_auf_folder', 'auf_folder_path = wise_auf_folder'],
                 ['', 'joint_folder_path = /User/test/some/path/\n', '',
                  'auf_folder_path = /User/test/some/path\n'],
-                ['Missing key', 'Error when trying to create temporary',
+                ['Missing key', 'Error when trying to check temporary',
                  'Missing key auf_folder_path from catalogue "a"',
                  'folder for catalogue "b" AUF outputs. Please ensure that b_auf_folder_path'],
                 [ValueError, OSError, ValueError, OSError],
@@ -1993,46 +1993,48 @@ class TestPostProcess:
         self.a_cat_folder_path = os.path.abspath('a_cat')
         self.b_cat_folder_path = os.path.abspath('b_cat')
 
-        os.makedirs(f'{self.joint_folder_path}/pairing', exist_ok=True)
+        os.makedirs(f'{self.joint_folder_path}', exist_ok=True)
         os.makedirs(self.a_cat_folder_path, exist_ok=True)
         os.makedirs(self.b_cat_folder_path, exist_ok=True)
 
         na, nb, nmatch = 10000, 7000, 4000
         self.na, self.nb, self.nmatch = na, nb, nmatch
 
+        self.cm = CrossMatch(os.path.join(os.path.dirname(__file__), 'data'))
+
         rng = np.random.default_rng(seed=7893467234)
         self.ac = rng.choice(na, size=nmatch, replace=False)
-        np.save(f'{self.joint_folder_path}/pairing/ac.npy', self.ac)
+        self.cm.ac = self.ac
         self.bc = rng.choice(nb, size=nmatch, replace=False)
-        np.save(f'{self.joint_folder_path}/pairing/bc.npy', self.bc)
+        self.cm.bc = self.bc
 
         self.af = np.delete(np.arange(na), self.ac)
-        np.save(f'{self.joint_folder_path}/pairing/af.npy', self.af)
+        self.cm.af = self.af
         self.bf = np.delete(np.arange(nb), self.bc)
-        np.save(f'{self.joint_folder_path}/pairing/bf.npy', self.bf)
+        self.cm.bf = self.bf
 
         np.save(f'{self.a_cat_folder_path}/in_chunk_overlap.npy', rng.choice(2, size=na).astype(bool))
         np.save(f'{self.b_cat_folder_path}/in_chunk_overlap.npy', rng.choice(2, size=nb).astype(bool))
 
         rng = np.random.default_rng(seed=13256)
-        np.save(f'{self.joint_folder_path}/pairing/pc.npy', rng.uniform(0, 1, size=self.nmatch))
-        np.save(f'{self.joint_folder_path}/pairing/eta.npy', rng.uniform(0, 1, size=self.nmatch))
-        np.save(f'{self.joint_folder_path}/pairing/xi.npy', rng.uniform(0, 1, size=self.nmatch))
-        np.save(f'{self.joint_folder_path}/pairing/acontamflux.npy', rng.uniform(0, 1, size=self.nmatch))
-        np.save(f'{self.joint_folder_path}/pairing/bcontamflux.npy', rng.uniform(0, 1, size=self.nmatch))
-        np.save(f'{self.joint_folder_path}/pairing/pacontam.npy', rng.uniform(0, 1, size=(2, self.nmatch)))
-        np.save(f'{self.joint_folder_path}/pairing/pbcontam.npy', rng.uniform(0, 1, size=(2, self.nmatch)))
-        np.save(f'{self.joint_folder_path}/pairing/crptseps.npy', rng.uniform(0, 1, size=self.nmatch))
+        self.cm.pc = rng.uniform(0, 1, size=self.nmatch)
+        self.cm.eta = rng.uniform(0, 1, size=self.nmatch)
+        self.cm.xi = rng.uniform(0, 1, size=self.nmatch)
+        self.cm.acontamflux = rng.uniform(0, 1, size=self.nmatch)
+        self.cm.bcontamflux = rng.uniform(0, 1, size=self.nmatch)
+        self.cm.pacontam = rng.uniform(0, 1, size=(2, self.nmatch))
+        self.cm.pbcontam = rng.uniform(0, 1, size=(2, self.nmatch))
+        self.cm.crptseps = rng.uniform(0, 1, size=self.nmatch)
 
         for t, n in zip(['a', 'b'], [self.na, self.nb]):
-            np.save(f'{self.joint_folder_path}/pairing/{t}fieldflux.npy',
-                    rng.uniform(0, 1, size=n-self.nmatch))
-            np.save(f'{self.joint_folder_path}/pairing/pf{t}.npy', rng.uniform(0, 1, size=n-self.nmatch))
-            np.save(f'{self.joint_folder_path}/pairing/{t}fieldseps.npy',
-                    rng.uniform(0, 1, size=n-self.nmatch))
-            np.save(f'{self.joint_folder_path}/pairing/{t}fieldeta.npy',
-                    rng.uniform(0, 1, size=n-self.nmatch))
-            np.save(f'{self.joint_folder_path}/pairing/{t}fieldxi.npy', rng.uniform(0, 1, size=n-self.nmatch))
+            setattr(self.cm, f'{t}fieldflux', rng.uniform(0, 1, size=n-self.nmatch))
+            setattr(self.cm, f'pf{t}', rng.uniform(0, 1, size=n-self.nmatch))
+            setattr(self.cm, f'{t}fieldseps', rng.uniform(0, 1, size=n-self.nmatch))
+            setattr(self.cm, f'{t}fieldeta', rng.uniform(0, 1, size=n-self.nmatch))
+            setattr(self.cm, f'{t}fieldxi', rng.uniform(0, 1, size=n-self.nmatch))
+
+        self.cm.reject_a = None
+        self.cm.reject_b = None
 
     def make_temp_catalogue(self, nrow, ncol, nnans, designation):
         # Fake a ID/ra/dec/err/[mags xN]/bestflag/inchunk csv file.
@@ -2051,23 +2053,22 @@ class TestPostProcess:
         return data, data1
 
     def test_postprocess(self):
-        cm = CrossMatch(os.path.join(os.path.dirname(__file__), 'data'))
-        cm.joint_folder_path = self.joint_folder_path
-        cm.a_cat_folder_path = self.a_cat_folder_path
-        cm.b_cat_folder_path = self.b_cat_folder_path
+        self.cm.joint_folder_path = self.joint_folder_path
+        self.cm.a_cat_folder_path = self.a_cat_folder_path
+        self.cm.b_cat_folder_path = self.b_cat_folder_path
 
-        cm.make_output_csv = False
+        self.cm.make_output_csv = False
 
-        cm.chunk_id = 1
+        self.cm.chunk_id = 1
 
-        cm._postprocess_chunk()
+        self.cm._postprocess_chunk()
 
         aino = np.load(f'{self.a_cat_folder_path}/in_chunk_overlap.npy')
         bino = np.load(f'{self.b_cat_folder_path}/in_chunk_overlap.npy')
-        ac = np.load(f'{self.joint_folder_path}/pairing/ac.npy')
-        af = np.load(f'{self.joint_folder_path}/pairing/af.npy')
-        bc = np.load(f'{self.joint_folder_path}/pairing/bc.npy')
-        bf = np.load(f'{self.joint_folder_path}/pairing/bf.npy')
+        ac = np.load(f'{self.joint_folder_path}/ac.npy')
+        af = np.load(f'{self.joint_folder_path}/af.npy')
+        bc = np.load(f'{self.joint_folder_path}/bc.npy')
+        bf = np.load(f'{self.joint_folder_path}/bf.npy')
 
         assert np.all(~aino[ac] | ~bino[bc])
         assert np.all(~aino[af])
@@ -2084,59 +2085,58 @@ class TestPostProcess:
 
     # pylint: disable-next=too-many-statements,too-many-locals
     def test_postprocess_with_csv(self):
-        cm = CrossMatch(os.path.join(os.path.dirname(__file__), 'data'))
-        cm.joint_folder_path = self.joint_folder_path
-        cm.a_cat_folder_path = self.a_cat_folder_path
-        cm.b_cat_folder_path = self.b_cat_folder_path
+        self.cm.joint_folder_path = self.joint_folder_path
+        self.cm.a_cat_folder_path = self.a_cat_folder_path
+        self.cm.b_cat_folder_path = self.b_cat_folder_path
 
-        cm.make_output_csv = True
+        self.cm.make_output_csv = True
 
         # Set a whole load of fake inputs
-        cm.output_csv_folder = 'output_csv_folder'
-        os.makedirs(cm.output_csv_folder, exist_ok=True)
-        cm.a_input_csv_folder = 'a_input_csv_folder'
-        os.makedirs(cm.a_input_csv_folder, exist_ok=True)
-        cm.a_cat_csv_name = 'gaia_catalogue.csv'
-        cm.a_csv_has_header = False
+        self.cm.output_csv_folder = 'output_csv_folder'
+        os.makedirs(self.cm.output_csv_folder, exist_ok=True)
+        self.cm.a_input_csv_folder = 'a_input_csv_folder'
+        os.makedirs(self.cm.a_input_csv_folder, exist_ok=True)
+        self.cm.a_cat_csv_name = 'gaia_catalogue.csv'
+        self.cm.a_csv_has_header = False
         acat, acatstring = self.make_temp_catalogue(self.na, 8, 100, 'Gaia ')
-        np.savetxt(f'{cm.a_input_csv_folder}/{cm.a_cat_csv_name}', acatstring, delimiter=',',
+        np.savetxt(f'{self.cm.a_input_csv_folder}/{self.cm.a_cat_csv_name}', acatstring, delimiter=',',
                    fmt='%s', header='')
-        cm.b_input_csv_folder = 'b_input_csv_folder'
-        os.makedirs(cm.b_input_csv_folder, exist_ok=True)
-        cm.b_cat_csv_name = 'wise_catalogue.csv'
-        cm.b_csv_has_header = True
+        self.cm.b_input_csv_folder = 'b_input_csv_folder'
+        os.makedirs(self.cm.b_input_csv_folder, exist_ok=True)
+        self.cm.b_cat_csv_name = 'wise_catalogue.csv'
+        self.cm.b_csv_has_header = True
         bcat, bcatstring = self.make_temp_catalogue(self.nb, 10, 500, 'J')
-        np.savetxt(f'{cm.b_input_csv_folder}/{cm.b_cat_csv_name}', bcatstring, delimiter=',', fmt='%s',
-                   header='ID, RA, Dec, Err, W1, W2, W3, W4, bestflag, inchunk')
-        cm.match_out_csv_name = 'match.csv'
-        cm.a_nonmatch_out_csv_name = 'gaia_nonmatch.csv'
-        cm.b_nonmatch_out_csv_name = 'wise_nonmatch.csv'
+        np.savetxt(f'{self.cm.b_input_csv_folder}/{self.cm.b_cat_csv_name}', bcatstring, delimiter=',',
+                   fmt='%s', header='ID, RA, Dec, Err, W1, W2, W3, W4, bestflag, inchunk')
+        self.cm.match_out_csv_name = 'match.csv'
+        self.cm.a_nonmatch_out_csv_name = 'gaia_nonmatch.csv'
+        self.cm.b_nonmatch_out_csv_name = 'wise_nonmatch.csv'
         # These would be ['Des', 'RA', 'Dec', 'G', 'RP'] as passed to CrossMatch,
         # but to avoid exactly this situation we prepend the catalogue name on the
         # front since RA and Dec are likely duplicated in all matches...
-        cm.a_cat_col_names = ['Gaia_Des', 'Gaia_RA', 'Gaia_Dec', 'Gaia_G', 'Gaia_RP']
-        cm.a_cat_col_nums = [0, 1, 2, 4, 5]
-        cm.b_cat_col_names = ['WISE_ID', 'WISE_RA', 'WISE_Dec', 'WISE_W1', 'WISE_W2',
-                              'WISE_W3', 'WISE_W4']
-        cm.b_cat_col_nums = [0, 1, 2, 4, 5, 6, 7]
-        cm.a_cat_name = 'Gaia'
-        cm.b_cat_name = 'WISE'
-        cm.a_input_npy_folder = None
-        cm.b_input_npy_folder = None
-        cm.a_extra_col_names = None
-        cm.a_extra_col_nums = None
-        cm.b_extra_col_names = ['WErr']
-        cm.b_extra_col_nums = [3]
-        cm.chunk_id = 1
+        self.cm.a_cat_col_names = ['Gaia_Des', 'Gaia_RA', 'Gaia_Dec', 'Gaia_G', 'Gaia_RP']
+        self.cm.a_cat_col_nums = [0, 1, 2, 4, 5]
+        self.cm.b_cat_col_names = ['WISE_ID', 'WISE_RA', 'WISE_Dec', 'WISE_W1', 'WISE_W2',
+                                   'WISE_W3', 'WISE_W4']
+        self.cm.b_cat_col_nums = [0, 1, 2, 4, 5, 6, 7]
+        self.cm.a_cat_name = 'Gaia'
+        self.cm.b_cat_name = 'WISE'
+        self.cm.a_input_npy_folder = None
+        self.cm.b_input_npy_folder = None
+        self.cm.a_extra_col_names = None
+        self.cm.a_extra_col_nums = None
+        self.cm.b_extra_col_names = ['WErr']
+        self.cm.b_extra_col_nums = [3]
+        self.cm.chunk_id = 1
 
-        cm._postprocess_chunk()
+        self.cm._postprocess_chunk()
 
         aino = np.load(f'{self.a_cat_folder_path}/in_chunk_overlap.npy')
         bino = np.load(f'{self.b_cat_folder_path}/in_chunk_overlap.npy')
-        ac = np.load(f'{self.joint_folder_path}/pairing/ac.npy')
-        af = np.load(f'{self.joint_folder_path}/pairing/af.npy')
-        bc = np.load(f'{self.joint_folder_path}/pairing/bc.npy')
-        bf = np.load(f'{self.joint_folder_path}/pairing/bf.npy')
+        ac = np.load(f'{self.joint_folder_path}/ac.npy')
+        af = np.load(f'{self.joint_folder_path}/af.npy')
+        bc = np.load(f'{self.joint_folder_path}/bc.npy')
+        bf = np.load(f'{self.joint_folder_path}/bf.npy')
 
         assert np.all(~aino[ac] | ~bino[bc])
         assert np.all(~aino[af])
@@ -2154,69 +2154,72 @@ class TestPostProcess:
         # Check that the outputs make sense, treating this more like a
         # parse_catalogue test than anything else, but importantly
         # checking for correct lengths of produced outputs like pc.
-        assert os.path.isfile(f'{cm.output_csv_folder}/{cm.match_out_csv_name}')
-        assert os.path.isfile(f'{cm.output_csv_folder}/{cm.a_nonmatch_out_csv_name}')
-        assert os.path.isfile(f'{cm.output_csv_folder}/{cm.b_nonmatch_out_csv_name}')
+        assert os.path.isfile(f'{self.cm.output_csv_folder}/{self.cm.match_out_csv_name}')
+        assert os.path.isfile(f'{self.cm.output_csv_folder}/{self.cm.a_nonmatch_out_csv_name}')
+        assert os.path.isfile(f'{self.cm.output_csv_folder}/{self.cm.b_nonmatch_out_csv_name}')
 
-        pc = np.load(f'{self.joint_folder_path}/pairing/pc.npy')
-        eta = np.load(f'{self.joint_folder_path}/pairing/eta.npy')
-        xi = np.load(f'{self.joint_folder_path}/pairing/xi.npy')
-        acf = np.load(f'{self.joint_folder_path}/pairing/acontamflux.npy')
-        bcf = np.load(f'{self.joint_folder_path}/pairing/bcontamflux.npy')
-        pac = np.load(f'{self.joint_folder_path}/pairing/pacontam.npy')
-        pbc = np.load(f'{self.joint_folder_path}/pairing/pbcontam.npy')
-        csep = np.load(f'{self.joint_folder_path}/pairing/crptseps.npy')
-        pfa = np.load(f'{self.joint_folder_path}/pairing/pfa.npy')
-        afs = np.load(f'{self.joint_folder_path}/pairing/afieldseps.npy')
-        afeta = np.load(f'{self.joint_folder_path}/pairing/afieldeta.npy')
-        afxi = np.load(f'{self.joint_folder_path}/pairing/afieldxi.npy')
-        aff = np.load(f'{self.joint_folder_path}/pairing/afieldflux.npy')
-        pfb = np.load(f'{self.joint_folder_path}/pairing/pfb.npy')
-        bfs = np.load(f'{self.joint_folder_path}/pairing/bfieldseps.npy')
-        bfeta = np.load(f'{self.joint_folder_path}/pairing/bfieldeta.npy')
-        bfxi = np.load(f'{self.joint_folder_path}/pairing/bfieldxi.npy')
-        bff = np.load(f'{self.joint_folder_path}/pairing/bfieldflux.npy')
+        pc = np.load(f'{self.joint_folder_path}/pc.npy')
+        eta = np.load(f'{self.joint_folder_path}/eta.npy')
+        xi = np.load(f'{self.joint_folder_path}/xi.npy')
+        acf = np.load(f'{self.joint_folder_path}/acontamflux.npy')
+        bcf = np.load(f'{self.joint_folder_path}/bcontamflux.npy')
+        pac = np.load(f'{self.joint_folder_path}/pacontam.npy')
+        pbc = np.load(f'{self.joint_folder_path}/pbcontam.npy')
+        csep = np.load(f'{self.joint_folder_path}/crptseps.npy')
+        pfa = np.load(f'{self.joint_folder_path}/pfa.npy')
+        afs = np.load(f'{self.joint_folder_path}/afieldseps.npy')
+        afeta = np.load(f'{self.joint_folder_path}/afieldeta.npy')
+        afxi = np.load(f'{self.joint_folder_path}/afieldxi.npy')
+        aff = np.load(f'{self.joint_folder_path}/afieldflux.npy')
+        pfb = np.load(f'{self.joint_folder_path}/pfb.npy')
+        bfs = np.load(f'{self.joint_folder_path}/bfieldseps.npy')
+        bfeta = np.load(f'{self.joint_folder_path}/bfieldeta.npy')
+        bfxi = np.load(f'{self.joint_folder_path}/bfieldxi.npy')
+        bff = np.load(f'{self.joint_folder_path}/bfieldflux.npy')
 
         extra_cols = ['MATCH_P', 'SEPARATION', 'ETA', 'XI', 'A_AVG_CONT', 'B_AVG_CONT',
                       'A_CONT_F1', 'A_CONT_F10', 'B_CONT_F1', 'B_CONT_F10']
-        names = np.append(np.append(cm.a_cat_col_names, cm.b_cat_col_names),
-                          np.append(extra_cols, cm.b_extra_col_names))
+        names = np.append(np.append(self.cm.a_cat_col_names, self.cm.b_cat_col_names),
+                          np.append(extra_cols, self.cm.b_extra_col_names))
 
-        df = pd.read_csv(f'{cm.output_csv_folder}/{cm.match_out_csv_name}', header=None, names=names)
-        for i, col in zip([1, 2, 4, 5], cm.a_cat_col_names[1:]):
+        df = pd.read_csv(f'{self.cm.output_csv_folder}/{self.cm.match_out_csv_name}',
+                         header=None, names=names)
+        for i, col in zip([1, 2, 4, 5], self.cm.a_cat_col_names[1:]):
             assert_allclose(df[col], acat[ac, i])
 
-        assert np.all([df[cm.a_cat_col_names[0]].iloc[i] == acatstring[ac[i], 0] for i in
+        assert np.all([df[self.cm.a_cat_col_names[0]].iloc[i] == acatstring[ac[i], 0] for i in
                        range(len(ac))])
 
-        for i, col in zip([1, 2, 4, 5, 6], cm.b_cat_col_names[1:]):
+        for i, col in zip([1, 2, 4, 5, 6], self.cm.b_cat_col_names[1:]):
             assert_allclose(df[col], bcat[bc, i])
-        assert np.all([df[cm.b_cat_col_names[0]].iloc[i] == bcatstring[bc[i], 0] for i in
+        assert np.all([df[self.cm.b_cat_col_names[0]].iloc[i] == bcatstring[bc[i], 0] for i in
                        range(len(bc))])
 
         for f, col in zip([pc, csep, eta, xi, acf, bcf, pac[0], pac[1], pbc[0], pbc[1]],
                           extra_cols):
             assert_allclose(df[col], f)
 
-        names = np.append(cm.a_cat_col_names,
+        names = np.append(self.cm.a_cat_col_names,
                           ['MATCH_P', 'NNM_SEPARATION', 'NNM_ETA', 'NNM_XI', 'A_AVG_CONT'])
-        df = pd.read_csv(f'{cm.output_csv_folder}/{cm.a_nonmatch_out_csv_name}', header=None, names=names)
-        for i, col in zip([1, 2, 4, 5], cm.a_cat_col_names[1:]):
+        df = pd.read_csv(f'{self.cm.output_csv_folder}/{self.cm.a_nonmatch_out_csv_name}', header=None,
+                         names=names)
+        for i, col in zip([1, 2, 4, 5], self.cm.a_cat_col_names[1:]):
             assert_allclose(df[col], acat[af, i])
-        assert np.all([df[cm.a_cat_col_names[0]].iloc[i] == acatstring[af[i], 0] for i in
+        assert np.all([df[self.cm.a_cat_col_names[0]].iloc[i] == acatstring[af[i], 0] for i in
                        range(len(af))])
         assert_allclose(df['MATCH_P'], pfa)
         assert_allclose(df['A_AVG_CONT'], aff)
         assert_allclose(df['NNM_SEPARATION'], afs)
         assert_allclose(df['NNM_ETA'], afeta)
         assert_allclose(df['NNM_XI'], afxi)
-        names = np.append(np.append(cm.b_cat_col_names,
+        names = np.append(np.append(self.cm.b_cat_col_names,
                           ['MATCH_P', 'NNM_SEPARATION', 'NNM_ETA', 'NNM_XI', 'B_AVG_CONT']),
-                          cm.b_extra_col_names)
-        df = pd.read_csv(f'{cm.output_csv_folder}/{cm.b_nonmatch_out_csv_name}', header=None, names=names)
-        for i, col in zip([1, 2, 4, 5, 6], cm.b_cat_col_names[1:]):
+                          self.cm.b_extra_col_names)
+        df = pd.read_csv(f'{self.cm.output_csv_folder}/{self.cm.b_nonmatch_out_csv_name}', header=None,
+                         names=names)
+        for i, col in zip([1, 2, 4, 5, 6], self.cm.b_cat_col_names[1:]):
             assert_allclose(df[col], bcat[bf, i])
-        assert np.all([df[cm.b_cat_col_names[0]].iloc[i] == bcatstring[bf[i], 0] for i in
+        assert np.all([df[self.cm.b_cat_col_names[0]].iloc[i] == bcatstring[bf[i], 0] for i in
                        range(len(bf))])
         assert_allclose(df['MATCH_P'], pfb)
         assert_allclose(df['B_AVG_CONT'], bff)

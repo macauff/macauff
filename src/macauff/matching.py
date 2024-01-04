@@ -296,13 +296,10 @@ class CrossMatch():
                 raise ValueError('b_snr_mag_params should be of shape (X, Y, 5)')
             self.b_snr_mag_params = a
 
-        # Ensure that we can create the folders for outputs.
-        for path in ['reject', 'pairing']:
-            try:
-                os.makedirs(f'{self.joint_folder_path}/{path}', exist_ok=True)
-            except OSError as exc:
-                raise OSError("Error when trying to create temporary folder for joint outputs. "
-                              "Please ensure that joint_folder_path is correct.") from exc
+        # Ensure that we can save to the folders for outputs.
+        if not os.path.exists(self.joint_folder_path):
+            raise OSError("Error when trying to check temporary folder for joint outputs. "
+                          "Please ensure that joint_folder_path is correct.")
 
         for path, catname, flag in zip([self.a_auf_folder_path, self.b_auf_folder_path],
                                        ['"a"', '"b"'], ['a_', 'b_']):
@@ -527,34 +524,38 @@ class CrossMatch():
         t = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         print(f"{t} Rank {self.rank}, chunk {self.chunk_id}: Removing halo matches and non-matches...")
 
-        ac = np.load(f'{self.joint_folder_path}/pairing/ac.npy')
-        bc = np.load(f'{self.joint_folder_path}/pairing/bc.npy')
-
-        af = np.load(f'{self.joint_folder_path}/pairing/af.npy')
-        bf = np.load(f'{self.joint_folder_path}/pairing/bf.npy')
-
         a_in_overlaps = np.load(f'{self.a_cat_folder_path}/in_chunk_overlap.npy')
         b_in_overlaps = np.load(f'{self.b_cat_folder_path}/in_chunk_overlap.npy')
 
-        core_matches = ~a_in_overlaps[ac] | ~b_in_overlaps[bc]
-        np.save(f'{self.joint_folder_path}/pairing/ac.npy', ac[core_matches])
-        np.save(f'{self.joint_folder_path}/pairing/bc.npy', bc[core_matches])
+        core_matches = ~a_in_overlaps[self.ac] | ~b_in_overlaps[self.bc]
+        np.save(f'{self.joint_folder_path}/ac.npy', self.ac[core_matches])
+        np.save(f'{self.joint_folder_path}/bc.npy', self.bc[core_matches])
         for fname in ['pc', 'eta', 'xi', 'crptseps', 'acontamflux', 'bcontamflux']:
-            np.save(f'{self.joint_folder_path}/pairing/{fname}.npy',
-                    np.load(f'{self.joint_folder_path}/pairing/{fname}.npy')[core_matches])
+            np.save(f'{self.joint_folder_path}/{fname}.npy', getattr(self, fname)[core_matches])
         for fname in ['pacontam', 'pbcontam']:
-            np.save(f'{self.joint_folder_path}/pairing/{fname}.npy',
-                    np.load(f'{self.joint_folder_path}/pairing/{fname}.npy')[:, core_matches])
+            np.save(f'{self.joint_folder_path}/{fname}.npy', getattr(self, fname)[:, core_matches])
 
-        a_core_nonmatches = ~a_in_overlaps[af]
-        b_core_nonmatches = ~b_in_overlaps[bf]
-        np.save(f'{self.joint_folder_path}/pairing/af.npy', af[a_core_nonmatches])
-        np.save(f'{self.joint_folder_path}/pairing/bf.npy', bf[b_core_nonmatches])
+        a_core_nonmatches = ~a_in_overlaps[self.af]
+        b_core_nonmatches = ~b_in_overlaps[self.bf]
+        np.save(f'{self.joint_folder_path}/af.npy', self.af[a_core_nonmatches])
+        np.save(f'{self.joint_folder_path}/bf.npy', self.bf[b_core_nonmatches])
         for fnametype, cnm in zip(['a', 'b'], [a_core_nonmatches, b_core_nonmatches]):
             for fname_ in ['{}fieldflux', 'pf{}', '{}fieldeta', '{}fieldxi', '{}fieldseps']:
                 fname = fname_.format(fnametype)
-                np.save(f'{self.joint_folder_path}/pairing/{fname}.npy',
-                        np.load(f'{self.joint_folder_path}/pairing/{fname}.npy')[cnm])
+                np.save(f'{self.joint_folder_path}/{fname}.npy', getattr(self, fname)[cnm])
+
+        if self.reject_a is not None:
+            np.save(f'{self.joint_folder_path}/reject_a.npy',
+                    np.append(np.append(self.reject_a, self.ac[~core_matches]), self.af[~a_core_nonmatches]))
+        else:
+            np.save(f'{self.joint_folder_path}/reject_a.npy',
+                    np.append(self.ac[~core_matches], self.af[~a_core_nonmatches]))
+        if self.reject_b is not None:
+            np.save(f'{self.joint_folder_path}/reject_b.npy',
+                    np.append(np.append(self.reject_b, self.bc[~core_matches]), self.bf[~b_core_nonmatches]))
+        else:
+            np.save(f'{self.joint_folder_path}/reject_b.npy',
+                    np.append(self.bc[~core_matches], self.bf[~b_core_nonmatches]))
 
         if self.make_output_csv:
             npy_to_csv(

@@ -297,7 +297,7 @@ class TestAstroCorrection:
             np.save('ac_save_folder/npy/m_sigs_array.npy', np.array([-1, 12], dtype=float))
             np.save('ac_save_folder/npy/n_sigs_array.npy', np.array([-1, 15], dtype=float))
         if return_nm:
-            marray, narray, abc_array, ax1_mids, ax2_mids = ac(
+            marray, narray, abc_array = ac(
                 self.a_cat_name, self.b_cat_name, a_cat_func, b_cat_func,
                 tri_download=False, make_plots=True, make_summary_plot=True)
         else:

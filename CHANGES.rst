@@ -16,6 +16,10 @@ Bug Fixes
 API Changes
 ^^^^^^^^^^^
 
+- Outputs in ``joint_folder_path`` are no longer saved to sub-folders; instead,
+  all final saving of file to disk is done within the post-process step of the
+  I/O wrapper and into the base ``joint_folder_path`` folder. [#79]
+
 - Added ``dens_hist_tri_location``, ``tri_model_mags_location``,
   ``ntri_model_mag_mids_location``, ``tri_model_mags_interval_location``,
   and ``tri_n_bright_sources_star_location`` as input parameters into catalogue

@@ -146,8 +146,8 @@ which will save all intermediate match data to the ``joint_folder_path`` paramet
     joint_folder_path = 'test_macauff_outputs/test_path'
     a = np.load('{}/con_cat_astro.npy'.format(a_cat_path))
     b = np.load('{}/con_cat_astro.npy'.format(b_cat_path))
-    cat_a_match_inds = np.load('{}/pairing/ac.npy'.format(joint_folder_path))
-    cat_b_match_inds = np.load('{}/pairing/bc.npy'.format(joint_folder_path))
+    cat_a_match_inds = np.load('{}/ac.npy'.format(joint_folder_path))
+    cat_b_match_inds = np.load('{}/bc.npy'.format(joint_folder_path))
 
     a_matches, b_matches = a[cat_a_match_inds], b[cat_b_match_inds]
 
