@@ -194,7 +194,7 @@ class CrossMatch():
                 use_photometric_uncertainties=self.a_use_photometric_uncertainties,
                 pregenerate_cutouts=True, chunks=[self.chunk_id],
                 n_r=self.real_hankel_points, n_rho=self.four_hankel_points, max_rho=self.four_max_rho)
-            ac(self.a_ref_csv_cat_file_string, self.a_csv_cat_file_string,
+            ac(a_cat_name=self.a_ref_csv_cat_file_string, b_cat_name=self.a_csv_cat_file_string,
                tri_download=self.a_download_tri, make_plots=True, overwrite_all_sightlines=True)
 
             # Having corrected the astrometry, we have to call csv_to_npy
@@ -262,7 +262,7 @@ class CrossMatch():
                 use_photometric_uncertainties=self.b_use_photometric_uncertainties,
                 pregenerate_cutouts=True, chunks=[self.chunk_id],
                 n_r=self.real_hankel_points, n_rho=self.four_hankel_points, max_rho=self.four_max_rho)
-            ac(self.b_ref_csv_cat_file_string, self.b_csv_cat_file_string,
+            ac(a_cat_name=self.b_ref_csv_cat_file_string, b_cat_name=self.b_csv_cat_file_string,
                tri_download=self.b_download_tri, make_plots=True, overwrite_all_sightlines=True)
 
             csv_folder, csv_filename = os.path.split(

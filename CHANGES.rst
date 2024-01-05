@@ -16,6 +16,10 @@ Bug Fixes
 API Changes
 ^^^^^^^^^^^
 
+- ``AstrometricCorrections`` and ``SNRMagnitudeRelationship`` are able to now
+  accept pre-loaded catalogues via ``a_cat`` and ``b_cat``, instead of passing
+  ``a_cat_name`` and ``b_cat_name``. [#79]
+
 - Outputs in ``joint_folder_path`` are no longer saved to sub-folders; instead,
   all final saving of file to disk is done within the post-process step of the
   I/O wrapper and into the base ``joint_folder_path`` folder. [#79]
