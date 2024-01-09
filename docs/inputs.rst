@@ -459,6 +459,7 @@ The inter-dependency of input parameters on one another, and the output ``CrossM
     │                     ├─* tri_model_mags_location[3b] -> tri_model_mags_list
     │                     ├─* tri_model_mag_mids_location[3b] -> tri_model_mag_mids_list
     │                     ├─* tri_model_mags_interval_location[3b] -> tri_model_mags_interval_list
+    │                     ├─* tri_model_mags_uncert_location[3b] -> tri_model_mags_uncert_list
     │                     └─* tri_n_bright_sources_star_location[3b] -> tri_n_bright_sources_star_list
     ├─> include_phot_like
     ├─> use_phot_priors

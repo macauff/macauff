@@ -17,6 +17,7 @@ from test_fit_astrometry import TestAstroCorrection as TAC
 # pylint: disable=import-error,no-name-in-module
 from macauff.macauff import Macauff
 from macauff.matching import CrossMatch
+from macauff.perturbation_auf import make_tri_counts
 
 # pylint: enable=import-error,no-name-in-module
 
@@ -124,7 +125,8 @@ class TestInputs:
         old_line = 'auf_folder_path = gaia_auf_folder'
         new_line = ('auf_folder_path = gaia_auf_folder\ndens_hist_tri_location = None\n'
                     'tri_model_mags_location = None\ntri_model_mag_mids_location = None\n'
-                    'tri_model_mags_interval_location = None\ntri_n_bright_sources_star_location = None\n')
+                    'tri_model_mags_interval_location = None\ntri_dens_uncert_location = None\n'
+                    'tri_n_bright_sources_star_location = None\n')
         idx = np.where([old_line in line for line in f])[0][0]
         _replace_line(os.path.join(os.path.dirname(__file__), 'data/cat_a_params.txt'),
                       idx, new_line, out_file=os.path.join(
@@ -135,7 +137,8 @@ class TestInputs:
         old_line = 'auf_folder_path = wise_auf_folder'
         new_line = ('auf_folder_path = wise_auf_folder\ndens_hist_tri_location = None\n'
                     'tri_model_mags_location = None\ntri_model_mag_mids_location = None\n'
-                    'tri_model_mags_interval_location = None\ntri_n_bright_sources_star_location = None\n')
+                    'tri_model_mags_interval_location = None\ntri_dens_uncert_location = None\n'
+                    'tri_n_bright_sources_star_location = None\n')
         idx = np.where([old_line in line for line in f])[0][0]
         _replace_line(os.path.join(os.path.dirname(__file__), 'data/cat_b_params.txt'),
                       idx, new_line, out_file=os.path.join(
@@ -286,7 +289,8 @@ class TestInputs:
         old_line = 'auf_folder_path = gaia_auf_folder'
         new_line = ('auf_folder_path = None\ndens_hist_tri_location = None\n'
                     'tri_model_mags_location = None\ntri_model_mag_mids_location = None\n'
-                    'tri_model_mags_interval_location = None\ntri_n_bright_sources_star_location = None\n')
+                    'tri_model_mags_interval_location = None\ntri_dens_uncert_location = None\n'
+                    'tri_n_bright_sources_star_location = None\n')
         idx = np.where([old_line in line for line in f])[0][0]
         _replace_line(os.path.join(os.path.dirname(__file__), 'data/cat_a_params.txt'),
                       idx, new_line, out_file=os.path.join(
@@ -303,7 +307,8 @@ class TestInputs:
         old_line = 'auf_folder_path = wise_auf_folder'
         new_line = ('auf_folder_path = None\ndens_hist_tri_location = None\n'
                     'tri_model_mags_location = None\ntri_model_mag_mids_location = None\n'
-                    'tri_model_mags_interval_location = None\ntri_n_bright_sources_star_location = None\n')
+                    'tri_model_mags_interval_location = None\ntri_dens_uncert_location = None\n'
+                    'tri_n_bright_sources_star_location = None\n')
         idx = np.where([old_line in line for line in f])[0][0]
         _replace_line(os.path.join(os.path.dirname(__file__), 'data/cat_b_params.txt'),
                       idx, new_line, out_file=os.path.join(
@@ -378,9 +383,9 @@ class TestInputs:
         for catname, nfilts in zip(['a', 'b'], [3, 4]):
             for file, file_name in zip(
                     [np.ones((nfilts, 10), float), np.ones((nfilts, 10), float), np.ones((nfilts, 10), float),
-                     np.ones((nfilts, 10), float), np.ones((nfilts,), float)],
+                     np.ones((nfilts, 10), float), np.ones((nfilts, 10), float), np.ones((nfilts,), float)],
                     ['dens_hist_tri', 'tri_model_mags', 'tri_model_mag_mids', 'tri_model_mags_interval',
-                     'tri_n_bright_sources_star']):
+                     'tri_dens_uncert', 'tri_n_bright_sources_star']):
                 np.save(os.path.join(os.path.dirname(__file__), f'data/{catname}_{file_name}.npy'), file)
                 with open(os.path.join(os.path.dirname(__file__), f'data/cat_{catname}_params_new.txt'),
                           encoding='utf-8') as file:
@@ -397,6 +402,7 @@ class TestInputs:
         assert cm.b_auf_folder_path is None
         assert np.all([b is None for b in cm.a_tri_filt_names])
         assert np.all(cm.a_dens_hist_tri_list == np.ones((3, 10), float))
+        assert np.all(cm.a_tri_dens_uncert_list == np.ones((3, 10), float))
         assert np.all(cm.b_tri_n_bright_sources_star_list == np.ones((4,), float))
 
     def test_crossmatch_folder_path_inputs(self):
@@ -459,7 +465,8 @@ class TestInputs:
         old_line = 'auf_folder_path = gaia_auf_folder'
         new_line = ('auf_folder_path = gaia_auf_folder\ndens_hist_tri_location = None\n'
                     'tri_model_mags_location = None\ntri_model_mag_mids_location = None\n'
-                    'tri_model_mags_interval_location = None\ntri_n_bright_sources_star_location = None\n')
+                    'tri_model_mags_interval_location = None\ntri_dens_uncert_location = None\n'
+                    'tri_n_bright_sources_star_location = None\n')
         idx = np.where([old_line in line for line in f])[0][0]
         _replace_line(os.path.join(os.path.dirname(__file__), 'data/cat_a_params.txt'),
                       idx, new_line, out_file=os.path.join(
@@ -470,7 +477,8 @@ class TestInputs:
         old_line = 'auf_folder_path = wise_auf_folder'
         new_line = ('auf_folder_path = wise_auf_folder\ndens_hist_tri_location = None\n'
                     'tri_model_mags_location = None\ntri_model_mag_mids_location = None\n'
-                    'tri_model_mags_interval_location = None\ntri_n_bright_sources_star_location = None\n')
+                    'tri_model_mags_interval_location = None\ntri_dens_uncert_location = None\n'
+                    'tri_n_bright_sources_star_location = None\n')
         idx = np.where([old_line in line for line in f])[0][0]
         _replace_line(os.path.join(os.path.dirname(__file__), 'data/cat_b_params.txt'),
                       idx, new_line, out_file=os.path.join(
@@ -543,7 +551,8 @@ class TestInputs:
         old_line = 'auf_folder_path = gaia_auf_folder'
         new_line = ('auf_folder_path = gaia_auf_folder\ndens_hist_tri_location = None\n'
                     'tri_model_mags_location = None\ntri_model_mag_mids_location = None\n'
-                    'tri_model_mags_interval_location = None\ntri_n_bright_sources_star_location = None\n')
+                    'tri_model_mags_interval_location = None\ntri_dens_uncert_location = None\n'
+                    'tri_n_bright_sources_star_location = None\n')
         idx = np.where([old_line in line for line in f])[0][0]
         _replace_line(os.path.join(os.path.dirname(__file__), 'data/cat_a_params.txt'),
                       idx, new_line, out_file=os.path.join(
@@ -554,7 +563,8 @@ class TestInputs:
         old_line = 'auf_folder_path = wise_auf_folder'
         new_line = ('auf_folder_path = wise_auf_folder\ndens_hist_tri_location = None\n'
                     'tri_model_mags_location = None\ntri_model_mag_mids_location = None\n'
-                    'tri_model_mags_interval_location = None\ntri_n_bright_sources_star_location = None\n')
+                    'tri_model_mags_interval_location = None\ntri_dens_uncert_location = None\n'
+                    'tri_n_bright_sources_star_location = None\n')
         idx = np.where([old_line in line for line in f])[0][0]
         _replace_line(os.path.join(os.path.dirname(__file__), 'data/cat_b_params.txt'),
                       idx, new_line, out_file=os.path.join(
@@ -649,7 +659,8 @@ class TestInputs:
         old_line = 'auf_folder_path = gaia_auf_folder'
         new_line = ('auf_folder_path = gaia_auf_folder\ndens_hist_tri_location = None\n'
                     'tri_model_mags_location = None\ntri_model_mag_mids_location = None\n'
-                    'tri_model_mags_interval_location = None\ntri_n_bright_sources_star_location = None\n')
+                    'tri_model_mags_interval_location = None\ntri_dens_uncert_location = None\n'
+                    'tri_n_bright_sources_star_location = None\n')
         idx = np.where([old_line in line for line in f])[0][0]
         _replace_line(os.path.join(os.path.dirname(__file__), 'data/cat_a_params.txt'),
                       idx, new_line, out_file=os.path.join(
@@ -660,7 +671,8 @@ class TestInputs:
         old_line = 'auf_folder_path = wise_auf_folder'
         new_line = ('auf_folder_path = wise_auf_folder\ndens_hist_tri_location = None\n'
                     'tri_model_mags_location = None\ntri_model_mag_mids_location = None\n'
-                    'tri_model_mags_interval_location = None\ntri_n_bright_sources_star_location = None\n')
+                    'tri_model_mags_interval_location = None\ntri_dens_uncert_location = None\n'
+                    'tri_n_bright_sources_star_location = None\n')
         idx = np.where([old_line in line for line in f])[0][0]
         _replace_line(os.path.join(os.path.dirname(__file__), 'data/cat_b_params.txt'),
                       idx, new_line, out_file=os.path.join(
@@ -714,7 +726,8 @@ class TestInputs:
         old_line = 'auf_folder_path = gaia_auf_folder'
         new_line = ('auf_folder_path = gaia_auf_folder\ndens_hist_tri_location = None\n'
                     'tri_model_mags_location = None\ntri_model_mag_mids_location = None\n'
-                    'tri_model_mags_interval_location = None\ntri_n_bright_sources_star_location = None\n')
+                    'tri_model_mags_interval_location = None\ntri_dens_uncert_location = None\n'
+                    'tri_n_bright_sources_star_location = None\n')
         idx = np.where([old_line in line for line in f])[0][0]
         _replace_line(os.path.join(os.path.dirname(__file__), 'data/cat_a_params.txt'),
                       idx, new_line, out_file=os.path.join(
@@ -725,7 +738,8 @@ class TestInputs:
         old_line = 'auf_folder_path = wise_auf_folder'
         new_line = ('auf_folder_path = wise_auf_folder\ndens_hist_tri_location = None\n'
                     'tri_model_mags_location = None\ntri_model_mag_mids_location = None\n'
-                    'tri_model_mags_interval_location = None\ntri_n_bright_sources_star_location = None\n')
+                    'tri_model_mags_interval_location = None\ntri_dens_uncert_location = None\n'
+                    'tri_n_bright_sources_star_location = None\n')
         idx = np.where([old_line in line for line in f])[0][0]
         _replace_line(os.path.join(os.path.dirname(__file__), 'data/cat_b_params.txt'),
                       idx, new_line, out_file=os.path.join(
@@ -1577,7 +1591,8 @@ class TestInputs:
         old_line = 'auf_folder_path = gaia_auf_folder'
         new_line = ('auf_folder_path = gaia_auf_folder\ndens_hist_tri_location = None\n'
                     'tri_model_mags_location = None\ntri_model_mag_mids_location = None\n'
-                    'tri_model_mags_interval_location = None\ntri_n_bright_sources_star_location = None\n')
+                    'tri_model_mags_interval_location = None\ntri_dens_uncert_location = None\n'
+                    'tri_n_bright_sources_star_location = None\n')
         idx = np.where([old_line in line for line in f])[0][0]
         _replace_line(os.path.join(os.path.dirname(__file__), 'data/cat_a_params_.txt'), idx, new_line)
         with open(os.path.join(os.path.dirname(__file__), 'data/cat_b_params_.txt'),
@@ -1586,7 +1601,8 @@ class TestInputs:
         old_line = 'auf_folder_path = wise_auf_folder'
         new_line = ('auf_folder_path = wise_auf_folder\ndens_hist_tri_location = None\n'
                     'tri_model_mags_location = None\ntri_model_mag_mids_location = None\n'
-                    'tri_model_mags_interval_location = None\ntri_n_bright_sources_star_location = None\n')
+                    'tri_model_mags_interval_location = None\ntri_dens_uncert_location = None\n'
+                    'tri_n_bright_sources_star_location = None\n')
         idx = np.where([old_line in line for line in f])[0][0]
         _replace_line(os.path.join(os.path.dirname(__file__), 'data/cat_b_params_.txt'), idx, new_line)
 
@@ -1874,6 +1890,66 @@ class TestInputs:
         assert np.all(cm.a_pos_and_err_indices == np.array([[0, 1, 2], [0, 1, 2]]))
         assert np.all(cm.a_mag_indices == np.array([3, 5, 7]))
         assert np.all(cm.a_mag_unc_indices == np.array([4, 6, 8]))
+        marray = np.load('ac_folder/npy/m_sigs_array.npy')
+        narray = np.load('ac_folder/npy/n_sigs_array.npy')
+        assert_allclose([marray[0], narray[0]], [2, 0], rtol=0.1, atol=0.01)
+
+        # New test of the AC run, just with pre-made histograms.
+        with open(os.path.join(os.path.dirname(__file__), 'data/cat_b_params_2.txt'),
+                  encoding='utf-8') as file:
+            f = file.readlines()
+        dens, tri_mags, tri_mags_mids, dtri_mags, uncert, num_bright_obj = make_tri_counts(
+            'wise_auf_folder', '134.5/0.0/trilegal_auf_simulation', 'W1', 0.1, 13.5, 16)
+        dhtl = 'ac_folder/npy/dhtl.npy'
+        np.save(dhtl, [dens, dens, dens, dens])
+        tmml = 'ac_folder/npy/tmml.npy'
+        np.save(tmml, [tri_mags, tri_mags, tri_mags, tri_mags])
+        tmmml = 'ac_folder/npy/tmmml.npy'
+        np.save(tmmml, [tri_mags_mids, tri_mags_mids, tri_mags_mids, tri_mags_mids])
+        tmmil = 'ac_folder/npy/tmmil.npy'
+        np.save(tmmil, [dtri_mags, dtri_mags, dtri_mags, dtri_mags])
+        tdul = 'ac_folder/npy/tdul.npy'
+        np.save(tdul, [uncert, uncert, uncert, uncert])
+        tnbssl = 'ac_folder/npy/tnbssl.npy'
+        np.save(tnbssl, [num_bright_obj, num_bright_obj, num_bright_obj, num_bright_obj])
+
+        ol, nl = 'auf_folder_path = ', 'auf_folder_path = None\n'
+        idx = np.where([ol in line for line in f])[0][0]
+        _replace_line(os.path.join(os.path.dirname(__file__), 'data/cat_b_params_2.txt'), idx, nl,
+                      out_file=os.path.join(os.path.dirname(__file__), 'data/cat_b_params_2c.txt'))
+        for ol, nl in zip(['tri_set_name = ', 'tri_filt_names = ', 'tri_filt_num = ', 'download_tri = ',
+                           'tri_maglim_faint = ', 'tri_num_faint = ', 'dens_hist_tri_location = ',
+                           'tri_model_mags_location = ', 'tri_model_mag_mids_location = ',
+                           'tri_model_mags_interval_location = ', 'tri_dens_uncert_location = ',
+                           'tri_n_bright_sources_star_location = '], [
+                'tri_set_name = None\n', 'tri_filt_names = None\n', 'tri_filt_num = None\n',
+                'download_tri = None\n', 'tri_maglim_faint = None\n', 'tri_num_faint = None\n',
+                f'dens_hist_tri_location = {dhtl}\n', f'tri_model_mags_location = {tmml}\n',
+                f'tri_model_mag_mids_location = {tmmml}\n', f'tri_model_mags_interval_location = {tmmil}\n',
+                f'tri_dens_uncert_location = {tdul}\n', f'tri_n_bright_sources_star_location = {tnbssl}\n']):
+            idx = np.where([ol in line for line in f])[0][0]
+            _replace_line(os.path.join(os.path.dirname(__file__), 'data/cat_b_params_2c.txt'), idx, nl)
+        if os.path.isfile('ac_folder/npy/snr_mag_params.npy'):
+            os.remove('ac_folder/npy/snr_mag_params.npy')
+        cm = CrossMatch(os.path.join(os.path.dirname(__file__), 'data'))
+        cm.chunk_id = 1
+        cm._initialise_chunk(os.path.join(os.path.dirname(__file__),
+                             'data/crossmatch_params_v2.txt'),
+                             os.path.join(os.path.dirname(__file__),
+                             'data/cat_b_params_2c.txt'),
+                             os.path.join(os.path.dirname(__file__),
+                             'data/cat_a_params.txt'))
+        assert cm.a_best_mag_index == 0
+        assert_allclose(cm.a_nn_radius, 30)
+        assert cm.a_correct_astro_save_folder == os.path.abspath('ac_folder')
+        assert cm.a_csv_cat_file_string == os.path.abspath('file_{}.csv')
+        assert cm.a_ref_csv_cat_file_string == os.path.abspath('ref_{}.csv')
+        assert_allclose(cm.a_correct_mag_array, np.array([14.07, 14.17, 14.27, 14.37]))
+        assert_allclose(cm.a_correct_mag_slice, np.array([0.05, 0.05, 0.05, 0.05]))
+        assert_allclose(cm.a_correct_sig_slice, np.array([0.1, 0.1, 0.1, 0.1]))
+        assert np.all(cm.a_pos_and_err_indices == np.array([[0, 1, 2], [0, 1, 2]]))
+        assert np.all(cm.a_mag_indices == np.array([3, 5, 7, 9]))
+        assert np.all(cm.a_mag_unc_indices == np.array([4, 6, 8, 10]))
         marray = np.load('ac_folder/npy/m_sigs_array.npy')
         narray = np.load('ac_folder/npy/n_sigs_array.npy')
         assert_allclose([marray[0], narray[0]], [2, 0], rtol=0.1, atol=0.01)

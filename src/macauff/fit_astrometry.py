@@ -52,13 +52,14 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
     to a well-understood second dataset.
     """
     # pylint: disable-next=too-many-locals,too-many-arguments
-    def __init__(self, psf_fwhm, numtrials, nn_radius, dens_search_radius, save_folder, trifolder,
-                 triname, maglim_f, magnum, tri_num_faint, trifilterset, trifiltname,
+    def __init__(self, psf_fwhm, numtrials, nn_radius, dens_search_radius, save_folder,
                  gal_wav_micron, gal_ab_offset, gal_filtname, gal_alav, dm, dd_params, l_cut,
                  ax1_mids, ax2_mids, ax_dimension, mag_array, mag_slice, sig_slice, n_pool,
                  npy_or_csv, coord_or_chunk, pos_and_err_indices, mag_indices, mag_unc_indices,
                  mag_names, best_mag_index, coord_system, pregenerate_cutouts, n_r, n_rho, max_rho,
-                 use_photometric_uncertainties=False, cutout_area=None, cutout_height=None,
+                 trifolder=None, triname=None, maglim_f=None, magnum=None, tri_num_faint=None,
+                 trifilterset=None, trifiltname=None, tri_hist=None, tri_mags=None, dtri_mags=None,
+                 tri_uncert=None, use_photometric_uncertainties=False, cutout_area=None, cutout_height=None,
                  single_sided_auf=True, chunks=None, return_nm=False):
         """
         Initialisation of AstrometricCorrections, accepting inputs required for
@@ -84,31 +85,12 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
         save_folder : string
             Absolute or relative filepath of folder into which to store
             temporary and generated outputs from the fitting process.
-        trifolder : string
-            Filepath of the location into which to save TRILEGAL simulations.
-        triname : string
-            Name to give TRILEGAL simulations when downloaded. Is required to have
-            two format ``{}`` options in string, for unique ax1-ax2 sightline
-            combination downloads. Should not contain any file types, just the
-            name of the file up to, but not including, the final ".".
-        maglim_f : float
-            Magnitude in the ``magnum`` filter down to which sources should be
-            drawn for the "faint" sample.
-        magnum : float
-            Zero-indexed column number of the chosen filter limiting magnitude.
-        tri_num_faint : integer
-            Approximate number of objects to simulate in the chosen filter for
-            TRILEGAL simulations.
-        trifilterset : string
-            Name of the TRILEGAL filter set for which to generate simulations.
-        trifiltname : string
-            Name of the specific filter to generate perturbation AUF component in.
         gal_wav_micron : float
-            Wavelength, in microns, of the ``trifiltname`` filter, for use in
+            Wavelength, in microns, of the chosen filter, for use in
             simulating galaxy counts.
         gal_ab_offset : float
-            The offset between the ``trifiltname`` filter zero point and the
-            AB magnitude offset.
+            The offset between the filter zero point and the AB magnitude
+            offset.
         gal_filtname : string
             Name of the filter in the ``speclite`` compound naming convention.
         gal_alav : float
@@ -139,8 +121,7 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
             ``ax1_mids``-``ax2_mids`` combination is a unique ax-ax pairing used
             as given.
         mag_array : numpy.ndarray
-            List of magnitudes in the ``trifiltname`` filter to derive astrometry
-            for.
+            List of magnitudes in the filter to derive astrometry for.
         mag_slice : numpy.ndarray
             Widths of interval at which to take slices of magnitudes for deriving
             astrometric properties. Each ``mag_slice`` maps elementwise to each
@@ -206,6 +187,50 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
         max_rho : float
             Largest fourier-space value to integrate functions to during the
             convolution of AUF PDFs.
+        trifolder : string, optional
+            Filepath of the location into which to save TRILEGAL simulations. If
+            provided ``tri_hist``, ``tri_mags``, ``dtri_mags``, and ``tri_uncert``
+            must be ``None``, and ``triname``, ``maglim_f``, ``magnum``,
+            ``tri_num_faint``, ``trifilterset``, and ``trifiltname`` must be
+            given.
+        triname : string, optional
+            Name to give TRILEGAL simulations when downloaded. Is required to have
+            two format ``{}`` options in string, for unique ax1-ax2 sightline
+            combination downloads. Should not contain any file types, just the
+            name of the file up to, but not including, the final ".". Should be
+            ``None`` if ``tri_hist`` et al. are provided.
+        maglim_f : float, optional
+            Magnitude in the ``magnum`` filter down to which sources should be
+            drawn for the "faint" sample. Should be ``None`` if ``tri_hist``
+            et al. are provided.
+        magnum : float, optional
+            Zero-indexed column number of the chosen filter limiting magnitude.
+            Should be ``None`` if ``tri_hist`` et al. are provided.
+        tri_num_faint : integer, optional
+            Approximate number of objects to simulate in the chosen filter for
+            TRILEGAL simulations. Should be ``None`` if ``tri_hist`` et al.
+            are provided.
+        trifilterset : string, optional
+            Name of the TRILEGAL filter set for which to generate simulations.
+            Should be ``None`` if ``tri_hist`` et al. are provided.
+        trifiltname : string, optional
+            Name of the specific filter to generate perturbation AUF component in.
+            Should be ``None`` if ``tri_hist`` et al. are provided.
+        tri_hist : numpy.ndarray or None, optional
+            If given, array of differential source densities, per square degree
+            per magnitude, in the given filter, as computed by
+            `~macauff.make_tri_counts`. Must be provided if ``trifolder`` is
+            ``None``, else must itself be ``None``.
+        tri_mags : numpy.ndarray, optional
+            Left-hand magnitude bin edges for each bin in ``tri_hist``. Must be
+            given if ``tri_hist`` is provided, else ``None``.
+        dtri_mags : numpy.ndarray, optional
+            Magnitude bin widths for each ``tri_mags`` bin.  Must be given if
+            ``tri_hist`` is provided, else ``None``.
+        tri_uncert : numpy.ndarray, optional
+            Differential source count uncertainties, as derived by
+            `~macauff.make_tri_counts`.  Must be given if ``tri_hist`` is
+            provided, else ``None``.
         use_photometric_uncertainties : boolean, optional
             Flag for whether or not to use the photometric uncertainties instead
             of astrometric uncertainties when deriving astrometric uncertainties
@@ -289,6 +314,11 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
         self.gal_ab_offset = gal_ab_offset
         self.gal_filtname = gal_filtname
         self.gal_alav = gal_alav
+
+        self.tri_hist = tri_hist
+        self.tri_mags = tri_mags
+        self.dtri_mags = dtri_mags
+        self.tri_uncert = tri_uncert
 
         self.dm = dm
 
@@ -391,9 +421,10 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
         b_cat_func : callable
             Function used to generate reduced catalogue table for catalogue "b".
             Must be given if ``pregenerate_cutouts`` is ``False``.
-        tri_download : boolean, optional
+        tri_download : boolean or None, optional
             Flag determining if TRILEGAL simulations should be re-downloaded
-            if they already exist on disk.
+            if they already exist on disk. Should be ``None`` if ``tri_hist``
+            et al. were given in initialisation.
         overwrite_all_sightlines : boolean, optional
             Flag for whether to create a totally fresh run of astrometric
             corrections, regardless of whether ``abc_array`` or ``m_sigs_array``
@@ -423,6 +454,12 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
             raise ValueError("a_cat_func must be given if pregenerate_cutouts is 'False'.")
         if b_cat_func is None and self.pregenerate_cutouts is False:
             raise ValueError("b_cat_func must be given if pregenerate_cutouts is 'False'.")
+        if tri_download not in (None, True, False):
+            raise ValueError("tri_download must either be True, False, or None.")
+        if self.trifolder is not None and tri_download not in (True, False):
+            raise ValueError("tri_download must either be True or False if trifolder given.")
+        if self.tri_hist is not None and tri_download is not None:
+            raise ValueError("tri_download must be None if tri_hist is given.")
         self.a_cat_func = a_cat_func
         self.b_cat_func = b_cat_func
         self.a_cat_name = a_cat_name
@@ -952,8 +989,9 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
         # directly into AstrometricCorrections.
         maxmag = bins[:-1][np.argmax(hist_mag)] - 0.5
 
-        if (self.tri_download or not
-                os.path.isfile(f'{self.trifolder}/{self.triname.format(ax1_mid, ax2_mid)}_faint.dat')):
+        if (self.trifolder is not None and (
+                self.tri_download or not
+                os.path.isfile(f'{self.trifolder}/{self.triname.format(ax1_mid, ax2_mid)}_faint.dat'))):
             # Have to check for the existence of the folder as well as just
             # the lack of file. However, we can't guarantee that self.triname
             # doesn't contain folder sub-structure (e.g.
@@ -991,9 +1029,14 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
                 av = get_av_infinity(l, b, frame='galactic')[0]
                 avs[j, k] = av
         avs = avs.flatten()
-        tri_hist, tri_mags, _, dtri_mags, tri_uncert, _ = make_tri_counts(
-            self.trifolder, self.triname.format(ax1_mid, ax2_mid), self.trifiltname, self.dm,
-            np.amin(b_mag_data), maxmag, al_av=self.gal_alav, av_grid=avs)
+
+        if self.trifolder is not None:
+            tri_hist, tri_mags, _, dtri_mags, tri_uncert, _ = make_tri_counts(
+                self.trifolder, self.triname.format(ax1_mid, ax2_mid), self.trifiltname, self.dm,
+                np.amin(b_mag_data), maxmag, al_av=self.gal_alav, av_grid=avs)
+        else:
+            tri_hist, tri_mags = self.tri_hist, self.tri_mags
+            dtri_mags, tri_uncert = self.dtri_mags, self.tri_uncert
 
         gal_dns = create_galaxy_counts(
             self.gal_cmau_array, tri_mags+dtri_mags/2, np.linspace(0, 4, 41),

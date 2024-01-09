@@ -181,19 +181,23 @@ class CrossMatch():
             print(f"{t} Rank {self.rank}, chunk {self.chunk_id}: Calculating catalogue 'a' "
                   "uncertainty corrections...")
             ac = AstrometricCorrections(
-                self.a_psf_fwhms[acbi], self.num_trials, self.a_nn_radius,
-                self.a_dens_dist, self.a_correct_astro_save_folder, self.a_auf_folder_path,
-                a_correct_astro_tri_name, self.a_tri_maglim_faint, self.a_tri_filt_num,
-                self.a_tri_num_faint, self.a_tri_set_name, self.a_tri_filt_names[acbi],
-                self.a_gal_wavs[acbi], self.a_gal_aboffsets[acbi], self.a_gal_filternames[acbi],
-                self.a_gal_al_avs[acbi], self.d_mag, self.a_dd_params, self.a_l_cut, ax1_mids,
-                ax2_mids, ax_dimension, self.a_correct_mag_array, self.a_correct_mag_slice,
-                self.a_correct_sig_slice, self.n_pool, a_npy_or_csv, a_coord_or_chunk,
-                self.a_pos_and_err_indices, self.a_mag_indices, self.a_mag_unc_indices,
+                self.a_psf_fwhms[acbi], self.num_trials, self.a_nn_radius, self.a_dens_dist,
+                self.a_correct_astro_save_folder, self.a_gal_wavs[acbi], self.a_gal_aboffsets[acbi],
+                self.a_gal_filternames[acbi], self.a_gal_al_avs[acbi], self.d_mag, self.a_dd_params,
+                self.a_l_cut, ax1_mids, ax2_mids, ax_dimension, self.a_correct_mag_array,
+                self.a_correct_mag_slice, self.a_correct_sig_slice, self.n_pool, a_npy_or_csv,
+                a_coord_or_chunk, self.a_pos_and_err_indices, self.a_mag_indices, self.a_mag_unc_indices,
                 self.a_filt_names, self.a_best_mag_index, self.a_auf_region_frame,
-                use_photometric_uncertainties=self.a_use_photometric_uncertainties,
-                pregenerate_cutouts=True, chunks=[self.chunk_id],
-                n_r=self.real_hankel_points, n_rho=self.four_hankel_points, max_rho=self.four_max_rho)
+                trifolder=self.a_auf_folder_path, triname=a_correct_astro_tri_name,
+                maglim_f=self.a_tri_maglim_faint, magnum=self.a_tri_filt_num,
+                tri_num_faint=self.a_tri_num_faint, trifilterset=self.a_tri_set_name,
+                trifiltname=self.a_tri_filt_names[acbi], tri_hist=self.a_dens_hist_tri_list[acbi],
+                tri_mags=self.a_tri_model_mags_list[acbi],
+                dtri_mags=self.a_tri_model_mags_interval_list[acbi],
+                tri_uncert=self.a_tri_dens_uncert_list[acbi],
+                use_photometric_uncertainties=self.a_use_photometric_uncertainties, pregenerate_cutouts=True,
+                chunks=[self.chunk_id], n_r=self.real_hankel_points, n_rho=self.four_hankel_points,
+                max_rho=self.four_max_rho)
             ac(a_cat_name=self.a_ref_csv_cat_file_string, b_cat_name=self.a_csv_cat_file_string,
                tri_download=self.a_download_tri, make_plots=True, overwrite_all_sightlines=True)
 
@@ -216,7 +220,7 @@ class CrossMatch():
                 a_coord_or_chunk, self.a_pos_and_err_indices, self.a_mag_indices,
                 self.a_mag_unc_indices, self.a_filt_names, self.a_auf_region_frame,
                 chunks=[self.chunk_id])
-            smr(self.a_csv_cat_file_string, make_plots=True, overwrite_all_sightlines=True)
+            smr(b_cat_name=self.a_csv_cat_file_string, make_plots=True, overwrite_all_sightlines=True)
         if self.a_correct_astrometry or self.a_compute_snr_mag_relation:
             # If we re-made either side's astrometry then we need to load its
             # SNR-mag relation now.
@@ -249,16 +253,20 @@ class CrossMatch():
             print(f"{t} Rank {self.rank}, chunk {self.chunk_id}: Calculating catalogue 'b' "
                   "uncertainty corrections...")
             ac = AstrometricCorrections(
-                self.b_psf_fwhms[bcbi], self.num_trials, self.b_nn_radius,
-                self.b_dens_dist, self.b_correct_astro_save_folder, self.b_auf_folder_path,
-                b_correct_astro_tri_name, self.b_tri_maglim_faint, self.b_tri_filt_num,
-                self.b_tri_num_faint, self.b_tri_set_name, self.b_tri_filt_names[bcbi],
-                self.b_gal_wavs[bcbi], self.b_gal_aboffsets[bcbi], self.b_gal_filternames[bcbi],
-                self.b_gal_al_avs[bcbi], self.d_mag, self.b_dd_params, self.b_l_cut, ax1_mids,
-                ax2_mids, ax_dimension, self.b_correct_mag_array, self.b_correct_mag_slice,
-                self.b_correct_sig_slice, self.n_pool, b_npy_or_csv, b_coord_or_chunk,
-                self.b_pos_and_err_indices, self.b_mag_indices, self.b_mag_unc_indices,
+                self.b_psf_fwhms[bcbi], self.num_trials, self.b_nn_radius, self.b_dens_dist,
+                self.b_correct_astro_save_folder, self.b_gal_wavs[bcbi], self.b_gal_aboffsets[bcbi],
+                self.b_gal_filternames[bcbi], self.b_gal_al_avs[bcbi], self.d_mag, self.b_dd_params,
+                self.b_l_cut, ax1_mids, ax2_mids, ax_dimension, self.b_correct_mag_array,
+                self.b_correct_mag_slice, self.b_correct_sig_slice, self.n_pool, b_npy_or_csv,
+                b_coord_or_chunk, self.b_pos_and_err_indices, self.b_mag_indices, self.b_mag_unc_indices,
                 self.b_filt_names, self.b_best_mag_index, self.b_auf_region_frame,
+                trifolder=self.b_auf_folder_path, triname=b_correct_astro_tri_name,
+                maglim_f=self.b_tri_maglim_faint, magnum=self.b_tri_filt_num,
+                tri_num_faint=self.b_tri_num_faint, trifilterset=self.b_tri_set_name,
+                trifiltname=self.b_tri_filt_names[bcbi], tri_hist=self.b_dens_hist_tri_list[bcbi],
+                tri_mags=self.b_tri_model_mags_list[bcbi],
+                dtri_mags=self.b_tri_model_mags_interval_list[bcbi],
+                tri_uncert=self.b_tri_dens_uncert_list[bcbi],
                 use_photometric_uncertainties=self.b_use_photometric_uncertainties,
                 pregenerate_cutouts=True, chunks=[self.chunk_id],
                 n_r=self.real_hankel_points, n_rho=self.four_hankel_points, max_rho=self.four_max_rho)
@@ -282,7 +290,7 @@ class CrossMatch():
                 b_coord_or_chunk, self.b_pos_and_err_indices, self.b_mag_indices,
                 self.b_mag_unc_indices, self.b_filt_names, self.b_auf_region_frame,
                 chunks=[self.chunk_id])
-            smr(self.b_csv_cat_file_string, make_plots=True, overwrite_all_sightlines=True)
+            smr(b_cat_name=self.b_csv_cat_file_string, make_plots=True, overwrite_all_sightlines=True)
         if self.b_correct_astrometry or self.b_compute_snr_mag_relation:
             os.system(f'cp {self.b_correct_astro_save_folder}/npy/snr_mag_params.npy '
                       f'{self.b_snr_mag_params_path}')
@@ -1040,7 +1048,7 @@ class CrossMatch():
                 # pre-computed TRILEGAL histogram file, and that they are all shape
                 # (len(filters), ...).
                 for name in ['dens_hist_tri', 'tri_model_mags', 'tri_model_mag_mids',
-                             'tri_model_mags_interval', 'tri_n_bright_sources_star']:
+                             'tri_model_mags_interval', 'tri_dens_uncert', 'tri_n_bright_sources_star']:
                     f = config[f'{name}_location']
                     if f == "None":
                         setattr(self, f'{flag}{name}_list', [None] * len(getattr(self, f'{flag}filt_names')))

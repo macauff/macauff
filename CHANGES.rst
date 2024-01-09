@@ -16,6 +16,9 @@ Bug Fixes
 API Changes
 ^^^^^^^^^^^
 
+- ``AstrometricCorrections`` accepts pre-computed TRILEGAL histograms, following
+  the expansion of ``CrossMatch`` accepting them. [#79]
+
 - ``AstrometricCorrections`` and ``SNRMagnitudeRelationship`` are able to now
   accept pre-loaded catalogues via ``a_cat`` and ``b_cat``, instead of passing
   ``a_cat_name`` and ``b_cat_name``. [#79]
@@ -26,12 +29,12 @@ API Changes
 
 - Added ``dens_hist_tri_location``, ``tri_model_mags_location``,
   ``ntri_model_mag_mids_location``, ``tri_model_mags_interval_location``,
-  and ``tri_n_bright_sources_star_location`` as input parameters into catalogue
-  configuration files. These must be provided, and should be ``None`` if previous
-  TRILEGAL histogram-generation parameters (``auf_folder_path``,
-  ``tri_set_name``,  ``tri_filt_names``, ``tri_filt_num``, ``download_tri``,
-  ``tri_maglim_faint``, ``tri_num_faint``) are provided, while those parameters
-  must be ``None`` if the new set are given. [#79]
+  ``tri_dens_uncert_location``, and ``tri_n_bright_sources_star_location`` as
+  input parameters into catalogue configuration files. These must be provided,
+  and should be ``None`` if previous TRILEGAL histogram-generation parameters
+  (``auf_folder_path``, ``tri_set_name``,  ``tri_filt_names``, ``tri_filt_num``,
+  ``download_tri``, ``tri_maglim_faint``, ``tri_num_faint``) are provided,
+  while those parameters must be ``None`` if the new set are given. [#79]
 
 - ``AstrometricCorrections`` and ``SNRMagnitudeRelationship`` accept ``return_nm``
   as an optional keyword, allowing for the non-saving of arrays to disk, instead

@@ -788,7 +788,8 @@ class TestMakePerturbAUFs():
         old_line = 'auf_folder_path = auf_folder'
         new_line = ('auf_folder_path = auf_folder\ndens_hist_tri_location = None\n'
                     'tri_model_mags_location = None\ntri_model_mag_mids_location = None\n'
-                    'tri_model_mags_interval_location = None\ntri_n_bright_sources_star_location = None\n')
+                    'tri_model_mags_interval_location = None\ntri_dens_uncert_location = None\n'
+                    'tri_n_bright_sources_star_location = None\n')
         idx = np.where([old_line in line for line in f])[0][0]
         _replace_line(os.path.join(os.path.dirname(__file__), 'data/cat_a_params_.txt'), idx, new_line)
         with open(os.path.join(os.path.dirname(__file__), 'data/cat_b_params_.txt'),
@@ -797,7 +798,8 @@ class TestMakePerturbAUFs():
         old_line = 'auf_folder_path = auf_folder'
         new_line = ('auf_folder_path = auf_folder\ndens_hist_tri_location = None\n'
                     'tri_model_mags_location = None\ntri_model_mag_mids_location = None\n'
-                    'tri_model_mags_interval_location = None\ntri_n_bright_sources_star_location = None\n')
+                    'tri_model_mags_interval_location = None\ntri_dens_uncert_location = None\n'
+                    'tri_n_bright_sources_star_location = None\n')
         idx = np.where([old_line in line for line in f])[0][0]
         _replace_line(os.path.join(os.path.dirname(__file__), 'data/cat_b_params_.txt'), idx, new_line)
 
@@ -1008,7 +1010,8 @@ class TestMakePerturbAUFs():
         old_line = 'auf_folder_path = auf_folder'
         new_line = ('auf_folder_path = auf_folder\ndens_hist_tri_location = None\n'
                     'tri_model_mags_location = None\ntri_model_mag_mids_location = None\n'
-                    'tri_model_mags_interval_location = None\ntri_n_bright_sources_star_location = None\n')
+                    'tri_model_mags_interval_location = None\ntri_dens_uncert_location = None\n'
+                    'tri_n_bright_sources_star_location = None\n')
         idx = np.where([old_line in line for line in f])[0][0]
         _replace_line(os.path.join(os.path.dirname(__file__), 'data/cat_a_params_.txt'), idx, new_line)
         with open(os.path.join(os.path.dirname(__file__), 'data/cat_b_params_.txt'),
@@ -1017,7 +1020,8 @@ class TestMakePerturbAUFs():
         old_line = 'auf_folder_path = auf_folder'
         new_line = ('auf_folder_path = auf_folder\ndens_hist_tri_location = None\n'
                     'tri_model_mags_location = None\ntri_model_mag_mids_location = None\n'
-                    'tri_model_mags_interval_location = None\ntri_n_bright_sources_star_location = None\n')
+                    'tri_model_mags_interval_location = None\ntri_dens_uncert_location = None\n'
+                    'tri_n_bright_sources_star_location = None\n')
         idx = np.where([old_line in line for line in f])[0][0]
         _replace_line(os.path.join(os.path.dirname(__file__), 'data/cat_b_params_.txt'), idx, new_line)
 
