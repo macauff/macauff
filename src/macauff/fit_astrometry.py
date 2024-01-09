@@ -387,7 +387,7 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
                 if not os.path.exists(folder):
                     os.makedirs(folder)
 
-    # pylint: disable-next=too-many-statements
+    # pylint: disable-next=too-many-statements,too-many-branches
     def __call__(self, a_cat=None, b_cat=None, a_cat_name=None, b_cat_name=None, a_cat_func=None,
                  b_cat_func=None, tri_download=True, overwrite_all_sightlines=False, make_plots=False,
                  make_summary_plot=True):

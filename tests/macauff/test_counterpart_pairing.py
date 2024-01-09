@@ -303,6 +303,7 @@ class TestCounterpartPairing:  # pylint: disable=too-many-instance-attributes
         assert_allclose(prob/integral, 1)
 
     def test_source_pairing(self):  # pylint: disable=too-many-statements
+        # pylint: disable=no-member
         fake_cm = self.make_class()
         source_pairing(fake_cm)
 
@@ -372,6 +373,7 @@ class TestCounterpartPairing:  # pylint: disable=too-many-instance-attributes
         assert_allclose(afeta[q], np.log10(1.0))
 
     def test_including_b_reject(self):
+        # pylint: disable=no-member
         os.system(f'rm -r {self.joint_folder_path}')
         os.makedirs(f'{self.joint_folder_path}', exist_ok=True)
         # Remove the third group, pretending it's rejected in the group stage.
@@ -434,6 +436,7 @@ class TestCounterpartPairing:  # pylint: disable=too-many-instance-attributes
         assert prob_b_field[q] == 1
 
     def test_small_length_warnings(self):
+        # pylint: disable=no-member
         os.system(f'rm -r {self.joint_folder_path}')
         os.makedirs(f'{self.joint_folder_path}', exist_ok=True)
         # Here want to test that the number of recorded matches -- either
@@ -482,6 +485,7 @@ class TestCounterpartPairing:  # pylint: disable=too-many-instance-attributes
         assert np.all([q not in b_field for q in [0, 1, 3]])
 
     def test_large_length_warnings(self):
+        # pylint: disable=no-member
         os.system(f'rm -r {self.joint_folder_path}')
         os.makedirs(f'{self.joint_folder_path}', exist_ok=True)
         # Here want to test that the number of recorded matches -- either
