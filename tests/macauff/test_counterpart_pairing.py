@@ -559,6 +559,7 @@ class TestCounterpartPairing:  # pylint: disable=too-many-instance-attributes
                           f'data/chunk0/{file_name}_.txt'))
 
     def test_pair_sources(self):  # pylint: disable=too-many-statements
+        # pylint: disable=no-member
         os.system(f'rm -r {self.joint_folder_path}/*')
         # Same run as test_source_pairing, but called from CrossMatch rather than
         # directly this time.

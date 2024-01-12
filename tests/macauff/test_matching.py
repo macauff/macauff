@@ -273,6 +273,7 @@ class TestInputs:
                                       [131, 1], [132, 1], [133, 1], [134, 1]]))
 
     def test_crossmatch_load_tri_hists(self):  # pylint: disable=too-many-statements
+        # pylint: disable=no-member
         with open(os.path.join(os.path.dirname(__file__), 'data/crossmatch_params.txt'),
                   encoding='utf-8') as file:
             f = file.readlines()

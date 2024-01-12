@@ -45,6 +45,7 @@ class TestCreatePerturbAUF:
         self.cm.perturb_auf_func = make_perturb_aufs
 
     def test_no_perturb_outputs(self):
+        # pylint: disable=no-member
         # Randomly generate two catalogues (x3 files) between coordinates
         # 0, 0 and 50, 50.
         rng = np.random.default_rng()
@@ -656,6 +657,7 @@ class TestMakePerturbAUFs():
     @pytest.mark.remote_data
     @pytest.mark.parametrize("precompute_tri_hists", [True, False])
     def test_compute_local_density(self, precompute_tri_hists):
+        # pylint: disable=no-member
         # Number of sources per PSF circle, on average, solved backwards to ensure
         # that local density ends up exactly in the middle of a count_array bin.
         # This should be approximately 0.076 sources per PSF circle.
