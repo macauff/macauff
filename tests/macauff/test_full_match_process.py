@@ -81,6 +81,7 @@ def test_naive_bayes_match(x, y):
         idx = np.where([ol in line for line in f])[0][0]
         _replace_line(os.path.join(os.path.dirname(__file__), f'data/chunk0/{cat}_.txt'), idx, nl)
 
+    os.makedirs('new_test_path', exist_ok=True)
     cm = CrossMatch(os.path.join(os.path.dirname(__file__), 'data'))
     cm()
 
@@ -97,3 +98,5 @@ def test_naive_bayes_match(x, y):
         assert b_right_inds[i] in bc
         q = np.where(a_right_inds[i] == ac)[0][0]
         assert np.all([a_right_inds[i], b_right_inds[i]] == [ac[q], bc[q]])
+
+    os.system('rm -r new_test_path')

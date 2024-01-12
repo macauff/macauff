@@ -369,12 +369,9 @@ class TestAstroCorrection:
         assert_allclose([marray[0], narray[0]], [2, 0], rtol=0.1, atol=0.01)
 
         if not return_nm:
-            ax1_mids = np.load('ac_save_folder/npy/ax1_mids.npy')
-            ax2_mids = np.load('ac_save_folder/npy/ax2_mids.npy')
-        assert_allclose([ax1_mids[0], ax2_mids[0]], [105, 0], atol=0.001)
-
-        if not return_nm:
             abc_array = np.load('ac_save_folder/npy/snr_mag_params.npy')
+        assert_allclose([abc_array[0, 0, 3], abc_array[0, 0, 4]], [105, 0], atol=0.001)
+
         assert_allclose(abc_array[0, 0, 0], 1.2e-2, rtol=0.05, atol=0.001)
         assert_allclose(abc_array[0, 0, 1], 8e-17, rtol=0.05, atol=5e-19)
 
@@ -537,12 +534,9 @@ class TestSNRMagRelation:
             assert os.path.isfile('ac_save_folder/pdf/s_vs_snr_2017.pdf')
 
         if not return_nm:
-            ax1_mids = np.load('ac_save_folder/npy/ax1_mids.npy')
-            ax2_mids = np.load('ac_save_folder/npy/ax2_mids.npy')
-        assert_allclose([ax1_mids[0], ax2_mids[0]], [105, 0], atol=0.001)
-
-        if not return_nm:
             abc_array = np.load('ac_save_folder/npy/snr_mag_params.npy')
+        assert_allclose([abc_array[0, 0, 3], abc_array[0, 0, 4]], [105, 0], atol=0.001)
+
         assert_allclose(abc_array[0, 0, 0], 1.2e-2, rtol=0.05, atol=0.001)
         assert_allclose(abc_array[0, 0, 1], 8e-17, rtol=0.05, atol=5e-19)
 
