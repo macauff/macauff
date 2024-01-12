@@ -121,8 +121,7 @@ class TestParseCatalogue:
         os.makedirs('test_sig_folder')
         np.save('test_sig_folder/m_sigs_array.npy', np.array([2]))
         np.save('test_sig_folder/n_sigs_array.npy', np.array([0.01]))
-        np.save('test_sig_folder/ax1_mids.npy', np.array([10.0]))
-        np.save('test_sig_folder/ax2_mids.npy', np.array([0.0]))
+        np.save('test_sig_folder/snr_mag_params.npy', np.array([[[0, 0, 0, 10.0, 0.0]]]))
 
         csv_to_npy('.', 'test_data.csv', '.', [0, 1, 2], [4, 5], 6, None, header=header,
                    process_uncerts=True, astro_sig_fits_filepath='test_sig_folder',
@@ -141,8 +140,8 @@ class TestParseCatalogue:
         assert_allclose(best_index, self.data[:, 6])
 
         a = SkyCoord(ra=[10.0], dec=[0.0], unit='deg', frame='icrs')
-        np.save('test_sig_folder/ax1_mids.npy', np.array([a.galactic.l.degree]))
-        np.save('test_sig_folder/ax2_mids.npy', np.array([a.galactic.b.degree]))
+        np.save('test_sig_folder/snr_mag_params.npy',
+                np.array([[[0, 0, 0, a.galactic.l.degree[0], a.galactic.b.degree[0]]]]))
 
         csv_to_npy('.', 'test_data.csv', '.', [0, 1, 2], [4, 5], 6, None, header=header,
                    process_uncerts=True, astro_sig_fits_filepath='test_sig_folder',
@@ -264,60 +263,60 @@ class TestParseCatalogueNpyToCsv:  # pylint: disable=too-many-instance-attribute
         # Fake 3x match probability, eta/xi/2x contamination/match+non-match
         # index arrays.
         os.system('rm -r test_folder')
-        os.makedirs('test_folder/pairing', exist_ok=True)
+        os.makedirs('test_folder', exist_ok=True)
         self.n_match = int(0.6*self.n)
         self.ac = rng.choice(self.n, size=self.n_match, replace=False)
-        np.save('test_folder/pairing/ac.npy', self.ac)
+        np.save('test_folder/ac.npy', self.ac)
         self.bc = rng.choice(self.nb, size=self.n_match, replace=False)
-        np.save('test_folder/pairing/bc.npy', self.bc)
+        np.save('test_folder/bc.npy', self.bc)
         self.af = np.delete(np.arange(0, self.n), self.ac)
-        np.save('test_folder/pairing/af.npy', self.af)
+        np.save('test_folder/af.npy', self.af)
         self.bf = np.delete(np.arange(0, self.nb), self.bc)
-        np.save('test_folder/pairing/bf.npy', self.bf)
+        np.save('test_folder/bf.npy', self.bf)
 
         self.pc = rng.uniform(0.5, 1, size=self.n_match)
-        np.save('test_folder/pairing/pc.npy', self.pc)
+        np.save('test_folder/pc.npy', self.pc)
         self.pfa = rng.uniform(0.5, 1, size=len(self.af))
-        np.save('test_folder/pairing/pfa.npy', self.pfa)
+        np.save('test_folder/pfa.npy', self.pfa)
         self.pfb = rng.uniform(0.5, 1, size=len(self.bf))
-        np.save('test_folder/pairing/pfb.npy', self.pfb)
+        np.save('test_folder/pfb.npy', self.pfb)
 
         self.eta = rng.uniform(-10, 10, size=self.n_match)
-        np.save('test_folder/pairing/eta.npy', self.eta)
+        np.save('test_folder/eta.npy', self.eta)
         self.xi = rng.uniform(-10, 10, size=self.n_match)
-        np.save('test_folder/pairing/xi.npy', self.xi)
+        np.save('test_folder/xi.npy', self.xi)
 
         self.pac = rng.uniform(0, 1, size=(2, self.n_match))
-        np.save('test_folder/pairing/pacontam.npy', self.pac)
+        np.save('test_folder/pacontam.npy', self.pac)
         self.pbc = rng.uniform(0, 1, size=(2, self.n_match))
-        np.save('test_folder/pairing/pbcontam.npy', self.pbc)
+        np.save('test_folder/pbcontam.npy', self.pbc)
 
         self.acf = rng.uniform(0, 0.2, size=self.n_match)
-        np.save('test_folder/pairing/acontamflux.npy', self.acf)
+        np.save('test_folder/acontamflux.npy', self.acf)
         self.bcf = rng.uniform(0, 3, size=self.n_match)
-        np.save('test_folder/pairing/bcontamflux.npy', self.bcf)
+        np.save('test_folder/bcontamflux.npy', self.bcf)
 
         self.aff = rng.uniform(0, 0.2, size=len(self.af))
-        np.save('test_folder/pairing/afieldflux.npy', self.aff)
+        np.save('test_folder/afieldflux.npy', self.aff)
         self.bff = rng.uniform(0, 3, size=len(self.bf))
-        np.save('test_folder/pairing/bfieldflux.npy', self.bff)
+        np.save('test_folder/bfieldflux.npy', self.bff)
 
         self.csep = rng.uniform(0, 0.5, size=self.n_match)
-        np.save('test_folder/pairing/crptseps.npy', self.csep)
+        np.save('test_folder/crptseps.npy', self.csep)
 
         self.afs = rng.uniform(0, 0.5, size=len(self.af))
-        np.save('test_folder/pairing/afieldseps.npy', self.afs)
+        np.save('test_folder/afieldseps.npy', self.afs)
         self.afeta = rng.uniform(-3, 0, size=len(self.af))
-        np.save('test_folder/pairing/afieldeta.npy', self.afeta)
+        np.save('test_folder/afieldeta.npy', self.afeta)
         self.afxi = rng.uniform(-3, 0, size=len(self.af))
-        np.save('test_folder/pairing/afieldxi.npy', self.afxi)
+        np.save('test_folder/afieldxi.npy', self.afxi)
 
         self.bfs = rng.uniform(0, 0.5, size=len(self.bf))
-        np.save('test_folder/pairing/bfieldseps.npy', self.bfs)
+        np.save('test_folder/bfieldseps.npy', self.bfs)
         self.bfeta = rng.uniform(0, 0.5, size=len(self.bf))
-        np.save('test_folder/pairing/bfieldeta.npy', self.bfeta)
+        np.save('test_folder/bfieldeta.npy', self.bfeta)
         self.bfxi = rng.uniform(0, 0.5, size=len(self.bf))
-        np.save('test_folder/pairing/bfieldxi.npy', self.bfxi)
+        np.save('test_folder/bfieldxi.npy', self.bfxi)
 
     def test_npy_to_csv(self):
         a_cols = ['A_Designation', 'A_RA', 'A_Dec', 'G', 'G_RP']

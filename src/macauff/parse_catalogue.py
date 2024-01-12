@@ -115,8 +115,8 @@ def csv_to_npy(input_folder, input_filename, output_folder, astro_cols, photo_co
         m_sigs = np.load(f'{astro_sig_fits_filepath}/m_sigs_array.npy')
         n_sigs = np.load(f'{astro_sig_fits_filepath}/n_sigs_array.npy')
         mn_coords = np.empty((len(m_sigs), 2), float)
-        mn_coords[:, 0] = np.load(f'{astro_sig_fits_filepath}/ax1_mids.npy')
-        mn_coords[:, 1] = np.load(f'{astro_sig_fits_filepath}/ax2_mids.npy')
+        mn_coords[:, 0] = np.load(f'{astro_sig_fits_filepath}/snr_mag_params.npy')[0, :, 3]
+        mn_coords[:, 1] = np.load(f'{astro_sig_fits_filepath}/snr_mag_params.npy')[0, :, 4]
         if cat_in_radec and not mn_in_radec:
             # Convert mn_coords to RA/Dec if catalogue is in Equatorial coords.
             a = SkyCoord(l=mn_coords[:, 0], b=mn_coords[:, 1], unit='deg', frame='galactic')
@@ -243,16 +243,16 @@ def npy_to_csv(input_csv_folders, input_match_folder, output_folder, csv_filenam
                               "catalogue.")
         if extra_col_num_lists[i] is not None:
             cols = np.append(cols, extra_col_name_lists[i])
-    ac = np.load(f'{input_match_folder}/pairing/ac.npy')
-    bc = np.load(f'{input_match_folder}/pairing/bc.npy')
-    p = np.load(f'{input_match_folder}/pairing/pc.npy')
-    eta = np.load(f'{input_match_folder}/pairing/eta.npy')
-    xi = np.load(f'{input_match_folder}/pairing/xi.npy')
-    a_avg_cont = np.load(f'{input_match_folder}/pairing/acontamflux.npy')
-    b_avg_cont = np.load(f'{input_match_folder}/pairing/bcontamflux.npy')
-    acontprob = np.load(f'{input_match_folder}/pairing/pacontam.npy')
-    bcontprob = np.load(f'{input_match_folder}/pairing/pbcontam.npy')
-    seps = np.load(f'{input_match_folder}/pairing/crptseps.npy')
+    ac = np.load(f'{input_match_folder}/ac.npy')
+    bc = np.load(f'{input_match_folder}/bc.npy')
+    p = np.load(f'{input_match_folder}/pc.npy')
+    eta = np.load(f'{input_match_folder}/eta.npy')
+    xi = np.load(f'{input_match_folder}/xi.npy')
+    a_avg_cont = np.load(f'{input_match_folder}/acontamflux.npy')
+    b_avg_cont = np.load(f'{input_match_folder}/bcontamflux.npy')
+    acontprob = np.load(f'{input_match_folder}/pacontam.npy')
+    bcontprob = np.load(f'{input_match_folder}/pbcontam.npy')
+    seps = np.load(f'{input_match_folder}/crptseps.npy')
 
     if input_npy_folders[0] is not None:
         cols = np.append(cols, [f'{extra_col_cat_names[0]}_FIT_SIG'])
@@ -323,12 +323,12 @@ def npy_to_csv(input_csv_folders, input_match_folder, output_folder, csv_filenam
 
     # For non-match, ID/coordinates/mags, then island probability + average
     # contamination.
-    af = np.load(f'{input_match_folder}/pairing/af.npy')
-    a_avg_cont = np.load(f'{input_match_folder}/pairing/afieldflux.npy')
-    p = np.load(f'{input_match_folder}/pairing/pfa.npy')
-    seps = np.load(f'{input_match_folder}/pairing/afieldseps.npy')
-    afeta = np.load(f'{input_match_folder}/pairing/afieldeta.npy')
-    afxi = np.load(f'{input_match_folder}/pairing/afieldxi.npy')
+    af = np.load(f'{input_match_folder}/af.npy')
+    a_avg_cont = np.load(f'{input_match_folder}/afieldflux.npy')
+    p = np.load(f'{input_match_folder}/pfa.npy')
+    seps = np.load(f'{input_match_folder}/afieldseps.npy')
+    afeta = np.load(f'{input_match_folder}/afieldeta.npy')
+    afxi = np.load(f'{input_match_folder}/afieldxi.npy')
     our_columns = ['MATCH_P', 'NNM_SEPARATION', 'NNM_ETA', 'NNM_XI', f'{extra_col_cat_names[0]}_AVG_CONT']
     cols = np.append(column_name_lists[0], our_columns)
     if extra_col_num_lists[0] is not None:
@@ -357,12 +357,12 @@ def npy_to_csv(input_csv_folders, input_match_folder, output_folder, csv_filenam
     a_nonmatch_df.to_csv(f'{output_folder}/{output_filenames[1]}', encoding='utf-8',
                          index=False, header=False)
 
-    bf = np.load(f'{input_match_folder}/pairing/bf.npy')
-    b_avg_cont = np.load(f'{input_match_folder}/pairing/bfieldflux.npy')
-    p = np.load(f'{input_match_folder}/pairing/pfb.npy')
-    seps = np.load(f'{input_match_folder}/pairing/bfieldseps.npy')
-    bfeta = np.load(f'{input_match_folder}/pairing/bfieldeta.npy')
-    bfxi = np.load(f'{input_match_folder}/pairing/bfieldxi.npy')
+    bf = np.load(f'{input_match_folder}/bf.npy')
+    b_avg_cont = np.load(f'{input_match_folder}/bfieldflux.npy')
+    p = np.load(f'{input_match_folder}/pfb.npy')
+    seps = np.load(f'{input_match_folder}/bfieldseps.npy')
+    bfeta = np.load(f'{input_match_folder}/bfieldeta.npy')
+    bfxi = np.load(f'{input_match_folder}/bfieldxi.npy')
     our_columns = ['MATCH_P', 'NNM_SEPARATION', 'NNM_ETA', 'NNM_XI', f'{extra_col_cat_names[1]}_AVG_CONT']
     cols = np.append(column_name_lists[1], our_columns)
     if extra_col_num_lists[1] is not None:

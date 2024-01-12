@@ -71,8 +71,8 @@ def make_island_groupings(cm):
         ax2_sparse_loops = np.append(ax2_sparse_loops, ax2_loops[-1])
 
     # Load the astrometry of each catalogue for slicing.
-    a_full = np.load(f'{cm.a_cat_folder_path}/con_cat_astro.npy')
-    b_full = np.load(f'{cm.b_cat_folder_path}/con_cat_astro.npy')
+    a_full = cm.a_astro
+    b_full = cm.b_astro
 
     asize = np.zeros(dtype=int, shape=(len(a_full),))
     bsize = np.zeros(dtype=int, shape=(len(b_full),))
@@ -96,10 +96,9 @@ def make_island_groupings(cm):
                                               ax2_loops[j*ax2_skip+1:(j+1)*ax2_skip+1]):
                     ax_cutout = [ax1_start, ax1_end, ax2_start, ax2_end]
                     a, afouriergrid, amodrefindsmall, a_cut = _load_fourier_grid_cutouts(
-                        a_cutout, ax_cutout, cm.a_cat_folder_path, cm.a_perturb_auf_outputs, 0, a_big_sky_cut,
-                        cm.a_modelrefinds)
+                        a_cutout, ax_cutout, cm.a_perturb_auf_outputs, 0, a_big_sky_cut, cm.a_modelrefinds)
                     b, bfouriergrid, bmodrefindsmall, b_cut = _load_fourier_grid_cutouts(
-                        b_cutout, ax_cutout, cm.b_cat_folder_path, cm.b_perturb_auf_outputs, max_sep,
+                        b_cutout, ax_cutout, cm.b_perturb_auf_outputs, max_sep,
                         b_big_sky_cut, cm.b_modelrefinds)
                     if len(a) > 0 and len(b) > 0:
                         overlapa, overlapb = gsf.get_max_overlap(
@@ -149,10 +148,9 @@ def make_island_groupings(cm):
                                               ax2_loops[j*ax2_skip+1:(j+1)*ax2_skip+1]):
                     ax_cutout = [ax1_start, ax1_end, ax2_start, ax2_end]
                     a, afouriergrid, amodrefindsmall, a_cut = _load_fourier_grid_cutouts(
-                        a_cutout, ax_cutout, cm.a_cat_folder_path, cm.a_perturb_auf_outputs, 0, a_big_sky_cut,
-                        cm.a_modelrefinds)
+                        a_cutout, ax_cutout, cm.a_perturb_auf_outputs, 0, a_big_sky_cut, cm.a_modelrefinds)
                     b, bfouriergrid, bmodrefindsmall, b_cut = _load_fourier_grid_cutouts(
-                        b_cutout, ax_cutout, cm.b_cat_folder_path, cm.b_perturb_auf_outputs, max_sep,
+                        b_cutout, ax_cutout, cm.b_perturb_auf_outputs, max_sep,
                         b_big_sky_cut, cm.b_modelrefinds)
 
                     if len(a) > 0 and len(b) > 0:
@@ -306,14 +304,16 @@ def make_island_groupings(cm):
     if num_a_failed_checks + a_first_rejected_len > 0:
         lenrejecta = len(reject_a)
         # Save rejects output files.
-        np.save(f'{cm.joint_folder_path}/reject/reject_a.npy', reject_a)
+        cm.reject_a = reject_a
     else:
         lenrejecta = 0
+        cm.reject_a = None
     if num_b_failed_checks + b_first_rejected_len > 0:
         lenrejectb = len(reject_b)
-        np.save(f'{cm.joint_folder_path}/reject/reject_b.npy', reject_b)
+        cm.reject_b = reject_b
     else:
         lenrejectb = 0
+        cm.reject_b = None
 
     cm.ablen = ablen
     cm.bblen = bblen
@@ -331,7 +331,7 @@ def make_island_groupings(cm):
     cm.lenrejectb = lenrejectb
 
 
-def _load_fourier_grid_cutouts(a, sky_rect_coords, cat_folder_path, perturb_auf_outputs, padding,
+def _load_fourier_grid_cutouts(a, sky_rect_coords, perturb_auf_outputs, padding,
                                large_sky_slice, modelrefinds):
     '''
     Function to load a sub-set of a given catalogue's astrometry, slicing it
@@ -346,9 +346,6 @@ def _load_fourier_grid_cutouts(a, sky_rect_coords, cat_folder_path, perturb_auf_
         Array with the rectangular extents of the cutout to be performed, in the
         order lower longitudinal coordinate, upper longitudinal coordinate,
         lower latitudinal coordinate, and upper latitudinal coordinate.
-    cat_folder_path : string
-        Location on disk where catalogues for the same dataset given in ``a``
-        are stored.
     perturb_auf_outputs : dictionary
         Results from the simulations of catalogue ``a``'s AUF extensions.
     padding : float
@@ -367,7 +364,7 @@ def _load_fourier_grid_cutouts(a, sky_rect_coords, cat_folder_path, perturb_auf_
 
     sky_cut = _load_rectangular_slice(a, lon1, lon2, lat1, lat2, padding)
 
-    a_cutout = np.load(f'{cat_folder_path}/con_cat_astro.npy')[large_sky_slice][sky_cut]
+    a_cutout = a[sky_cut]
 
     modrefind = modelrefinds[:, large_sky_slice][:, sky_cut]
 

@@ -57,7 +57,7 @@ def test_load_fourier_grid_cutouts():  # pylint:disable=too-many-statements
 
     padding = 0.1
     p_a_o = {'fourier_grid': grid}
-    _a, _b, _c, _ = _load_fourier_grid_cutouts(a, rect, '.', p_a_o, padding, np.array([True]*lena),
+    _a, _b, _c, _ = _load_fourier_grid_cutouts(a, rect, p_a_o, padding, np.array([True]*lena),
                                                modelrefinds=m)
     assert np.all(_a.shape == (4, 3))
     assert np.all(_a ==
@@ -80,7 +80,7 @@ def test_load_fourier_grid_cutouts():  # pylint:disable=too-many-statements
     # This should not return sources 123 and 555 above, removing a potential
     # reference index. Hence we only have one unique grid reference now.
     padding = 0
-    _a, _b, _c, _ = _load_fourier_grid_cutouts(a, rect, '.', p_a_o, padding, np.array([True]*lena),
+    _a, _b, _c, _ = _load_fourier_grid_cutouts(a, rect, p_a_o, padding, np.array([True]*lena),
                                                modelrefinds=m)
     assert np.all(_a.shape == (2, 3))
     assert np.all(_a == np.array([[50, 50, 0.1], [45, 45, 0.2]]))
@@ -293,7 +293,6 @@ class TestMakeIslandGroupings():  # pylint: disable=too-many-instance-attributes
         for folder in [self.a_cat_folder_path, self.b_cat_folder_path, self.joint_folder_path,
                        self.a_auf_folder_path, self.b_auf_folder_path]:
             os.makedirs(folder, exist_ok=True)
-        os.makedirs(f'{self.joint_folder_path}/reject', exist_ok=True)
         self.r = np.linspace(0, self.max_sep, 10000)
         self.dr = np.diff(self.r)
         self.rho = np.linspace(0, 100, 9900)
@@ -441,7 +440,7 @@ class TestMakeIslandGroupings():  # pylint: disable=too-many-instance-attributes
                                                    *np.arange(n_c, n_b), 0]))).reshape(1, -1)
 
     def test_make_island_groupings(self):
-        os.system(f'rm -rf {self.joint_folder_path}/reject/*')
+        os.system(f'rm -rf {self.joint_folder_path}/*')
         self._fake_fourier_grid(self.n_a, self.n_b)
         n_a, n_b, n_c = self.n_a, self.n_b, self.n_com
         np.save(f'{self.a_cat_folder_path}/con_cat_astro.npy', self.a_coords)
@@ -453,17 +452,22 @@ class TestMakeIslandGroupings():  # pylint: disable=too-many-instance-attributes
         self.cm.b_perturb_auf_outputs = self.b_perturb_auf_outputs
         self.cm.a_modelrefinds = self.a_modelrefinds
         self.cm.b_modelrefinds = self.b_modelrefinds
+        self.cm.a_astro = self.a_coords
+        self.cm.b_astro = self.b_coords
         mcff = Macauff(self.cm)
         mcff.group_sources()
 
         alist, blist = self.cm.alist, self.cm.blist
         agrplen, bgrplen = self.cm.agrplen, self.cm.bgrplen
         self._comparisons_in_islands(alist, blist, agrplen, bgrplen, n_a, n_b, n_c)
-        assert len(os.listdir(f'{self.joint_folder_path}/reject')) == 0
+        assert self.cm.lenrejecta == 0
+        assert self.cm.lenrejectb == 0
+        assert self.cm.reject_a is None
+        assert self.cm.reject_b is None
 
     @pytest.mark.filterwarnings("ignore:.*island, containing.*")
     def test_mig_extra_reject(self):  # pylint: disable=too-many-statements
-        os.system(f'rm -rf {self.joint_folder_path}/reject/*')
+        os.system(f'rm -rf {self.joint_folder_path}/*')
         self._fake_fourier_grid(self.n_a+10, self.n_b+11)
         n_a, n_b, n_c = self.n_a, self.n_b, self.n_com
         ax_lims = self.ax_lims
@@ -495,6 +499,8 @@ class TestMakeIslandGroupings():  # pylint: disable=too-many-instance-attributes
         self.cm.b_perturb_auf_outputs = self.b_perturb_auf_outputs
         self.cm.a_modelrefinds = self.a_modelrefinds
         self.cm.b_modelrefinds = self.b_modelrefinds
+        self.cm.a_astro = a_coords
+        self.cm.b_astro = b_coords
 
         make_island_groupings(self.cm)
 
@@ -520,18 +526,16 @@ class TestMakeIslandGroupings():  # pylint: disable=too-many-instance-attributes
                                          np.array([-1, -1, -1, -1,
                                                    *np.arange(n_c, n_b), 0]))).reshape(1, -1)
 
-        areject = np.load('joint/reject/reject_a.npy')
-        breject = np.load('joint/reject/reject_b.npy')
+        areject = self.cm.reject_a
+        breject = self.cm.reject_b
         assert np.all(areject.shape == (10+3,))
         assert np.all(breject.shape == (11+3,))
         assert np.all(areject == np.concatenate(([3, 4, 5], np.arange(n_a, n_a+10))))
         assert np.all(breject == np.concatenate(([3, 4, 5], np.arange(n_b, n_b+11))))
 
-        assert len(os.listdir(f'{self.joint_folder_path}/reject')) == 2
-
     @pytest.mark.filterwarnings("ignore:.*island, containing.*")
     def test_mig_no_reject_ax_lims(self):
-        os.system(f'rm -rf {self.joint_folder_path}/reject/*')
+        os.system(f'rm -rf {self.joint_folder_path}/*')
         self._fake_fourier_grid(self.n_a+10, self.n_b+11)
         n_a, n_b, n_c = self.n_a, self.n_b, self.n_com
         ax_lims = np.array([0, 360, -90, -88])
@@ -568,6 +572,8 @@ class TestMakeIslandGroupings():  # pylint: disable=too-many-instance-attributes
         self.cm.b_perturb_auf_outputs = self.b_perturb_auf_outputs
         self.cm.a_modelrefinds = self.a_modelrefinds
         self.cm.b_modelrefinds = self.b_modelrefinds
+        self.cm.a_astro = a_coords
+        self.cm.b_astro = b_coords
 
         make_island_groupings(self.cm)
 
@@ -575,16 +581,15 @@ class TestMakeIslandGroupings():  # pylint: disable=too-many-instance-attributes
         agrplen, bgrplen = self.cm.agrplen, self.cm.bgrplen  # pylint: disable=no-member
         # The same tests that were ran in make_island_groupings should pass here.
         self._comparisons_in_islands(alist, blist, agrplen, bgrplen, n_a, n_b, n_c)
-        areject = np.load('joint/reject/reject_a.npy')
-        breject = np.load('joint/reject/reject_b.npy')
+        areject = self.cm.reject_a
+        breject = self.cm.reject_b
         assert np.all(areject.shape == (10,))
         assert np.all(breject.shape == (11,))
         assert np.all(areject == np.arange(n_a, n_a+10))
         assert np.all(breject == np.arange(n_b, n_b+11))
-        assert len(os.listdir(f'{self.joint_folder_path}/reject')) == 2
 
     def test_make_island_groupings_include_phot_like(self):  # pylint: disable=too-many-statements
-        os.system(f'rm -rf {self.joint_folder_path}/reject/*')
+        os.system(f'rm -rf {self.joint_folder_path}/*')
         self._fake_fourier_grid(self.n_a, self.n_b)
         np.save(f'{self.a_cat_folder_path}/con_cat_astro.npy', self.a_coords)
         np.save(f'{self.b_cat_folder_path}/con_cat_astro.npy', self.b_coords)
@@ -594,6 +599,8 @@ class TestMakeIslandGroupings():  # pylint: disable=too-many-instance-attributes
         self.cm.b_perturb_auf_outputs = self.b_perturb_auf_outputs
         self.cm.a_modelrefinds = self.a_modelrefinds
         self.cm.b_modelrefinds = self.b_modelrefinds
+        self.cm.a_astro = self.a_coords
+        self.cm.b_astro = self.b_coords
         make_island_groupings(self.cm)
 
         # Verify that make_island_groupings doesn't change when the extra arrays
@@ -603,7 +610,10 @@ class TestMakeIslandGroupings():  # pylint: disable=too-many-instance-attributes
         self._comparisons_in_islands(alist, blist, agrplen, bgrplen, self.n_a, self.n_b,
                                      self.n_com)
 
-        assert len(os.listdir(f'{self.joint_folder_path}/reject')) == 0
+        assert self.cm.lenrejecta == 0
+        assert self.cm.lenrejectb == 0
+        assert self.cm.reject_a is None
+        assert self.cm.reject_b is None
 
         aerr = np.load(f'{self.a_cat_folder_path}/con_cat_astro.npy')[:, 2]
         berr = np.load(f'{self.b_cat_folder_path}/con_cat_astro.npy')[:, 2]

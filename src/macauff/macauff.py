@@ -37,6 +37,7 @@ class Macauff():
         Call each step in a cross-match in turn.
         '''
 
+        os.system(f'rm -r {self.cm.joint_folder_path}/*')
         # The first step is to create the perturbation AUF components, if needed.
         self.create_perturb_auf()
 
@@ -115,7 +116,6 @@ class Macauff():
         sys.stdout.flush()
         if self.cm.j1s is None:
             self.cm.j1s = gsf.calc_j1s(self.cm.rho[:-1]+self.cm.drho/2, self.cm.r[:-1]+self.cm.dr/2)
-        os.system(f'rm -rf {self.cm.joint_folder_path}/reject/*')
         self.cm.group_func(self.cm)
 
     def calculate_phot_like(self):
@@ -171,5 +171,4 @@ class Macauff():
         t = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         print(f'{t} Rank {self.cm.rank}, chunk {self.cm.chunk_id}: Determining counterparts...')
         sys.stdout.flush()
-        os.system(f'rm -r {self.cm.joint_folder_path}/pairing/*')
         self.cm.count_pair_func(self.cm)

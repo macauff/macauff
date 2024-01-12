@@ -122,7 +122,7 @@ class TestCounterpartPairing:  # pylint: disable=too-many-instance-attributes
         self.b_auf_folder_path = 'wise_auf_folder'
 
         os.system(f'rm -r {self.joint_folder_path}')
-        os.makedirs(f'{self.joint_folder_path}/pairing', exist_ok=True)
+        os.makedirs(f'{self.joint_folder_path}', exist_ok=True)
         for f in [self.a_cat_folder_path, self.b_cat_folder_path,
                   self.a_auf_folder_path, self.b_auf_folder_path]:
             os.makedirs(f, exist_ok=True)
@@ -182,6 +182,12 @@ class TestCounterpartPairing:  # pylint: disable=too-many-instance-attributes
         a.bgrplen = self.bgrplen
         a.lenrejecta = 0
         a.lenrejectb = 0
+        a.a_astro = self.a_astro
+        a.a_photo = self.a_photo
+        a.b_astro = self.b_astro
+        a.b_photo = self.b_photo
+        a.a_magref = self.amagref
+        a.b_magref = self.bmagref
 
         return a
 
@@ -199,8 +205,8 @@ class TestCounterpartPairing:  # pylint: disable=too-many-instance-attributes
         self.nfa, self.nfb = self.fa_priors[0, 0, 0], self.fb_priors[0, 0, 0]
 
     def test_individual_island_probability(self):
-        os.system(f'rm -r {self.joint_folder_path}/pairing')
-        os.makedirs(f'{self.joint_folder_path}/pairing', exist_ok=True)
+        os.system(f'rm -r {self.joint_folder_path}')
+        os.makedirs(f'{self.joint_folder_path}', exist_ok=True)
         i = 0
         wrapper = [
             self.a_astro, self.a_photo, self.b_astro, self.b_photo, self.c_array, self.fa_array,
@@ -243,8 +249,8 @@ class TestCounterpartPairing:  # pylint: disable=too-many-instance-attributes
         assert_allclose(prob, _prob, rtol=1e-5)
 
     def test_individual_island_zero_probabilities(self):
-        os.system(f'rm -r {self.joint_folder_path}/pairing')
-        os.makedirs(f'{self.joint_folder_path}/pairing', exist_ok=True)
+        os.system(f'rm -r {self.joint_folder_path}')
+        os.makedirs(f'{self.joint_folder_path}', exist_ok=True)
         # Fake the extra fire extinguisher likelihood/prior used in the main code.
         fa_array = np.zeros_like(self.fa_array) + 1e-10
         fb_array = np.zeros_like(self.fb_array) + 1e-10
@@ -297,36 +303,35 @@ class TestCounterpartPairing:  # pylint: disable=too-many-instance-attributes
         assert_allclose(prob/integral, 1)
 
     def test_source_pairing(self):  # pylint: disable=too-many-statements
-        os.system(f'rm -r {self.joint_folder_path}/pairing')
-        os.makedirs(f'{self.joint_folder_path}/pairing', exist_ok=True)
+        # pylint: disable=no-member
         fake_cm = self.make_class()
         source_pairing(fake_cm)
 
-        bflux = np.load(f'{self.joint_folder_path}/pairing/bcontamflux.npy')
+        bflux = fake_cm.bcontamflux
         assert np.all(bflux == np.zeros((2), float))
 
-        aflux = np.load(f'{self.joint_folder_path}/pairing/afieldflux.npy')
+        aflux = fake_cm.afieldflux
         assert np.all(aflux == np.zeros((5), float))
-        bflux = np.load(f'{self.joint_folder_path}/pairing/bfieldflux.npy')
+        bflux = fake_cm.bfieldflux
         assert np.all(bflux == np.zeros((2), float))
 
-        a_matches = np.load(f'{self.joint_folder_path}/pairing/ac.npy')
+        a_matches = fake_cm.ac
         assert np.all([q in a_matches for q in [0, 1]])
         assert np.all([q not in a_matches for q in [2, 3, 4, 5, 6]])
 
-        a_field = np.load(f'{self.joint_folder_path}/pairing/af.npy')
+        a_field = fake_cm.af
         assert np.all([q in a_field for q in [2, 3, 4, 5, 6]])
         assert np.all([q not in a_field for q in [0, 1]])
 
-        b_matches = np.load(f'{self.joint_folder_path}/pairing/bc.npy')
+        b_matches = fake_cm.bc
         assert np.all([q in b_matches for q in [0, 1]])
         assert np.all([q not in b_matches for q in [2, 3]])
 
-        b_field = np.load(f'{self.joint_folder_path}/pairing/bf.npy')
+        b_field = fake_cm.bf
         assert np.all([q in b_field for q in [2, 3]])
         assert np.all([q not in b_field for q in [0, 1]])
 
-        prob_counterpart = np.load(f'{self.joint_folder_path}/pairing/pc.npy')
+        prob_counterpart = fake_cm.pc
         self._calculate_prob_integral()
         _integral = self.nc*self.g*self.nfa + self.nc*self.g_wrong*self.nfa +\
             self.nfa*self.nfa*self.nfb
@@ -334,26 +339,26 @@ class TestCounterpartPairing:  # pylint: disable=too-many-instance-attributes
         norm_prob = _prob/_integral
         q = np.where(a_matches == 0)[0][0]
         assert_allclose(prob_counterpart[q], norm_prob, rtol=1e-5)
-        xicrpts = np.load(f'{self.joint_folder_path}/pairing/xi.npy')
+        xicrpts = fake_cm.xi
         assert_allclose(xicrpts[q], np.array([np.log10(self.g / self.fa_priors[0, 0, 0])]),
                         rtol=1e-6)
-        csep = np.load(f'{self.joint_folder_path}/pairing/crptseps.npy')
+        csep = fake_cm.crptseps
         assert_allclose(csep[q], self.sep * 3600, rtol=1e-6)
         assert len(csep) == len(a_matches)
 
-        prob_a_field = np.load(f'{self.joint_folder_path}/pairing/pfa.npy')
-        a_field = np.load(f'{self.joint_folder_path}/pairing/af.npy')
+        prob_a_field = fake_cm.pfa
+        a_field = fake_cm.af
         q = np.where(a_field == 6)[0][0]
         assert prob_a_field[q] == 1
 
-        prob_b_field = np.load(f'{self.joint_folder_path}/pairing/pfb.npy')
-        b_field = np.load(f'{self.joint_folder_path}/pairing/bf.npy')
+        prob_b_field = fake_cm.pfb
+        b_field = fake_cm.bf
         q = np.where(b_field == 2)[0][0]
         assert prob_b_field[q] == 1
 
-        afs = np.load(f'{self.joint_folder_path}/pairing/afieldseps.npy')
-        afeta = np.load(f'{self.joint_folder_path}/pairing/afieldeta.npy')
-        afxi = np.load(f'{self.joint_folder_path}/pairing/afieldxi.npy')
+        afs = fake_cm.afieldseps
+        afeta = fake_cm.afieldeta
+        afxi = fake_cm.afieldxi
         q = np.where(a_field == 2)[0][0]
         fake_field_sep = np.sqrt(((self.a_astro[2, 0] -
                                    self.b_astro[3, 0])*np.cos(np.radians(self.b_astro[3, 1])))**2 +
@@ -368,8 +373,9 @@ class TestCounterpartPairing:  # pylint: disable=too-many-instance-attributes
         assert_allclose(afeta[q], np.log10(1.0))
 
     def test_including_b_reject(self):
-        os.system(f'rm -r {self.joint_folder_path}/pairing')
-        os.makedirs(f'{self.joint_folder_path}/pairing', exist_ok=True)
+        # pylint: disable=no-member
+        os.system(f'rm -r {self.joint_folder_path}')
+        os.makedirs(f'{self.joint_folder_path}', exist_ok=True)
         # Remove the third group, pretending it's rejected in the group stage.
         alist = self.alist[:, [0, 1, 3, 4]]
         blist = self.blist[:, [0, 1, 3, 4]]
@@ -378,9 +384,6 @@ class TestCounterpartPairing:  # pylint: disable=too-many-instance-attributes
 
         a_reject = np.array([2, 5])
         b_reject = np.array([3])
-
-        os.system(f'rm -r {self.joint_folder_path}/reject')
-        os.makedirs(f'{self.joint_folder_path}/reject', exist_ok=True)
 
         fake_cm = self.make_class()
         fake_cm.alist = alist
@@ -391,26 +394,26 @@ class TestCounterpartPairing:  # pylint: disable=too-many-instance-attributes
         fake_cm.lenrejectb = len(b_reject)
         source_pairing(fake_cm)
 
-        bflux = np.load(f'{self.joint_folder_path}/pairing/bcontamflux.npy')
+        bflux = fake_cm.bcontamflux
         assert np.all(bflux == np.zeros((2), float))
 
-        a_matches = np.load(f'{self.joint_folder_path}/pairing/ac.npy')
+        a_matches = fake_cm.ac
         assert np.all([q in a_matches for q in [0, 1]])
         assert np.all([q not in a_matches for q in [2, 3, 4, 5, 6]])
 
-        a_field = np.load(f'{self.joint_folder_path}/pairing/af.npy')
+        a_field = fake_cm.af
         assert np.all([q in a_field for q in [3, 4, 6]])
         assert np.all([q not in a_field for q in [0, 1, 2, 5]])
 
-        b_matches = np.load(f'{self.joint_folder_path}/pairing/bc.npy')
+        b_matches = fake_cm.bc
         assert np.all([q in b_matches for q in [0, 1]])
         assert np.all([q not in b_matches for q in [2, 3]])
 
-        b_field = np.load(f'{self.joint_folder_path}/pairing/bf.npy')
+        b_field = fake_cm.bf
         assert np.all([q in b_field for q in [2]])
         assert np.all([q not in b_field for q in [0, 1, 3]])
 
-        prob_counterpart = np.load(f'{self.joint_folder_path}/pairing/pc.npy')
+        prob_counterpart = fake_cm.pc
         self._calculate_prob_integral()
         _integral = self.nc*self.g*self.nfa + self.nc*self.g_wrong*self.nfa + \
             self.nfa*self.nfa*self.nfb
@@ -418,24 +421,24 @@ class TestCounterpartPairing:  # pylint: disable=too-many-instance-attributes
         norm_prob = _prob/_integral
         q = np.where(a_matches == 0)[0][0]
         assert_allclose(prob_counterpart[q], norm_prob, rtol=1e-5)
-        xicrpts = np.load(f'{self.joint_folder_path}/pairing/xi.npy')
+        xicrpts = fake_cm.xi
         assert_allclose(xicrpts[q], np.array([np.log10(self.g / self.fa_priors[0, 0, 0])]),
                         rtol=1e-6)
 
-        prob_a_field = np.load(f'{self.joint_folder_path}/pairing/pfa.npy')
-        a_field = np.load(f'{self.joint_folder_path}/pairing/af.npy')
+        prob_a_field = fake_cm.pfa
+        a_field = fake_cm.af
         q = np.where(a_field == 6)[0][0]
         assert prob_a_field[q] == 1
 
-        prob_b_field = np.load(f'{self.joint_folder_path}/pairing/pfb.npy')
-        b_field = np.load(f'{self.joint_folder_path}/pairing/bf.npy')
+        prob_b_field = fake_cm.pfb
+        b_field = fake_cm.bf
         q = np.where(b_field == 2)[0][0]
         assert prob_b_field[q] == 1
 
     def test_small_length_warnings(self):
-        os.system(f'rm -r {self.joint_folder_path}/pairing')
-        os.makedirs(f'{self.joint_folder_path}/pairing', exist_ok=True)
-        os.makedirs(f'{self.joint_folder_path}/reject', exist_ok=True)
+        # pylint: disable=no-member
+        os.system(f'rm -r {self.joint_folder_path}')
+        os.makedirs(f'{self.joint_folder_path}', exist_ok=True)
         # Here want to test that the number of recorded matches -- either
         # counterpart, field, or rejected -- is lower than the total length.
         # To achieve this we fake reject length arrays smaller than their
@@ -462,29 +465,29 @@ class TestCounterpartPairing:  # pylint: disable=too-many-instance-attributes
         assert '2 catalogue a sources not in either counterpart, f' in record[0].message.args[0]
         assert '1 catalogue b source not in either counterpart, f' in record[1].message.args[0]
 
-        bflux = np.load(f'{self.joint_folder_path}/pairing/bcontamflux.npy')
+        bflux = fake_cm.bcontamflux
         assert np.all(bflux == np.zeros((2), float))
 
-        a_matches = np.load(f'{self.joint_folder_path}/pairing/ac.npy')
+        a_matches = fake_cm.ac
         assert np.all([q in a_matches for q in [0, 1]])
         assert np.all([q not in a_matches for q in [2, 3, 4, 5, 6]])
 
-        a_field = np.load(f'{self.joint_folder_path}/pairing/af.npy')
+        a_field = fake_cm.af
         assert np.all([q in a_field for q in [3, 4]])
         assert np.all([q not in a_field for q in [0, 1, 2, 5, 6]])
 
-        b_matches = np.load(f'{self.joint_folder_path}/pairing/bc.npy')
+        b_matches = fake_cm.bc
         assert np.all([q in b_matches for q in [0, 1]])
         assert np.all([q not in b_matches for q in [2, 3]])
 
-        b_field = np.load(f'{self.joint_folder_path}/pairing/bf.npy')
+        b_field = fake_cm.bf
         assert np.all([q in b_field for q in [2]])
         assert np.all([q not in b_field for q in [0, 1, 3]])
 
     def test_large_length_warnings(self):
-        os.system(f'rm -r {self.joint_folder_path}/pairing')
-        os.makedirs(f'{self.joint_folder_path}/pairing', exist_ok=True)
-        os.makedirs(f'{self.joint_folder_path}/reject', exist_ok=True)
+        # pylint: disable=no-member
+        os.system(f'rm -r {self.joint_folder_path}')
+        os.makedirs(f'{self.joint_folder_path}', exist_ok=True)
         # Here want to test that the number of recorded matches -- either
         # counterpart, field, or rejected -- is higher than the total length.
         # To achieve this we fake reject length arrays larger than their
@@ -510,22 +513,22 @@ class TestCounterpartPairing:  # pylint: disable=too-many-instance-attributes
         assert '2 additional catalogue a indices recorded' in record[0].message.args[0]
         assert '1 additional catalogue b index recorded' in record[1].message.args[0]
 
-        bflux = np.load(f'{self.joint_folder_path}/pairing/bcontamflux.npy')
+        bflux = fake_cm.bcontamflux
         assert np.all(bflux == np.zeros((2), float))
 
-        a_matches = np.load(f'{self.joint_folder_path}/pairing/ac.npy')
+        a_matches = fake_cm.ac
         assert np.all([q in a_matches for q in [0, 1]])
         assert np.all([q not in a_matches for q in [2, 3, 4, 5, 6]])
 
-        a_field = np.load(f'{self.joint_folder_path}/pairing/af.npy')
+        a_field = fake_cm.af
         assert np.all([q in a_field for q in [3, 4]])
         assert np.all([q not in a_field for q in [0, 1, 2, 5, 6]])
 
-        b_matches = np.load(f'{self.joint_folder_path}/pairing/bc.npy')
+        b_matches = fake_cm.bc
         assert np.all([q in b_matches for q in [0, 1]])
         assert np.all([q not in b_matches for q in [2, 3]])
 
-        b_field = np.load(f'{self.joint_folder_path}/pairing/bf.npy')
+        b_field = fake_cm.bf
         assert np.all([q in b_field for q in [2]])
         assert np.all([q not in b_field for q in [0, 1, 3]])
 
@@ -556,9 +559,8 @@ class TestCounterpartPairing:  # pylint: disable=too-many-instance-attributes
                           f'data/chunk0/{file_name}_.txt'))
 
     def test_pair_sources(self):  # pylint: disable=too-many-statements
-        os.system(f'rm -r {self.joint_folder_path}/pairing')
-        os.makedirs(f'{self.joint_folder_path}/pairing', exist_ok=True)
-        os.system(f'rm -r {self.joint_folder_path}/reject/*')
+        # pylint: disable=no-member
+        os.system(f'rm -r {self.joint_folder_path}/*')
         # Same run as test_source_pairing, but called from CrossMatch rather than
         # directly this time.
         self._setup_cross_match_parameters()
@@ -599,26 +601,26 @@ class TestCounterpartPairing:  # pylint: disable=too-many-instance-attributes
         mcff = Macauff(self.cm)
         mcff.pair_sources()
 
-        bflux = np.load(f'{self.joint_folder_path}/pairing/bcontamflux.npy')
+        bflux = self.cm.bcontamflux
         assert np.all(bflux == np.zeros((2), float))
 
-        a_matches = np.load(f'{self.joint_folder_path}/pairing/ac.npy')
+        a_matches = self.cm.ac
         assert np.all([q in a_matches for q in [0, 1]])
         assert np.all([q not in a_matches for q in [2, 3, 4, 5, 6]])
 
-        a_field = np.load(f'{self.joint_folder_path}/pairing/af.npy')
+        a_field = self.cm.af
         assert np.all([q in a_field for q in [2, 3, 4, 5, 6]])
         assert np.all([q not in a_field for q in [0, 1]])
 
-        b_matches = np.load(f'{self.joint_folder_path}/pairing/bc.npy')
+        b_matches = self.cm.bc
         assert np.all([q in b_matches for q in [0, 1]])
         assert np.all([q not in b_matches for q in [2, 3]])
 
-        b_field = np.load(f'{self.joint_folder_path}/pairing/bf.npy')
+        b_field = self.cm.bf
         assert np.all([q in b_field for q in [2, 3]])
         assert np.all([q not in b_field for q in [0, 1]])
 
-        prob_counterpart = np.load(f'{self.joint_folder_path}/pairing/pc.npy')
+        prob_counterpart = self.cm.pc
         self._calculate_prob_integral()
         _integral = self.nc*self.g*self.nfa + self.nc*self.g_wrong*self.nfa + \
             self.nfa*self.nfa*self.nfb
@@ -626,23 +628,23 @@ class TestCounterpartPairing:  # pylint: disable=too-many-instance-attributes
         norm_prob = _prob/_integral
         q = np.where(a_matches == 0)[0][0]
         assert_allclose(prob_counterpart[q], norm_prob, rtol=1e-5)
-        xicrpts = np.load(f'{self.joint_folder_path}/pairing/xi.npy')
+        xicrpts = self.cm.xi
         assert_allclose(xicrpts[q], np.array([np.log10(self.g / self.fa_priors[0, 0, 0])]),
                         rtol=1e-6)
 
-        prob_a_field = np.load(f'{self.joint_folder_path}/pairing/pfa.npy')
-        a_field = np.load(f'{self.joint_folder_path}/pairing/af.npy')
+        prob_a_field = self.cm.pfa
+        a_field = self.cm.af
         q = np.where(a_field == 6)[0][0]
         assert prob_a_field[q] == 1
 
-        prob_b_field = np.load(f'{self.joint_folder_path}/pairing/pfb.npy')
-        b_field = np.load(f'{self.joint_folder_path}/pairing/bf.npy')
+        prob_b_field = self.cm.pfb
+        b_field = self.cm.bf
         q = np.where(b_field == 2)[0][0]
         assert prob_b_field[q] == 1
 
-        afs = np.load(f'{self.joint_folder_path}/pairing/afieldseps.npy')
-        afeta = np.load(f'{self.joint_folder_path}/pairing/afieldeta.npy')
-        afxi = np.load(f'{self.joint_folder_path}/pairing/afieldxi.npy')
+        afs = self.cm.afieldseps
+        afeta = self.cm.afieldeta
+        afxi = self.cm.afieldxi
         q = np.where(a_field == 2)[0][0]
         fake_field_sep = np.sqrt(((self.a_astro[2, 0] -
                                    self.b_astro[3, 0])*np.cos(np.radians(self.b_astro[3, 1])))**2 +

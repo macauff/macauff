@@ -47,7 +47,6 @@ def make_perturb_aufs(cm, which_cat):
 
     # Extract the single-catalogue values for determining the perturbation
     # component of the AUF.
-    cat_folder = getattr(cm, f'{which_cat}_cat_folder_path')
     auf_folder = getattr(cm, f'{which_cat}_auf_folder_path')
     auf_points = getattr(cm, f'{which_cat}_auf_region_points')
     filters = getattr(cm, f'{which_cat}_filt_names')
@@ -87,9 +86,16 @@ def make_perturb_aufs(cm, which_cat):
             ab_offsets = getattr(cm, f'{which_cat}_gal_aboffsets')
             filter_names = getattr(cm, f'{which_cat}_gal_filternames')
 
-    a_tot_astro = np.load(f'{cat_folder}/con_cat_astro.npy')
+        # Extract either dummy or real TRILEGAL histogram lists.
+        dens_hist_tri = getattr(cm, f'{which_cat}_dens_hist_tri_list')
+        tri_model_mags = getattr(cm, f'{which_cat}_tri_model_mags_list')
+        tri_model_mag_mids = getattr(cm, f'{which_cat}_tri_model_mag_mids_list')
+        tri_model_mags_interval = getattr(cm, f'{which_cat}_tri_model_mags_interval_list')
+        tri_n_bright_sources_star = getattr(cm, f'{which_cat}_tri_n_bright_sources_star_list')
+
+    a_tot_astro = getattr(cm, f'{which_cat}_astro')
     if cm.include_perturb_auf:
-        a_tot_photo = np.load(f'{cat_folder}/con_cat_photo.npy')
+        a_tot_photo = getattr(cm, f'{which_cat}_photo')
 
     n_sources = len(a_tot_astro)
 
@@ -117,9 +123,12 @@ def make_perturb_aufs(cm, which_cat):
 
     for i, auf_point in enumerate(auf_points):
         ax1, ax2 = auf_point
-        ax_folder = f'{auf_folder}/{ax1}/{ax2}'
-        if not os.path.exists(ax_folder):
-            os.makedirs(ax_folder, exist_ok=True)
+        if auf_folder is not None:
+            ax_folder = f'{auf_folder}/{ax1}/{ax2}'
+            if not os.path.exists(ax_folder):
+                os.makedirs(ax_folder, exist_ok=True)
+        else:
+            ax_folder = None
 
         if cm.include_perturb_auf:
             sky_cut = modelrefinds[2, :] == i
@@ -143,7 +152,7 @@ def make_perturb_aufs(cm, which_cat):
         # If there are no sources in this entire section of sky, we don't need
         # to bother downloading any TRILEGAL simulations since we'll auto-fill
         # dummy data (and never use it) in the filter loop.
-        if cm.include_perturb_auf and len(a_astro_cut) > 0 and (
+        if auf_folder is not None and cm.include_perturb_auf and len(a_astro_cut) > 0 and (
                 tri_download_flag or not os.path.isfile(f'{ax_folder}/trilegal_auf_simulation_faint.dat')):
             # Currently assume that the area of each small patch is a rectangle
             # on the sky, implicitly assuming that the large region is also a
@@ -206,17 +215,23 @@ def make_perturb_aufs(cm, which_cat):
                 ax2_list = np.linspace(ax2_min, ax2_max, 7)
                 if fit_gal_flag:
                     single_perturb_auf_output = create_single_perturb_auf(
-                        ax_folder, auf_points[i], cm.r, cm.dr, cm.j0s, num_trials, psf_fwhms[j],
-                        tri_filt_names[j], dens_mags[j], a_photo, localn, d_mag, delta_mag_cuts, dd_params,
-                        l_cut, run_fw, run_psf, snr_mag_params[j], al_avs[j], auf_region_frame, ax1_list,
-                        ax2_list, fit_gal_flag, cmau_array, wavs[j], z_maxs[j], nzs[j], alpha0, alpha1,
-                        alpha_weight, ab_offsets[j], filter_names[j])
+                        auf_points[i], cm.r, cm.dr, cm.j0s, num_trials, psf_fwhms[j], dens_mags[j], a_photo,
+                        localn, d_mag, delta_mag_cuts, dd_params, l_cut, run_fw, run_psf, snr_mag_params[j],
+                        al_avs[j], auf_region_frame, ax1_list, ax2_list, fit_gal_flag, cmau_array, wavs[j],
+                        z_maxs[j], nzs[j], alpha0, alpha1, alpha_weight, ab_offsets[j], filter_names[j],
+                        tri_folder=ax_folder, filt_header=tri_filt_names[j], dens_hist_tri=dens_hist_tri[j],
+                        model_mags=tri_model_mags[j], model_mag_mids=tri_model_mag_mids[j],
+                        model_mags_interval=tri_model_mags_interval[j],
+                        n_bright_sources_star=tri_n_bright_sources_star[j])
                 else:
                     single_perturb_auf_output = create_single_perturb_auf(
-                        ax_folder, auf_points[i], cm.r, cm.dr, cm.j0s, num_trials, psf_fwhms[j],
-                        tri_filt_names[j], dens_mags[j], a_photo, localn, d_mag, delta_mag_cuts, dd_params,
-                        l_cut, run_fw, run_psf, snr_mag_params[j], al_avs[j], auf_region_frame, ax1_list,
-                        ax2_list, fit_gal_flag)
+                        auf_points[i], cm.r, cm.dr, cm.j0s, num_trials, psf_fwhms[j], dens_mags[j], a_photo,
+                        localn, d_mag, delta_mag_cuts, dd_params, l_cut, run_fw, run_psf, snr_mag_params[j],
+                        al_avs[j], auf_region_frame, ax1_list, ax2_list, fit_gal_flag, tri_folder=ax_folder,
+                        filt_header=tri_filt_names[j], dens_hist_tri=dens_hist_tri[j],
+                        model_mags=tri_model_mags[j], model_mag_mids=tri_model_mag_mids[j],
+                        model_mags_interval=tri_model_mags_interval[j],
+                        n_bright_sources_star=tri_n_bright_sources_star[j])
                 perturb_auf_outputs[perturb_auf_combo] = single_perturb_auf_output
             else:
                 # Without the simulations to force local normalising density N or
@@ -287,9 +302,9 @@ def make_perturb_aufs(cm, which_cat):
     sys.stdout.flush()
 
     if cm.include_perturb_auf:
-        a = np.load(f'{cat_folder}/con_cat_photo.npy')
+        a = getattr(cm, f'{which_cat}_photo')
         localn = local_n
-    magref = np.load(f'{cat_folder}/magref.npy')
+    magref = getattr(cm, f'{which_cat}_magref')
 
     if cm.include_perturb_auf:
         for i in range(0, len(a)):
@@ -575,20 +590,19 @@ def calculate_local_density(a_astro, a_tot_astro, a_tot_photo, density_radius, d
 
 
 # pylint: disable=too-many-locals,too-many-arguments
-def create_single_perturb_auf(tri_folder, auf_point, r, dr, j0s, num_trials, psf_fwhm, filt_header,
+def create_single_perturb_auf(auf_point, r, dr, j0s, num_trials, psf_fwhm,
                               density_mag, a_photo, localn, d_mag, mag_cut, dd_params, l_cut, run_fw, run_psf,
                               snr_mag_params, al_av, region_frame, ax1s, ax2s, fit_gal_flag, cmau_array=None,
                               wav=None, z_max=None, nz=None, alpha0=None, alpha1=None, alpha_weight=None,
-                              ab_offset=None, filter_name=None):
+                              ab_offset=None, filter_name=None, tri_folder=None, filt_header=None,
+                              dens_hist_tri=None, model_mags=None, model_mag_mids=None,
+                              model_mags_interval=None, n_bright_sources_star=None):
     r'''
     Creates the associated parameters for describing a single perturbation AUF
     component, for a single sky position.
 
     Parameters
     ----------
-    tri_folder : string
-        Folder where the TRILEGAL datafile is stored, and where the individual
-        filter-specific perturbation AUF simulations should be saved.
     auf_point : numpy.ndarray
         The orthogonal sky coordinates of the simulated AUF component.
     r : numpy.ndarray
@@ -603,8 +617,6 @@ def create_single_perturb_auf(tri_folder, auf_point, r, dr, j0s, num_trials, psf
         when simulating perturbations of source positions.
     psf_fwhm : float
         The full-width at half maxima of the ``filt`` filter.
-    header : float
-        The filter name, as given by the TRILEGAL datafile, for this simulation.
     density_mag : float
         The limiting magnitude above which to consider local normalising densities,
         corresponding to the ``filt`` bandpass.
@@ -679,6 +691,32 @@ def create_single_perturb_auf(tri_folder, auf_point, r, dr, j0s, num_trials, psf
     filter_name : string, optional
         The ``speclite`` style ``group_name-band_name`` name for the filter,
         for use in the creation of simulated galaxy counts.
+    tri_folder : string or None, optional
+        Folder where the TRILEGAL datafile is stored, and where the individual
+        filter-specific perturbation AUF simulations should be saved. Must be
+        provided if not providing pre-computed TRILEGAL magnitude counts.
+    filt_header : float or None, optional
+        The filter name, as given by the TRILEGAL datafile, for this simulation.
+        Must be provided along with ``tri_folder``, or must be ``None`` if
+        ``tri_folder`` is ``None``.
+    dens_hist_tri : list or numpy.ndarray or None, optional
+        A pre-computed list of densities (per square degree per magnitude) of
+        simulated star counts, such as from TRILEGAL, and the output from
+        ``make_tri_counts``. Must be provided if ``tri_folder`` is ``None`` and
+        be ``None`` is ``tri_folder`` is specified.
+    model_mags : list or numpy.ndarray or None, optional
+        Left-hand bin edges of magnitudes of star differential source counts.
+        Must be given if ``dens_hist_tri`` is given, otherwise be ``None``.
+    model_mag_mids : list or numpy.ndarray or None, optional
+        Magnitude bin centres of star differential source counts. Must be given
+        if ``dens_hist_tri`` is given, otherwise be ``None``.
+    model_mags_interval : list or numpy.ndarray or None, optional
+        Widths of magnitude bins of star differential source counts. Must be
+        given if ``dens_hist_tri`` is given, otherwise be ``None``.
+    n_bright_sources_star : integer or None, optional
+        Number of sources above a specified magnitude limit ``density_mag``
+        for resolution purposes, as given by ``make_tri_counts``. Must be given
+        if ``dens_hist_tri`` is given, otherwise be ``None``.
 
     Returns
     -------
@@ -694,7 +732,8 @@ def create_single_perturb_auf(tri_folder, auf_point, r, dr, j0s, num_trials, psf
 
     '''
     # TODO: extend to allow a Galactic source model that doesn't depend on TRILEGAL  pylint: disable=fixme
-    tri_name = 'trilegal_auf_simulation'
+    if tri_folder is not None:
+        tri_name = 'trilegal_auf_simulation'
     avs = np.empty((len(ax1s), len(ax2s)), float)
     for j, ax1 in enumerate(ax1s):
         for k, ax2 in enumerate(ax2s):
@@ -706,10 +745,11 @@ def create_single_perturb_auf(tri_folder, auf_point, r, dr, j0s, num_trials, psf
             av = get_av_infinity(l, b, frame='galactic')[0]
             avs[j, k] = av
     avs = avs.flatten()
-    (dens_hist_tri, model_mags, model_mag_mids, model_mags_interval, _,
-     n_bright_sources_star) = make_tri_counts(
-        tri_folder, tri_name, filt_header, d_mag, np.amin(a_photo), density_mag, al_av=al_av,
-        av_grid=avs)
+    if tri_folder is not None:
+        (dens_hist_tri, model_mags, model_mag_mids, model_mags_interval, _,
+         n_bright_sources_star) = make_tri_counts(
+            tri_folder, tri_name, filt_header, d_mag, np.amin(a_photo), density_mag, al_av=al_av,
+            av_grid=avs)
 
     log10y_tri = -np.inf * np.ones_like(dens_hist_tri)
     log10y_tri[dens_hist_tri > 0] = np.log10(dens_hist_tri[dens_hist_tri > 0])

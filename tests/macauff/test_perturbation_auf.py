@@ -3,7 +3,7 @@
 Tests for the "perturbation_auf" module.
 '''
 
-# pylint: disable=too-many-lines
+# pylint: disable=too-many-lines,duplicate-code
 
 import os
 
@@ -36,10 +36,6 @@ class TestCreatePerturbAUF:
         os.makedirs('gaia_folder', exist_ok=True)
         os.makedirs('wise_folder', exist_ok=True)
         os.makedirs('test_path', exist_ok=True)
-        for path, n in zip(['gaia_folder', 'wise_folder'], [3, 4]):
-            np.save(f'{path}/con_cat_astro.npy', np.array([[1, 1, 1]]))
-            np.save(f'{path}/con_cat_photo.npy', np.array([[1] * n]))
-            np.save(f'{path}/magref.npy', np.array([1]))
         self.cm = CrossMatch(os.path.join(os.path.dirname(__file__), 'data'))
         self.cm._initialise_chunk(os.path.join(os.path.dirname(__file__), 'data/crossmatch_params.txt'),
                                   os.path.join(os.path.dirname(__file__), 'data/cat_a_params.txt'),
@@ -49,23 +45,23 @@ class TestCreatePerturbAUF:
         self.cm.perturb_auf_func = make_perturb_aufs
 
     def test_no_perturb_outputs(self):
+        # pylint: disable=no-member
         # Randomly generate two catalogues (x3 files) between coordinates
         # 0, 0 and 50, 50.
         rng = np.random.default_rng()
-        for path, nf, size in zip([self.cm.a_cat_folder_path, self.cm.b_cat_folder_path], [3, 4],
-                                  [25, 54]):
+        for nf, size in zip([3, 4], [25, 54]):
             cat = np.zeros((size, 3), float)
             rand_inds = rng.permutation(cat.shape[0])[:size // 2 - 1]
             cat[rand_inds, 0] = 50
             cat[rand_inds, 1] = 50
             cat += rng.uniform(-0.1, 0.1, cat.shape)
-            np.save(f'{path}/con_cat_astro.npy', cat)
+            setattr(self.cm, f"{'a' if size == 25 else 'b'}_astro", cat)
 
             cat = rng.uniform(10, 20, (size, nf))
-            np.save(f'{path}/con_cat_photo.npy', cat)
+            setattr(self.cm, f"{'a' if size == 25 else 'b'}_photo", cat)
 
             cat = rng.choice(nf, size=(size,))
-            np.save(f'{path}/magref.npy', cat)
+            setattr(self.cm, f"{'a' if size == 25 else 'b'}_magref", cat)
 
         self.cm.include_perturb_auf = False
         self.cm.chunk_id = 1
@@ -93,10 +89,10 @@ class TestCreatePerturbAUF:
 
         file = self.cm.a_modelrefinds
         assert np.all(file[0, :] == 0)
-        assert np.all(file[1, :] == np.load(f'{self.cm.a_cat_folder_path}/magref.npy'))
+        assert np.all(file[1, :] == self.cm.a_magref)
 
         # Select AUF pointing index based on a 0 vs 50 cut in longitude.
-        cat = np.load(f'{self.cm.a_cat_folder_path}/con_cat_astro.npy')
+        cat = self.cm.a_astro
         inds = np.ones(file.shape[1], int)
         inds[np.where(cat[:, 0] < 1)[0]] = 0
         assert np.all(file[2, :] == inds)
@@ -456,11 +452,6 @@ class TestMakePerturbAUFs():
     def test_create_single_low_numbers(self):
         density_radius = np.sqrt(1 / np.pi / np.exp(8.7))
 
-        np.save(f'{self.cat_folder}/con_cat_astro.npy', np.array([[0.3, 0.3, 0.1]] * 101))
-        np.save(f'{self.cat_folder}/con_cat_photo.npy',
-                np.array([np.concatenate(([14.99], [100]*100))]).T)
-        np.save(f'{self.cat_folder}/magref.npy', np.array([0] * 101))
-
         d_mag = 0.1
 
         # Fake up a TRILEGAL simulation data file.
@@ -509,6 +500,14 @@ class TestMakePerturbAUFs():
         self.fake_cm.b_snr_mag_params = snr_mag_params
         self.fake_cm.b_gal_al_avs = [0]
         self.fake_cm.b_download_tri = False
+        self.fake_cm.b_astro = np.array([[0.3, 0.3, 0.1]] * 101)
+        self.fake_cm.b_photo = np.array([np.concatenate(([14.99], [100]*100))]).T
+        self.fake_cm.b_magref = np.array([0] * 101)
+        self.fake_cm.b_dens_hist_tri_list = [None] * len(self.filters)
+        self.fake_cm.b_tri_model_mags_list = [None] * len(self.filters)
+        self.fake_cm.b_tri_model_mag_mids_list = [None] * len(self.filters)
+        self.fake_cm.b_tri_model_mags_interval_list = [None] * len(self.filters)
+        self.fake_cm.b_tri_n_bright_sources_star_list = [None] * len(self.filters)
 
         with pytest.raises(ValueError, match="The number of simulated objects in this sky patch "):
             make_perturb_aufs(self.fake_cm, 'b')
@@ -523,14 +522,6 @@ class TestMakePerturbAUFs():
         density_radius = np.sqrt(1 / np.pi / np.exp(9.38))
 
         new_auf_points = np.vstack((self.auf_points, np.array([[10, 10]])))
-
-        # Have to fudge extra sources to keep our 15th mag source in the local
-        # density cutout.
-        np.save(f'{self.cat_folder}/con_cat_astro.npy',
-                np.concatenate(([0.3, 0.3, 0.1] * 101, [0.1, 0.1, 0.1], [0.9, 0.9, 0.1])).reshape(-1, 3))
-        np.save(f'{self.cat_folder}/con_cat_photo.npy',
-                np.array([np.concatenate(([14.99], [100]*100, [10], [10]))]).T)
-        np.save(f'{self.cat_folder}/magref.npy', np.array([0] * 103))
 
         d_mag = 0.1
 
@@ -572,8 +563,9 @@ class TestMakePerturbAUFs():
             if mag > 17:
                 keep_flux = np.zeros((1,), float)
 
+            photo_array = np.array([np.concatenate(([14.99], [100]*100, [10], [10]))]).T
             # Catalogue bins for the source:
-            a_photo = np.load(f'{self.cat_folder}/con_cat_photo.npy')[0, :]
+            a_photo = photo_array[0, :]
             dmag = 0.25
             mag_min = dmag * np.floor(np.amin(a_photo[0])/dmag)
             mag_max = dmag * np.ceil(np.amax(a_photo[0])/dmag)
@@ -615,6 +607,17 @@ class TestMakePerturbAUFs():
             self.fake_cm.b_l_cut = l_cut
             self.fake_cm.b_gal_al_avs = [0]
             self.fake_cm.b_download_tri = False
+            self.fake_cm.b_dens_hist_tri_list = [None] * len(self.filters)
+            self.fake_cm.b_tri_model_mags_list = [None] * len(self.filters)
+            self.fake_cm.b_tri_model_mag_mids_list = [None] * len(self.filters)
+            self.fake_cm.b_tri_model_mags_interval_list = [None] * len(self.filters)
+            self.fake_cm.b_tri_n_bright_sources_star_list = [None] * len(self.filters)
+            # Have to fudge extra sources to keep our 15th mag source in the local
+            # density cutout.
+            self.fake_cm.b_astro = np.concatenate(
+                ([0.3, 0.3, 0.1] * 101, [0.1, 0.1, 0.1], [0.9, 0.9, 0.1])).reshape(-1, 3)
+            self.fake_cm.b_photo = photo_array
+            self.fake_cm.b_magref = np.array([0] * 103)
             _, p_a_o = make_perturb_aufs(self.fake_cm, 'b')
 
             perturb_auf_combo = f'{ax1}-{ax2}-{self.filters[0]}'
@@ -652,7 +655,9 @@ class TestMakePerturbAUFs():
                                 prob_2_draw*2*df), rtol=0.1, atol=0.005)
 
     @pytest.mark.remote_data
-    def test_compute_local_density(self):
+    @pytest.mark.parametrize("precompute_tri_hists", [True, False])
+    def test_compute_local_density(self, precompute_tri_hists):
+        # pylint: disable=no-member
         # Number of sources per PSF circle, on average, solved backwards to ensure
         # that local density ends up exactly in the middle of a count_array bin.
         # This should be approximately 0.076 sources per PSF circle.
@@ -777,11 +782,64 @@ class TestMakePerturbAUFs():
         np.save('a_snr_mag/snr_mag_params.npy', np.array([[[0.0109, 46.08, 0.119, 130, 0]]]))
         np.save('b_snr_mag/snr_mag_params.npy', np.array([[[0.0109, 46.08, 0.119, 130, 0]]]))
 
+        # Fake this the easy way both times, then below correct the parameters
+        # for the precompute_hist version of the test.
+        with open(os.path.join(os.path.dirname(__file__), 'data/cat_a_params_.txt'),
+                  encoding='utf-8') as file:
+            f = file.readlines()
+        old_line = 'auf_folder_path = auf_folder'
+        new_line = ('auf_folder_path = auf_folder\ndens_hist_tri_location = None\n'
+                    'tri_model_mags_location = None\ntri_model_mag_mids_location = None\n'
+                    'tri_model_mags_interval_location = None\ntri_dens_uncert_location = None\n'
+                    'tri_n_bright_sources_star_location = None\n')
+        idx = np.where([old_line in line for line in f])[0][0]
+        _replace_line(os.path.join(os.path.dirname(__file__), 'data/cat_a_params_.txt'), idx, new_line)
+        with open(os.path.join(os.path.dirname(__file__), 'data/cat_b_params_.txt'),
+                  encoding='utf-8') as file:
+            f = file.readlines()
+        old_line = 'auf_folder_path = auf_folder'
+        new_line = ('auf_folder_path = auf_folder\ndens_hist_tri_location = None\n'
+                    'tri_model_mags_location = None\ntri_model_mag_mids_location = None\n'
+                    'tri_model_mags_interval_location = None\ntri_dens_uncert_location = None\n'
+                    'tri_n_bright_sources_star_location = None\n')
+        idx = np.where([old_line in line for line in f])[0][0]
+        _replace_line(os.path.join(os.path.dirname(__file__), 'data/cat_b_params_.txt'), idx, new_line)
+
         cm = CrossMatch(os.path.join(os.path.dirname(__file__), 'data'))
         cm._initialise_chunk(os.path.join(os.path.dirname(__file__),
                                           'data/crossmatch_params_.txt'),
                              os.path.join(os.path.dirname(__file__), 'data/cat_a_params_.txt'),
                              os.path.join(os.path.dirname(__file__), 'data/cat_b_params_.txt'))
+
+        if precompute_tri_hists:
+            for flag in ['a_', 'b_']:
+                _a_photo = np.load(f'{self.cat_folder}/con_cat_photo.npy')
+                hist, bins = np.histogram(_a_photo[~np.isnan(_a_photo)], bins='auto')
+                dens_mag = (bins[:-1]+np.diff(bins)/2)[np.argmax(hist)] - 0.5
+                dens, tri_mags, tri_mags_mids, dtri_mags, _, num_bright_obj = make_tri_counts(
+                    f'{self.auf_folder}/{new_auf_points[0][0]}/{new_auf_points[0][1]}/',
+                    'trilegal_auf_simulation', getattr(cm, f'{flag}tri_filt_names')[0], cm.d_mag,
+                    np.amin(a_photo), dens_mag)
+                setattr(cm, f'{flag}dens_hist_tri_list', [dens])
+                setattr(cm, f'{flag}tri_model_mags_list', [tri_mags])
+                setattr(cm, f'{flag}tri_model_mag_mids_list', [tri_mags_mids])
+                setattr(cm, f'{flag}tri_model_mags_interval_list', [dtri_mags])
+                setattr(cm, f'{flag}tri_n_bright_sources_star_list', [num_bright_obj])
+
+            cm.a_auf_folder_path = None
+            cm.b_auf_folder_path = None
+            cm.a_tri_set_name = None
+            cm.b_tri_set_name = None
+            cm.a_tri_maglim_faint = None
+            cm.b_tri_maglim_faint = None
+            cm.a_tri_num_faint = None
+            cm.b_tri_num_faint = None
+            cm.a_download_tri = None
+            cm.b_download_tri = None
+            cm.a_tri_filt_num = None
+            cm.b_tri_filt_num = None
+            cm.a_tri_filt_names = [None] * len(cm.a_tri_filt_names)
+            cm.b_tri_maglim_faint = [None] * len(cm.b_tri_filt_names)
 
         cm.a_auf_region_points = new_auf_points
         cm.b_auf_region_points = new_auf_points
@@ -947,6 +1005,27 @@ class TestMakePerturbAUFs():
         os.makedirs('b_snr_mag', exist_ok=True)
         np.save('a_snr_mag/snr_mag_params.npy', np.array([[[0.0109, 46.08, 0.119, 130, 0]]]))
         np.save('b_snr_mag/snr_mag_params.npy', np.array([[[0.0109, 46.08, 0.119, 130, 0]]]))
+
+        with open(os.path.join(os.path.dirname(__file__), 'data/cat_a_params_.txt'),
+                  encoding='utf-8') as file:
+            f = file.readlines()
+        old_line = 'auf_folder_path = auf_folder'
+        new_line = ('auf_folder_path = auf_folder\ndens_hist_tri_location = None\n'
+                    'tri_model_mags_location = None\ntri_model_mag_mids_location = None\n'
+                    'tri_model_mags_interval_location = None\ntri_dens_uncert_location = None\n'
+                    'tri_n_bright_sources_star_location = None\n')
+        idx = np.where([old_line in line for line in f])[0][0]
+        _replace_line(os.path.join(os.path.dirname(__file__), 'data/cat_a_params_.txt'), idx, new_line)
+        with open(os.path.join(os.path.dirname(__file__), 'data/cat_b_params_.txt'),
+                  encoding='utf-8') as file:
+            f = file.readlines()
+        old_line = 'auf_folder_path = auf_folder'
+        new_line = ('auf_folder_path = auf_folder\ndens_hist_tri_location = None\n'
+                    'tri_model_mags_location = None\ntri_model_mag_mids_location = None\n'
+                    'tri_model_mags_interval_location = None\ntri_dens_uncert_location = None\n'
+                    'tri_n_bright_sources_star_location = None\n')
+        idx = np.where([old_line in line for line in f])[0][0]
+        _replace_line(os.path.join(os.path.dirname(__file__), 'data/cat_b_params_.txt'), idx, new_line)
 
         cm = CrossMatch(os.path.join(os.path.dirname(__file__), 'data'))
         cm._initialise_chunk(os.path.join(os.path.dirname(__file__),

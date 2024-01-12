@@ -91,14 +91,15 @@ class TestOneSidedPhotometricLikelihood:
         a.use_phot_priors = self.include_phot_like
         a.rank = 0
         a.chunk_id = 1
+        a.a_astro = self.a_astro
+        a.a_photo = self.a_photo
+        a.b_astro = self.b_astro
+        a.b_photo = self.b_photo
 
         return a
 
     def test_compute_photometric_likelihoods(self):
         na, nb, area = self.na, self.nb, self.area
-        for folder, name in zip([self.a_cat_folder_path, self.b_cat_folder_path], ['a', 'b']):
-            np.save(f'{folder}/con_cat_astro.npy', getattr(self, f'{name}_astro'))
-            np.save(f'{folder}/con_cat_photo.npy', getattr(self, f'{name}_photo'))
         fake_cm = self.make_class()
         compute_photometric_likelihoods(fake_cm)
 
@@ -124,10 +125,9 @@ class TestOneSidedPhotometricLikelihood:
 
         abins = fake_cm.abinsarray
         bbins = fake_cm.bbinsarray
-        for folder, filts, _bins in zip([self.a_cat_folder_path, self.b_cat_folder_path],
-                                        [self.afilts, self.bfilts], [abins, bbins]):
-            a = np.load(f'{folder}/con_cat_astro.npy')
-            b = np.load(f'{folder}/con_cat_photo.npy')
+        for which_cat, filts, _bins in zip(['a', 'b'], [self.afilts, self.bfilts], [abins, bbins]):
+            a = getattr(fake_cm, f'{which_cat}_astro')  # np.load(f'{folder}/con_cat_astro.npy')
+            b = getattr(fake_cm, f'{which_cat}_photo')  # np.load(f'{folder}/con_cat_photo.npy')
             for i, (ax1, ax2) in enumerate(self.cf_points):
                 q = ((a[:, 0] >= ax1-0.5) & (a[:, 0] <= ax1+0.5) &
                      (a[:, 1] >= ax2-0.5) & (a[:, 1] <= ax2+0.5))
@@ -144,12 +144,9 @@ class TestOneSidedPhotometricLikelihood:
         q = ((self.b_astro[:, 0] >= ax1_1) & (self.b_astro[:, 0] <= ax1_2) &
              (self.b_astro[:, 1] >= ax2_1) & (self.b_astro[:, 1] <= ax2_2))
         a[q, 2] = np.nan
-        var = [[self.a_astro, self.a_photo], [self.b_astro, a]]
-        for folder, obj in zip([self.a_cat_folder_path, self.b_cat_folder_path], var):
-            np.save(f'{folder}/con_cat_astro.npy', obj[0])
-            np.save(f'{folder}/con_cat_photo.npy', obj[1])
 
         fake_cm = self.make_class()
+        fake_cm.b_photo = a
         compute_photometric_likelihoods(fake_cm)
 
         abinlen = fake_cm.abinlengths
@@ -177,12 +174,8 @@ class TestOneSidedPhotometricLikelihood:
         rng = np.random.default_rng(seed)
         a[q, 2] = np.append(rng.uniform(10, 15, (100,)), (np.sum(q)-100)*[np.nan])
 
-        var = [[self.a_astro, self.a_photo], [self.b_astro, a]]
-        for folder, obj in zip([self.a_cat_folder_path, self.b_cat_folder_path], var):
-            np.save(f'{folder}/con_cat_astro.npy', obj[0])
-            np.save(f'{folder}/con_cat_photo.npy', obj[1])
-
         fake_cm = self.make_class()
+        fake_cm.b_photo = a
         compute_photometric_likelihoods(fake_cm)
 
         abinlen = fake_cm.abinlengths
@@ -461,13 +454,14 @@ class TestFullPhotometricLikelihood:  # pylint: disable=too-many-instance-attrib
         a.asize = self.asize
         a.binds = self.binds
         a.bsize = self.bsize
+        a.a_astro = self.a_astro
+        a.a_photo = self.a_photo
+        a.b_astro = self.b_astro
+        a.b_photo = self.b_photo
 
         return a
 
     def test_compute_phot_like(self):
-        for folder, name in zip([self.a_cat_folder_path, self.b_cat_folder_path], ['a', 'b']):
-            np.save(f'{folder}/con_cat_astro.npy', getattr(self, f'{name}_astro'))
-            np.save(f'{folder}/con_cat_photo.npy', getattr(self, f'{name}_photo'))
         fake_cm = self.make_class()
         compute_photometric_likelihoods(fake_cm)
 
@@ -516,9 +510,6 @@ class TestFullPhotometricLikelihood:  # pylint: disable=too-many-instance-attrib
         assert_allclose(c_l, fake_c_l, rtol=0.1, atol=0.05)
 
     def test_compute_phot_like_use_priors_only(self):
-        for folder, name in zip([self.a_cat_folder_path, self.b_cat_folder_path], ['a', 'b']):
-            np.save(f'{folder}/con_cat_astro.npy', getattr(self, f'{name}_astro'))
-            np.save(f'{folder}/con_cat_photo.npy', getattr(self, f'{name}_photo'))
         fake_cm = self.make_class()
         fake_cm.include_phot_like = False
         compute_photometric_likelihoods(fake_cm)
