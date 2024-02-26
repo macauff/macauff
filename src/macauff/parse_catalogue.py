@@ -284,9 +284,9 @@ def npy_to_csv(input_csv_folders, input_match_folder, output_folder, csv_filenam
     match_df = pd.DataFrame(columns=cols, index=np.arange(0, n_matches))
 
     for i in column_name_lists[0]:
-        match_df[i].iloc[:] = cat_a[i].iloc[ac].values
+        match_df.loc[:, i] = cat_a.loc[ac, i].values
     for i in column_name_lists[1]:
-        match_df[i].iloc[:] = cat_b[i].iloc[bc].values
+        match_df.loc[:, i] = cat_b.loc[bc, i].values
     match_df.iloc[:, 6+n_amags+n_bmags] = p
     match_df.iloc[:, 6+n_amags+n_bmags+1] = seps
     match_df.iloc[:, 6+n_amags+n_bmags+2] = eta
@@ -299,10 +299,10 @@ def npy_to_csv(input_csv_folders, input_match_folder, output_folder, csv_filenam
         match_df.iloc[:, 6+n_amags+n_bmags+6+acontprob.shape[0]+i] = bcontprob[i, :]
     if extra_col_name_lists[0] is not None:
         for i in extra_col_name_lists[0]:
-            match_df[i].iloc[:] = cat_a[i].iloc[ac].values
+            match_df.loc[:, i] = cat_a.loc[ac, i].values
     if extra_col_name_lists[1] is not None:
         for i in extra_col_name_lists[1]:
-            match_df[i].iloc[:] = cat_b[i].iloc[bc].values
+            match_df.loc[:, i] = cat_b.loc[bc, i].values
 
     # FIT_SIG are the last 0-2 columns, after [ID+coords(x2)+mag(xN)]x2 +
     # Q match-made columns, plus len(extra_col_name_lists)x2.
@@ -339,7 +339,7 @@ def npy_to_csv(input_csv_folders, input_match_folder, output_folder, csv_filenam
     n_anonmatches = len(af)
     a_nonmatch_df = pd.DataFrame(columns=cols, index=np.arange(0, n_anonmatches))
     for i in column_name_lists[0]:
-        a_nonmatch_df[i].iloc[:] = cat_a[i].iloc[af].values
+        a_nonmatch_df.loc[:, i] = cat_a.loc[af, i].values
     a_nonmatch_df.iloc[:, 3+n_amags] = p
     a_nonmatch_df.iloc[:, 3+n_amags+1] = seps
     a_nonmatch_df.iloc[:, 3+n_amags+2] = afeta
@@ -347,7 +347,7 @@ def npy_to_csv(input_csv_folders, input_match_folder, output_folder, csv_filenam
     a_nonmatch_df.iloc[:, 3+n_amags+4] = a_avg_cont
     if extra_col_name_lists[0] is not None:
         for i in extra_col_name_lists[0]:
-            a_nonmatch_df[i].iloc[:] = cat_a[i].iloc[af].values
+            a_nonmatch_df.loc[:, i] = cat_a.loc[af, i].values
 
     if input_npy_folders[0] is not None:
         ind = (len(column_name_lists[0]) + len(our_columns) +
@@ -373,7 +373,7 @@ def npy_to_csv(input_csv_folders, input_match_folder, output_folder, csv_filenam
     n_bnonmatches = len(bf)
     b_nonmatch_df = pd.DataFrame(columns=cols, index=np.arange(0, n_bnonmatches))
     for i in column_name_lists[1]:
-        b_nonmatch_df[i].iloc[:] = cat_b[i].iloc[bf].values
+        b_nonmatch_df.loc[:, i] = cat_b.loc[bf, i].values
     b_nonmatch_df.iloc[:, 3+n_bmags] = p
     b_nonmatch_df.iloc[:, 3+n_bmags+1] = seps
     b_nonmatch_df.iloc[:, 3+n_bmags+2] = bfeta
@@ -381,7 +381,7 @@ def npy_to_csv(input_csv_folders, input_match_folder, output_folder, csv_filenam
     b_nonmatch_df.iloc[:, 3+n_bmags+4] = b_avg_cont
     if extra_col_name_lists[1] is not None:
         for i in extra_col_name_lists[1]:
-            b_nonmatch_df[i].iloc[:] = cat_b[i].iloc[bf].values
+            b_nonmatch_df.loc[:, i] = cat_b.loc[bf, i].values
 
     if input_npy_folders[1] is not None:
         ind = (len(column_name_lists[1]) + len(our_columns) +
