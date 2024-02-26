@@ -169,8 +169,8 @@ def trilegal_webcall(trilegal_version, l, b, area, binaries, av, sigma_av, filte
     while not complete:  # pylint: disable=too-many-nested-blocks
         notconnected = True
         busy = True
-        print("TRILEGAL is being called with \n l={l} deg, b={b} deg, area={area} sqrdeg\n "
-              "Av={av} with {sigma_av} fractional r.m.s. spread \n in the {filterset} system, complete "
+        print(f"TRILEGAL is being called with \n l={l} deg, b={b} deg, area={area} sqrdeg\n "
+              f"Av={av} with {sigma_av} fractional r.m.s. spread \n in the {filterset} system, complete "
               f"down to mag={maglim} in its {magnum}th filter, use_binaries set to {binaries}.")
         sp.Popen(cmd, shell=True).wait()  # pylint: disable=consider-using-with
         if (os.path.exists(f'{outfolder}/tmpfile') and
