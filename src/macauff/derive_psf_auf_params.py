@@ -861,7 +861,7 @@ class FitPSFPerturbations:
                 diff[i, 2] = _li
                 diff[i, 3] = x
                 diff[i, 4] = dx
-                diff[i, 5] = dx_fit
+                diff[i, 5] = dx_fit[0]
 
         pool.join()
 
