@@ -5,6 +5,7 @@ Tests for the "perturbation_auf" module.
 
 # pylint: disable=too-many-lines,duplicate-code
 
+import math
 import os
 
 import numpy as np
@@ -102,9 +103,9 @@ class TestCreatePerturbAUF:
 def test_perturb_aufs():
     # Poisson distribution with mean 0.08 gives 92.3% zero, 7.4% one, and 0.3% two draws.
     mean = 0.08
-    prob_0_draw = mean**0 * np.exp(-mean) / np.math.factorial(0)
-    prob_1_draw = mean**1 * np.exp(-mean) / np.math.factorial(1)
-    prob_2_draw = mean**2 * np.exp(-mean) / np.math.factorial(2)
+    prob_0_draw = mean**0 * np.exp(-mean) / math.factorial(0)
+    prob_1_draw = mean**1 * np.exp(-mean) / math.factorial(1)
+    prob_2_draw = mean**2 * np.exp(-mean) / math.factorial(2)
 
     n = np.array([1.0])
     m = np.array([0.0])
@@ -553,9 +554,9 @@ class TestMakePerturbAUFs():
                           'trilegal_auf_simulation_faint.dat', "w", encoding='utf-8') as f:
                     f.write(text)
 
-            prob_0_draw = psf_mean**0 * np.exp(-psf_mean) / np.math.factorial(0)
-            prob_1_draw = psf_mean**1 * np.exp(-psf_mean) / np.math.factorial(1)
-            prob_2_draw = psf_mean**2 * np.exp(-psf_mean) / np.math.factorial(2)
+            prob_0_draw = psf_mean**0 * np.exp(-psf_mean) / math.factorial(0)
+            prob_1_draw = psf_mean**1 * np.exp(-psf_mean) / math.factorial(1)
+            prob_2_draw = psf_mean**2 * np.exp(-psf_mean) / math.factorial(2)
 
             ax1, ax2 = self.auf_points[0]
 
@@ -701,9 +702,9 @@ class TestMakePerturbAUFs():
                       'trilegal_auf_simulation_faint.dat', "w", encoding='utf-8') as f:
                 f.write(text)
 
-        prob_0_draw = psf_mean**0 * np.exp(-psf_mean) / np.math.factorial(0)
-        prob_1_draw = psf_mean**1 * np.exp(-psf_mean) / np.math.factorial(1)
-        prob_2_draw = psf_mean**2 * np.exp(-psf_mean) / np.math.factorial(2)
+        prob_0_draw = psf_mean**0 * np.exp(-psf_mean) / math.factorial(0)
+        prob_1_draw = psf_mean**1 * np.exp(-psf_mean) / math.factorial(1)
+        prob_2_draw = psf_mean**2 * np.exp(-psf_mean) / math.factorial(2)
 
         ax1, ax2 = self.auf_points[0]
 
@@ -927,9 +928,9 @@ class TestMakePerturbAUFs():
                       'trilegal_auf_simulation_faint.dat', "w", encoding='utf-8') as f:
                 f.write(text)
 
-        prob_0_draw = psf_mean**0 * np.exp(-psf_mean) / np.math.factorial(0)
-        prob_1_draw = psf_mean**1 * np.exp(-psf_mean) / np.math.factorial(1)
-        prob_2_draw = psf_mean**2 * np.exp(-psf_mean) / np.math.factorial(2)
+        prob_0_draw = psf_mean**0 * np.exp(-psf_mean) / math.factorial(0)
+        prob_1_draw = psf_mean**1 * np.exp(-psf_mean) / math.factorial(1)
+        prob_2_draw = psf_mean**2 * np.exp(-psf_mean) / math.factorial(2)
 
         ax1, ax2 = self.auf_points[0]
 

@@ -4,6 +4,7 @@ Tests for the "make_set_list" module.
 '''
 
 import os
+import warnings
 
 import numpy as np
 import pytest
@@ -55,11 +56,10 @@ def test_set_list_maximum_exceeded():
                               f'{n_b}/{n_b+2} catalogue b stars'):
                 alist, blist, agrplen, bgrplen, _, _ = set_list(a_overlaps, b_overlaps, a_num, b_num, 2)
         else:
-            with pytest.warns(None) as record:
+            with warnings.catch_warnings():
+                warnings.simplefilter("error")
                 # pylint: disable-next=unbalanced-tuple-unpacking
                 alist, blist, agrplen, bgrplen = set_list(a_overlaps, b_overlaps, a_num, b_num, 2)
-            # Should be empty if no warnings were raised.
-            assert not record
         if i != 2:
             assert np.all(agrplen == np.array([1, 1, 0]))
             assert np.all(bgrplen == np.array([1, 0, 1]))

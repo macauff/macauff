@@ -4,6 +4,7 @@ Tests for the "counterpart_pairing" module.
 '''
 
 import itertools
+import math
 import os
 
 import numpy as np
@@ -662,7 +663,7 @@ class TestCounterpartPairing:  # pylint: disable=too-many-instance-attributes
 def test_f90_comb():
     for n in [2, 3, 4, 5]:
         for k in range(2, n+1, 1):
-            n_combs = np.math.factorial(n) / np.math.factorial(k) / np.math.factorial(n - k)
+            n_combs = math.factorial(n) / math.factorial(k) / math.factorial(n - k)
             combs = cpf.calc_combs(n, n_combs, k).T
             new_combs = combs[np.lexsort([combs[:, i] for i in range(k)])]
 
@@ -674,8 +675,8 @@ def test_f90_comb():
 def test_f90_perm_comb():
     for n in [2, 3, 4, 5]:
         for k in range(2, n+1, 1):
-            n_combs = np.math.factorial(n) / np.math.factorial(k) / np.math.factorial(n - k)
-            n_perms_per_comb = np.math.factorial(k)
+            n_combs = math.factorial(n) / math.factorial(k) / math.factorial(n - k)
+            n_perms_per_comb = math.factorial(k)
             perms = cpf.calc_permcombs(n, k, n_perms_per_comb, n_combs).T
             new_perms = perms[np.lexsort([perms[:, i] for i in range(k)])]
 
@@ -688,12 +689,12 @@ def test_f90_perm_comb():
 
 def test_factorial():
     for k in range(21):
-        assert np.math.factorial(k) == cpf.factorial(k, k-1)
-        assert np.math.factorial(k) == cpf.factorial(k, k)
+        assert math.factorial(k) == cpf.factorial(k, k-1)
+        assert math.factorial(k) == cpf.factorial(k, k)
 
     for k in range(21):
         assert cpf.factorial(k, 1) == k
 
     for k in range(21):
         for l in range(1, k+1):
-            assert cpf.factorial(k, l) == np.math.factorial(k) / np.math.factorial(k - l)
+            assert cpf.factorial(k, l) == math.factorial(k) / math.factorial(k - l)
