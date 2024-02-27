@@ -411,8 +411,7 @@ def _clean_overlaps(inds, size, n_pool):
             y = len(unique_inds)
             inds[:y, i] = unique_inds
             inds[y:, i] = -1
-            if y > maxsize:
-                maxsize = y
+            maxsize = max(maxsize, y)
             size[i] = y
 
     pool.join()
