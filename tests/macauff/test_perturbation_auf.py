@@ -502,6 +502,9 @@ class TestMakePerturbAUFs():
         self.fake_cm.b_gal_al_avs = [0]
         self.fake_cm.b_download_tri = False
         self.fake_cm.b_astro = np.array([[0.3, 0.3, 0.1]] * 101)
+        self.fake_cm.b_astro[0, [0, 1]] = [0.3, 0.31]
+        self.fake_cm.b_astro[1, [0, 1]] = [0.31, 0.3]
+        self.fake_cm.b_astro[2, [0, 1]] = [0.31, 0.31]
         self.fake_cm.b_photo = np.array([np.concatenate(([14.99], [100]*100))]).T
         self.fake_cm.b_magref = np.array([0] * 101)
         self.fake_cm.b_dens_hist_tri_list = [None] * len(self.filters)
@@ -617,6 +620,9 @@ class TestMakePerturbAUFs():
             # density cutout.
             self.fake_cm.b_astro = np.concatenate(
                 ([0.3, 0.3, 0.1] * 101, [0.1, 0.1, 0.1], [0.9, 0.9, 0.1])).reshape(-1, 3)
+            self.fake_cm.b_astro[0, [0, 1]] = [0.3, 0.31]
+            self.fake_cm.b_astro[1, [0, 1]] = [0.31, 0.3]
+            self.fake_cm.b_astro[2, [0, 1]] = [0.31, 0.31]
             self.fake_cm.b_photo = photo_array
             self.fake_cm.b_magref = np.array([0] * 103)
             _, p_a_o = make_perturb_aufs(self.fake_cm, 'b')
@@ -672,8 +678,11 @@ class TestMakePerturbAUFs():
 
         # Have to fudge extra sources to keep our 15th mag source in the local
         # density cutout.
-        np.save(f'{self.cat_folder}/con_cat_astro.npy',
-                np.concatenate(([0.3, 0.3, 0.1] * 101, [0.1, 0.1, 0.1], [0.9, 0.9, 0.1])).reshape(-1, 3))
+        x = np.concatenate(([0.3, 0.3, 0.1] * 101, [0.1, 0.1, 0.1], [0.9, 0.9, 0.1])).reshape(-1, 3)
+        x[0, [0, 1]] = [0.3, 0.31]
+        x[1, [0, 1]] = [0.31, 0.3]
+        x[2, [0, 1]] = [0.31, 0.31]
+        np.save(f'{self.cat_folder}/con_cat_astro.npy', x)
         np.save(f'{self.cat_folder}/con_cat_photo.npy',
                 np.array([np.concatenate(([14.99], [100]*100, [10], [10]))]).T)
         np.save(f'{self.cat_folder}/magref.npy', np.array([0] * 103))
@@ -898,8 +907,11 @@ class TestMakePerturbAUFs():
 
         new_auf_points = np.vstack((self.auf_points, np.array([[10, 10]])))
 
-        np.save(f'{self.cat_folder}/con_cat_astro.npy',
-                np.concatenate(([0.3, 0.3, 0.1] * 101, [0.1, 0.1, 0.1], [0.9, 0.9, 0.1])).reshape(-1, 3))
+        x = np.concatenate(([0.3, 0.3, 0.1] * 101, [0.1, 0.1, 0.1], [0.9, 0.9, 0.1])).reshape(-1, 3)
+        x[0, [0, 1]] = [0.3, 0.31]
+        x[1, [0, 1]] = [0.31, 0.3]
+        x[2, [0, 1]] = [0.31, 0.31]
+        np.save(f'{self.cat_folder}/con_cat_astro.npy', x)
         rng = np.random.default_rng(seed=83458923)
         main_mags = rng.uniform(24.95, 25.05, size=100)
         np.save(f'{self.cat_folder}/con_cat_photo.npy',

@@ -30,8 +30,11 @@ if usetex:
 
 # pylint: disable=wrong-import-position,import-error,no-name-in-module
 from macauff.galaxy_counts import create_galaxy_counts
-from macauff.get_trilegal_wrapper import get_av_infinity
-from macauff.misc_functions import convex_hull_area, find_model_counts_corrections, min_max_lon
+from macauff.misc_functions import (
+    convex_hull_area,
+    find_model_counts_corrections,
+    generate_avs_inside_hull,
+    min_max_lon)
 from macauff.misc_functions_fortran import misc_functions_fortran as mff
 from macauff.perturbation_auf import (
     _calculate_magnitude_offsets,
@@ -560,7 +563,8 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
                 self.a = self.load_catalogue('a', self.cat_args)
                 self.b = self.load_catalogue('b', self.cat_args)
 
-            self.area = convex_hull_area(self.b[:, 0], self.b[:, 1])
+            self.area, self.hull_points, self.hull_x_shift = convex_hull_area(
+                self.b[:, 0], self.b[:, 1], return_hull=True)
 
             self.a_array, self.b_array, self.c_array = self.make_snr_model()
             abc_array[:, index_, 0] = self.a_array
@@ -1020,19 +1024,8 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
             os.system(f'mv {self.trifolder}/trilegal_auf_simulation.dat '
                       f'{self.trifolder}/{self.triname.format(ax1_mid, ax2_mid)}_faint.dat')
 
-        ax1s = np.linspace(ax1_min, ax1_max, 7)
-        ax2s = np.linspace(ax2_min, ax2_max, 7)
-        avs = np.empty((len(ax1s), len(ax2s)), float)
-        for j, ax1 in enumerate(ax1s):
-            for k, ax2 in enumerate(ax2s):
-                if self.coord_system == 'equatorial':
-                    c = SkyCoord(ra=ax1, dec=ax2, unit='deg', frame='icrs')
-                    l, b = c.galactic.l.degree, c.galactic.b.degree
-                else:
-                    l, b = ax1, ax2
-                av = get_av_infinity(l, b, frame='galactic')[0]
-                avs[j, k] = av
-        avs = avs.flatten()
+        avs = generate_avs_inside_hull(
+            ax1_min, ax1_max, ax2_min, ax2_max, self.hull_points, self.hull_x_shift, self.coord_system)
 
         if self.trifolder is not None:
             tri_hist, tri_mags, _, dtri_mags, tri_uncert, _ = make_tri_counts(
@@ -1085,9 +1078,9 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
         print('Plotting data and model counts...')
 
         if self.coord_or_chunk == 'coord':
-            ax1_mid, ax2_mid, ax1_min, ax1_max, ax2_min, ax2_max = self.list_of_things
+            ax1_mid, ax2_mid, _, _, _, _ = self.list_of_things
         else:
-            ax1_mid, ax2_mid, ax1_min, ax1_max, ax2_min, ax2_max, _ = self.list_of_things
+            ax1_mid, ax2_mid, _, _, _, _, _ = self.list_of_things
 
         mag_ind = self.mag_indices[self.best_mag_index]
         data_mags = self.b[~np.isnan(self.b[:, mag_ind]), mag_ind]
@@ -1358,10 +1351,6 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
         chi_sq : float
             Chi-squared of the fit, to be minimised in the wrapping function call.
         """
-        if self.coord_or_chunk == 'coord':
-            _, _, ax1_min, ax1_max, ax2_min, ax2_max = self.list_of_things
-        else:
-            _, _, ax1_min, ax1_max, ax2_min, ax2_max, _ = self.list_of_things
         m, n = p
 
         chi_sq = 0
@@ -1455,10 +1444,6 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
         Calculate chi-squared value and create verification plots showing the
         quality of the fits.
         """
-        if self.coord_or_chunk == 'coord':
-            _, _, ax1_min, ax1_max, ax2_min, ax2_max = self.list_of_things
-        else:
-            _, _, ax1_min, ax1_max, ax2_min, ax2_max, _ = self.list_of_things
         x2s = np.ones((len(self.mag_array), 2), float) * np.nan
 
         if self.make_plots:

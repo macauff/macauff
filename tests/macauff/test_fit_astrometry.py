@@ -253,6 +253,8 @@ class TestAstroCorrection:
             ac(a_cat_name=self.a_cat_name, b_cat_name=self.b_cat_name, a_cat_func=a_cat_func,
                b_cat_func=b_cat_func, tri_download=False, make_plots=True, make_summary_plot=True)
 
+        os.system('rm -r store_data')
+
     @pytest.mark.remote_data
     @pytest.mark.parametrize("npy_or_csv,coord_or_chunk,coord_system,pregenerate_cutouts,return_nm,in_memory",
                              [("csv", "chunk", "equatorial", True, False, False),
@@ -391,6 +393,8 @@ class TestAstroCorrection:
             assert_allclose(abc_array[0, 1, 1], -2, atol=0.001)
             assert_allclose(abc_array[0, 1, 3], -4, atol=0.001)
 
+        os.system('rm -r store_data')
+
 
 class TestSNRMagRelation:
     def setup_method(self):
@@ -445,6 +449,8 @@ class TestSNRMagRelation:
             smr(b_cat=None, b_cat_name=None)
         with pytest.raises(ValueError, match="Only one of b_cat and b_cat_name "):
             smr(b_cat=np.array([0]), b_cat_name='name')
+
+        os.system('rm -r store_data')
 
     @pytest.mark.parametrize("npy_or_csv,coord_or_chunk,coord_system,return_nm,in_memory",
                              [("csv", "chunk", "equatorial", True, False),
@@ -554,3 +560,5 @@ class TestSNRMagRelation:
             assert_allclose(abc_array[0, 1, 0], -1, atol=0.001)
             assert_allclose(abc_array[0, 1, 1], -2, atol=0.001)
             assert_allclose(abc_array[0, 1, 3], -4, atol=0.001)
+
+        os.system('rm -r store_data')
