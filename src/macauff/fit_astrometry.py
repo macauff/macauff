@@ -1133,15 +1133,10 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
         """
         print('Creating local densities and nearest neighbour matches...')
 
-        if self.coord_or_chunk == 'coord':
-            _, _, ax1_min, ax1_max, ax2_min, ax2_max = self.list_of_things
-        else:
-            _, _, ax1_min, ax1_max, ax2_min, ax2_max, _ = self.list_of_things
-
         narray = create_densities(
-            self.b, self.minmag, self.maxmag, ax1_min, ax1_max, ax2_min, ax2_max,
-            self.dens_search_radius, self.n_pool, self.mag_indices[self.best_mag_index],
-            self.pos_and_err_indices[1][0], self.pos_and_err_indices[1][1], self.coord_system)
+            self.b, self.minmag, self.maxmag, self.hull_points, self.hull_x_shift, self.dens_search_radius,
+            self.n_pool, self.mag_indices[self.best_mag_index], self.pos_and_err_indices[1][0],
+            self.pos_and_err_indices[1][1], self.coord_system)
 
         _, bmatch, dists = create_distances(
             self.a, self.b, self.nn_radius, self.pos_and_err_indices[0][0], self.pos_and_err_indices[0][1],
@@ -1434,8 +1429,11 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
 
             modely, _, _ = binned_statistic(self.r[:-1]+self.dr/2, tot_model, bins=bins)
 
-            chi_sq += np.sum((y[q] - modely[q])**2 / dy[q]**2)
-            ndof += np.sum(q)
+            # Empty binned_statistic bins return as NaN, drop these from calculations.
+            q_ = q & ~np.isnan(modely)
+
+            chi_sq += np.sum((y[q_] - modely[q_])**2 / dy[q_]**2)
+            ndof += np.sum(q_)
 
         return chi_sq
 
@@ -1687,8 +1685,8 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
         return x
 
 
-def create_densities(b, minmag, maxmag, ax1_min, ax1_max, ax2_min, ax2_max, search_radius,
-                     n_pool, mag_ind, ax1_ind, ax2_ind, coord_system):
+def create_densities(b, minmag, maxmag, hull, hull_x_shift, search_radius, n_pool, mag_ind, ax1_ind, ax2_ind,
+                     coord_system):
     """
     Generate local normalising densities for all sources in catalogue "b".
 
@@ -1703,14 +1701,14 @@ def create_densities(b, minmag, maxmag, ax1_min, ax1_max, ax2_min, ax2_max, sear
     maxmag : float
         Faintest magnitude within which to determine the density of catalogue
         ``b`` objects.
-    ax1_min : float
-        The minimum longitude of the box of the cutout region.
-    ax1_max : float
-        The maximum longitude of the box of the cutout region.
-    ax2_min : float
-        The minimum latitude of the box of the cutout region.
-    ax2_max : float
-        The maximum latitude of the box of the cutout region.
+    hull : numpy.ndarray
+        Array of shape ``(N, 2)``, giving the ``(ax1, ax2)`` coordinates for
+        each of the ``N`` polygon points defining the convex hull of the
+        region in which the objects are contained.
+    hull_x_shift : float
+        Amount by which ``hull`` points were shifted in longitude during
+        area calculation, to avoid 0/360 wraparound issues, and the amount
+        by which coordinates should be moved to mirror "new" coord system.
     search_radius : float
         Radius, in degrees, around which to calculate the density of objects.
         Smaller values will allow for more fluctuations and handle smaller scale
@@ -1788,8 +1786,11 @@ def create_densities(b, minmag, maxmag, ax1_min, ax1_max, ax2_min, ax2_max, sear
 
     pool.join()
 
-    area = paf.get_circle_area_overlap(b[:, ax1_ind], b[:, ax2_ind], search_radius,
-                                       ax1_min, ax1_max, ax2_min, ax2_max)
+    seed = np.random.default_rng().choice(100000, size=(paf.get_random_seed_size(), len(b)))
+
+    area = paf.get_circle_area_overlap(
+        b[:, ax1_ind] + hull_x_shift, b[:, ax2_ind], search_radius,
+        np.append(hull[:, 0], hull[0, 0]), np.append(hull[:, 1], hull[0, 1]), seed)
 
     narray = overlap_number / area
 
