@@ -76,4 +76,130 @@ subroutine calc_j0(r, r0, j0s)
 
 end subroutine calc_j0
 
+subroutine get_circle_area_overlap(cat_ax1, cat_ax2, density_radius, hull_ax1, hull_ax2, seed, circ_overlap_area)
+    ! Calculates the amount of circle overlap with a rectangle of particular coordinates. Adapts
+    ! code provided by B. Retter, from Retter, Hatchell & Naylor (2019, MNRAS, 487, 887).
+    integer, parameter :: dp = kind(0.0d0)  ! double precision
+    ! Coordinates in orthogonal sky axes, and radius of, circles to calculate the overlap with sky position of.
+    real(dp), intent(in) :: cat_ax1(:), cat_ax2(:), density_radius
+    ! Sky coordinates of the points defining the sky cutout region. Note that this should be cyclical, such
+    ! that hull_ax1(1) == hull_ax1(size(hull_ax1)), hull_ax2(1) == hull_ax2(size(hull_ax2)).
+    real(dp), intent(in) :: hull_ax1(:), hull_ax2(:)
+    ! RNG seed.
+    integer, intent(in) :: seed(:, :)
+    ! Relative amount of circle inside rectangle for each unique point.
+    real(dp), intent(out) :: circ_overlap_area(size(cat_ax1))
+
+    ! Loop counters.
+    integer :: i, j, k
+    ! Flags for forks in the logic of calculating circle area.
+    logical :: circle_too_near_edge, hull_point_inside_circle
+    ! Area of circle inside rectangle, coordinates and variables of various calculations.
+    real(dp) :: area, x0, y0, x1, y1, x2, y2, cross_prod, dot_prod, fraction
+    ! Sampled radius and position angles of objects.
+    real(dp) :: r(25000), t(25000)
+    ! Distance between circle and a particular rectangle edge; Haversine distance; amount of circle outside a
+    ! particular rectangle edge; and point-inside-hull parameters.
+    real(dp) :: h, d, chord_area_overlap, sum_of_angles, theta
+
+!$OMP PARALLEL DO DEFAULT(NONE) PRIVATE(i, j, k, area, h, d, chord_area_overlap, sum_of_angles, theta, x0, y0, x1, y1, x2, y2, &
+!$OMP& circle_too_near_edge, hull_point_inside_circle, cross_prod, dot_prod, fraction, r, t) &
+!$OMP& SHARED(density_radius, cat_ax1, cat_ax2, circ_overlap_area, hull_ax1, hull_ax2, seed)
+    do j = 1, size(cat_ax1)
+        call random_seed(put=seed(:, j))
+        ! First, check if the circle overlaps any edges. If not, then we know what the area is trivially.
+        circle_too_near_edge = .false.
+        x0 = cat_ax1(j)
+        y0 = cat_ax2(j)
+        do k = 1, size(hull_ax1)-1
+            x1 = hull_ax1(k)
+            y1 = hull_ax2(k)
+            x2 = hull_ax1(k+1)
+            y2 = hull_ax2(k+1)
+            ! https://mathworld.wolfram.com/Point-LineDistance2-Dimensional.html
+            d = abs((x2 - x1) * (y1 - y0) - (x1 - x0) * (y2 - y1)) / sqrt((x2 - x1)**2 + (y2 - y1)**2)
+            if (d <= density_radius) then
+                circle_too_near_edge = .true.
+                exit
+            end if
+        end do
+
+        if (circle_too_near_edge) then
+            ! Inside the "circle overlaps edges" part, we can see if it's a straight-line overlap or not.
+            hull_point_inside_circle = .false.
+            do k = 1, size(hull_ax1)-1
+                call haversine(hull_ax1(k), x0, hull_ax2(k), y0, d)
+                if (d <= density_radius) then
+                    hull_point_inside_circle = .true.
+                    exit
+                end if
+            end do
+
+            if (hull_point_inside_circle) then
+                ! Draw samples to determine fraction of circle inside polygon of odd shape.
+                call random_number(t(:))
+                call random_number(r(:))
+                t(:) = t(:) * 2.0_dp * pi
+                r(:) = sqrt(r(:)) * density_radius
+                fraction = 0.0_dp
+                do k = 1, size(t)
+                    x0 = cat_ax1(j) + r(k) * cos(t(k))
+                    y0 = cat_ax2(j) + r(k) * sin(t(k))
+                    sum_of_angles = 0.0_dp
+                    do i = 1, size(hull_ax1)-1
+                        x1 = hull_ax1(i) - x0
+                        y1 = hull_ax2(i) - y0
+                        x2 = hull_ax1(i+1) - x0
+                        y2 = hull_ax2(i+1) - y0
+
+                        dot_prod = x1*x2 + y1*y2
+                        cross_prod = x1*y2 - x2*y1
+                        theta = atan2(cross_prod, dot_prod)
+                        sum_of_angles = sum_of_angles + theta
+                    end do
+                    if (abs(sum_of_angles) > pi) then
+                        fraction = fraction + 1.0_dp
+                    end if
+                end do
+                fraction = fraction / real(size(t), dp)
+                area = fraction * pi * density_radius**2
+            else
+                ! If no point directly inside the circle, then the area of missing circle is defined by
+                ! a straight line intersecting the circle, and hence a chord integral. Taking height to
+                ! be sqrt(r**2 - x**2) - h, h being the distance from the circle center to the straight
+                ! line, with x the straight-line-parallel distance from the circle center, we can
+                ! integrate across the chord from x = -sqrt(r**2 - h**2) to +sqrt(r**2 - h**2), giving
+                x0 = cat_ax1(j)
+                y0 = cat_ax2(j)
+                do k = 1, size(hull_ax1)-1
+                    x1 = hull_ax1(k)
+                    y1 = hull_ax2(k)
+                    x2 = hull_ax1(k+1)
+                    y2 = hull_ax2(k+1)
+                    h = abs((x2 - x1) * (y1 - y0) - (x1 - x0) * (y2 - y1)) / sqrt((x2 - x1)**2 + (y2 - y1)**2)
+                    if (h <= density_radius) then
+                        exit
+                    end if
+                end do
+                chord_area_overlap = density_radius**2 * atan(sqrt(density_radius**2 - h**2) / h) - &
+                                     h * sqrt(density_radius**2 - h**2)
+                area = pi * density_radius**2 - chord_area_overlap
+            end if
+        else
+            area = pi * density_radius**2
+        end if
+        circ_overlap_area(j) = area
+    end do
+!$OMP END PARALLEL DO
+
+end subroutine get_circle_area_overlap
+
+subroutine get_random_seed_size(size)
+    ! Number of initial seeds expected by random_seed, to be initialised for a specified RNG setup.
+    integer, intent(out) :: size
+
+    call random_seed(size=size)
+
+end subroutine get_random_seed_size
+
 end module misc_functions_fortran

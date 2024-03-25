@@ -15,7 +15,7 @@ from scipy.optimize import minimize
 from scipy.spatial import ConvexHull  # pylint: disable=no-name-in-module
 
 from macauff.get_trilegal_wrapper import get_av_infinity
-from macauff.perturbation_auf_fortran import perturbation_auf_fortran as paf
+from macauff.misc_functions_fortran import misc_functions_fortran as mff
 
 
 __all__ = []
@@ -666,9 +666,9 @@ def create_densities(b, minmag, maxmag, hull, hull_x_shift, search_radius, n_poo
 
     pool.join()
 
-    seed = np.random.default_rng().choice(100000, size=(paf.get_random_seed_size(), len(b)))
+    seed = np.random.default_rng().choice(100000, size=(mff.get_random_seed_size(), len(b)))
 
-    area = paf.get_circle_area_overlap(
+    area = mff.get_circle_area_overlap(
         b[:, ax1_ind] + hull_x_shift, b[:, ax2_ind], search_radius,
         np.append(hull[:, 0], hull[0, 0]), np.append(hull[:, 1], hull[0, 1]), seed)
 
