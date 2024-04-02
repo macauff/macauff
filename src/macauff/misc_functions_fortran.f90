@@ -98,12 +98,12 @@ subroutine get_circle_area_overlap(cat_ax1, cat_ax2, density_radius, hull_ax1, h
     real(dp) :: area, x0, y0, x1, y1, x2, y2, cross_prod, dot_prod, fraction
     ! Sampled radius and position angles of objects.
     real(dp) :: r(25000), t(25000)
-    ! Distance between circle and a particular rectangle edge; Haversine distance; amount of circle outside a
-    ! particular rectangle edge; and point-inside-hull parameters.
-    real(dp) :: h, d, chord_area_overlap, sum_of_angles, theta
+    ! Distance between circle and a particular rectangle edge; Haversine distance; minimum-vector coordinates;
+    ! amount of circle outside a particular rectangle edge; and point-inside-hull parameters.
+    real(dp) :: h, d, z, s, xn, yn, chord_area_overlap, sum_of_angles, theta
 
-!$OMP PARALLEL DO DEFAULT(NONE) PRIVATE(i, j, k, area, h, d, chord_area_overlap, sum_of_angles, theta, x0, y0, x1, y1, x2, y2, &
-!$OMP& circle_too_near_edge, hull_point_inside_circle, cross_prod, dot_prod, fraction, r, t) &
+!$OMP PARALLEL DO DEFAULT(NONE) PRIVATE(i, j, k, area, h, d, z, s, xn, yn, chord_area_overlap, sum_of_angles, theta, x0, y0, x1, &
+!$OMP& y1, x2, y2, circle_too_near_edge, hull_point_inside_circle, cross_prod, dot_prod, fraction, r, t) &
 !$OMP& SHARED(density_radius, cat_ax1, cat_ax2, circ_overlap_area, hull_ax1, hull_ax2, seed)
     do j = 1, size(cat_ax1)
         call random_seed(put=seed(:, j))
@@ -116,8 +116,25 @@ subroutine get_circle_area_overlap(cat_ax1, cat_ax2, density_radius, hull_ax1, h
             y1 = hull_ax2(k)
             x2 = hull_ax1(k+1)
             y2 = hull_ax2(k+1)
-            ! https://mathworld.wolfram.com/Point-LineDistance2-Dimensional.html
-            d = abs((x2 - x1) * (y1 - y0) - (x1 - x0) * (y2 - y1)) / sqrt((x2 - x1)**2 + (y2 - y1)**2)
+            if (abs(x2 - x1) <= 1e-8_dp) then
+                ! If we have flat lines in either direction then the intersection point should be trivial.
+                xn = x1
+                yn = y0
+            else if (abs(y2 - y1) <= 1e-8_dp) then
+                xn = x0
+                yn = y1
+            else
+                ! Solving s * (x2-x1, y2-y1) + (x1, y1) = t * (y2-y1, -(x2-x1)) + (x0, y0) for s,
+                ! re-arranging both x- and y-versions for t and setting equal, yields
+                z = (y2 - y1) / (x2 - x1)
+                s = -1 / (1/z + z) * ((x1 - x0) / (y2 - y1) + (y1 - y0) / (x2 - x1))
+                xn = s * (x2 - x1) + x1
+                yn = s * (y2 - y1) + y1
+            end if
+            ! Then, despite using euclidean geometry above, we can use the more-accurate
+            ! great-circle distance here for whether objects fall outside of the larger
+            ! area or not.
+            call haversine(xn, x0, yn, y0, d)
             if (d <= density_radius) then
                 circle_too_near_edge = .true.
                 exit
@@ -176,7 +193,19 @@ subroutine get_circle_area_overlap(cat_ax1, cat_ax2, density_radius, hull_ax1, h
                     y1 = hull_ax2(k)
                     x2 = hull_ax1(k+1)
                     y2 = hull_ax2(k+1)
-                    h = abs((x2 - x1) * (y1 - y0) - (x1 - x0) * (y2 - y1)) / sqrt((x2 - x1)**2 + (y2 - y1)**2)
+                    if (abs(x2 - x1) <= 1e-8_dp) then
+                        xn = x1
+                        yn = y0
+                    else if (abs(y2 - y1) <= 1e-8_dp) then
+                        xn = x0
+                        yn = y1
+                    else
+                        z = (y2 - y1) / (x2 - x1)
+                        s = -1 / (1/z + z) * ((x1 - x0) / (y2 - y1) + (y1 - y0) / (x2 - x1))
+                        xn = s * (x2 - x1) + x1
+                        yn = s * (y2 - y1) + y1
+                    end if
+                    call haversine(xn, x0, yn, y0, h)
                     if (h <= density_radius) then
                         exit
                     end if

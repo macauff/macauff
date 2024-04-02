@@ -141,11 +141,11 @@ def generate_random_catalogs(
         # with magnitude
         raise ValueError("b_sig currently has to be an integer for all generated data.")
 
-    a_circ_dist = rng.normal(loc=0, scale=a_astro[:, 2], size=n_a) / 3600
+    a_circ_dist = rng.rayleigh(scale=a_astro[:, 2], size=n_a) / 3600
     a_circ_angle = rng.uniform(0, 2 * np.pi, size=n_a)
     a_astro[:, 0] = a_astro[:, 0] + a_circ_dist * np.cos(a_circ_angle)
     a_astro[:, 1] = a_astro[:, 1] + a_circ_dist * np.sin(a_circ_angle)
-    b_circ_dist = rng.normal(loc=0, scale=b_astro[:, 2], size=n_b) / 3600
+    b_circ_dist = rng.rayleigh(scale=b_astro[:, 2], size=n_b) / 3600
     b_circ_angle = rng.uniform(0, 2 * np.pi, size=n_b)
     b_astro[:, 0] = b_astro[:, 0] + b_circ_dist * np.cos(b_circ_angle)
     b_astro[:, 1] = b_astro[:, 1] + b_circ_dist * np.sin(b_circ_angle)
