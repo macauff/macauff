@@ -16,6 +16,10 @@ Bug Fixes
 API Changes
 ^^^^^^^^^^^
 
+- ``CrossMatch`` now expects ``saturation_magnitudes`` as an input parameter in
+  its input files, if ``fit_gal_flag`` or ``correct_astrometry`` are
+  ``True``. [#81]
+
 - ``AstrometricCorrections`` accepts pre-computed TRILEGAL histograms, following
   the expansion of ``CrossMatch`` accepting them. [#79]
 
