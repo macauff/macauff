@@ -184,7 +184,7 @@ the inputs required if either ``correct_astrometry`` or ``compute_snr_mag_relati
 
 and the inputs required if ``correct_astrometry`` is ``True``:
 
-``best_mag_index``, ``nn_radius``, ``ref_csv_cat_file_string``, ``correct_mag_array``, ``correct_mag_slice``, ``correct_sig_slice``, ``chunk_overlap_col``, and ``best_mag_index_col``.
+``best_mag_index``, ``nn_radius``, ``ref_csv_cat_file_string``, ``correct_mag_array``, ``correct_mag_slice``, ``correct_sig_slice``, ``chunk_overlap_col``, ``best_mag_index_col``, and ``saturation_magnitudes``.
 
 .. note::
     ``run_fw_auf``, ``run_psf_auf``, ``psf_fwhms``, ``snr_mag_params_path``, ``download_tri``, ``tri_set_name``, ``tri_filt_names``, ``tri_filt_num``, ``tri_maglim_faint``, ``tri_num_faint``, ``dens_dist``, ``dd_params_path``, ``l_cut_path``, ``gal_wavs``, ``gal_zmax``, ``gal_nzs``, ``gal_aboffsets``, ``gal_filternames``, and ``gal_al_avs`` are all currently required if ``correct_astrometry`` is ``True``, bypassing the nested flags above. For example, ``dens_dist`` is required as an input if ``include_perturb_auf`` is ``True``, or if ``correct_astrometry`` is set. This means that ``AstrometricCorrections`` implicitly always runs and fits for a full Astrometric Uncertainty Function.
@@ -425,6 +425,10 @@ The zero-indexed integer column number in the original input csv file used in ``
 ``use_photometric_uncertainties``
 
 Boolean flag indicating whether the astrometric or photometric uncertainties of the input catalogue should be used to derive the astrometric uncertainties from ensemble statistics in ``AstrometricCorrections``.
+
+``saturation_magnitudes``
+
+A list, one float per filter, of the magnitudes in the given filter at which the telescope or survey saturates, used in the filtering of source counts for model-fitting purposes in ``AstrometricCorrections``.
 
 
 Parameter Dependency Graph

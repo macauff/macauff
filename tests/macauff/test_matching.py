@@ -68,6 +68,7 @@ class TestInputs:
         self.a_cat_folder_path = os.path.abspath(cat_a_config['cat_folder_path'])
         self.b_cat_folder_path = os.path.abspath(cat_b_config['cat_folder_path'])
 
+        os.makedirs(joint_config['joint_folder_path'], exist_ok=True)
         os.makedirs(self.a_cat_folder_path, exist_ok=True)
         os.makedirs(self.b_cat_folder_path, exist_ok=True)
 
@@ -1620,13 +1621,14 @@ class TestInputs:
                  'best_mag_index = 0\n', 'nn_radius = 30\n', 'ref_csv_cat_file_string = ref_{}.csv\n',
                  'correct_mag_array = 14.07 14.17 14.27 14.37\n', 'correct_mag_slice = 0.05 0.05 0.05 0.05\n',
                  'correct_sig_slice = 0.1 0.1 0.1 0.1\n', 'chunk_overlap_col = None\n',
-                 'best_mag_index_col = 8\n', 'use_photometric_uncertainties = no\n']
+                 'best_mag_index_col = 8\n', 'use_photometric_uncertainties = no\n',
+                 'saturation_magnitudes = 5 5 5\n']
         for i, key in enumerate(['correct_astro_save_folder', 'csv_cat_file_string',
                                  'pos_and_err_indices', 'mag_indices', 'mag_unc_indices',
                                  'best_mag_index', 'nn_radius', 'ref_csv_cat_file_string',
                                  'correct_mag_array', 'correct_mag_slice', 'correct_sig_slice',
                                  'chunk_overlap_col', 'best_mag_index_col',
-                                 'use_photometric_uncertainties']):
+                                 'use_photometric_uncertainties', 'saturation_magnitudes']):
             new_line = ''
             for j in range(i+1):
                 new_line = new_line + lines[j]
@@ -1677,6 +1679,8 @@ class TestInputs:
                       lines])[0][0]] = 'best_mag_index_col = 11\n'
                 lines[np.where(['chunk_overlap_col' in y for y in
                       lines])[0][0]] = 'chunk_overlap_col = 12\n'
+                lines[np.where(['saturation_magnitudes' in y for y in
+                      lines])[0][0]] = 'saturation_magnitudes = 5 5 5 5\n'
             new_line = ''
             for line in lines:
                 new_line = new_line + line
@@ -1968,7 +1972,7 @@ class TestInputs:
                  'mag_unc_indices =', 'mag_unc_indices =', 'mag_unc_indices =',
                  'chunk_overlap_col = ', 'chunk_overlap_col = ', 'chunk_overlap_col = ',
                  'best_mag_index_col = ', 'best_mag_index_col = ', 'dd_params_path = ',
-                 'l_cut_path = '],
+                 'l_cut_path = ', 'saturation_magnitudes =', 'saturation_magnitudes ='],
                 ['best_mag_index = A\n', 'best_mag_index = 2.5\n', 'best_mag_index = 7\n',
                  'nn_radius = A\n', 'nn_radius = 1 2\n', 'correct_mag_array = 1 2 A 4 5\n',
                  'correct_mag_slice = 0.1 0.1 0.1 A 0.1\n', 'correct_mag_slice = 0.1 0.1 0.1\n',
@@ -1980,9 +1984,10 @@ class TestInputs:
                  'chunk_overlap_col = Non\n', 'chunk_overlap_col = A\n',
                  'chunk_overlap_col = 1.2\n', 'best_mag_index_col = A\n',
                  'best_mag_index_col = 1.2\n', 'dd_params_path = ./some_folder\n',
-                 'l_cut_path = ./l_cut_dummy_folder\n'],
+                 'l_cut_path = ./l_cut_dummy_folder\n', 'saturation_magnitudes = something else\n',
+                 'saturation_magnitudes = 1\n'],
                 ['a', 'b', 'a', 'b', 'a', 'a', 'b', 'a', 'b', 'a', 'b', 'a', 'a', 'a', 'b', 'b',
-                 'b', 'a', 'a', 'a', 'b', 'a', 'a', 'b', 'b', 'a'],
+                 'b', 'a', 'a', 'a', 'b', 'a', 'a', 'b', 'b', 'a', 'a', 'b'],
                 ['best_mag_index should be an integer in the catalogue "a"',
                  'best_mag_index should be an integer in the catalogue "b"',
                  'best_mag_index cannot be a larger index than the list of filters '
@@ -2008,7 +2013,9 @@ class TestInputs:
                  'best_mag_index_col should be an integer in the catalogue "a"',
                  'best_mag_index_col should be an integer in the catalogue "b"',
                  'b_dd_params_path does not exist. Please ensure that path for catalogue "b"',
-                 'l_cut file not found in catalogue "a" path. Please ensure PSF ']):
+                 'l_cut file not found in catalogue "a" path. Please ensure PSF ',
+                 'saturation_magnitudes should be a list of floats in the catalogue "a"',
+                 'b_saturation_magnitudes and b_mag_indices should contain']):
             with open(os.path.join(os.path.dirname(__file__), f'data/cat_{x}_params_2.txt'),
                       encoding='utf-8') as file:
                 f = file.readlines()

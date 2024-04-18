@@ -5,6 +5,7 @@ framework.
 '''
 
 import numpy as np
+from scipy.optimize import minimize
 
 __all__ = []
 
@@ -312,3 +313,79 @@ def min_max_lon(a):
     # Otherwise, the limits are inside [0, 360] and should be returned
     # as the "normal" minimum and maximum values.
     return min_lon, max_lon
+
+
+def find_model_counts_corrections(data_loghist, data_dloghist, data_bin_mids, tri_hist,
+                                  gal_dns, tri_mag_mids):
+    '''
+    Derivation of two-parameter corrections to differential source counts, fitting
+    both stellar and galaxy components with separate scaling factors.
+
+    Parameters
+    ----------
+    data_loghist : numpy.ndarray
+        Logarithmic differential source counts.
+    data_dloghist : numpy.ndarray
+        Uncertainties in log-counts from ``data_loghist``.
+    data_bin_mids : numpy.ndarray
+        Magnitudes of each bin corresponding to ``data_loghist``.
+    tri_hist : numpy.ndarray
+        Stellar model linear differential source counts.
+    gal_dns : numpy.ndarray
+        Galaxy model linear differential source counts.
+    tri_mag_mids : numpy.ndarray
+        Model magnitudes for each element of ``tri_hist`` and/or ``gal_dns``.
+
+    Returns
+    -------
+    res.x : numpy.ndarray
+        Value of least-squares fit scaling factors for stellar and galaxy
+        components of the differential source counts, as fit to the
+        input data.
+    '''
+    def lst_sq(p, y, o, t, g):
+        '''
+        Function evaluating the least-squares minimisation, and Jacobian,
+        of a fit to model and data differential source counts.
+
+        Parameters
+        ----------
+        p : list
+            ``a`` and ``b``, scaling factors for star and galaxy components
+            of the source counts.
+        y : numpy.ndarray
+            Data log-counts.
+        o : numpy.ndarray
+            Uncertainties corresponding to ``y``.
+        t : numpy.ndarray
+            Log-counts of stellar component of source counts.
+        g : numpy.ndarray
+            Log-counts of galaxy component of source counts.
+
+        Returns
+        -------
+        float
+            Chi-squared of the model source counts fit to the data.
+        list of floats
+            Gradient of the chi-squared, differentiated with respect to
+            the stellar and galaxy correction factors.
+        '''
+        a, b = p
+        f = np.log10(10**t * a + 10**g * b)
+        dfda = 10**t / (np.log(10) * (10**t * a + 10**g * b))
+        dfdb = 10**g / (np.log(10) * (10**t * a + 10**g * b))
+        dchida = np.sum(-2 * (y - f) / o**2 * dfda)
+        dchidb = np.sum(-2 * (y - f) / o**2 * dfdb)
+        return np.sum((y - f)**2 / o**2), [dchida, dchidb]
+
+    q = tri_hist > 0
+    tri_log_hist_at_data = np.interp(data_bin_mids, tri_mag_mids[q],
+                                     np.log10(tri_hist[q]), left=np.nan, right=np.nan)
+    q = gal_dns > 0
+    gal_log_hist_at_data = np.interp(data_bin_mids, tri_mag_mids[q],
+                                     np.log10(gal_dns[q]), left=np.nan, right=np.nan)
+    q = ~np.isnan(tri_log_hist_at_data) & ~np.isnan(gal_log_hist_at_data)
+    res = minimize(lst_sq, args=(data_loghist[q], np.ones_like(data_loghist[q]),
+                                 tri_log_hist_at_data[q], gal_log_hist_at_data[q]), x0=[1, 1], jac=True,
+                   method='L-BFGS-B', options={'ftol': 1e-12}, bounds=[(0.01, None), (0.01, None)])
+    return res.x

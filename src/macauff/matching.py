@@ -188,11 +188,11 @@ class CrossMatch():
                 self.a_correct_mag_slice, self.a_correct_sig_slice, self.n_pool, a_npy_or_csv,
                 a_coord_or_chunk, self.a_pos_and_err_indices, self.a_mag_indices, self.a_mag_unc_indices,
                 self.a_filt_names, self.a_best_mag_index, self.a_auf_region_frame,
-                trifolder=self.a_auf_folder_path, triname=a_correct_astro_tri_name,
-                maglim_f=self.a_tri_maglim_faint, magnum=self.a_tri_filt_num,
-                tri_num_faint=self.a_tri_num_faint, trifilterset=self.a_tri_set_name,
-                trifiltname=self.a_tri_filt_names[acbi], tri_hist=self.a_dens_hist_tri_list[acbi],
-                tri_mags=self.a_tri_model_mags_list[acbi],
+                self.a_saturation_magnitudes, trifolder=self.a_auf_folder_path,
+                triname=a_correct_astro_tri_name, maglim_f=self.a_tri_maglim_faint,
+                magnum=self.a_tri_filt_num, tri_num_faint=self.a_tri_num_faint,
+                trifilterset=self.a_tri_set_name, trifiltname=self.a_tri_filt_names[acbi],
+                tri_hist=self.a_dens_hist_tri_list[acbi], tri_mags=self.a_tri_model_mags_list[acbi],
                 dtri_mags=self.a_tri_model_mags_interval_list[acbi],
                 tri_uncert=self.a_tri_dens_uncert_list[acbi],
                 use_photometric_uncertainties=self.a_use_photometric_uncertainties, pregenerate_cutouts=True,
@@ -260,11 +260,11 @@ class CrossMatch():
                 self.b_correct_mag_slice, self.b_correct_sig_slice, self.n_pool, b_npy_or_csv,
                 b_coord_or_chunk, self.b_pos_and_err_indices, self.b_mag_indices, self.b_mag_unc_indices,
                 self.b_filt_names, self.b_best_mag_index, self.b_auf_region_frame,
-                trifolder=self.b_auf_folder_path, triname=b_correct_astro_tri_name,
-                maglim_f=self.b_tri_maglim_faint, magnum=self.b_tri_filt_num,
-                tri_num_faint=self.b_tri_num_faint, trifilterset=self.b_tri_set_name,
-                trifiltname=self.b_tri_filt_names[bcbi], tri_hist=self.b_dens_hist_tri_list[bcbi],
-                tri_mags=self.b_tri_model_mags_list[bcbi],
+                self.b_saturation_magnitudes, trifolder=self.b_auf_folder_path,
+                triname=b_correct_astro_tri_name, maglim_f=self.b_tri_maglim_faint,
+                magnum=self.b_tri_filt_num, tri_num_faint=self.b_tri_num_faint,
+                trifilterset=self.b_tri_set_name, trifiltname=self.b_tri_filt_names[bcbi],
+                tri_hist=self.b_dens_hist_tri_list[bcbi], tri_mags=self.b_tri_model_mags_list[bcbi],
                 dtri_mags=self.b_tri_model_mags_interval_list[bcbi],
                 tri_uncert=self.b_tri_dens_uncert_list[bcbi],
                 use_photometric_uncertainties=self.b_use_photometric_uncertainties,
@@ -1284,7 +1284,7 @@ class CrossMatch():
                 for check_flag in ['best_mag_index', 'nn_radius', 'ref_csv_cat_file_string',
                                    'correct_mag_array', 'correct_mag_slice', 'correct_sig_slice',
                                    'chunk_overlap_col', 'best_mag_index_col',
-                                   'use_photometric_uncertainties']:
+                                   'use_photometric_uncertainties', 'saturation_magnitudes']:
                     if check_flag not in config:
                         raise ValueError(f"Missing key {check_flag} from catalogue {catname} metadata file.")
 
@@ -1368,6 +1368,17 @@ class CrossMatch():
                     raise ValueError(f'{flag}correct_mag_array and {flag}correct_sig_slice should contain '
                                      'the same number of entries.')
                 setattr(self, f'{flag}correct_sig_slice', b)
+
+                a = config['saturation_magnitudes'].split()
+                try:
+                    b = np.array([float(f) for f in a])
+                except ValueError as exc:
+                    raise ValueError('saturation_magnitudes should be a list of floats in the '
+                                     f'catalogue {catname} metadata file.') from exc
+                if len(b) != len(getattr(self, f'{flag}mag_indices')):
+                    raise ValueError(f'{flag}saturation_magnitudes and {flag}mag_indices should '
+                                     'contain the same number of entries.')
+                setattr(self, f'{flag}saturation_magnitudes', b)
 
     def _read_metadata_csv(self, joint_config, cat_a_config, cat_b_config):
         """
