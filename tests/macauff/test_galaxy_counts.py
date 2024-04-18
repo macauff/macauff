@@ -84,7 +84,7 @@ class TestCreateGalaxyCounts():
         filter_name = f'{f}-{n}'
 
         generate_speclite_filters(f, [n], [np.array([0.159, 0.16, 0.161])], [np.array([0, 1, 0])],
-                                  u.micron)
+                                  u.micron)  # pylint: disable=no-member
 
         gal_dens = create_galaxy_counts(gal_values.cmau, self.mag_bins, self.z_array, wav,
                                         gal_values.alpha0, gal_values.alpha1,

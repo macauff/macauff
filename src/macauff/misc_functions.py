@@ -315,6 +315,7 @@ def min_max_lon(a):
     return min_lon, max_lon
 
 
+# pylint: disable=unused-argument
 def find_model_counts_corrections(data_loghist, data_dloghist, data_bin_mids, tri_hist,
                                   gal_dns, tri_mag_mids):
     '''

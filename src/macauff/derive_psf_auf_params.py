@@ -20,7 +20,7 @@ from scipy.special import erf  # pylint: disable=no-name-in-module
 
 # Assume that usetex = False only applies for tests where no TeX is installed
 # at all, instead of users having half-installed TeX, dvipng et al. somewhere.
-usetex = not not shutil.which("tex")  # pylint: disable=unnecessary-negation
+usetex = not not shutil.which("tex")  # pylint: disable=unneeded-not
 if usetex:
     plt.rcParams.update({"text.usetex": True, "text.latex.preamble": r"\usepackage{amsmath}"})
 

@@ -24,7 +24,7 @@ from scipy.stats import binned_statistic, chi2  # pylint: disable=unused-import
 
 # Assume that usetex = False only applies for tests where no TeX is installed
 # at all, instead of users having half-installed TeX, dvipng et al. somewhere.
-usetex = not not shutil.which("tex")  # pylint: disable=unnecessary-negation
+usetex = not not shutil.which("tex")  # pylint: disable=unneeded-not
 if usetex:
     plt.rcParams.update({"text.usetex": True, "text.latex.preamble": r"\usepackage{amsmath}"})
 
@@ -949,7 +949,7 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
 
         return res, s_bins, s_d_snr_med, s_d_snr_dmed, snr_med, snr_dmed
 
-    def make_star_galaxy_counts(self):
+    def make_star_galaxy_counts(self):  # pylint: disable=too-many-locals
         """
         Generate differential source counts for each cutout region, simulating
         both stars and galaxies.
@@ -1808,7 +1808,7 @@ def create_densities(b, minmag, maxmag, ax1_min, ax1_max, ax2_min, ax2_max, sear
     mag_cut_ucoords = mag_cut_cat.realize_frame(mag_cut_urepr)
     mag_cut_kdt = _get_cart_kdt(mag_cut_ucoords)
 
-    r = (2 * np.sin(Angle(search_radius * u.degree) / 2.0)).value
+    r = (2 * np.sin(Angle(search_radius * u.degree) / 2.0)).value  # pylint: disable=no-member
     overlap_number = np.empty(len(b), int)
 
     counter = np.arange(0, len(b))

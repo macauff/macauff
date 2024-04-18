@@ -599,7 +599,7 @@ def calculate_local_density(a_astro, a_tot_astro, a_tot_photo, density_radius, d
     return count_density
 
 
-# pylint: disable=too-many-locals,too-many-arguments
+# pylint: disable=too-many-locals,too-many-arguments,too-many-statements
 def create_single_perturb_auf(auf_point, r, dr, j0s, num_trials, psf_fwhm, density_mag, a_photo, localn,
                               d_mag, mag_cut, dd_params, l_cut, run_fw, run_psf, snr_mag_params, al_av,
                               region_frame, ax1s, ax2s, fit_gal_flag, rect_area=None,
