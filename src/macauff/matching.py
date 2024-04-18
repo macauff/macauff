@@ -1113,12 +1113,12 @@ class CrossMatch():
                         fit_gal_flag = self.b_fit_gal_flag
                 if correct_astro or fit_gal_flag:
                     for check_flag in ['gal_wavs', 'gal_zmax', 'gal_nzs',
-                                       'gal_aboffsets', 'gal_filternames']:
+                                       'gal_aboffsets', 'gal_filternames', 'saturation_magnitudes']:
                         if check_flag not in config:
                             raise ValueError(f"Missing key {check_flag} from catalogue {catname} "
                                              "metadata file.")
                     # Set all lists of floats
-                    for var in ['gal_wavs', 'gal_zmax', 'gal_aboffsets']:
+                    for var in ['gal_wavs', 'gal_zmax', 'gal_aboffsets', 'saturation_magnitudes']:
                         a = config[var].split(' ')
                         try:
                             b = np.array([float(f) for f in a])
@@ -1284,7 +1284,7 @@ class CrossMatch():
                 for check_flag in ['best_mag_index', 'nn_radius', 'ref_csv_cat_file_string',
                                    'correct_mag_array', 'correct_mag_slice', 'correct_sig_slice',
                                    'chunk_overlap_col', 'best_mag_index_col',
-                                   'use_photometric_uncertainties', 'saturation_magnitudes']:
+                                   'use_photometric_uncertainties']:
                     if check_flag not in config:
                         raise ValueError(f"Missing key {check_flag} from catalogue {catname} metadata file.")
 
@@ -1368,17 +1368,6 @@ class CrossMatch():
                     raise ValueError(f'{flag}correct_mag_array and {flag}correct_sig_slice should contain '
                                      'the same number of entries.')
                 setattr(self, f'{flag}correct_sig_slice', b)
-
-                a = config['saturation_magnitudes'].split()
-                try:
-                    b = np.array([float(f) for f in a])
-                except ValueError as exc:
-                    raise ValueError('saturation_magnitudes should be a list of floats in the '
-                                     f'catalogue {catname} metadata file.') from exc
-                if len(b) != len(getattr(self, f'{flag}mag_indices')):
-                    raise ValueError(f'{flag}saturation_magnitudes and {flag}mag_indices should '
-                                     'contain the same number of entries.')
-                setattr(self, f'{flag}saturation_magnitudes', b)
 
     def _read_metadata_csv(self, joint_config, cat_a_config, cat_b_config):
         """

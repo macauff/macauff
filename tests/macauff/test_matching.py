@@ -937,7 +937,8 @@ class TestInputs:
         new_line = ('fit_gal_flag = yes\ngal_wavs = 0.513 0.641 0.778\n'
                     'gal_zmax = 4.5 4.5 5\ngal_nzs = 46 46 51\n'
                     'gal_aboffsets = 0.5 0.5 0.5\n'
-                    'gal_filternames = gaiadr2-BP gaiadr2-G gaiadr2-RP\n')
+                    'gal_filternames = gaiadr2-BP gaiadr2-G gaiadr2-RP\n'
+                    'saturation_magnitudes = 5 5 5\n')
         idx = np.where([old_line in line for line in f])[0][0]
         _replace_line(os.path.join(os.path.dirname(__file__), 'data/cat_a_params_new.txt'), idx,
                       new_line, out_file=os.path.join(os.path.dirname(__file__),
@@ -949,7 +950,8 @@ class TestInputs:
         new_line = ('fit_gal_flag = yes\ngal_wavs = 3.37 4.62 12.08 22.19\n'
                     'gal_zmax = 3.2 4.0 1 4\ngal_nzs = 33 41 11 41\n'
                     'gal_aboffsets = 0.5 0.5 0.5 0.5\n'
-                    'gal_filternames = wise2010-W1 wise2010-W2 wise2010-W3 wise2010-W4\n')
+                    'gal_filternames = wise2010-W1 wise2010-W2 wise2010-W3 wise2010-W4\n'
+                    'saturation_magnitudes = 5 5 5 5\n')
         idx = np.where([old_line in line for line in f])[0][0]
         _replace_line(os.path.join(os.path.dirname(__file__), 'data/cat_b_params_new.txt'), idx,
                       new_line, out_file=os.path.join(os.path.dirname(__file__),
@@ -986,11 +988,13 @@ class TestInputs:
                 ['gal_wavs = 0.513 0.641 0.778', 'gal_aboffsets = 0.5 0.5 0.5 0.5',
                  'gal_nzs = 46 46 51', 'gal_nzs = 33 41 11 41', 'gal_nzs = 33 41 11 41',
                  'gal_filternames = gaiadr2-BP gaiadr2-G gaiadr2-RP',
-                 'gal_al_avs = 1.002 0.789 0.589', 'gal_al_avs = 1.002 0.789 0.589'],
+                 'gal_al_avs = 1.002 0.789 0.589', 'gal_al_avs = 1.002 0.789 0.589',
+                 'saturation_magnitudes = ', 'saturation_magnitudes = '],
                 ['gal_wavs = 0.513 0.641\n', 'gal_aboffsets = a 0.5 0.5 0.5\n',
                  'gal_nzs = 46 a 51\n', 'gal_nzs = 33.1 41 11 41\n', 'gal_nzs = 33 41 11\n',
                  'gal_filternames = gaiadr2-BP gaiadr2-G gaiadr2-RP wise2010-W1\n',
-                 'gal_al_avs = words\n', 'gal_al_avs = 0.789 1.002\n'],
+                 'gal_al_avs = words\n', 'gal_al_avs = 0.789 1.002\n',
+                 'saturation_magnitudes = words\n', 'saturation_magnitudes = 4 4\n'],
                 ['a_gal_wavs and a_filt_names should contain the same number',
                  'gal_aboffsets should be a list of floats in catalogue "b"',
                  'gal_nzs should be a list of integers in catalogue "a"',
@@ -998,9 +1002,12 @@ class TestInputs:
                  'b_gal_nzs and b_filt_names should contain the same number of entries.',
                  'a_gal_filternames and a_filt_names should contain the same number of entries.',
                  'gal_al_avs should be a list of floats in catalogue "a"',
-                 'a_gal_al_avs and a_filt_names should contain the same number of entries.'],
+                 'a_gal_al_avs and a_filt_names should contain the same number of entries.',
+                 'saturation_magnitudes should be a list of floats in catalogue "b"',
+                 'b_saturation_magnitudes and b_filt_names should contain the same number of entries.'],
                 ['cat_a_params_new', 'cat_b_params_new', 'cat_a_params_new', 'cat_b_params_new',
-                 'cat_b_params_new', 'cat_a_params_new', 'cat_a_params_new', 'cat_a_params_new']):
+                 'cat_b_params_new', 'cat_a_params_new', 'cat_a_params_new', 'cat_a_params_new',
+                 'cat_b_params_new', 'cat_b_params_new']):
             with open(os.path.join(os.path.dirname(__file__), f'data/{in_file}_.txt'),
                       encoding='utf-8') as file:
                 f = file.readlines()
@@ -1571,7 +1578,8 @@ class TestInputs:
         new_line = ('gal_wavs = 0.513 0.641 0.778\n'
                     'gal_zmax = 4.5 4.5 5\ngal_nzs = 46 46 51\n'
                     'gal_aboffsets = 0.5 0.5 0.5\n'
-                    'gal_filternames = gaiadr2-BP gaiadr2-G gaiadr2-RP\n')
+                    'gal_filternames = gaiadr2-BP gaiadr2-G gaiadr2-RP\n'
+                    'saturation_magnitudes = 5 5 5\n')
         idx = np.where([old_line in line for line in f])[0][0]
         _replace_line(os.path.join(os.path.dirname(__file__), 'data/cat_a_params_.txt'), idx,
                       new_line, out_file=os.path.join(os.path.dirname(__file__), 'data/cat_a_params_.txt'))
@@ -1581,7 +1589,8 @@ class TestInputs:
         new_line = ('gal_wavs = 3.37 4.62 12.08 22.19\n'
                     'gal_zmax = 3.2 4.0 1 4\ngal_nzs = 33 41 11 41\n'
                     'gal_aboffsets = 0.5 0.5 0.5 0.5\n'
-                    'gal_filternames = wise2010-W1 wise2010-W2 wise2010-W3 wise2010-W4\n')
+                    'gal_filternames = wise2010-W1 wise2010-W2 wise2010-W3 wise2010-W4\n'
+                    'saturation_magnitudes = 5 5 5 5\n')
         idx = np.where([old_line in line for line in f])[0][0]
         _replace_line(os.path.join(os.path.dirname(__file__), 'data/cat_b_params_.txt'), idx,
                       new_line, out_file=os.path.join(os.path.dirname(__file__),
@@ -1621,14 +1630,13 @@ class TestInputs:
                  'best_mag_index = 0\n', 'nn_radius = 30\n', 'ref_csv_cat_file_string = ref_{}.csv\n',
                  'correct_mag_array = 14.07 14.17 14.27 14.37\n', 'correct_mag_slice = 0.05 0.05 0.05 0.05\n',
                  'correct_sig_slice = 0.1 0.1 0.1 0.1\n', 'chunk_overlap_col = None\n',
-                 'best_mag_index_col = 8\n', 'use_photometric_uncertainties = no\n',
-                 'saturation_magnitudes = 5 5 5\n']
+                 'best_mag_index_col = 8\n', 'use_photometric_uncertainties = no\n']
         for i, key in enumerate(['correct_astro_save_folder', 'csv_cat_file_string',
                                  'pos_and_err_indices', 'mag_indices', 'mag_unc_indices',
                                  'best_mag_index', 'nn_radius', 'ref_csv_cat_file_string',
                                  'correct_mag_array', 'correct_mag_slice', 'correct_sig_slice',
                                  'chunk_overlap_col', 'best_mag_index_col',
-                                 'use_photometric_uncertainties', 'saturation_magnitudes']):
+                                 'use_photometric_uncertainties']):
             new_line = ''
             for j in range(i+1):
                 new_line = new_line + lines[j]
@@ -1679,8 +1687,6 @@ class TestInputs:
                       lines])[0][0]] = 'best_mag_index_col = 11\n'
                 lines[np.where(['chunk_overlap_col' in y for y in
                       lines])[0][0]] = 'chunk_overlap_col = 12\n'
-                lines[np.where(['saturation_magnitudes' in y for y in
-                      lines])[0][0]] = 'saturation_magnitudes = 5 5 5 5\n'
             new_line = ''
             for line in lines:
                 new_line = new_line + line
@@ -1972,7 +1978,7 @@ class TestInputs:
                  'mag_unc_indices =', 'mag_unc_indices =', 'mag_unc_indices =',
                  'chunk_overlap_col = ', 'chunk_overlap_col = ', 'chunk_overlap_col = ',
                  'best_mag_index_col = ', 'best_mag_index_col = ', 'dd_params_path = ',
-                 'l_cut_path = ', 'saturation_magnitudes =', 'saturation_magnitudes ='],
+                 'l_cut_path = '],
                 ['best_mag_index = A\n', 'best_mag_index = 2.5\n', 'best_mag_index = 7\n',
                  'nn_radius = A\n', 'nn_radius = 1 2\n', 'correct_mag_array = 1 2 A 4 5\n',
                  'correct_mag_slice = 0.1 0.1 0.1 A 0.1\n', 'correct_mag_slice = 0.1 0.1 0.1\n',
@@ -1984,10 +1990,9 @@ class TestInputs:
                  'chunk_overlap_col = Non\n', 'chunk_overlap_col = A\n',
                  'chunk_overlap_col = 1.2\n', 'best_mag_index_col = A\n',
                  'best_mag_index_col = 1.2\n', 'dd_params_path = ./some_folder\n',
-                 'l_cut_path = ./l_cut_dummy_folder\n', 'saturation_magnitudes = something else\n',
-                 'saturation_magnitudes = 1\n'],
+                 'l_cut_path = ./l_cut_dummy_folder\n'],
                 ['a', 'b', 'a', 'b', 'a', 'a', 'b', 'a', 'b', 'a', 'b', 'a', 'a', 'a', 'b', 'b',
-                 'b', 'a', 'a', 'a', 'b', 'a', 'a', 'b', 'b', 'a', 'a', 'b'],
+                 'b', 'a', 'a', 'a', 'b', 'a', 'a', 'b', 'b', 'a'],
                 ['best_mag_index should be an integer in the catalogue "a"',
                  'best_mag_index should be an integer in the catalogue "b"',
                  'best_mag_index cannot be a larger index than the list of filters '
@@ -2013,9 +2018,7 @@ class TestInputs:
                  'best_mag_index_col should be an integer in the catalogue "a"',
                  'best_mag_index_col should be an integer in the catalogue "b"',
                  'b_dd_params_path does not exist. Please ensure that path for catalogue "b"',
-                 'l_cut file not found in catalogue "a" path. Please ensure PSF ',
-                 'saturation_magnitudes should be a list of floats in the catalogue "a"',
-                 'b_saturation_magnitudes and b_mag_indices should contain']):
+                 'l_cut file not found in catalogue "a" path. Please ensure PSF ']):
             with open(os.path.join(os.path.dirname(__file__), f'data/cat_{x}_params_2.txt'),
                       encoding='utf-8') as file:
                 f = file.readlines()

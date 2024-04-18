@@ -900,8 +900,10 @@ class TestMakePerturbAUFs():
 
         np.save(f'{self.cat_folder}/con_cat_astro.npy',
                 np.concatenate(([0.3, 0.3, 0.1] * 101, [0.1, 0.1, 0.1], [0.9, 0.9, 0.1])).reshape(-1, 3))
+        rng = np.random.default_rng(seed=83458923)
+        main_mags = rng.uniform(24.95, 25.05, size=100)
         np.save(f'{self.cat_folder}/con_cat_photo.npy',
-                np.array([np.concatenate(([14.99], [25]*100, [10], [10]))]).T)
+                np.array([np.concatenate(([14.99], main_mags, [10], [10]))]).T)
         np.save(f'{self.cat_folder}/magref.npy', np.array([0] * 103))
 
         # Fake up a TRILEGAL simulation data file.
@@ -1053,6 +1055,7 @@ class TestMakePerturbAUFs():
         cm.a_gal_aboffsets = np.array([0.105])
         cm.a_gal_filternames = np.array(['gaiadr2-G'])
         cm.a_gal_al_avs = np.array([0])
+        cm.a_saturation_magnitudes = np.array([5])
 
         cm.b_gal_wavs = np.array([3.4])
         cm.b_gal_zmax = np.array([1])
@@ -1060,6 +1063,7 @@ class TestMakePerturbAUFs():
         cm.b_gal_aboffsets = np.array([2.699])
         cm.b_gal_filternames = ['wise2010-W1']
         cm.b_gal_al_avs = np.array([0])
+        cm.b_saturation_magnitudes = np.array([5])
 
         cm.a_run_fw = True
         cm.a_run_psf = False
