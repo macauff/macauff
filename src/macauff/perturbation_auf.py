@@ -20,8 +20,12 @@ from astropy.coordinates import SkyCoord
 # pylint: disable=import-error,no-name-in-module
 from macauff.galaxy_counts import create_galaxy_counts
 from macauff.get_trilegal_wrapper import get_av_infinity, get_trilegal
-from macauff.misc_functions import (_load_rectangular_slice, create_auf_params_grid,
-                                    find_model_counts_corrections, min_max_lon)
+from macauff.misc_functions import (
+    _load_rectangular_slice,
+    create_auf_params_grid,
+    find_model_counts_corrections,
+    min_max_lon,
+)
 from macauff.misc_functions_fortran import misc_functions_fortran as mff
 from macauff.perturbation_auf_fortran import perturbation_auf_fortran as paf
 
