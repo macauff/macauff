@@ -704,8 +704,8 @@ def create_single_perturb_auf(auf_point, r, dr, j0s, num_trials, psf_fwhm, densi
         data_dbins = np.diff(_data_bins)[d_hc]
         data_bins = _data_bins[d_hc]
 
-        data_uncert = np.sqrt(data_hist) / data_dbins / rect_area
-        data_hist = data_hist / data_dbins / rect_area
+        data_uncert = np.sqrt(data_hist) / data_dbins / sky_area
+        data_hist = data_hist / data_dbins / sky_area
         data_loghist = np.log10(data_hist)
         data_dloghist = 1/np.log(10) * data_uncert / data_hist
 
