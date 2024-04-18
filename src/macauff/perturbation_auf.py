@@ -20,7 +20,12 @@ from astropy.coordinates import SkyCoord
 # pylint: disable=import-error,no-name-in-module
 from macauff.galaxy_counts import create_galaxy_counts
 from macauff.get_trilegal_wrapper import get_av_infinity, get_trilegal
-from macauff.misc_functions import _load_rectangular_slice, create_auf_params_grid, min_max_lon
+from macauff.misc_functions import (
+    _load_rectangular_slice,
+    create_auf_params_grid,
+    find_model_counts_corrections,
+    min_max_lon,
+)
 from macauff.misc_functions_fortran import misc_functions_fortran as mff
 from macauff.perturbation_auf_fortran import perturbation_auf_fortran as paf
 
@@ -85,6 +90,7 @@ def make_perturb_aufs(cm, which_cat):
             alpha_weight = cm.gal_alphaweight
             ab_offsets = getattr(cm, f'{which_cat}_gal_aboffsets')
             filter_names = getattr(cm, f'{which_cat}_gal_filternames')
+            saturation_magnitudes = getattr(cm, f'{which_cat}_saturation_magnitudes')
 
         # Extract either dummy or real TRILEGAL histogram lists.
         dens_hist_tri = getattr(cm, f'{which_cat}_dens_hist_tri_list')
@@ -211,15 +217,19 @@ def make_perturb_aufs(cm, which_cat):
                 index_slice = med_index_slice[good_mag_slice]
                 for ii, ind_slice in enumerate(index_slice):
                     local_n[ind_slice, j] = localn[ii]
+                if fit_gal_flag:
+                    rect_area = (ax1_max - ax1_min) * (
+                        np.sin(np.radians(ax2_max)) - np.sin(np.radians(ax2_min))) * 180/np.pi
                 ax1_list = np.linspace(ax1_min, ax1_max, 7)
                 ax2_list = np.linspace(ax2_min, ax2_max, 7)
                 if fit_gal_flag:
                     single_perturb_auf_output = create_single_perturb_auf(
                         auf_points[i], cm.r, cm.dr, cm.j0s, num_trials, psf_fwhms[j], dens_mags[j], a_photo,
                         localn, d_mag, delta_mag_cuts, dd_params, l_cut, run_fw, run_psf, snr_mag_params[j],
-                        al_avs[j], auf_region_frame, ax1_list, ax2_list, fit_gal_flag, cmau_array, wavs[j],
-                        z_maxs[j], nzs[j], alpha0, alpha1, alpha_weight, ab_offsets[j], filter_names[j],
-                        tri_folder=ax_folder, filt_header=tri_filt_names[j], dens_hist_tri=dens_hist_tri[j],
+                        al_avs[j], auf_region_frame, ax1_list, ax2_list, fit_gal_flag, rect_area,
+                        saturation_magnitudes[j], cmau_array, wavs[j], z_maxs[j], nzs[j], alpha0, alpha1,
+                        alpha_weight, ab_offsets[j], filter_names[j], tri_folder=ax_folder,
+                        filt_header=tri_filt_names[j], dens_hist_tri=dens_hist_tri[j],
                         model_mags=tri_model_mags[j], model_mag_mids=tri_model_mag_mids[j],
                         model_mags_interval=tri_model_mags_interval[j],
                         n_bright_sources_star=tri_n_bright_sources_star[j])
@@ -589,14 +599,14 @@ def calculate_local_density(a_astro, a_tot_astro, a_tot_photo, density_radius, d
     return count_density
 
 
-# pylint: disable=too-many-locals,too-many-arguments
-def create_single_perturb_auf(auf_point, r, dr, j0s, num_trials, psf_fwhm,
-                              density_mag, a_photo, localn, d_mag, mag_cut, dd_params, l_cut, run_fw, run_psf,
-                              snr_mag_params, al_av, region_frame, ax1s, ax2s, fit_gal_flag, cmau_array=None,
-                              wav=None, z_max=None, nz=None, alpha0=None, alpha1=None, alpha_weight=None,
-                              ab_offset=None, filter_name=None, tri_folder=None, filt_header=None,
-                              dens_hist_tri=None, model_mags=None, model_mag_mids=None,
-                              model_mags_interval=None, n_bright_sources_star=None):
+# pylint: disable=too-many-locals,too-many-arguments,too-many-statements
+def create_single_perturb_auf(auf_point, r, dr, j0s, num_trials, psf_fwhm, density_mag, a_photo, localn,
+                              d_mag, mag_cut, dd_params, l_cut, run_fw, run_psf, snr_mag_params, al_av,
+                              region_frame, ax1s, ax2s, fit_gal_flag, rect_area=None,
+                              saturation_magnitude=None, cmau_array=None, wav=None, z_max=None, nz=None,
+                              alpha0=None, alpha1=None, alpha_weight=None, ab_offset=None, filter_name=None,
+                              tri_folder=None, filt_header=None, dens_hist_tri=None, model_mags=None,
+                              model_mag_mids=None, model_mags_interval=None, n_bright_sources_star=None):
     r'''
     Creates the associated parameters for describing a single perturbation AUF
     component, for a single sky position.
@@ -662,6 +672,12 @@ def create_single_perturb_auf(auf_point, r, dr, j0s, num_trials, psf_fwhm,
     fit_gal_flag : bool
         Flag to indicate whether to simulate galaxy counts for the purposes of
         simulating the perturbation component of the AUF.
+    rect_area : float, optional
+        Area of the region in question, in square degrees. Required if
+        ``fit_gal_flag`` is ``True``.
+    saturation_magnitude : float, optional
+        Magnitude at which the given filter experiences source dropout due to
+        saturation effects. Required if ``fit_gal_flag`` is ``True``.
     cmau_array : numpy.ndarray, optional
         Array holding the c/m/a/u values that describe the parameterisation
         of the Schechter functions with wavelength, following Wilson (2022, RNAAS,
@@ -776,7 +792,36 @@ def create_single_perturb_auf(auf_point, r, dr, j0s, num_trials, psf_fwhm,
         model_mags_interval = model_mags_interval[hc]
         log10y_tri = log10y_tri[hc]
 
-    model_count = tri_count + gal_count
+    # If we have the two-component model for source counts, then we have to
+    # allow for their relative normalisation factors to not be right, and hence
+    # perform a quick least-squares fit to the ensemble counts now to re-weight
+    # the two components. If just one is used, then with the re-normalisation
+    # within paf.perturb_aufs this doesn't matter, so we set corrections to 1/0
+    # respectively.
+    if fit_gal_flag:
+        data_hist, data_bins = np.histogram(a_photo, bins='auto')
+        d_hc = np.where(data_hist > 3)[0]
+        data_hist = data_hist[d_hc]
+        data_dbins = np.diff(data_bins)[d_hc]
+        data_bins = data_bins[d_hc]
+
+        data_uncert = np.sqrt(data_hist) / data_dbins / rect_area
+        data_hist = data_hist / data_dbins / rect_area
+        data_loghist = np.log10(data_hist)
+        data_dloghist = 1/np.log(10) * data_uncert / data_hist
+
+        # pylint: disable-next=fixme
+        # TODO: make the half-mag offset flexible, passing from CrossMatch and/or
+        # directly into AstrometricCorrections.
+        maxmag = data_bins[:-1][np.argmax(data_hist)] - 0.5
+
+        q = (data_bins <= maxmag) & (data_bins >= saturation_magnitude)
+        tri_corr, gal_corr = find_model_counts_corrections(data_loghist[q], data_dloghist[q],
+                                                           data_bins[q]+data_dbins[q]/2, 10**log10y_tri,
+                                                           10**log10y_gal, model_mags_interval)
+    else:
+        tri_corr, gal_corr = 1, 0
+    model_count = tri_count * tri_corr + gal_count * gal_corr
 
     if fit_gal_flag:
         # If we have both galaxies and stars to consider, both can be sufficiently
@@ -795,7 +840,7 @@ def create_single_perturb_auf(auf_point, r, dr, j0s, num_trials, psf_fwhm,
                          "reliably derive a model source density. Please include "
                          "more simulated objects.")
 
-    log10y = np.log10(10**log10y_tri + 10**log10y_gal)
+    log10y = np.log10(10**log10y_tri * tri_corr + 10**log10y_gal * gal_corr)
 
     # Set a magnitude bin width of 0.25 mags, to avoid oversampling.
     dmag = 0.25

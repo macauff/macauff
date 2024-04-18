@@ -68,6 +68,7 @@ class TestInputs:
         self.a_cat_folder_path = os.path.abspath(cat_a_config['cat_folder_path'])
         self.b_cat_folder_path = os.path.abspath(cat_b_config['cat_folder_path'])
 
+        os.makedirs(joint_config['joint_folder_path'], exist_ok=True)
         os.makedirs(self.a_cat_folder_path, exist_ok=True)
         os.makedirs(self.b_cat_folder_path, exist_ok=True)
 
@@ -936,7 +937,8 @@ class TestInputs:
         new_line = ('fit_gal_flag = yes\ngal_wavs = 0.513 0.641 0.778\n'
                     'gal_zmax = 4.5 4.5 5\ngal_nzs = 46 46 51\n'
                     'gal_aboffsets = 0.5 0.5 0.5\n'
-                    'gal_filternames = gaiadr2-BP gaiadr2-G gaiadr2-RP\n')
+                    'gal_filternames = gaiadr2-BP gaiadr2-G gaiadr2-RP\n'
+                    'saturation_magnitudes = 5 5 5\n')
         idx = np.where([old_line in line for line in f])[0][0]
         _replace_line(os.path.join(os.path.dirname(__file__), 'data/cat_a_params_new.txt'), idx,
                       new_line, out_file=os.path.join(os.path.dirname(__file__),
@@ -948,7 +950,8 @@ class TestInputs:
         new_line = ('fit_gal_flag = yes\ngal_wavs = 3.37 4.62 12.08 22.19\n'
                     'gal_zmax = 3.2 4.0 1 4\ngal_nzs = 33 41 11 41\n'
                     'gal_aboffsets = 0.5 0.5 0.5 0.5\n'
-                    'gal_filternames = wise2010-W1 wise2010-W2 wise2010-W3 wise2010-W4\n')
+                    'gal_filternames = wise2010-W1 wise2010-W2 wise2010-W3 wise2010-W4\n'
+                    'saturation_magnitudes = 5 5 5 5\n')
         idx = np.where([old_line in line for line in f])[0][0]
         _replace_line(os.path.join(os.path.dirname(__file__), 'data/cat_b_params_new.txt'), idx,
                       new_line, out_file=os.path.join(os.path.dirname(__file__),
@@ -985,11 +988,13 @@ class TestInputs:
                 ['gal_wavs = 0.513 0.641 0.778', 'gal_aboffsets = 0.5 0.5 0.5 0.5',
                  'gal_nzs = 46 46 51', 'gal_nzs = 33 41 11 41', 'gal_nzs = 33 41 11 41',
                  'gal_filternames = gaiadr2-BP gaiadr2-G gaiadr2-RP',
-                 'gal_al_avs = 1.002 0.789 0.589', 'gal_al_avs = 1.002 0.789 0.589'],
+                 'gal_al_avs = 1.002 0.789 0.589', 'gal_al_avs = 1.002 0.789 0.589',
+                 'saturation_magnitudes = ', 'saturation_magnitudes = '],
                 ['gal_wavs = 0.513 0.641\n', 'gal_aboffsets = a 0.5 0.5 0.5\n',
                  'gal_nzs = 46 a 51\n', 'gal_nzs = 33.1 41 11 41\n', 'gal_nzs = 33 41 11\n',
                  'gal_filternames = gaiadr2-BP gaiadr2-G gaiadr2-RP wise2010-W1\n',
-                 'gal_al_avs = words\n', 'gal_al_avs = 0.789 1.002\n'],
+                 'gal_al_avs = words\n', 'gal_al_avs = 0.789 1.002\n',
+                 'saturation_magnitudes = words\n', 'saturation_magnitudes = 4 4\n'],
                 ['a_gal_wavs and a_filt_names should contain the same number',
                  'gal_aboffsets should be a list of floats in catalogue "b"',
                  'gal_nzs should be a list of integers in catalogue "a"',
@@ -997,9 +1002,12 @@ class TestInputs:
                  'b_gal_nzs and b_filt_names should contain the same number of entries.',
                  'a_gal_filternames and a_filt_names should contain the same number of entries.',
                  'gal_al_avs should be a list of floats in catalogue "a"',
-                 'a_gal_al_avs and a_filt_names should contain the same number of entries.'],
+                 'a_gal_al_avs and a_filt_names should contain the same number of entries.',
+                 'saturation_magnitudes should be a list of floats in catalogue "b"',
+                 'b_saturation_magnitudes and b_filt_names should contain the same number of entries.'],
                 ['cat_a_params_new', 'cat_b_params_new', 'cat_a_params_new', 'cat_b_params_new',
-                 'cat_b_params_new', 'cat_a_params_new', 'cat_a_params_new', 'cat_a_params_new']):
+                 'cat_b_params_new', 'cat_a_params_new', 'cat_a_params_new', 'cat_a_params_new',
+                 'cat_b_params_new', 'cat_b_params_new']):
             with open(os.path.join(os.path.dirname(__file__), f'data/{in_file}_.txt'),
                       encoding='utf-8') as file:
                 f = file.readlines()
@@ -1570,7 +1578,8 @@ class TestInputs:
         new_line = ('gal_wavs = 0.513 0.641 0.778\n'
                     'gal_zmax = 4.5 4.5 5\ngal_nzs = 46 46 51\n'
                     'gal_aboffsets = 0.5 0.5 0.5\n'
-                    'gal_filternames = gaiadr2-BP gaiadr2-G gaiadr2-RP\n')
+                    'gal_filternames = gaiadr2-BP gaiadr2-G gaiadr2-RP\n'
+                    'saturation_magnitudes = 5 5 5\n')
         idx = np.where([old_line in line for line in f])[0][0]
         _replace_line(os.path.join(os.path.dirname(__file__), 'data/cat_a_params_.txt'), idx,
                       new_line, out_file=os.path.join(os.path.dirname(__file__), 'data/cat_a_params_.txt'))
@@ -1580,7 +1589,8 @@ class TestInputs:
         new_line = ('gal_wavs = 3.37 4.62 12.08 22.19\n'
                     'gal_zmax = 3.2 4.0 1 4\ngal_nzs = 33 41 11 41\n'
                     'gal_aboffsets = 0.5 0.5 0.5 0.5\n'
-                    'gal_filternames = wise2010-W1 wise2010-W2 wise2010-W3 wise2010-W4\n')
+                    'gal_filternames = wise2010-W1 wise2010-W2 wise2010-W3 wise2010-W4\n'
+                    'saturation_magnitudes = 5 5 5 5\n')
         idx = np.where([old_line in line for line in f])[0][0]
         _replace_line(os.path.join(os.path.dirname(__file__), 'data/cat_b_params_.txt'), idx,
                       new_line, out_file=os.path.join(os.path.dirname(__file__),
