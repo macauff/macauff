@@ -65,6 +65,8 @@ API Changes
 Other Changes
 ^^^^^^^^^^^^^
 
+- Pinned ``speclite`` to minimum v0.18 for additional filters. [#82]
+
 - Added ``dustmaps`` as a dependency. [#69]
 
 

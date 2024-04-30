@@ -175,7 +175,8 @@ def make_perturb_aufs(cm, which_cat):
             # Hard-coding the AV=1 trick to allow for using av_grid later.
             download_trilegal_simulation(ax_folder, tri_set_name, ax1, ax2, tri_filt_num,
                                          auf_region_frame, tri_maglim_faint, min_area,
-                                         av=1, sigma_av=0, total_objs=tri_num_faint)
+                                         av=1, sigma_av=0, total_objs=tri_num_faint,
+                                         rank=cm.rank, chunk_id=cm.chunk_id)
             os.system(f'mv {ax_folder}/trilegal_auf_simulation.dat '
                       f'{ax_folder}/trilegal_auf_simulation_faint.dat')
         for j, filt in enumerate(filters):
@@ -799,11 +800,11 @@ def create_single_perturb_auf(auf_point, r, dr, j0s, num_trials, psf_fwhm, densi
     # within paf.perturb_aufs this doesn't matter, so we set corrections to 1/0
     # respectively.
     if fit_gal_flag:
-        data_hist, data_bins = np.histogram(a_photo, bins='auto')
-        d_hc = np.where(data_hist > 3)[0]
-        data_hist = data_hist[d_hc]
-        data_dbins = np.diff(data_bins)[d_hc]
-        data_bins = data_bins[d_hc]
+        _data_hist, _data_bins = np.histogram(a_photo, bins='auto')
+        d_hc = np.where(_data_hist > 3)[0]
+        data_hist = _data_hist[d_hc]
+        data_dbins = np.diff(_data_bins)[d_hc]
+        data_bins = _data_bins[d_hc]
 
         data_uncert = np.sqrt(data_hist) / data_dbins / rect_area
         data_hist = data_hist / data_dbins / rect_area
@@ -813,7 +814,7 @@ def create_single_perturb_auf(auf_point, r, dr, j0s, num_trials, psf_fwhm, densi
         # pylint: disable-next=fixme
         # TODO: make the half-mag offset flexible, passing from CrossMatch and/or
         # directly into AstrometricCorrections.
-        maxmag = data_bins[:-1][np.argmax(data_hist)] - 0.5
+        maxmag = _data_bins[:-1][np.argmax(_data_hist)] - 0.5
 
         q = (data_bins <= maxmag) & (data_bins >= saturation_magnitude)
         tri_corr, gal_corr = find_model_counts_corrections(data_loghist[q], data_dloghist[q],
@@ -1185,6 +1186,9 @@ def _calculate_magnitude_offsets(count_array, mag_array, b, snr, model_mag_mids,
     dm_max_no_perturb = np.empty_like(mag_array)
     for i, mag in enumerate(mag_array):
         q = model_mag_mids >= mag
+        if np.sum(q) == 0:
+            dm_max_no_perturb[i] = 0
+            continue
         _x = model_mag_mids[q]
         _y = 10**log10y[q] * model_mags_interval[q] * np.pi * (r/3600)**2 * count_array[i] / n_norm
 
