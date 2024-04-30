@@ -22,7 +22,7 @@ dependencies = [
     "scipy",
     "pandas",
     "skypy",
-    "speclite",
+    "speclite>=0.18",
     "dustmaps",
     "ipykernel", # Support for Jupyter notebooks
 ]
