@@ -12,7 +12,7 @@ from scipy.special import j1  # pylint: disable=no-name-in-module
 from test_matching import _replace_line
 
 # pylint: disable=no-name-in-module,import-error
-from macauff.group_sources import _clean_overlaps, make_island_groupings
+from macauff.group_sources import make_island_groupings
 from macauff.group_sources_fortran import group_sources_fortran as gsf
 from macauff.macauff import Macauff
 from macauff.matching import CrossMatch
@@ -194,38 +194,6 @@ class TestOverlap():
             b_overlaps[:len(_inds), _i] = np.array(_inds)
         assert np.all(a_inds == a_overlaps)
         assert np.all(b_inds == b_overlaps)
-
-
-def test_clean_overlaps():
-    maxsize, size = 5, np.array([3, 5, 3, 4, 4, 5, 4, 2, 5, 4]*3)
-    inds = np.empty(dtype=int, shape=(maxsize, len(size)), order='F')
-    for i in range(0, 3):
-        inds[:, 0+10*i] = [0, 1, 0, -1, -1]
-        inds[:, 1+10*i] = [3, 4, 1, 1, 4]
-        inds[:, 2+10*i] = [2, 3, 4, -1, -1]
-        inds[:, 3+10*i] = [0, 0, 0, 1, -1]
-        inds[:, 4+10*i] = [0, 1, 2, 3, -1]
-        inds[:, 5+10*i] = [0, 0, 1, 1, 2]
-        inds[:, 6+10*i] = [3, 4, 3, 4, -1]
-        inds[:, 7+10*i] = [0, 1, -1, -1, -1]
-        inds[:, 8+10*i] = [2, 2, 2, 2, 2]
-        inds[:, 9+10*i] = [1, 1, 2, 3, -1]
-
-    inds2, size2 = _clean_overlaps(inds, size, 2)
-    compare_inds2 = np.empty((4, 30), int)
-    for i in range(0, 3):
-        compare_inds2[:, 0+10*i] = [0, 1, -1, -1]
-        compare_inds2[:, 1+10*i] = [1, 3, 4, -1]
-        compare_inds2[:, 2+10*i] = [2, 3, 4, -1]
-        compare_inds2[:, 3+10*i] = [0, 1, -1, -1]
-        compare_inds2[:, 4+10*i] = [0, 1, 2, 3]
-        compare_inds2[:, 5+10*i] = [0, 1, 2, -1]
-        compare_inds2[:, 6+10*i] = [3, 4, -1, -1]
-        compare_inds2[:, 7+10*i] = [0, 1, -1, -1]
-        compare_inds2[:, 8+10*i] = [2, -1, -1, -1]
-        compare_inds2[:, 9+10*i] = [1, 2, 3, -1]
-    assert np.all(inds2 == compare_inds2)
-    assert np.all(size2 == np.array([2, 3, 3, 2, 4, 3, 2, 2, 1, 3]*3))
 
 
 class TestMakeIslandGroupings():  # pylint: disable=too-many-instance-attributes

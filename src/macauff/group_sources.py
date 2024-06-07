@@ -88,8 +88,13 @@ def make_island_groupings(cm):
     print(f"{t} Rank {cm.rank}, chunk {cm.chunk_id}: Cleaning overlaps...")
     sys.stdout.flush()
 
-    ainds, asize = _clean_overlaps(ainds, asize, cm.n_pool)
-    binds, bsize = _clean_overlaps(binds, bsize, cm.n_pool)
+    # Clean arrays for any potential unnecessary extra rows caused by the largest
+    # overlap number being reduced due to the additional criteria for match in
+    # get_overlap_indices vs a naive radius-based search. In some cases we will
+    # then have e.g. np.all(ainds[-1, :] == -1) evaluating to True, and might
+    # as well get rid of the extraneous column.
+    ainds = np.asfortranarray(ainds[:np.amax(asize), :])
+    binds = np.asfortranarray(binds[:np.amax(bsize), :])
 
     t = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     print(f"{t} Rank {cm.rank}, chunk {cm.chunk_id}: Calculating integral lengths...")
@@ -263,55 +268,3 @@ def make_island_groupings(cm):
     cm.bgrplen = bgrplen
     cm.lenrejecta = lenrejecta
     cm.lenrejectb = lenrejectb
-
-
-def _clean_overlaps(inds, size, n_pool):
-    '''
-    Convenience function to parse either catalogue's indices array for
-    duplicate references to the opposing array on a per-source basis,
-    and filter duplications.
-
-    Parameters
-    ----------
-    inds : numpy.ndarray
-        Array containing the indices of overlap between this catalogue, for each
-        source, and the opposing catalogue, including potential duplication.
-    size : numpy.ndarray
-        Array containing the number of overlaps between this catalogue and the
-        opposing catalogue prior to duplication removal.
-    n_pool : integer
-        Number of multiprocessing threads to use.
-
-    Returns
-    -------
-    inds : numpy.ndarray
-        The unique indices of overlap into the opposing catalogue for each
-        source in a given catalogue, stripped of potential duplicates.
-    size : numpy.ndarray
-        Newly updated ``size`` array, containing the lengths of the unique
-        indices of overlap into the opposing catalogue for each source.
-    '''
-    maxsize = 0
-    size[:] = 0
-    counter = np.arange(0, inds.shape[1])
-    iter_group = zip(counter, itertools.repeat(inds))
-    with multiprocessing.Pool(n_pool) as pool:
-        for return_items in pool.imap_unordered(_calc_unique_inds, iter_group,
-                                                chunksize=max(1, len(counter) // n_pool)):
-            i, unique_inds = return_items
-            y = len(unique_inds)
-            inds[:y, i] = unique_inds
-            inds[y:, i] = -1
-            maxsize = max(maxsize, y)
-            size[i] = y
-
-    pool.join()
-
-    inds = np.asfortranarray(inds[:maxsize, :])
-
-    return inds, size
-
-
-def _calc_unique_inds(iterable):
-    i, inds = iterable
-    return i, np.unique(inds[inds[:, i] > -1, i])
