@@ -15,8 +15,7 @@ import numpy as np
 # pylint: disable=import-error,no-name-in-module
 from macauff.group_sources_fortran import group_sources_fortran as gsf
 from macauff.make_set_list import set_list
-from macauff.misc_functions import (_load_rectangular_slice, load_small_ref_auf_grid, convex_hull_area,
-                                    calculate_overlap_counts)
+from macauff.misc_functions import convex_hull_area, calculate_overlap_counts
 from macauff.misc_functions_fortran import misc_functions_fortran as mff
 
 # pylint: enable=import-error,no-name-in-module
@@ -264,49 +263,6 @@ def make_island_groupings(cm):
     cm.bgrplen = bgrplen
     cm.lenrejecta = lenrejecta
     cm.lenrejectb = lenrejectb
-
-
-def _load_fourier_grid_cutouts(a, sky_rect_coords, perturb_auf_outputs, padding,
-                               large_sky_slice, modelrefinds):
-    '''
-    Function to load a sub-set of a given catalogue's astrometry, slicing it
-    in a given sky coordinate rectangle, and load the appropriate sub-array
-    of the perturbation AUF's fourier-space PDF.
-
-    Parameters
-    ----------
-    a : numpy.ndarray
-        Array containing the full entries for a given catalogue.
-    sky_rect_coords : numpy.ndarray or list
-        Array with the rectangular extents of the cutout to be performed, in the
-        order lower longitudinal coordinate, upper longitudinal coordinate,
-        lower latitudinal coordinate, and upper latitudinal coordinate.
-    perturb_auf_outputs : dictionary
-        Results from the simulations of catalogue ``a``'s AUF extensions.
-    padding : float
-        Maximum allowed sky separation the "wrong" side of ``sky_rect_coords``,
-        allowing for an increase in sky box size which ensures that all overlaps
-        get caught in ``get_overlap_indices``.
-    large_sky_slice : boolean
-        Slice array containing the ``True`` and ``False`` elements of which
-        elements of the full catalogue, in ``con_cat_astro.npy``, are in ``a``.
-    modelrefinds : numpy.ndarray
-        The modelrefinds array output from ``create_perturb_auf``.
-        TODO Improve description
-    '''
-
-    lon1, lon2, lat1, lat2 = sky_rect_coords
-
-    sky_cut = _load_rectangular_slice(a, lon1, lon2, lat1, lat2, padding)
-
-    a_cutout = a[sky_cut]
-
-    modrefind = modelrefinds[:, large_sky_slice][:, sky_cut]
-
-    [fouriergrid], modrefindsmall = load_small_ref_auf_grid(modrefind, perturb_auf_outputs,
-                                                            ['fourier'])
-
-    return a_cutout, fouriergrid, modrefindsmall, sky_cut
 
 
 def _clean_overlaps(inds, size, n_pool):
