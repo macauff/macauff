@@ -20,7 +20,6 @@ import requests
 from macauff.galaxy_counts import create_galaxy_counts
 from macauff.get_trilegal_wrapper import get_trilegal
 from macauff.misc_functions import (
-    _load_rectangular_slice,
     convex_hull_area,
     create_auf_params_grid,
     create_densities,
