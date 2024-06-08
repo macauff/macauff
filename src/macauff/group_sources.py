@@ -6,8 +6,6 @@ various photometric integral purposes.
 '''
 
 import datetime
-import itertools
-import multiprocessing
 import sys
 
 import numpy as np
@@ -47,7 +45,7 @@ def make_island_groupings(cm):
     print(f"{t} Rank {cm.rank}, chunk {cm.chunk_id}: Calculating maximum overlap...")
     sys.stdout.flush()
 
-    # Load the astrometry of each catalogue for slicing.
+    # Load the astrometry of each catalogue.
     a_full = cm.a_astro
     b_full = cm.b_astro
 
@@ -79,7 +77,7 @@ def make_island_groupings(cm):
     bsize = np.array([np.sum(binds[:, i] >= 0) for i in range(binds.shape[1])])
 
     ainds, binds, asize, bsize = gsf.get_overlap_indices(
-        a_full[:, 0], a_full[:, 1], b_full[:, 0], b_full[:, 1], ainds, asize, binds, bsize, max_sep, amaxsize,
+        a_full[:, 0], a_full[:, 1], b_full[:, 0], b_full[:, 1], ainds, asize, binds, bsize, amaxsize,
         bmaxsize, a_full[:, 2], b_full[:, 2], cm.r[:-1]+cm.dr/2, cm.rho[:-1], cm.drho, cm.j1s,
         cm.a_perturb_auf_outputs['fourier_grid'], cm.b_perturb_auf_outputs['fourier_grid'], cm.a_modelrefinds,
         cm.b_modelrefinds, cm.int_fracs[2])

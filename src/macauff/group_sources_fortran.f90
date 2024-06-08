@@ -56,7 +56,7 @@ subroutine cumulative_fourier_probability(pr, drho, dist, j1s, cumulative_prob)
 
 end subroutine cumulative_fourier_probability
 
-subroutine get_overlap_indices(a_ax_1, a_ax_2, b_ax_1, b_ax_2, a_inds, a_size, b_inds, b_size, max_sep, amax, bmax, a_axerr, &
+subroutine get_overlap_indices(a_ax_1, a_ax_2, b_ax_1, b_ax_2, a_inds, a_size, b_inds, b_size, amax, bmax, a_axerr, &
     b_axerr, r, rho, drho, j1s, afouriergrid, bfouriergrid, amodrefind, bmodrefind, max_frac, aindices, bindices, anumoverlap, &
     bnumoverlap)
     ! Once total potential overlap is found in getmaxn, we can keep track of each individual
@@ -71,9 +71,6 @@ subroutine get_overlap_indices(a_ax_1, a_ax_2, b_ax_1, b_ax_2, a_inds, a_size, b
     real(dp), intent(in) :: a_ax_1(:), a_ax_2(:), b_ax_1(:), b_ax_2(:), a_axerr(:), b_axerr(:)
     ! Number of overlaps, and indices of the overlaps, of all sources in catalogue "b" for each "a" object (and vice versa).
     integer, intent(in) :: a_size(:), a_inds(:, :), b_size(:), b_inds(:, :)
-    ! Largest allowed separation between objects across catalogue a and b to be considered
-    ! potential counterparts to one another.
-    real(dp), intent(in) :: max_sep
     ! Real- and fourier-space values for empirical AUF convolutions and integrals. Note that r
     ! evalutaes at a bin middle (i.e., r'+dr'/2) while rho is left-hand bin edges and drho
     ! bin widths.
@@ -91,20 +88,17 @@ subroutine get_overlap_indices(a_ax_1, a_ax_2, b_ax_1, b_ax_2, a_inds, a_size, b
     ! Loop counters.
     integer :: i, j, k, l
     ! Sky offsets and uncertainties
-    real(dp) :: dax2, oa, ob
+    real(dp) :: oa, ob
     ! Respective fourier-space variables.
     real(dp) :: afourier(size(afouriergrid, 1)), bfourier(size(bfouriergrid, 1)), four(size(afouriergrid, 1))
     ! Cumulative real-space probability.
     real(dp) :: cumulative
-    ! Sky separations -- square of maximum allowed separation, max_sep, and the offset between
-    ! opposing catalogue sources, as given by the Haversine formula.
-    real(dp) :: max_sep2, dist
+    ! The offset between opposing catalogue sources, as given by the Haversine formula.
+    real(dp) :: dist
     ! Temporary flag arrays.
     integer :: tempcounter, changeflag
     ! Allocatable temporary index array.
     integer, allocatable :: tempind(:)
-
-    max_sep2 = max_sep**2
 
     aindices = -1
     bindices = -1
@@ -112,9 +106,9 @@ subroutine get_overlap_indices(a_ax_1, a_ax_2, b_ax_1, b_ax_2, a_inds, a_size, b
     bnumoverlap = 0
 
     allocate(tempind(amax))
-!$OMP PARALLEL DO DEFAULT(NONE) PRIVATE(i, j, k, l, dax2, dist, afourier, bfourier, four, cumulative, tempind, tempcounter, &
-!$OMP& changeflag, oa, ob) SHARED(a_ax_1, a_ax_2, b_ax_1, b_ax_2, max_sep, max_sep2, aindices, anumoverlap, afouriergrid, &
-!$OMP& bfouriergrid, amodrefind, bmodrefind, r, rho, drho, max_frac, a_axerr, b_axerr, j1s, a_inds, a_size, b_inds, b_size)
+!$OMP PARALLEL DO DEFAULT(NONE) PRIVATE(i, j, k, l, dist, afourier, bfourier, four, cumulative, tempind, tempcounter, &
+!$OMP& changeflag, oa, ob) SHARED(a_ax_1, a_ax_2, b_ax_1, b_ax_2, aindices, anumoverlap, afouriergrid, &
+!$OMP& bfouriergrid, amodrefind, bmodrefind, r, rho, drho, max_frac, a_axerr, b_axerr, j1s, a_inds, a_size)
     do j = 1, size(a_ax_1)
         tempind = -1
         tempcounter = 1
@@ -146,9 +140,9 @@ subroutine get_overlap_indices(a_ax_1, a_ax_2, b_ax_1, b_ax_2, a_inds, a_size, b
     deallocate(tempind)
     allocate(tempind(bmax))
 
-!$OMP PARALLEL DO DEFAULT(NONE) PRIVATE(i, j, k, l, dax2, dist, afourier, bfourier, four, cumulative, tempind, tempcounter, &
-!$OMP& changeflag, oa, ob) SHARED(a_ax_1, a_ax_2, b_ax_1, b_ax_2, max_sep, max_sep2, bindices, bnumoverlap, afouriergrid, &
-!$OMP& bfouriergrid, amodrefind, bmodrefind, r, rho, drho, max_frac, a_axerr, b_axerr, j1s, a_inds, a_size, b_inds, b_size)
+!$OMP PARALLEL DO DEFAULT(NONE) PRIVATE(i, j, k, l, dist, afourier, bfourier, four, cumulative, tempind, tempcounter, &
+!$OMP& changeflag, oa, ob) SHARED(a_ax_1, a_ax_2, b_ax_1, b_ax_2, bindices, bnumoverlap, afouriergrid, &
+!$OMP& bfouriergrid, amodrefind, bmodrefind, r, rho, drho, max_frac, a_axerr, b_axerr, j1s, b_inds, b_size)
     do i = 1, size(b_ax_1)
         tempind = -1
         tempcounter = 1

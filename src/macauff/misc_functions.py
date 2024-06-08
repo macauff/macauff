@@ -719,7 +719,7 @@ def ball_point_query(iterable):
     i, (full_ucoords, mag_cut_kdt, r, len_or_inds) = iterable
     # query_ball_point returns the neighbours of x (full_ucoords) around self
     # (mag_cut_kdt) within r.
-    kdt_query = mag_cut_kdt.query_ball_point(full_ucoords[i].cartesian.xyz, r)
+    kdt_query = mag_cut_kdt.query_ball_point(full_ucoords[i].cartesian.xyz, r, return_sorted=True)
     if len_or_inds == 'len':
         return i, len(kdt_query)
     return i, kdt_query

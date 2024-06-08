@@ -173,7 +173,7 @@ class TestOverlap():
         bsize = np.array([np.sum(binds[:, i] >= 0) for i in range(binds.shape[1])])
 
         a_inds, b_inds, a_num, b_num = gsf.get_overlap_indices(
-            self.a_ax_1, self.a_ax_2, self.b_ax_1, self.b_ax_2, ainds, asize, binds, bsize, self.max_sep/3600,
+            self.a_ax_1, self.a_ax_2, self.b_ax_1, self.b_ax_2, ainds, asize, binds, bsize,
             a_max, b_max, self.a_axerr, self.b_axerr, self.r[:-1]+self.dr/2, self.rho[:-1], self.drho,
             self.j1s, self.afouriergrid, self.bfouriergrid, self.amodrefind, self.bmodrefind, self.max_frac)
 
@@ -185,7 +185,7 @@ class TestOverlap():
                       np.array([2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 1, 1, 0, 0, 1, 1]))
 
         a_overlaps = -1*np.ones((2, 20), int)
-        for _i, _inds in enumerate([[0], [1], [2], [18, 3], [4], [5], [6], [7], [8], [9], [10],
+        for _i, _inds in enumerate([[0], [1], [2], [3, 18], [4], [5], [6], [7], [8], [9], [10],
                                     [11], [12, 17], [13], [14], [], [], [], [0], [12]]):
             a_overlaps[:len(_inds), _i] = np.array(_inds)
         b_overlaps = -1*np.ones((2, 19), int)
@@ -232,7 +232,7 @@ class TestMakeIslandGroupings():  # pylint: disable=too-many-instance-attributes
         a_coords = np.empty((self.n_a + 4, 3), float)
         a_coords[:-4, 0] = self.rng.uniform(self.ax_lims[0]+0.5, self.ax_lims[1]-0.5, self.n_a)
         a_coords[:-4, 1] = self.rng.uniform(self.ax_lims[2]+0.5, self.ax_lims[3]-0.5, self.n_a)
-        a_coords[:-4, 2] = self.sigma
+        a_coords[:, 2] = self.sigma
         # Move one source to have a forced overlap of objects
         a_coords[-5, :2] = a_coords[0, :2] + [0.01*self.sigma/3600, 0.02*self.sigma/3600]
         b_coords = np.empty((self.n_b + 4, 3), float)
