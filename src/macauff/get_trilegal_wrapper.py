@@ -22,6 +22,7 @@ Provides the code to query the online TRILEGAL API and download the results.
 import os
 import re
 import subprocess as sp
+import sys
 import time
 
 import dustmaps.sfd
@@ -172,12 +173,14 @@ def trilegal_webcall(trilegal_version, l, b, area, binaries, av, sigma_av, filte
         print(f"TRILEGAL is being called with \n l={l} deg, b={b} deg, area={area} sqrdeg\n "
               f"Av={av} with {sigma_av} fractional r.m.s. spread \n in the {filterset} system, complete "
               f"down to mag={maglim} in its {magnum}th filter, use_binaries set to {binaries}.")
+        sys.stdout.flush()
         sp.Popen(cmd, shell=True).wait()  # pylint: disable=consider-using-with
         if (os.path.exists(f'{outfolder}/tmpfile') and
                 os.path.getsize(f'{outfolder}/tmpfile') > 0):
             notconnected = False
         else:
             print(f"No communication with {webserver}, will retry in 2 min")
+            sys.stdout.flush()
             time.sleep(120)
             return "nocomm"
         if not notconnected:
@@ -195,6 +198,7 @@ def trilegal_webcall(trilegal_version, l, b, area, binaries, av, sigma_av, filte
                 fileendidx = save_line[filenameidx:].find('.dat')
                 filename = save_line[filenameidx:filenameidx+fileendidx+4]
                 print(f"retrieving data from {filename} ...")
+                sys.stdout.flush()
                 while not complete:
                     time.sleep(40)
                     modcmd = f'wget -o {outfolder}/lixo -O {outfolder}/{filename} {webserver}/tmp/{filename}'
@@ -205,10 +209,13 @@ def trilegal_webcall(trilegal_version, l, b, area, binaries, av, sigma_av, filte
                         if 'normally' in lastline:
                             complete = True
                             print('model downloaded!..')
+                            sys.stdout.flush()
                     if not complete:
                         print('still running...')
+                        sys.stdout.flush()
             else:
                 print('Server busy, trying again in 2 minutes')
+                sys.stdout.flush()
                 time.sleep(120)
                 # The way the "breakout" return calls work now we don't loop
                 # within trilegal_webcall any more, but the loops and if
@@ -216,6 +223,7 @@ def trilegal_webcall(trilegal_version, l, b, area, binaries, av, sigma_av, filte
                 return "timeout"
     sp.Popen(f'mv {outfolder}/{filename} {outfile}', shell=True).wait()  # pylint: disable=consider-using-with
     print(f'results copied to {outfile}')
+    sys.stdout.flush()
 
     return "good"
 
