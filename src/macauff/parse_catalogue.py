@@ -148,6 +148,7 @@ def csv_to_npy(input_folder, input_filename, output_folder, astro_cols, photo_co
             sig_mn_inds = mff.find_nearest_point(chunk.values[:, new_astro_cols[0]],
                                                  chunk.values[:, new_astro_cols[1]],
                                                  mn_coords[:, 0], mn_coords[:, 1])
+            # pylint: disable-next=possibly-used-before-assignment
             new_sigs = np.sqrt((m_sigs[sig_mn_inds]*old_sigs)**2 + n_sigs[sig_mn_inds]**2)
             astro[n:n+chunk.shape[0], 2] = new_sigs
         photo[n:n+chunk.shape[0]] = chunk.values[:, new_photo_cols]

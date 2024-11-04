@@ -121,7 +121,9 @@ def compute_photometric_likelihoods(cm):
 
                     bright_frac, field_frac = cm.int_fracs[[0, 1]]
                     c_prior, c_like, fa_prior, fa_like, fb_prior, fb_like = create_c_and_f(
+                        # pylint: disable-next=possibly-used-before-assignment
                         a_astro, b_astro, a_mag, b_mag, a_inds_cut, a_size_cut,
+                        # pylint: disable-next=possibly-used-before-assignment
                         b_inds_cut, b_size_cut, a_blen_cut, a_flen_cut, b_flen_cut,
                         a_bins, b_bins, bright_frac, field_frac, a_flags, b_flags, area)
                 if cm.use_phot_priors and not cm.include_phot_like:

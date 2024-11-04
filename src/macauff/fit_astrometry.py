@@ -53,7 +53,7 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
     precisions in photometric catalogues, based on reliable cross-matching
     to a well-understood second dataset.
     """
-    # pylint: disable-next=too-many-locals,too-many-arguments
+    # pylint: disable-next=too-many-locals,too-many-arguments,too-many-positional-arguments
     def __init__(self, psf_fwhm, numtrials, nn_radius, dens_search_radius, save_folder,
                  gal_wav_micron, gal_ab_offset, gal_filtname, gal_alav, dm, dd_params, l_cut,
                  ax1_mids, ax2_mids, ax_dimension, mag_array, mag_slice, sig_slice, n_pool,
@@ -1310,6 +1310,10 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
         self.moden, self.dn = moden, dn
 
     def plot_sigma_mag_slices(self):
+        """
+        Plots the histogram of astrometric or photometric uncertainties in each
+        magnitude slice for a given sightline.
+        """
         print("Plotting sigma-mag distributions...")
         sys.stdout.flush()
         if self.coord_or_chunk == 'coord':
@@ -1322,7 +1326,7 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
         mag_ind = self.mag_indices[self.best_mag_index]
         pos_err_ind = self.pos_and_err_indices[1][2]
         for i, mag in enumerate(self.mag_array):
-            ax = plt.subplot(gs[i])
+            ax = plt.subplot(gs[i])  # pylint: disable=possibly-used-before-assignment
 
             mag_cut = ((b_matches[:, mag_ind] <= mag+self.mag_slice[i]) &
                        (b_matches[:, mag_ind] >= mag-self.mag_slice[i]))
@@ -1711,7 +1715,7 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
         log_fac_k[k >= 100] = k[k >= 100] * np.log(k[k >= 100]) - k[k >= 100] + 1/6 * np.log(
             8 * k[k >= 100]**3 + 4 * k[k >= 100]**2 + k[k >= 100] + 1/30) + np.log(np.pi)/2
         for _nnf in np.linspace(0, 1, 101):
-            modely = (_nnf * reduced_nn_model + (1 - _nnf) * reduced_m_conv_plus_nn)
+            modely = _nnf * reduced_nn_model + (1 - _nnf) * reduced_m_conv_plus_nn
 
             # Poisson is exp(-L) L**k / k!, so negative log-likelihood is
             # L - k*ln(L) + ln(k!). Have to convert from PDF to counts through
@@ -1724,7 +1728,7 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
                 nnf = _nnf
                 _nll = temp_neg_log_like
 
-        modely = (nnf * reduced_nn_model + (1 - nnf) * reduced_m_conv_plus_nn)
+        modely = nnf * reduced_nn_model + (1 - nnf) * reduced_m_conv_plus_nn
 
         k = y[q] * np.diff(bins)[q] * num
         _l = modely[q] * np.diff(bins)[q] * num
@@ -1733,7 +1737,7 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
 
         return neg_log_like_part
 
-    def plot_fits_calculate_cdfs(self, m_sig, n_sig):  # pylint: disable=too-many-locals
+    def plot_fits_calculate_cdfs(self, m_sig, n_sig):  # pylint: disable=too-many-locals,too-many-statements
         """
         Calculate poisson CDFs and create verification plots showing the
         quality of the fits.
@@ -1811,19 +1815,19 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
             h = 1 - np.sqrt(1 - min(1,
                                     self.a_array[self.best_mag_index]**2 * self.avg_snr[i, 0]**2))
 
+            ind_fit_sig = self.fit_sigs[i, 1]
+            if usetex:
+                labels_list = [r'H/$\sigma_\mathrm{fit}$', r'1/$\sigma_\mathrm{fit}$',
+                               r'0/$\sigma_\mathrm{fit}$', r'H/$\sigma_\mathrm{quoted}$',
+                               r'1/$\sigma_\mathrm{quoted}$', r'0/$\sigma_\mathrm{quoted}$',
+                               r'H/$\sigma_\mathrm{single}$', r'1/$\sigma_\mathrm{single}$',
+                               r'0/$\sigma_\mathrm{single}$']
+            else:
+                labels_list = [r'H/sigma_fit', r'1/sigma_fit', r'0/sigma_fit',
+                               r'H/sigma_quoted', r'1/sigma_quoted', r'0/sigma_quoted',
+                               r'H/sigma_single', r'1/sigma_single', r'0/sigma_single']
             if self.make_plots:
-                ind_fit_sig = self.fit_sigs[i, 1]
                 ax = ax1s[i]
-                if usetex:
-                    labels_list = [r'H/$\sigma_\mathrm{fit}$', r'1/$\sigma_\mathrm{fit}$',
-                                   r'0/$\sigma_\mathrm{fit}$', r'H/$\sigma_\mathrm{quoted}$',
-                                   r'1/$\sigma_\mathrm{quoted}$', r'0/$\sigma_\mathrm{quoted}$',
-                                   r'H/$\sigma_\mathrm{single}$', r'1/$\sigma_\mathrm{single}$',
-                                   r'0/$\sigma_\mathrm{single}$']
-                else:
-                    labels_list = [r'H/sigma_fit', r'1/sigma_fit', r'0/sigma_fit',
-                                   r'H/sigma_quoted', r'1/sigma_quoted', r'0/sigma_quoted',
-                                   r'H/sigma_single', r'1/sigma_single', r'0/sigma_single']
             for j, (sig, _h, ls, lab) in enumerate(zip(
                     [fit_sig, fit_sig, fit_sig, self.avg_sig[i, 0], self.avg_sig[i, 0], self.avg_sig[i, 0],
                      ind_fit_sig, ind_fit_sig, ind_fit_sig],
@@ -1847,7 +1851,7 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
                 reduced_m_conv_plus_nn, _, _ = binned_statistic(self.r[:-1]+self.dr/2,
                                                                 m_conv_plus_nn, bins=pdf_bin)
 
-                if j == 0 or j == 3 or j == 6:
+                if j in [0, 3, 6]:
                     _nll = 1e10
                     nn_frac = -1
 
@@ -1857,7 +1861,7 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
                     log_fac_k[k >= 100] = k[k >= 100] * np.log(k[k >= 100]) - k[k >= 100] + 1/6 * np.log(
                         8 * k[k >= 100]**3 + 4 * k[k >= 100]**2 + k[k >= 100] + 1/30) + np.log(np.pi)/2
                     for _nnf in np.linspace(0, 1, 101):
-                        modely = (_nnf * reduced_nn_model + (1 - _nnf) * reduced_m_conv_plus_nn)
+                        modely = _nnf * reduced_nn_model + (1 - _nnf) * reduced_m_conv_plus_nn
 
                         _l = modely[q_pdf] * np.diff(pdf_bin)[q_pdf] * num_pdf
                         _l[_l <= 1e-10] = 1e-10
@@ -1870,13 +1874,13 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
                     if j == 6:
                         nn_frac_ind = nn_frac
 
-                modely = (nn_frac * reduced_nn_model + (1 - nn_frac) * reduced_m_conv_plus_nn)
+                modely = nn_frac * reduced_nn_model + (1 - nn_frac) * reduced_m_conv_plus_nn
 
-                if j == 0 or j == 6:
+                if j in [0, 6]:
                     _l = modely[q_pdf] * np.diff(pdf_bin)[q_pdf] * num_pdf
                     _l[_l <= 1e-10] = 1e-10
                     p_cdf = np.empty(len(_l), float)
-                    for _i in range(len(_l)):
+                    for _i in range(len(_l)):  # pylint: disable=consider-using-enumerate
                         p_cdf[_i] = poisson.cdf(k=k[_i], mu=_l[_i])
                     if j == 0:
                         mn_poisson_cdfs = np.append(mn_poisson_cdfs, p_cdf)
@@ -1888,8 +1892,10 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
 
             if self.make_plots:
                 _q = (self.r[:-1]+self.dr/2) <= (pdf_bin[:-1]+np.diff(pdf_bin)/2)[q_pdf][-1]
+                # pylint: disable-next=used-before-assignment
                 ax.plot((self.r[:-1]+self.dr/2)[_q], nn_frac_mn * nn_model[_q], c='g', ls='-',
                         label='False Match Model (mn)')
+                # pylint: disable-next=used-before-assignment
                 ax.plot((self.r[:-1]+self.dr/2)[_q], nn_frac_ind * nn_model[_q], c='m', ls='-',
                         label='False Match Model (ind)')
                 if usetex:
@@ -1954,7 +1960,7 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
             ls_list = ['r--', 'k-']
         elif len(self.seeing_ranges) == 3:
             ls_list = ['r--', 'k-', 'r-']
-        for seeing, ls in zip(self.seeing_ranges, ls_list):
+        for seeing, ls in zip(self.seeing_ranges, ls_list):  # pylint: disable=possibly-used-before-assignment
             log_ks = np.log10(seeing / (2 * np.sqrt(2 * np.log(2))))
             ax.plot(x, log_ks + x, ls, label=rf'seeing = {seeing:.1f} arcsec')
 
@@ -1968,7 +1974,7 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
             man_log_inv_snr = np.log10(1/man_snr)
             man_log_err_fit = np.log10(man_sig_fit)
             man_log_err_quoted = np.log10(man_sig_quoted)
-            for _index in range(len(man_log_inv_snr)):
+            for _index in range(len(man_log_inv_snr)):  # pylint: disable=consider-using-enumerate
                 ax.arrow(man_log_inv_snr[_index], man_log_err_quoted[_index],
                          0, man_log_err_fit[_index]-man_log_err_quoted[_index], color='k',
                          zorder=30, head_width=0.06, head_length=0.03)
@@ -1998,7 +2004,7 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
             # m = -2.5 log10(B) + 2.5 x.
             # Pin x and y (m) to the last data point for scaling.
             _i = np.argmax(man_mag)
-            log_B = (man_mag[_i] - (2.5 * man_log_inv_snr[_i])) / (-2.5)
+            log_B = (man_mag[_i] - (2.5 * man_log_inv_snr[_i])) / (-2.5)  # pylint: disable=invalid-name
             ax.plot(x, 2.5 * x - 2.5 * log_B, 'k-', label='Background-dominated')
 
             # Now SNR = sqrt(flux), if flux_err = sqrt(flux).
@@ -2031,7 +2037,7 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
             man_sig_fit = self.fit_sigs[q, 1]
             man_log_err_fit = np.log10(man_sig_fit)
             man_log_err_quoted = np.log10(man_sig_quoted)
-            for _index in range(len(man_mag)):
+            for _index in range(len(man_mag)):  # pylint: disable=consider-using-enumerate
                 ax.arrow(man_mag[_index], man_log_err_quoted[_index],
                          0, man_log_err_fit[_index]-man_log_err_quoted[_index], color='k',
                          zorder=30, head_width=0.06, head_length=0.03)

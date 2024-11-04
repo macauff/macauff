@@ -1416,11 +1416,13 @@ class TestInputs:
             elif cfg_type == 'b':
                 load_old = 'cat_b_params_'
                 load_new = 'cat_b_params_2'
+            # pylint: disable-next=possibly-used-before-assignment
             with open(os.path.join(os.path.dirname(__file__), f'data/{load_old}.txt'),
                       encoding='utf-8') as file:
                 f = file.readlines()
             idx = np.where([old_line in line for line in f])[0][0]
             _replace_line(os.path.join(os.path.dirname(__file__), f'data/{load_old}.txt'), idx, new_line,
+            # pylint: disable-next=possibly-used-before-assignment
                           out_file=os.path.join(os.path.dirname(__file__), f'data/{load_new}.txt'))
             with pytest.raises(err_type, match=error_msg):
                 cm._initialise_chunk(os.path.join(os.path.dirname(__file__), f'data/{j}.txt'),

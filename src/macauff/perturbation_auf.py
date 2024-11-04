@@ -159,11 +159,14 @@ def make_perturb_aufs(cm, which_cat):
         # to bother downloading any TRILEGAL simulations since we'll auto-fill
         # dummy data (and never use it) in the filter loop.
         if auf_folder is not None and cm.include_perturb_auf and len(a_astro_cut) > 0 and (
+                # pylint: disable-next=possibly-used-before-assignment
                 tri_download_flag or not os.path.isfile(f'{ax_folder}/trilegal_auf_simulation_faint.dat')):
             # Currently assume that the area of each small patch is a rectangle
             # on the sky, implicitly assuming that the large region is also a
             # rectangle, after any spherical projection cos(delta) effects.
+            # pylint: disable=used-before-assignment
             rect_area = (ax1_max - ax1_min) * (
+                # pylint: disable=used-before-assignment
                 np.sin(np.radians(ax2_max)) - np.sin(np.radians(ax2_min))) * 180/np.pi
 
             data_bright_dens = np.array([np.sum(~np.isnan(a_photo_cut[:, q]) &
@@ -173,8 +176,11 @@ def make_perturb_aufs(cm, which_cat):
             min_bright_tri_number = 1000
             min_area = max(min_bright_tri_number / data_bright_dens)
             # Hard-coding the AV=1 trick to allow for using av_grid later.
+            # pylint: disable-next=possibly-used-before-assignment
             download_trilegal_simulation(ax_folder, tri_set_name, ax1, ax2, tri_filt_num,
+                                         # pylint: disable-next=possibly-used-before-assignment
                                          auf_region_frame, tri_maglim_faint, min_area,
+                                         # pylint: disable-next=possibly-used-before-assignment
                                          av=1, sigma_av=0, total_objs=tri_num_faint,
                                          rank=cm.rank, chunk_id=cm.chunk_id)
             os.system(f'mv {ax_folder}/trilegal_auf_simulation.dat '
@@ -600,7 +606,7 @@ def calculate_local_density(a_astro, a_tot_astro, a_tot_photo, density_radius, d
     return count_density
 
 
-# pylint: disable=too-many-locals,too-many-arguments,too-many-statements
+# pylint: disable=too-many-locals,too-many-arguments,too-many-statements,too-many-positional-arguments
 def create_single_perturb_auf(auf_point, r, dr, j0s, num_trials, psf_fwhm, density_mag, a_photo, localn,
                               d_mag, mag_cut, dd_params, l_cut, run_fw, run_psf, snr_mag_params, al_av,
                               region_frame, ax1s, ax2s, fit_gal_flag, rect_area=None,
@@ -896,11 +902,13 @@ def create_single_perturb_auf(auf_point, r, dr, j0s, num_trials, psf_fwhm, densi
 
     if run_fw and run_psf:
         h = 1 - np.sqrt(1 - np.minimum(np.ones_like(snr), a_snr**2 * snr**2))
-        flux = h * flux_fw + (1 - h) * flux_psf
+        flux = h * flux_fw + (1 - h) * flux_psf  # pylint: disable=possibly-used-before-assignment
         h = h.reshape(1, -1)
-        frac = h * frac_fw + (1 - h) * frac_psf
-        offset = h * offset_fw + (1 - h) * offset_psf
+        frac = h * frac_fw + (1 - h) * frac_psf  # pylint: disable=possibly-used-before-assignment
+        offset = h * offset_fw + (1 - h) * offset_psf  # pylint: disable=possibly-used-before-assignment
+        # pylint: disable-next=possibly-used-before-assignment
         cumulative = h * cumulative_fw + (1 - h) * cumulative_psf
+        # pylint: disable-next=possibly-used-before-assignment
         fourieroffset = h * fourieroffset_fw + (1 - h) * fourieroffset_psf
     elif run_fw:
         flux = flux_fw
@@ -1036,23 +1044,25 @@ def make_tri_counts(trifolder, trifilename, trifiltname, dm, brightest_source_ma
 
     minmag = dm * np.floor(brightest_source_mag/dm)
     if use_bright and use_faint:
+        # pylint: disable-next=possibly-used-before-assignment
         maxmag = dm * np.ceil(max(np.amax(tridata_faint), np.amax(tridata_bright))/dm)
     elif use_bright:
         maxmag = dm * np.ceil(np.amax(tridata_bright)/dm)
     elif use_faint:
         maxmag = dm * np.ceil(np.amax(tridata_faint)/dm)
     if al_av is None:
-        tri_mags = np.arange(minmag, maxmag+1e-10, dm)
+        tri_mags = np.arange(minmag, maxmag+1e-10, dm)  # pylint: disable=possibly-used-before-assignment
     else:
         # Pad the brightest magnitude (minmag) by the possibility of AV=0,
         # scaled to current reddening vector.
         if use_bright and use_faint:
+            # pylint: disable-next=possibly-used-before-assignment
             tri_mags = np.arange(minmag-al_av*max(tri_av_faint, tri_av_bright), maxmag+1e-10, dm)
         elif use_bright:
             tri_mags = np.arange(minmag-al_av*tri_av_bright, maxmag+1e-10, dm)
         elif use_faint:
             tri_mags = np.arange(minmag-al_av*tri_av_faint, maxmag+1e-10, dm)
-    tri_mags_mids = tri_mags[:-1]+np.diff(tri_mags)/2
+    tri_mags_mids = tri_mags[:-1]+np.diff(tri_mags)/2  # pylint: disable=used-before-assignment
     if use_faint:
         if al_av is None:
             hist, tri_mags = np.histogram(tridata_faint, bins=tri_mags)
@@ -1118,7 +1128,7 @@ def make_tri_counts(trifolder, trifilename, trifiltname, dm, brightest_source_ma
         w_f, w_b = 1 / dens_uncert_faint**2, 1 / dens_uncert_bright**2
         dens = (dens_bright * w_b + dens_faint * w_f) / (w_b + w_f)
         dens_uncert = (dens_uncert_bright * w_b + dens_uncert_faint * w_f) / (w_b + w_f)
-        hc = hc_bright | hc_faint
+        hc = hc_bright | hc_faint  # pylint: disable=possibly-used-before-assignment
 
         num_bright_obj = max(num_bright_obj_faint, num_bright_obj_bright)
     elif use_bright:
@@ -1134,12 +1144,13 @@ def make_tri_counts(trifolder, trifilename, trifiltname, dm, brightest_source_ma
 
         num_bright_obj = num_bright_obj_faint
 
-    dens = dens[hc]
+    dens = dens[hc]  # pylint: disable=used-before-assignment,possibly-used-before-assignment
     dtri_mags = np.diff(tri_mags)[hc]
     tri_mags_mids = tri_mags_mids[hc]
     tri_mags = tri_mags[:-1][hc]
-    uncert = dens_uncert[hc]
+    uncert = dens_uncert[hc]  # pylint: disable=possibly-used-before-assignment
 
+    # pylint: disable-next=possibly-used-before-assignment
     return dens, tri_mags, tri_mags_mids, dtri_mags, uncert, num_bright_obj
 
 

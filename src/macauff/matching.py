@@ -70,12 +70,12 @@ class CrossMatch():
 
         # Initialise MPI if available and enabled
         if MPI is not None and use_mpi:
-            self.comm = MPI.COMM_WORLD
+            self.comm = MPI.COMM_WORLD  # pylint: disable=c-extension-no-member
             self.rank = self.comm.Get_rank()
             self.comm_size = self.comm.Get_size()
             # Set MPI error handling to return exceptions rather than MPI_Abort the
             # application. Allows for recovery of crashed workers.
-            self.comm.Set_errhandler(MPI.ERRORS_RETURN)
+            self.comm.Set_errhandler(MPI.ERRORS_RETURN)  # pylint: disable=c-extension-no-member
         else:
             if use_mpi:
                 print("Warning: MPI initialisation failed. Check mpi4py is correctly installed. "
@@ -184,8 +184,11 @@ class CrossMatch():
                 self.a_psf_fwhms[acbi], self.num_trials, self.a_nn_radius, self.a_dens_dist,
                 self.a_correct_astro_save_folder, self.a_gal_wavs[acbi], self.a_gal_aboffsets[acbi],
                 self.a_gal_filternames[acbi], self.a_gal_al_avs[acbi], self.d_mag, self.a_dd_params,
+                # pylint: disable-next=possibly-used-before-assignment
                 self.a_l_cut, ax1_mids, ax2_mids, ax_dimension, self.a_correct_mag_array,
+                # pylint: disable-next=possibly-used-before-assignment
                 self.a_correct_mag_slice, self.a_correct_sig_slice, self.n_pool, a_npy_or_csv,
+                # pylint: disable-next=possibly-used-before-assignment
                 a_coord_or_chunk, self.a_pos_and_err_indices, self.a_mag_indices, self.a_mag_unc_indices,
                 self.a_filt_names, self.a_best_mag_index, self.a_auf_region_frame,
                 self.a_saturation_magnitudes, trifolder=self.a_auf_folder_path,
@@ -258,7 +261,9 @@ class CrossMatch():
                 self.b_correct_astro_save_folder, self.b_gal_wavs[bcbi], self.b_gal_aboffsets[bcbi],
                 self.b_gal_filternames[bcbi], self.b_gal_al_avs[bcbi], self.d_mag, self.b_dd_params,
                 self.b_l_cut, ax1_mids, ax2_mids, ax_dimension, self.b_correct_mag_array,
+                # pylint: disable-next=possibly-used-before-assignment
                 self.b_correct_mag_slice, self.b_correct_sig_slice, self.n_pool, b_npy_or_csv,
+                # pylint: disable-next=possibly-used-before-assignment
                 b_coord_or_chunk, self.b_pos_and_err_indices, self.b_mag_indices, self.b_mag_unc_indices,
                 self.b_filt_names, self.b_best_mag_index, self.b_auf_region_frame,
                 self.b_saturation_magnitudes, trifolder=self.b_auf_folder_path,
@@ -1114,7 +1119,7 @@ class CrossMatch():
                         fit_gal_flag = self.a_fit_gal_flag
                     else:
                         fit_gal_flag = self.b_fit_gal_flag
-                if correct_astro or fit_gal_flag:
+                if correct_astro or fit_gal_flag:  # pylint: disable=possibly-used-before-assignment
                     for check_flag in ['gal_wavs', 'gal_zmax', 'gal_nzs',
                                        'gal_aboffsets', 'gal_filternames', 'saturation_magnitudes']:
                         if check_flag not in config:
@@ -1298,8 +1303,7 @@ class CrossMatch():
                 if mn_fit_type not in ['quadratic', 'linear']:
                     raise ValueError(f"mn_fit_type must be 'quadratic' or 'linear' in catalogue {catname} "
                                      "metadata file.")
-                else:
-                    setattr(self, f'{flag}mn_fit_type', mn_fit_type)
+                setattr(self, f'{flag}mn_fit_type', mn_fit_type)
 
                 # Since make_plots is always True, we always need seeing_ranges.
                 a = config['seeing_ranges'].split(' ')

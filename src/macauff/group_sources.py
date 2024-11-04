@@ -262,21 +262,21 @@ def make_island_groupings(cm):
     # to match extent to those now. Ensure that we only reject the unique source IDs
     # across each island group, ignoring the "default" -1 index.
     if reject_flag:
-        a_first_rejected_len = len(areject)
+        a_first_rejected_len = len(areject)  # pylint: disable=possibly-used-before-assignment
     else:
         a_first_rejected_len = 0
     if num_a_failed_checks + a_first_rejected_len > 0:
         reject_a = np.zeros(dtype=int, shape=(num_a_failed_checks+a_first_rejected_len,))
     if reject_flag:
-        reject_a[num_a_failed_checks:] = areject
+        reject_a[num_a_failed_checks:] = areject  # pylint: disable=used-before-assignment
     if reject_flag:
-        b_first_rejected_len = len(breject)
+        b_first_rejected_len = len(breject)  # pylint: disable=possibly-used-before-assignment
     else:
         b_first_rejected_len = 0
     if num_b_failed_checks + b_first_rejected_len > 0:
         reject_b = np.zeros(dtype=int, shape=(num_b_failed_checks+b_first_rejected_len,))
     if reject_flag:
-        reject_b[num_b_failed_checks:] = breject
+        reject_b[num_b_failed_checks:] = breject  # pylint: disable=used-before-assignment
 
     if reject_flag:
         alist_reject = alist[:, failed_check]
@@ -315,14 +315,14 @@ def make_island_groupings(cm):
         lenrejectb = 0
         cm.reject_b = None
 
-    cm.ablen = ablen
-    cm.bblen = bblen
+    cm.ablen = ablen  # pylint: disable=possibly-used-before-assignment
+    cm.bblen = bblen  # pylint: disable=possibly-used-before-assignment
     cm.ainds = ainds
     cm.binds = binds
     cm.asize = asize
     cm.bsize = bsize
-    cm.aflen = aflen
-    cm.bflen = bflen
+    cm.aflen = aflen  # pylint: disable=possibly-used-before-assignment
+    cm.bflen = bflen  # pylint: disable=possibly-used-before-assignment
     cm.alist = alist
     cm.blist = blist
     cm.agrplen = agrplen

@@ -413,10 +413,12 @@ class TestAstroCorrection:
         if not return_nm:
             marray = np.load('ac_save_folder/npy/m_sigs_array.npy')
             narray = np.load('ac_save_folder/npy/n_sigs_array.npy')
+        # pylint: disable-next=possibly-used-before-assignment
         assert_allclose([marray[0], narray[0]], [2, 0], rtol=0.1, atol=0.01)
 
         if not return_nm:
             abc_array = np.load('ac_save_folder/npy/snr_mag_params.npy')
+        # pylint: disable-next=possibly-used-before-assignment
         assert_allclose([abc_array[0, 0, 3], abc_array[0, 0, 4]], [105, 0], atol=0.001)
 
         assert_allclose(abc_array[0, 0, 0], 1.2e-2, rtol=0.05, atol=0.001)
@@ -582,6 +584,7 @@ class TestSNRMagRelation:
 
         if not return_nm:
             abc_array = np.load('ac_save_folder/npy/snr_mag_params.npy')
+        # pylint: disable-next=possibly-used-before-assignment
         assert_allclose([abc_array[0, 0, 3], abc_array[0, 0, 4]], [105, 0], atol=0.001)
 
         assert_allclose(abc_array[0, 0, 0], 1.2e-2, rtol=0.05, atol=0.001)

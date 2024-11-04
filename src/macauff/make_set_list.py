@@ -135,6 +135,7 @@ def set_list(aindices, bindices, aoverlap, boverlap, n_pool):
     bgrouplengths = bgrouplengths[goodlength]
 
     if reject_flag:
+        # pylint: disable-next=possibly-used-before-assignment
         return alist, blist, agrouplengths, bgrouplengths, areject, breject
     return alist, blist, agrouplengths, bgrouplengths
 
