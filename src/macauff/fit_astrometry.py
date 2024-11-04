@@ -498,7 +498,7 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
             raise ValueError("seeing_ranges must be provided if make_plots is True.")
         if make_plots:
             seeing_ranges = np.array(seeing_ranges)
-            if len(seeing_ranges) not in [1, 2, 3] and len(seeing_ranges.shape) != 1:
+            if len(seeing_ranges) not in [1, 2, 3] or len(seeing_ranges.shape) != 1:
                 raise ValueError("seeing_ranges must be a list of length 1, 2, or 3.")
             try:
                 seeing_ranges = np.array([float(f) for f in seeing_ranges])

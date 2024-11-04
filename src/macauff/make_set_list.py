@@ -98,8 +98,8 @@ def set_list(aindices, bindices, aoverlap, boverlap, n_pool):
                       f"more than {maxiters} possible iterations. Please check any results carefully.")
         sys.stdout.flush()
         rejectgroupnum = np.arange(1, groupmax+1)[grouplengthexceeded]
-        areject = np.arange(0, len(aoverlap))[np.in1d(agroup, rejectgroupnum)]
-        breject = np.arange(0, len(boverlap))[np.in1d(bgroup, rejectgroupnum)]
+        areject = np.arange(0, len(aoverlap))[np.isin(agroup, rejectgroupnum)]
+        breject = np.arange(0, len(boverlap))[np.isin(bgroup, rejectgroupnum)]
         reject_flag = True
     else:
         reject_flag = False

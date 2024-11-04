@@ -508,7 +508,7 @@ def rect_slice_npy(input_folder, output_folder, rect_coords, padding, mem_chunk_
     for cnum in range(0, mem_chunk_num):
         lowind = np.floor(n_rows*cnum/mem_chunk_num).astype(int)
         highind = np.floor(n_rows*(cnum+1)/mem_chunk_num).astype(int)
-        n_inside_rows += np.sum(sky_cut[lowind:highind])
+        n_inside_rows += int(np.sum(sky_cut[lowind:highind]))
 
     small_astro = open_memmap(f'{output_folder}/con_cat_astro.npy', mode='w+', dtype=float,
                               shape=(n_inside_rows, 3))

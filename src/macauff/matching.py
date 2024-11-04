@@ -197,9 +197,10 @@ class CrossMatch():
                 tri_uncert=self.a_tri_dens_uncert_list[acbi],
                 use_photometric_uncertainties=self.a_use_photometric_uncertainties, pregenerate_cutouts=True,
                 chunks=[self.chunk_id], n_r=self.real_hankel_points, n_rho=self.four_hankel_points,
-                max_rho=self.four_max_rho)
+                max_rho=self.four_max_rho, mn_fit_type=self.a_mn_fit_type)
             ac(a_cat_name=self.a_ref_csv_cat_file_string, b_cat_name=self.a_csv_cat_file_string,
-               tri_download=self.a_download_tri, make_plots=True, overwrite_all_sightlines=True)
+               tri_download=self.a_download_tri, make_plots=True, overwrite_all_sightlines=True,
+               seeing_ranges=self.a_seeing_ranges)
 
             # Having corrected the astrometry, we have to call csv_to_npy
             # now, rather than pre-generating our binary input catalogues.
@@ -269,9 +270,11 @@ class CrossMatch():
                 tri_uncert=self.b_tri_dens_uncert_list[bcbi],
                 use_photometric_uncertainties=self.b_use_photometric_uncertainties,
                 pregenerate_cutouts=True, chunks=[self.chunk_id],
-                n_r=self.real_hankel_points, n_rho=self.four_hankel_points, max_rho=self.four_max_rho)
+                n_r=self.real_hankel_points, n_rho=self.four_hankel_points, max_rho=self.four_max_rho,
+                mn_fit_type=self.b_mn_fit_type)
             ac(a_cat_name=self.b_ref_csv_cat_file_string, b_cat_name=self.b_csv_cat_file_string,
-               tri_download=self.b_download_tri, make_plots=True, overwrite_all_sightlines=True)
+               tri_download=self.b_download_tri, make_plots=True, overwrite_all_sightlines=True,
+               seeing_ranges=self.b_seeing_ranges)
 
             csv_folder, csv_filename = os.path.split(
                 self.b_csv_cat_file_string.format(self.chunk_id))
@@ -1284,12 +1287,38 @@ class CrossMatch():
                 for check_flag in ['best_mag_index', 'nn_radius', 'ref_csv_cat_file_string',
                                    'correct_mag_array', 'correct_mag_slice', 'correct_sig_slice',
                                    'chunk_overlap_col', 'best_mag_index_col',
-                                   'use_photometric_uncertainties']:
+                                   'use_photometric_uncertainties', 'mn_fit_type', 'seeing_ranges']:
                     if check_flag not in config:
                         raise ValueError(f"Missing key {check_flag} from catalogue {catname} metadata file.")
 
                 setattr(self, f'{flag}use_photometric_uncertainties',
                         self._str2bool(config['use_photometric_uncertainties']))
+
+                mn_fit_type = config['mn_fit_type']
+                if mn_fit_type not in ['quadratic', 'linear']:
+                    raise ValueError(f"mn_fit_type must be 'quadratic' or 'linear' in catalogue {catname} "
+                                     "metadata file.")
+                else:
+                    setattr(self, f'{flag}mn_fit_type', mn_fit_type)
+
+                # Since make_plots is always True, we always need seeing_ranges.
+                a = config['seeing_ranges'].split(' ')
+                try:
+                    b = np.array([float(f) for f in a])
+                    if len(b.shape) != 1 or len(b) not in [1, 2, 3]:
+                        raise ValueError("seeing_ranges must be a 1-D list or array of ints, length 1, 2, or "
+                                         f"3 {catname} metadata file.")
+                except ValueError as exc:
+                    raise ValueError("seeing_ranges must be a 1-D list or array of ints, length 1, 2, or "
+                                     f"3 in catalogue {catname} metadata file.") from exc
+                setattr(self, f'{flag}seeing_ranges', b)
+
+                # AstrometricCorrections takes both single_or_repeat and
+                # repeat_unique_visits_list, but since you can't do a
+                # cross-match on multiple observations of the same objects
+                # at once, we assume that time-series is outside of the loop
+                # and therefore need to pass neither parameter through to
+                # the fitting routine.
 
                 a = config['best_mag_index']
                 try:
