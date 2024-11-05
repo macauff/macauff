@@ -1032,9 +1032,11 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
         b_guess = np.log10(np.mean((10**s_d_snr_med[q][:15])**2))
         # Then take average of the difference between the a+b model and the full
         # model to get the photon-noise, sqrt(S)-scaling final parameter.
-        half_model = 10**b_guess + (10**a_guess * 10**((s_bins[:-1]+np.diff(s_bins)/2)[q]))
-        # If (S/SNR)^2 = c * S + b + (a * S)^2, then c ~ (S/SNR)^2 / half_model:
-        c_guess = np.log10(np.mean((10**s_d_snr_med[q])**2 / half_model))
+        half_model = 10**b_guess + (10**a_guess * 10**((s_bins[:-1]+np.diff(s_bins)/2)[q]))**2
+        # If (S/SNR)^2 = c * S + b + (a * S)^2, then c ~ ((S/SNR)^2 - half_model) / S:
+        c_guess = np.log10(np.maximum(10**-30,
+                           np.mean(((10**s_d_snr_med[q])**2 - half_model) /
+                                   10**((s_bins[:-1]+np.diff(s_bins)/2)[q]))))
 
         res = minimize(fit_snr_sqrt, args=((s_bins[:-1]+np.diff(s_bins)/2)[q],
                        s_d_snr_med[q]), x0=[a_guess, b_guess, c_guess], jac=True,
