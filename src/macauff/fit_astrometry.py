@@ -627,7 +627,14 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
 
             rect_area = (ax1_max - (ax1_min)) * (
                 np.sin(np.radians(ax2_max)) - np.sin(np.radians(ax2_min))) * 180/np.pi
-            self.avg_b_dens[index_] = len(self.b) / rect_area
+            if self.single_or_repeat == 'repeat':
+                # Divide the density through by the number of repeat visits,
+                # since we want the average density of the visits, not the
+                # sum of all repeated visits.
+                n_visits = len(np.unique(self.repeat_unique_visits))
+                self.avg_b_dens[index_] = len(self.b) / rect_area / n_visits
+            else:
+                self.avg_b_dens[index_] = len(self.b) / rect_area
 
             self.a_array, self.b_array, self.c_array = self.make_snr_model()
             abc_array[:, index_, 0] = self.a_array
