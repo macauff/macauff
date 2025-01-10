@@ -40,8 +40,7 @@ subroutine find_mag_bin_inds(mags, flags, bins, cuts)
 
 end subroutine find_mag_bin_inds
 
-subroutine get_field_dists(a_ax1, a_ax2, b_ax1, b_ax2, a_indices, a_overlap, b_err_circ, a_flags, b_flags, b_mag, low_mag, &
-    upp_mag, a_mask_ind, a_area_cut)
+subroutine get_field_dists(auf_cdf_a, a_indices, a_overlap, f_frac, a_flags, b_flags, b_mag, low_mag, upp_mag, a_mask_ind)
     ! Derive the distribution of "field" sources, those with no counterpart in the opposing
     ! catalogue, by removing any source within the "field" integral fraction radius of any object.
     integer, parameter :: dp = kind(0.0d0)  ! double precision
@@ -50,8 +49,9 @@ subroutine get_field_dists(a_ax1, a_ax2, b_ax1, b_ax2, a_indices, a_overlap, b_e
     integer, intent(in) :: a_indices(:, :), a_overlap(:)
     ! Boolean flags indicating whether a given object in a catalogue is detected in its bandpass.
     logical, intent(in) :: a_flags(:), b_flags(:)
-    ! Orthogonal sky coordinates, and "secondary" catalogue error circle radius.
-    real(dp), intent(in) :: a_ax1(:), a_ax2(:), b_ax1(:), b_ax2(:), b_err_circ(:)
+    ! Evaluation of the AUF, integrated to the separation between potential counterparts, and fraction of
+    ! counterpart objects to remove (and hence also remove "field" objects).
+    real(dp), intent(in) :: auf_cdf_a(:, :), f_frac
     ! Second catalogue magnitude for this bandpass, and limits between which to consider removing
     ! sources from the field source distribution.
     real(dp), intent(in) :: b_mag(:), low_mag, upp_mag
@@ -59,32 +59,22 @@ subroutine get_field_dists(a_ax1, a_ax2, b_ax1, b_ax2, a_indices, a_overlap, b_e
     ! field source, or if it is too close to a primary catalogue object and thus not used to
     ! construct the "unmatched" distribution.
     integer, intent(out) :: a_mask_ind(size(a_overlap))
-    ! Area of error ellipses cut out of the distribution.
-    real(dp), intent(out) :: a_area_cut
     ! Loop counters.
     integer :: i, j, k
-    ! Haversine on-sky distance.
-    real(dp) :: dist
 
     a_mask_ind = 1
-    ! Note that the cut areas are reversed, so we get the areas of any sources of catalogue b and cut
-    ! them out of catalogue a.
 
-!$OMP PARALLEL DO DEFAULT(NONE) PRIVATE(i, j, k, dist) SHARED(a_ax1, a_ax2, b_ax1, b_ax2, &
-!$OMP& a_mask_ind, b_err_circ, a_indices, a_overlap, a_flags, b_flags, b_mag, low_mag, upp_mag) REDUCTION(+:a_area_cut)
+!$OMP PARALLEL DO DEFAULT(NONE) PRIVATE(i, j, k) SHARED(auf_cdf_a, a_indices, a_overlap, a_flags, b_flags, b_mag, &
+!$OMP& low_mag, upp_mag, f_frac, a_mask_ind)
     do j = 1, size(a_overlap)
         if (a_flags(j)) then
             do k = 1, a_overlap(j)
                 ! Index arrays have come from python and are zero-indexed, so correct offset here.
                 i = a_indices(k, j) + 1
                 if (i > 0) then
-                    if (b_flags(i) .and. (b_mag(i) >= low_mag .and. b_mag(i) <= upp_mag)) then
-                        call haversine(a_ax1(j), b_ax1(i), a_ax2(j), b_ax2(i), dist)
-                        if (b_err_circ(i) >= dist) then
-                            a_mask_ind(j) = 0
-                            a_area_cut = a_area_cut + pi*b_err_circ(i)**2
-                            exit
-                        end if
+                    if (auf_cdf_a(k, j) < f_frac .and. b_flags(i) .and. b_mag(i) >= low_mag .and. b_mag(i) <= upp_mag) then
+                        a_mask_ind(j) = 0
+                        exit
                     end if
                 end if
             end do
@@ -96,7 +86,7 @@ subroutine get_field_dists(a_ax1, a_ax2, b_ax1, b_ax2, a_indices, a_overlap, b_e
 
 end subroutine get_field_dists
 
-subroutine brightest_mag(a_ax1, a_ax2, b_ax1, b_ax2, a_mag, b_mag, a_indices, a_overlap, a_err_circ, a_flags, b_flags, a_bin, &
+subroutine brightest_mag(auf_cdf_a, a_mag, b_mag, a_indices, a_overlap, b_frac, a_err_circ, a_flags, b_flags, a_bin, &
     mag_mask, av_area)
     ! Derive the distribution of brightest sources of one catalogue inside "error circles" of
     ! another catalogue.
@@ -106,8 +96,10 @@ subroutine brightest_mag(a_ax1, a_ax2, b_ax1, b_ax2, a_mag, b_mag, a_indices, a_
     integer, intent(in) :: a_indices(:, :), a_overlap(:)
     ! Boolean flags indicating whether a given object in a catalogue is detected in its bandpass.
     logical, intent(in) :: a_flags(:), b_flags(:)
-    ! Orthogonal sky coordinates, and "primary" catalogue error circle radius.
-    real(dp), intent(in) :: a_ax1(:), a_ax2(:), b_ax1(:), b_ax2(:), a_err_circ(:)
+    ! "Primary" catalogue error circle radius, evaluation of the AUF, integrated to the separation
+    ! between potential counterparts, and fraction of overlapping objects to keep when considering
+    ! brightest object in a given error circle.
+    real(dp), intent(in) :: a_err_circ(:), auf_cdf_a(:, :), b_frac
     ! Catalogue magnitude for these bandpasses, and bins into which to divide the "a" catalogue
     ! magnitudes.
     real(dp), intent(in) :: a_mag(:), b_mag(:), a_bin(:)
@@ -122,9 +114,8 @@ subroutine brightest_mag(a_ax1, a_ax2, b_ax1, b_ax2, a_mag, b_mag, a_indices, a_
     integer :: brightindex, m, r
     ! Counter for the number of sources in each a_bin magnitude range.
     integer :: n(size(a_bin)-1)
-    ! Variables keeping track of various parameters: the brightest magnitude inside an error circle,
-    ! and the Haversine distance between sources.
-    real(dp) :: brightmag, dist
+    ! Brightest magnitude inside an error circle.
+    real(dp) :: brightmag
 
     mag_mask = 0
     n = 0
@@ -151,8 +142,8 @@ subroutine brightest_mag(a_ax1, a_ax2, b_ax1, b_ax2, a_mag, b_mag, a_indices, a_
         end if
     end do
 
-!$OMP PARALLEL DO DEFAULT(NONE) PRIVATE(i, j, brightindex, brightmag, dist, m, r) SHARED(a_ax1, a_ax2, b_ax1, &
-!$OMP& b_ax2, b_mag, mag_mask, a_indices, a_overlap, a_err_circ, a_flags, b_flags, a_bin, a_mag)
+!$OMP PARALLEL DO DEFAULT(NONE) PRIVATE(i, j, k, brightindex, brightmag, m, r) SHARED(auf_cdf_a, b_mag, mag_mask, a_indices, &
+!$OMP& a_overlap, a_err_circ, a_flags, b_flags, a_bin, a_mag, b_frac)
     do i = 1, size(a_overlap)
         if (a_flags(i)) then
             r = 1
@@ -168,8 +159,7 @@ subroutine brightest_mag(a_ax1, a_ax2, b_ax1, b_ax2, a_mag, b_mag, a_indices, a_
                 j = a_indices(k, i) + 1
                 if (j > 0) then
                     if (b_flags(j)) then
-                        call haversine(a_ax1(i), b_ax1(j), a_ax2(i), b_ax2(j), dist)
-                        if (a_err_circ(i) > dist .and. b_mag(j) < brightmag) then
+                        if (auf_cdf_a(k, i) < b_frac .and. b_mag(j) < brightmag) then
                             brightindex = j
                             brightmag = b_mag(j)
                         end if
