@@ -173,7 +173,9 @@ subroutine get_overlap_indices(a_ax_1, a_ax_2, b_ax_1, b_ax_2, max_sep, amax, bm
     ! Temporary flag arrays.
     integer :: tempcounter, changeflag
     ! Allocatable temporary index array.
-    integer, allocatable :: tempind(:), tempcdf(:)
+    integer, allocatable :: tempind(:)
+    ! Allocatable temporary CDF array.
+    real(dp), allocatable :: tempcdf(:)
 
     max_sep2 = max_sep**2
 

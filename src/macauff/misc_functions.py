@@ -5,6 +5,7 @@ framework.
 '''
 
 import numpy as np
+from multiprocessing import shared_memory
 from scipy.optimize import minimize
 
 __all__ = []
@@ -390,3 +391,47 @@ def find_model_counts_corrections(data_loghist, data_dloghist, data_bin_mids, tr
                                  tri_log_hist_at_data[q], gal_log_hist_at_data[q]), x0=[1, 1], jac=True,
                    method='L-BFGS-B', options={'ftol': 1e-12}, bounds=[(0.01, None), (0.01, None)])
     return res.x
+
+
+class SharedNumpyArray:
+    '''
+    Wraps a numpy array so that it can be shared quickly among processes,
+    avoiding unnecessary copying and (de)serializing. Resource originally
+    from https://e-dorigatti.github.io/python/2020/06/19/
+    multiprocessing-large-objects.html.
+    '''
+    def __init__(self, array, name='123'):
+        '''
+        Creates the shared memory and copies the array.
+        '''
+        try:
+            shm = shared_memory.SharedMemory(name=name)
+            shm.unlink()
+        except FileNotFoundError:
+            pass
+        self._shared = shared_memory.SharedMemory(name=name, create=True, size=array.nbytes)
+
+        self._dtype, self._shape = array.dtype, array.shape
+
+        res = np.ndarray(self._shape, dtype=self._dtype, buffer=self._shared.buf)
+        res[:] = array[:]
+
+    def read(self):
+        '''
+        Reads the array from the shared memory without unnecessary copying.
+        '''
+        return np.ndarray(self._shape, self._dtype, buffer=self._shared.buf)
+
+    def copy(self):
+        '''
+        Returns a new copy of the array stored in shared memory.
+        '''
+        return np.copy(self.read())
+
+    def unlink(self):
+        '''
+        Releases the allocated memory. Call when finished using the data,
+        or when the data was copied somewhere else.
+        '''
+        self._shared.close()
+        self._shared.unlink()

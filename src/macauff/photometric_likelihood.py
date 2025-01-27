@@ -389,8 +389,8 @@ def create_c_and_f(a_astro, b_astro, a_mag, b_mag, a_inds, a_size, b_inds, b_siz
 
     # Areas are reversed, so we remove the "a" areas from catalogue b and cut
     # them out of the density calculation for Nfa, and vice versa.
-    a_area = np.sum(b_flen[b_flags])
-    b_area = np.sum(a_flen[a_flags])
+    a_area = np.sum(np.pi * b_flen[b_flags]**2)
+    b_area = np.sum(np.pi * a_flen[a_flags]**2)
 
     nfa = num_fa/(area - a_area)
     nfb = num_fb/(area - b_area)
@@ -421,7 +421,7 @@ def create_c_and_f(a_astro, b_astro, a_mag, b_mag, a_inds, a_size, b_inds, b_siz
         _fb = hist / (np.sum(hist)*np.diff(b_bins))
         # We remove the objects from catalogue b, but it's the area of catalogue
         # a that is removed for density calculation purposes!
-        barea = np.sum(a_flen[a_flags & (a_mag >= a_bins[i]) & (a_mag <= a_bins[i+1])])
+        barea = np.sum(np.pi * a_flen[a_flags & (a_mag >= a_bins[i]) & (a_mag <= a_bins[i+1])]**2)
         _nfb = _num_fb/(area - barea)
         fm = np.append(0, np.cumsum(_fb[:-1] * np.diff(b_bins[:-1])))
         for j in range(0, len(b_bins)-1):

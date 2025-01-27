@@ -15,7 +15,8 @@ import numpy as np
 # pylint: disable=import-error,no-name-in-module
 from macauff.group_sources_fortran import group_sources_fortran as gsf
 from macauff.make_set_list import set_list
-from macauff.misc_functions import _load_rectangular_slice, hav_dist_constant_lat, load_small_ref_auf_grid
+from macauff.misc_functions import (_load_rectangular_slice, hav_dist_constant_lat, load_small_ref_auf_grid,
+                                    SharedNumpyArray)
 
 # pylint: enable=import-error,no-name-in-module
 
@@ -123,8 +124,8 @@ def make_island_groupings(cm):
     ainds = np.zeros(dtype=int, shape=(amaxsize, len(a_full)), order='F')
     binds = np.zeros(dtype=int, shape=(bmaxsize, len(b_full)), order='F')
 
-    auf_cdf_a = np.zeros(dtype=int, shape=(amaxsize, len(a_full)), order='F')
-    auf_cdf_b = np.zeros(dtype=int, shape=(bmaxsize, len(b_full)), order='F')
+    auf_cdf_a = np.zeros(dtype=float, shape=(amaxsize, len(a_full)), order='F')
+    auf_cdf_b = np.zeros(dtype=float, shape=(bmaxsize, len(b_full)), order='F')
 
     ainds[:, :] = -1
     binds[:, :] = -1
@@ -248,8 +249,15 @@ def make_island_groupings(cm):
     # look at whether any source has a sky separation of less than max_sep
     # from any of the four lines defining extent in orthogonal sky axes.
     counter = np.arange(0, alist.shape[1])
+    shared_a = SharedNumpyArray(a_full, 'a_full')
+    shared_b = SharedNumpyArray(b_full, 'b_full')
+    shared_alist = SharedNumpyArray(alist, 'alist')
+    shared_blist = SharedNumpyArray(blist, 'blist')
+    shared_agrplen = SharedNumpyArray(agrplen, 'agrplen')
+    shared_bgrplen = SharedNumpyArray(bgrplen, 'bgrplen')
     expand_constants = [itertools.repeat(item) for item in [
-        a_full, b_full, alist, blist, agrplen, bgrplen, cm.cross_match_extent, max_sep]]
+        shared_a, shared_b, shared_alist, shared_blist, shared_agrplen, shared_bgrplen,
+        cm.cross_match_extent, max_sep]]
     iter_group = zip(counter, *expand_constants)
     # Initialise the multiprocessing loop setup:
     with multiprocessing.Pool(cm.n_pool) as pool:
@@ -267,6 +275,9 @@ def make_island_groupings(cm):
                 num_b_failed_checks += len(b)
 
     pool.join()
+
+    for _shared in [shared_a, shared_b, shared_alist, shared_blist, shared_agrplen, shared_bgrplen]:
+        _shared.unlink()
 
     # If set_list returned any rejected sources, then add any sources too close
     # to match extent to those now. Ensure that we only reject the unique source IDs
@@ -451,10 +462,10 @@ def _calc_unique_inds(iterable):
 
 def _distance_check(iterable):
     i, a_, b_, alist_1, blist_1, agrplen_small, bgrplen_small, ax_lims, max_sep = iterable
-    subset = alist_1[:agrplen_small[i], i]
-    a = a_[subset]
-    subset = blist_1[:bgrplen_small[i], i]
-    b = b_[subset]
+    subset = alist_1.read()[:agrplen_small.read()[i], i]
+    a = a_.read()[subset]
+    subset = blist_1.read()[:bgrplen_small.read()[i], i]
+    b = b_.read()[subset]
     meets_min_distance = np.zeros(len(a)+len(b), bool)
     # Do not check for longitudinal "extent" small separations for cases
     # where all 0-360 degrees are included, as this will result in no loss
