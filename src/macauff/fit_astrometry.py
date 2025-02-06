@@ -1985,20 +1985,20 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
 
         if usetex:
             if not self.use_photometric_uncertainties:
-                self.ax_b_sing.set_xlabel(r'Input astrometric $\sigma$ / arcsecond')
-                self.ax_b_log_sing.set_xlabel(r'Input astrometric $\sigma$ / arcsecond')
+                self.ax_b_sing.set_xlabel(r'Quoted astrometric $\sigma$ / arcsecond')
+                self.ax_b_log_sing.set_xlabel(r'Quoted astrometric $\sigma$ / arcsecond')
             else:
-                self.ax_b_sing.set_xlabel(r'Input photometric $\sigma$ / arcsecond')
-                self.ax_b_log_sing.set_xlabel(r'Input photometric $\sigma$ / arcsecond')
+                self.ax_b_sing.set_xlabel(r'Quoted photometric $\sigma$ / arcsecond')
+                self.ax_b_log_sing.set_xlabel(r'Quoted photometric $\sigma$ / arcsecond')
             self.ax_b_sing.set_ylabel(r'Individually-fit astrometric $\sigma$ / arcsecond')
             self.ax_b_log_sing.set_ylabel(r'Individually-fit astrometric $\sigma$ / arcsecond')
         else:
             if not self.use_photometric_uncertainties:
-                self.ax_b_sing.set_xlabel(r'Input astrometric sigma / arcsecond')
-                self.ax_b_log_sing.set_xlabel(r'Input astrometric sigma / arcsecond')
+                self.ax_b_sing.set_xlabel(r'Quoted astrometric sigma / arcsecond')
+                self.ax_b_log_sing.set_xlabel(r'Quoted astrometric sigma / arcsecond')
             else:
-                self.ax_b_sing.set_xlabel(r'Input photometric sigma / arcsecond')
-                self.ax_b_log_sing.set_xlabel(r'Input photometric sigma / arcsecond')
+                self.ax_b_sing.set_xlabel(r'Quoted photometric sigma / arcsecond')
+                self.ax_b_log_sing.set_xlabel(r'Quoted photometric sigma / arcsecond')
             self.ax_b_sing.set_ylabel(r'Individually-fit astrometric sigma / arcsecond')
             self.ax_b_log_sing.set_ylabel(r'Individually-fit astrometric sigma / arcsecond')
         plt.savefig(f'{self.save_folder}/pdf/summary_individual_sig_vs_sig.pdf')
