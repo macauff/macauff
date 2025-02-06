@@ -670,7 +670,7 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
                 # calculate the chi-squareds, but since we don't plot those at
                 # the moment that's okay; if plotting is turned back on, a
                 # better call will be required.
-                mn_poisson_cdfs, ind_poisson_cdfs = self.plot_fits_calculate_cdfs(m_sig, n_sig)
+                mn_poisson_cdfs, ind_poisson_cdfs = self.plot_fits_calculate_cdfs()
                 if self.make_summary_plot:
                     self.mn_poisson_cdfs[index_] = mn_poisson_cdfs
                     self.ind_poisson_cdfs[index_] = ind_poisson_cdfs
@@ -1664,22 +1664,15 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
 
         return neg_log_like_part
 
-    def plot_fits_calculate_cdfs(self, m_sig, n_sig):  # pylint: disable=too-many-locals,too-many-statements
+    def plot_fits_calculate_cdfs(self):  # pylint: disable=too-many-locals,too-many-statements
         """
         Calculate poisson CDFs and create verification plots showing the
         quality of the fits.
-
-        Parameters
-        ----------
-        m_sig : float
-            The best-fit multiplicative scaling factor for astrometric corrections.
-        n_sig : float
-            The best-fit additive scaling factor for astrometric corrections.
         """
         if self.coord_or_chunk == 'coord':
-            ax1_mid, ax2_mid, ax1_min, ax1_max, ax2_min, ax2_max = self.list_of_things
+            _, _, ax1_min, ax1_max, ax2_min, ax2_max = self.list_of_things
         else:
-            ax1_mid, ax2_mid, ax1_min, ax1_max, ax2_min, ax2_max, _ = self.list_of_things
+            _, _, ax1_min, ax1_max, ax2_min, ax2_max, _ = self.list_of_things
         mn_poisson_cdfs = np.array([], float)
         ind_poisson_cdfs = np.array([], float)
 
@@ -1728,7 +1721,6 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
                 final_slice = sig_cut & mag_cut & n_cut & (self.dists <= 20*bsig)
             else:
                 final_slice = sig_cut & mag_cut & n_cut & (self.dists <= 20*self.psfsig*bsig)
-            bm = b_matches[final_slice]
 
             rect_area = (ax1_max - (ax1_min)) * (
                 np.sin(np.radians(ax2_max)) - np.sin(np.radians(ax2_min))) * 180/np.pi
