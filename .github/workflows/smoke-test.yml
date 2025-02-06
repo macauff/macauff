@@ -20,28 +20,28 @@ jobs:
             os: ubuntu-latest
             python-version: 3.8
             toxenv: py38-test
-            gfortran-version: 9
+            gfortran-version: 13
           - name: Linux, Python 3.9
             os: ubuntu-22.04
             python-version: 3.9
             toxenv: py39-test
-            gfortran-version: 11
+            gfortran-version: 12
           - name: Linux, Python 3.11
             os: ubuntu-22.04
             python-version: "3.11"
             toxenv: py311-test
-            gfortran-version: 11
+            gfortran-version: 12
           - name: macOS, Python 3.8
-            os: macOS-11
+            os: macOS-13
             python-version: 3.8
             toxenv: py38-test
-            gfortran-version: 10
+            gfortran-version: 12
           - name: macOS, Python 3.10, coverage
-            os: macOS-11
+            os: macOS-13
             python-version: "3.10"
             # Include at least one coverage option for codecov.
             toxenv: py310-test-cov
-            gfortran-version: 11
+            gfortran-version: 13
     steps:
     - uses: actions/checkout@v3
     - name: Set up Python ${{ matrix.python-version }}
