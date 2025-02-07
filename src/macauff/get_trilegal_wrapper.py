@@ -141,7 +141,7 @@ def trilegal_webcall(trilegal_version, l, b, area, binaries, av, sigma_av, filte
         ``timeout`` or ``good`` depending on whether the run was successful
         or not.
     """
-    webserver = 'http://stev.oapd.inaf.it'
+    webserver = 'https://stev.oapd.inaf.it'
     mainparams = ('imf_file=tab_imf%2Fimf_chabrier_lognormal.dat&binary_frac=0.3&'
                   'binary_mrinf=0.7&binary_mrsup=1&extinction_h_r=100000&extinction_h_z='
                   f'110&extinction_kind=2&extinction_rho_sun=0.00015&extinction_infty={av}&'
