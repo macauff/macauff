@@ -18,7 +18,7 @@ API Changes
 
 - ``AstrometricCorrections`` has keyword inputs ``mn_fit_type``, ``seeing_ranges``,
   ``single_or_repeat``, and ``repeat_unique_visits_list``, which are accordingly
-  optional inputs into ``CrossMatch``. [#84]
+  optional inputs into ``CrossMatch``. [#85]
 
 - ``CrossMatch`` now expects ``saturation_magnitudes`` as an input parameter in
   its input files, if ``fit_gal_flag`` or ``correct_astrometry`` are
@@ -69,7 +69,7 @@ API Changes
 Other Changes
 ^^^^^^^^^^^^^
 
-- Pinned ``numpy`` to minimum v2.0 for compatibility with new features. [#84]
+- Pinned ``numpy`` to minimum v2.0 for compatibility with new features. [#85]
 
 - Pinned ``speclite`` to minimum v0.18 for additional filters. [#82]
 
