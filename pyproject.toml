@@ -35,7 +35,8 @@ dev = [
     "nbconvert", # Needed for pre-commit check to clear output from Python notebooks
     "pylint", # Used for static linting of files
     "ipython", # Also used in building notebooks into Sphinx
-    "asv==0.6.1", # Used to compute performance benchmarks
+    "asv", # Used to compute performance benchmarks
+    "pytest", # Linting errors without being able to import
 ]
 test = [
     "pytest-astropy",
@@ -54,11 +55,7 @@ url = "https://github.com/macauff/macauff"
 [build-system]
 requires = [
     "scikit-build-core",
-    # We need as old numpy as possible for binary compatibility,
-    # but we also need some f2py features intrdocued in 1.21.
-    # The oldest-supported-numpy for Py3.10 is 1.21.
-    "numpy==1.21.6; python_version<'3.10'",
-    "oldest-supported-numpy; python_version>='3.10'",
+    "numpy>=2.0.0"
 ]
 build-backend = "scikit_build_core.build"
 

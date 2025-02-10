@@ -22,7 +22,7 @@ jobs:
         with:
           python-version: 3.9
       - name: Setup ubuntu gfortran
-        run: sudo ln -sf /usr/bin/gfortran-9 /usr/bin/gfortran
+        run: sudo ln -sf /usr/bin/gfortran-12 /usr/bin/gfortran
       - name: Install requirements
         run: |
           sudo apt-get update

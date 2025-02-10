@@ -148,6 +148,7 @@ def csv_to_npy(input_folder, input_filename, output_folder, astro_cols, photo_co
             sig_mn_inds = mff.find_nearest_point(chunk.values[:, new_astro_cols[0]],
                                                  chunk.values[:, new_astro_cols[1]],
                                                  mn_coords[:, 0], mn_coords[:, 1])
+            # pylint: disable-next=possibly-used-before-assignment
             new_sigs = np.sqrt((m_sigs[sig_mn_inds]*old_sigs)**2 + n_sigs[sig_mn_inds]**2)
             astro[n:n+chunk.shape[0], 2] = new_sigs
         photo[n:n+chunk.shape[0]] = chunk.values[:, new_photo_cols]
@@ -508,7 +509,7 @@ def rect_slice_npy(input_folder, output_folder, rect_coords, padding, mem_chunk_
     for cnum in range(0, mem_chunk_num):
         lowind = np.floor(n_rows*cnum/mem_chunk_num).astype(int)
         highind = np.floor(n_rows*(cnum+1)/mem_chunk_num).astype(int)
-        n_inside_rows += np.sum(sky_cut[lowind:highind])
+        n_inside_rows += int(np.sum(sky_cut[lowind:highind]))
 
     small_astro = open_memmap(f'{output_folder}/con_cat_astro.npy', mode='w+', dtype=float,
                               shape=(n_inside_rows, 3))

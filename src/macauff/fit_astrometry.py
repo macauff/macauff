@@ -11,6 +11,7 @@ import itertools
 import multiprocessing
 import os
 import shutil
+import sys
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -20,7 +21,8 @@ from matplotlib import gridspec
 from numpy.lib.format import open_memmap
 from scipy import spatial
 from scipy.optimize import minimize
-from scipy.stats import binned_statistic, chi2  # pylint: disable=unused-import
+from scipy.special import factorial
+from scipy.stats import binned_statistic, poisson
 
 # Assume that usetex = False only applies for tests where no TeX is installed
 # at all, instead of users having half-installed TeX, dvipng et al. somewhere.
@@ -51,16 +53,16 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
     precisions in photometric catalogues, based on reliable cross-matching
     to a well-understood second dataset.
     """
-    # pylint: disable-next=too-many-locals,too-many-arguments
+    # pylint: disable-next=too-many-locals,too-many-arguments,too-many-positional-arguments
     def __init__(self, psf_fwhm, numtrials, nn_radius, dens_search_radius, save_folder,
                  gal_wav_micron, gal_ab_offset, gal_filtname, gal_alav, dm, dd_params, l_cut,
                  ax1_mids, ax2_mids, ax_dimension, mag_array, mag_slice, sig_slice, n_pool,
                  npy_or_csv, coord_or_chunk, pos_and_err_indices, mag_indices, mag_unc_indices,
                  mag_names, best_mag_index, coord_system, saturation_magnitudes, pregenerate_cutouts, n_r,
-                 n_rho, max_rho, trifolder=None, triname=None, maglim_f=None, magnum=None, tri_num_faint=None,
-                 trifilterset=None, trifiltname=None, tri_hist=None, tri_mags=None, dtri_mags=None,
-                 tri_uncert=None, use_photometric_uncertainties=False, cutout_area=None, cutout_height=None,
-                 single_sided_auf=True, chunks=None, return_nm=False):
+                 n_rho, max_rho, mn_fit_type, trifolder=None, triname=None, maglim_f=None, magnum=None,
+                 tri_num_faint=None, trifilterset=None, trifiltname=None, tri_hist=None, tri_mags=None,
+                 dtri_mags=None, tri_uncert=None, use_photometric_uncertainties=False, cutout_area=None,
+                 cutout_height=None, single_sided_auf=True, chunks=None, return_nm=False):
         """
         Initialisation of AstrometricCorrections, accepting inputs required for
         the running of the optimisation and parameterisation of astrometry of
@@ -190,6 +192,10 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
         max_rho : float
             Largest fourier-space value to integrate functions to during the
             convolution of AUF PDFs.
+        mn_fit_type : string
+            Determines whether we perform quadratic or linear scaling for
+            hyper-parameter fits to data-driven vs quoted astrometric
+            uncertainties. Must either be "quadratic" or "linear."
         trifolder : string, optional
             Filepath of the location into which to save TRILEGAL simulations. If
             provided ``tri_hist``, ``tri_mags``, ``dtri_mags``, and ``tri_uncert``
@@ -290,6 +296,8 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
             raise ValueError("use_photometric_uncertainties must either be True or False.")
         if return_nm is not True and return_nm is not False:
             raise ValueError("return_nm must either be True or False.")
+        if mn_fit_type not in ("quadratic", "linear"):
+            raise ValueError("mn_fit_type must either be 'quadratic' or 'linear'.")
         self.return_nm = return_nm
         self.psf_fwhm = psf_fwhm
         self.numtrials = numtrials
@@ -350,6 +358,8 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
 
         self.coord_system = coord_system
 
+        self.mn_fit_type = mn_fit_type
+
         if npy_or_csv == 'npy':
             self.pos_and_err_indices = pos_and_err_indices
             self.mag_indices = mag_indices
@@ -395,7 +405,8 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
     # pylint: disable-next=too-many-statements,too-many-branches
     def __call__(self, a_cat=None, b_cat=None, a_cat_name=None, b_cat_name=None, a_cat_func=None,
                  b_cat_func=None, tri_download=True, overwrite_all_sightlines=False, make_plots=False,
-                 make_summary_plot=True):
+                 make_summary_plot=True, seeing_ranges=None, single_or_repeat="single",
+                 repeat_unique_visits_list=None):
         """
         Call function for the correction calculation process.
 
@@ -440,6 +451,24 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
         make_summary_plot : boolean, optional
             If ``True`` then final summary plot is created, even if
             ``make_plots`` is ``False`` and intermediate plots are not created.
+        seeing_ranges : list or numpy.ndarray, optional
+            If ``make_plots`` is True, must be a valid 1-, 2-, or 3-length list
+            of floats, the seeing, in arcseconds, of observations, for plotting
+            over astrometric precision vs SNR distributions.
+        single_or_repeat : string, either "single" or "repeat"
+            Flag indicating whether catalogue is made of a single set of
+            observations or repeated "visits" to this patch of sky. If "single"
+            then each row is assumed to be unique, but if "repeat" is given then
+            ``repeat_unique_visits_list`` must be provided, giving the indices for
+            which row comes from which unique repeat-observation of the sky
+            region.
+        repeat_unique_visits_list : list of list or numpy.ndarray of integers
+            If ``single_or_repeat`` is "repeat", then these arrays must be
+            provided, giving the ID of each sub-visit that has been merged
+            into a single catalogue, for use in separating individual visits
+            out for cross-matches and local normalising density calculations.
+            Length must match ``a_cat`` and ``b_cat``, one set of visit indices
+            per field pointing.
         """
         if (a_cat is None and b_cat is not None) or (a_cat is not None and b_cat is None):
             raise ValueError("a_cat and b_cat must either both be None or both not be None.")
@@ -465,6 +494,33 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
             raise ValueError("tri_download must either be True or False if trifolder given.")
         if self.tri_hist is not None and tri_download is not None:
             raise ValueError("tri_download must be None if tri_hist is given.")
+        if make_plots and seeing_ranges is None:
+            raise ValueError("seeing_ranges must be provided if make_plots is True.")
+        if make_plots:
+            seeing_ranges = np.array(seeing_ranges)
+            if len(seeing_ranges) not in [1, 2, 3] or len(seeing_ranges.shape) != 1:
+                raise ValueError("seeing_ranges must be a list of length 1, 2, or 3.")
+            try:
+                seeing_ranges = np.array([float(f) for f in seeing_ranges])
+            except ValueError as exc:
+                raise ValueError('seeing_ranges should be a list of floats.') from exc
+            self.seeing_ranges = seeing_ranges
+        else:
+            self.seeing_ranges = None
+        if single_or_repeat not in ["single", "repeat"]:
+            raise ValueError("single_or_repeat must either be 'single' or 'repeat'.")
+        # For now, limit repeat observation handling to datasets passed through
+        # directly, to avoid extra work loading those.
+        if (not (self.pregenerate_cutouts is None and a_cat is not None)) and single_or_repeat == "repeat":
+            raise ValueError("single_or_repeat cannot be 'repeat' unless pregenerate_cutouts is None and "
+                             "a_cat and b_cat are provided directly.")
+        self.single_or_repeat = single_or_repeat
+        if self.single_or_repeat == "repeat" and repeat_unique_visits_list is None:
+            raise ValueError("repeat_unique_visits_list must be provided if single_or_repeat is 'repeat'.")
+        if self.single_or_repeat == "repeat":
+            self.repeat_unique_visits_list = repeat_unique_visits_list
+            if isinstance(self.repeat_unique_visits_list, np.ndarray):
+                self.repeat_unique_visits_list = [self.repeat_unique_visits_list]
         self.a_cat_func = a_cat_func
         self.b_cat_func = b_cat_func
         self.a_cat_name = a_cat_name
@@ -526,27 +582,34 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
             n_sigs = open_memmap(f'{self.save_folder}/npy/n_sigs_array.npy', mode='r+')
 
         if self.make_summary_plot:
-            self.gs = self.make_gridspec('12312', 2, 2, 0.8, 10)
-            self.ax_b = plt.subplot(self.gs[0])
+            self.gs_single_sigsig = self.make_gridspec('single_sigsig', 1, 2, 0.8, 5)
+            self.ax_b_sing = plt.subplot(self.gs_single_sigsig[0])
+            self.ax_b_log_sing = plt.subplot(self.gs_single_sigsig[1])
 
-            self.ylims = [999, 0]
+            self.ylims_sing = [999, 0]
 
             self.cols = ['k', 'r', 'b', 'g', 'c', 'm', 'orange', 'brown', 'purple', 'grey', 'olive',
                          'cornflowerblue', 'deeppink', 'maroon', 'palevioletred', 'teal', 'crimson',
                          'chocolate', 'darksalmon', 'steelblue', 'slateblue', 'tan', 'yellowgreen',
                          'silver']
 
+            self.avg_b_dens = np.empty(len(self.ax1_mids), float)
+
+            self.mn_poisson_cdfs = np.empty(len(self.ax1_mids), object)
+            self.ind_poisson_cdfs = np.empty(len(self.ax1_mids), object)
+
         for index_, list_of_things in enumerate(zip(*zip_list)):
             if not (m_sigs[index_] == -1 and n_sigs[index_] == -1):
                 continue
             print(f'Running astrometry fits for sightline {index_+1}/{len(self.ax1_mids)}...')
+            sys.stdout.flush()
 
             if self.coord_or_chunk == 'coord':
-                ax1_mid, ax2_mid, _, _, _, _ = list_of_things
+                ax1_mid, ax2_mid, ax1_min, ax1_max, ax2_min, ax2_max = list_of_things
                 cat_args = (ax1_mid, ax2_mid)
                 file_name = f'{ax1_mid}_{ax2_mid}'
             else:
-                ax1_mid, ax2_mid, _, _, _, _, chunk = list_of_things
+                ax1_mid, ax2_mid, ax1_min, ax1_max, ax2_min, ax2_max, chunk = list_of_things
                 cat_args = (chunk,)
                 file_name = f'{chunk}'
             self.list_of_things = list_of_things
@@ -556,9 +619,22 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
             if self.pregenerate_cutouts is None:
                 self.a = self.a_cat[index_]
                 self.b = self.b_cat[index_]
+                if self.single_or_repeat == 'repeat':
+                    self.repeat_unique_visits = self.repeat_unique_visits_list[index_]
             else:
                 self.a = self.load_catalogue('a', self.cat_args)
                 self.b = self.load_catalogue('b', self.cat_args)
+
+            rect_area = (ax1_max - (ax1_min)) * (
+                np.sin(np.radians(ax2_max)) - np.sin(np.radians(ax2_min))) * 180/np.pi
+            if self.single_or_repeat == 'repeat':
+                # Divide the density through by the number of repeat visits,
+                # since we want the average density of the visits, not the
+                # sum of all repeated visits.
+                n_visits = len(np.unique(self.repeat_unique_visits))
+                self.avg_b_dens[index_] = len(self.b) / rect_area / n_visits
+            else:
+                self.avg_b_dens[index_] = len(self.b) / rect_area
 
             self.a_array, self.b_array, self.c_array = self.make_snr_model()
             abc_array[:, index_, 0] = self.a_array
@@ -571,40 +647,50 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
             if self.make_plots:
                 self.plot_star_galaxy_counts()
             self.calculate_local_densities_and_nearest_neighbours()
+
             self.simulate_aufs()
             self.create_auf_pdfs()
-            m_sig, n_sig = self.fit_uncertainty()
-            self.plot_fits_calculate_chi_sq()
-            m_sigs[index_] = m_sig
-            n_sigs[index_] = n_sig
+            # If we don't have at least 5 unique magnitude slices to calculate,
+            # skip and set m and n as NaNs.
+            if np.sum([q[0] == -1 for q in self.pdfs]) <= len(self.pdfs)-5:
+                # m_sig, n_sig = self.fit_uncertainty()
+                m_sig, n_sig = self.fit_uncertainty()
+                m_sigs[index_] = m_sig
+                n_sigs[index_] = n_sig
+            else:
+                # If we failed to generate sufficient numbers of magnitude slices
+                # to fit, then we won't need most plots. In this case, if we
+                # plotted the star-galaxy counts comparison, delete it now.
+                if self.make_plots:
+                    os.system(f'rm {self.save_folder}/pdf/counts_comparison_{self.file_name}.pdf')
+                m_sigs[index_] = np.nan
+                n_sigs[index_] = np.nan
+            if np.sum([q[0] == -1 for q in self.pdfs]) <= len(self.pdfs)-5:
+                # Currently by simply skipping this function altogether we don't
+                # calculate the chi-squareds, but since we don't plot those at
+                # the moment that's okay; if plotting is turned back on, a
+                # better call will be required.
+                mn_poisson_cdfs, ind_poisson_cdfs = self.plot_fits_calculate_cdfs()
+                if self.make_summary_plot:
+                    self.mn_poisson_cdfs[index_] = mn_poisson_cdfs
+                    self.ind_poisson_cdfs[index_] = ind_poisson_cdfs
             if self.make_summary_plot:
-                plt.figure('12312')
                 c = self.cols[index_ % len(self.cols)]
-                self.ax_b.errorbar(self.avg_sig[~self.skip_flags, 0],
-                                   self.fit_sigs[~self.skip_flags, 0],
-                                   linestyle='None', c=c, marker='.')
-                self.ylims[0] = min(self.ylims[0], np.amin(self.fit_sigs[:, 0]))
-                self.ylims[1] = max(self.ylims[1], np.amax(self.fit_sigs[:, 0]))
+                if np.sum([q[0] == -1 for q in self.pdfs]) <= len(self.pdfs)-5:
+                    plt.figure('single_sigsig')
+                    self.ax_b_sing.errorbar(self.avg_sig[~self.skip_flags, 0],
+                                            self.fit_sigs[~self.skip_flags, 1],
+                                            linestyle='None', c=c, marker='x', label=file_name)
+                    self.ax_b_log_sing.errorbar(self.avg_sig[~self.skip_flags, 0],
+                                                self.fit_sigs[~self.skip_flags, 1],
+                                                linestyle='None', c=c, marker='x')
+                    self.ylims_sing[0] = min(self.ylims_sing[0], np.amin(self.fit_sigs[:, 1]))
+                    self.ylims_sing[1] = max(self.ylims_sing[1], np.amax(self.fit_sigs[:, 1]))
+                self.plot_snr_mag_sig()
 
         self.m_sigs, self.n_sigs = m_sigs, n_sigs
         if self.make_summary_plot:
-            plt.figure('12312')
-            x_array = np.linspace(0, self.ax_b.get_xlim()[1], 100)
-            self.ax_b.plot(x_array, x_array, 'g:')
-            self.ax_b.set_ylim(0.95 * self.ylims[0], 1.05 * self.ylims[1])
-            if usetex:
-                if not self.use_photometric_uncertainties:
-                    self.ax_b.set_xlabel(r'Input astrometric $\sigma$ / "')
-                else:
-                    self.ax_b.set_xlabel(r'Input photometric $\sigma$ / "')
-                self.ax_b.set_ylabel(r'Fit astrometric $\sigma$ / "')
-            else:
-                if not self.use_photometric_uncertainties:
-                    self.ax_b.set_xlabel(r'Input astrometric sigma / "')
-                else:
-                    self.ax_b.set_xlabel(r'Input photometric sigma / "')
-                self.ax_b.set_ylabel(r'Fit astrometric sigma / "')
-            self.finalise_summary_plot()
+            self.finalise_summary_plots()
 
         if self.return_nm:
             return m_sigs, n_sigs, abc_array
@@ -722,6 +808,7 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
             zip_list = (self.chunks, self.ax1_mins, self.ax1_maxs, self.ax2_mins, self.ax2_maxs)
         for index_, list_of_things in enumerate(zip(*zip_list)):
             print(f'Creating catalogue cutouts... {index_+1}/{len(self.ax1_mids)}', end='\r')
+            sys.stdout.flush()
 
             if self.coord_or_chunk == 'coord':
                 ax1_mid, ax2_mid, ax1_min, ax1_max, ax2_min, ax2_max = list_of_things
@@ -738,6 +825,7 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
                 self.b_cat_func(ax1_min, ax1_max, ax2_min, ax2_max, *cat_args)
 
         print('')
+        sys.stdout.flush()
 
     def make_snr_model(self):
         r"""
@@ -754,15 +842,13 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
         """
 
         print("Making SNR model...")
+        sys.stdout.flush()
         a_array = np.ones(len(self.mag_indices), float) * np.nan
         b_array = np.ones(len(self.mag_indices), float) * np.nan
         c_array = np.ones(len(self.mag_indices), float) * np.nan
-        if self.coord_or_chunk == 'coord':
-            ax1_mid, ax2_mid, _, _, _, _ = self.list_of_things
-        else:
-            ax1_mid, ax2_mid, _, _, _, _, _ = self.list_of_things
+
         if self.make_plots:
-            gs = self.make_gridspec('2', self.n_filt_cols, self.n_filt_rows, 0.8, 8)
+            gs = self.make_gridspec('2', self.n_filt_cols, self.n_filt_rows, 0.8, 5)
         for j in range(len(self.mag_indices)):
             (res, s_bins, s_d_snr_med,
              s_d_snr_dmed, snr_med, snr_dmed) = self.fit_snr_model(j)
@@ -780,13 +866,10 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
                 ax.plot(_x, np.log10(np.sqrt(c * 10**_x + b + (a * 10**_x)**2)),
                         'r-', zorder=5)
 
-                ax.errorbar((s_bins[:-1]+np.diff(s_bins)/2)[q], s_d_snr_med[q], fmt='k.',
-                            yerr=s_d_snr_dmed[q], zorder=3)
-
-                ax1_name = 'l' if self.coord_system == 'galactic' else 'RA'
-                ax2_name = 'b' if self.coord_system == 'galactic' else 'Dec'
-                ax.set_title(f'{ax1_name} = {ax1_mid}, {ax2_name} = {ax2_mid}, '
-                             f'{self.mag_names[j]}\na = {a:.2e}, b = {b:.2e}, c = {c:.2e}', fontsize=15)
+                ax.errorbar((s_bins[:-1]+np.diff(s_bins)/2)[q], s_d_snr_med[q], c='grey', marker='.',
+                            ls='None', yerr=s_d_snr_dmed[q], zorder=3)
+                ax.plot((s_bins[:-1]+np.diff(s_bins)/2)[q], s_d_snr_med[q], c='k', ls='None', marker='.',
+                        zorder=4)
 
                 if usetex:
                     ax.set_xlabel('log$_{10}$(S)')
@@ -795,9 +878,14 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
                     ax.set_xlabel('log10(S)')
                     ax.set_ylabel('log10(S / SNR)')
 
+                secax = ax.secondary_xaxis('top', functions=(lambda x: -2.5 * x, lambda x: -1/2.5 * x))
+                secax.set_xlabel(f'Magnitude, {self.mag_names[j]}')
+
                 ax1 = ax.twinx()
-                ax1.errorbar((s_bins[:-1]+np.diff(s_bins)/2)[q], snr_med[q], fmt='b.',
-                             yerr=snr_dmed[q], zorder=3)
+                ax1.errorbar((s_bins[:-1]+np.diff(s_bins)/2)[q], snr_med[q], c='lightblue', marker='.',
+                             ls='None', yerr=snr_dmed[q], zorder=3)
+                ax1.plot((s_bins[:-1]+np.diff(s_bins)/2)[q], snr_med[q], c='b', ls='None', marker='.',
+                         zorder=4)
                 ax1.plot(_x, np.log10(10**_x / np.sqrt(c * 10**_x + b + (a * 10**_x)**2)),
                          'r--', zorder=5)
                 if usetex:
@@ -905,8 +993,8 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
                                                  for i in [dfda, dfdb, dfdc]])
 
         s = 10**(-1/2.5 * self.b[:, self.mag_indices[j]])
-        # Based on a naive dm = 2.5 log10((S+N)/S).
-        snr = 1 / (10**(self.b[:, self.mag_unc_indices[j]] / 2.5) - 1)
+        # Based on m = -2.5 log(S), dm = |df dm/df|.
+        snr = 2.5 / np.log(10) / self.b[:, self.mag_unc_indices[j]]
 
         q = ~np.isnan(s) & ~np.isnan(snr) & (snr > 2)
         s, snr = s[q], snr[q]
@@ -939,9 +1027,11 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
         b_guess = np.log10(np.mean((10**s_d_snr_med[q][:15])**2))
         # Then take average of the difference between the a+b model and the full
         # model to get the photon-noise, sqrt(S)-scaling final parameter.
-        half_model = 10**b_guess + (10**a_guess * 10**((s_bins[:-1]+np.diff(s_bins)/2)[q]))
-        # If (S/SNR)^2 = c * S + b + (a * S)^2, then c ~ (S/SNR)^2 / half_model:
-        c_guess = np.log10(np.mean((10**s_d_snr_med[q])**2 / half_model))
+        half_model = 10**b_guess + (10**a_guess * 10**((s_bins[:-1]+np.diff(s_bins)/2)[q]))**2
+        # If (S/SNR)^2 = c * S + b + (a * S)^2, then c ~ ((S/SNR)^2 - half_model) / S:
+        c_guess = np.log10(np.maximum(10**-30,
+                           np.mean(((10**s_d_snr_med[q])**2 - half_model) /
+                                   10**((s_bins[:-1]+np.diff(s_bins)/2)[q]))))
 
         res = minimize(fit_snr_sqrt, args=((s_bins[:-1]+np.diff(s_bins)/2)[q],
                        s_d_snr_med[q]), x0=[a_guess, b_guess, c_guess], jac=True,
@@ -977,6 +1067,7 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
                                 [3.84e+09, 1.57e+06, 3.91e+08, 4.66e+10, 3.03e+07]]
 
         print('Creating simulated star+galaxy counts...')
+        sys.stdout.flush()
         if self.coord_or_chunk == 'coord':
             ax1_mid, ax2_mid, ax1_min, ax1_max, ax2_min, ax2_max = self.list_of_things
         else:
@@ -1061,6 +1152,13 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
 
         data_uncert = np.sqrt(data_hist) / data_dbins / rect_area
         data_hist = data_hist / data_dbins / rect_area
+
+        if self.single_or_repeat == 'repeat':
+            # Divide the counts through by the number of repeat visits.
+            n_visits = len(np.unique(self.repeat_unique_visits))
+            data_hist = data_hist / n_visits
+            data_uncert = data_uncert / np.sqrt(n_visits)
+
         data_loghist = np.log10(data_hist)
         data_dloghist = 1/np.log(10) * data_uncert / data_hist
 
@@ -1085,13 +1183,14 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
         Plotting routine to display data and model differential source counts,
         for verification purposes.
         """
-        gs = self.make_gridspec('123123', 1, 1, 0.8, 15)
+        gs = self.make_gridspec('123123', 1, 1, 0.8, 5)
         print('Plotting data and model counts...')
+        sys.stdout.flush()
 
         if self.coord_or_chunk == 'coord':
-            ax1_mid, ax2_mid, ax1_min, ax1_max, ax2_min, ax2_max = self.list_of_things
+            _, _, ax1_min, ax1_max, ax2_min, ax2_max = self.list_of_things
         else:
-            ax1_mid, ax2_mid, ax1_min, ax1_max, ax2_min, ax2_max, _ = self.list_of_things
+            _, _, ax1_min, ax1_max, ax2_min, ax2_max, _ = self.list_of_things
 
         # Unit area is cos(t) dt dx for 0 <= t <= 90deg, 0 <= x <= 360 deg,
         # integrated between ax2_min < t < ax2_max, ax1_min < x < ax1_max, converted
@@ -1103,9 +1202,6 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
         data_mags = self.b[~np.isnan(self.b[:, mag_ind]), mag_ind]
 
         ax = plt.subplot(gs[0])
-        ax1_name = 'l' if self.coord_system == 'galactic' else 'RA'
-        ax2_name = 'b' if self.coord_system == 'galactic' else 'Dec'
-        ax.set_title(f'{ax1_name} = {ax1_mid}, {ax2_name} = {ax2_mid}')
         ax.errorbar(self.tri_mags+self.dtri_mags/2, self.log10y,
                     yerr=self.dlog10y, c='k', marker='.', zorder=1, ls='None')
 
@@ -1117,6 +1213,13 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
 
         data_uncert = np.sqrt(data_hist) / data_dbins / rect_area
         data_hist = data_hist / data_dbins / rect_area
+
+        if self.single_or_repeat == 'repeat':
+            # Divide the counts through by the number of repeat visits.
+            n_visits = len(np.unique(self.repeat_unique_visits))
+            data_hist = data_hist / n_visits
+            data_uncert = data_uncert / np.sqrt(n_visits)
+
         data_loghist = np.log10(data_hist)
         data_dloghist = 1/np.log(10) * data_uncert / data_hist
         ax.errorbar(data_bins+data_dbins/2, data_loghist, yerr=data_dloghist, c='r',
@@ -1149,6 +1252,7 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
         nearest neighbour match pairings for each cutout region.
         """
         print('Creating local densities and nearest neighbour matches...')
+        sys.stdout.flush()
 
         if self.coord_or_chunk == 'coord':
             _, _, ax1_min, ax1_max, ax2_min, ax2_max = self.list_of_things
@@ -1160,9 +1264,33 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
             self.dens_search_radius, self.n_pool, self.mag_indices[self.best_mag_index],
             self.pos_and_err_indices[1][0], self.pos_and_err_indices[1][1], self.coord_system)
 
-        _, bmatch, dists = create_distances(
-            self.a, self.b, self.nn_radius, self.pos_and_err_indices[0][0], self.pos_and_err_indices[0][1],
-            self.pos_and_err_indices[1][0], self.pos_and_err_indices[1][1], self.coord_system)
+        if self.single_or_repeat == 'repeat':
+            # Divide the counts through by the number of repeat visits.
+            n_visits = len(np.unique(self.repeat_unique_visits))
+            narray = narray / n_visits
+
+        if self.single_or_repeat == 'single':
+            _, bmatch, dists = create_distances(
+                self.a, self.b, self.nn_radius, self.pos_and_err_indices[0][0],
+                self.pos_and_err_indices[0][1], self.pos_and_err_indices[1][0],
+                self.pos_and_err_indices[1][1], self.coord_system)
+        else:
+            bmatch, dists = [], []
+            for v in np.unique(self.repeat_unique_visits):
+                q = self.repeat_unique_visits == v
+                _, _bm, _d = create_distances(
+                    self.a, self.b[q], self.nn_radius, self.pos_and_err_indices[0][0],
+                    self.pos_and_err_indices[0][1], self.pos_and_err_indices[1][0],
+                    self.pos_and_err_indices[1][1], self.coord_system)
+                # The _bm array returned is [0, len(self.b[q])] indexed, so we
+                # need to convert to indices back into self.b.
+                b_match_large = np.arange(len(self.b))[q]
+                if len(bmatch) == 0:
+                    bmatch = b_match_large[_bm]
+                    dists = _d
+                else:
+                    bmatch = np.concatenate((bmatch, b_match_large[_bm]))
+                    dists = np.concatenate((dists, _d))
 
         # pylint: disable-next=fixme
         # TODO: extend to 3-D search around N-m-sig to find as many good
@@ -1182,6 +1310,7 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
         algorithms.
         """
         print('Creating AUF simulations...')
+        sys.stdout.flush()
 
         a = self.a_array[self.best_mag_index]
         b = self.b_array[self.best_mag_index]
@@ -1222,11 +1351,13 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
         statistics such as average magnitude or SNR.
         """
         print('Creating catalogue AUF probability densities...')
+        sys.stdout.flush()
         b_matches = self.b[self.bmatch]
 
         skip_flags = np.zeros_like(self.mag_array, dtype=bool)
 
         pdfs, pdf_uncerts, q_pdfs, pdf_bins = [], [], [], []
+        nums = []
 
         avg_sig = np.empty((len(self.mag_array), 3), float)
         avg_snr = np.empty((len(self.mag_array), 3), float)
@@ -1242,6 +1373,7 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
                 pdf_uncerts.append([-1])
                 q_pdfs.append([-1])
                 pdf_bins.append([-1])
+                nums.append([-1])
                 continue
             if not self.use_photometric_uncertainties:
                 sig = np.percentile(b_matches[mag_cut, self.pos_and_err_indices[1][2]], 50)
@@ -1271,10 +1403,11 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
                 pdf_uncerts.append([-1])
                 q_pdfs.append([-1])
                 pdf_bins.append([-1])
+                nums.append([-1])
                 continue
 
             bm = b_matches[final_slice]
-            snr = 1 / (10**(bm[:, self.mag_unc_indices[self.best_mag_index]] / 2.5) - 1)
+            snr = 2.5 / np.log(10) / bm[:, self.mag_unc_indices[self.best_mag_index]]
             avg_snr[i, 0] = np.median(snr)
             avg_snr[i, [1, 2]] = np.abs(np.percentile(snr, [16, 84]) - np.median(snr))
             avg_mag[i, 0] = np.median(bm[:, mag_ind])
@@ -1297,13 +1430,15 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
             pdf_uncert = np.sqrt(h) / np.diff(bins) / num
             # To avoid binned_statistic NaNing when the data are beyond the
             # edge of the model, we want to limit our bins to the maximum r value.
-            q_pdf = (h > 3) & (bins[1:] <= self.r[-1])
+            q_pdf = bins[1:] <= self.r[-1]
 
             pdfs.append(pdf)
             pdf_uncerts.append(pdf_uncert)
             q_pdfs.append(q_pdf)
             pdf_bins.append(bins)
+            nums.append(num)
 
+        self.nums = nums
         self.avg_snr, self.avg_mag, self.avg_sig = avg_snr, avg_mag, avg_sig
         self.pdfs, self.pdf_uncerts = pdfs, pdf_uncerts
         self.q_pdfs, self.pdf_bins = q_pdfs, pdf_bins
@@ -1326,29 +1461,37 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
         """
 
         print('Creating joint H/sig fits...')
+        sys.stdout.flush()
 
         self.fit_sigs = np.zeros((len(self.mag_array), 2), float)
 
-        res = minimize(self.fit_auf_joint, x0=[1, 0.005], method='L-BFGS-B',
-                       options={'ftol': 1e-12}, bounds=[(0, None), (0, None)])
+        res = minimize(self.fit_auf_joint, x0=[1, 0.001], method='L-BFGS-B',
+                       options={'ftol': 1e-9}, bounds=[(0, None), (0, None)])
         self.res = res
 
-        cov = res.hess_inv.todense()
         m, n = res.x
-        om, on = np.sqrt(cov[0, 0]), np.sqrt(cov[1, 1])
         for i, pdf in enumerate(self.pdfs):
             if pdf[0] == -1:
                 self.skip_flags[i] = 1
                 continue
             sig_orig = self.avg_sig[i, 0]
-            new_sig = np.sqrt((m * sig_orig)**2 + n**2)
+            if self.mn_fit_type == 'quadratic':
+                new_sig = np.sqrt((m * sig_orig)**2 + n**2)
+            else:
+                new_sig = m * sig_orig + n
             self.fit_sigs[i, 0] = new_sig
-            # sig_sig = sqrt((dsig_dm * sig_m)**2 + (dsig_dn * sig_n)**2);
-            # sig = sqrt((m * sig_orig)**2 + n)
-            do_dm = m * sig_orig**2 / np.sqrt((m * sig_orig)**2 + n**2)
-            do_dn = n / np.sqrt((m * sig_orig)**2 + n**2)
-            # Bother propagating standard deviation in sig_orig?
-            self.fit_sigs[i, 1] = np.sqrt((do_dm * om)**2 + (do_dn * on)**2)
+
+            if self.coord_or_chunk == 'coord':
+                _, _, ax1_min, ax1_max, ax2_min, ax2_max = self.list_of_things
+            else:
+                _, _, ax1_min, ax1_max, ax2_min, ax2_max, _ = self.list_of_things
+            (y, q, bins, sig, snr, num) = (pdf, self.q_pdfs[i], self.pdf_bins[i],
+                                           self.avg_sig[i, 0], self.avg_snr[i, 0], self.nums[i])
+            res = minimize(self.calc_single_joint_auf, x0=[sig],
+                           args=(i, ax1_min, ax1_max, ax2_min, ax2_max, bins, y, q, num, snr),
+                           method='L-BFGS-B', options={'ftol': 1e-9}, bounds=[(0, None)])
+
+            self.fit_sigs[i, 1] = res.x[0]
 
         return m, n
 
@@ -1361,12 +1504,13 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
         Parameters
         ----------
         p : list
-            List containing the two scaling values to be fit for.
+            List containing the scaling values to be fit for.
 
         Returns
         -------
-        chi_sq : float
-            Chi-squared of the fit, to be minimised in the wrapping function call.
+        neg_log_like : float
+            Negative-log-likelihood of the fit, to be minimised in the wrapping
+            function call.
         """
         if self.coord_or_chunk == 'coord':
             _, _, ax1_min, ax1_max, ax2_min, ax2_max = self.list_of_things
@@ -1374,127 +1518,184 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
             _, _, ax1_min, ax1_max, ax2_min, ax2_max, _ = self.list_of_things
         m, n = p
 
-        chi_sq = 0
-        ndof = -2
+        neg_log_like = 0
         for i, pdf in enumerate(self.pdfs):
             if self.pdfs[i][0] == -1:
                 continue
-            (y, dy, q, bins, sig,
-             snr) = (pdf, self.pdf_uncerts[i], self.q_pdfs[i], self.pdf_bins[i],
-                     self.avg_sig[i, 0], self.avg_snr[i, 0])
+            (y, q, bins, sig, snr, num) = (pdf, self.q_pdfs[i], self.pdf_bins[i],
+                                           self.avg_sig[i, 0], self.avg_snr[i, 0], self.nums[i])
 
-            h = 1 - np.sqrt(1 - min(1, self.a_array[self.best_mag_index]**2 * snr**2))
-            four_combined = h * self.four_off_fw[:, i] + (1 - h) * self.four_off_ps[:, i]
+            if self.mn_fit_type == 'quadratic':
+                o = np.sqrt((m * sig)**2 + n**2)
+            else:
+                o = m * sig + n
 
-            o = np.sqrt((m * sig)**2 + n**2)
+            neg_log_like += self.calc_single_joint_auf(o, i, ax1_min, ax1_max, ax2_min, ax2_max, bins,
+                                                       y, q, num, snr)
 
-            four_gauss = np.exp(-2 * np.pi**2 * (self.rho[:-1]+self.drho/2)**2 * o**2)
+        return neg_log_like
 
-            convolve_hist = paf.fourier_transform(
-                four_combined*four_gauss, self.rho[:-1]+self.drho/2, self.drho, self.j0s)
-
-            convolve_hist_dr = convolve_hist * np.pi * (self.r[1:]**2 - self.r[:-1]**2) / self.dr
-
-            # We have two components to fit to our data: first, some fraction F
-            # of the objects do not have a counterpart and therefore follow
-            # a nearest-neighbour distribution, n(r), while 1-F of the objects follow
-            # an NN-contaminated counterpart distribution, m(r).
-            # Here n(r) = 2 pi r rho exp(-pi r^2 rho) and
-            # N(r) = \int_0^r n(r') dr' = 1 - exp(-pi r^2 rho).
-            # We then have to consider two contributions to our match distribution;
-            # the match could either be a counterpart if there's no NN inside of it,
-            # or an NN if there's no counterpart inside of it, and hence
-            # m(r) = c(r)[1 - N(r)] + n(r)[1 - C(r)], with c(r) the empirical
-            # distribution of counterparts and C(r) = \int_0^r c(r') dr'.
-            # Finally, the combination y(r) = F n(r) + (1 - F) m(r).
-
-            # For a symmetric nearest neighbour distribution we need to use the
-            # combined density of sources -- this is derived from consideration
-            # of the probability of no NN object inside r being the chance that
-            # NEITHER source has an asymmetric nearest neighbour inside r, or
-            # F(r) = (1 - \int a(r) dr) * (1 - \int b(r) dr), where the integrals
-            # of a and b, being of the form 2 pi r N exp(-pi r^2 N) are
-            # 1 - exp(-pi r^2 N), and hence the survival integrals multiplied
-            # together form N' = N_a + N_b, and then you use f(r) = dF/dr.
-            # Unit area is cos(t) dt dx for 0 <= t <= 90deg, 0 <= x <= 360 deg,
-            # integrated between ax2_min < t < ax2_max, ax1_min < x < ax1_max, converted
-            # to degrees.
-            rect_area = (ax1_max - (ax1_min)) * (
-                np.sin(np.radians(ax2_max)) - np.sin(np.radians(ax2_min))) * 180/np.pi
-            avg_a_dens = len(self.a) / rect_area
-            density = (self.moden + avg_a_dens) / 3600**2
-            nn_model = 2 * np.pi * (self.r[:-1]+self.dr/2) * density * np.exp(
-                -np.pi * (self.r[:-1]+self.dr/2)**2 * density)
-
-            m_conv_plus_nn = (convolve_hist_dr * (np.exp(-np.pi * (self.r[:-1]+self.dr/2)**2 *
-                              density)) + nn_model * np.cumsum(convolve_hist_dr * self.dr))
-            # Normalise m(r) so that it integrates to unity inside R.
-            qq = self.r[1:] <= bins[-1]
-            int_m_c_p_nn = np.sum(m_conv_plus_nn[qq] * self.dr[qq])
-            m_conv_plus_nn /= int_m_c_p_nn
-
-            # Normalise n(r) so it integrates to unity inside R as well.
-            reduced_nn_model, _, _ = binned_statistic(
-                self.r[:-1]+self.dr/2,
-                nn_model / (1 - np.exp(-np.pi * bins[1:][q][-1]**2 * density)), bins=bins)
-            reduced_m_conv_plus_nn, _, _ = binned_statistic(self.r[:-1]+self.dr/2,
-                                                            m_conv_plus_nn, bins=bins)
-
-            # For the subset of data in the single magnitude slice we need
-            # a nearest neighbour fraction, which we can fit for on-the-fly
-            # for each slice separately (for the same m/n). Here we have
-            # x2 = sum_i ((y_i - f_i(F))**2 / o_yi**2),
-            # f_i(F) = F a_i + (1-F) b_i, giving
-            # F = [sum_i (y_i - b_i)*(a_i - b_i) / i_yi**2] /
-            #      [sum_i (a_i - b_i)**2 / i_yi**2];
-            # here a <-> n and b <-> m, and hence
-            a, b = reduced_nn_model, reduced_m_conv_plus_nn
-            nnf = (np.sum((y[q] - b[q])*(a[q] - b[q]) / dy[q]**2) /
-                   np.sum((a[q] - b[q])**2 / dy[q]**2))
-            # Since this should be parabolic in F, cap at the bounded limits.
-            nnf = min(1, max(0, nnf))
-
-            tot_model = nnf * nn_model / (
-                1 - np.exp(-np.pi * bins[1:][q][-1]**2 * density)) + (
-                1 - nnf) * m_conv_plus_nn
-
-            modely, _, _ = binned_statistic(self.r[:-1]+self.dr/2, tot_model, bins=bins)
-
-            chi_sq += np.sum((y[q] - modely[q])**2 / dy[q]**2)
-            ndof += np.sum(q)
-
-        return chi_sq
-
-    def plot_fits_calculate_chi_sq(self):  # pylint: disable=too-many-locals
+    def calc_single_joint_auf(self, o, i, ax1_min, ax1_max, ax2_min, ax2_max, bins, y, q, num, snr):
         """
-        Calculate chi-squared value and create verification plots showing the
+        Calculates the negative-log-likelihood of a single magnitude slice of
+        match separations as fit with an AUF.
+
+        Parameters
+        ----------
+        o : float
+            The Gaussian uncertainty of the centroid component of the AUF.
+        i : int
+            Index to access particular magnitude slice.
+        ax1_min : float
+            Minimum of the first orthogonal sky axis, used to calculate
+            rectangular sky area.
+        ax1_max : float
+            Maximum of the first orthogonal sky axis, used to calculate
+            rectangular sky area.
+        ax2_min : float
+            Minimum of the second orthogonal sky axis, used to calculate
+            rectangular sky area.
+        ax2_max : float
+            Maximum of the second orthogonal sky axis, used to calculate
+            rectangular sky area.
+        bins : numpy.ndarray
+            Array of floats, bin edges of histogram of cross-match distances.
+        y : numpy.ndarray
+            Array of floats, counts in each bin of ``bins`` of cross-match
+            distances.
+        q : numpy.ndarray
+            Array of booleans, flags for whether to use each ``y`` bin or not.
+        num : int
+            Total number of counts within each PDF in ``y``, to convert back to
+            raw counts for Poisson counting statistics.
+        snr: numpy.ndarray
+            Array of signal-to-noise ratios, for weighting between different
+            algorithms for the Perturbation component of the AUF.
+
+        Returns
+        -------
+        neg_log_like_part : numpy.ndarray
+            The negative-log-likelihood of dataset of separations given the AUF
+            model.
+        """
+        h = 1 - np.sqrt(1 - min(1, self.a_array[self.best_mag_index]**2 * snr**2))
+        four_combined = h * self.four_off_fw[:, i] + (1 - h) * self.four_off_ps[:, i]
+
+        four_gauss = np.exp(-2 * np.pi**2 * (self.rho[:-1]+self.drho/2)**2 * o**2)
+
+        convolve_hist = paf.fourier_transform(
+            four_combined*four_gauss, self.rho[:-1]+self.drho/2, self.drho, self.j0s)
+
+        convolve_hist_dr = convolve_hist * np.pi * (self.r[1:]**2 - self.r[:-1]**2) / self.dr
+
+        # We have two components to fit to our data: first, some fraction F
+        # of the objects do not have a counterpart and therefore follow
+        # a nearest-neighbour distribution, n(r), while 1-F of the objects follow
+        # an NN-contaminated counterpart distribution, m(r).
+        # Here n(r) = 2 pi r rho exp(-pi r^2 rho) and
+        # N(r) = \int_0^r n(r') dr' = 1 - exp(-pi r^2 rho).
+        # We then have to consider two contributions to our match distribution;
+        # the match could either be a counterpart if there's no NN inside of it,
+        # or an NN if there's no counterpart inside of it, and hence
+        # m(r) = c(r)[1 - N(r)] + n(r)[1 - C(r)], with c(r) the empirical
+        # distribution of counterparts and C(r) = \int_0^r c(r') dr'.
+        # Finally, the combination y(r) = F n(r) + (1 - F) m(r).
+
+        # Unit area is cos(t) dt dx for 0 <= t <= 90deg, 0 <= x <= 360 deg,
+        # integrated between ax2_min < t < ax2_max, ax1_min < x < ax1_max, converted
+        # to degrees.
+        rect_area = (ax1_max - (ax1_min)) * (
+            np.sin(np.radians(ax2_max)) - np.sin(np.radians(ax2_min))) * 180/np.pi
+        avg_a_dens = len(self.a) / rect_area
+        # For a symmetric nearest neighbour distribution we need to use the
+        # combined density of sources -- this is derived from consideration
+        # of the probability of no NN object inside r being the chance that
+        # NEITHER source has an asymmetric nearest neighbour inside r, or
+        # F(r) = (1 - \int a(r) dr) * (1 - \int b(r) dr), where the integrals
+        # of a and b, being of the form 2 pi r N exp(-pi r^2 N) are
+        # 1 - exp(-pi r^2 N), and hence the survival integrals multiplied
+        # together form N' = N_a + N_b, and then you use f(r) = dF/dr.
+        density = (self.moden + avg_a_dens) / 3600**2
+        nn_model = 2 * np.pi * (self.r[:-1]+self.dr/2) * density * np.exp(
+            -np.pi * (self.r[:-1]+self.dr/2)**2 * density)
+
+        m_conv_plus_nn = (convolve_hist_dr * (np.exp(-np.pi * (self.r[:-1]+self.dr/2)**2 *
+                          density)) + nn_model * (1 - np.cumsum(convolve_hist_dr * self.dr)))
+
+        reduced_nn_model, _, _ = binned_statistic(self.r[:-1]+self.dr/2, nn_model, bins=bins)
+        reduced_m_conv_plus_nn, _, _ = binned_statistic(self.r[:-1]+self.dr/2,
+                                                        m_conv_plus_nn, bins=bins)
+        # For the subset of data in the single magnitude slice we need
+        # a nearest neighbour fraction, which we can fit for on-the-fly
+        # for each slice separately (for the same m/n).
+        _nll = 1e10
+        nnf = -1
+
+        k = y[q] * np.diff(bins)[q] * num
+        log_fac_k = np.log(factorial(k))
+        # Ramanujan, The Lost Notebook and other Unpublished Papers, gives
+        # an approximation for ln(n!) as n ln(n) - n + 1/6 ln(8 n^3 +
+        # 4 n^2 + n + 1/30) + ln(pi)/2. We use this, to avoid overflowing
+        # n!, above n=100
+        log_fac_k = np.empty(len(k), float)
+        log_fac_k[k < 100] = np.log(factorial(k[k < 100]))
+        log_fac_k[k >= 100] = k[k >= 100] * np.log(k[k >= 100]) - k[k >= 100] + 1/6 * np.log(
+            8 * k[k >= 100]**3 + 4 * k[k >= 100]**2 + k[k >= 100] + 1/30) + np.log(np.pi)/2
+        for _nnf in np.linspace(0, 1, 101):
+            modely = _nnf * reduced_nn_model + (1 - _nnf) * reduced_m_conv_plus_nn
+
+            # Poisson is exp(-L) L**k / k!, so negative log-likelihood is
+            # L - k*ln(L) + ln(k!). Have to convert from PDF to counts through
+            # bin width and number of objects, forcing a non-zero rate to avoid
+            # logarithmic issues.
+            _l = modely[q] * np.diff(bins)[q] * num
+            _l[_l <= 1e-10] = 1e-10
+            temp_neg_log_like = np.sum(_l - k*np.log(_l) + log_fac_k)
+            if temp_neg_log_like < _nll:
+                nnf = _nnf
+                _nll = temp_neg_log_like
+
+        modely = nnf * reduced_nn_model + (1 - nnf) * reduced_m_conv_plus_nn
+
+        k = y[q] * np.diff(bins)[q] * num
+        _l = modely[q] * np.diff(bins)[q] * num
+        _l[_l <= 1e-10] = 1e-10
+        neg_log_like_part = np.sum(_l - k*np.log(_l) + log_fac_k)
+
+        return neg_log_like_part
+
+    def plot_fits_calculate_cdfs(self):  # pylint: disable=too-many-locals,too-many-statements
+        """
+        Calculate poisson CDFs and create verification plots showing the
         quality of the fits.
         """
         if self.coord_or_chunk == 'coord':
             _, _, ax1_min, ax1_max, ax2_min, ax2_max = self.list_of_things
         else:
             _, _, ax1_min, ax1_max, ax2_min, ax2_max, _ = self.list_of_things
-        x2s = np.ones((len(self.mag_array), 2), float) * np.nan
+        mn_poisson_cdfs = np.array([], float)
+        ind_poisson_cdfs = np.array([], float)
 
         if self.make_plots:
             print('Creating individual AUF figures and calculating goodness-of-fits...')
         else:
             print('Calculating goodness-of-fits...')
+        sys.stdout.flush()
 
         if self.make_plots:
             # Grid just big enough square to cover mag_array entries.
-            gs1 = self.make_gridspec('34242b', self.n_mag_rows, self.n_mag_cols, 0.8, 15)
+            gs1 = self.make_gridspec('34242b', self.n_mag_rows, self.n_mag_cols, 0.8, 5)
             ax1s = [plt.subplot(gs1[i]) for i in range(len(self.mag_array))]
 
         b_matches = self.b[self.bmatch]
 
         for i, mag in enumerate(self.mag_array):
-            if self.make_plots:
-                ax = ax1s[i]
             if self.skip_flags[i]:
                 continue
-            pdf, pdf_uncert, q_pdf, pdf_bin = (
-                self.pdfs[i], self.pdf_uncerts[i], self.q_pdfs[i], self.pdf_bins[i])
+            if self.make_plots:
+                ax = ax1s[i]
+            pdf, pdf_uncert, q_pdf, pdf_bin, num_pdf = (
+                self.pdfs[i], self.pdf_uncerts[i], self.q_pdfs[i], self.pdf_bins[i], self.nums[i])
             if self.make_plots:
                 ax.errorbar((pdf_bin[:-1]+np.diff(pdf_bin)/2)[q_pdf], pdf[q_pdf],
                             yerr=pdf_uncert[q_pdf], c='k', marker='.', zorder=1, ls='None')
@@ -1520,7 +1721,6 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
                 final_slice = sig_cut & mag_cut & n_cut & (self.dists <= 20*bsig)
             else:
                 final_slice = sig_cut & mag_cut & n_cut & (self.dists <= 20*self.psfsig*bsig)
-            bm = b_matches[final_slice]
 
             rect_area = (ax1_max - (ax1_min)) * (
                 np.sin(np.radians(ax2_max)) - np.sin(np.radians(ax2_min))) * 180/np.pi
@@ -1534,18 +1734,13 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
             h = 1 - np.sqrt(1 - min(1,
                                     self.a_array[self.best_mag_index]**2 * self.avg_snr[i, 0]**2))
 
+            ind_fit_sig = self.fit_sigs[i, 1]
             if self.make_plots:
                 ax = ax1s[i]
-                if usetex:
-                    labels_list = [r'H/$\sigma_\mathrm{fit}$', r'1/$\sigma_\mathrm{fit}$',
-                                   r'0/$\sigma_\mathrm{fit}$', r'H/$\sigma_\mathrm{quoted}$',
-                                   r'1/$\sigma_\mathrm{quoted}$', r'0/$\sigma_\mathrm{quoted}$']
-                else:
-                    labels_list = [r'H/sigma_fit', r'1/sigma_fit', r'0/sigma_fit',
-                                   r'H/sigma_quoted', r'1/sigma_quoted', r'0/sigma_quoted']
-            for j, (sig, _h, ls, lab) in enumerate(zip(
-                    [fit_sig, fit_sig, fit_sig, bsig, bsig, bsig], [h, 1, 0, h, 1, 0],
-                    ['r-', 'r-.', 'r:', 'k-', 'k-.', 'k:'], labels_list)):
+            for j, (sig, _h, ls) in enumerate(zip(
+                    [fit_sig, fit_sig, fit_sig, self.avg_sig[i, 0], self.avg_sig[i, 0], self.avg_sig[i, 0],
+                     ind_fit_sig, ind_fit_sig, ind_fit_sig],
+                    [h, 1, 0, h, 1, 0, h, 1, 0], ['r-', 'r-.', 'r:', 'k-', 'k-.', 'k:', 'c-', 'c-.', 'c:'])):
                 if not self.make_plots and j != 0:
                     continue
                 four_gauss = np.exp(-2 * np.pi**2 * (self.rho[:-1]+self.drho/2)**2 * sig**2)
@@ -1558,125 +1753,282 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
                     self.r[1:]**2 - self.r[:-1]**2) / self.dr
 
                 m_conv_plus_nn = (convolve_hist_dr * (np.exp(-np.pi * (self.r[:-1]+self.dr/2)**2 *
-                                  density)) + nn_model * np.cumsum(convolve_hist_dr * self.dr))
+                                  density)) + nn_model * (1 - np.cumsum(convolve_hist_dr * self.dr)))
 
-                # Normalise m(r) so that it integrates to unity inside R.
-                qq = self.r[1:] <= pdf_bin[-1]
-                int_m_c_p_nn = np.sum(m_conv_plus_nn[qq] * self.dr[qq])
-                m_conv_plus_nn /= int_m_c_p_nn
+                reduced_nn_model, _, _ = binned_statistic(self.r[:-1]+self.dr/2, nn_model, bins=pdf_bin)
+                reduced_m_conv_plus_nn, _, _ = binned_statistic(self.r[:-1]+self.dr/2,
+                                                                m_conv_plus_nn, bins=pdf_bin)
 
-                if j == 0:
-                    # Normalise NN distribution so it also integrates to 1 inside R.
-                    reduced_nn_model, _, _ = binned_statistic(
-                        self.r[:-1]+self.dr/2,
-                        nn_model / (1 - np.exp(-np.pi * pdf_bin[1:][q_pdf][-1]**2 * density)),
-                        bins=pdf_bin)
-                    reduced_m_conv_plus_nn, _, _ = binned_statistic(self.r[:-1]+self.dr/2,
-                                                                    m_conv_plus_nn, bins=pdf_bin)
+                if j in [0, 3, 6]:
+                    _nll = 1e10
+                    nn_frac = -1
 
-                    a, b = reduced_nn_model, reduced_m_conv_plus_nn
-                    nn_frac = (np.sum((pdf[q_pdf] - b[q_pdf])*(a[q_pdf] - b[q_pdf]) /
-                                      pdf_uncert[q_pdf]**2) /
-                               np.sum((a[q_pdf] - b[q_pdf])**2 / pdf_uncert[q_pdf]**2))
-                    nn_frac = min(1, max(0, nn_frac))
+                    k = pdf[q_pdf] * np.diff(pdf_bin)[q_pdf] * num_pdf
+                    log_fac_k = np.empty(len(k), float)
+                    log_fac_k[k < 100] = np.log(factorial(k[k < 100]))
+                    log_fac_k[k >= 100] = k[k >= 100] * np.log(k[k >= 100]) - k[k >= 100] + 1/6 * np.log(
+                        8 * k[k >= 100]**3 + 4 * k[k >= 100]**2 + k[k >= 100] + 1/30) + np.log(np.pi)/2
+                    for _nnf in np.linspace(0, 1, 101):
+                        modely = _nnf * reduced_nn_model + (1 - _nnf) * reduced_m_conv_plus_nn
 
-                tot_model = nn_frac * nn_model / (
-                    1 - np.exp(-np.pi * pdf_bin[1:][q_pdf][-1]**2 * density)) + (
-                    1 - nn_frac) * m_conv_plus_nn
+                        _l = modely[q_pdf] * np.diff(pdf_bin)[q_pdf] * num_pdf
+                        _l[_l <= 1e-10] = 1e-10
+                        temp_neg_log_like = np.sum(_l - k*np.log(_l) + log_fac_k)
+                        if temp_neg_log_like < _nll:
+                            nn_frac = _nnf
+                            _nll = temp_neg_log_like
+                    if j == 0:
+                        nn_frac_mn = nn_frac
+                    if j == 3:
+                        nn_frac_quot = nn_frac
+                    if j == 6:
+                        nn_frac_ind = nn_frac
 
-                modely, _, _ = binned_statistic(self.r[:-1]+self.dr/2, tot_model, bins=pdf_bin)
+                modely = nn_frac * reduced_nn_model + (1 - nn_frac) * reduced_m_conv_plus_nn
 
-                if j == 0:
-                    x2s[i, 0] = np.sum((pdf[q_pdf] - modely[q_pdf])**2 / pdf_uncert[q_pdf]**2)
-                    # We fit the ensemble for m and n simultaneously, but ignore
-                    # that here since we can't define DOF properly for part of
-                    # the chi-squared.
-                    x2s[i, 1] = np.sum(q_pdf)
+                if j in [0, 3, 6]:
+                    _l = modely[q_pdf] * np.diff(pdf_bin)[q_pdf] * num_pdf
+                    _l[_l <= 1e-10] = 1e-10
+                    p_cdf = np.empty(len(_l), float)
+                    for _i in range(len(_l)):  # pylint: disable=consider-using-enumerate
+                        p_cdf[_i] = poisson.cdf(k=k[_i], mu=_l[_i])
+                    if j == 0:
+                        mn_poisson_cdfs = np.append(mn_poisson_cdfs, p_cdf)
+                    if j == 6:
+                        ind_poisson_cdfs = np.append(ind_poisson_cdfs, p_cdf)
 
                 if self.make_plots:
+                    if j in [0, 3, 6]:
+                        sig_type = 'fit' if j == 0 else 'quoted' if j == 3 else 'ind'
+                        sig_val = fit_sig if j == 0 else self.avg_sig[i, 0] if j == 3 else ind_fit_sig
+                        f_val = nn_frac_mn if j == 0 else nn_frac_quot if j == 3 else nn_frac_ind
+                        h_str = f', H = {h:.2f}' if j == 0 else ''
+                        if usetex:
+                            lab = rf'\sigma_\mathrm{{{sig_type}}} = {sig_val:.4f}", F = {f_val:.2f}{h_str}'
+                        else:
+                            lab = rf'sigma_{sig_type} = {sig_val:.4f}", F = {f_val:.2f}{h_str}'
+                    else:
+                        lab = ''
                     ax.plot((pdf_bin[:-1]+np.diff(pdf_bin)/2)[q_pdf], modely[q_pdf], ls, label=lab)
 
-                    if j == 0:
-                        _q = (self.r[:-1]+self.dr/2) <= (pdf_bin[:-1]+np.diff(pdf_bin)/2)[q_pdf][-1]
-                        ax.plot((self.r[:-1]+self.dr/2)[_q], m_conv_plus_nn[_q], 'g--')
-                        ax.plot((self.r[:-1]+self.dr/2)[_q],
-                                (convolve_hist_dr[_q] * (np.exp(-np.pi *
-                                 (self.r[:-1]+self.dr/2)[_q]**2 * density))) / int_m_c_p_nn, 'g-.')
-                        ax.plot((self.r[:-1]+self.dr/2)[_q],
-                                (nn_model[_q] * np.cumsum(convolve_hist_dr * self.dr)[_q]) /
-                                int_m_c_p_nn, 'g:')
-
             if self.make_plots:
-                r_arr = np.linspace(0, pdf_bin[1:][q_pdf][-1], 1000)
-                # NN distribution is 2 pi r N exp(-pi r^2 N),
-                # with N converted from sq deg and r in arcseconds;
-                # integral to R is 1 - exp(-pi R^2 N)
-                nn_dist = 2 * np.pi * r_arr * density * np.exp(-np.pi * r_arr**2 * density)
-                ax.plot(r_arr, nn_dist / (1 - np.exp(-np.pi * r_arr[-1]**2 * density)),
-                        c='g', ls='-')
-
-                o_sig = self.fit_sigs[i, 1]
-                if usetex:
-                    ax.set_title(rf'mag = {mag}, H = {h:.2f}, '
-                                 rf'$\sigma$ = {fit_sig:.3f}$\pm${o_sig:.3f} ({bsig:.3f})"; '
-                                 rf'$F$ = {nn_frac:.2f}; SNR = {self.avg_snr[i, 0]:.2f}'
-                                 rf'$^{{+{self.avg_snr[i, 2]:.2f}}}_{{-{self.avg_snr[i, 1]:.2f}}}$; '
-                                 rf'N = {len(bm)}', fontsize=22)
-                else:
-                    ax.set_title(rf'mag = {mag}, H = {h:.2f}, '
-                                 rf'sigma = {fit_sig:.3f}+/-{o_sig:.3f} ({bsig:.3f})"; '
-                                 rf'F = {nn_frac:.2f}; SNR = {self.avg_snr[i, 0]:.2f}'
-                                 rf'+{self.avg_snr[i, 2]:.2f}/-{self.avg_snr[i, 1]:.2f}; '
-                                 rf'N = {len(bm)}', fontsize=22)
-                ax.legend(fontsize=15)
+                ax.legend(fontsize=8)
                 ax.set_xlabel('Radius / arcsecond')
                 if usetex:
                     ax.set_ylabel('PDF / arcsecond$^{-1}$')
                 else:
                     ax.set_ylabel('PDF / arcsecond^-1')
+
         if self.make_plots:
             plt.tight_layout()
             plt.savefig(f'{self.save_folder}/pdf/auf_fits_{self.file_name}.pdf')
             plt.close()
 
-        self.x2s = x2s
+        return mn_poisson_cdfs, ind_poisson_cdfs
 
-    def finalise_summary_plot(self):
+    def plot_snr_mag_sig(self):
         """
-        After running all of the sightlines' fits, generate a final
-        summary plot of the sig-sig relations, quality of fits, and
+        Generate 2-D histograms of SNR, quoted/fit astrometric uncertainty, and
+        photometric magnitude.
+        """
+        print("Plotting SNR-Magnitude-Uncertainty scaling relations...")
+        sys.stdout.flush()
+        _snr = 2.5 / np.log(10) / self.b[:, self.mag_unc_indices[self.best_mag_index]]
+        if not self.use_photometric_uncertainties:
+            obj_err = self.b[:, self.pos_and_err_indices[1][2]]
+        else:
+            # Since we expect the astrometric/inverse-photometric-snr scaling to
+            # be roughly a factor FWHM/(2 * sqrt(2 * ln(2))), i.e. the sigma of
+            # a Gaussian-ish PSF, scale accordingly:
+            obj_err = self.psfsig / _snr
+        obj_mag = self.b[:, self.mag_indices[self.best_mag_index]]
+
+        gs = self.make_gridspec('sig_vs_snr_vs_mag', 1, 3, 0.8, 6)
+        ax = plt.subplot(gs[0])
+        q = (obj_err < 1) & (_snr > 1) & (obj_err > 0)
+        log_inv_snr = np.log10(1 / _snr[q])
+        log_err = np.log10(obj_err[q])
+        h, x, y = np.histogram2d(log_inv_snr, log_err, bins=(100, 101))
+        ax.pcolormesh(x, y, h.T, edgecolors='face', cmap='viridis', rasterized=True)
+        ylims = ax.get_ylim()
+        xlims = ax.get_xlim()
+        if len(self.seeing_ranges) == 1:
+            ls_list = ['k-']
+        elif len(self.seeing_ranges) == 2:
+            ls_list = ['r--', 'k-']
+        elif len(self.seeing_ranges) == 3:
+            ls_list = ['r--', 'k-', 'r-']
+        for seeing, ls in zip(self.seeing_ranges, ls_list):  # pylint: disable=possibly-used-before-assignment
+            log_ks = np.log10(seeing / (2 * np.sqrt(2 * np.log(2))))
+            ax.plot(x, log_ks + x, ls, label=rf'seeing = {seeing:.1f} arcsec')
+
+        if np.sum([q[0] == -1 for q in self.pdfs]) <= len(self.pdfs)-5:
+            q = ~self.skip_flags
+            man_snr = self.avg_snr[q, 0]
+            man_sig_quoted = self.avg_sig[q, 0]
+            # Here we want the second column of fit_sigs, the individual
+            # derivations of astrometric uncertainty.
+            man_sig_fit = self.fit_sigs[q, 1]
+            man_log_inv_snr = np.log10(1/man_snr)
+            man_log_err_fit = np.log10(man_sig_fit)
+            man_log_err_quoted = np.log10(man_sig_quoted)
+            for _index in range(len(man_log_inv_snr)):  # pylint: disable=consider-using-enumerate
+                ax.arrow(man_log_inv_snr[_index], man_log_err_quoted[_index],
+                         0, man_log_err_fit[_index]-man_log_err_quoted[_index], color='k',
+                         zorder=30, head_width=0.06, head_length=0.03)
+
+        ax.set_xlim(*xlims)
+        ax.set_ylim(*ylims)
+        ax.legend(fontsize=10)
+        if usetex:
+            ax.set_xlabel(r'$\log_{10}$(1 / SNR)')
+        else:
+            ax.set_xlabel(r'log10(1 / SNR)')
+        if usetex:
+            ax.set_ylabel(r'$\log_{10}$(Quoted uncertainty / arcsecond)')
+        else:
+            ax.set_ylabel(r'log10(Quoted uncertainty / arcsecond)')
+
+        ax = plt.subplot(gs[1])
+        q = (obj_err < 1) & (_snr > 1) & (obj_err > 0)
+        log_inv_snr = np.log10(1 / _snr[q])
+        h, x, y = np.histogram2d(log_inv_snr, obj_mag[q], bins=(100, 101))
+        ax.pcolormesh(x, y, h.T, edgecolors='face', cmap='viridis', rasterized=True)
+        ylims = ax.get_ylim()
+        xlims = ax.get_xlim()
+        if np.sum([q[0] == -1 for q in self.pdfs]) <= len(self.pdfs)-5:
+            q = ~self.skip_flags
+            man_snr = self.avg_snr[q, 0]
+            man_mag = self.mag_array[q]
+            man_log_inv_snr = np.log10(1/man_snr)
+            ax.plot(man_log_inv_snr, man_mag, 'kx')
+
+            # m = -2.5 log10(flux), SNR = flux/B, thus
+            # m = -2.5 log10(B) - 2.5 log10(SNR), so
+            # m = -2.5 log10(B) + 2.5 x.
+            # Pin x and y (m) to the last data point for scaling.
+            _i = np.argmax(man_mag)
+            log_B = (man_mag[_i] - (2.5 * man_log_inv_snr[_i])) / (-2.5)  # pylint: disable=invalid-name
+            ax.plot(x, 2.5 * x - 2.5 * log_B, 'k-', label='Background-dominated')
+
+            # Now SNR = sqrt(flux), if flux_err = sqrt(flux).
+            # Thus m = -2.5 log10(SNR^2) = -5 log10(SNR) = 5 x.
+            # This also needs some kind of + C since we don't zeropoint, though.
+            _j = np.argmin(man_mag)
+            C = man_mag[_j] - (5 * man_log_inv_snr[_j])
+            ax.plot(x, 5 * x + C, 'r--', label='Photon-limited')
+
+        ax.set_xlim(*xlims)
+        ax.set_ylim(*ylims)
+        if np.sum([q[0] == -1 for q in self.pdfs]) <= len(self.pdfs)-5:
+            ax.legend(fontsize=10)
+        if usetex:
+            ax.set_xlabel(r'$\log_{10}$(1 / SNR)')
+        else:
+            ax.set_xlabel(r'log10(1 / SNR)')
+        ax.set_ylabel('Magnitude')
+
+        ax = plt.subplot(gs[2])
+        q = (obj_err < 1) & (_snr > 1) & (obj_err > 0)
+        log_err = np.log10(obj_err[q])
+        h, x, y = np.histogram2d(obj_mag[q], log_err, bins=(100, 101))
+        ax.pcolormesh(x, y, h.T, edgecolors='face', cmap='viridis', rasterized=True)
+        ylims = ax.get_ylim()
+        xlims = ax.get_xlim()
+
+        if np.sum([q[0] == -1 for q in self.pdfs]) <= len(self.pdfs)-5:
+            q = ~self.skip_flags
+            man_mag = self.mag_array[q]
+            man_sig_quoted = self.avg_sig[q, 0]
+            # Remember, individually fit not parameterisation.
+            man_sig_fit = self.fit_sigs[q, 1]
+            man_log_err_fit = np.log10(man_sig_fit)
+            man_log_err_quoted = np.log10(man_sig_quoted)
+            for _index in range(len(man_mag)):  # pylint: disable=consider-using-enumerate
+                ax.arrow(man_mag[_index], man_log_err_quoted[_index],
+                         0, man_log_err_fit[_index]-man_log_err_quoted[_index], color='k',
+                         zorder=30, head_width=0.06, head_length=0.03)
+
+        ax.set_xlim(*xlims)
+        ax.set_ylim(*ylims)
+        ax.set_xlabel('Magnitude')
+        if usetex:
+            ax.set_ylabel(r'$\log_{10}$(Quoted uncertainty / arcsecond)')
+        else:
+            ax.set_ylabel(r'log10(Quoted uncertainty / arcsecond)')
+        plt.tight_layout()
+        plt.savefig(f'{self.save_folder}/pdf/histogram_mag_vs_sig_vs_snr_{self.file_name}.pdf')
+        plt.close()
+
+    def finalise_summary_plots(self):
+        """
+        After running all of the sightlines' fits, generate final
+        summary plots of the sig-sig relations, quality of fits, and
         resulting "m" and "n" scaling parameters.
         """
-        # pylint: disable-next=fixme
-        # TODO: put chi-squred distribution comparison back, but that needs
-        # self.x2s saving out somehow so that we can skip to the end and just
-        # run finalise_summary_plot on re-runs when we don't need to fit any
-        # astrometry, and currently that isn't possible.
 
-        # ax_d = plt.subplot(self.gs[1])
-        # q = ~np.isnan(self.x2s[:, 0])
-        # chi_sqs, dofs = self.x2s[:, 0][q].flatten(), self.x2s[:, 1][q].flatten()
-        # chi_sq_cdf = np.empty(np.sum(q), float)
-        # for i, (chi_sq, dof) in enumerate(zip(chi_sqs, dofs)):
-        #     chi_sq_cdf[i] = chi2.cdf(chi_sq, dof)
-        # # Under the hypothesis all CDFs are "true" we should expect
-        # # the distribution of CDFs to be linear with fraction of the way
-        # # through the sorted list of CDFs -- that is, the CDF ranked 30%
-        # # in order should be ~0.3.
-        # q_sort = np.argsort(chi_sq_cdf)
-        # filter_log_nans = chi_sq_cdf[q_sort] < 1
-        # true_hypothesis_cdf_dist = (np.arange(1, len(chi_sq_cdf)+1, 1) - 0.5) / len(chi_sq_cdf)
-        # ax_d.plot(np.log10(1 - chi_sq_cdf[q_sort][filter_log_nans]),
-        #           true_hypothesis_cdf_dist[filter_log_nans], 'k.')
-        # ax_d.plot(np.log10(1 - true_hypothesis_cdf_dist), true_hypothesis_cdf_dist, 'r--')
-        # if usetex:
-        #     ax_d.set_xlabel(r'$\log_{10}(1 - \mathrm{CDF})$')
-        # else:
-        #     ax_d.set_xlabel(r'log10(1 - CDF)')
-        # ax_d.set_ylabel('Fraction')
+        x_array = np.linspace(0, self.ax_b_sing.get_xlim()[1], 1000)
+        plt.figure('single_sigsig')
+        self.ax_b_sing.plot(x_array, x_array, 'g:')
+        self.ax_b_sing.set_ylim(0.95 * self.ylims_sing[0], 1.05 * self.ylims_sing[1])
+        self.ax_b_log_sing.plot(x_array, x_array, 'g:')
+        self.ax_b_log_sing.set_xscale('log')
+        self.ax_b_log_sing.set_yscale('log')
 
-        for i, (f, label) in enumerate(zip([self.m_sigs, self.n_sigs], ['m', 'n'])):
-            ax = plt.subplot(self.gs[i+2])
+        if usetex:
+            if not self.use_photometric_uncertainties:
+                self.ax_b_sing.set_xlabel(r'Quoted astrometric $\sigma$ / arcsecond')
+                self.ax_b_log_sing.set_xlabel(r'Quoted astrometric $\sigma$ / arcsecond')
+            else:
+                self.ax_b_sing.set_xlabel(r'Quoted photometric $\sigma$ / arcsecond')
+                self.ax_b_log_sing.set_xlabel(r'Quoted photometric $\sigma$ / arcsecond')
+            self.ax_b_sing.set_ylabel(r'Individually-fit astrometric $\sigma$ / arcsecond')
+            self.ax_b_log_sing.set_ylabel(r'Individually-fit astrometric $\sigma$ / arcsecond')
+        else:
+            if not self.use_photometric_uncertainties:
+                self.ax_b_sing.set_xlabel(r'Quoted astrometric sigma / arcsecond')
+                self.ax_b_log_sing.set_xlabel(r'Quoted astrometric sigma / arcsecond')
+            else:
+                self.ax_b_sing.set_xlabel(r'Quoted photometric sigma / arcsecond')
+                self.ax_b_log_sing.set_xlabel(r'Quoted photometric sigma / arcsecond')
+            self.ax_b_sing.set_ylabel(r'Individually-fit astrometric sigma / arcsecond')
+            self.ax_b_log_sing.set_ylabel(r'Individually-fit astrometric sigma / arcsecond')
+        plt.savefig(f'{self.save_folder}/pdf/summary_individual_sig_vs_sig.pdf')
+        plt.close()
+
+        gs = self.make_gridspec('fits_cdf', 1, 2, 0.8, 6)
+        for i, (f, label) in enumerate(zip([self.mn_poisson_cdfs, self.ind_poisson_cdfs],
+                                           ['Hyper-Parameter', 'Individual'])):
+            ax_d = plt.subplot(gs[i])
+            for j, g in enumerate(f):
+                if g is None:
+                    continue
+                sys.stdout.flush()
+                q = ~np.isnan(g)
+                p_cdf = g[q]
+                # Under the hypothesis all CDFs are "true" we should expect
+                # the distribution of CDFs to be linear with fraction of the way
+                # through the sorted list of CDFs -- that is, the CDF ranked 30%
+                # in order should be ~0.3.
+                q_sort = np.argsort(p_cdf)
+                filter_log_nans = p_cdf[q_sort] < 1
+                true_hypothesis_cdf_dist = (np.arange(1, len(p_cdf)+1, 1) - 0.5) / len(p_cdf)
+                c = self.cols[j % len(self.cols)]
+                ax_d.plot(np.log10(1 - p_cdf[q_sort][filter_log_nans]),
+                          true_hypothesis_cdf_dist[filter_log_nans], ls='None', c=c, marker='.')
+                ax_d.plot(np.log10(1 - true_hypothesis_cdf_dist), true_hypothesis_cdf_dist, 'r--')
+            if usetex:
+                ax_d.set_xlabel(rf'$\log_{10}(1 - \mathrm{{{label} CDF}})$')
+            else:
+                ax_d.set_xlabel(rf'log10(1 - {label} CDF)')
+            ax_d.set_ylabel('Fraction')
+        plt.savefig(f'{self.save_folder}/pdf/summary_mn_ind_cdfs.pdf')
+        plt.close()
+
+        self.gs_mn_sky = self.make_gridspec('mn_sky', 2, 2, 0.8, 5)
+        for i, (f, label) in enumerate(zip([self.m_sigs, self.n_sigs],
+                                           ['m', 'n / arcsecond'])):
+            ax = plt.subplot(self.gs_mn_sky[i])
             img = ax.scatter(self.ax1_mids, self.ax2_mids, c=f, cmap='viridis')
             c = plt.colorbar(img, ax=ax, use_gridspec=True)
             c.ax.set_ylabel(label)
@@ -1685,8 +2037,40 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
             ax.set_xlabel(f'{ax1_name} / deg')
             ax.set_ylabel(f'{ax2_name} / deg')
 
+            xlims = ax.get_xlim()
+            ylims = ax.get_ylim()
+
+            # Plot the Galactic and Ecliptic planes.
+            for _b in [-20, 0, 20]:
+                l = np.linspace(0, 360, 10000)
+                b = np.zeros_like(l) + _b
+                c = SkyCoord(l=l, b=b, unit='deg', frame='galactic')
+                ra, dec = c.icrs.ra.degree, c.icrs.dec.degree
+                q = np.argsort(ra)
+                ra, dec = ra[q], dec[q]
+                ax.plot(ra, dec, ls='-', c='k' if _b == 0 else 'grey', alpha=0.7, zorder=-1)
+            for _lat in [-20, 0, 20]:
+                lon = np.linspace(0, 360, 10000)
+                lat = np.zeros_like(lon) + _lat
+                c = SkyCoord(lon=lon, lat=lat, unit='deg', frame='barycentricmeanecliptic')
+                ra, dec = c.icrs.ra.degree, c.icrs.dec.degree
+                q = np.argsort(ra)
+                ra, dec = ra[q], dec[q]
+                ax.plot(ra, dec, ls='--', c='k' if _lat == 0 else 'grey', alpha=0.7, zorder=-1)
+
+            ax.set_xlim(*xlims)
+            ax.set_ylim(*ylims)
+
+            ax = plt.subplot(self.gs_mn_sky[i+2])
+            ax.plot(self.avg_b_dens, f, 'k.')
+            if usetex:
+                ax.set_xlabel(r'Average density / deg$^{-2}$')
+            else:
+                ax.set_xlabel('Average density / deg^-2')
+            ax.set_ylabel(label)
+
         plt.tight_layout()
-        plt.savefig(f'{self.save_folder}/pdf/sig_h_stats.pdf')
+        plt.savefig(f'{self.save_folder}/pdf/summary_mn_sky.pdf')
         plt.close()
 
     def load_catalogue(self, cat_type, sub_cat_id):
@@ -1864,11 +2248,11 @@ def create_distances(a, b, nn_radius, a_ax1_ind, a_ax2_ind, b_ax1_ind, b_ax2_ind
     Parameters
     ----------
     a : numpy.ndarray
-        Array containing catalogue "a"'s sources. Must have astrometry as its
-        first and second columns.
+        Array containing catalogue "a"'s sources. Must have astrometric
+        coordinates as two of its columns.
     b : numpy.ndarray
-        Catalogue "b"'s object array. Longitude and latitude must be its first
-        two axes respectively.
+        Catalogue "b"'s object array. Longitude and latitude must be two
+        columns in the array.
     nn_radius : float
         Maximum match radius within which to consider potential counterpart
         assignments, in arcseconds.
@@ -2133,6 +2517,7 @@ class SNRMagnitudeRelationship(AstrometricCorrections):  # pylint: disable=too-m
             if not np.all(abc_array[:, index_, :] == [-1, -1, -1, -1, -1]):
                 continue
             print(f'Running SNR-mag fits for sightline {index_+1}/{len(self.ax1_mids)}...')
+            sys.stdout.flush()
 
             if self.coord_or_chunk == 'coord':
                 ax1_mid, ax2_mid, _, _, _, _ = list_of_things

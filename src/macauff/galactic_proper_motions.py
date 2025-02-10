@@ -433,7 +433,7 @@ def calc_pm(iterable):  # pylint: disable=too-many-locals
         if i == 2:
             cov = find_halo_dispersion(l[j], b[j], d[j])
 
-        new_uvw = rng.multivariate_normal(mean, cov, n)
+        new_uvw = rng.multivariate_normal(mean, cov, n)  # pylint: disable=possibly-used-before-assignment
         v_d, v_l, v_z = new_uvw[:, 0], new_uvw[:, 1], new_uvw[:, 2]
 
         # 1 km/s/kpc = 0.2108 mas/year

@@ -1416,11 +1416,13 @@ class TestInputs:
             elif cfg_type == 'b':
                 load_old = 'cat_b_params_'
                 load_new = 'cat_b_params_2'
+            # pylint: disable-next=possibly-used-before-assignment
             with open(os.path.join(os.path.dirname(__file__), f'data/{load_old}.txt'),
                       encoding='utf-8') as file:
                 f = file.readlines()
             idx = np.where([old_line in line for line in f])[0][0]
             _replace_line(os.path.join(os.path.dirname(__file__), f'data/{load_old}.txt'), idx, new_line,
+            # pylint: disable-next=possibly-used-before-assignment
                           out_file=os.path.join(os.path.dirname(__file__), f'data/{load_new}.txt'))
             with pytest.raises(err_type, match=error_msg):
                 cm._initialise_chunk(os.path.join(os.path.dirname(__file__), f'data/{j}.txt'),
@@ -1628,15 +1630,17 @@ class TestInputs:
                  'correct_astro_save_folder = ac_folder\n', 'csv_cat_file_string = file_{}.csv\n',
                  'pos_and_err_indices = 0 1 2 0 1 2\n', 'mag_indices = 3 5 7\n', 'mag_unc_indices = 4 6 8\n',
                  'best_mag_index = 0\n', 'nn_radius = 30\n', 'ref_csv_cat_file_string = ref_{}.csv\n',
-                 'correct_mag_array = 14.07 14.17 14.27 14.37\n', 'correct_mag_slice = 0.05 0.05 0.05 0.05\n',
-                 'correct_sig_slice = 0.1 0.1 0.1 0.1\n', 'chunk_overlap_col = None\n',
-                 'best_mag_index_col = 8\n', 'use_photometric_uncertainties = no\n']
+                 'correct_mag_array = 14.07 14.17 14.27 14.37 14.47\n',
+                 'correct_mag_slice = 0.05 0.05 0.05 0.05 0.05\n',
+                 'correct_sig_slice = 0.1 0.1 0.1 0.1 0.1\n', 'chunk_overlap_col = None\n',
+                 'best_mag_index_col = 8\n', 'use_photometric_uncertainties = no\n',
+                 'mn_fit_type = quadratic\n', 'seeing_ranges = 0.9 1.1\n']
         for i, key in enumerate(['correct_astro_save_folder', 'csv_cat_file_string',
                                  'pos_and_err_indices', 'mag_indices', 'mag_unc_indices',
                                  'best_mag_index', 'nn_radius', 'ref_csv_cat_file_string',
                                  'correct_mag_array', 'correct_mag_slice', 'correct_sig_slice',
                                  'chunk_overlap_col', 'best_mag_index_col',
-                                 'use_photometric_uncertainties']):
+                                 'use_photometric_uncertainties', 'mn_fit_type', 'seeing_ranges']):
             new_line = ''
             for j in range(i+1):
                 new_line = new_line + lines[j]
@@ -1669,6 +1673,57 @@ class TestInputs:
                                  'data/crossmatch_params.txt'),
                                  os.path.join(os.path.dirname(__file__),
                                  'data/cat_a_params_2c.txt'),
+                                 os.path.join(os.path.dirname(__file__),
+                                 'data/cat_b_params.txt'))
+        old_line = 'mn_fit_type = quadratic'
+        new_line = 'mn_fit_type = something else\n'
+        with open(os.path.join(os.path.dirname(__file__), 'data/cat_a_params_2.txt'),
+                  encoding='utf-8') as file:
+            f = file.readlines()
+        idx = np.where([old_line in line for line in f])[0][0]
+        _replace_line(os.path.join(os.path.dirname(__file__),
+                      'data/cat_a_params_2.txt'), idx, new_line,
+                      out_file=os.path.join(os.path.dirname(__file__),
+                                            'data/cat_a_params_2d.txt'))
+        with pytest.raises(ValueError, match="mn_fit_type must be 'quadratic' or 'linear' in"):
+            cm._initialise_chunk(os.path.join(os.path.dirname(__file__),
+                                 'data/crossmatch_params.txt'),
+                                 os.path.join(os.path.dirname(__file__),
+                                 'data/cat_a_params_2d.txt'),
+                                 os.path.join(os.path.dirname(__file__),
+                                 'data/cat_b_params.txt'))
+        old_line = 'seeing_ranges = 0.9'
+        new_line = 'seeing_ranges = a\n'
+        with open(os.path.join(os.path.dirname(__file__), 'data/cat_a_params_2.txt'),
+                  encoding='utf-8') as file:
+            f = file.readlines()
+        idx = np.where([old_line in line for line in f])[0][0]
+        _replace_line(os.path.join(os.path.dirname(__file__),
+                      'data/cat_a_params_2.txt'), idx, new_line,
+                      out_file=os.path.join(os.path.dirname(__file__),
+                                            'data/cat_a_params_2e.txt'))
+        with pytest.raises(ValueError, match="seeing_ranges must be a 1-D list or array of ints, length 1, "):
+            cm._initialise_chunk(os.path.join(os.path.dirname(__file__),
+                                 'data/crossmatch_params.txt'),
+                                 os.path.join(os.path.dirname(__file__),
+                                 'data/cat_a_params_2e.txt'),
+                                 os.path.join(os.path.dirname(__file__),
+                                 'data/cat_b_params.txt'))
+        old_line = 'seeing_ranges = 0.9'
+        new_line = 'seeing_ranges = 1 2 3 4\n'
+        with open(os.path.join(os.path.dirname(__file__), 'data/cat_a_params_2.txt'),
+                  encoding='utf-8') as file:
+            f = file.readlines()
+        idx = np.where([old_line in line for line in f])[0][0]
+        _replace_line(os.path.join(os.path.dirname(__file__),
+                      'data/cat_a_params_2.txt'), idx, new_line,
+                      out_file=os.path.join(os.path.dirname(__file__),
+                                            'data/cat_a_params_2f.txt'))
+        with pytest.raises(ValueError, match="seeing_ranges must be a 1-D list or array of ints, length 1, "):
+            cm._initialise_chunk(os.path.join(os.path.dirname(__file__),
+                                 'data/crossmatch_params.txt'),
+                                 os.path.join(os.path.dirname(__file__),
+                                 'data/cat_a_params_2f.txt'),
                                  os.path.join(os.path.dirname(__file__),
                                  'data/cat_b_params.txt'))
         # Set up a completely valid test of cat_a_params and cat_b_params
@@ -1789,9 +1844,9 @@ class TestInputs:
         assert cm.b_correct_astro_save_folder == os.path.abspath('ac_folder')
         assert cm.b_csv_cat_file_string == os.path.abspath('file_{}.csv')
         assert cm.b_ref_csv_cat_file_string == os.path.abspath('ref_{}.csv')
-        assert_allclose(cm.b_correct_mag_array, np.array([14.07, 14.17, 14.27, 14.37]))
-        assert_allclose(cm.b_correct_mag_slice, np.array([0.05, 0.05, 0.05, 0.05]))
-        assert_allclose(cm.b_correct_sig_slice, np.array([0.1, 0.1, 0.1, 0.1]))
+        assert_allclose(cm.b_correct_mag_array, np.array([14.07, 14.17, 14.27, 14.37, 14.47]))
+        assert_allclose(cm.b_correct_mag_slice, np.array([0.05, 0.05, 0.05, 0.05, 0.05]))
+        assert_allclose(cm.b_correct_sig_slice, np.array([0.1, 0.1, 0.1, 0.1, 0.1]))
         assert np.all(cm.b_pos_and_err_indices == np.array([[0, 1, 2], [0, 1, 2]]))
         assert np.all(cm.b_mag_indices == np.array([3, 5, 7, 9]))
         assert np.all(cm.b_mag_unc_indices == np.array([4, 6, 8, 10]))
@@ -1828,9 +1883,9 @@ class TestInputs:
         assert cm.a_correct_astro_save_folder == os.path.abspath('ac_folder')
         assert cm.a_csv_cat_file_string == os.path.abspath('file_{}.csv')
         assert cm.a_ref_csv_cat_file_string == os.path.abspath('ref_{}.csv')
-        assert_allclose(cm.a_correct_mag_array, np.array([14.07, 14.17, 14.27, 14.37]))
-        assert_allclose(cm.a_correct_mag_slice, np.array([0.05, 0.05, 0.05, 0.05]))
-        assert_allclose(cm.a_correct_sig_slice, np.array([0.1, 0.1, 0.1, 0.1]))
+        assert_allclose(cm.a_correct_mag_array, np.array([14.07, 14.17, 14.27, 14.37, 14.47]))
+        assert_allclose(cm.a_correct_mag_slice, np.array([0.05, 0.05, 0.05, 0.05, 0.05]))
+        assert_allclose(cm.a_correct_sig_slice, np.array([0.1, 0.1, 0.1, 0.1, 0.1]))
         assert np.all(cm.a_pos_and_err_indices == np.array([[0, 1, 2], [0, 1, 2]]))
         assert np.all(cm.a_mag_indices == np.array([3, 5, 7, 9]))
         assert np.all(cm.a_mag_unc_indices == np.array([4, 6, 8, 10]))
@@ -1955,9 +2010,9 @@ class TestInputs:
         assert cm.a_correct_astro_save_folder == os.path.abspath('ac_folder')
         assert cm.a_csv_cat_file_string == os.path.abspath('file_{}.csv')
         assert cm.a_ref_csv_cat_file_string == os.path.abspath('ref_{}.csv')
-        assert_allclose(cm.a_correct_mag_array, np.array([14.07, 14.17, 14.27, 14.37]))
-        assert_allclose(cm.a_correct_mag_slice, np.array([0.05, 0.05, 0.05, 0.05]))
-        assert_allclose(cm.a_correct_sig_slice, np.array([0.1, 0.1, 0.1, 0.1]))
+        assert_allclose(cm.a_correct_mag_array, np.array([14.07, 14.17, 14.27, 14.37, 14.47]))
+        assert_allclose(cm.a_correct_mag_slice, np.array([0.05, 0.05, 0.05, 0.05, 0.05]))
+        assert_allclose(cm.a_correct_sig_slice, np.array([0.1, 0.1, 0.1, 0.1, 0.1]))
         assert np.all(cm.a_pos_and_err_indices == np.array([[0, 1, 2], [0, 1, 2]]))
         assert np.all(cm.a_mag_indices == np.array([3, 5, 7, 9]))
         assert np.all(cm.a_mag_unc_indices == np.array([4, 6, 8, 10]))

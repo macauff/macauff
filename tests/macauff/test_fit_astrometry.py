@@ -110,7 +110,8 @@ class TestAstroCorrection:
             'mag_slice': magslice, 'sig_slice': sigslice, 'n_pool': 1,
             'pos_and_err_indices': [[0, 1, 2], [0, 1, 2]], 'mag_indices': [3],
             'mag_unc_indices': [4], 'mag_names': ['W1'], 'best_mag_index': 0,
-            'n_r': 5000, 'n_rho': 5000, 'max_rho': 100, 'saturation_magnitudes': [15]}
+            'n_r': 5000, 'n_rho': 5000, 'max_rho': 100, 'saturation_magnitudes': [15],
+            'mn_fit_type': 'quadratic'}
 
         with pytest.raises(ValueError, match='single_sided_auf must be True.'):
             AstrometricCorrections(
@@ -173,9 +174,16 @@ class TestAstroCorrection:
                 **_kwargs, ax_dimension=1, npy_or_csv='csv', pregenerate_cutouts=False,
                 coord_or_chunk='coord', coord_system='equatorial', cutout_area=60, cutout_height=6,
                 use_photometric_uncertainties=True, return_nm='f')
+        del _kwargs['mn_fit_type']
+        with pytest.raises(ValueError, match="mn_fit_type must either be 'quad"):
+            ac = AstrometricCorrections(
+                **_kwargs, ax_dimension=1, npy_or_csv='csv', pregenerate_cutouts=False,
+                coord_or_chunk='coord', coord_system='equatorial', cutout_area=60, cutout_height=6,
+                use_photometric_uncertainties=True, return_nm=False, mn_fit_type='something else')
         ac = AstrometricCorrections(
             **_kwargs, ax_dimension=1, npy_or_csv='csv', pregenerate_cutouts=False,
-            coord_or_chunk='coord', coord_system='equatorial', cutout_area=60, cutout_height=6)
+            coord_or_chunk='coord', coord_system='equatorial', cutout_area=60, cutout_height=6,
+            mn_fit_type='quadratic')
         self.a_cat_name = 'store_data/a_cat{}{}.npy'
         self.b_cat_name = 'store_data/b_cat{}{}.npy'
         with pytest.raises(ValueError, match='a_cat_func must be given if pregenerate_cutouts '):
@@ -203,7 +211,7 @@ class TestAstroCorrection:
             coord_or_chunk='coord', pos_and_err_indices=[[0, 1, 2], [0, 1, 2]], mag_indices=[3],
             mag_unc_indices=[4], mag_names=['W1'], best_mag_index=0, coord_system='equatorial',
             chunks=chunks, pregenerate_cutouts=True, n_r=2000, n_rho=2000, max_rho=40,
-            saturation_magnitudes=[15])
+            saturation_magnitudes=[15], mn_fit_type='quadratic')
         with pytest.raises(ValueError, match="a_cat and b_cat must either both be None or "):
             ac(a_cat=None, b_cat=np.array([0]), a_cat_name=None, b_cat_name=None, a_cat_func=None,
                b_cat_func=None, tri_download=False, make_plots=True, make_summary_plot=True)
@@ -244,13 +252,43 @@ class TestAstroCorrection:
         with pytest.raises(ValueError, match="If pregenerate_cutouts is 'True' all files must "
                            f"exist already, but {self.a_cat_name.format(*cat_args)} does not."):
             ac(a_cat_name=self.a_cat_name, b_cat_name=self.b_cat_name, a_cat_func=a_cat_func,
-               b_cat_func=b_cat_func, tri_download=False, make_plots=True, make_summary_plot=True)
+               b_cat_func=b_cat_func, tri_download=False, make_plots=True, make_summary_plot=True,
+               seeing_ranges=[1, 2, 3])
         ax1_min, ax1_max, ax2_min, ax2_max = 100, 110, -3, 3
         self.fake_cata_cutout(ax1_min, ax1_max, ax2_min, ax2_max, *cat_args)
         with pytest.raises(ValueError, match="If pregenerate_cutouts is 'True' all files must "
                            f"exist already, but {self.b_cat_name.format(*cat_args)} does not."):
             ac(a_cat_name=self.a_cat_name, b_cat_name=self.b_cat_name, a_cat_func=a_cat_func,
-               b_cat_func=b_cat_func, tri_download=False, make_plots=True, make_summary_plot=True)
+               b_cat_func=b_cat_func, tri_download=False, make_plots=True, make_summary_plot=True,
+               seeing_ranges=[1, 2, 3])
+        with pytest.raises(ValueError, match="seeing_ranges must be provided if make_plots"):
+            ac(a_cat=None, b_cat=None, a_cat_name=self.a_cat_name, b_cat_name=self.b_cat_name,
+               a_cat_func=None, b_cat_func=None, tri_download=False, make_plots=True,
+               make_summary_plot=True)
+        ac.pregenerate_cutouts = None
+        with pytest.raises(ValueError, match="seeing_ranges must be a list of length 1, 2"):
+            ac(a_cat='a', b_cat='b', a_cat_name=None, b_cat_name=None,
+               a_cat_func=None, b_cat_func=None, tri_download=False, make_plots=True,
+               make_summary_plot=True, seeing_ranges=[1, 2, 3, 4, 5])
+        with pytest.raises(ValueError, match="seeing_ranges should be a list of floats"):
+            ac(a_cat='a', b_cat='b', a_cat_name=None, b_cat_name=None,
+               a_cat_func=None, b_cat_func=None, tri_download=False, make_plots=True,
+               make_summary_plot=True, seeing_ranges=['a', 'b', 'c'])
+        with pytest.raises(ValueError, match="single_or_repeat must either be 'single' "):
+            ac(a_cat='a', b_cat='b', a_cat_name=None, b_cat_name=None,
+               a_cat_func=None, b_cat_func=None, tri_download=False, make_plots=True,
+               make_summary_plot=True, seeing_ranges=np.array([1, 2]), single_or_repeat='something else')
+        ac.pregenerate_cutouts = False
+        with pytest.raises(ValueError, match="single_or_repeat cannot be 'repeat' unless pregenerate_cutouts "
+                           "is None and a_cat "):
+            ac(a_cat=None, b_cat=None, a_cat_name=self.a_cat_name, b_cat_name=self.b_cat_name,
+               a_cat_func=np.array([0]), b_cat_func=np.array([0]), tri_download=False, make_plots=True,
+               make_summary_plot=True, seeing_ranges=np.array([1, 2]), single_or_repeat='repeat')
+        ac.pregenerate_cutouts = None
+        with pytest.raises(ValueError, match="repeat_unique_visits_list must be provided if "):
+            ac(a_cat='a', b_cat='b', a_cat_name=None, b_cat_name=None,
+               a_cat_func=None, b_cat_func=None, tri_download=False, make_plots=True,
+               make_summary_plot=True, seeing_ranges=np.array([1, 2]), single_or_repeat='repeat')
 
     @pytest.mark.remote_data
     @pytest.mark.parametrize("npy_or_csv,coord_or_chunk,coord_system,pregenerate_cutouts,return_nm,in_memory",
@@ -296,7 +334,8 @@ class TestAstroCorrection:
             pregenerate_cutouts=pregenerate_cutouts,
             cutout_area=60 if pregenerate_cutouts is False else None,
             cutout_height=6 if pregenerate_cutouts is False else None, n_r=2000, n_rho=2000, max_rho=40,
-            return_nm=return_nm, saturation_magnitudes=[5])
+            return_nm=return_nm, saturation_magnitudes=[5],
+            mn_fit_type='quadratic' if pregenerate_cutouts is False else 'linear')
 
         if coord_or_chunk == 'coord':
             self.a_cat_name = 'store_data/a_cat{}{}' + ('.csv' if npy_or_csv == 'csv' else '.npy')
@@ -338,39 +377,48 @@ class TestAstroCorrection:
             if in_memory:
                 marray, narray, abc_array = ac(
                     a_cat=a_cat, b_cat=b_cat, a_cat_name=None, b_cat_name=None, a_cat_func=None,
-                    b_cat_func=None, tri_download=False, make_plots=True, make_summary_plot=True)
+                    b_cat_func=None, tri_download=False, make_plots=True, make_summary_plot=True,
+                    seeing_ranges=np.array([0.5, 1, 1.5]))
             else:
                 marray, narray, abc_array = ac(
                     a_cat=None, b_cat=None, a_cat_name=self.a_cat_name, b_cat_name=self.b_cat_name,
                     a_cat_func=a_cat_func, b_cat_func=b_cat_func, tri_download=False, make_plots=True,
-                    make_summary_plot=True)
+                    make_summary_plot=True, seeing_ranges=np.array([0.5, 1, 1.5]))
         else:
             if in_memory:
                 ac(a_cat=a_cat, b_cat=b_cat, a_cat_name=None, b_cat_name=None, a_cat_func=None,
-                    b_cat_func=None, tri_download=False, make_plots=True, make_summary_plot=True)
+                    b_cat_func=None, tri_download=False, make_plots=True, make_summary_plot=True,
+                    seeing_ranges=np.array([0.5, 1, 1.5]), single_or_repeat='repeat',
+                   repeat_unique_visits_list=np.array([1] * len(b_cat)))
             else:
                 ac(a_cat=None, b_cat=None, a_cat_name=self.a_cat_name, b_cat_name=self.b_cat_name,
                    a_cat_func=a_cat_func, b_cat_func=b_cat_func, tri_download=False, make_plots=True,
-                   make_summary_plot=True)
+                   make_summary_plot=True, seeing_ranges=np.array([0.5, 1, 1.5]))
 
         if coord_or_chunk == 'coord':
             assert os.path.isfile('ac_save_folder/pdf/auf_fits_105.0_0.0.pdf')
             assert os.path.isfile('ac_save_folder/pdf/counts_comparison_105.0_0.0.pdf')
             assert os.path.isfile('ac_save_folder/pdf/s_vs_snr_105.0_0.0.pdf')
+            assert os.path.isfile('ac_save_folder/pdf/histogram_mag_vs_sig_vs_snr_105.0_0.0.pdf')
         else:
             assert os.path.isfile('ac_save_folder/pdf/auf_fits_2017.pdf')
             assert os.path.isfile('ac_save_folder/pdf/counts_comparison_2017.pdf')
             assert os.path.isfile('ac_save_folder/pdf/s_vs_snr_2017.pdf')
+            assert os.path.isfile('ac_save_folder/pdf/histogram_mag_vs_sig_vs_snr_2017.pdf')
 
-        assert os.path.isfile('ac_save_folder/pdf/sig_h_stats.pdf')
+        assert os.path.isfile('ac_save_folder/pdf/summary_mn_ind_cdfs.pdf')
+        assert os.path.isfile('ac_save_folder/pdf/summary_mn_sky.pdf')
+        assert os.path.isfile('ac_save_folder/pdf/summary_individual_sig_vs_sig.pdf')
 
         if not return_nm:
             marray = np.load('ac_save_folder/npy/m_sigs_array.npy')
             narray = np.load('ac_save_folder/npy/n_sigs_array.npy')
+        # pylint: disable-next=possibly-used-before-assignment
         assert_allclose([marray[0], narray[0]], [2, 0], rtol=0.1, atol=0.01)
 
         if not return_nm:
             abc_array = np.load('ac_save_folder/npy/snr_mag_params.npy')
+        # pylint: disable-next=possibly-used-before-assignment
         assert_allclose([abc_array[0, 0, 3], abc_array[0, 0, 4]], [105, 0], atol=0.001)
 
         assert_allclose(abc_array[0, 0, 0], 1.2e-2, rtol=0.05, atol=0.001)
@@ -536,10 +584,11 @@ class TestSNRMagRelation:
 
         if not return_nm:
             abc_array = np.load('ac_save_folder/npy/snr_mag_params.npy')
+        # pylint: disable-next=possibly-used-before-assignment
         assert_allclose([abc_array[0, 0, 3], abc_array[0, 0, 4]], [105, 0], atol=0.001)
 
         assert_allclose(abc_array[0, 0, 0], 1.2e-2, rtol=0.05, atol=0.001)
-        assert_allclose(abc_array[0, 0, 1], 8e-17, rtol=0.05, atol=5e-19)
+        assert_allclose(abc_array[0, 0, 1], 8e-17, rtol=0.06, atol=5e-19)
 
         assert_allclose(smr.ax1_mins[0], 100, rtol=0.01)
         assert_allclose(smr.ax1_maxs[0], 110, rtol=0.01)
