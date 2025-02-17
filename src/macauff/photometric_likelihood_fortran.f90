@@ -40,7 +40,8 @@ subroutine find_mag_bin_inds(mags, flags, bins, cuts)
 
 end subroutine find_mag_bin_inds
 
-subroutine get_field_dists(auf_cdf_a, a_indices, a_overlap, f_frac, a_flags, b_flags, b_mag, low_mag, upp_mag, a_mask_ind)
+subroutine get_field_dists(auf_cdf_a, a_indices, a_overlap, f_fracs, a_flags, a_mag, b_flags, b_mag, a_low_mag, a_upp_mag, &
+    b_low_mag, b_upp_mag, a_mask_ind)
     ! Derive the distribution of "field" sources, those with no counterpart in the opposing
     ! catalogue, by removing any source within the "field" integral fraction radius of any object.
     integer, parameter :: dp = kind(0.0d0)  ! double precision
@@ -51,35 +52,38 @@ subroutine get_field_dists(auf_cdf_a, a_indices, a_overlap, f_frac, a_flags, b_f
     logical, intent(in) :: a_flags(:), b_flags(:)
     ! Evaluation of the AUF, integrated to the separation between potential counterparts, and fraction of
     ! counterpart objects to remove (and hence also remove "field" objects).
-    real(dp), intent(in) :: auf_cdf_a(:, :), f_frac
-    ! Second catalogue magnitude for this bandpass, and limits between which to consider removing
+    real(dp), intent(in) :: auf_cdf_a(:, :), f_fracs(:)
+    ! Catalogue magnitude for their bandpasses, and limits between which to consider removing
     ! sources from the field source distribution.
-    real(dp), intent(in) :: b_mag(:), low_mag, upp_mag
+    real(dp), intent(in) :: a_mag(:), a_low_mag, a_upp_mag, b_mag(:), b_low_mag, b_upp_mag
     ! Integer representation of boolean flag determining whether a source remains as a potential
     ! field source, or if it is too close to a primary catalogue object and thus not used to
     ! construct the "unmatched" distribution.
-    integer, intent(out) :: a_mask_ind(size(a_overlap))
+    integer, intent(out) :: a_mask_ind(size(f_fracs), size(a_overlap))
     ! Loop counters.
-    integer :: i, j, k
+    integer :: i, j, k, l
 
     a_mask_ind = 1
 
-!$OMP PARALLEL DO DEFAULT(NONE) PRIVATE(i, j, k) SHARED(auf_cdf_a, a_indices, a_overlap, a_flags, b_flags, b_mag, &
-!$OMP& low_mag, upp_mag, f_frac, a_mask_ind)
+!$OMP PARALLEL DO DEFAULT(NONE) PRIVATE(i, j, k) SHARED(auf_cdf_a, a_indices, a_overlap, a_flags, a_mag, b_flags, b_mag, &
+!$OMP& a_low_mag, a_upp_mag, b_low_mag, b_upp_mag, f_fracs, a_mask_ind)
     do j = 1, size(a_overlap)
-        if (a_flags(j)) then
+        if (a_flags(j) .and. a_mag(j) >= a_low_mag .and. a_mag(j) <= a_upp_mag) then
             do k = 1, a_overlap(j)
                 ! Index arrays have come from python and are zero-indexed, so correct offset here.
                 i = a_indices(k, j) + 1
                 if (i > 0) then
-                    if (auf_cdf_a(k, j) < f_frac .and. b_flags(i) .and. b_mag(i) >= low_mag .and. b_mag(i) <= upp_mag) then
-                        a_mask_ind(j) = 0
-                        exit
+                    if (b_flags(i) .and. b_mag(i) >= b_low_mag .and. b_mag(i) <= b_upp_mag) then
+                        do l = 1, size(f_fracs)
+                            if (auf_cdf_a(k, j) < f_fracs(l)) then
+                                a_mask_ind(l, j) = 0
+                            end if
+                        end do
                     end if
                 end if
             end do
         else
-            a_mask_ind(j) = 0
+            a_mask_ind(:, j) = 0
         end if
     end do
 !$OMP END PARALLEL DO

@@ -8,6 +8,7 @@ import datetime
 import sys
 
 import numpy as np
+from scipy.optimize import minimize
 
 # pylint: disable=import-error,no-name-in-module
 from macauff.misc_functions_fortran import misc_functions_fortran as mff
@@ -89,8 +90,8 @@ def compute_photometric_likelihoods(cm):
         b_photo_cut = b_photo[b_sky_cut]
         if cm.include_phot_like or cm.use_phot_priors:
             b_auf_cdf = auf_cdf_b[:, b_sky_cut]
-            b_flen_cut, b_inds_cut, b_size_cut = (
-                cm.bflen[b_sky_cut], cm.binds[:, b_sky_cut], cm.bsize[b_sky_cut])
+            b_blen_cut, b_flen_cut, b_inds_cut, b_size_cut = (
+                cm.bblen[b_sky_cut], cm.bflen[b_sky_cut], cm.binds[:, b_sky_cut], cm.bsize[b_sky_cut])
 
         for i in range(0, len(cm.a_filt_names)):
             if not cm.include_phot_like and not cm.use_phot_priors:
@@ -128,7 +129,7 @@ def compute_photometric_likelihoods(cm):
                         # pylint: disable-next=possibly-used-before-assignment
                         a_astro, b_astro, a_mag, b_mag, a_inds_cut, a_size_cut,
                         # pylint: disable-next=possibly-used-before-assignment
-                        b_inds_cut, b_size_cut, a_blen_cut, a_flen_cut, b_flen_cut,
+                        b_inds_cut, b_size_cut, a_blen_cut, b_blen_cut, a_flen_cut, b_flen_cut,
                         a_auf_cdf, b_auf_cdf, a_bins, b_bins, bright_frac, field_frac, a_flags, b_flags, area)
                 if cm.use_phot_priors and not cm.include_phot_like:
                     # If we only used the create_c_and_f routine to derive
@@ -280,8 +281,9 @@ def make_bins(input_mags):
 
 
 # pylint: disable-next=too-many-locals
-def create_c_and_f(a_astro, b_astro, a_mag, b_mag, a_inds, a_size, b_inds, b_size, a_blen, a_flen, b_flen,
-                   auf_cdf_a, auf_cdf_b, a_bins, b_bins, bright_frac, field_frac, a_flags, b_flags, area):
+def create_c_and_f(a_astro, b_astro, a_mag, b_mag, a_inds, a_size, b_inds, b_size, a_blen, b_blen, a_flen,
+                   b_flen, auf_cdf_a, auf_cdf_b, a_bins, b_bins, bright_frac, field_frac, a_flags, b_flags,
+                   area):
     '''
     Functionality to create the photometric likelihood and priors from a set
     of photometric data in a given pair of filters.
@@ -311,6 +313,8 @@ def create_c_and_f(a_astro, b_astro, a_mag, b_mag, a_inds, a_size, b_inds, b_siz
         The "bright" error circle radius, integrating the joint AUF convolution
         out to ``expected_frac`` for largest "a"-"b" potential pairing, for each
         catalogue "a" object.
+    b_blen : numpy.narray
+        Catalogue b's "bright" error circle radii.
     a_flen : numpy.ndarray
         The "field" error circle radius, integrating the joint AUF convolution
         out to ``expected_frac`` for largest "a"-"b" potential pairing, for each
@@ -371,29 +375,61 @@ def create_c_and_f(a_astro, b_astro, a_mag, b_mag, a_inds, a_size, b_inds, b_siz
 
     # get_field_dists allows for magnitude slicing, to get f(m | m) instead of f(m),
     # but when we do want f(m) we just pass two impossible magnitudes as the limits.
-    a_mask = plf.get_field_dists(auf_cdf_a, a_inds, a_size, field_frac, a_flags, b_flags, b_mag, -999, 999)
-    b_mask = plf.get_field_dists(auf_cdf_b, b_inds, b_size, field_frac, b_flags, a_flags, a_mag, -999, 999)
-    a_mask = a_mask.astype(bool)
-    b_mask = b_mask.astype(bool)
+    a_masks = plf.get_field_dists(auf_cdf_a, a_inds, a_size, np.array([bright_frac, field_frac]), a_flags,
+                                  a_mag, b_flags, b_mag, -999, 999, -999, 999)
+    b_masks = plf.get_field_dists(auf_cdf_b, b_inds, b_size, np.array([bright_frac, field_frac]), b_flags,
+                                  b_mag, a_flags, a_mag, -999, 999, -999, 999)
+
+    # Generate our chosen field-frac's field source histograms.
+    a_mask = a_masks[:, 1].astype(bool)
+    b_mask = b_masks[:, 1].astype(bool)
     a_left = a_mag[a_mask]
     b_left = b_mag[b_mask]
-    hist, a_bins = np.histogram(a_left, bins=a_bins)
-    num_fa = np.sum(a_mask)
 
+    hist, a_bins = np.histogram(a_left, bins=a_bins)
     fa = hist / (np.sum(hist)*np.diff(a_bins))
 
     hist, b_bins = np.histogram(b_left, bins=b_bins)
-    num_fb = np.sum(b_mask)
-
     fb = hist / (np.sum(hist)*np.diff(b_bins))
 
-    # Areas are reversed, so we remove the "a" areas from catalogue b and cut
-    # them out of the density calculation for Nfa, and vice versa.
-    a_area = np.sum(np.pi * b_flen[b_flags]**2)
-    b_area = np.sum(np.pi * a_flen[a_flags]**2)
+    # Calculate the Nc and two Nf values from our biased densities.
+    # These are generated from the measured density being counterparts (X)
+    # and field density (Y), mitigated by deliberated removed objects inside
+    # our chosen counterpart CDF fraction F and unintentional removal due to
+    # random-chance alignment.
+    measured_density_a = np.sum(a_masks, axis=0) / area
+    measured_density_b = np.sum(b_masks, axis=0) / area
+    # rho = x / a, sig_x = sqrt(x), sig_rho = sig_x * drho/dx = sig_x / a
+    # sig_rho = sqrt(x) / a = sqrt(x / a) / sqrt(a) = sqrt(rho) / sqrt(a)
+    # = sqrt(rho / a).
+    meas_dens_a_uncert = np.sqrt(measured_density_a / area)
+    meas_dens_b_uncert = np.sqrt(measured_density_b / area)
 
-    nfa = num_fa/(area - a_area)
-    nfb = num_fb/(area - b_area)
+    # Values for the case where we don't remove anything, and F = 0. This
+    # is used to get a handle on the total combined value of our two contributing
+    # densities, X and Y.
+    tot_density_a = np.sum(a_flags) / area
+    tot_dens_a_uncert = np.sqrt(tot_density_a / area)
+    tot_density_b = np.sum(b_flags) / area
+    tot_dens_b_uncert = np.sqrt(tot_density_b / area)
+
+    measured_density_a = np.array([tot_density_a, *measured_density_a])
+    measured_density_b = np.array([tot_density_b, *measured_density_b])
+    meas_dens_a_uncert = np.array([tot_dens_a_uncert, *meas_dens_a_uncert])
+    meas_dens_b_uncert = np.array([tot_dens_b_uncert, *meas_dens_b_uncert])
+
+    # TODO: TAKE AVERAGES IN AREA OR RADIUS SQUARED INSTEAD?
+    # Filter for completely isolated sources, which will have zero lengths,
+    # to take a meaningful sample.
+    avg_alens = np.array([np.mean(a_blen[a_blen > 0]), np.mean(a_flen[a_flen > 0])])
+    avg_blens = np.array([np.mean(b_blen[b_blen > 0]), np.mean(b_flen[b_flen > 0])])
+
+    res = minimize(calculate_prior_densities, args=(measured_density_a, measured_density_b,
+                   meas_dens_a_uncert, meas_dens_b_uncert, np.array([bright_frac, field_frac]), avg_alens,
+                   avg_blens), x0=[1, tot_density_a, tot_density_b], jac=True, method='L-BFGS-B',
+                   bounds=[(0, None), (0, None), (0, None)])
+
+    nc, nfa, nfb = res.x
 
     bm = np.empty((len(b_bins)-1, len(a_bins)-1), float, order='F')
     z = np.empty(len(a_bins)-1, float)
@@ -411,38 +447,199 @@ def create_c_and_f(a_astro, b_astro, a_mag, b_mag, a_inds, a_size, b_inds, b_siz
         z[i] = np.sum(hist)/np.sum(a_cuts[i])
     cdmdm = np.empty((len(b_bins)-1, len(a_bins)-1), float, order='F')
     for i in range(0, len(a_bins)-1):
-        bmask = plf.get_field_dists(auf_cdf_b, b_inds, b_size, field_frac, b_flags, a_flags, a_mag,
-                                    a_bins[i], a_bins[i+1])
-        bmask = bmask.astype(bool)
+        # Within the loop, we only want to consider a catalogue, effectively, of
+        # "a" sources with magitude [a_bins[i], a_bins[i+1]]. We therefore
+        # get_field_dists with a slice in catalogue a, but no slice in b.
+        b_masks = plf.get_field_dists(auf_cdf_b, b_inds, b_size, np.array([bright_frac, field_frac]), b_flags,
+                                      b_mag, a_flags, a_mag, -999, 999, a_bins[i], a_bins[i+1])
+        # However, to calculate the opposite masking -- and get biased-density
+        # measurements of the "field" density of surviving objects in catalogue
+        # "a" with narrow-range brightnesses -- we slice in a still, and not in b,
+        # remembering that in the function call a and b will be swapped, with "a"
+        # now the first-passed catalogue (either a or b).
+        a_masks = plf.get_field_dists(auf_cdf_a, a_inds, a_size, np.array([bright_frac, field_frac]), a_flags,
+                                      a_mag, b_flags, b_mag, a_bins[i], a_bins[i+1], -999, 999)
+
+        a_mag_filter = (a_mag >= a_bins[i]) & (a_mag <= a_bins[i+1])
+
+        measured_density_a = np.sum(a_masks, axis=0) / area
+        measured_density_b = np.sum(b_masks, axis=0) / area
+        meas_dens_a_uncert = np.sqrt(measured_density_a / area)
+        meas_dens_b_uncert = np.sqrt(measured_density_b / area)
+        tot_density_a = np.sum(a_flags & a_mag_filter) / area
+        tot_dens_a_uncert = np.sqrt(tot_density_a / area)
+        tot_density_b = np.sum(b_flags) / area
+        tot_dens_b_uncert = np.sqrt(tot_density_b / area)
+
+        measured_density_a = np.array([tot_density_a, *measured_density_a])
+        measured_density_b = np.array([tot_density_b, *measured_density_b])
+        meas_dens_a_uncert = np.array([tot_dens_a_uncert, *meas_dens_a_uncert])
+        meas_dens_b_uncert = np.array([tot_dens_b_uncert, *meas_dens_b_uncert])
+
+        # Also filter the a-catalogue objects for being within our magnitude
+        # range, but don't do anything to b, so re-use the previous one.
+        avg_alens = np.array([np.mean(a_blen[(a_blen > 0) & a_mag_filter]),
+                              np.mean(a_flen[(a_flen > 0) & a_mag_filter])])
+
+        res = minimize(calculate_prior_densities, args=(measured_density_a, measured_density_b,
+                       meas_dens_a_uncert, meas_dens_b_uncert, np.array([bright_frac, field_frac]),
+                       avg_alens, avg_blens), x0=[0, tot_density_a, tot_density_b], jac=True,
+                       method='L-BFGS-B', bounds=[(0, None), (0, None), (0, None)])
+
+        _, _, _nfb = res.x
+
+        bmask = b_masks[:, 1].astype(bool)
         b_left = b_mag[bmask]
         hist, b_bins = np.histogram(b_left, bins=b_bins)
-        _num_fb = np.sum(bmask)
-
         _fb = hist / (np.sum(hist)*np.diff(b_bins))
-        # We remove the objects from catalogue b, but it's the area of catalogue
-        # a that is removed for density calculation purposes!
-        barea = np.sum(np.pi * a_flen[a_flags & (a_mag >= a_bins[i]) & (a_mag <= a_bins[i+1])]**2)
-        _nfb = _num_fb/(area - barea)
+
         fm = np.append(0, np.cumsum(_fb[:-1] * np.diff(b_bins[:-1])))
         for j in range(0, len(b_bins)-1):
             cm = np.sum(cdmdm[:j, i]*np.diff(b_bins[:j+1]))
             cdmdm[j, i] = max(0, z[i]*bm[j, i]*np.exp(aa[i]*_nfb*fm[j]) - (1-cm)*aa[i]*_nfb*_fb[j])
-
-    zc = np.sum(cdmdm*np.diff(b_bins).reshape(-1, 1), axis=0)
-    frac = zc/bright_frac
-    density_of_inputs = np.sum(a_cuts, axis=1)/area
-    nc = np.sum(frac*density_of_inputs)
+        # What we get at the end is, as per Naylor et al. (2013), Zc c. They
+        # convert directly to X c, but we have split that out above into Nc
+        # already. Here we therefore don't care about the constant in front
+        # of c(m | m), and simply normalise.
+        cdmdm[:, i] /= np.sum(cdmdm[:, i] * np.diff(b_bins))
 
     integral = 0
     for i in range(0, len(a_bins)-1):
-        cdmdm[:, i] *= pa[i] / (a_bins[i+1] - a_bins[i])
+        cdmdm[:, i] *= pa[i]
         integral = integral + np.sum(cdmdm[:, i]*np.diff(b_bins))*(a_bins[i+1] - a_bins[i])
     if integral > 0:
         cdmdm /= integral
 
-    # Correct the field priors for the fraction of counterparts that get left
-    # in their "cutout" circle, by the fact that we don't use the entire integral:
-    nfa = nfa - (1 - field_frac)*nc
-    nfb = nfb - (1 - field_frac)*nc
+    # If any density is NaN, or Nc and at least one of Nfa or Nfb are
+    # non-positive, then we have to warn and quit, since we won't be able to
+    # recover that below.
+    if np.any(np.isnan([nc, nfa, nfb])) or (nc <= 0 and (nfa <= 0 or nfb <= 0)):
+        raise ValueError("Incorrect prior densities, unable to process chunk.")
+    # Otherwise, if we somehow have a negative or totally zero overall
+    # counterpart density, then simply set to 1% the lowest of the field
+    # densities.
+    if nc <= 0:
+        nc = 0.01 * min(nfa, nfb)
+    # If either field density is zero or negative, set to 1% the counterpart
+    # density, similarly.
+    if nfa <= 0:
+        nfa = 0.01 * nc
+    if nfb <= 0:
+        nfb = 0.01 * nc
 
     return nc, cdmdm, nfa, fa, nfb, fb
+
+
+def calculate_prior_densities(model_densities, rho, phi, o_rho, o_phi, fs, rs_rho, rs_phi):
+    '''
+    Calculate the joint-catalogue counterpart density and separate catalogue
+    non-matched ("field") densities of two catalogues based on a series of
+    measured densities. In each case, objects within a particular integrated
+    fraction of object pairs being counterparts given their separation and
+    corresponding positional uncertainties are removed from consideration,
+    and "surviving" object densities are computed, to break the degeneracy
+    between counterparts and non-counterparts.
+
+    Parameters
+    ----------
+    model_densities : list or numpy.ndarray
+        Three-element array with counterpart, catalogue a's field density,
+        and catalogue b's field density in, evaluated by the minimisation.
+    rho : list or numpy.ndarray
+        Measured densities for catalogue a, at each fraction in ``fs``.
+    phi : list or numpy.ndarray
+        Catalogue b density measurements, corresponding to ``fs``.
+    o_rho : list or numpy.ndarray
+        Uncertainty in measured ``rho`` densities.
+    o_phi : list or numpy.ndarray
+        ``phi`` uncertainties.
+    fs : list or numpy.ndarray
+        Each CDF fraction used to remove potential counterparts (true or
+        otherwise) in measuring ``rho`` and ``phi``.
+    rs_rho : list or numpy.ndarray
+        Average "error circle" radii, the average radius out to which all
+        objects in catalogue a integrated to get to each ``fs`` CDF, for
+        each CDF fraction.
+    rs_phi : list or numpy.ndarray
+        Average catalogue b error circle radii, corresponding to each
+        ``fs`` CDF.
+
+    Returns
+    -------
+    lst_sq : float
+        The chi-squared fit between the model measured-densities, evaluated at
+        each ``fs``, and ``rho`` and ``phi``.
+    lst_sq_grad : numpy.ndarray
+        The gradient of ``lst_sq`` with respect to each element of
+        ``model_densities``.
+    '''
+    def calculate_dens_and_grad(t, u, v, fs, rs):
+        '''
+        Calculate the model for measured number counts based on
+        joint-counterpart and randomly aligned source densities of two
+        catalogues.
+
+        Parameters
+        ----------
+        t : float
+            Density, sources per square degree, of counterparts
+        u : float
+            Catalogue a's field density.
+        v : float
+            Catalogue b's field density.
+        fs : list or numpy.ndarray
+            Set of CDF fractions at which catalogue densities have been sampled,
+            removing some percentage of counterparts from the measured densities.
+        rs : list or numpy.ndarray
+            Set of average "error circle" radii, corresponding to each ``fs``
+            integral, the area of which accounts for some percentage of removed
+            chance-alignment sources from the measured density.
+
+        Returns
+        -------
+        model : float
+            The expected calculated overlap density between the two catalogues
+            based on counterpart and non-matching densities and percentile
+            integration for removal from measurements.
+        model_grad : numpy.ndarray
+            The gradient of the model with respect to ``t``, ``u``, and ``v``.
+        '''
+        # d/d[tv] o_m_e = -pi r^2 o_m_e
+        o_m_e = 1 - e(t, v, rs)
+        model = ((1 - fs) * t + u) * o_m_e
+
+        dmodel_dt = (1 - fs) * o_m_e - np.pi * rs**2 * model
+        dmodel_du = o_m_e
+        dmodel_dv = -np.pi * rs**2 * model
+        model_grad = np.array([dmodel_dt, dmodel_du, dmodel_dv])
+
+        return model, model_grad
+
+    def e(g, h, r):
+        return 1 - np.exp(-np.pi * r**2 * (g + h))
+    x, y, z = model_densities
+    # The first measurement we make is for F=0, not passed through the fs array,
+    # but IS passed through rho and phi as their first elements. This is a
+    # simple function, and gives P = X + Y, Q = X + Z.
+    p_0 = x + y
+    q_0 = x + z
+    p_0_grad = np.array([1, 1, 0])
+    q_0_grad = np.array([1, 0, 1])
+    # Flip y and z for the two calls!
+    p, p_grad = calculate_dens_and_grad(x, y, z, fs, rs_rho)
+    q, q_grad = calculate_dens_and_grad(x, z, y, fs, rs_phi)
+    # Reverse the q_grad order, so that what is actually y is the 2nd element.
+    q_grad = np.array([q_grad[0], q_grad[2], q_grad[1]])
+
+    p = np.array([p_0, *p])
+    q = np.array([q_0, *q])
+    p_grad = np.array([[p_0_grad[0], *p_grad[0]], [p_0_grad[1], *p_grad[1]], [p_0_grad[2], *p_grad[2]]])
+    q_grad = np.array([[q_0_grad[0], *q_grad[0]], [q_0_grad[1], *q_grad[1]], [q_0_grad[2], *q_grad[2]]])
+
+    lst_sq = np.sum((p - rho)**2 / o_rho**2 + (q - phi)**2 / o_phi**2)
+    lst_sq_grad = np.empty(3, float)
+    lst_sq_grad[0] = np.sum(2 * (p - rho) / o_rho**2 * p_grad[0] + 2 * (q - phi) / o_phi**2 * q_grad[0])
+    lst_sq_grad[1] = np.sum(2 * (p - rho) / o_rho**2 * p_grad[1] + 2 * (q - phi) / o_phi**2 * q_grad[1])
+    lst_sq_grad[2] = np.sum(2 * (p - rho) / o_rho**2 * p_grad[2] + 2 * (q - phi) / o_phi**2 * q_grad[2])
+
+    return lst_sq, lst_sq_grad
