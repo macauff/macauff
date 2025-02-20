@@ -83,15 +83,15 @@ def compute_photometric_likelihoods(cm):
         a_photo_cut = a_photo[a_sky_cut]
         if cm.include_phot_like or cm.use_phot_priors:
             a_auf_cdf = auf_cdf_a[:, a_sky_cut]
-            a_blen_cut, a_flen_cut, a_inds_cut, a_size_cut = (
-                cm.ablen[a_sky_cut], cm.aflen[a_sky_cut], cm.ainds[:, a_sky_cut], cm.asize[a_sky_cut])
+            a_b_area_cut, a_f_area_cut, a_inds_cut, a_size_cut = (
+                cm.ab_area[a_sky_cut], cm.af_area[a_sky_cut], cm.ainds[:, a_sky_cut], cm.asize[a_sky_cut])
 
         b_sky_cut = b_sky_inds == m
         b_photo_cut = b_photo[b_sky_cut]
         if cm.include_phot_like or cm.use_phot_priors:
             b_auf_cdf = auf_cdf_b[:, b_sky_cut]
-            b_blen_cut, b_flen_cut, b_inds_cut, b_size_cut = (
-                cm.bblen[b_sky_cut], cm.bflen[b_sky_cut], cm.binds[:, b_sky_cut], cm.bsize[b_sky_cut])
+            b_b_area_cut, b_f_area_cut, b_inds_cut, b_size_cut = (
+                cm.bb_area[b_sky_cut], cm.bf_area[b_sky_cut], cm.binds[:, b_sky_cut], cm.bsize[b_sky_cut])
 
         for i in range(0, len(cm.a_filt_names)):
             if not cm.include_phot_like and not cm.use_phot_priors:
@@ -129,7 +129,7 @@ def compute_photometric_likelihoods(cm):
                         # pylint: disable-next=possibly-used-before-assignment
                         a_astro, b_astro, a_mag, b_mag, a_inds_cut, a_size_cut,
                         # pylint: disable-next=possibly-used-before-assignment
-                        b_inds_cut, b_size_cut, a_blen_cut, b_blen_cut, a_flen_cut, b_flen_cut,
+                        b_inds_cut, b_size_cut, a_b_area_cut, b_b_area_cut, a_f_area_cut, b_f_area_cut,
                         a_auf_cdf, b_auf_cdf, a_bins, b_bins, bright_frac, field_frac, a_flags, b_flags, area)
                 if cm.use_phot_priors and not cm.include_phot_like:
                     # If we only used the create_c_and_f routine to derive
@@ -281,9 +281,9 @@ def make_bins(input_mags):
 
 
 # pylint: disable-next=too-many-locals
-def create_c_and_f(a_astro, b_astro, a_mag, b_mag, a_inds, a_size, b_inds, b_size, a_blen, b_blen, a_flen,
-                   b_flen, auf_cdf_a, auf_cdf_b, a_bins, b_bins, bright_frac, field_frac, a_flags, b_flags,
-                   area):
+def create_c_and_f(a_astro, b_astro, a_mag, b_mag, a_inds, a_size, b_inds, b_size, a_b_area, b_b_area,
+                   a_f_area, b_f_area, auf_cdf_a, auf_cdf_b, a_bins, b_bins, bright_frac, field_frac, a_flags,
+                   b_flags, area):
     '''
     Functionality to create the photometric likelihood and priors from a set
     of photometric data in a given pair of filters.
@@ -309,18 +309,18 @@ def create_c_and_f(a_astro, b_astro, a_mag, b_mag, a_inds, a_size, b_inds, b_siz
         Overlap indices into catalogue "a" for each catalogue "b" object.
     b_size : numpy.ndarray
         Number of overlaps from catalogue "b" into catalogue "a".
-    a_blen : numpy.ndarray
-        The "bright" error circle radius, integrating the joint AUF convolution
+    a_b_area : numpy.ndarray
+        The "bright" error circle area, integrating the joint AUF convolution
         out to ``expected_frac`` for largest "a"-"b" potential pairing, for each
         catalogue "a" object.
-    b_blen : numpy.narray
-        Catalogue b's "bright" error circle radii.
-    a_flen : numpy.ndarray
-        The "field" error circle radius, integrating the joint AUF convolution
+    b_b_area : numpy.narray
+        Catalogue b's "bright" error circle area.
+    a_f_area : numpy.ndarray
+        The "field" error circle area, integrating the joint AUF convolution
         out to ``expected_frac`` for largest "a"-"b" potential pairing, for each
         catalogue "a" object.
-    b_flen : numpy.ndarray
-        Catalogue b's "field" error circle radii.
+    b_f_area : numpy.ndarray
+        Catalogue b's "field" error circle area.
     auf_cdf_a : numpy.ndarray
         Evaluations of the astrometric uncertainty function, integrated out to
         the separation of the potential overlaps to all potential counterparts
@@ -418,15 +418,14 @@ def create_c_and_f(a_astro, b_astro, a_mag, b_mag, a_inds, a_size, b_inds, b_siz
     meas_dens_a_uncert = np.array([tot_dens_a_uncert, *meas_dens_a_uncert])
     meas_dens_b_uncert = np.array([tot_dens_b_uncert, *meas_dens_b_uncert])
 
-    # TODO: TAKE AVERAGES IN AREA OR RADIUS SQUARED INSTEAD?
-    # Filter for completely isolated sources, which will have zero lengths,
+    # Filter for completely isolated sources, which will have zero area,
     # to take a meaningful sample.
-    avg_alens = np.array([np.mean(a_blen[a_blen > 0]), np.mean(a_flen[a_flen > 0])])
-    avg_blens = np.array([np.mean(b_blen[b_blen > 0]), np.mean(b_flen[b_flen > 0])])
+    avg_a_areas = np.array([np.mean(a_b_area[a_b_area > 0]), np.mean(a_f_area[a_f_area > 0])])
+    avg_b_areas = np.array([np.mean(b_b_area[b_b_area > 0]), np.mean(b_f_area[b_f_area > 0])])
 
     res = minimize(calculate_prior_densities, args=(measured_density_a, measured_density_b,
-                   meas_dens_a_uncert, meas_dens_b_uncert, np.array([bright_frac, field_frac]), avg_alens,
-                   avg_blens), x0=[1, tot_density_a, tot_density_b], jac=True, method='L-BFGS-B',
+                   meas_dens_a_uncert, meas_dens_b_uncert, np.array([bright_frac, field_frac]), avg_a_areas,
+                   avg_b_areas), x0=[1, tot_density_a, tot_density_b], jac=True, method='L-BFGS-B',
                    bounds=[(0, None), (0, None), (0, None)])
 
     nc, nfa, nfb = res.x
@@ -434,7 +433,7 @@ def create_c_and_f(a_astro, b_astro, a_mag, b_mag, a_inds, a_size, b_inds, b_siz
     bm = np.empty((len(b_bins)-1, len(a_bins)-1), float, order='F')
     z = np.empty(len(a_bins)-1, float)
 
-    mag_mask, aa = plf.brightest_mag(auf_cdf_a, a_mag, b_mag, a_inds, a_size, bright_frac, a_blen,
+    mag_mask, aa = plf.brightest_mag(auf_cdf_a, a_mag, b_mag, a_inds, a_size, bright_frac, a_b_area,
                                      a_flags, b_flags, a_bins)
     mag_mask = mag_mask.astype(bool)
     for i in range(0, len(a_bins)-1):
@@ -478,12 +477,12 @@ def create_c_and_f(a_astro, b_astro, a_mag, b_mag, a_inds, a_size, b_inds, b_siz
 
         # Also filter the a-catalogue objects for being within our magnitude
         # range, but don't do anything to b, so re-use the previous one.
-        avg_alens = np.array([np.mean(a_blen[(a_blen > 0) & a_mag_filter]),
-                              np.mean(a_flen[(a_flen > 0) & a_mag_filter])])
+        avg_a_areas = np.array([np.mean(a_b_area[(a_b_area > 0) & a_mag_filter]),
+                                np.mean(a_f_area[(a_f_area > 0) & a_mag_filter])])
 
         res = minimize(calculate_prior_densities, args=(measured_density_a, measured_density_b,
                        meas_dens_a_uncert, meas_dens_b_uncert, np.array([bright_frac, field_frac]),
-                       avg_alens, avg_blens), x0=[0, tot_density_a, tot_density_b], jac=True,
+                       avg_a_areas, avg_b_areas), x0=[1, tot_density_a, tot_density_b], jac=True,
                        method='L-BFGS-B', bounds=[(0, None), (0, None), (0, None)])
 
         _, _, _nfb = res.x
@@ -530,7 +529,7 @@ def create_c_and_f(a_astro, b_astro, a_mag, b_mag, a_inds, a_size, b_inds, b_siz
     return nc, cdmdm, nfa, fa, nfb, fb
 
 
-def calculate_prior_densities(model_densities, rho, phi, o_rho, o_phi, fs, rs_rho, rs_phi):
+def calculate_prior_densities(model_densities, rho, phi, o_rho, o_phi, fs, as_rho, as_phi):
     '''
     Calculate the joint-catalogue counterpart density and separate catalogue
     non-matched ("field") densities of two catalogues based on a series of
@@ -556,12 +555,12 @@ def calculate_prior_densities(model_densities, rho, phi, o_rho, o_phi, fs, rs_rh
     fs : list or numpy.ndarray
         Each CDF fraction used to remove potential counterparts (true or
         otherwise) in measuring ``rho`` and ``phi``.
-    rs_rho : list or numpy.ndarray
-        Average "error circle" radii, the average radius out to which all
-        objects in catalogue a integrated to get to each ``fs`` CDF, for
+    as_rho : list or numpy.ndarray
+        Average "error circle" area, the average area for a radius out to which
+        all objects in catalogue a integrated to get to each ``fs`` CDF, for
         each CDF fraction.
-    rs_phi : list or numpy.ndarray
-        Average catalogue b error circle radii, corresponding to each
+    as_phi : list or numpy.ndarray
+        Average catalogue b error circle area, corresponding to each
         ``fs`` CDF.
 
     Returns
@@ -573,7 +572,7 @@ def calculate_prior_densities(model_densities, rho, phi, o_rho, o_phi, fs, rs_rh
         The gradient of ``lst_sq`` with respect to each element of
         ``model_densities``.
     '''
-    def calculate_dens_and_grad(t, u, v, fs, rs):
+    def calculate_dens_and_grad(t, u, v, f_s, a_s):
         '''
         Calculate the model for measured number counts based on
         joint-counterpart and randomly aligned source densities of two
@@ -587,12 +586,12 @@ def calculate_prior_densities(model_densities, rho, phi, o_rho, o_phi, fs, rs_rh
             Catalogue a's field density.
         v : float
             Catalogue b's field density.
-        fs : list or numpy.ndarray
+        f_s : list or numpy.ndarray
             Set of CDF fractions at which catalogue densities have been sampled,
             removing some percentage of counterparts from the measured densities.
-        rs : list or numpy.ndarray
-            Set of average "error circle" radii, corresponding to each ``fs``
-            integral, the area of which accounts for some percentage of removed
+        a_s : list or numpy.ndarray
+            Set of average "error circle" area, corresponding to each ``f_s``
+            integral, which accounts for some percentage of removed
             chance-alignment sources from the measured density.
 
         Returns
@@ -604,19 +603,38 @@ def calculate_prior_densities(model_densities, rho, phi, o_rho, o_phi, fs, rs_rh
         model_grad : numpy.ndarray
             The gradient of the model with respect to ``t``, ``u``, and ``v``.
         '''
-        # d/d[tv] o_m_e = -pi r^2 o_m_e
-        o_m_e = 1 - e(t, v, rs)
-        model = ((1 - fs) * t + u) * o_m_e
+        # d/d[tv] o_m_e = -pi r^2 o_m_e = -a_s o_m_e
+        o_m_e = 1 - e(t, v, a_s)
+        model = ((1 - f_s) * t + u) * o_m_e
 
-        dmodel_dt = (1 - fs) * o_m_e - np.pi * rs**2 * model
+        dmodel_dt = (1 - f_s) * o_m_e - a_s * model
         dmodel_du = o_m_e
-        dmodel_dv = -np.pi * rs**2 * model
+        dmodel_dv = -a_s * model
         model_grad = np.array([dmodel_dt, dmodel_du, dmodel_dv])
 
         return model, model_grad
 
-    def e(g, h, r):
-        return 1 - np.exp(-np.pi * r**2 * (g + h))
+    def e(g, h, a):
+        '''
+        Calculate CDF of randomly aligned nearest-neighbour distribution.
+
+        Parameters
+        ----------
+        g : float
+            Density of one dataset.
+        h : float
+            Density of second dataset.
+        a : float
+            Area enclosed by radius out to which to consider potential
+            neighbours.
+
+        Returns
+        -------
+        float
+            CDF, 1 - exp(-pi r^2 (g + h)).
+        '''
+        return 1 - np.exp(-a * (g + h))
+
     x, y, z = model_densities
     # The first measurement we make is for F=0, not passed through the fs array,
     # but IS passed through rho and phi as their first elements. This is a
@@ -626,8 +644,8 @@ def calculate_prior_densities(model_densities, rho, phi, o_rho, o_phi, fs, rs_rh
     p_0_grad = np.array([1, 1, 0])
     q_0_grad = np.array([1, 0, 1])
     # Flip y and z for the two calls!
-    p, p_grad = calculate_dens_and_grad(x, y, z, fs, rs_rho)
-    q, q_grad = calculate_dens_and_grad(x, z, y, fs, rs_phi)
+    p, p_grad = calculate_dens_and_grad(x, y, z, fs, as_rho)
+    q, q_grad = calculate_dens_and_grad(x, z, y, fs, as_phi)
     # Reverse the q_grad order, so that what is actually y is the 2nd element.
     q_grad = np.array([q_grad[0], q_grad[2], q_grad[1]])
 

@@ -266,8 +266,8 @@ subroutine get_overlap_indices(a_ax_1, a_ax_2, b_ax_1, b_ax_2, max_sep, amax, bm
 end subroutine get_overlap_indices
 
 subroutine get_integral_length(a_err, b_err, r, rho, drho, j1s, a_fouriergrid, b_fouriergrid, a_modrefind, b_modrefind, &
-    a_inds, a_size, frac_array, int_dists)
-    ! Calculate the "error circle" lengths for sources, based on various cumulative integral fractions
+    a_inds, a_size, frac_array, int_areas)
+    ! Calculate the "error circle" areas for sources, based on various cumulative integral fractions
     ! of the convolution of all overlapping opposing catalogue source AUFs with the given source's AUF.
     integer, parameter :: dp = kind(0.0d0)  ! double precision
     ! Indices for each source into the grid of perturbation component AUFs.
@@ -284,23 +284,23 @@ subroutine get_integral_length(a_err, b_err, r, rho, drho, j1s, a_fouriergrid, b
     ! Fractions of integral to consider when integrating convolutions of AUFs; likely to be the "bright"
     ! and "field" source identifications necessary to derive photometric likelihoods and priors.
     real(dp), intent(in) :: frac_array(:)
-    ! Output source error circle radii (probably "bright" and "field") for all catalogue "a" sources.
-    real(dp), intent(out) :: int_dists(size(a_err), size(frac_array))
-    ! Loop counters, and counter for keeping average error circle radius.
-    integer :: i, j, k, l, int_dists_n(size(a_err), size(frac_array))
+    ! Output source error circle areas (probably "bright" and "field") for all catalogue "a" sources.
+    real(dp), intent(out) :: int_areas(size(a_err), size(frac_array))
+    ! Loop counters, and counter for keeping average error circle area.
+    integer :: i, j, k, l, int_areas_n(size(a_err), size(frac_array))
     ! Real-space lengthscales: singular astrometric uncertainties, and cumulative convolution
     ! integral distance.
     real(dp) :: ao, bo, cumulative_dists(size(frac_array))
     ! Respective fourier-space variables.
     real(dp) :: afourier(size(a_fouriergrid, 1)), bfourier(size(b_fouriergrid, 1)), four(size(a_fouriergrid, 1))
 
-    int_dists = 0.0_dp
+    int_areas = 0.0_dp
 
-    int_dists_n = 0
+    int_areas_n = 0
 
 !$OMP PARALLEL DO DEFAULT(NONE) PRIVATE(i, j, k, l, ao, bo, afourier, bfourier, four, cumulative_dists) SHARED(a_err, &
-!$OMP& a_fouriergrid, a_modrefind, r, rho, drho, j1s, a_size, a_inds, b_err, b_fouriergrid, b_modrefind, frac_array, int_dists, &
-!$OMP& int_dists_n)
+!$OMP& a_fouriergrid, a_modrefind, r, rho, drho, j1s, a_size, a_inds, b_err, b_fouriergrid, b_modrefind, frac_array, &
+!$OMP& int_areas, int_areas_n)
     do i = 1, size(a_err)
         ao = a_err(i)
         afourier = a_fouriergrid(:, a_modrefind(1, i)+1, a_modrefind(2, i)+1, a_modrefind(3, i)+1)
@@ -311,9 +311,8 @@ subroutine get_integral_length(a_err, b_err, r, rho, drho, j1s, a_fouriergrid, b
             four = afourier*bfourier*exp(-2.0_dp * pi**2 * (rho+drho/2.0_dp)**2 * (ao**2 + bo**2))
             call cumulative_fourier_distance(four, r, drho, frac_array, j1s, cumulative_dists)
             do l = 1, size(frac_array)
-                ! Once you take the ratio of int_dists / int_dists_n, we get the average error circle radius.
-                int_dists(i, l) = int_dists(i, l) + cumulative_dists(l)
-                int_dists_n(i, l) = int_dists_n(i, l) + 1
+                int_areas(i, l) = int_areas(i, l) + cumulative_dists(l)
+                int_areas_n(i, l) = int_areas_n(i, l) + 1
             end do
         end do
     end do
@@ -321,8 +320,8 @@ subroutine get_integral_length(a_err, b_err, r, rho, drho, j1s, a_fouriergrid, b
 
     do i = 1, size(a_err)
         do l = 1, size(frac_array)
-            if (int_dists_n(i, l) > 0) then
-                int_dists(i, l) = int_dists(i, l) / int_dists_n(i, l)
+            if (int_areas_n(i, l) > 0) then
+                int_areas(i, l) = pi * (int_areas(i, l) / int_areas_n(i, l))**2
             end if
         end do
     end do

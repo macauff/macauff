@@ -205,17 +205,17 @@ def make_island_groupings(cm):
         a_fouriergrid = cm.a_perturb_auf_outputs['fourier_grid']
         b_fouriergrid = cm.b_perturb_auf_outputs['fourier_grid']
 
-        a_int_lens = gsf.get_integral_length(
+        a_int_areas = gsf.get_integral_length(
             a_err, b_err, cm.r[:-1]+cm.dr/2, cm.rho[:-1], cm.drho, cm.j1s, a_fouriergrid, b_fouriergrid,
             cm.a_modelrefinds, cm.b_modelrefinds, ainds, asize, cm.int_fracs[0:2])
-        ablen = a_int_lens[:, 0]
-        aflen = a_int_lens[:, 1]
+        ab_area = a_int_areas[:, 0]
+        af_area = a_int_areas[:, 1]
 
-        b_int_lens = gsf.get_integral_length(
+        b_int_areas = gsf.get_integral_length(
             b_err, a_err, cm.r[:-1]+cm.dr/2, cm.rho[:-1], cm.drho, cm.j1s, b_fouriergrid, a_fouriergrid,
             cm.b_modelrefinds, cm.a_modelrefinds, binds, bsize, cm.int_fracs[0:2])
-        bblen = b_int_lens[:, 0]
-        bflen = b_int_lens[:, 1]
+        bb_area = b_int_areas[:, 0]
+        bf_area = b_int_areas[:, 1]
 
     t = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     print(f"{t} Rank {cm.rank}, chunk {cm.chunk_id}: Maximum overlaps are:", amaxsize, bmaxsize)
@@ -317,10 +317,10 @@ def make_island_groupings(cm):
     agrplen = agrplen[passed_check]
     blist = blist[:, passed_check]
     bgrplen = bgrplen[passed_check]
-    # Only return aflen and bflen if they were created
+    # Only return a[bf]_area and b[bf]_area if they were created
     if not (cm.include_phot_like or cm.use_phot_priors):
-        ablen = bblen = None
-        aflen = bflen = None
+        ab_area = bb_area = None
+        af_area = bf_area = None
         auf_cdf_a = auf_cdf_b = None
     # Only return reject counts if they were created
     if num_a_failed_checks + a_first_rejected_len > 0:
@@ -337,14 +337,14 @@ def make_island_groupings(cm):
         lenrejectb = 0
         cm.reject_b = None
 
-    cm.ablen = ablen  # pylint: disable=possibly-used-before-assignment
-    cm.bblen = bblen  # pylint: disable=possibly-used-before-assignment
+    cm.ab_area = ab_area  # pylint: disable=possibly-used-before-assignment
+    cm.bb_area = bb_area  # pylint: disable=possibly-used-before-assignment
     cm.ainds = ainds
     cm.binds = binds
     cm.asize = asize
     cm.bsize = bsize
-    cm.aflen = aflen  # pylint: disable=possibly-used-before-assignment
-    cm.bflen = bflen  # pylint: disable=possibly-used-before-assignment
+    cm.af_area = af_area  # pylint: disable=possibly-used-before-assignment
+    cm.bf_area = bf_area  # pylint: disable=possibly-used-before-assignment
     cm.alist = alist
     cm.blist = blist
     cm.agrplen = agrplen

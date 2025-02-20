@@ -59,7 +59,7 @@ subroutine get_field_dists(auf_cdf_a, a_indices, a_overlap, f_fracs, a_flags, a_
     ! Integer representation of boolean flag determining whether a source remains as a potential
     ! field source, or if it is too close to a primary catalogue object and thus not used to
     ! construct the "unmatched" distribution.
-    integer, intent(out) :: a_mask_ind(size(f_fracs), size(a_overlap))
+    integer, intent(out) :: a_mask_ind(size(a_overlap), size(f_fracs))
     ! Loop counters.
     integer :: i, j, k, l
 
@@ -76,21 +76,21 @@ subroutine get_field_dists(auf_cdf_a, a_indices, a_overlap, f_fracs, a_flags, a_
                     if (b_flags(i) .and. b_mag(i) >= b_low_mag .and. b_mag(i) <= b_upp_mag) then
                         do l = 1, size(f_fracs)
                             if (auf_cdf_a(k, j) < f_fracs(l)) then
-                                a_mask_ind(l, j) = 0
+                                a_mask_ind(j, l) = 0
                             end if
                         end do
                     end if
                 end if
             end do
         else
-            a_mask_ind(:, j) = 0
+            a_mask_ind(j, :) = 0
         end if
     end do
 !$OMP END PARALLEL DO
 
 end subroutine get_field_dists
 
-subroutine brightest_mag(auf_cdf_a, a_mag, b_mag, a_indices, a_overlap, b_frac, a_err_circ, a_flags, b_flags, a_bin, &
+subroutine brightest_mag(auf_cdf_a, a_mag, b_mag, a_indices, a_overlap, bright_frac, a_err_circ, a_flags, b_flags, a_bin, &
     mag_mask, av_area)
     ! Derive the distribution of brightest sources of one catalogue inside "error circles" of
     ! another catalogue.
@@ -100,10 +100,10 @@ subroutine brightest_mag(auf_cdf_a, a_mag, b_mag, a_indices, a_overlap, b_frac, 
     integer, intent(in) :: a_indices(:, :), a_overlap(:)
     ! Boolean flags indicating whether a given object in a catalogue is detected in its bandpass.
     logical, intent(in) :: a_flags(:), b_flags(:)
-    ! "Primary" catalogue error circle radius, evaluation of the AUF, integrated to the separation
+    ! "Primary" catalogue error circle area, evaluation of the AUF, integrated to the separation
     ! between potential counterparts, and fraction of overlapping objects to keep when considering
     ! brightest object in a given error circle.
-    real(dp), intent(in) :: a_err_circ(:), auf_cdf_a(:, :), b_frac
+    real(dp), intent(in) :: a_err_circ(:), auf_cdf_a(:, :), bright_frac
     ! Catalogue magnitude for these bandpasses, and bins into which to divide the "a" catalogue
     ! magnitudes.
     real(dp), intent(in) :: a_mag(:), b_mag(:), a_bin(:)
@@ -135,19 +135,19 @@ subroutine brightest_mag(auf_cdf_a, a_mag, b_mag, a_indices, a_overlap, b_frac, 
                     exit
                 end if
             end do
-            av_area(r) = av_area(r) + a_err_circ(i)**2
+            av_area(r) = av_area(r) + a_err_circ(i)
             n(r) = n(r) + 1
         end if
     end do
 !$OMP END PARALLEL DO
     do i = 1, size(a_bin)-1
         if (n(i) > 0) then
-            av_area(i) = pi*av_area(i)/n(i)
+            av_area(i) = av_area(i)/n(i)
         end if
     end do
 
 !$OMP PARALLEL DO DEFAULT(NONE) PRIVATE(i, j, k, brightindex, brightmag, m, r) SHARED(auf_cdf_a, b_mag, mag_mask, a_indices, &
-!$OMP& a_overlap, a_err_circ, a_flags, b_flags, a_bin, a_mag, b_frac)
+!$OMP& a_overlap, a_err_circ, a_flags, b_flags, a_bin, a_mag, bright_frac)
     do i = 1, size(a_overlap)
         if (a_flags(i)) then
             r = 1
@@ -163,7 +163,7 @@ subroutine brightest_mag(auf_cdf_a, a_mag, b_mag, a_indices, a_overlap, b_frac, 
                 j = a_indices(k, i) + 1
                 if (j > 0) then
                     if (b_flags(j)) then
-                        if (auf_cdf_a(k, i) < b_frac .and. b_mag(j) < brightmag) then
+                        if (auf_cdf_a(k, i) < bright_frac .and. b_mag(j) < brightmag) then
                             brightindex = j
                             brightmag = b_mag(j)
                         end if
