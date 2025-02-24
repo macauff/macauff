@@ -420,19 +420,29 @@ def create_c_and_f(a_astro, b_astro, a_mag, b_mag, a_inds, a_size, b_inds, b_siz
 
     # Filter for completely isolated sources, which will have zero area,
     # to take a meaningful sample.
-    avg_a_areas = np.array([np.mean(a_b_area[a_b_area > 0]), np.mean(a_f_area[a_f_area > 0])])
-    avg_b_areas = np.array([np.mean(b_b_area[b_b_area > 0]), np.mean(b_f_area[b_f_area > 0])])
+    pc = [5, 15, 25, 35, 45, 55, 65, 75, 85, 95]
+    avg_a_areas = np.array([np.percentile(a_b_area[a_b_area > 0], pc),
+                            np.percentile(a_f_area[a_f_area > 0], pc)]).T
+    avg_b_areas = np.array([np.percentile(b_b_area[b_b_area > 0], pc),
+                            np.percentile(b_f_area[b_f_area > 0], pc)]).T
+
+    # With a percentile in steps of 10 percentage points, each area will be
+    # equally weighted with 1/10th of the objects.
+    wht_a_areas = 0.1 * np.ones_like(avg_a_areas)
+    wht_b_areas = 0.1 * np.ones_like(avg_b_areas)
 
     res = minimize(calculate_prior_densities, args=(measured_density_a, measured_density_b,
                    meas_dens_a_uncert, meas_dens_b_uncert, np.array([bright_frac, field_frac]), avg_a_areas,
-                   avg_b_areas), x0=[1, tot_density_a, tot_density_b], jac=True, method='L-BFGS-B',
-                   bounds=[(0, None), (0, None), (0, None)])
+                   avg_b_areas, wht_a_areas, wht_b_areas), x0=[1, tot_density_a, tot_density_b], jac=True,
+                   method='L-BFGS-B', bounds=[(0, None), (0, None), (0, None)])
 
     nc, nfa, nfb = res.x
 
     bm = np.empty((len(b_bins)-1, len(a_bins)-1), float, order='F')
     z = np.empty(len(a_bins)-1, float)
 
+    # Average area here might be wrong too, but since we deal in small magnitude
+    # slices the approximations should hold.
     mag_mask, aa = plf.brightest_mag(auf_cdf_a, a_mag, b_mag, a_inds, a_size, bright_frac, a_b_area,
                                      a_flags, b_flags, a_bins)
     mag_mask = mag_mask.astype(bool)
@@ -477,13 +487,15 @@ def create_c_and_f(a_astro, b_astro, a_mag, b_mag, a_inds, a_size, b_inds, b_siz
 
         # Also filter the a-catalogue objects for being within our magnitude
         # range, but don't do anything to b, so re-use the previous one.
-        avg_a_areas = np.array([np.mean(a_b_area[(a_b_area > 0) & a_mag_filter]),
-                                np.mean(a_f_area[(a_f_area > 0) & a_mag_filter])])
+        avg_a_areas = np.array([np.percentile(a_b_area[(a_b_area > 0) & a_mag_filter], pc),
+                                np.percentile(a_f_area[(a_f_area > 0) & a_mag_filter], pc)]).T
+        wht_a_areas = 0.1 * np.ones_like(avg_a_areas)
 
         res = minimize(calculate_prior_densities, args=(measured_density_a, measured_density_b,
                        meas_dens_a_uncert, meas_dens_b_uncert, np.array([bright_frac, field_frac]),
-                       avg_a_areas, avg_b_areas), x0=[1, tot_density_a, tot_density_b], jac=True,
-                       method='L-BFGS-B', bounds=[(0, None), (0, None), (0, None)])
+                       avg_a_areas, avg_b_areas, wht_a_areas, wht_b_areas),
+                       x0=[1, tot_density_a, tot_density_b], jac=True, method='L-BFGS-B',
+                       bounds=[(0, None), (0, None), (0, None)])
 
         _, _, _nfb = res.x
 
@@ -529,7 +541,7 @@ def create_c_and_f(a_astro, b_astro, a_mag, b_mag, a_inds, a_size, b_inds, b_siz
     return nc, cdmdm, nfa, fa, nfb, fb
 
 
-def calculate_prior_densities(model_densities, rho, phi, o_rho, o_phi, fs, as_rho, as_phi):
+def calculate_prior_densities(model_densities, rho, phi, o_rho, o_phi, fs, as_rho, as_phi, ws_rho, ws_phi):
     '''
     Calculate the joint-catalogue counterpart density and separate catalogue
     non-matched ("field") densities of two catalogues based on a series of
@@ -555,13 +567,21 @@ def calculate_prior_densities(model_densities, rho, phi, o_rho, o_phi, fs, as_rh
     fs : list or numpy.ndarray
         Each CDF fraction used to remove potential counterparts (true or
         otherwise) in measuring ``rho`` and ``phi``.
-    as_rho : list or numpy.ndarray
+    as_rho : list of lists or numpy.ndarray
         Average "error circle" area, the average area for a radius out to which
         all objects in catalogue a integrated to get to each ``fs`` CDF, for
-        each CDF fraction.
-    as_phi : list or numpy.ndarray
+        each CDF fraction. A weighted distribution is given for each ``fs``,
+        corresponding to ``ws_rho``.
+    as_phi : list of lists or numpy.ndarray
         Average catalogue b error circle area, corresponding to each
-        ``fs`` CDF.
+        ``fs`` CDF with an associated weight in ``ws_phi``.
+    ws_rho : list of lists or numpy.ndarray
+        Array of shape ``(X, Y)``, with fractions ``fs`` of length ``Y``. Each
+        fraction has a set of error circle areas with corresponding weights,
+        such that a sum along ``ws_rho[:, i]`` is unity, weighting the ``i``th
+        fraction's error circles.
+    ws_phi : list of lists or numpy.ndarray
+        The joint error circle-fraction weights for catalogue ``phi``.
 
     Returns
     -------
@@ -572,7 +592,7 @@ def calculate_prior_densities(model_densities, rho, phi, o_rho, o_phi, fs, as_rh
         The gradient of ``lst_sq`` with respect to each element of
         ``model_densities``.
     '''
-    def calculate_dens_and_grad(t, u, v, f_s, a_s):
+    def calculate_dens_and_grad(t, u, v, f_s, a_s, w_s):
         '''
         Calculate the model for measured number counts based on
         joint-counterpart and randomly aligned source densities of two
@@ -589,30 +609,40 @@ def calculate_prior_densities(model_densities, rho, phi, o_rho, o_phi, fs, as_rh
         f_s : list or numpy.ndarray
             Set of CDF fractions at which catalogue densities have been sampled,
             removing some percentage of counterparts from the measured densities.
-        a_s : list or numpy.ndarray
-            Set of average "error circle" area, corresponding to each ``f_s``
-            integral, which accounts for some percentage of removed
-            chance-alignment sources from the measured density.
+        a_s : list of lists or numpy.ndarray
+            Set of average "error circle" areas, shape ``(X, Y)``, with ``X`` the
+            number of different error circle areas to weight by and ``Y``
+            corresponding to each ``f_s`` integral, which accounts for some
+            percentage of removed chance-alignment sources from the measured
+            density.
+        w_s : list of lists or numpy.ndarray
+            Two-dimensional array, shape ``(X, Y)``, the weights for each area
+            for each set of fractions ``f_s``.
 
         Returns
         -------
-        model : float
+        weighted_model : float
             The expected calculated overlap density between the two catalogues
             based on counterpart and non-matching densities and percentile
             integration for removal from measurements.
-        model_grad : numpy.ndarray
+        weighted_model_grad : numpy.ndarray
             The gradient of the model with respect to ``t``, ``u``, and ``v``.
         '''
-        # d/d[tv] o_m_e = -pi r^2 o_m_e = -a_s o_m_e
-        o_m_e = 1 - e(t, v, a_s)
-        model = ((1 - f_s) * t + u) * o_m_e
+        weighted_model = np.zeros((len(f_s)), float)
+        weighted_model_grad = np.zeros((3, len(f_s)), float)
+        for a, w in zip(a_s, w_s):
+            # d/d[tv] o_m_e = -pi r^2 o_m_e = -a o_m_e
+            o_m_e = 1 - e(t, v, a)
+            model = w * (((1 - f_s) * t + u) * o_m_e)
 
-        dmodel_dt = (1 - f_s) * o_m_e - a_s * model
-        dmodel_du = o_m_e
-        dmodel_dv = -a_s * model
-        model_grad = np.array([dmodel_dt, dmodel_du, dmodel_dv])
+            dmodel_dt = w * ((1 - f_s) * o_m_e - a * model)
+            dmodel_du = w * o_m_e
+            dmodel_dv = w * -a * model
 
-        return model, model_grad
+            weighted_model += model
+            weighted_model_grad += np.array([dmodel_dt, dmodel_du, dmodel_dv])
+
+        return weighted_model, weighted_model_grad
 
     def e(g, h, a):
         '''
@@ -644,8 +674,8 @@ def calculate_prior_densities(model_densities, rho, phi, o_rho, o_phi, fs, as_rh
     p_0_grad = np.array([1, 1, 0])
     q_0_grad = np.array([1, 0, 1])
     # Flip y and z for the two calls!
-    p, p_grad = calculate_dens_and_grad(x, y, z, fs, as_rho)
-    q, q_grad = calculate_dens_and_grad(x, z, y, fs, as_phi)
+    p, p_grad = calculate_dens_and_grad(x, y, z, fs, as_rho, ws_rho)
+    q, q_grad = calculate_dens_and_grad(x, z, y, fs, as_phi, ws_phi)
     # Reverse the q_grad order, so that what is actually y is the 2nd element.
     q_grad = np.array([q_grad[0], q_grad[2], q_grad[1]])
 
