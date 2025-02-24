@@ -523,19 +523,26 @@ def create_c_and_f(a_astro, b_astro, a_mag, b_mag, a_inds, a_size, b_inds, b_siz
 
     # If any density is NaN, or Nc and at least one of Nfa or Nfb are
     # non-positive, then we have to warn and quit, since we won't be able to
-    # recover that below.
-    if np.any(np.isnan([nc, nfa, nfb])) or (nc <= 0 and (nfa <= 0 or nfb <= 0)):
+    # recover that below. Similarly, we can't allow for a dependency-based
+    # density condition where Nc is set based on one Nf and then the other Nf
+    # is set based on Nc, since we don't know which counterpart density to use.
+    if (np.any(np.isnan([nc, nfa, nfb])) or (nc <= 0 and (nfa <= 0 or nfb <= 0)) or
+            (nfa <= 0.01 * nc and nc <= 0.01 * nfb) or (nfb <= 0.01 * nc and nc <= 0.01 * nfa)):
         raise ValueError("Incorrect prior densities, unable to process chunk.")
-    # Otherwise, if we somehow have a negative or totally zero overall
-    # counterpart density, then simply set to 1% the lowest of the field
-    # densities.
-    if nc <= 0:
+    # Otherwise, if simply set to 1% the lowest of the (valid) field densities.
+    if nfa > 0 and nfb > 0 and nc <= 0.01 * min(nfa, nfb):
         nc = 0.01 * min(nfa, nfb)
-    # If either field density is zero or negative, set to 1% the counterpart
-    # density, similarly.
-    if nfa <= 0:
+    # We would have conditions something like nfb <= 0 and nc <= 0.01 * nfa
+    # and nfa > 0, to test the asymmetric cases, implicitly requiring nc > 0 to
+    # avoid the raise above, but these will always trigger one of the latter
+    # two error-criteria above.
+
+    # If either field density is too small, set to 1% the counterpart density,
+    # similarly. nfa <= 0.01 * nc implies nc > 0.01 * nfb or we'd've triggered
+    # the latter two error-criteria again, though, so nc > 0 requires nfb > 0.
+    if nfa <= 0.01 * nc and nc > 0:
         nfa = 0.01 * nc
-    if nfb <= 0:
+    if nfb <= 0.01 * nc and nc > 0:
         nfb = 0.01 * nc
 
     return nc, cdmdm, nfa, fa, nfb, fb
