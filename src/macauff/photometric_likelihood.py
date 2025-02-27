@@ -415,8 +415,10 @@ def create_c_and_f(a_astro, b_astro, a_mag, b_mag, a_inds, a_size, b_inds, b_siz
 
     measured_density_a = np.array([tot_density_a, *measured_density_a])
     measured_density_b = np.array([tot_density_b, *measured_density_b])
-    meas_dens_a_uncert = np.array([tot_dens_a_uncert, *meas_dens_a_uncert])
-    meas_dens_b_uncert = np.array([tot_dens_b_uncert, *meas_dens_b_uncert])
+    # Add a floor of 1/sq deg in quadrature to avoid empty measurements
+    # causing NaNs.
+    meas_dens_a_uncert = np.sqrt(np.array([tot_dens_a_uncert, *meas_dens_a_uncert])**2 + 1**2)
+    meas_dens_b_uncert = np.sqrt(np.array([tot_dens_b_uncert, *meas_dens_b_uncert])**2 + 1**2)
 
     # Filter for completely isolated sources, which will have zero area,
     # to take a meaningful sample.
@@ -482,8 +484,8 @@ def create_c_and_f(a_astro, b_astro, a_mag, b_mag, a_inds, a_size, b_inds, b_siz
 
         measured_density_a = np.array([tot_density_a, *measured_density_a])
         measured_density_b = np.array([tot_density_b, *measured_density_b])
-        meas_dens_a_uncert = np.array([tot_dens_a_uncert, *meas_dens_a_uncert])
-        meas_dens_b_uncert = np.array([tot_dens_b_uncert, *meas_dens_b_uncert])
+        meas_dens_a_uncert = np.sqrt(np.array([tot_dens_a_uncert, *meas_dens_a_uncert])**2 + 1**2)
+        meas_dens_b_uncert = np.sqrt(np.array([tot_dens_b_uncert, *meas_dens_b_uncert])**2 + 1**2)
 
         # Also filter the a-catalogue objects for being within our magnitude
         # range, but don't do anything to b, so re-use the previous one.
@@ -512,7 +514,8 @@ def create_c_and_f(a_astro, b_astro, a_mag, b_mag, a_inds, a_size, b_inds, b_siz
         # convert directly to X c, but we have split that out above into Nc
         # already. Here we therefore don't care about the constant in front
         # of c(m | m), and simply normalise.
-        cdmdm[:, i] /= np.sum(cdmdm[:, i] * np.diff(b_bins))
+        if np.sum(cdmdm[:, i] * np.diff(b_bins)) > 0:
+            cdmdm[:, i] /= np.sum(cdmdm[:, i] * np.diff(b_bins))
 
     integral = 0
     for i in range(0, len(a_bins)-1):

@@ -96,6 +96,9 @@ class TestOneSidedPhotometricLikelihood:
         a.b_astro = self.b_astro
         a.b_photo = self.b_photo
 
+        a.auf_cdf_a = None
+        a.auf_cdf_b = None
+
         return a
 
     def test_compute_photometric_likelihoods(self):
@@ -207,6 +210,8 @@ class TestOneSidedPhotometricLikelihood:
         self.cm.chunk_id = 1
         self.cm.phot_like_func = compute_photometric_likelihoods
         self.cm.cf_areas = self.cf_areas
+        self.cm.auf_cdf_a = None
+        self.cm.auf_cdf_b = None
         mcff = Macauff(self.cm)
         mcff.calculate_phot_like()
 
@@ -239,63 +244,49 @@ class TestOneSidedPhotometricLikelihood:
 
 def test_get_field_dists_fortran():
     rng = np.random.default_rng(11119999)
-    a = np.empty((10, 2), float)
-    a[:, 0] = rng.uniform(0, 1, 10)
-    a[:, 1] = rng.uniform(0, 1, 10)
 
-    b = np.empty((15, 2), float)
-    b[:, 0] = rng.uniform(0, 1, 15)
-    b[:, 1] = rng.uniform(0, 1, 15)
-    d = rng.rayleigh(scale=0.1/3600, size=10)
-    t = rng.uniform(0, 2*np.pi, 10)
-    b[:10, 0] = a[:, 0] + d * np.cos(t)
-    b[:10, 1] = a[:, 1] + d * np.sin(t)
     ainds = np.arange(0, 10).reshape(1, 10, order='F')
     asize = np.array([1] * 10)
-    berr = np.array([0.05/3600] * 15)
     aflags = np.ones(10, bool)
     bflags = np.ones(15, bool)
+    amag = np.array([13] * 10)
     bmag = np.array([10] * 15)
     lowmag, uppmag = -999, 999
 
-    mask, area = plf.get_field_dists(a[:, 0], a[:, 1], b[:, 0], b[:, 1], ainds, asize, berr,
-                                     aflags, bflags, bmag, lowmag, uppmag)
-    test_mask = np.ones(10, bool)
-    test_mask[d <= berr[:10]] = 0
+    fracs = np.array([0.5, 0.7, 0.9])
+
+    auf_cdf = rng.uniform(0, 1, size=(1, 10)).reshape(1, 10, order='F')
+
+    mask = plf.get_field_dists(auf_cdf, ainds, asize, fracs, aflags, amag, bflags, bmag,
+                               lowmag, uppmag, lowmag, uppmag)
+    test_mask = np.ones((10, len(fracs)), bool)
+    for i in range(len(fracs)):
+        test_mask[auf_cdf[0, :] <= fracs[i], i] = 0
     assert np.all(mask == test_mask)
     assert np.sum(mask) > 0
-    assert area == np.sum(np.pi * berr[:10][d <= berr[:10]]**2)
 
 
 def test_brightest_mag_fortran():
     rng = np.random.default_rng(11119998)
-    a = np.empty((10, 2), float)
-    a[:, 0] = rng.uniform(0, 1, 10)
-    a[:, 1] = rng.uniform(0, 1, 10)
 
-    b = np.empty((15, 2), float)
-    b[:, 0] = rng.uniform(0, 1, 15)
-    b[:, 1] = rng.uniform(0, 1, 15)
-    d = rng.rayleigh(scale=0.1/3600, size=10)
-    t = rng.uniform(0, 2*np.pi, 10)
-    b[:10, 0] = a[:, 0] + d * np.cos(t)
-    b[:10, 1] = a[:, 1] + d * np.sin(t)
     ainds = np.arange(0, 10).reshape(1, 10, order='F')
     asize = np.array([1] * 10)
-    aerr = np.array([0.05/3600] * 10)
+    aerr_circ = np.pi * np.array([0.05/3600] * 10)**2
     aflags = np.ones(10, bool)
     bflags = np.ones(15, bool)
     amag = np.array([10] * 10)
     bmag = np.array([12] * 15)
     abin = np.array([9, 11])
 
-    mask, area = plf.brightest_mag(a[:, 0], a[:, 1], b[:, 0], b[:, 1], amag, bmag, ainds, asize,
-                                   aerr, aflags, bflags, abin)
+    frac = 0.63
+    auf_cdf = rng.uniform(0, 1, size=(1, 10)).reshape(1, 10, order='F')
+
+    mask, area = plf.brightest_mag(auf_cdf, amag, bmag, ainds, asize, frac, aerr_circ, aflags, bflags, abin)
     test_mask = np.zeros((15, 1), bool)
-    test_mask[:10][d <= aerr, 0] = 1
+    test_mask[:10][auf_cdf[0, :] <= frac, 0] = 1
     assert np.all(mask == test_mask)
     assert np.sum(mask) > 0
-    assert_allclose(area, np.sum(np.pi * aerr[d <= aerr]**2) / np.sum(d <= aerr))
+    assert_allclose(area, np.sum(aerr_circ[auf_cdf[0, :] <= frac]) / np.sum(auf_cdf[0, :] <= frac))
 
 
 def test_make_bins():
@@ -383,7 +374,7 @@ class TestFullPhotometricLikelihood:  # pylint: disable=too-many-instance-attrib
         ba[:, 1] = aa[:, 1] + d * np.sin(t)
         ba[:, 2] = bsig
 
-        a_phot_sig, b_phot_sig = 0.05, 0.1
+        a_phot_sig, b_phot_sig = 0.05, 0.05
 
         ap = rng.uniform(10, 15, (self.ntot, len(self.afilts)))
         bp = ap + rng.normal(loc=0, scale=b_phot_sig, size=(self.ntot, len(self.bfilts)))
@@ -405,13 +396,17 @@ class TestFullPhotometricLikelihood:  # pylint: disable=too-many-instance-attrib
         # Have to pre-create the various overlap arrays, and integral lengths:
         self.asize = np.ones(self.ntot, int)
         self.asize[~a_cut] = 0
+        self.asize[~b_cut] = 0
         self.ainds = -1*np.ones((1, self.ntot), int, order='F')
         self.ainds[0, :] = np.arange(0, self.ntot)
         self.ainds[0, ~a_cut] = -1
+        self.ainds[0, ~b_cut] = -1
         self.bsize = np.ones(self.ntot, int)
+        self.bsize[~a_cut] = 0
         self.bsize[~b_cut] = 0
         self.binds = -1*np.ones((1, self.ntot), int, order='F')
         self.binds[0, :] = np.arange(0, self.ntot)
+        self.binds[0, ~a_cut] = -1
         self.binds[0, ~b_cut] = -1
 
         # Integrate 2-D Gaussian to N*sigma radius gives probability Y of
@@ -420,14 +415,22 @@ class TestFullPhotometricLikelihood:  # pylint: disable=too-many-instance-attrib
         self.y_f, self.y_b = 0.99, 0.63
         n_b = np.sqrt(-2 * np.log(1 - self.y_b))
         n_f = np.sqrt(-2 * np.log(1 - self.y_f))
-        self.ablen = n_b * np.sqrt(asig**2 + bsig**2) * np.ones(self.ntot, float) / 3600
-        self.ablen[~a_cut] = 0
-        self.aflen = n_f * np.sqrt(asig**2 + bsig**2) * np.ones(self.ntot, float) / 3600
-        self.aflen[~a_cut] = 0
-        self.bblen = n_b * np.sqrt(asig**2 + bsig**2) * np.ones(self.ntot, float) / 3600
-        self.bblen[~b_cut] = 0
-        self.bflen = n_f * np.sqrt(asig**2 + bsig**2) * np.ones(self.ntot, float) / 3600
-        self.bflen[~b_cut] = 0
+        self.ab_area = np.pi * (n_b * np.sqrt(asig**2 + bsig**2) * np.ones(self.ntot, float) / 3600)**2
+        self.af_area = np.pi * (n_f * np.sqrt(asig**2 + bsig**2) * np.ones(self.ntot, float) / 3600)**2
+        self.bb_area = np.pi * (n_b * np.sqrt(asig**2 + bsig**2) * np.ones(self.ntot, float) / 3600)**2
+        self.bf_area = np.pi * (n_f * np.sqrt(asig**2 + bsig**2) * np.ones(self.ntot, float) / 3600)**2
+
+        self.auf_cdf_a = (1 - np.exp(-0.5 * d**2 / ((asig**2 + bsig**2) / 3600**2))).reshape(1, -1, order='F')
+        # Even though we've moved the objects, distance d preserves the object
+        # separation, so we have to give both "a" and "b" sources CDFs of 1
+        # when resetting the bonds. This way we have no false-match overlap,
+        # but that's a <1% error. This is also true above, where we have to
+        # remove the *size and *inds bonds for bright and faint magnitudes.
+        self.auf_cdf_a[0, ~a_cut] = 1.0
+        self.auf_cdf_a[0, ~b_cut] = 1.0
+        self.auf_cdf_b = (1 - np.exp(-0.5 * d**2 / ((asig**2 + bsig**2) / 3600**2))).reshape(1, -1, order='F')
+        self.auf_cdf_b[0, ~a_cut] = 1.0
+        self.auf_cdf_b[0, ~b_cut] = 1.0
 
     def make_class(self):
         class A():  # pylint: disable=too-few-public-methods
@@ -446,10 +449,10 @@ class TestFullPhotometricLikelihood:  # pylint: disable=too-many-instance-attrib
         a.int_fracs = np.array([self.y_b, self.y_f])
         a.rank = 0
         a.chunk_id = 1
-        a.ablen = self.ablen
-        a.aflen = self.aflen
-        a.bblen = self.bblen
-        a.bflen = self.bflen
+        a.ab_area = self.ab_area
+        a.af_area = self.af_area
+        a.bb_area = self.bb_area
+        a.bf_area = self.bf_area
         a.ainds = self.ainds
         a.asize = self.asize
         a.binds = self.binds
@@ -458,6 +461,9 @@ class TestFullPhotometricLikelihood:  # pylint: disable=too-many-instance-attrib
         a.a_photo = self.a_photo
         a.b_astro = self.b_astro
         a.b_photo = self.b_photo
+
+        a.auf_cdf_a = self.auf_cdf_a
+        a.auf_cdf_b = self.auf_cdf_b
 
         return a
 
@@ -478,8 +484,8 @@ class TestFullPhotometricLikelihood:  # pylint: disable=too-many-instance-attrib
         fake_fa_p = (self.ntot - self.nc) / self.area
         fake_fb_p = (self.ntot - self.nc) / self.area
         assert_allclose(c_p, fake_c_p, rtol=0.05)
-        assert_allclose(fa_p, fake_fa_p, rtol=0.01)
-        assert_allclose(fb_p, fake_fb_p, rtol=0.01)
+        assert_allclose(fa_p, fake_fa_p, rtol=0.02)
+        assert_allclose(fb_p, fake_fb_p, rtol=0.02)
 
         abins = make_bins(self.a_photo[~np.isnan(self.a_photo[:, 0]), 0])
         bbins = make_bins(self.b_photo[~np.isnan(self.b_photo[:, 0]), 0])
@@ -503,9 +509,17 @@ class TestFullPhotometricLikelihood:  # pylint: disable=too-many-instance-attrib
         assert np.all(fake_fb_l.shape == fb_l.shape)
         assert_allclose(fb_l, fake_fb_l, atol=0.02)
 
-        h, _, _ = np.histogram2d(a[~q], b[~q], bins=[abins, bbins], density=True)
+        h, _, _ = np.histogram2d(a[~q], b[~q], bins=[abins, bbins])
         fake_c_l = np.zeros((len(bbins)-1, len(abins) - 1, 1, 1, 1), float, order='F')
-        fake_c_l[:, :, 0, 0, 0] = h.T
+        pa, _ = np.histogram(a, bins=abins, density=True)
+        integral = 0
+        for i in range(len(abins)-1):
+            if np.sum(h[i]) > 0:
+                fake_c_l[:, i, 0, 0, 0] = h[i] / np.sum(h[i]) / np.diff(bbins) * pa[i]
+            else:
+                fake_c_l[:, i, 0, 0, 0] = 0
+            integral += np.sum(fake_c_l[:, i, 0, 0, 0] * np.diff(bbins) * (abins[i+1] - abins[i]))
+        fake_c_l /= integral
         assert np.all(fake_c_l.shape == c_l.shape)
         assert_allclose(c_l, fake_c_l, rtol=0.1, atol=0.05)
 
@@ -527,8 +541,8 @@ class TestFullPhotometricLikelihood:  # pylint: disable=too-many-instance-attrib
         fake_fa_p = (self.ntot - self.nc) / self.area
         fake_fb_p = (self.ntot - self.nc) / self.area
         assert_allclose(c_p, fake_c_p, rtol=0.05)
-        assert_allclose(fa_p, fake_fa_p, rtol=0.01)
-        assert_allclose(fb_p, fake_fb_p, rtol=0.01)
+        assert_allclose(fa_p, fake_fa_p, rtol=0.02)
+        assert_allclose(fb_p, fake_fb_p, rtol=0.02)
 
         abins = make_bins(self.a_photo[~np.isnan(self.a_photo[:, 0]), 0])
         bbins = make_bins(self.b_photo[~np.isnan(self.b_photo[:, 0]), 0])

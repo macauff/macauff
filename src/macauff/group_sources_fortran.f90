@@ -179,6 +179,8 @@ subroutine get_overlap_indices(a_ax_1, a_ax_2, b_ax_1, b_ax_2, max_sep, amax, bm
 
     max_sep2 = max_sep**2
 
+    a_auf_cdf = 2
+    b_auf_cdf = 2
     aindices = -1
     bindices = -1
     anumoverlap = 0
@@ -192,6 +194,7 @@ subroutine get_overlap_indices(a_ax_1, a_ax_2, b_ax_1, b_ax_2, max_sep, amax, bm
     do j = 1, size(a_ax_1)
         tempind = -1
         tempcounter = 1
+        tempcdf = 2
         changeflag = 0
         oa = a_axerr(j)
         do i = 1, size(b_ax_1)
@@ -233,6 +236,7 @@ subroutine get_overlap_indices(a_ax_1, a_ax_2, b_ax_1, b_ax_2, max_sep, amax, bm
     do i = 1, size(b_ax_1)
         tempind = -1
         tempcounter = 1
+        tempcdf = 2
         changeflag = 0
         ob = b_axerr(i)
         do j = 1, size(a_ax_1)
