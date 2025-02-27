@@ -13,6 +13,9 @@ New Features
 Bug Fixes
 ^^^^^^^^^
 
+- Fixed an issue where, in very crowded but asymetrically dense fields, photometric
+  priors could become negative. [#86]
+
 API Changes
 ^^^^^^^^^^^
 
