@@ -250,8 +250,8 @@ class TestOverlap():
         assert np.all(b_inds == b_overlaps)
 
         fake_a_cdf = np.ones((a_max, len(self.a_ax_1)), float) * 2
-        for i in range(len(a_num)):
-            for j in range(a_num[i]):
+        for i, _anum in enumerate(a_num):
+            for j in range(_anum):
                 d = mff.haversine_wrapper(self.a_ax_1[i], self.b_ax_1[a_overlaps[j, i]-1], self.a_ax_2[i],
                                           self.b_ax_2[a_overlaps[j, i]-1])
                 fake_a_cdf[j, i] = 1 - np.exp(-0.5 * d**2 / ((self.a_axerr[i]**2 +
@@ -259,8 +259,8 @@ class TestOverlap():
         assert_allclose(a_cdf, fake_a_cdf, atol=1e-5, rtol=0.001)
 
         fake_b_cdf = np.ones((b_max, len(self.b_ax_1)), float) * 2
-        for i in range(len(b_num)):
-            for j in range(b_num[i]):
+        for i, _bnum in enumerate(b_num):
+            for j in range(_bnum):
                 d = mff.haversine_wrapper(self.b_ax_1[i], self.a_ax_1[b_overlaps[j, i]-1], self.b_ax_2[i],
                                           self.a_ax_2[b_overlaps[j, i]-1])
                 fake_b_cdf[j, i] = 1 - np.exp(-0.5 * d**2 / ((self.b_axerr[i]**2 +

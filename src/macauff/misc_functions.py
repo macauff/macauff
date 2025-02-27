@@ -4,8 +4,9 @@ This module provides miscellaneous scripts, called in other parts of the cross-m
 framework.
 '''
 
-import numpy as np
 from multiprocessing import shared_memory
+
+import numpy as np
 from scipy.optimize import minimize
 
 __all__ = []

@@ -127,10 +127,11 @@ def compute_photometric_likelihoods(cm):
                     bright_frac, field_frac = cm.int_fracs[[0, 1]]
                     c_prior, c_like, fa_prior, fa_like, fb_prior, fb_like = create_c_and_f(
                         # pylint: disable-next=possibly-used-before-assignment
-                        a_astro, b_astro, a_mag, b_mag, a_inds_cut, a_size_cut,
+                        a_mag, b_mag, a_inds_cut, a_size_cut, b_inds_cut, b_size_cut, a_b_area_cut,
                         # pylint: disable-next=possibly-used-before-assignment
-                        b_inds_cut, b_size_cut, a_b_area_cut, b_b_area_cut, a_f_area_cut, b_f_area_cut,
-                        a_auf_cdf, b_auf_cdf, a_bins, b_bins, bright_frac, field_frac, a_flags, b_flags, area)
+                        b_b_area_cut, a_f_area_cut, b_f_area_cut, a_auf_cdf, b_auf_cdf, a_bins, b_bins,
+                        # pylint: disable-next=possibly-used-before-assignment
+                        bright_frac, field_frac, a_flags, b_flags, area)
                 if cm.use_phot_priors and not cm.include_phot_like:
                     # If we only used the create_c_and_f routine to derive
                     # priors, then quickly update likelihoods here.
@@ -280,21 +281,15 @@ def make_bins(input_mags):
     return output_bins
 
 
-# pylint: disable-next=too-many-locals
-def create_c_and_f(a_astro, b_astro, a_mag, b_mag, a_inds, a_size, b_inds, b_size, a_b_area, b_b_area,
-                   a_f_area, b_f_area, auf_cdf_a, auf_cdf_b, a_bins, b_bins, bright_frac, field_frac, a_flags,
-                   b_flags, area):
+# pylint: disable-next=too-many-locals,too-many-arguments
+def create_c_and_f(a_mag, b_mag, a_inds, a_size, b_inds, b_size, a_b_area, b_b_area, a_f_area, b_f_area,
+                   auf_cdf_a, auf_cdf_b, a_bins, b_bins, bright_frac, field_frac, a_flags, b_flags, area):
     '''
     Functionality to create the photometric likelihood and priors from a set
     of photometric data in a given pair of filters.
 
     Parameters
     ----------
-    a_astro : numpy.ndarray
-        Array of astrometric parameters for all catalogue "a" sources in this
-        given sky slice.
-    b_astro : numpy.ndarray
-        Astrometric parameters for small sky region catalogue "b" objects.
     a_mag : numpy.ndarray
         Catalogue "a" magnitudes for sky area.
     b_mag : numpy.ndarray
@@ -529,6 +524,7 @@ def create_c_and_f(a_astro, b_astro, a_mag, b_mag, a_inds, a_size, b_inds, b_siz
     # recover that below. Similarly, we can't allow for a dependency-based
     # density condition where Nc is set based on one Nf and then the other Nf
     # is set based on Nc, since we don't know which counterpart density to use.
+    # pylint: disable-next=too-many-boolean-expressions
     if (np.any(np.isnan([nc, nfa, nfb])) or (nc <= 0 and (nfa <= 0 or nfb <= 0)) or
             (nfa <= 0.01 * nc and nc <= 0.01 * nfb) or (nfb <= 0.01 * nc and nc <= 0.01 * nfa)):
         raise ValueError("Incorrect prior densities, unable to process chunk.")

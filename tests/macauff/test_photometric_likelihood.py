@@ -260,8 +260,8 @@ def test_get_field_dists_fortran():
     mask = plf.get_field_dists(auf_cdf, ainds, asize, fracs, aflags, amag, bflags, bmag,
                                lowmag, uppmag, lowmag, uppmag)
     test_mask = np.ones((10, len(fracs)), bool)
-    for i in range(len(fracs)):
-        test_mask[auf_cdf[0, :] <= fracs[i], i] = 0
+    for i, frac in enumerate(fracs):
+        test_mask[auf_cdf[0, :] <= frac, i] = 0
     assert np.all(mask == test_mask)
     assert np.sum(mask) > 0
 
