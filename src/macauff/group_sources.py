@@ -15,7 +15,12 @@ import numpy as np
 # pylint: disable=import-error,no-name-in-module
 from macauff.group_sources_fortran import group_sources_fortran as gsf
 from macauff.make_set_list import set_list
-from macauff.misc_functions import _load_rectangular_slice, hav_dist_constant_lat, load_small_ref_auf_grid
+from macauff.misc_functions import (
+    SharedNumpyArray,
+    _load_rectangular_slice,
+    hav_dist_constant_lat,
+    load_small_ref_auf_grid,
+)
 
 # pylint: enable=import-error,no-name-in-module
 
@@ -123,8 +128,13 @@ def make_island_groupings(cm):
     ainds = np.zeros(dtype=int, shape=(amaxsize, len(a_full)), order='F')
     binds = np.zeros(dtype=int, shape=(bmaxsize, len(b_full)), order='F')
 
+    auf_cdf_a = np.zeros(dtype=float, shape=(amaxsize, len(a_full)), order='F')
+    auf_cdf_b = np.zeros(dtype=float, shape=(bmaxsize, len(b_full)), order='F')
+
     ainds[:, :] = -1
     binds[:, :] = -1
+    auf_cdf_a[:, :] = -1
+    auf_cdf_b[:, :] = -1
     asize[:] = 0
     bsize[:] = 0
 
@@ -154,7 +164,8 @@ def make_island_groupings(cm):
                         b_big_sky_cut, cm.b_modelrefinds)
 
                     if len(a) > 0 and len(b) > 0:
-                        indicesa, indicesb, overlapa, overlapb = gsf.get_overlap_indices(
+                        (indicesa, indicesb, overlapa, overlapb,
+                         aufcdfa, aufcdfb) = gsf.get_overlap_indices(
                             a[:, 0], a[:, 1], b[:, 0], b[:, 1], max_sep, amaxsize, bmaxsize,
                             a[:, 2], b[:, 2], cm.r[:-1]+cm.dr/2, cm.rho[:-1], cm.drho, cm.j1s, afouriergrid,
                             bfouriergrid, amodrefindsmall, bmodrefindsmall, cm.int_fracs[2])
@@ -165,9 +176,13 @@ def make_island_groupings(cm):
                         for k, _acut2 in enumerate(a_cut2):
                             ainds[asize[_acut2]:asize[_acut2]+overlapa[k], _acut2] = \
                                 b_cut2[indicesa[:overlapa[k], k] - 1]
+                            auf_cdf_a[asize[_acut2]:asize[_acut2]+overlapa[k], _acut2] = \
+                                aufcdfa[:overlapa[k], k]
                         for k, _bcut2 in enumerate(b_cut2):
                             binds[bsize[_bcut2]:bsize[_bcut2]+overlapb[k], _bcut2] = \
                                 a_cut2[indicesb[:overlapb[k], k] - 1]
+                            auf_cdf_b[bsize[_bcut2]:bsize[_bcut2]+overlapb[k], _bcut2] = \
+                                aufcdfb[:overlapb[k], k]
 
                         asize[a_cut2] = asize[a_cut2] + overlapa
                         bsize[b_cut2] = bsize[b_cut2] + overlapb
@@ -179,8 +194,8 @@ def make_island_groupings(cm):
     print(f"{t} Rank {cm.rank}, chunk {cm.chunk_id}: Cleaning overlaps...")
     sys.stdout.flush()
 
-    ainds, asize = _clean_overlaps(ainds, asize, cm.n_pool)
-    binds, bsize = _clean_overlaps(binds, bsize, cm.n_pool)
+    ainds, asize, auf_cdf_a = _clean_overlaps(ainds, asize, auf_cdf_a, cm.n_pool)
+    binds, bsize, auf_cdf_b = _clean_overlaps(binds, bsize, auf_cdf_b, cm.n_pool)
 
     t = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     print(f"{t} Rank {cm.rank}, chunk {cm.chunk_id}: Calculating integral lengths...")
@@ -194,17 +209,17 @@ def make_island_groupings(cm):
         a_fouriergrid = cm.a_perturb_auf_outputs['fourier_grid']
         b_fouriergrid = cm.b_perturb_auf_outputs['fourier_grid']
 
-        a_int_lens = gsf.get_integral_length(
+        a_int_areas = gsf.get_integral_length(
             a_err, b_err, cm.r[:-1]+cm.dr/2, cm.rho[:-1], cm.drho, cm.j1s, a_fouriergrid, b_fouriergrid,
             cm.a_modelrefinds, cm.b_modelrefinds, ainds, asize, cm.int_fracs[0:2])
-        ablen = a_int_lens[:, 0]
-        aflen = a_int_lens[:, 1]
+        ab_area = a_int_areas[:, 0]
+        af_area = a_int_areas[:, 1]
 
-        b_int_lens = gsf.get_integral_length(
+        b_int_areas = gsf.get_integral_length(
             b_err, a_err, cm.r[:-1]+cm.dr/2, cm.rho[:-1], cm.drho, cm.j1s, b_fouriergrid, a_fouriergrid,
             cm.b_modelrefinds, cm.a_modelrefinds, binds, bsize, cm.int_fracs[0:2])
-        bblen = b_int_lens[:, 0]
-        bflen = b_int_lens[:, 1]
+        bb_area = b_int_areas[:, 0]
+        bf_area = b_int_areas[:, 1]
 
     t = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     print(f"{t} Rank {cm.rank}, chunk {cm.chunk_id}: Maximum overlaps are:", amaxsize, bmaxsize)
@@ -238,8 +253,15 @@ def make_island_groupings(cm):
     # look at whether any source has a sky separation of less than max_sep
     # from any of the four lines defining extent in orthogonal sky axes.
     counter = np.arange(0, alist.shape[1])
+    shared_a = SharedNumpyArray(a_full, 'a_full')
+    shared_b = SharedNumpyArray(b_full, 'b_full')
+    shared_alist = SharedNumpyArray(alist, 'alist')
+    shared_blist = SharedNumpyArray(blist, 'blist')
+    shared_agrplen = SharedNumpyArray(agrplen, 'agrplen')
+    shared_bgrplen = SharedNumpyArray(bgrplen, 'bgrplen')
     expand_constants = [itertools.repeat(item) for item in [
-        a_full, b_full, alist, blist, agrplen, bgrplen, cm.cross_match_extent, max_sep]]
+        shared_a, shared_b, shared_alist, shared_blist, shared_agrplen, shared_bgrplen,
+        cm.cross_match_extent, max_sep]]
     iter_group = zip(counter, *expand_constants)
     # Initialise the multiprocessing loop setup:
     with multiprocessing.Pool(cm.n_pool) as pool:
@@ -257,6 +279,9 @@ def make_island_groupings(cm):
                 num_b_failed_checks += len(b)
 
     pool.join()
+
+    for _shared in [shared_a, shared_b, shared_alist, shared_blist, shared_agrplen, shared_bgrplen]:
+        _shared.unlink()
 
     # If set_list returned any rejected sources, then add any sources too close
     # to match extent to those now. Ensure that we only reject the unique source IDs
@@ -296,10 +321,11 @@ def make_island_groupings(cm):
     agrplen = agrplen[passed_check]
     blist = blist[:, passed_check]
     bgrplen = bgrplen[passed_check]
-    # Only return aflen and bflen if they were created
+    # Only return a[bf]_area and b[bf]_area if they were created
     if not (cm.include_phot_like or cm.use_phot_priors):
-        ablen = bblen = None
-        aflen = bflen = None
+        ab_area = bb_area = None
+        af_area = bf_area = None
+        auf_cdf_a = auf_cdf_b = None
     # Only return reject counts if they were created
     if num_a_failed_checks + a_first_rejected_len > 0:
         lenrejecta = len(reject_a)
@@ -315,20 +341,22 @@ def make_island_groupings(cm):
         lenrejectb = 0
         cm.reject_b = None
 
-    cm.ablen = ablen  # pylint: disable=possibly-used-before-assignment
-    cm.bblen = bblen  # pylint: disable=possibly-used-before-assignment
+    cm.ab_area = ab_area  # pylint: disable=possibly-used-before-assignment
+    cm.bb_area = bb_area  # pylint: disable=possibly-used-before-assignment
     cm.ainds = ainds
     cm.binds = binds
     cm.asize = asize
     cm.bsize = bsize
-    cm.aflen = aflen  # pylint: disable=possibly-used-before-assignment
-    cm.bflen = bflen  # pylint: disable=possibly-used-before-assignment
+    cm.af_area = af_area  # pylint: disable=possibly-used-before-assignment
+    cm.bf_area = bf_area  # pylint: disable=possibly-used-before-assignment
     cm.alist = alist
     cm.blist = blist
     cm.agrplen = agrplen
     cm.bgrplen = bgrplen
     cm.lenrejecta = lenrejecta
     cm.lenrejectb = lenrejectb
+    cm.auf_cdf_a = auf_cdf_a
+    cm.auf_cdf_b = auf_cdf_b
 
 
 def _load_fourier_grid_cutouts(a, sky_rect_coords, perturb_auf_outputs, padding,
@@ -374,7 +402,7 @@ def _load_fourier_grid_cutouts(a, sky_rect_coords, perturb_auf_outputs, padding,
     return a_cutout, fouriergrid, modrefindsmall, sky_cut
 
 
-def _clean_overlaps(inds, size, n_pool):
+def _clean_overlaps(inds, size, cdf, n_pool):
     '''
     Convenience function to parse either catalogue's indices array for
     duplicate references to the opposing array on a per-source basis,
@@ -388,6 +416,10 @@ def _clean_overlaps(inds, size, n_pool):
     size : numpy.ndarray
         Array containing the number of overlaps between this catalogue and the
         opposing catalogue prior to duplication removal.
+    cdf : numpy.ndarray
+        Array of the cumulative distribution functions of each ``inds`` pair
+        overlap between the two catalogues, evaluating the chance of counterpart
+        between objects based on sky position, position precision, etc.
     n_pool : integer
         Number of multiprocessing threads to use.
 
@@ -396,6 +428,8 @@ def _clean_overlaps(inds, size, n_pool):
     inds : numpy.ndarray
         The unique indices of overlap into the opposing catalogue for each
         source in a given catalogue, stripped of potential duplicates.
+    cdf: numpy.ndarray
+        ``cdf`` filtered by the unique indices in ``inds``.
     size : numpy.ndarray
         Newly updated ``size`` array, containing the lengths of the unique
         indices of overlap into the opposing catalogue for each source.
@@ -403,35 +437,39 @@ def _clean_overlaps(inds, size, n_pool):
     maxsize = 0
     size[:] = 0
     counter = np.arange(0, inds.shape[1])
-    iter_group = zip(counter, itertools.repeat(inds))
+    iter_group = zip(counter, itertools.repeat(inds), itertools.repeat(cdf))
     with multiprocessing.Pool(n_pool) as pool:
         for return_items in pool.imap_unordered(_calc_unique_inds, iter_group,
                                                 chunksize=max(1, len(counter) // n_pool)):
-            i, unique_inds = return_items
+            i, unique_inds, unique_cdf = return_items
             y = len(unique_inds)
             inds[:y, i] = unique_inds
             inds[y:, i] = -1
+            cdf[:y, i] = unique_cdf
+            cdf[y:, i] = -1
             maxsize = max(maxsize, y)
             size[i] = y
 
     pool.join()
 
     inds = np.asfortranarray(inds[:maxsize, :])
+    cdf = np.asfortranarray(cdf[:maxsize, :])
 
-    return inds, size
+    return inds, size, cdf
 
 
 def _calc_unique_inds(iterable):
-    i, inds = iterable
-    return i, np.unique(inds[inds[:, i] > -1, i])
+    i, inds, cdf = iterable
+    x, inds_for_x = np.unique(inds[inds[:, i] > -1, i], return_index=True)
+    return i, x, cdf[inds[:, i] > -1, i][inds_for_x]
 
 
 def _distance_check(iterable):
     i, a_, b_, alist_1, blist_1, agrplen_small, bgrplen_small, ax_lims, max_sep = iterable
-    subset = alist_1[:agrplen_small[i], i]
-    a = a_[subset]
-    subset = blist_1[:bgrplen_small[i], i]
-    b = b_[subset]
+    subset = alist_1.read()[:agrplen_small.read()[i], i]
+    a = a_.read()[subset]
+    subset = blist_1.read()[:bgrplen_small.read()[i], i]
+    b = b_.read()[subset]
     meets_min_distance = np.zeros(len(a)+len(b), bool)
     # Do not check for longitudinal "extent" small separations for cases
     # where all 0-360 degrees are included, as this will result in no loss

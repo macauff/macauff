@@ -128,7 +128,8 @@ subroutine cumulative_fourier_probability(pr, drho, dist, j1s, cumulative_prob)
 end subroutine cumulative_fourier_probability
 
 subroutine get_overlap_indices(a_ax_1, a_ax_2, b_ax_1, b_ax_2, max_sep, amax, bmax, a_axerr, b_axerr, r, rho, drho, &
-    j1s, afouriergrid, bfouriergrid, amodrefind, bmodrefind, max_frac, aindices, bindices, anumoverlap, bnumoverlap)
+    j1s, afouriergrid, bfouriergrid, amodrefind, bmodrefind, max_frac, aindices, bindices, anumoverlap, bnumoverlap, a_auf_cdf, &
+    b_auf_cdf)
     ! Once total potential overlap is found in getmaxn, we can keep track of each individual
     ! source overlap between the two catalogues, storing their respective indices to keep
     ! links of potential counterparts between the two catalogues.
@@ -156,6 +157,8 @@ subroutine get_overlap_indices(a_ax_1, a_ax_2, b_ax_1, b_ax_2, max_sep, amax, bm
     integer, intent(out) :: aindices(amax, size(a_ax_1)), bindices(bmax, size(b_ax_1))
     ! Number of overlaps of each source into the opposing catalogue.
     integer, intent(out) :: anumoverlap(size(a_ax_1)), bnumoverlap(size(b_ax_1))
+    ! Cumulative Distribution Functions evaluates for each potential pairing, within max_frac, matching [ab]indices.
+    real(dp), intent(out) :: a_auf_cdf(amax, size(a_ax_1)), b_auf_cdf(bmax, size(b_ax_1))
     ! Loop counters.
     integer :: i, j, k
     ! Sky offsets and uncertainties
@@ -171,21 +174,27 @@ subroutine get_overlap_indices(a_ax_1, a_ax_2, b_ax_1, b_ax_2, max_sep, amax, bm
     integer :: tempcounter, changeflag
     ! Allocatable temporary index array.
     integer, allocatable :: tempind(:)
+    ! Allocatable temporary CDF array.
+    real(dp), allocatable :: tempcdf(:)
 
     max_sep2 = max_sep**2
 
+    a_auf_cdf = 2
+    b_auf_cdf = 2
     aindices = -1
     bindices = -1
     anumoverlap = 0
     bnumoverlap = 0
 
     allocate(tempind(amax))
-!$OMP PARALLEL DO DEFAULT(NONE) PRIVATE(i, j, k, dax2, dist, afourier, bfourier, four, cumulative, tempind, tempcounter, &
+    allocate(tempcdf(amax))
+!$OMP PARALLEL DO DEFAULT(NONE) PRIVATE(i, j, k, dax2, dist, afourier, bfourier, four, cumulative, tempind, tempcdf, tempcounter, &
 !$OMP& changeflag, oa, ob) SHARED(a_ax_1, a_ax_2, b_ax_1, b_ax_2, max_sep, max_sep2, aindices, anumoverlap, afouriergrid, &
-!$OMP& bfouriergrid, amodrefind, bmodrefind, r, rho, drho, max_frac, a_axerr, b_axerr, j1s)
+!$OMP& bfouriergrid, amodrefind, bmodrefind, r, rho, drho, max_frac, a_axerr, b_axerr, j1s, a_auf_cdf)
     do j = 1, size(a_ax_1)
         tempind = -1
         tempcounter = 1
+        tempcdf = 2
         changeflag = 0
         oa = a_axerr(j)
         do i = 1, size(b_ax_1)
@@ -201,6 +210,7 @@ subroutine get_overlap_indices(a_ax_1, a_ax_2, b_ax_1, b_ax_2, max_sep, amax, bm
                     call cumulative_fourier_probability(four, drho, dist*3600.0_dp, j1s(:, k), cumulative)
                     if (cumulative < max_frac) then
                         tempind(tempcounter) = i
+                        tempcdf(tempcounter) = cumulative
                         tempcounter = tempcounter + 1
                         changeflag = 1
                     end if
@@ -209,6 +219,7 @@ subroutine get_overlap_indices(a_ax_1, a_ax_2, b_ax_1, b_ax_2, max_sep, amax, bm
         end do
         if (changeflag > 0) then
             aindices(:, j) = tempind
+            a_auf_cdf(:, j) = tempcdf
             anumoverlap(j) = tempcounter - 1
         end if
     end do
@@ -216,13 +227,16 @@ subroutine get_overlap_indices(a_ax_1, a_ax_2, b_ax_1, b_ax_2, max_sep, amax, bm
 
     deallocate(tempind)
     allocate(tempind(bmax))
+    deallocate(tempcdf)
+    allocate(tempcdf(bmax))
 
-!$OMP PARALLEL DO DEFAULT(NONE) PRIVATE(i, j, k, dax2, dist, afourier, bfourier, four, cumulative, tempind, tempcounter, &
+!$OMP PARALLEL DO DEFAULT(NONE) PRIVATE(i, j, k, dax2, dist, afourier, bfourier, four, cumulative, tempind, tempcdf, tempcounter, &
 !$OMP& changeflag, oa, ob) SHARED(a_ax_1, a_ax_2, b_ax_1, b_ax_2, max_sep, max_sep2, bindices, bnumoverlap, afouriergrid, &
-!$OMP& bfouriergrid, amodrefind, bmodrefind, r, rho, drho, max_frac, a_axerr, b_axerr, j1s)
+!$OMP& bfouriergrid, amodrefind, bmodrefind, r, rho, drho, max_frac, a_axerr, b_axerr, j1s, b_auf_cdf)
     do i = 1, size(b_ax_1)
         tempind = -1
         tempcounter = 1
+        tempcdf = 2
         changeflag = 0
         ob = b_axerr(i)
         do j = 1, size(a_ax_1)
@@ -238,6 +252,7 @@ subroutine get_overlap_indices(a_ax_1, a_ax_2, b_ax_1, b_ax_2, max_sep, amax, bm
                     call cumulative_fourier_probability(four, drho, dist*3600.0_dp, j1s(:, k), cumulative)
                     if (cumulative < max_frac) then
                         tempind(tempcounter) = j
+                        tempcdf(tempcounter) = cumulative
                         tempcounter = tempcounter + 1
                         changeflag = 1
                     end if
@@ -246,6 +261,7 @@ subroutine get_overlap_indices(a_ax_1, a_ax_2, b_ax_1, b_ax_2, max_sep, amax, bm
         end do
         if (changeflag > 0) then
             bindices(:, i) = tempind
+            b_auf_cdf(:, i) = tempcdf
             bnumoverlap(i) = tempcounter - 1
         end if
     end do
@@ -254,8 +270,8 @@ subroutine get_overlap_indices(a_ax_1, a_ax_2, b_ax_1, b_ax_2, max_sep, amax, bm
 end subroutine get_overlap_indices
 
 subroutine get_integral_length(a_err, b_err, r, rho, drho, j1s, a_fouriergrid, b_fouriergrid, a_modrefind, b_modrefind, &
-    a_inds, a_size, frac_array, int_dists)
-    ! Calculate the "error circle" lengths for sources, based on various cumulative integral fractions
+    a_inds, a_size, frac_array, int_areas)
+    ! Calculate the "error circle" areas for sources, based on various cumulative integral fractions
     ! of the convolution of all overlapping opposing catalogue source AUFs with the given source's AUF.
     integer, parameter :: dp = kind(0.0d0)  ! double precision
     ! Indices for each source into the grid of perturbation component AUFs.
@@ -272,20 +288,23 @@ subroutine get_integral_length(a_err, b_err, r, rho, drho, j1s, a_fouriergrid, b
     ! Fractions of integral to consider when integrating convolutions of AUFs; likely to be the "bright"
     ! and "field" source identifications necessary to derive photometric likelihoods and priors.
     real(dp), intent(in) :: frac_array(:)
-    ! Output source error circle radii (probably "bright" and "field") for all catalogue "a" sources.
-    real(dp), intent(out) :: int_dists(size(a_err), size(frac_array))
-    ! Loop counters.
-    integer :: i, j, k, l
+    ! Output source error circle areas (probably "bright" and "field") for all catalogue "a" sources.
+    real(dp), intent(out) :: int_areas(size(a_err), size(frac_array))
+    ! Loop counters, and counter for keeping average error circle area.
+    integer :: i, j, k, l, int_areas_n(size(a_err), size(frac_array))
     ! Real-space lengthscales: singular astrometric uncertainties, and cumulative convolution
     ! integral distance.
     real(dp) :: ao, bo, cumulative_dists(size(frac_array))
     ! Respective fourier-space variables.
     real(dp) :: afourier(size(a_fouriergrid, 1)), bfourier(size(b_fouriergrid, 1)), four(size(a_fouriergrid, 1))
 
-    int_dists = 0.0_dp
+    int_areas = 0.0_dp
+
+    int_areas_n = 0
 
 !$OMP PARALLEL DO DEFAULT(NONE) PRIVATE(i, j, k, l, ao, bo, afourier, bfourier, four, cumulative_dists) SHARED(a_err, &
-!$OMP& a_fouriergrid, a_modrefind, r, rho, drho, j1s, a_size, a_inds, b_err, b_fouriergrid, b_modrefind, frac_array, int_dists)
+!$OMP& a_fouriergrid, a_modrefind, r, rho, drho, j1s, a_size, a_inds, b_err, b_fouriergrid, b_modrefind, frac_array, &
+!$OMP& int_areas, int_areas_n)
     do i = 1, size(a_err)
         ao = a_err(i)
         afourier = a_fouriergrid(:, a_modrefind(1, i)+1, a_modrefind(2, i)+1, a_modrefind(3, i)+1)
@@ -296,11 +315,20 @@ subroutine get_integral_length(a_err, b_err, r, rho, drho, j1s, a_fouriergrid, b
             four = afourier*bfourier*exp(-2.0_dp * pi**2 * (rho+drho/2.0_dp)**2 * (ao**2 + bo**2))
             call cumulative_fourier_distance(four, r, drho, frac_array, j1s, cumulative_dists)
             do l = 1, size(frac_array)
-                int_dists(i, l) = max(int_dists(i, l), cumulative_dists(l))
+                int_areas(i, l) = int_areas(i, l) + cumulative_dists(l)
+                int_areas_n(i, l) = int_areas_n(i, l) + 1
             end do
         end do
     end do
 !$OMP END PARALLEL DO
+
+    do i = 1, size(a_err)
+        do l = 1, size(frac_array)
+            if (int_areas_n(i, l) > 0) then
+                int_areas(i, l) = pi * (int_areas(i, l) / int_areas_n(i, l))**2
+            end if
+        end do
+    end do
 
 end subroutine get_integral_length
 

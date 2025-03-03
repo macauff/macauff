@@ -139,7 +139,7 @@ class Macauff():
         '''
         t = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         print(f'{t} Rank {self.cm.rank}, chunk {self.cm.chunk_id}: Calculating photometric region areas...')
-        dlon, dlat = 0.01, 0.01
+        dlon, dlat = 0.001, 0.001
         test_lons = np.arange(self.cm.cross_match_extent[0], self.cm.cross_match_extent[1], dlon)
         test_lats = np.arange(self.cm.cross_match_extent[2], self.cm.cross_match_extent[3], dlat)
 

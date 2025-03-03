@@ -1804,7 +1804,7 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
                         f_val = nn_frac_mn if j == 0 else nn_frac_quot if j == 3 else nn_frac_ind
                         h_str = f', H = {h:.2f}' if j == 0 else ''
                         if usetex:
-                            lab = rf'\sigma_\mathrm{{{sig_type}}} = {sig_val:.4f}", F = {f_val:.2f}{h_str}'
+                            lab = rf'$\sigma_\mathrm{{{sig_type}}}$ = {sig_val:.4f}", F = {f_val:.2f}{h_str}'
                         else:
                             lab = rf'sigma_{sig_type} = {sig_val:.4f}", F = {f_val:.2f}{h_str}'
                     else:

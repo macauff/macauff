@@ -17,6 +17,7 @@ from macauff.group_sources_fortran import group_sources_fortran as gsf
 from macauff.macauff import Macauff
 from macauff.matching import CrossMatch
 from macauff.misc_functions import create_auf_params_grid
+from macauff.misc_functions_fortran import misc_functions_fortran as mff
 
 # pylint: enable=no-name-in-module,import-error
 
@@ -153,17 +154,17 @@ class TestFortranCode():
             ainds[:_asize, i] = rng.choice(len(b_err), size=_asize, replace=False)
         frac_array = np.array([0.63, 0.9])
 
-        int_dists = gsf.get_integral_length(a_err, b_err, self.r[:-1]+self.dr/2, self.rho[:-1],
+        int_areas = gsf.get_integral_length(a_err, b_err, self.r[:-1]+self.dr/2, self.rho[:-1],
                                             self.drho, self.j1s, a_fouriergrid, b_fouriergrid,
                                             amodrefind, bmodrefind, ainds, asize, frac_array)
 
-        assert np.all(int_dists.shape == (len(a_err), len(frac_array)))
+        assert np.all(int_areas.shape == (len(a_err), len(frac_array)))
         for i, frac in enumerate(frac_array):
             for j, aerr in enumerate(a_err):
-                _berr = np.amax(b_err[ainds[:, j]])
-                assert_allclose(int_dists[j, i]*3600, np.sqrt(-2 * (aerr**2 + _berr**2 +
-                                a_four_sig**2 + b_four_sig**2) * np.log(1 - frac)),
-                                rtol=1e-3, atol=self.dr[0]/2)
+                assert_allclose(np.sqrt(int_areas[j, i]/np.pi)*3600, np.mean(
+                    np.sqrt(-2 * (aerr**2 + b_err[ainds[:asize[j], j]]**2 +
+                                  a_four_sig**2 + b_four_sig**2) * np.log(1 - frac))),
+                    rtol=1e-3, atol=self.dr[0]/2)
 
 
 class TestOverlap():
@@ -225,7 +226,7 @@ class TestOverlap():
 
     def test_get_overlap_indices_fortran(self):
         a_max, b_max = 2, 2
-        a_inds, b_inds, a_num, b_num = gsf.get_overlap_indices(
+        a_inds, b_inds, a_num, b_num, a_cdf, b_cdf = gsf.get_overlap_indices(
             self.a_ax_1, self.a_ax_2, self.b_ax_1, self.b_ax_2, self.max_sep/3600, a_max, b_max,
             self.a_axerr, self.b_axerr, self.r[:-1]+self.dr/2, self.rho[:-1], self.drho, self.j1s,
             self.afouriergrid, self.bfouriergrid, self.amodrefind, self.bmodrefind, self.max_frac)
@@ -248,6 +249,24 @@ class TestOverlap():
         assert np.all(a_inds == a_overlaps)
         assert np.all(b_inds == b_overlaps)
 
+        fake_a_cdf = np.ones((a_max, len(self.a_ax_1)), float) * 2
+        for i, _anum in enumerate(a_num):
+            for j in range(_anum):
+                d = mff.haversine_wrapper(self.a_ax_1[i], self.b_ax_1[a_overlaps[j, i]-1], self.a_ax_2[i],
+                                          self.b_ax_2[a_overlaps[j, i]-1])
+                fake_a_cdf[j, i] = 1 - np.exp(-0.5 * d**2 / ((self.a_axerr[i]**2 +
+                                                              self.b_axerr[a_overlaps[j, i]-1]**2)/3600**2))
+        assert_allclose(a_cdf, fake_a_cdf, atol=1e-5, rtol=0.001)
+
+        fake_b_cdf = np.ones((b_max, len(self.b_ax_1)), float) * 2
+        for i, _bnum in enumerate(b_num):
+            for j in range(_bnum):
+                d = mff.haversine_wrapper(self.b_ax_1[i], self.a_ax_1[b_overlaps[j, i]-1], self.b_ax_2[i],
+                                          self.a_ax_2[b_overlaps[j, i]-1])
+                fake_b_cdf[j, i] = 1 - np.exp(-0.5 * d**2 / ((self.b_axerr[i]**2 +
+                                                              self.a_axerr[b_overlaps[j, i]-1]**2)/3600**2))
+        assert_allclose(b_cdf, fake_b_cdf, atol=1e-5, rtol=0.001)
+
 
 def test_clean_overlaps():
     maxsize, size = 5, np.array([3, 5, 3, 4, 4, 5, 4, 2, 5, 4]*3)
@@ -264,7 +283,7 @@ def test_clean_overlaps():
         inds[:, 8+10*i] = [2, 2, 2, 2, 2]
         inds[:, 9+10*i] = [1, 1, 2, 3, -1]
 
-    inds2, size2 = _clean_overlaps(inds, size, 2)
+    inds2, size2, cdf2 = _clean_overlaps(inds, size, inds*10, 2)
     compare_inds2 = np.empty((4, 30), int)
     for i in range(0, 3):
         compare_inds2[:, 0+10*i] = [0, 1, -1, -1]
@@ -279,6 +298,11 @@ def test_clean_overlaps():
         compare_inds2[:, 9+10*i] = [1, 2, 3, -1]
     assert np.all(inds2 == compare_inds2)
     assert np.all(size2 == np.array([2, 3, 3, 2, 4, 3, 2, 2, 1, 3]*3))
+    # Fake the CDF array with inds times 10, since it just needs to be
+    # a different array of the same shape.
+    fake_cdf2 = np.copy(compare_inds2*10)
+    fake_cdf2[fake_cdf2 == -10] = -1
+    assert np.all(cdf2 == fake_cdf2)
 
 
 class TestMakeIslandGroupings():  # pylint: disable=too-many-instance-attributes
@@ -619,10 +643,10 @@ class TestMakeIslandGroupings():  # pylint: disable=too-many-instance-attributes
         berr = np.load(f'{self.b_cat_folder_path}/con_cat_astro.npy')[:, 2]
 
         # pylint: disable=no-member
-        ablen = self.cm.ablen
-        aflen = self.cm.aflen
-        bblen = self.cm.bblen
-        bflen = self.cm.bflen
+        ab_area = self.cm.ab_area
+        af_area = self.cm.af_area
+        bb_area = self.cm.bb_area
+        bf_area = self.cm.bf_area
 
         asize = self.cm.asize
         ainds = self.cm.ainds
@@ -630,8 +654,8 @@ class TestMakeIslandGroupings():  # pylint: disable=too-many-instance-attributes
         binds = self.cm.binds
         # pylint: enable=no-member
 
-        for i, _ablen in enumerate(ablen):
-            d = _ablen*3600
+        for i, _ab_area in enumerate(ab_area):
+            d = np.sqrt(_ab_area/np.pi)*3600
             if asize[i] > 0:
                 _berr = np.amax(berr[ainds[:asize[i], i]])
                 real_d = np.sqrt(-2 * (aerr[i]**2 + _berr**2) * np.log(1 - self.int_fracs[0]))
@@ -640,8 +664,8 @@ class TestMakeIslandGroupings():  # pylint: disable=too-many-instance-attributes
                 # If there is no overlap in opposing catalogue objects, we should
                 # get a zero distance error circle.
                 assert d == 0
-        for i, _aflen in enumerate(aflen):
-            d = _aflen*3600
+        for i, _af_area in enumerate(af_area):
+            d = np.sqrt(_af_area/np.pi)*3600
             if asize[i] > 0:
                 _berr = np.amax(berr[ainds[:asize[i], i]])
                 real_d = np.sqrt(-2 * (aerr[i]**2 + _berr**2) * np.log(1 - self.int_fracs[1]))
@@ -649,16 +673,16 @@ class TestMakeIslandGroupings():  # pylint: disable=too-many-instance-attributes
             else:
                 assert d == 0
 
-        for i, _bblen in enumerate(bblen):
-            d = _bblen*3600
+        for i, _bb_area in enumerate(bb_area):
+            d = np.sqrt(_bb_area/np.pi)*3600
             if bsize[i] > 0:
                 _aerr = np.amax(aerr[binds[:bsize[i], i]])
                 real_d = np.sqrt(-2 * (berr[i]**2 + _aerr**2) * np.log(1 - self.int_fracs[0]))
                 assert_allclose(d, real_d, rtol=1e-3, atol=self.dr[0]/2)
             else:
                 assert d == 0
-        for i, _bflen in enumerate(bflen):
-            d = _bflen*3600
+        for i, _bf_area in enumerate(bf_area):
+            d = np.sqrt(_bf_area/np.pi)*3600
             if bsize[i] > 0:
                 _aerr = np.amax(aerr[binds[:bsize[i], i]])
                 real_d = np.sqrt(-2 * (berr[i]**2 + _aerr**2) * np.log(1 - self.int_fracs[1]))
