@@ -253,12 +253,12 @@ def make_island_groupings(cm):
     # look at whether any source has a sky separation of less than max_sep
     # from any of the four lines defining extent in orthogonal sky axes.
     counter = np.arange(0, alist.shape[1])
-    shared_a = SharedNumpyArray(a_full, 'a_full')
-    shared_b = SharedNumpyArray(b_full, 'b_full')
-    shared_alist = SharedNumpyArray(alist, 'alist')
-    shared_blist = SharedNumpyArray(blist, 'blist')
-    shared_agrplen = SharedNumpyArray(agrplen, 'agrplen')
-    shared_bgrplen = SharedNumpyArray(bgrplen, 'bgrplen')
+    shared_a = SharedNumpyArray(a_full, f'a_full_{cm.chunk_id}')
+    shared_b = SharedNumpyArray(b_full, f'b_full_{cm.chunk_id}')
+    shared_alist = SharedNumpyArray(alist, f'alist_{cm.chunk_id}')
+    shared_blist = SharedNumpyArray(blist, f'blis_{cm.chunk_id}t')
+    shared_agrplen = SharedNumpyArray(agrplen, f'agrplen_{cm.chunk_id}')
+    shared_bgrplen = SharedNumpyArray(bgrplen, f'bgrplen_{cm.chunk_id}')
     expand_constants = [itertools.repeat(item) for item in [
         shared_a, shared_b, shared_alist, shared_blist, shared_agrplen, shared_bgrplen,
         cm.cross_match_extent, max_sep]]
