@@ -992,9 +992,10 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
             return np.sum((f - y)**2), np.array([np.sum(2 * (f - y) * i)
                                                  for i in [dfda, dfdb, dfdc]])
 
-        s = 10**(-1/2.5 * self.b[:, self.mag_indices[j]])
+        p = self.b[:, self.mag_unc_indices[j]] > 0
+        s = 10**(-1/2.5 * self.b[p, self.mag_indices[j]])
         # Based on m = -2.5 log(S), dm = |df dm/df|.
-        snr = 2.5 / np.log(10) / self.b[:, self.mag_unc_indices[j]]
+        snr = 2.5 / np.log(10) / self.b[p, self.mag_unc_indices[j]]
 
         q = ~np.isnan(s) & ~np.isnan(snr) & (snr > 2)
         s, snr = s[q], snr[q]
@@ -1407,7 +1408,8 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
                 continue
 
             bm = b_matches[final_slice]
-            snr = 2.5 / np.log(10) / bm[:, self.mag_unc_indices[self.best_mag_index]]
+            p = bm[:, self.mag_unc_indices[self.best_mag_index]] > 0
+            snr = 2.5 / np.log(10) / bm[p, self.mag_unc_indices[self.best_mag_index]]
             avg_snr[i, 0] = np.median(snr)
             avg_snr[i, [1, 2]] = np.abs(np.percentile(snr, [16, 84]) - np.median(snr))
             avg_mag[i, 0] = np.median(bm[:, mag_ind])
@@ -1833,15 +1835,16 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
         """
         print("Plotting SNR-Magnitude-Uncertainty scaling relations...")
         sys.stdout.flush()
-        _snr = 2.5 / np.log(10) / self.b[:, self.mag_unc_indices[self.best_mag_index]]
+        p = self.b[:, self.mag_unc_indices[self.best_mag_index]] > 0
+        _snr = 2.5 / np.log(10) / self.b[p, self.mag_unc_indices[self.best_mag_index]]
         if not self.use_photometric_uncertainties:
-            obj_err = self.b[:, self.pos_and_err_indices[1][2]]
+            obj_err = self.b[p, self.pos_and_err_indices[1][2]]
         else:
             # Since we expect the astrometric/inverse-photometric-snr scaling to
             # be roughly a factor FWHM/(2 * sqrt(2 * ln(2))), i.e. the sigma of
             # a Gaussian-ish PSF, scale accordingly:
             obj_err = self.psfsig / _snr
-        obj_mag = self.b[:, self.mag_indices[self.best_mag_index]]
+        obj_mag = self.b[p, self.mag_indices[self.best_mag_index]]
 
         gs = self.make_gridspec('sig_vs_snr_vs_mag', 1, 3, 0.8, 6)
         ax = plt.subplot(gs[0])
@@ -1890,7 +1893,7 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
             ax.set_ylabel(r'log10(Quoted uncertainty / arcsecond)')
 
         ax = plt.subplot(gs[1])
-        q = (obj_err < 1) & (_snr > 1) & (obj_err > 0)
+        q = (obj_err < 1) & (_snr > 1) & (obj_err > 0) & ~np.isnan(obj_mag)
         log_inv_snr = np.log10(1 / _snr[q])
         h, x, y = np.histogram2d(log_inv_snr, obj_mag[q], bins=(100, 101))
         ax.pcolormesh(x, y, h.T, edgecolors='face', cmap='viridis', rasterized=True)
@@ -1929,7 +1932,7 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
         ax.set_ylabel('Magnitude')
 
         ax = plt.subplot(gs[2])
-        q = (obj_err < 1) & (_snr > 1) & (obj_err > 0)
+        q = (obj_err < 1) & (_snr > 1) & (obj_err > 0) & ~np.isnan(obj_mag)
         log_err = np.log10(obj_err[q])
         h, x, y = np.histogram2d(obj_mag[q], log_err, bins=(100, 101))
         ax.pcolormesh(x, y, h.T, edgecolors='face', cmap='viridis', rasterized=True)
@@ -1998,7 +2001,7 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
 
         gs = self.make_gridspec('fits_cdf', 1, 2, 0.8, 6)
         for i, (f, label) in enumerate(zip([self.mn_poisson_cdfs, self.ind_poisson_cdfs],
-                                           ['Hyper-Parameter', 'Individual'])):
+                                           ['HyperParameter', 'Individual'])):
             ax_d = plt.subplot(gs[i])
             for j, g in enumerate(f):
                 if g is None:
@@ -2018,7 +2021,7 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
                           true_hypothesis_cdf_dist[filter_log_nans], ls='None', c=c, marker='.')
                 ax_d.plot(np.log10(1 - true_hypothesis_cdf_dist), true_hypothesis_cdf_dist, 'r--')
             if usetex:
-                ax_d.set_xlabel(rf'$\log_{10}(1 - \mathrm{{{label} CDF}})$')
+                ax_d.set_xlabel(rf'$\log_{{10}}(1 - \mathrm{{{label} CDF}})$')
             else:
                 ax_d.set_xlabel(rf'log10(1 - {label} CDF)')
             ax_d.set_ylabel('Fraction')
