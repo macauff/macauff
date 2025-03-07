@@ -418,10 +418,24 @@ def create_c_and_f(a_mag, b_mag, a_inds, a_size, b_inds, b_size, a_b_area, b_b_a
     # Filter for completely isolated sources, which will have zero area,
     # to take a meaningful sample.
     pc = [5, 15, 25, 35, 45, 55, 65, 75, 85, 95]
-    avg_a_areas = np.array([np.percentile(a_b_area[a_b_area > 0], pc),
-                            np.percentile(a_f_area[a_f_area > 0], pc)]).T
-    avg_b_areas = np.array([np.percentile(b_b_area[b_b_area > 0], pc),
-                            np.percentile(b_f_area[b_f_area > 0], pc)]).T
+    if np.sum(a_b_area > 0) > 0:
+        aba_perc = np.percentile(a_b_area[a_b_area > 0], pc)
+    else:
+        aba_perc = np.zeros(len(pc), float)
+    if np.sum(a_f_area > 0) > 0:
+        afa_perc = np.percentile(a_f_area[a_f_area > 0], pc)
+    else:
+        afa_perc = np.zeros(len(pc), float)
+    if np.sum(b_b_area > 0) > 0:
+        bba_perc = np.percentile(b_b_area[b_b_area > 0], pc)
+    else:
+        bba_perc = np.zeros(len(pc), float)
+    if np.sum(b_f_area > 0) > 0:
+        bfa_perc = np.percentile(b_f_area[b_f_area > 0], pc)
+    else:
+        bfa_perc = np.zeros(len(pc), float)
+    avg_a_areas = np.array([aba_perc, afa_perc]).T
+    avg_b_areas = np.array([bba_perc, bfa_perc]).T
 
     # With a percentile in steps of 10 percentage points, each area will be
     # equally weighted with 1/10th of the objects.
@@ -484,8 +498,15 @@ def create_c_and_f(a_mag, b_mag, a_inds, a_size, b_inds, b_size, a_b_area, b_b_a
 
         # Also filter the a-catalogue objects for being within our magnitude
         # range, but don't do anything to b, so re-use the previous one.
-        avg_a_areas = np.array([np.percentile(a_b_area[(a_b_area > 0) & a_mag_filter], pc),
-                                np.percentile(a_f_area[(a_f_area > 0) & a_mag_filter], pc)]).T
+        if np.sum(a_b_area > 0) > 0:
+            aba_perc = np.percentile(a_b_area[(a_b_area > 0) & a_mag_filter], pc)
+        else:
+            aba_perc = np.zeros(len(pc), float)
+        if np.sum(a_f_area > 0) > 0:
+            afa_perc = np.percentile(a_f_area[(a_f_area > 0) & a_mag_filter], pc)
+        else:
+            afa_perc = np.zeros(len(pc), float)
+        avg_a_areas = np.array([aba_perc, afa_perc]).T
         wht_a_areas = 0.1 * np.ones_like(avg_a_areas)
 
         res = minimize(calculate_prior_densities, args=(measured_density_a, measured_density_b,
