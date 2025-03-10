@@ -283,7 +283,7 @@ def test_clean_overlaps():
         inds[:, 8+10*i] = [2, 2, 2, 2, 2]
         inds[:, 9+10*i] = [1, 1, 2, 3, -1]
 
-    inds2, size2, cdf2 = _clean_overlaps(inds, size, inds*10, 2)
+    inds2, size2, cdf2 = _clean_overlaps(inds, size, inds*10, 2, 0)
     compare_inds2 = np.empty((4, 30), int)
     for i in range(0, 3):
         compare_inds2[:, 0+10*i] = [0, 1, -1, -1]
