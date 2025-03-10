@@ -498,11 +498,11 @@ def create_c_and_f(a_mag, b_mag, a_inds, a_size, b_inds, b_size, a_b_area, b_b_a
 
         # Also filter the a-catalogue objects for being within our magnitude
         # range, but don't do anything to b, so re-use the previous one.
-        if np.sum(a_b_area > 0) > 0:
+        if np.sum((a_b_area > 0) & a_mag_filter) > 0:
             aba_perc = np.percentile(a_b_area[(a_b_area > 0) & a_mag_filter], pc)
         else:
             aba_perc = np.zeros(len(pc), float)
-        if np.sum(a_f_area > 0) > 0:
+        if np.sum((a_f_area > 0) & a_mag_filter) > 0:
             afa_perc = np.percentile(a_f_area[(a_f_area > 0) & a_mag_filter], pc)
         else:
             afa_perc = np.zeros(len(pc), float)
