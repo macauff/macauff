@@ -281,7 +281,7 @@ def make_bins(input_mags):
     return output_bins
 
 
-# pylint: disable-next=too-many-locals,too-many-arguments
+# pylint: disable-next=too-many-locals,too-many-arguments,too-many-statements
 def create_c_and_f(a_mag, b_mag, a_inds, a_size, b_inds, b_size, a_b_area, b_b_area, a_f_area, b_f_area,
                    auf_cdf_a, auf_cdf_b, a_bins, b_bins, bright_frac, field_frac, a_flags, b_flags, area):
     '''
