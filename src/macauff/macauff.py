@@ -139,26 +139,30 @@ class Macauff():
         '''
         t = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         print(f'{t} Rank {self.cm.rank}, chunk {self.cm.chunk_id}: Calculating photometric region areas...')
+        sys.stdout.flush()
         dlon, dlat = 0.001, 0.001
         test_lons = np.arange(self.cm.cross_match_extent[0], self.cm.cross_match_extent[1], dlon)
         test_lats = np.arange(self.cm.cross_match_extent[2], self.cm.cross_match_extent[3], dlat)
 
-        test_coords = np.array([[a, b] for a in test_lons for b in test_lats])
-
-        inds = mff.find_nearest_point(test_coords[:, 0], test_coords[:, 1],
-                                      self.cm.cf_region_points[:, 0], self.cm.cf_region_points[:, 1])
-
         cf_areas = np.zeros((len(self.cm.cf_region_points)), float)
+        test_coords = np.empty((len(test_lons), 2), float)
+        test_coords[:, 0] = test_lons
 
-        # Unit area of a sphere is cos(theta) dtheta dphi if theta goes from -90
-        # to +90 degrees (sin(theta) for 0 to 180 degrees). Note, however, that
-        # dtheta and dphi have to be in radians, so we have to convert the entire
-        # thing from degrees and re-convert at the end. Hence:
-        for i, ind in enumerate(inds):
-            theta = np.radians(test_coords[i, 1])
-            dtheta, dphi = dlat / 180 * np.pi, dlon / 180 * np.pi
-            # Remember to convert back to square degrees:
-            cf_areas[ind] += (np.cos(theta) * dtheta * dphi) * (180 / np.pi)**2
+        for test_lat in test_lats:
+            test_coords[:, 1] = test_lat
+
+            inds = mff.find_nearest_point(test_coords[:, 0], test_coords[:, 1],
+                                          self.cm.cf_region_points[:, 0], self.cm.cf_region_points[:, 1])
+
+            # Unit area of a sphere is cos(theta) dtheta dphi if theta goes from -90
+            # to +90 degrees (sin(theta) for 0 to 180 degrees). Note, however, that
+            # dtheta and dphi have to be in radians, so we have to convert the entire
+            # thing from degrees and re-convert at the end. Hence:
+            for i, ind in enumerate(inds):
+                theta = np.radians(test_coords[i, 1])
+                dtheta, dphi = dlat / 180 * np.pi, dlon / 180 * np.pi
+                # Remember to convert back to square degrees:
+                cf_areas[ind] += (np.cos(theta) * dtheta * dphi) * (180 / np.pi)**2
 
         self.cm.cf_areas = cf_areas
 

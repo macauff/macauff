@@ -12,6 +12,7 @@ import multiprocessing
 import os
 import shutil
 import sys
+import warnings
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -651,32 +652,28 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
             self.simulate_aufs()
             self.create_auf_pdfs()
             # If we don't have at least 5 unique magnitude slices to calculate,
-            # skip and set m and n as NaNs.
+            # reduce the number of data points per histogram to increase
+            # number statistics.
+            if np.sum([q[0] == -1 for q in self.pdfs]) > len(self.pdfs)-5:
+                warnings.warn("Reduced PDF histogram counts to 75.")
+                self.create_auf_pdfs(min_hist_cut=75)
+            if np.sum([q[0] == -1 for q in self.pdfs]) > len(self.pdfs)-5:
+                warnings.warn("Reduced PDF histogram counts to 50.")
+                self.create_auf_pdfs(min_hist_cut=50)
             if np.sum([q[0] == -1 for q in self.pdfs]) <= len(self.pdfs)-5:
-                # m_sig, n_sig = self.fit_uncertainty()
                 m_sig, n_sig = self.fit_uncertainty()
-                m_sigs[index_] = m_sig
-                n_sigs[index_] = n_sig
             else:
-                # If we failed to generate sufficient numbers of magnitude slices
-                # to fit, then we won't need most plots. In this case, if we
-                # plotted the star-galaxy counts comparison, delete it now.
-                if self.make_plots:
-                    os.system(f'rm {self.save_folder}/pdf/counts_comparison_{self.file_name}.pdf')
-                m_sigs[index_] = np.nan
-                n_sigs[index_] = np.nan
-            if np.sum([q[0] == -1 for q in self.pdfs]) <= len(self.pdfs)-5:
-                # Currently by simply skipping this function altogether we don't
-                # calculate the chi-squareds, but since we don't plot those at
-                # the moment that's okay; if plotting is turned back on, a
-                # better call will be required.
-                mn_poisson_cdfs, ind_poisson_cdfs = self.plot_fits_calculate_cdfs()
-                if self.make_summary_plot:
-                    self.mn_poisson_cdfs[index_] = mn_poisson_cdfs
-                    self.ind_poisson_cdfs[index_] = ind_poisson_cdfs
+                # Fall back to not correcting anything if data still too poor
+                # to draw any meaningful conclusions from.
+                m_sig, n_sig = 1, 0
+            m_sigs[index_] = m_sig
+            n_sigs[index_] = n_sig
+            mn_poisson_cdfs, ind_poisson_cdfs = self.plot_fits_calculate_cdfs()
             if self.make_summary_plot:
-                c = self.cols[index_ % len(self.cols)]
-                if np.sum([q[0] == -1 for q in self.pdfs]) <= len(self.pdfs)-5:
+                self.mn_poisson_cdfs[index_] = mn_poisson_cdfs
+                self.ind_poisson_cdfs[index_] = ind_poisson_cdfs
+                if np.sum(~self.skip_flags) > 0:
+                    c = self.cols[index_ % len(self.cols)]
                     plt.figure('single_sigsig')
                     self.ax_b_sing.errorbar(self.avg_sig[~self.skip_flags, 0],
                                             self.fit_sigs[~self.skip_flags, 1],
@@ -684,8 +681,8 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
                     self.ax_b_log_sing.errorbar(self.avg_sig[~self.skip_flags, 0],
                                                 self.fit_sigs[~self.skip_flags, 1],
                                                 linestyle='None', c=c, marker='x')
-                    self.ylims_sing[0] = min(self.ylims_sing[0], np.amin(self.fit_sigs[:, 1]))
-                    self.ylims_sing[1] = max(self.ylims_sing[1], np.amax(self.fit_sigs[:, 1]))
+                    self.ylims_sing[0] = min(self.ylims_sing[0], np.amin(self.fit_sigs[~self.skip_flags, 1]))
+                    self.ylims_sing[1] = max(self.ylims_sing[1], np.amax(self.fit_sigs[~self.skip_flags, 1]))
                 self.plot_snr_mag_sig()
 
         self.m_sigs, self.n_sigs = m_sigs, n_sigs
@@ -992,9 +989,10 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
             return np.sum((f - y)**2), np.array([np.sum(2 * (f - y) * i)
                                                  for i in [dfda, dfdb, dfdc]])
 
-        s = 10**(-1/2.5 * self.b[:, self.mag_indices[j]])
+        p = self.b[:, self.mag_unc_indices[j]] > 0
+        s = 10**(-1/2.5 * self.b[p, self.mag_indices[j]])
         # Based on m = -2.5 log(S), dm = |df dm/df|.
-        snr = 2.5 / np.log(10) / self.b[:, self.mag_unc_indices[j]]
+        snr = 2.5 / np.log(10) / self.b[p, self.mag_unc_indices[j]]
 
         q = ~np.isnan(s) & ~np.isnan(snr) & (snr > 2)
         s, snr = s[q], snr[q]
@@ -1344,11 +1342,17 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
 
         self.four_off_fw, self.four_off_ps = four_off_fw, four_off_ps
 
-    def create_auf_pdfs(self):
+    def create_auf_pdfs(self, min_hist_cut=100):
         """
         Using perturbation AUF simulations, generate probability density functions
         of perturbation distance for all cutout regions, as well as recording key
         statistics such as average magnitude or SNR.
+
+        Parameters
+        ----------
+        min_hist_cut : integer, optional
+            Number of data points in each magnitude-uncertainty slice to be
+            considered for fitting for scaling relations.
         """
         print('Creating catalogue AUF probability densities...')
         sys.stdout.flush()
@@ -1397,7 +1401,7 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
             else:
                 final_slice = sig_cut & mag_cut & n_cut & (self.dists <= 20*self.psfsig*sig)
             final_dists = self.dists[final_slice]
-            if len(final_dists) < 100:
+            if len(final_dists) < min_hist_cut:
                 skip_flags[i] = 1
                 pdfs.append([-1])
                 pdf_uncerts.append([-1])
@@ -1407,7 +1411,8 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
                 continue
 
             bm = b_matches[final_slice]
-            snr = 2.5 / np.log(10) / bm[:, self.mag_unc_indices[self.best_mag_index]]
+            p = bm[:, self.mag_unc_indices[self.best_mag_index]] > 0
+            snr = 2.5 / np.log(10) / bm[p, self.mag_unc_indices[self.best_mag_index]]
             avg_snr[i, 0] = np.median(snr)
             avg_snr[i, [1, 2]] = np.abs(np.percentile(snr, [16, 84]) - np.median(snr))
             avg_mag[i, 0] = np.median(bm[:, mag_ind])
@@ -1833,15 +1838,16 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
         """
         print("Plotting SNR-Magnitude-Uncertainty scaling relations...")
         sys.stdout.flush()
-        _snr = 2.5 / np.log(10) / self.b[:, self.mag_unc_indices[self.best_mag_index]]
+        p = self.b[:, self.mag_unc_indices[self.best_mag_index]] > 0
+        _snr = 2.5 / np.log(10) / self.b[p, self.mag_unc_indices[self.best_mag_index]]
         if not self.use_photometric_uncertainties:
-            obj_err = self.b[:, self.pos_and_err_indices[1][2]]
+            obj_err = self.b[p, self.pos_and_err_indices[1][2]]
         else:
             # Since we expect the astrometric/inverse-photometric-snr scaling to
             # be roughly a factor FWHM/(2 * sqrt(2 * ln(2))), i.e. the sigma of
             # a Gaussian-ish PSF, scale accordingly:
             obj_err = self.psfsig / _snr
-        obj_mag = self.b[:, self.mag_indices[self.best_mag_index]]
+        obj_mag = self.b[p, self.mag_indices[self.best_mag_index]]
 
         gs = self.make_gridspec('sig_vs_snr_vs_mag', 1, 3, 0.8, 6)
         ax = plt.subplot(gs[0])
@@ -1862,8 +1868,8 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
             log_ks = np.log10(seeing / (2 * np.sqrt(2 * np.log(2))))
             ax.plot(x, log_ks + x, ls, label=rf'seeing = {seeing:.1f} arcsec')
 
-        if np.sum([q[0] == -1 for q in self.pdfs]) <= len(self.pdfs)-5:
-            q = ~self.skip_flags
+        q = ~self.skip_flags
+        if np.sum(q) > 0:
             man_snr = self.avg_snr[q, 0]
             man_sig_quoted = self.avg_sig[q, 0]
             # Here we want the second column of fit_sigs, the individual
@@ -1890,14 +1896,15 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
             ax.set_ylabel(r'log10(Quoted uncertainty / arcsecond)')
 
         ax = plt.subplot(gs[1])
-        q = (obj_err < 1) & (_snr > 1) & (obj_err > 0)
+        q = (obj_err < 1) & (_snr > 1) & (obj_err > 0) & ~np.isnan(obj_mag)
         log_inv_snr = np.log10(1 / _snr[q])
         h, x, y = np.histogram2d(log_inv_snr, obj_mag[q], bins=(100, 101))
         ax.pcolormesh(x, y, h.T, edgecolors='face', cmap='viridis', rasterized=True)
         ylims = ax.get_ylim()
         xlims = ax.get_xlim()
-        if np.sum([q[0] == -1 for q in self.pdfs]) <= len(self.pdfs)-5:
-            q = ~self.skip_flags
+
+        q = ~self.skip_flags
+        if np.sum(q) > 0:
             man_snr = self.avg_snr[q, 0]
             man_mag = self.mag_array[q]
             man_log_inv_snr = np.log10(1/man_snr)
@@ -1920,7 +1927,7 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
 
         ax.set_xlim(*xlims)
         ax.set_ylim(*ylims)
-        if np.sum([q[0] == -1 for q in self.pdfs]) <= len(self.pdfs)-5:
+        if np.sum(q) > 0:
             ax.legend(fontsize=10)
         if usetex:
             ax.set_xlabel(r'$\log_{10}$(1 / SNR)')
@@ -1929,15 +1936,15 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
         ax.set_ylabel('Magnitude')
 
         ax = plt.subplot(gs[2])
-        q = (obj_err < 1) & (_snr > 1) & (obj_err > 0)
+        q = (obj_err < 1) & (_snr > 1) & (obj_err > 0) & ~np.isnan(obj_mag)
         log_err = np.log10(obj_err[q])
         h, x, y = np.histogram2d(obj_mag[q], log_err, bins=(100, 101))
         ax.pcolormesh(x, y, h.T, edgecolors='face', cmap='viridis', rasterized=True)
         ylims = ax.get_ylim()
         xlims = ax.get_xlim()
 
-        if np.sum([q[0] == -1 for q in self.pdfs]) <= len(self.pdfs)-5:
-            q = ~self.skip_flags
+        q = ~self.skip_flags
+        if np.sum(q) > 0:
             man_mag = self.mag_array[q]
             man_sig_quoted = self.avg_sig[q, 0]
             # Remember, individually fit not parameterisation.
@@ -1998,7 +2005,7 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
 
         gs = self.make_gridspec('fits_cdf', 1, 2, 0.8, 6)
         for i, (f, label) in enumerate(zip([self.mn_poisson_cdfs, self.ind_poisson_cdfs],
-                                           ['Hyper-Parameter', 'Individual'])):
+                                           ['HyperParameter', 'Individual'])):
             ax_d = plt.subplot(gs[i])
             for j, g in enumerate(f):
                 if g is None:
@@ -2018,7 +2025,7 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
                           true_hypothesis_cdf_dist[filter_log_nans], ls='None', c=c, marker='.')
                 ax_d.plot(np.log10(1 - true_hypothesis_cdf_dist), true_hypothesis_cdf_dist, 'r--')
             if usetex:
-                ax_d.set_xlabel(rf'$\log_{10}(1 - \mathrm{{{label} CDF}})$')
+                ax_d.set_xlabel(rf'$\log_{{10}}(1 - \mathrm{{{label} CDF}})$')
             else:
                 ax_d.set_xlabel(rf'log10(1 - {label} CDF)')
             ax_d.set_ylabel('Fraction')

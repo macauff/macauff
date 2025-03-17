@@ -194,8 +194,8 @@ def make_island_groupings(cm):
     print(f"{t} Rank {cm.rank}, chunk {cm.chunk_id}: Cleaning overlaps...")
     sys.stdout.flush()
 
-    ainds, asize, auf_cdf_a = _clean_overlaps(ainds, asize, auf_cdf_a, cm.n_pool)
-    binds, bsize, auf_cdf_b = _clean_overlaps(binds, bsize, auf_cdf_b, cm.n_pool)
+    ainds, asize, auf_cdf_a = _clean_overlaps(ainds, asize, auf_cdf_a, cm.n_pool, cm.chunk_id)
+    binds, bsize, auf_cdf_b = _clean_overlaps(binds, bsize, auf_cdf_b, cm.n_pool, cm.chunk_id)
 
     t = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     print(f"{t} Rank {cm.rank}, chunk {cm.chunk_id}: Calculating integral lengths...")
@@ -253,12 +253,12 @@ def make_island_groupings(cm):
     # look at whether any source has a sky separation of less than max_sep
     # from any of the four lines defining extent in orthogonal sky axes.
     counter = np.arange(0, alist.shape[1])
-    shared_a = SharedNumpyArray(a_full, 'a_full')
-    shared_b = SharedNumpyArray(b_full, 'b_full')
-    shared_alist = SharedNumpyArray(alist, 'alist')
-    shared_blist = SharedNumpyArray(blist, 'blist')
-    shared_agrplen = SharedNumpyArray(agrplen, 'agrplen')
-    shared_bgrplen = SharedNumpyArray(bgrplen, 'bgrplen')
+    shared_a = SharedNumpyArray(a_full, f'a_full_{cm.chunk_id}')
+    shared_b = SharedNumpyArray(b_full, f'b_full_{cm.chunk_id}')
+    shared_alist = SharedNumpyArray(alist, f'alist_{cm.chunk_id}')
+    shared_blist = SharedNumpyArray(blist, f'blis_{cm.chunk_id}t')
+    shared_agrplen = SharedNumpyArray(agrplen, f'agrplen_{cm.chunk_id}')
+    shared_bgrplen = SharedNumpyArray(bgrplen, f'bgrplen_{cm.chunk_id}')
     expand_constants = [itertools.repeat(item) for item in [
         shared_a, shared_b, shared_alist, shared_blist, shared_agrplen, shared_bgrplen,
         cm.cross_match_extent, max_sep]]
@@ -402,7 +402,7 @@ def _load_fourier_grid_cutouts(a, sky_rect_coords, perturb_auf_outputs, padding,
     return a_cutout, fouriergrid, modrefindsmall, sky_cut
 
 
-def _clean_overlaps(inds, size, cdf, n_pool):
+def _clean_overlaps(inds, size, cdf, n_pool, n_mem):
     '''
     Convenience function to parse either catalogue's indices array for
     duplicate references to the opposing array on a per-source basis,
@@ -422,6 +422,8 @@ def _clean_overlaps(inds, size, cdf, n_pool):
         between objects based on sky position, position precision, etc.
     n_pool : integer
         Number of multiprocessing threads to use.
+    n_mem : integer
+        Unique value, used to ensure shared-memory operations do not clash.
 
     Returns
     -------
@@ -437,7 +439,11 @@ def _clean_overlaps(inds, size, cdf, n_pool):
     maxsize = 0
     size[:] = 0
     counter = np.arange(0, inds.shape[1])
-    iter_group = zip(counter, itertools.repeat(inds), itertools.repeat(cdf))
+
+    shared_inds = SharedNumpyArray(inds, f'inds_{n_mem}')
+    shared_cdf = SharedNumpyArray(cdf, f'cdf_{n_mem}')
+
+    iter_group = zip(counter, itertools.repeat(shared_inds), itertools.repeat(shared_cdf))
     with multiprocessing.Pool(n_pool) as pool:
         for return_items in pool.imap_unordered(_calc_unique_inds, iter_group,
                                                 chunksize=max(1, len(counter) // n_pool)):
@@ -452,6 +458,9 @@ def _clean_overlaps(inds, size, cdf, n_pool):
 
     pool.join()
 
+    for _shared in [shared_inds, shared_cdf]:
+        _shared.unlink()
+
     inds = np.asfortranarray(inds[:maxsize, :])
     cdf = np.asfortranarray(cdf[:maxsize, :])
 
@@ -460,8 +469,8 @@ def _clean_overlaps(inds, size, cdf, n_pool):
 
 def _calc_unique_inds(iterable):
     i, inds, cdf = iterable
-    x, inds_for_x = np.unique(inds[inds[:, i] > -1, i], return_index=True)
-    return i, x, cdf[inds[:, i] > -1, i][inds_for_x]
+    x, inds_for_x = np.unique(inds.read()[inds.read()[:, i] > -1, i], return_index=True)
+    return i, x, cdf.read()[inds.read()[:, i] > -1, i][inds_for_x]
 
 
 def _distance_check(iterable):

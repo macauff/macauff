@@ -114,7 +114,7 @@ def make_perturb_aufs(cm, which_cat):
                                                 auf_points[:, 0], auf_points[:, 1])
 
     t = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    print(f'{t} Rank {cm.rank}, chunk {cm.chunk_id}: Creating empirical perturbation AUFs for '
+    print(f'{t} Rank {cm.rank}, chunk {cm.chunk_id}: Creating empirical perturbation AUF PDFs for '
           f'catalogue "{which_cat}"...')
     sys.stdout.flush()
 
