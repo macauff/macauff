@@ -7,8 +7,13 @@ framework.
 from multiprocessing import shared_memory
 
 import numpy as np
+
+from astropy.coordinates import SkyCoord
 from scipy.optimize import minimize
-from scipy.spatial import ConvexHull
+from scipy.spatial import ConvexHull  # pylint: disable=no-name-in-module
+
+from macauff.get_trilegal_wrapper import get_av_infinity
+
 
 __all__ = []
 
@@ -395,7 +400,7 @@ def find_model_counts_corrections(data_loghist, data_dloghist, data_bin_mids, tr
     return res.x
 
 
-def convex_hull_area(x, y):
+def convex_hull_area(x, y, return_hull=False):
     """
     Function to calculate the convex hull vertices and the area enclosed by
     those verticies.
@@ -406,6 +411,9 @@ def convex_hull_area(x, y):
         Coordinates in the longitudinal, or RA, sky axis, in degrees.
     y : list or numpy.ndarray
         Latitudinal, or Declination, sky axis coordinates, in degrees.
+    return_hull : boolean, optional
+        Boolean flag indicating whether to return the coordinates of the points
+        defining the convex hull, or just return the area.
 
     Returns
     -------
@@ -420,10 +428,12 @@ def convex_hull_area(x, y):
     new_x = x + x_shift
     new_x[new_x > 360] = new_x[new_x > 360] - 360
     new_x[new_x < 0] = new_x[new_x < 0] + 360
-    new_x *= np.cos(np.radians(y))
-    hull = ConvexHull(np.array([new_x, y]).T)
-    area = shoelace_formula_area(new_x[hull.vertices], y[hull.vertices])
+    new_x_cosd = new_x * np.cos(np.radians(y))
+    hull = ConvexHull(np.array([new_x_cosd, y]).T)
+    area = shoelace_formula_area(new_x_cosd[hull.vertices], y[hull.vertices])
 
+    if return_hull:
+        return area, np.array([new_x[hull.vertices], y[hull.vertices]]).T, x_shift
     return area
 
 
@@ -448,6 +458,109 @@ def shoelace_formula_area(x, y):
     area = abs(0.5 * np.array(np.dot(x, np.roll(y, 1)) - np.dot(y, np.roll(x, 1))))
 
     return area
+
+
+def generate_avs_inside_hull(ax1_min, ax1_max, ax2_min, ax2_max, hull_points, hull_x_shift, coord_system):
+    """
+    Sample V-band exctinction across an arbitrarily-shaped region, using points
+    the area's convex hull.
+
+    Parameters
+    ----------
+    ax1_min : float
+        Smallest longitudinal coordinate of the bounding box around the region.
+    ax1_max : float
+        Largest longitudinal coordinate of the bounding box around the region.
+    ax2_min : float
+        Smallest latitudinal coordinate of the bounding box around the region.
+    ax2_max : float
+        Largest latitudinal coordinate of the bounding box around the region.
+    hull_points : numpy.ndarray
+        Array of shape ``(N, 2)`` of the coordinates defining the region's
+        external region as a set of coordinate polygons, following
+        `~macauff.convex_hull_area`.
+    hull_x_shift : float
+        The longitudinal shift in coordinates used by the hull to avoid 0-360
+        degree wraparound issues.
+    coord_system : string, "equatorial" or "galactic"
+        Frame in which the coordinates are defined, used to sample the on-sky
+        V-band extinction in the right coordinate system.
+
+    Returns
+    -------
+    avs : numpy.ndarray
+        V-band extinctions within the convex region, sampled sufficiently highly
+        to give good differential extinction measurements.
+    """
+    not_enough_points = True
+    n_dim = 7
+    while not_enough_points:
+        ax1s = np.linspace(ax1_min, ax1_max, n_dim)
+        ax2s = np.linspace(ax2_min, ax2_max, n_dim)
+        ax1s, ax2s = np.meshgrid(ax1s, ax2s, indexing='xy')
+        ax1s, ax2s = ax1s.flatten(), ax2s.flatten()
+        points_in_area = np.array([coord_inside_convex_hull(
+            [ax1 + hull_x_shift, ax2], hull_points) for ax1, ax2 in zip(ax1s, ax2s)])
+        if np.sum(points_in_area) >= 30:
+            not_enough_points = False
+        else:
+            n_dim += 1
+        ax1s, ax2s = ax1s[points_in_area], ax2s[points_in_area]
+
+    avs = np.empty(len(ax1s), float)
+    for j, (ax1, ax2) in enumerate(zip(ax1s, ax2s)):
+        if coord_system == 'equatorial':
+            c = SkyCoord(ra=ax1, dec=ax2, unit='deg', frame='icrs')
+            l, b = c.galactic.l.degree, c.galactic.b.degree
+        else:
+            l, b = ax1, ax2
+        av = get_av_infinity(l, b, frame='galactic')[0]
+        avs[j] = av
+
+    return avs
+
+
+def coord_inside_convex_hull(p, hull):
+    """
+    Given a set of convex hull points from `~macauff.convex_hull_area`, determine
+    if a single coordinate is within or outside the area defined by the points,
+    using the sum of the oriented angles between the point and each set of
+    neighbouring hull coordinates.
+
+    Parameters
+    ----------
+    p : list or numpy.ndarray
+        The coordinates of the point to determine the location of. Should be a
+        two-element list or array, first longitudinal then latitudinal
+        coordinates.
+    hull : numpy.ndarray
+        Array of hull points, from `~macauff.convex_hull_area`. Should be shape
+        ``(N, 2)``, with pairs of longitudinal coordinates in the first element
+        of the second axis and latitudinal points in the second element.
+
+    Returns
+    -------
+    boolean
+        ``True`` if ``p`` is inside the ``hull`` polygon, ``False`` otherwise.
+
+    Notes
+    -----
+    As ``hull`` returns from `~macauff.convex_hull_area` with an ``x_shift``
+    translation to avoid 0-360 degree wraparound effects, the same shift must
+    be applied to ``p`` prior to passing to this function.
+    """
+    hull = np.vstack((hull, hull[0]))
+    i, j = np.arange(len(hull)-1), np.arange(1, len(hull))
+    x1, y1 = hull[i, 0] - p[0], hull[i, 1] - p[1]
+    x2, y2 = hull[j, 0] - p[0], hull[j, 1] - p[1]
+
+    dot_prod, cross_prod = x1*x2 + y1*y2, x1*y2 - x2*y1
+    theta = np.arctan2(cross_prod, dot_prod)
+    sum_of_angles = np.abs(np.sum(theta))
+
+    if sum_of_angles < np.pi:
+        return False
+    return True
 
 
 class SharedNumpyArray:

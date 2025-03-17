@@ -33,8 +33,11 @@ if usetex:
 
 # pylint: disable=wrong-import-position,import-error,no-name-in-module
 from macauff.galaxy_counts import create_galaxy_counts
-from macauff.get_trilegal_wrapper import get_av_infinity
-from macauff.misc_functions import convex_hull_area, find_model_counts_corrections, min_max_lon
+from macauff.misc_functions import (
+    convex_hull_area,
+    find_model_counts_corrections,
+    generate_avs_inside_hull,
+    min_max_lon)
 from macauff.misc_functions_fortran import misc_functions_fortran as mff
 from macauff.perturbation_auf import (
     _calculate_magnitude_offsets,
@@ -606,11 +609,11 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
             sys.stdout.flush()
 
             if self.coord_or_chunk == 'coord':
-                ax1_mid, ax2_mid, ax1_min, ax1_max, ax2_min, ax2_max = list_of_things
+                ax1_mid, ax2_mid, _, _, _, _ = list_of_things
                 cat_args = (ax1_mid, ax2_mid)
                 file_name = f'{ax1_mid}_{ax2_mid}'
             else:
-                ax1_mid, ax2_mid, ax1_min, ax1_max, ax2_min, ax2_max, chunk = list_of_things
+                ax1_mid, ax2_mid, _, _, _, _, chunk = list_of_things
                 cat_args = (chunk,)
                 file_name = f'{chunk}'
             self.list_of_things = list_of_things
@@ -626,7 +629,8 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
                 self.a = self.load_catalogue('a', self.cat_args)
                 self.b = self.load_catalogue('b', self.cat_args)
 
-            self.area = convex_hull_area(self.b[:, 0], self.b[:, 1])
+            self.area, self.hull_points, self.hull_x_shift = convex_hull_area(
+                self.b[:, 0], self.b[:, 1], return_hull=True)
 
             if self.single_or_repeat == 'repeat':
                 # Divide the density through by the number of repeat visits,
@@ -1107,19 +1111,8 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
             os.system(f'mv {self.trifolder}/trilegal_auf_simulation.dat '
                       f'{self.trifolder}/{self.triname.format(ax1_mid, ax2_mid)}_faint.dat')
 
-        ax1s = np.linspace(ax1_min, ax1_max, 7)
-        ax2s = np.linspace(ax2_min, ax2_max, 7)
-        avs = np.empty((len(ax1s), len(ax2s)), float)
-        for j, ax1 in enumerate(ax1s):
-            for k, ax2 in enumerate(ax2s):
-                if self.coord_system == 'equatorial':
-                    c = SkyCoord(ra=ax1, dec=ax2, unit='deg', frame='icrs')
-                    l, b = c.galactic.l.degree, c.galactic.b.degree
-                else:
-                    l, b = ax1, ax2
-                av = get_av_infinity(l, b, frame='galactic')[0]
-                avs[j, k] = av
-        avs = avs.flatten()
+        avs = generate_avs_inside_hull(
+            ax1_min, ax1_max, ax2_min, ax2_max, self.hull_points, self.hull_x_shift, self.coord_system)
 
         if self.trifolder is not None:
             tri_hist, tri_mags, _, dtri_mags, tri_uncert, _ = make_tri_counts(
@@ -1178,11 +1171,6 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
         gs = self.make_gridspec('123123', 1, 1, 0.8, 5)
         print('Plotting data and model counts...')
         sys.stdout.flush()
-
-        if self.coord_or_chunk == 'coord':
-            _, _, ax1_min, ax1_max, ax2_min, ax2_max = self.list_of_things
-        else:
-            _, _, ax1_min, ax1_max, ax2_min, ax2_max, _ = self.list_of_things
 
         mag_ind = self.mag_indices[self.best_mag_index]
         data_mags = self.b[~np.isnan(self.b[:, mag_ind]), mag_ind]
@@ -1474,14 +1462,9 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
                 new_sig = m * sig_orig + n
             self.fit_sigs[i, 0] = new_sig
 
-            if self.coord_or_chunk == 'coord':
-                _, _, ax1_min, ax1_max, ax2_min, ax2_max = self.list_of_things
-            else:
-                _, _, ax1_min, ax1_max, ax2_min, ax2_max, _ = self.list_of_things
             (y, q, bins, sig, snr, num) = (pdf, self.q_pdfs[i], self.pdf_bins[i],
                                            self.avg_sig[i, 0], self.avg_snr[i, 0], self.nums[i])
-            res = minimize(self.calc_single_joint_auf, x0=[sig],
-                           args=(i, ax1_min, ax1_max, ax2_min, ax2_max, bins, y, q, num, snr),
+            res = minimize(self.calc_single_joint_auf, x0=[sig], args=(i, bins, y, q, num, snr),
                            method='L-BFGS-B', options={'ftol': 1e-9}, bounds=[(0, None)])
 
             self.fit_sigs[i, 1] = res.x[0]
@@ -1505,10 +1488,6 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
             Negative-log-likelihood of the fit, to be minimised in the wrapping
             function call.
         """
-        if self.coord_or_chunk == 'coord':
-            _, _, ax1_min, ax1_max, ax2_min, ax2_max = self.list_of_things
-        else:
-            _, _, ax1_min, ax1_max, ax2_min, ax2_max, _ = self.list_of_things
         m, n = p
 
         neg_log_like = 0
@@ -1523,12 +1502,11 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
             else:
                 o = m * sig + n
 
-            neg_log_like += self.calc_single_joint_auf(o, i, ax1_min, ax1_max, ax2_min, ax2_max, bins,
-                                                       y, q, num, snr)
+            neg_log_like += self.calc_single_joint_auf(o, i, bins, y, q, num, snr)
 
         return neg_log_like
 
-    def calc_single_joint_auf(self, o, i, ax1_min, ax1_max, ax2_min, ax2_max, bins, y, q, num, snr):
+    def calc_single_joint_auf(self, o, i, bins, y, q, num, snr):
         """
         Calculates the negative-log-likelihood of a single magnitude slice of
         match separations as fit with an AUF.
@@ -1539,18 +1517,6 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
             The Gaussian uncertainty of the centroid component of the AUF.
         i : int
             Index to access particular magnitude slice.
-        ax1_min : float
-            Minimum of the first orthogonal sky axis, used to calculate
-            rectangular sky area.
-        ax1_max : float
-            Maximum of the first orthogonal sky axis, used to calculate
-            rectangular sky area.
-        ax2_min : float
-            Minimum of the second orthogonal sky axis, used to calculate
-            rectangular sky area.
-        ax2_max : float
-            Maximum of the second orthogonal sky axis, used to calculate
-            rectangular sky area.
         bins : numpy.ndarray
             Array of floats, bin edges of histogram of cross-match distances.
         y : numpy.ndarray
@@ -1657,10 +1623,6 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
         Calculate poisson CDFs and create verification plots showing the
         quality of the fits.
         """
-        if self.coord_or_chunk == 'coord':
-            _, _, ax1_min, ax1_max, ax2_min, ax2_max = self.list_of_things
-        else:
-            _, _, ax1_min, ax1_max, ax2_min, ax2_max, _ = self.list_of_things
         mn_poisson_cdfs = np.array([], float)
         ind_poisson_cdfs = np.array([], float)
 

@@ -10,10 +10,13 @@ from numpy.testing import assert_allclose
 from scipy.stats import binned_statistic
 
 # pylint: disable=import-error,no-name-in-module
+from macauff.get_trilegal_wrapper import get_av_infinity
 from macauff.misc_functions import (
     _load_rectangular_slice,
     convex_hull_area,
+    coord_inside_convex_hull,
     create_auf_params_grid,
+    generate_avs_inside_hull,
     hav_dist_constant_lat,
     load_small_ref_auf_grid,
     min_max_lon,
@@ -164,49 +167,114 @@ def test_min_max_lon():
 @pytest.mark.parametrize("shape", ["circle", "rectangle"])
 @pytest.mark.parametrize("overlay_origin", [False, "-1", "359"])
 @pytest.mark.parametrize("high_lat", [True, False])
-def test_convex_hull_area(shape, overlay_origin, high_lat):
-    rng = np.random.default_rng(seed=565674123457)
-    x = rng.uniform(3, 7, size=300000)
-    y = rng.uniform(-2, 1, size=300000)
-    if high_lat:
-        y += 70
-    if overlay_origin in ("-1", "359"):
-        x -= 4
-    if overlay_origin == "359":
-        x[x < 0] = x[x < 0] + 360
-    if high_lat:
-        y_mid = -0.5 + 70
-    else:
-        y_mid = -0.5
-    if overlay_origin in ("-1", "359"):
-        x_mid = 0.5
-    else:
-        x_mid = 4.5
-
-    R = 1.5
-
-    if shape == "circle":
-        q = np.array([mff.haversine_wrapper(a, x_mid, b, y_mid) for a, b in zip(x, y)]) <= R
-        x, y = x[q], y[q]
-    hull_area = convex_hull_area(x, y)
-
-    ax1_min, ax1_max = min_max_lon(x)
-    ax2_min = np.amin(y)
-    ax2_max = np.amax(y)
-    if shape == "rectangle":
-        fake_area = (ax1_max - ax1_min) * (
-            np.sin(np.radians(ax2_max)) - np.sin(np.radians(ax2_min))) * 180/np.pi
-    else:
-        y_bins = np.linspace(-2, 1, 100)
-        dys = np.diff(y_bins)
+class TestConvexHull:
+    def generate_points(self, shape, overlay_origin, high_lat):
+        self.rng = np.random.default_rng(seed=6723486457)
+        self.x = self.rng.uniform(3, 13, size=300000)
+        self.y = self.rng.uniform(-2, 1, size=300000)
         if high_lat:
-            y_bins += 70
+            self.y += 70
+        if overlay_origin in ("-1", "359"):
+            self.x -= 4
         if overlay_origin == "359":
-            x[x > 180] = x[x > 180] - 360
-        min_xs, _, _ = binned_statistic(y, x, statistic='min', bins=y_bins)
-        max_xs, _, _ = binned_statistic(y, x, statistic='max', bins=y_bins)
-        fake_area = 0
-        for y, dy, min_x, max_x in zip(0.5*(y_bins[1:]+y_bins[:-1]), dys, min_xs, max_xs):
-            fake_area += (max_x - min_x) * np.cos(np.radians(y)) * dy
+            self.x[self.x < 0] = self.x[self.x < 0] + 360
+        if high_lat:
+            self.y_mid = -0.5 + 70
+        else:
+            self.y_mid = -0.5
+        if overlay_origin in ("-1", "359"):
+            self.x_mid = 4
+        else:
+            self.x_mid = 8
 
-    assert_allclose(hull_area, fake_area, rtol=0.01)
+        self.r = 1.5
+
+        if shape == "circle":
+            q = np.array([mff.haversine_wrapper(a, self.x_mid, b, self.y_mid) for a, b in
+                          zip(self.x, self.y)]) <= self.r
+            self.x, self.y = self.x[q], self.y[q]
+
+    def test_convex_hull_area(self, shape, overlay_origin, high_lat):
+        self.generate_points(shape, overlay_origin, high_lat)
+        hull_area = convex_hull_area(self.x, self.y)
+
+        ax1_min, ax1_max = min_max_lon(self.x)
+        ax2_min = np.amin(self.y)
+        ax2_max = np.amax(self.y)
+        if shape == "rectangle":
+            fake_area = (ax1_max - ax1_min) * (
+                np.sin(np.radians(ax2_max)) - np.sin(np.radians(ax2_min))) * 180/np.pi
+        else:
+            y_bins = np.linspace(-2, 1, 100)
+            dys = np.diff(y_bins)
+            if high_lat:
+                y_bins += 70
+            if overlay_origin == "359":
+                self.x[self.x > 180] = self.x[self.x > 180] - 360
+            min_xs, _, _ = binned_statistic(self.y, self.x, statistic='min', bins=y_bins)
+            max_xs, _, _ = binned_statistic(self.y, self.x, statistic='max', bins=y_bins)
+            fake_area = 0
+            for y, dy, min_x, max_x in zip(0.5*(y_bins[1:]+y_bins[:-1]), dys, min_xs, max_xs):
+                fake_area += (max_x - min_x) * np.cos(np.radians(y)) * dy
+
+        assert_allclose(hull_area, fake_area, rtol=0.01)
+
+    def test_coord_in_convex_hull(self, shape, overlay_origin, high_lat):
+        self.generate_points(shape, overlay_origin, high_lat)
+        _, hull_points, x_shift = convex_hull_area(self.x, self.y, return_hull=True)
+
+        ax1_min, ax1_max = min_max_lon(self.x)
+        ax2_min = np.amin(self.y)
+        ax2_max = np.amax(self.y)
+        points_x = self.rng.uniform(ax1_min-0.5, ax1_max+0.5, size=1000)
+        points_y = self.rng.uniform(ax2_min-0.5, ax2_max+0.5, size=1000)
+        for point_x, point_y in zip(points_x, points_y):
+            if shape == "circle":
+                point_dist = mff.haversine_wrapper(point_x, self.x_mid, point_y, self.y_mid)
+                if self.r*0.998 <= point_dist <= self.r*1.002:
+                    # Polygon precision means we can't verify points that lie
+                    # close to the circle edge, as the true distance isn't
+                    # an accurate measure of the polygon inside/outside.
+                    continue
+            inside = coord_inside_convex_hull([point_x + x_shift, point_y], hull_points)
+            if shape == "circle":
+                true_inside = point_dist <= self.r
+            else:
+                true_inside = ((point_x <= ax1_max) & (point_x >= ax1_min) &
+                               (point_y <= ax2_max) & (point_y >= ax2_min))
+
+            assert inside == true_inside
+
+    def test_generate_avs_inside_hull(self, shape, overlay_origin, high_lat):
+        self.generate_points(shape, overlay_origin, high_lat)
+        _, hull_points, x_shift = convex_hull_area(self.x, self.y, return_hull=True)
+
+        ax1_min, ax1_max = min_max_lon(self.x)
+        ax2_min = np.amin(self.y)
+        ax2_max = np.amax(self.y)
+
+        avs = generate_avs_inside_hull(ax1_min - 2, ax1_max + 2, ax2_min - 2, ax2_max + 2, hull_points,
+                                       x_shift, 'galactic')
+
+        assert len(avs) >= 30
+
+        n_dim = 7
+        while True:
+            ax1s = np.linspace(ax1_min - 2, ax1_max + 2, n_dim)
+            ax2s = np.linspace(ax2_min - 2, ax2_max + 2, n_dim)
+            ax1s, ax2s = np.meshgrid(ax1s, ax2s, indexing='xy')
+            ax1s, ax2s = ax1s.flatten(), ax2s.flatten()
+            # Basically just reproduce the code in generate_avs_inside_hull,
+            # except this bit where we use the known "inside" flags.
+            if shape == "circle":
+                check = np.array([mff.haversine_wrapper(a, self.x_mid, b, self.y_mid) <= self.r for
+                                  a, b in zip(ax1s, ax2s)])
+            else:
+                check = np.array([(a >= ax1_min) & (a <= ax1_max) & (b >= ax2_min) & (b <= ax2_max)
+                                  for a, b in zip(ax1s, ax2s)])
+            if np.sum(check) >= 30:
+                break
+            n_dim += 1
+        ax1s, ax2s = ax1s[check], ax2s[check]
+        other_avs = np.array([get_av_infinity(ax1, ax2, frame='galactic')[0] for ax1, ax2 in zip(ax1s, ax2s)])
+        assert_allclose(avs, other_avs, rtol=0.01)

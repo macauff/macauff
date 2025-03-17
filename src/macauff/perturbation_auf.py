@@ -15,16 +15,16 @@ import timeit
 
 import numpy as np
 import requests
-from astropy.coordinates import SkyCoord
 
 # pylint: disable=import-error,no-name-in-module
 from macauff.galaxy_counts import create_galaxy_counts
-from macauff.get_trilegal_wrapper import get_av_infinity, get_trilegal
+from macauff.get_trilegal_wrapper import get_trilegal
 from macauff.misc_functions import (
     _load_rectangular_slice,
     convex_hull_area,
     create_auf_params_grid,
     find_model_counts_corrections,
+    generate_avs_inside_hull,
     min_max_lon,
 )
 from macauff.misc_functions_fortran import misc_functions_fortran as mff
@@ -156,15 +156,22 @@ def make_perturb_aufs(cm, which_cat):
                     # TODO: relax half-mag cut, make input parameter  pylint: disable=fixme
                     dens_mags[j] = (bins[:-1]+np.diff(bins)/2)[np.argmax(hist)] - 0.5
 
+                # Calculate the area of the current patch, assuming it is
+                # sufficiently convex to be defineable by its convex hull.
+                sky_area, hull_points, hull_x_shift = convex_hull_area(
+                    a_astro_cut[:, 0], a_astro_cut[:, 1], return_hull=True)
+
+                # Also, before beginning the loop of filters, sample the V-band
+                # extinction across the region.
+                avs = generate_avs_inside_hull(ax1_min, ax1_max, ax2_min, ax2_max, hull_points,
+                                               hull_x_shift, auf_region_frame)
+
         # If there are no sources in this entire section of sky, we don't need
         # to bother downloading any TRILEGAL simulations since we'll auto-fill
         # dummy data (and never use it) in the filter loop.
         if auf_folder is not None and cm.include_perturb_auf and len(a_astro_cut) > 0 and (
                 # pylint: disable-next=possibly-used-before-assignment
                 tri_download_flag or not os.path.isfile(f'{ax_folder}/trilegal_auf_simulation_faint.dat')):
-            # Calculate the area of the current patch, assuming it is
-            # sufficiently convex to be defineable by its convex hull.
-            sky_area = convex_hull_area(a_astro_cut[:, 0], a_astro_cut[:, 1])
 
             data_bright_dens = np.array([np.sum(~np.isnan(a_photo_cut[:, q]) &
                                          (a_photo_cut[:, q] <= dens_mags[q])) / sky_area
@@ -222,14 +229,10 @@ def make_perturb_aufs(cm, which_cat):
                 for ii, ind_slice in enumerate(index_slice):
                     local_n[ind_slice, j] = localn[ii]
                 if fit_gal_flag:
-                    sky_area = convex_hull_area(a_astro_cut[:, 0], a_astro_cut[:, 1])
-                ax1_list = np.linspace(ax1_min, ax1_max, 7)
-                ax2_list = np.linspace(ax2_min, ax2_max, 7)
-                if fit_gal_flag:
                     single_perturb_auf_output = create_single_perturb_auf(
                         auf_points[i], cm.r, cm.dr, cm.j0s, num_trials, psf_fwhms[j], dens_mags[j], a_photo,
                         localn, d_mag, delta_mag_cuts, dd_params, l_cut, run_fw, run_psf, snr_mag_params[j],
-                        al_avs[j], auf_region_frame, ax1_list, ax2_list, fit_gal_flag, sky_area,
+                        al_avs[j], avs, fit_gal_flag, sky_area,
                         saturation_magnitudes[j], cmau_array, wavs[j], z_maxs[j], nzs[j], alpha0, alpha1,
                         alpha_weight, ab_offsets[j], filter_names[j], tri_folder=ax_folder,
                         filt_header=tri_filt_names[j], dens_hist_tri=dens_hist_tri[j],
@@ -240,7 +243,7 @@ def make_perturb_aufs(cm, which_cat):
                     single_perturb_auf_output = create_single_perturb_auf(
                         auf_points[i], cm.r, cm.dr, cm.j0s, num_trials, psf_fwhms[j], dens_mags[j], a_photo,
                         localn, d_mag, delta_mag_cuts, dd_params, l_cut, run_fw, run_psf, snr_mag_params[j],
-                        al_avs[j], auf_region_frame, ax1_list, ax2_list, fit_gal_flag, tri_folder=ax_folder,
+                        al_avs[j], avs, fit_gal_flag, tri_folder=ax_folder,
                         filt_header=tri_filt_names[j], dens_hist_tri=dens_hist_tri[j],
                         model_mags=tri_model_mags[j], model_mag_mids=tri_model_mag_mids[j],
                         model_mags_interval=tri_model_mags_interval[j],
@@ -605,11 +608,11 @@ def calculate_local_density(a_astro, a_tot_astro, a_tot_photo, density_radius, d
 # pylint: disable=too-many-locals,too-many-arguments,too-many-statements,too-many-positional-arguments
 def create_single_perturb_auf(auf_point, r, dr, j0s, num_trials, psf_fwhm, density_mag, a_photo, localn,
                               d_mag, mag_cut, dd_params, l_cut, run_fw, run_psf, snr_mag_params, al_av,
-                              region_frame, ax1s, ax2s, fit_gal_flag, rect_area=None,
-                              saturation_magnitude=None, cmau_array=None, wav=None, z_max=None, nz=None,
-                              alpha0=None, alpha1=None, alpha_weight=None, ab_offset=None, filter_name=None,
-                              tri_folder=None, filt_header=None, dens_hist_tri=None, model_mags=None,
-                              model_mag_mids=None, model_mags_interval=None, n_bright_sources_star=None):
+                              avs, fit_gal_flag, sky_area=None, saturation_magnitude=None, cmau_array=None,
+                              wav=None, z_max=None, nz=None, alpha0=None, alpha1=None, alpha_weight=None,
+                              ab_offset=None, filter_name=None, tri_folder=None, filt_header=None,
+                              dens_hist_tri=None, model_mags=None, model_mag_mids=None,
+                              model_mags_interval=None, n_bright_sources_star=None):
     r'''
     Creates the associated parameters for describing a single perturbation AUF
     component, for a single sky position.
@@ -663,19 +666,13 @@ def create_single_perturb_auf(auf_point, r, dr, j0s, num_trials, psf_fwhm, densi
         sightlines for this particular filter.
     al_av : float
         Reddening vector for the filter, :math:`\frac{A_\lambda}{A_V}`.
-    region_frame : string
-        Indicator as to whether we are in ``equatorial`` or ``galactic``
-        coordinates.
-    ax1s : list or numpy.ndarray of floats
-        The unique longitudinal coordinates which, when combined with ``ax1s``,
-        form a rectangular grid of extinctions to sample for model counts.
-    ax2s : list or numpy.ndarray of floats
-        Unique latitudinal coordinates to combine with ``ax1s`` for individual
-        ra-dec or l-b pairings for which to simulate extinction-at-infinity.
+    avs : list or numpy.ndarray of floats
+        Sampling of V-band extinctions from within the region for which we wish
+        to define the AUF perturbation components.
     fit_gal_flag : bool
         Flag to indicate whether to simulate galaxy counts for the purposes of
         simulating the perturbation component of the AUF.
-    rect_area : float, optional
+    sky_area : float, optional
         Area of the region in question, in square degrees. Required if
         ``fit_gal_flag`` is ``True``.
     saturation_magnitude : float, optional
@@ -753,18 +750,6 @@ def create_single_perturb_auf(auf_point, r, dr, j0s, num_trials, psf_fwhm, densi
     # TODO: extend to allow a Galactic source model that doesn't depend on TRILEGAL  pylint: disable=fixme
     if tri_folder is not None:
         tri_name = 'trilegal_auf_simulation'
-    avs = np.empty((len(ax1s), len(ax2s)), float)
-    for j, ax1 in enumerate(ax1s):
-        for k, ax2 in enumerate(ax2s):
-            if region_frame == 'equatorial':
-                c = SkyCoord(ra=ax1, dec=ax2, unit='deg', frame='icrs')
-                l, b = c.galactic.l.degree, c.galactic.b.degree
-            else:
-                l, b = ax1, ax2
-            av = get_av_infinity(l, b, frame='galactic')[0]
-            avs[j, k] = av
-    avs = avs.flatten()
-    if tri_folder is not None:
         (dens_hist_tri, model_mags, model_mag_mids, model_mags_interval, _,
          n_bright_sources_star) = make_tri_counts(
             tri_folder, tri_name, filt_header, d_mag, np.amin(a_photo), density_mag, al_av=al_av,
@@ -808,8 +793,8 @@ def create_single_perturb_auf(auf_point, r, dr, j0s, num_trials, psf_fwhm, densi
         data_dbins = np.diff(_data_bins)[d_hc]
         data_bins = _data_bins[d_hc]
 
-        data_uncert = np.sqrt(data_hist) / data_dbins / rect_area
-        data_hist = data_hist / data_dbins / rect_area
+        data_uncert = np.sqrt(data_hist) / data_dbins / sky_area
+        data_hist = data_hist / data_dbins / sky_area
         data_loghist = np.log10(data_hist)
         data_dloghist = 1/np.log(10) * data_uncert / data_hist
 
