@@ -4,12 +4,15 @@ Tests for the "misc_functions" module.
 '''
 
 import numpy as np
+import pytest
 import scipy.special
 from numpy.testing import assert_allclose
+from scipy.stats import binned_statistic
 
 # pylint: disable=import-error,no-name-in-module
 from macauff.misc_functions import (
     _load_rectangular_slice,
+    convex_hull_area,
     create_auf_params_grid,
     hav_dist_constant_lat,
     load_small_ref_auf_grid,
@@ -156,3 +159,54 @@ def test_min_max_lon():
             min_n, max_n = min_lon - 360, max_lon
         new_min_lon, new_max_lon = min_max_lon(a)
         assert_allclose([new_min_lon, new_max_lon], [min_n, max_n], rtol=0.01)
+
+
+@pytest.mark.parametrize("shape", ["circle", "rectangle"])
+@pytest.mark.parametrize("overlay_origin", [False, "-1", "359"])
+@pytest.mark.parametrize("high_lat", [True, False])
+def test_convex_hull_area(shape, overlay_origin, high_lat):
+    rng = np.random.default_rng(seed=565674123457)
+    x = rng.uniform(3, 7, size=300000)
+    y = rng.uniform(-2, 1, size=300000)
+    if high_lat:
+        y += 70
+    if overlay_origin in ("-1", "359"):
+        x -= 4
+    if overlay_origin == "359":
+        x[x < 0] = x[x < 0] + 360
+    if high_lat:
+        y_mid = -0.5 + 70
+    else:
+        y_mid = -0.5
+    if overlay_origin in ("-1", "359"):
+        x_mid = 0.5
+    else:
+        x_mid = 4.5
+
+    R = 1.5
+
+    if shape == "circle":
+        q = np.array([mff.haversine_wrapper(a, x_mid, b, y_mid) for a, b in zip(x, y)]) <= R
+        x, y = x[q], y[q]
+    hull_area = convex_hull_area(x, y)
+
+    ax1_min, ax1_max = min_max_lon(x)
+    ax2_min = np.amin(y)
+    ax2_max = np.amax(y)
+    if shape == "rectangle":
+        fake_area = (ax1_max - ax1_min) * (
+            np.sin(np.radians(ax2_max)) - np.sin(np.radians(ax2_min))) * 180/np.pi
+    else:
+        y_bins = np.linspace(-2, 1, 100)
+        dys = np.diff(y_bins)
+        if high_lat:
+            y_bins += 70
+        if overlay_origin == "359":
+            x[x > 180] = x[x > 180] - 360
+        min_xs, _, _ = binned_statistic(y, x, statistic='min', bins=y_bins)
+        max_xs, _, _ = binned_statistic(y, x, statistic='max', bins=y_bins)
+        fake_area = 0
+        for y, dy, min_x, max_x in zip(0.5*(y_bins[1:]+y_bins[:-1]), dys, min_xs, max_xs):
+            fake_area += (max_x - min_x) * np.cos(np.radians(y)) * dy
+
+    assert_allclose(hull_area, fake_area, rtol=0.01)
