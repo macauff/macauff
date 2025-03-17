@@ -148,7 +148,7 @@ class Macauff():
         test_coords = np.empty((len(test_lons), 2), float)
         test_coords[:, 0] = test_lons
 
-        for q, test_lat in enumerate(test_lats):
+        for test_lat in test_lats:
             test_coords[:, 1] = test_lat
 
             inds = mff.find_nearest_point(test_coords[:, 0], test_coords[:, 1],
