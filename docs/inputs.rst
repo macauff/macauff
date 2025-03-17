@@ -445,7 +445,8 @@ The inter-dependency of input parameters on one another, and the output ``CrossM
     │                     │             ├─* gal_zmax
     │                     │             ├─* gal_nzs
     │                     │             ├─* gal_aboffsets
-    │                     │             └─* gal_filternames
+    │                     │             ├─* gal_filternames
+    │                     │             └─* saturation_magnitudes
     │                     ├─* snr_mag_params_path -> snr_mag_params
     │                     ├─* tri_set_name[3a]
     │                     ├─* tri_filt_names[3a]
@@ -511,7 +512,8 @@ The inter-dependency of input parameters on one another, and the output ``CrossM
     │                    ├─* correct_sig_slice
     │                    ├─* chunk_overlap_col
     │                    ├─* best_mag_index_col
-    │                    └─* use_photometric_uncertainties
+    │                    ├-* use_photometric_uncertainties
+    │                    └─* saturation_magnitudes
     ├─* compute_snr_mag_relation[1]
     │                          ├─* correct_astro_save_folder
     │                          ├─* csv_cat_file_string
