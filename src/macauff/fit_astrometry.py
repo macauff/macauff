@@ -34,7 +34,7 @@ if usetex:
 # pylint: disable=wrong-import-position,import-error,no-name-in-module
 from macauff.galaxy_counts import create_galaxy_counts
 from macauff.get_trilegal_wrapper import get_av_infinity
-from macauff.misc_functions import find_model_counts_corrections, min_max_lon
+from macauff.misc_functions import convex_hull_area, find_model_counts_corrections, min_max_lon
 from macauff.misc_functions_fortran import misc_functions_fortran as mff
 from macauff.perturbation_auf import (
     _calculate_magnitude_offsets,
@@ -626,16 +626,16 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
                 self.a = self.load_catalogue('a', self.cat_args)
                 self.b = self.load_catalogue('b', self.cat_args)
 
-            rect_area = (ax1_max - (ax1_min)) * (
-                np.sin(np.radians(ax2_max)) - np.sin(np.radians(ax2_min))) * 180/np.pi
+            self.area = convex_hull_area(self.b[:, 0], self.b[:, 1])
+
             if self.single_or_repeat == 'repeat':
                 # Divide the density through by the number of repeat visits,
                 # since we want the average density of the visits, not the
                 # sum of all repeated visits.
                 n_visits = len(np.unique(self.repeat_unique_visits))
-                self.avg_b_dens[index_] = len(self.b) / rect_area / n_visits
+                self.avg_b_dens[index_] = len(self.b) / self.area / n_visits
             else:
-                self.avg_b_dens[index_] = len(self.b) / rect_area
+                self.avg_b_dens[index_] = len(self.b) / self.area
 
             self.a_array, self.b_array, self.c_array = self.make_snr_model()
             abc_array[:, index_, 0] = self.a_array
@@ -1095,10 +1095,7 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
             if not os.path.exists(base_auf_folder):
                 os.makedirs(base_auf_folder, exist_ok=True)
 
-            rect_area = (ax1_max - (ax1_min)) * (
-                np.sin(np.radians(ax2_max)) - np.sin(np.radians(ax2_min))) * 180/np.pi
-
-            data_bright_dens = np.sum(~np.isnan(b_mag_data) & (b_mag_data <= maxmag)) / rect_area
+            data_bright_dens = np.sum(~np.isnan(b_mag_data) & (b_mag_data <= maxmag)) / self.area
             # pylint: disable-next=fixme
             # TODO: un-hardcode min_bright_tri_number
             min_bright_tri_number = 1000
@@ -1145,11 +1142,8 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
         data_dbins = np.diff(data_bins)[d_hc]
         data_bins = data_bins[d_hc]
 
-        rect_area = (ax1_max - (ax1_min)) * (
-            np.sin(np.radians(ax2_max)) - np.sin(np.radians(ax2_min))) * 180/np.pi
-
-        data_uncert = np.sqrt(data_hist) / data_dbins / rect_area
-        data_hist = data_hist / data_dbins / rect_area
+        data_uncert = np.sqrt(data_hist) / data_dbins / self.area
+        data_hist = data_hist / data_dbins / self.area
 
         if self.single_or_repeat == 'repeat':
             # Divide the counts through by the number of repeat visits.
@@ -1190,12 +1184,6 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
         else:
             _, _, ax1_min, ax1_max, ax2_min, ax2_max, _ = self.list_of_things
 
-        # Unit area is cos(t) dt dx for 0 <= t <= 90deg, 0 <= x <= 360 deg,
-        # integrated between ax2_min < t < ax2_max, ax1_min < x < ax1_max, converted
-        # to degrees.
-        rect_area = (ax1_max - (ax1_min)) * (
-            np.sin(np.radians(ax2_max)) - np.sin(np.radians(ax2_min))) * 180/np.pi
-
         mag_ind = self.mag_indices[self.best_mag_index]
         data_mags = self.b[~np.isnan(self.b[:, mag_ind]), mag_ind]
 
@@ -1209,8 +1197,8 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
         data_dbins = np.diff(data_bins)[d_hc]
         data_bins = data_bins[d_hc]
 
-        data_uncert = np.sqrt(data_hist) / data_dbins / rect_area
-        data_hist = data_hist / data_dbins / rect_area
+        data_uncert = np.sqrt(data_hist) / data_dbins / self.area
+        data_hist = data_hist / data_dbins / self.area
 
         if self.single_or_repeat == 'repeat':
             # Divide the counts through by the number of repeat visits.
@@ -1606,12 +1594,7 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
         # distribution of counterparts and C(r) = \int_0^r c(r') dr'.
         # Finally, the combination y(r) = F n(r) + (1 - F) m(r).
 
-        # Unit area is cos(t) dt dx for 0 <= t <= 90deg, 0 <= x <= 360 deg,
-        # integrated between ax2_min < t < ax2_max, ax1_min < x < ax1_max, converted
-        # to degrees.
-        rect_area = (ax1_max - (ax1_min)) * (
-            np.sin(np.radians(ax2_max)) - np.sin(np.radians(ax2_min))) * 180/np.pi
-        avg_a_dens = len(self.a) / rect_area
+        avg_a_dens = len(self.a) / self.area
         # For a symmetric nearest neighbour distribution we need to use the
         # combined density of sources -- this is derived from consideration
         # of the probability of no NN object inside r being the chance that
@@ -1727,9 +1710,7 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
             else:
                 final_slice = sig_cut & mag_cut & n_cut & (self.dists <= 20*self.psfsig*bsig)
 
-            rect_area = (ax1_max - (ax1_min)) * (
-                np.sin(np.radians(ax2_max)) - np.sin(np.radians(ax2_min))) * 180/np.pi
-            avg_a_dens = len(self.a) / rect_area
+            avg_a_dens = len(self.a) / self.area
             density = (np.percentile(self.narray[self.bmatch][final_slice], 50) +
                        avg_a_dens) / 3600**2
             nn_model = 2 * np.pi * (self.r[:-1]+self.dr/2) * density * np.exp(

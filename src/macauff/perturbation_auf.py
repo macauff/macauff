@@ -22,6 +22,7 @@ from macauff.galaxy_counts import create_galaxy_counts
 from macauff.get_trilegal_wrapper import get_av_infinity, get_trilegal
 from macauff.misc_functions import (
     _load_rectangular_slice,
+    convex_hull_area,
     create_auf_params_grid,
     find_model_counts_corrections,
     min_max_lon,
@@ -161,16 +162,12 @@ def make_perturb_aufs(cm, which_cat):
         if auf_folder is not None and cm.include_perturb_auf and len(a_astro_cut) > 0 and (
                 # pylint: disable-next=possibly-used-before-assignment
                 tri_download_flag or not os.path.isfile(f'{ax_folder}/trilegal_auf_simulation_faint.dat')):
-            # Currently assume that the area of each small patch is a rectangle
-            # on the sky, implicitly assuming that the large region is also a
-            # rectangle, after any spherical projection cos(delta) effects.
-            # pylint: disable=used-before-assignment
-            rect_area = (ax1_max - ax1_min) * (
-                # pylint: disable=used-before-assignment
-                np.sin(np.radians(ax2_max)) - np.sin(np.radians(ax2_min))) * 180/np.pi
+            # Calculate the area of the current patch, assuming it is
+            # sufficiently convex to be defineable by its convex hull.
+            sky_area = convex_hull_area(a_astro_cut[:, 0], a_astro_cut[:, 1])
 
             data_bright_dens = np.array([np.sum(~np.isnan(a_photo_cut[:, q]) &
-                                         (a_photo_cut[:, q] <= dens_mags[q])) / rect_area
+                                         (a_photo_cut[:, q] <= dens_mags[q])) / sky_area
                                         for q in range(len(dens_mags))])
             # TODO: un-hardcode min_bright_tri_number  pylint: disable=fixme
             min_bright_tri_number = 1000
@@ -225,15 +222,14 @@ def make_perturb_aufs(cm, which_cat):
                 for ii, ind_slice in enumerate(index_slice):
                     local_n[ind_slice, j] = localn[ii]
                 if fit_gal_flag:
-                    rect_area = (ax1_max - ax1_min) * (
-                        np.sin(np.radians(ax2_max)) - np.sin(np.radians(ax2_min))) * 180/np.pi
+                    sky_area = convex_hull_area(a_astro_cut[:, 0], a_astro_cut[:, 1])
                 ax1_list = np.linspace(ax1_min, ax1_max, 7)
                 ax2_list = np.linspace(ax2_min, ax2_max, 7)
                 if fit_gal_flag:
                     single_perturb_auf_output = create_single_perturb_auf(
                         auf_points[i], cm.r, cm.dr, cm.j0s, num_trials, psf_fwhms[j], dens_mags[j], a_photo,
                         localn, d_mag, delta_mag_cuts, dd_params, l_cut, run_fw, run_psf, snr_mag_params[j],
-                        al_avs[j], auf_region_frame, ax1_list, ax2_list, fit_gal_flag, rect_area,
+                        al_avs[j], auf_region_frame, ax1_list, ax2_list, fit_gal_flag, sky_area,
                         saturation_magnitudes[j], cmau_array, wavs[j], z_maxs[j], nzs[j], alpha0, alpha1,
                         alpha_weight, ab_offsets[j], filter_names[j], tri_folder=ax_folder,
                         filt_header=tri_filt_names[j], dens_hist_tri=dens_hist_tri[j],
