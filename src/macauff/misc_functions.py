@@ -4,15 +4,22 @@ This module provides miscellaneous scripts, called in other parts of the cross-m
 framework.
 '''
 
+import itertools
+import multiprocessing
+
 from multiprocessing import shared_memory
 
 import numpy as np
 
-from astropy.coordinates import SkyCoord
+from astropy import units as u
+from astropy.coordinates import Angle, SkyCoord, UnitSphericalRepresentation
+from scipy import spatial
 from scipy.optimize import minimize
 from scipy.spatial import ConvexHull  # pylint: disable=no-name-in-module
 
 from macauff.get_trilegal_wrapper import get_av_infinity
+# pylint: disable=import-error,no-name-in-module
+from macauff.perturbation_auf_fortran import perturbation_auf_fortran as paf
 
 
 __all__ = []
@@ -561,6 +568,147 @@ def coord_inside_convex_hull(p, hull):
     if sum_of_angles < np.pi:
         return False
     return True
+
+
+def create_densities(b, minmag, maxmag, hull, hull_x_shift, search_radius, n_pool, mag_ind, ax1_ind, ax2_ind,
+                     coord_system):
+    """
+    Generate local normalising densities for all sources in catalogue "b".
+
+    Parameters
+    ----------
+    b : numpy.ndarray
+        Catalogue of the sources for which astrometric corrections should be
+        determined.
+    minmag : float
+        Bright limiting magnitude, fainter than which objects are used when
+        determining the number of nearby sources for density purposes.
+    maxmag : float
+        Faintest magnitude within which to determine the density of catalogue
+        ``b`` objects.
+    hull : numpy.ndarray
+        Array of shape ``(N, 2)``, giving the ``(ax1, ax2)`` coordinates for
+        each of the ``N`` polygon points defining the convex hull of the
+        region in which the objects are contained.
+    hull_x_shift : float
+        Amount by which ``hull`` points were shifted in longitude during
+        area calculation, to avoid 0/360 wraparound issues, and the amount
+        by which coordinates should be moved to mirror "new" coord system.
+    search_radius : float
+        Radius, in degrees, around which to calculate the density of objects.
+        Smaller values will allow for more fluctuations and handle smaller scale
+        variation better, but be subject to low-number statistics.
+    n_pool : integer
+        Number of parallel threads to run when calculating densities via
+        ``multiprocessing``.
+    mag_ind : integer
+        Index in ``b`` where the magnitude being used is stored.
+    ax1_ind : integer
+        Index of ``b`` for the longitudinal coordinate column.
+    ax2_ind : integer
+        ``b`` index for the latitude data.
+    coord_system : string
+        Determines whether we are in equatorial or galactic coordinates for
+        separation considerations.
+
+    Returns
+    -------
+    narray : numpy.ndarray
+        The density of objects within ``search_radius`` degrees of each object
+        in catalogue ``b``.
+
+    """
+    def _get_cart_kdt(coord):
+        """
+        Convenience function to create a KDTree of a set of sky coordinates,
+        represented in Cartesian space on the unit sphere.
+
+        Parameters
+        ----------
+        coord : ~`astropy.coordinates.SkyCoord`
+            The `astropy` object containing all of the objects coordinates,
+            as represented as Cartesian (x, y, z) coordinates on the unit sphere.
+
+        Returns
+        -------
+        kdt : ~`scipy.spatial.KDTree`
+            The KDTree for ``coord`` evaluated with Cartesian coordinates.
+        """
+        # Largely based on astropy.coordinates._get_cartesian_kdtree.
+        KDTree = spatial.KDTree
+        cartxyz = coord.cartesian.xyz
+        flatxyz = cartxyz.reshape((3, np.prod(cartxyz.shape) // 3))
+        kdt = KDTree(flatxyz.value.T, compact_nodes=False, balanced_tree=False)
+        return kdt
+
+    cutmag = (b[:, mag_ind] >= minmag) & (b[:, mag_ind] <= maxmag)
+
+    if coord_system == 'galactic':
+        full_cat = SkyCoord(l=b[:, ax1_ind], b=b[:, ax2_ind], unit='deg', frame='galactic')
+        mag_cut_cat = SkyCoord(l=b[cutmag, ax1_ind], b=b[cutmag, ax2_ind], unit='deg',
+                               frame='galactic')
+    else:
+        full_cat = SkyCoord(ra=b[:, ax1_ind], dec=b[:, ax2_ind], unit='deg', frame='icrs')
+        mag_cut_cat = SkyCoord(ra=b[cutmag, ax1_ind], dec=b[cutmag, ax2_ind], unit='deg',
+                               frame='icrs')
+
+    full_urepr = full_cat.data.represent_as(UnitSphericalRepresentation)
+    full_ucoords = full_cat.realize_frame(full_urepr)
+
+    mag_cut_urepr = mag_cut_cat.data.represent_as(UnitSphericalRepresentation)
+    mag_cut_ucoords = mag_cut_cat.realize_frame(mag_cut_urepr)
+    mag_cut_kdt = _get_cart_kdt(mag_cut_ucoords)
+
+    r = (2 * np.sin(Angle(search_radius * u.degree) / 2.0)).value  # pylint: disable=no-member
+    overlap_number = np.empty(len(b), int)
+
+    counter = np.arange(0, len(b))
+    iter_group = zip(counter, itertools.repeat([full_ucoords, mag_cut_kdt, r]))
+    with multiprocessing.Pool(n_pool) as pool:
+        for stuff in pool.imap_unordered(ball_point_query, iter_group, chunksize=len(b)//n_pool):
+            i, len_query = stuff
+            overlap_number[i] = len_query
+
+    pool.join()
+
+    seed = np.random.default_rng().choice(100000, size=(paf.get_random_seed_size(), len(b)))
+
+    area = paf.get_circle_area_overlap(
+        b[:, ax1_ind] + hull_x_shift, b[:, ax2_ind], search_radius,
+        np.append(hull[:, 0], hull[0, 0]), np.append(hull[:, 1], hull[0, 1]), seed)
+
+    narray = overlap_number / area
+
+    return narray
+
+
+def ball_point_query(iterable):
+    """
+    Wrapper function to distribute calculation of the number of neighbours
+    around a particular sky coordinate via KDTree query.
+
+    Parameters
+    ----------
+    iterable : list
+        List of variables passed through ``multiprocessing``, including index
+        into object having its neighbours determined, the Spherical Cartesian
+        representation of objects to search for neighbours around, the KDTree
+        containing all potential neighbours, and the Cartesian angle
+        representing the maximum on-sky separation.
+
+    Returns
+    -------
+    i : integer
+        The index of the object whose neighbour count was calculated.
+    integer
+        The number of neighbours in ``mag_cut_kdt`` within ``r`` of
+        ``full_ucoords[i]``.
+    """
+    i, (full_ucoords, mag_cut_kdt, r) = iterable
+    # query_ball_point returns the neighbours of x (full_ucoords) around self
+    # (mag_cut_kdt) within r.
+    kdt_query = mag_cut_kdt.query_ball_point(full_ucoords[i].cartesian.xyz, r)
+    return i, len(kdt_query)
 
 
 class SharedNumpyArray:

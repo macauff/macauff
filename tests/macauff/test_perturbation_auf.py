@@ -566,6 +566,7 @@ class TestMakePerturbAUFs():
         self.fake_cm.b_tri_model_mag_mids_list = [None] * len(self.filters)
         self.fake_cm.b_tri_model_mags_interval_list = [None] * len(self.filters)
         self.fake_cm.b_tri_n_bright_sources_star_list = [None] * len(self.filters)
+        self.fake_cm.n_pool = 1
 
         with pytest.raises(ValueError, match="The number of simulated objects in this sky patch "):
             make_perturb_aufs(self.fake_cm, 'b')
@@ -678,6 +679,7 @@ class TestMakePerturbAUFs():
                  [0.9, 0.1, 0.1], [0.9, 0.9, 0.1])).reshape(-1, 3)
             self.fake_cm.b_photo = photo_array
             self.fake_cm.b_magref = np.array([0] * 105)
+            self.fake_cm.n_pool = 1
             _, p_a_o = make_perturb_aufs(self.fake_cm, 'b')
 
             perturb_auf_combo = f'{ax1}-{ax2}-{self.filters[0]}'
