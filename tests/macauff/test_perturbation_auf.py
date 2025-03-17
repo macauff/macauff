@@ -216,71 +216,125 @@ def test_histogram():
     assert np.all(counts_f == counts_p)
 
 
-def test_circle_area():
-    rng = np.random.default_rng(123897123)
+@pytest.mark.parametrize("position", ["inside", "corner", "edge", "random"])
+# pylint: disable-next=too-many-branches
+def test_circle_area(position):
+    rng = np.random.default_rng(346675614)
     r = 0.1
 
-    x_edges = [0, 1]
-    y_edges = [0, 1]
+    x_edges = np.array([0, 1])
+    y_edges = np.array([0, 1])
 
-    # If circle is inside rectangle, get full area:
-    done = 0
-    while done < 10:
-        [x, y] = rng.uniform(0, 1, size=2)
-        if (x - r >= x_edges[0] and x + r <= x_edges[1] and
-                y - r >= y_edges[0] and y + r <= y_edges[1]):
-            calc_area = paf.get_circle_area_overlap([x], [y], r, x_edges[0], x_edges[1],
-                                                    y_edges[0], y_edges[1])
-            assert_allclose(calc_area, np.pi * r**2)
+    hull_x = x_edges[[0, 0, 1, 1, 0]]
+    hull_y = y_edges[[0, 1, 1, 0, 0]]
+
+    if position == "inside":
+        # If circle is inside rectangle, get full area:
+        done = 0
+        while done < 100:
+            seed = rng.choice(100000, size=(paf.get_random_seed_size(), 1))
+            [x, y] = rng.uniform(0, 1, size=2)
+            if (x - r >= x_edges[0] and x + r <= x_edges[1] and
+                    y - r >= y_edges[0] and y + r <= y_edges[1]):
+                calc_area = paf.get_circle_area_overlap([x], [y], r, hull_x, hull_y, seed)
+                assert_allclose(calc_area, np.pi * r**2)
+                done += 1
+
+    if position == "corner":
+        # Now, if the circle is exactly on the corners of the rectangle
+        # we should have a quarter the area:
+        for x, y in zip([0, 0, 1, 1], [0, 1, 0, 1]):
+            seed = rng.choice(100000, size=(paf.get_random_seed_size(), 1))
+            calc_area = paf.get_circle_area_overlap([x], [y], r, hull_x, hull_y, seed)
+            # We have a random process in this calculation, will result in small
+            # variations in the area.
+            assert_allclose(calc_area, np.pi * r**2 / 4, rtol=0.02, atol=5e-5)
+
+    if position == "edge":
+        # In the middle of an edge we should have half the circle area:
+        for _ in range(100):
+            for x, y in zip([0, 0.5, 1, 0.5], [0.5, 0, 0.5, 1]):
+                if x == 0.5:
+                    x = rng.uniform(0 + r + 1e-4, 1 - r - 1e-4, size=1)
+                if y == 0.5:
+                    y = rng.uniform(0 + r + 1e-4, 1 - r - 1e-4, size=1)
+                seed = rng.choice(100000, size=(paf.get_random_seed_size(), 1))
+                calc_area = paf.get_circle_area_overlap([x], [y], r, hull_x, hull_y, seed)
+                assert_allclose(calc_area, np.pi * r**2 / 2)
+
+        # Otherwise, we have a more random amount of missing circle:
+        xp = np.linspace(*x_edges, 800)
+        yp = np.linspace(*y_edges, 800)
+        dx, dy = xp[1] - xp[0], yp[1] - yp[0]
+        for _ in range(100):
+            for x0, y0 in zip([0, 0.5, 1, 0.5], [0.5, 0, 0.5, 1]):
+                if x0 == 0.5:
+                    x = rng.uniform(0 + r + 1e-4, 1 - r - 1e-4, size=1)
+                    if y0 == 0:
+                        y = rng.uniform(y0 + 1e-4, y0 + r - 1e-4, size=1)
+                    else:
+                        y = rng.uniform(y0 - r + 1e-4, y0 - 1e-4, size=1)
+                if y0 == 0.5:
+                    y = rng.uniform(0 + r + 1e-4, 1 - r - 1e-4, size=1)
+                    if x0 == 0:
+                        x = rng.uniform(x0 + 1e-4, x0 + r - 1e-4, size=1)
+                    else:
+                        x = rng.uniform(x0 - r + 1e-4, x0 - 1e-4, size=1)
+                seed = rng.choice(100000, size=(paf.get_random_seed_size(), 1))
+                calc_area = paf.get_circle_area_overlap([x], [y], r, hull_x, hull_y, seed)
+                if x0 == 0.5:
+                    if y0 == 0:
+                        h = r - (y - y0)
+                    else:
+                        h = r - (y0 - y)
+                if y0 == 0.5:
+                    if x0 == 0:
+                        h = r - (x - x0)
+                    else:
+                        h = r - (x0 - x)
+                # pylint: disable-next=possibly-used-before-assignment
+                chord_area = r**2 * np.arccos(1 - h / r) - (r - h) * np.sqrt(r**2 - (r - h)**2)
+                remaining_area = np.pi * r**2 - chord_area
+                assert_allclose(calc_area, remaining_area)
+
+    # pylint: disable-next=too-many-nested-blocks
+    if position == "random":
+        # Verify a few randomly placed circles too:
+        done = 0
+        xp = np.linspace(*x_edges, 400)
+        yp = np.linspace(*y_edges, 400)
+        dx, dy = xp[1] - xp[0], yp[1] - yp[0]
+        while done < 100:
+            seed = rng.choice(100000, size=(paf.get_random_seed_size(), 1))
+            [x, y] = rng.uniform(0, 1, size=2)
+            if np.any([x - r < x_edges[0], x + r > x_edges[1],
+                       y - r < y_edges[0], y + r > y_edges[1]]):
+                calc_area = paf.get_circle_area_overlap([x], [y], r, hull_x, hull_y, seed)
+                manual_area = 0
+                for x_p in xp:
+                    for y_p in yp:
+                        if np.sqrt((x_p - x)**2 + (y_p - y)**2) <= r:
+                            manual_area += dx*dy
+                assert_allclose(calc_area, manual_area, rtol=0.05)
             done += 1
 
-    # Now, if the circle is exactly on the corners of the rectangle
-    # we should have a quarter the area:
-    for x, y in zip([0, 0, 1, 1], [0, 1, 0, 1]):
-        calc_area = paf.get_circle_area_overlap([x], [y], r, x_edges[0], x_edges[1],
-                                                y_edges[0], y_edges[1])
-        assert_allclose(calc_area, np.pi * r**2 / 4)
-
-    # In the middle of an edge we should have half the circle area:
-    for x, y in zip([0, 0.5, 1, 0.5], [0.5, 0, 0.5, 1]):
-        calc_area = paf.get_circle_area_overlap([x], [y], r, x_edges[0], x_edges[1],
-                                                y_edges[0], y_edges[1])
-        assert_allclose(calc_area, np.pi * r**2 / 2)
-
-    # Verify a few randomly placed circles too:
-    done = 0
-    xp = np.linspace(*x_edges, 100)
-    yp = np.linspace(*y_edges, 100)
-    dx, dy = xp[1] - xp[0], yp[1] - yp[0]
-    while done < 20:
-        [x, y] = rng.uniform(0, 1, size=2)
-        if np.any([x - r < x_edges[0], x + r > x_edges[1],
-                   y - r < y_edges[0], y + r > y_edges[1]]):
-            calc_area = paf.get_circle_area_overlap([x], [y], r, x_edges[0], x_edges[1],
-                                                    y_edges[0], y_edges[1])
-            manual_area = 0
-            for x_p in xp:
-                for y_p in yp:
-                    if np.sqrt((x_p - x)**2 + (y_p - y)**2) <= r:
-                        manual_area += dx*dy
-            assert_allclose(calc_area, manual_area, rtol=0.05)
-        done += 1
-
-    # Verify that we don't mind if coordinates are negative:
-    x, y = -0.1, 0.08
-    x_edges = [-0.15, 0.15]
-    y_edges = [-0.15, 0.15]
-    calc_area = paf.get_circle_area_overlap([x], [y], r, x_edges[0], x_edges[1],
-                                            y_edges[0], y_edges[1])
-    xp = np.linspace(*x_edges, 100)
-    yp = np.linspace(*y_edges, 100)
-    dx, dy = xp[1] - xp[0], yp[1] - yp[0]
-    manual_area = 0
-    for x_p in xp:
-        for y_p in yp:
-            if np.sqrt((x_p - x)**2 + (y_p - y)**2) <= r:
-                manual_area += dx*dy
-    assert_allclose(calc_area, manual_area, rtol=0.05)
+        # Verify that we don't mind if coordinates are negative:
+        x, y = -0.1, 0.08
+        x_edges = np.array([-0.15, 0.15])
+        y_edges = np.array([-0.15, 0.15])
+        hull_x = x_edges[[0, 0, 1, 1, 0]]
+        hull_y = y_edges[[0, 1, 1, 0, 0]]
+        seed = rng.choice(100000, size=(paf.get_random_seed_size(), 1))
+        calc_area = paf.get_circle_area_overlap([x], [y], r, hull_x, hull_y, seed)
+        xp = np.linspace(*x_edges, 200)
+        yp = np.linspace(*y_edges, 200)
+        dx, dy = xp[1] - xp[0], yp[1] - yp[0]
+        manual_area = 0
+        for x_p in xp:
+            for y_p in yp:
+                if np.sqrt((x_p - x)**2 + (y_p - y)**2) <= r:
+                    manual_area += dx*dy
+        assert_allclose(calc_area, manual_area, rtol=0.05)
 
 
 def test_psf_perturb():
@@ -567,7 +621,7 @@ class TestMakePerturbAUFs():
             if mag > 17:
                 keep_flux = np.zeros((1,), float)
 
-            photo_array = np.array([np.concatenate(([14.99], [100]*100, [10], [10]))]).T
+            photo_array = np.array([np.concatenate(([14.99], [100]*100, [10], [10], [10], [10]))]).T
             # Catalogue bins for the source:
             a_photo = photo_array[0, :]
             dmag = 0.25
@@ -618,13 +672,12 @@ class TestMakePerturbAUFs():
             self.fake_cm.b_tri_n_bright_sources_star_list = [None] * len(self.filters)
             # Have to fudge extra sources to keep our 15th mag source in the local
             # density cutout.
+            # Add extra sources to force a 0.1-0.9 square convex hull cutout.
             self.fake_cm.b_astro = np.concatenate(
-                ([0.3, 0.3, 0.1] * 101, [0.1, 0.1, 0.1], [0.9, 0.9, 0.1])).reshape(-1, 3)
-            self.fake_cm.b_astro[0, [0, 1]] = [0.3, 0.31]
-            self.fake_cm.b_astro[1, [0, 1]] = [0.31, 0.3]
-            self.fake_cm.b_astro[2, [0, 1]] = [0.31, 0.31]
+                ([0.3, 0.3, 0.1] * 101, [0.1, 0.1, 0.1], [0.1, 0.9, 0.1],
+                 [0.9, 0.1, 0.1], [0.9, 0.9, 0.1])).reshape(-1, 3)
             self.fake_cm.b_photo = photo_array
-            self.fake_cm.b_magref = np.array([0] * 103)
+            self.fake_cm.b_magref = np.array([0] * 105)
             _, p_a_o = make_perturb_aufs(self.fake_cm, 'b')
 
             perturb_auf_combo = f'{ax1}-{ax2}-{self.filters[0]}'
@@ -678,14 +731,13 @@ class TestMakePerturbAUFs():
 
         # Have to fudge extra sources to keep our 15th mag source in the local
         # density cutout.
-        x = np.concatenate(([0.3, 0.3, 0.1] * 101, [0.1, 0.1, 0.1], [0.9, 0.9, 0.1])).reshape(-1, 3)
-        x[0, [0, 1]] = [0.3, 0.31]
-        x[1, [0, 1]] = [0.31, 0.3]
-        x[2, [0, 1]] = [0.31, 0.31]
+        # Force the 0.1-0.9 square with extra objects for the convex hull to pick up.
+        x = np.concatenate(([0.3, 0.3, 0.1] * 101, [0.1, 0.1, 0.1], [0.1, 0.9, 0.1],
+                            [0.9, 0.1, 0.1], [0.9, 0.9, 0.1])).reshape(-1, 3)
         np.save(f'{self.cat_folder}/con_cat_astro.npy', x)
         np.save(f'{self.cat_folder}/con_cat_photo.npy',
-                np.array([np.concatenate(([14.99], [100]*100, [10], [10]))]).T)
-        np.save(f'{self.cat_folder}/magref.npy', np.array([0] * 103))
+                np.array([np.concatenate(([14.99], [100]*100, [10], [10], [10], [10]))]).T)
+        np.save(f'{self.cat_folder}/magref.npy', np.array([0] * 105))
 
         # Fake up a TRILEGAL simulation data file.
         text = ('#area = 140.0 sq deg\n#Av at infinity = 1\n'
@@ -907,16 +959,15 @@ class TestMakePerturbAUFs():
 
         new_auf_points = np.vstack((self.auf_points, np.array([[10, 10]])))
 
-        x = np.concatenate(([0.3, 0.3, 0.1] * 101, [0.1, 0.1, 0.1], [0.9, 0.9, 0.1])).reshape(-1, 3)
-        x[0, [0, 1]] = [0.3, 0.31]
-        x[1, [0, 1]] = [0.31, 0.3]
-        x[2, [0, 1]] = [0.31, 0.31]
+        # Force the 0.1-0.9 square with extra objects for the convex hull to pick up.
+        x = np.concatenate(([0.3, 0.3, 0.1] * 101, [0.1, 0.1, 0.1], [0.1, 0.9, 0.1],
+                            [0.9, 0.1, 0.1], [0.9, 0.9, 0.1])).reshape(-1, 3)
         np.save(f'{self.cat_folder}/con_cat_astro.npy', x)
         rng = np.random.default_rng(seed=83458923)
         main_mags = rng.uniform(24.95, 25.05, size=100)
         np.save(f'{self.cat_folder}/con_cat_photo.npy',
-                np.array([np.concatenate(([14.99], main_mags, [10], [10]))]).T)
-        np.save(f'{self.cat_folder}/magref.npy', np.array([0] * 103))
+                np.array([np.concatenate(([14.99], main_mags, [10], [10], [10], [10]))]).T)
+        np.save(f'{self.cat_folder}/magref.npy', np.array([0] * 105))
 
         # Fake up a TRILEGAL simulation data file.
         text = ('#area = 140.0 sq deg\n#Av at infinity = 1\n'

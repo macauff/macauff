@@ -1228,15 +1228,10 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
         print('Creating local densities and nearest neighbour matches...')
         sys.stdout.flush()
 
-        if self.coord_or_chunk == 'coord':
-            _, _, ax1_min, ax1_max, ax2_min, ax2_max = self.list_of_things
-        else:
-            _, _, ax1_min, ax1_max, ax2_min, ax2_max, _ = self.list_of_things
-
         narray = create_densities(
-            self.b, self.minmag, self.maxmag, ax1_min, ax1_max, ax2_min, ax2_max,
-            self.dens_search_radius, self.n_pool, self.mag_indices[self.best_mag_index],
-            self.pos_and_err_indices[1][0], self.pos_and_err_indices[1][1], self.coord_system)
+            self.b, self.minmag, self.maxmag, self.hull_points, self.hull_x_shift, self.dens_search_radius,
+            self.n_pool, self.mag_indices[self.best_mag_index], self.pos_and_err_indices[1][0],
+            self.pos_and_err_indices[1][1], self.coord_system)
 
         if self.single_or_repeat == 'repeat':
             # Divide the counts through by the number of repeat visits.
@@ -1579,13 +1574,15 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
         reduced_nn_model, _, _ = binned_statistic(self.r[:-1]+self.dr/2, nn_model, bins=bins)
         reduced_m_conv_plus_nn, _, _ = binned_statistic(self.r[:-1]+self.dr/2,
                                                         m_conv_plus_nn, bins=bins)
+        # Empty binned_statistic bins return as NaNs.
+        _q = q & ~np.isnan(reduced_nn_model) & ~np.isnan(reduced_m_conv_plus_nn)
         # For the subset of data in the single magnitude slice we need
         # a nearest neighbour fraction, which we can fit for on-the-fly
         # for each slice separately (for the same m/n).
         _nll = 1e10
         nnf = -1
 
-        k = y[q] * np.diff(bins)[q] * num
+        k = y[_q] * np.diff(bins)[_q] * num
         log_fac_k = np.log(factorial(k))
         # Ramanujan, The Lost Notebook and other Unpublished Papers, gives
         # an approximation for ln(n!) as n ln(n) - n + 1/6 ln(8 n^3 +
@@ -1602,7 +1599,7 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
             # L - k*ln(L) + ln(k!). Have to convert from PDF to counts through
             # bin width and number of objects, forcing a non-zero rate to avoid
             # logarithmic issues.
-            _l = modely[q] * np.diff(bins)[q] * num
+            _l = modely[_q] * np.diff(bins)[_q] * num
             _l[_l <= 1e-10] = 1e-10
             temp_neg_log_like = np.sum(_l - k*np.log(_l) + log_fac_k)
             if temp_neg_log_like < _nll:
@@ -1611,8 +1608,8 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
 
         modely = nnf * reduced_nn_model + (1 - nnf) * reduced_m_conv_plus_nn
 
-        k = y[q] * np.diff(bins)[q] * num
-        _l = modely[q] * np.diff(bins)[q] * num
+        k = y[_q] * np.diff(bins)[_q] * num
+        _l = modely[_q] * np.diff(bins)[_q] * num
         _l[_l <= 1e-10] = 1e-10
         neg_log_like_part = np.sum(_l - k*np.log(_l) + log_fac_k)
 
@@ -2053,8 +2050,8 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
         return x
 
 
-def create_densities(b, minmag, maxmag, ax1_min, ax1_max, ax2_min, ax2_max, search_radius,
-                     n_pool, mag_ind, ax1_ind, ax2_ind, coord_system):
+def create_densities(b, minmag, maxmag, hull, hull_x_shift, search_radius, n_pool, mag_ind, ax1_ind, ax2_ind,
+                     coord_system):
     """
     Generate local normalising densities for all sources in catalogue "b".
 
@@ -2069,14 +2066,14 @@ def create_densities(b, minmag, maxmag, ax1_min, ax1_max, ax2_min, ax2_max, sear
     maxmag : float
         Faintest magnitude within which to determine the density of catalogue
         ``b`` objects.
-    ax1_min : float
-        The minimum longitude of the box of the cutout region.
-    ax1_max : float
-        The maximum longitude of the box of the cutout region.
-    ax2_min : float
-        The minimum latitude of the box of the cutout region.
-    ax2_max : float
-        The maximum latitude of the box of the cutout region.
+    hull : numpy.ndarray
+        Array of shape ``(N, 2)``, giving the ``(ax1, ax2)`` coordinates for
+        each of the ``N`` polygon points defining the convex hull of the
+        region in which the objects are contained.
+    hull_x_shift : float
+        Amount by which ``hull`` points were shifted in longitude during
+        area calculation, to avoid 0/360 wraparound issues, and the amount
+        by which coordinates should be moved to mirror "new" coord system.
     search_radius : float
         Radius, in degrees, around which to calculate the density of objects.
         Smaller values will allow for more fluctuations and handle smaller scale
@@ -2154,8 +2151,11 @@ def create_densities(b, minmag, maxmag, ax1_min, ax1_max, ax2_min, ax2_max, sear
 
     pool.join()
 
-    area = paf.get_circle_area_overlap(b[:, ax1_ind], b[:, ax2_ind], search_radius,
-                                       ax1_min, ax1_max, ax2_min, ax2_max)
+    seed = np.random.default_rng().choice(100000, size=(paf.get_random_seed_size(), len(b)))
+
+    area = paf.get_circle_area_overlap(
+        b[:, ax1_ind] + hull_x_shift, b[:, ax2_ind], search_radius,
+        np.append(hull[:, 0], hull[0, 0]), np.append(hull[:, 1], hull[0, 1]), seed)
 
     narray = overlap_number / area
 

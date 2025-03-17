@@ -220,7 +220,8 @@ def make_perturb_aufs(cm, which_cat):
                     perturb_auf_outputs[perturb_auf_combo] = single_perturb_auf_output
                     continue
                 localn = calculate_local_density(
-                    a_astro_cut[good_mag_slice], a_tot_astro, a_tot_photo[:, j], density_radius, dens_mags[j])
+                    a_astro_cut[good_mag_slice], a_tot_astro, a_tot_photo[:, j], density_radius, dens_mags[j],
+                    hull_points, hull_x_shift)
                 # Because we always calculate the density from the full
                 # catalogue, using just the astrometry, we should be able
                 # to just over-write this N times if there happen to be N
@@ -515,7 +516,8 @@ def download_trilegal_simulation(tri_folder, tri_filter_set, ax1, ax2, mag_num, 
         f.write(contents)
 
 
-def calculate_local_density(a_astro, a_tot_astro, a_tot_photo, density_radius, density_mag):
+def calculate_local_density(a_astro, a_tot_astro, a_tot_photo, density_radius, density_mag, hull,
+                            hull_x_shift):
     '''
     Calculates the number of sources above a given brightness within a specified
     radius of each source in a catalogue, to provide a local density for
@@ -537,6 +539,14 @@ def calculate_local_density(a_astro, a_tot_astro, a_tot_photo, density_radius, d
     density_mag : float
         The brightness, in magnitudes, above which to count sources for density
         purposes.
+    hull : numpy.ndarray
+        Array of shape ``(N, 2)``, giving the ``(ax1, ax2)`` coordinates for
+       each of the ``N`` polygon points defining the convex hull of the
+        region in which the objects are contained.
+    hull_x_shift : float
+        Amount by which ``hull`` points were shifted in longitude during
+        area calculation, to avoid 0/360 wraparound issues, and the amount
+        by which coordinates should be moved to mirror "new" coord system.
 
     Returns
     -------
@@ -592,11 +602,12 @@ def calculate_local_density(a_astro, a_tot_astro, a_tot_photo, density_radius, d
                 # in the error circle, slightly over-representing bright objects
                 # but still giving them a very low normalising sky density.
                 full_counts[small_sky_cut] = 1
-    min_lon, max_lon = min_max_lon(a_astro_overlap_cut[:, 0])
-    min_lat, max_lat = np.amin(a_astro_overlap_cut[:, 1]), np.amax(a_astro_overlap_cut[:, 1])
 
-    circle_overlap_area = paf.get_circle_area_overlap(a_astro[:, 0], a_astro[:, 1], density_radius,
-                                                      min_lon, max_lon, min_lat, max_lat)
+    seed = np.random.default_rng().choice(100000, size=(paf.get_random_seed_size(), len(a_astro)))
+
+    circle_overlap_area = paf.get_circle_area_overlap(
+        a_astro[:, 0] + hull_x_shift, a_astro[:, 1], density_radius,
+        np.append(hull[:, 0], hull[0, 0]), np.append(hull[:, 1], hull[0, 1]), seed)
 
     count_density = full_counts / circle_overlap_area
 

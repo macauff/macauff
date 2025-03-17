@@ -1769,9 +1769,20 @@ class TestInputs:
         t_a_c.npy_or_csv = 'csv'
         t_a_c.n = 5000
         t_a_c.rng = self.rng
-        choice = t_a_c.rng.choice(t_a_c.n, size=t_a_c.n, replace=False)
-        t_a_c.true_ra = np.linspace(100, 110, t_a_c.n)[choice]
-        t_a_c.true_dec = np.linspace(-3, 3, t_a_c.n)[choice]
+        # Fake sources for fake_catb_cutout. We need all N-25 objects
+        # to be within 0.25 degrees of each of the first 25 data points,
+        # except the 26-100th objects, which can be wherever.
+        x_25 = self.rng.uniform(100, 110, size=25)
+        y_25 = self.rng.uniform(-3, 3, size=25)
+        x_25_100 = self.rng.uniform(100, 110, size=75)
+        y_25_100 = self.rng.uniform(-3, 3, size=75)
+        spawn_choice = self.rng.choice(25, size=t_a_c.n-100, replace=True)
+        spawn_radius = np.sqrt(self.rng.uniform(0, 1, size=t_a_c.n-100)) * 0.25
+        spawn_angle = self.rng.uniform(0, 2*np.pi, size=t_a_c.n-100)
+        spawn_x = x_25[spawn_choice] + spawn_radius * np.cos(spawn_angle)
+        spawn_y = y_25[spawn_choice] + spawn_radius * np.sin(spawn_angle)
+        t_a_c.true_ra = np.append(np.append(x_25, x_25_100), spawn_x)
+        t_a_c.true_dec = np.append(np.append(y_25, y_25_100), spawn_y)
         t_a_c.a_cat_name = 'ref_{}.csv'
         t_a_c.b_cat_name = 'file_{}.csv'
         t_a_c.fake_cata_cutout(ax1_min, ax1_max, ax2_min, ax2_max, *cat_args)
