@@ -205,7 +205,7 @@ def _lon_cut(a, lon, padding, inequality, lon_shift):
     padding : float
         Maximum allowed sky separation the "wrong" side of ``lon``, to allow
         for an increase in sky box size to ensure all overlaps are caught in
-        ``get_max_overlap`` or ``get_max_indices``.
+        ``get_overlap_indices``.
     inequality : string, ``greater`` or ``lesser``
         Flag to determine whether a source is either above or below the
         given ``lon`` value.
@@ -260,7 +260,7 @@ def _lat_cut(a, lat, padding, inequality):
     padding : float
         Maximum allowed sky separation the "wrong" side of ``lat``, to allow
         for an increase in sky box size to ensure all overlaps are caught in
-        ``get_max_overlap`` or ``get_max_indices``.
+        ``get_overlap_indices``.
     inequality : string, ``greater`` or ``lesser``
         Flag to determine whether a source is either above or below the
         given ``lat`` value.
@@ -620,6 +620,67 @@ def create_densities(b, minmag, maxmag, hull, hull_x_shift, search_radius, n_poo
         in catalogue ``b``.
 
     """
+    overlap_number = calculate_overlap_counts(b, b, minmag, maxmag, search_radius, n_pool, mag_ind, ax1_ind,
+                                              ax2_ind, coord_system, 'len')
+
+    seed = np.random.default_rng().choice(100000, size=(mff.get_random_seed_size(), len(b)))
+
+    area = mff.get_circle_area_overlap(
+        b[:, ax1_ind] + hull_x_shift, b[:, ax2_ind], search_radius,
+        np.append(hull[:, 0], hull[0, 0]), np.append(hull[:, 1], hull[0, 1]), seed)
+
+    narray = overlap_number / area
+
+    return narray
+
+
+def calculate_overlap_counts(a, b, minmag, maxmag, search_radius, n_pool, mag_ind, ax1_ind, ax2_ind,
+                             coord_system, len_or_inds):
+    """
+    Calculate number of overlapping objects in catalogue "b" that are within
+    an optionally-set dynamic range and also within a given radius of each
+    object in catalogue "a".
+
+    Parameters
+    ----------
+    a : numpy.ndarray
+        Catalogue of sources for which number of opposing catalogue overlap
+        counts should be calculated.
+    b : numpy.ndarray
+        Catalogue to search for overlapping ``a`` objects in.
+    minmag : float
+        Bright limiting magnitude, fainter than which objects are used when
+        determining the number of nearby sources for density purposes.
+    maxmag : float
+        Faintest magnitude within which to determine the density of catalogue
+        ``b`` objects.
+    search_radius : float
+        Radius, in degrees, around which to calculate the density of objects.
+        Smaller values will allow for more fluctuations and handle smaller scale
+        variation better, but be subject to low-number statistics.
+    n_pool : integer
+        Number of parallel threads to run when calculating densities via
+        ``multiprocessing``.
+    mag_ind : integer
+        Index in ``b`` where the magnitude being used is stored. If `mag_ind`
+        is NaN, then skip magnitude cut.
+    ax1_ind : integer
+        Index of ``b`` for the longitudinal coordinate column.
+    ax2_ind : integer
+        ``b`` index for the latitude data.
+    coord_system : string
+        Determines whether we are in equatorial or galactic coordinates for
+        separation considerations.
+    len_or_inds : string, 'len' or 'array'
+        Flag for whether to return the number of overlaps ('len') or list of
+        each array index for overlaps ('array') for each primary object.
+
+    Returns
+    -------
+    numpy.ndarray
+        The number of catalogue b objects near each catalogue a object, or the
+        indices of all objects near each catalogue a source.
+    """
     def _get_cart_kdt(coord):
         """
         Convenience function to create a KDTree of a set of sky coordinates,
@@ -643,14 +704,17 @@ def create_densities(b, minmag, maxmag, hull, hull_x_shift, search_radius, n_poo
         kdt = KDTree(flatxyz.value.T, compact_nodes=False, balanced_tree=False)
         return kdt
 
-    cutmag = (b[:, mag_ind] >= minmag) & (b[:, mag_ind] <= maxmag)
+    if ~np.isnan(mag_ind):
+        cutmag = (b[:, mag_ind] >= minmag) & (b[:, mag_ind] <= maxmag)
+    else:
+        cutmag = np.ones(len(b), bool)
 
     if coord_system == 'galactic':
-        full_cat = SkyCoord(l=b[:, ax1_ind], b=b[:, ax2_ind], unit='deg', frame='galactic')
+        full_cat = SkyCoord(l=a[:, ax1_ind], b=a[:, ax2_ind], unit='deg', frame='galactic')
         mag_cut_cat = SkyCoord(l=b[cutmag, ax1_ind], b=b[cutmag, ax2_ind], unit='deg',
                                frame='galactic')
     else:
-        full_cat = SkyCoord(ra=b[:, ax1_ind], dec=b[:, ax2_ind], unit='deg', frame='icrs')
+        full_cat = SkyCoord(ra=a[:, ax1_ind], dec=a[:, ax2_ind], unit='deg', frame='icrs')
         mag_cut_cat = SkyCoord(ra=b[cutmag, ax1_ind], dec=b[cutmag, ax2_ind], unit='deg',
                                frame='icrs')
 
@@ -662,26 +726,26 @@ def create_densities(b, minmag, maxmag, hull, hull_x_shift, search_radius, n_poo
     mag_cut_kdt = _get_cart_kdt(mag_cut_ucoords)
 
     r = (2 * np.sin(Angle(search_radius * u.degree) / 2.0)).value  # pylint: disable=no-member
-    overlap_number = np.empty(len(b), int)
+    if len_or_inds == 'len':
+        overlap_number = np.empty(len(a), int)
+    else:
+        overlap_inds = [0] * len(a)
 
-    counter = np.arange(0, len(b))
-    iter_group = zip(counter, itertools.repeat([full_ucoords, mag_cut_kdt, r]))
+    counter = np.arange(0, len(a))
+    iter_group = zip(counter, itertools.repeat([full_ucoords, mag_cut_kdt, r, len_or_inds]))
     with multiprocessing.Pool(n_pool) as pool:
-        for stuff in pool.imap_unordered(ball_point_query, iter_group, chunksize=len(b)//n_pool):
-            i, len_query = stuff
-            overlap_number[i] = len_query
+        for stuff in pool.imap_unordered(ball_point_query, iter_group, chunksize=len(a)//n_pool):
+            i, result = stuff
+            if len_or_inds == 'len':
+                overlap_number[i] = result
+            else:
+                overlap_inds[i] = result
 
     pool.join()
 
-    seed = np.random.default_rng().choice(100000, size=(mff.get_random_seed_size(), len(b)))
-
-    area = mff.get_circle_area_overlap(
-        b[:, ax1_ind] + hull_x_shift, b[:, ax2_ind], search_radius,
-        np.append(hull[:, 0], hull[0, 0]), np.append(hull[:, 1], hull[0, 1]), seed)
-
-    narray = overlap_number / area
-
-    return narray
+    if len_or_inds == 'len':
+        return overlap_number
+    return overlap_inds
 
 
 def ball_point_query(iterable):
@@ -695,22 +759,26 @@ def ball_point_query(iterable):
         List of variables passed through ``multiprocessing``, including index
         into object having its neighbours determined, the Spherical Cartesian
         representation of objects to search for neighbours around, the KDTree
-        containing all potential neighbours, and the Cartesian angle
-        representing the maximum on-sky separation.
+        containing all potential neighbours, the Cartesian angle
+        representing the maximum on-sky separation, and the length-or-array
+        flag.
 
     Returns
     -------
     i : integer
         The index of the object whose neighbour count was calculated.
-    integer
-        The number of neighbours in ``mag_cut_kdt`` within ``r`` of
-        ``full_ucoords[i]``.
+    integer or numpy.ndarray
+        Either number of neighbours in ``mag_cut_kdt`` within ``r`` of
+        ``full_ucoords[i]``, or the indices into ``mag_cut_kdt`` that are
+        within the specified range.
     """
-    i, (full_ucoords, mag_cut_kdt, r) = iterable
+    i, (full_ucoords, mag_cut_kdt, r, len_or_inds) = iterable
     # query_ball_point returns the neighbours of x (full_ucoords) around self
     # (mag_cut_kdt) within r.
-    kdt_query = mag_cut_kdt.query_ball_point(full_ucoords[i].cartesian.xyz, r)
-    return i, len(kdt_query)
+    kdt_query = mag_cut_kdt.query_ball_point(full_ucoords[i].cartesian.xyz, r, return_sorted=True)
+    if len_or_inds == 'len':
+        return i, len(kdt_query)
+    return i, kdt_query
 
 
 class SharedNumpyArray:

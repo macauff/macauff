@@ -18,6 +18,7 @@ from macauff.make_set_list import set_list
 from macauff.misc_functions import (
     SharedNumpyArray,
     _load_rectangular_slice,
+    calculate_overlap_counts,
     convex_hull_area,
     load_small_ref_auf_grid,
 )
@@ -52,144 +53,42 @@ def make_island_groupings(cm):
     print(f"{t} Rank {cm.rank}, chunk {cm.chunk_id}: Calculating maximum overlap...")
     sys.stdout.flush()
 
-    # The initial step to create island groupings is to find the largest number
-    # of overlaps for a single source, to minimise the size of the array of
-    # overlap indices. To do so, we load small-ish chunks of the sky, with
-    # padding in one catalogue to ensure all pairings can be found, and total
-    # the number of overlaps for each object across all sky slices.
-
-    ax1_skip, ax2_skip = 8, 8
-    ax1_loops = np.linspace(cm.cross_match_extent[0], cm.cross_match_extent[1], 41)
-    # Force the sub-division of the sky area in question to be 1600 chunks, or
-    # roughly quarter square degree chunks, whichever is larger in area.
-    if ax1_loops[1] - ax1_loops[0] < 0.25:
-        ax1_loops = np.linspace(cm.cross_match_extent[0], cm.cross_match_extent[1],
-                                int(np.ceil((cm.cross_match_extent[1] - cm.cross_match_extent[0])/0.25) + 1))
-    ax2_loops = np.linspace(cm.cross_match_extent[2], cm.cross_match_extent[3], 41)
-    if ax2_loops[1] - ax2_loops[0] < 0.25:
-        ax2_loops = np.linspace(cm.cross_match_extent[2], cm.cross_match_extent[3],
-                                int(np.ceil((cm.cross_match_extent[3] - cm.cross_match_extent[2])/0.25) + 1))
-    ax1_sparse_loops = ax1_loops[::ax1_skip]
-    if ax1_sparse_loops[-1] != ax1_loops[-1]:
-        ax1_sparse_loops = np.append(ax1_sparse_loops, ax1_loops[-1])
-    ax2_sparse_loops = ax2_loops[::ax2_skip]
-    if ax2_sparse_loops[-1] != ax2_loops[-1]:
-        ax2_sparse_loops = np.append(ax2_sparse_loops, ax2_loops[-1])
-
-    # Load the astrometry of each catalogue for slicing.
+    # Load the astrometry of each catalogue.
     a_full = cm.a_astro
     b_full = cm.b_astro
 
-    asize = np.zeros(dtype=int, shape=(len(a_full),))
-    bsize = np.zeros(dtype=int, shape=(len(b_full),))
+    # The initial step to create island groupings is to find the largest number
+    # of overlaps for a single source, to minimise the size of the array of
+    # overlap indices.
 
-    for i, (ax1_sparse_start, ax1_sparse_end) in enumerate(zip(ax1_sparse_loops[:-1],
-                                                               ax1_sparse_loops[1:])):
-        for j, (ax2_sparse_start, ax2_sparse_end) in enumerate(zip(ax2_sparse_loops[:-1],
-                                                                   ax2_sparse_loops[1:])):
-            a_big_sky_cut = _load_rectangular_slice(a_full, ax1_sparse_start, ax1_sparse_end,
-                                                    ax2_sparse_start, ax2_sparse_end, 0)
-            b_big_sky_cut = _load_rectangular_slice(b_full, ax1_sparse_start, ax1_sparse_end,
-                                                    ax2_sparse_start, ax2_sparse_end, max_sep)
-            a_cutout = a_full[a_big_sky_cut]
-            b_cutout = b_full[b_big_sky_cut]
+    _ainds = calculate_overlap_counts(a_full, b_full, -999, 999, max_sep, cm.n_pool, np.nan, 0, 1,
+                                      cm.cf_region_frame, 'array')
+    _binds = calculate_overlap_counts(b_full, a_full, -999, 999, max_sep, cm.n_pool, np.nan, 0, 1,
+                                      cm.cf_region_frame, 'array')
 
-            a_sky_inds = np.arange(0, len(a_full))[a_big_sky_cut]
-            b_sky_inds = np.arange(0, len(b_full))[b_big_sky_cut]
-            for ax1_start, ax1_end in zip(ax1_loops[i*ax1_skip:(i+1)*ax1_skip],
-                                          ax1_loops[i*ax1_skip+1:(i+1)*ax1_skip+1]):
-                for ax2_start, ax2_end in zip(ax2_loops[j*ax2_skip:(j+1)*ax2_skip],
-                                              ax2_loops[j*ax2_skip+1:(j+1)*ax2_skip+1]):
-                    ax_cutout = [ax1_start, ax1_end, ax2_start, ax2_end]
-                    a, afouriergrid, amodrefindsmall, a_cut = _load_fourier_grid_cutouts(
-                        a_cutout, ax_cutout, cm.a_perturb_auf_outputs, 0, a_big_sky_cut, cm.a_modelrefinds)
-                    b, bfouriergrid, bmodrefindsmall, b_cut = _load_fourier_grid_cutouts(
-                        b_cutout, ax_cutout, cm.b_perturb_auf_outputs, max_sep,
-                        b_big_sky_cut, cm.b_modelrefinds)
-                    if len(a) > 0 and len(b) > 0:
-                        overlapa, overlapb = gsf.get_max_overlap(
-                            a[:, 0], a[:, 1], b[:, 0], b[:, 1], max_sep, a[:, 2], b[:, 2],
-                            cm.r[:-1]+cm.dr/2, cm.rho[:-1], cm.drho, cm.j1s, afouriergrid, bfouriergrid,
-                            amodrefindsmall, bmodrefindsmall, cm.int_fracs[2])
-                        a_cut2 = a_sky_inds[a_cut]
-                        b_cut2 = b_sky_inds[b_cut]
-
-                        asize[a_cut2] = asize[a_cut2] + overlapa
-                        bsize[b_cut2] = bsize[b_cut2] + overlapb
-
-    amaxsize = int(np.amax(asize))
-    bmaxsize = int(np.amax(bsize))
-    del (overlapa, overlapb, a, b, a_cut, b_cut, amodrefindsmall, bmodrefindsmall,
-         afouriergrid, bfouriergrid)
+    amaxsize = int(np.amax([len(x) for x in _ainds]))
+    bmaxsize = int(np.amax([len(x) for x in _binds]))
 
     t = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     print(f"{t} Rank {cm.rank}, chunk {cm.chunk_id}: Truncating star overlaps by AUF integral...")
     sys.stdout.flush()
 
-    ainds = np.zeros(dtype=int, shape=(amaxsize, len(a_full)), order='F')
-    binds = np.zeros(dtype=int, shape=(bmaxsize, len(b_full)), order='F')
+    ainds = np.ones(dtype=int, shape=(amaxsize, len(a_full)), order='F') * -1
+    binds = np.ones(dtype=int, shape=(bmaxsize, len(b_full)), order='F') * -1
+    # Populate the indices into a fortran-acceptable grid, rather than nested list.
+    for i, x in enumerate(_ainds):
+        ainds[:len(x), i] = x
+    for i, x in enumerate(_binds):
+        binds[:len(x), i] = x
 
-    auf_cdf_a = np.zeros(dtype=float, shape=(amaxsize, len(a_full)), order='F')
-    auf_cdf_b = np.zeros(dtype=float, shape=(bmaxsize, len(b_full)), order='F')
+    asize = np.array([np.sum(ainds[:, i] >= 0) for i in range(ainds.shape[1])])
+    bsize = np.array([np.sum(binds[:, i] >= 0) for i in range(binds.shape[1])])
 
-    ainds[:, :] = -1
-    binds[:, :] = -1
-    auf_cdf_a[:, :] = -1
-    auf_cdf_b[:, :] = -1
-    asize[:] = 0
-    bsize[:] = 0
-
-    # pylint: disable-next=too-many-nested-blocks
-    for i, (ax1_sparse_start, ax1_sparse_end) in enumerate(zip(ax1_sparse_loops[:-1],
-                                                               ax1_sparse_loops[1:])):
-        for j, (ax2_sparse_start, ax2_sparse_end) in enumerate(zip(ax2_sparse_loops[:-1],
-                                                                   ax2_sparse_loops[1:])):
-            a_big_sky_cut = _load_rectangular_slice(a_full, ax1_sparse_start, ax1_sparse_end,
-                                                    ax2_sparse_start, ax2_sparse_end, 0)
-            b_big_sky_cut = _load_rectangular_slice(b_full, ax1_sparse_start, ax1_sparse_end,
-                                                    ax2_sparse_start, ax2_sparse_end, max_sep)
-            a_cutout = a_full[a_big_sky_cut]
-            b_cutout = b_full[b_big_sky_cut]
-
-            a_sky_inds = np.arange(0, len(a_full))[a_big_sky_cut]
-            b_sky_inds = np.arange(0, len(b_full))[b_big_sky_cut]
-            for ax1_start, ax1_end in zip(ax1_loops[i*ax1_skip:(i+1)*ax1_skip],
-                                          ax1_loops[i*ax1_skip+1:(i+1)*ax1_skip+1]):
-                for ax2_start, ax2_end in zip(ax2_loops[j*ax2_skip:(j+1)*ax2_skip],
-                                              ax2_loops[j*ax2_skip+1:(j+1)*ax2_skip+1]):
-                    ax_cutout = [ax1_start, ax1_end, ax2_start, ax2_end]
-                    a, afouriergrid, amodrefindsmall, a_cut = _load_fourier_grid_cutouts(
-                        a_cutout, ax_cutout, cm.a_perturb_auf_outputs, 0, a_big_sky_cut, cm.a_modelrefinds)
-                    b, bfouriergrid, bmodrefindsmall, b_cut = _load_fourier_grid_cutouts(
-                        b_cutout, ax_cutout, cm.b_perturb_auf_outputs, max_sep,
-                        b_big_sky_cut, cm.b_modelrefinds)
-
-                    if len(a) > 0 and len(b) > 0:
-                        (indicesa, indicesb, overlapa, overlapb,
-                         aufcdfa, aufcdfb) = gsf.get_overlap_indices(
-                            a[:, 0], a[:, 1], b[:, 0], b[:, 1], max_sep, amaxsize, bmaxsize,
-                            a[:, 2], b[:, 2], cm.r[:-1]+cm.dr/2, cm.rho[:-1], cm.drho, cm.j1s, afouriergrid,
-                            bfouriergrid, amodrefindsmall, bmodrefindsmall, cm.int_fracs[2])
-
-                        a_cut2 = a_sky_inds[a_cut]
-                        b_cut2 = b_sky_inds[b_cut]
-
-                        for k, _acut2 in enumerate(a_cut2):
-                            ainds[asize[_acut2]:asize[_acut2]+overlapa[k], _acut2] = \
-                                b_cut2[indicesa[:overlapa[k], k] - 1]
-                            auf_cdf_a[asize[_acut2]:asize[_acut2]+overlapa[k], _acut2] = \
-                                aufcdfa[:overlapa[k], k]
-                        for k, _bcut2 in enumerate(b_cut2):
-                            binds[bsize[_bcut2]:bsize[_bcut2]+overlapb[k], _bcut2] = \
-                                a_cut2[indicesb[:overlapb[k], k] - 1]
-                            auf_cdf_b[bsize[_bcut2]:bsize[_bcut2]+overlapb[k], _bcut2] = \
-                                aufcdfb[:overlapb[k], k]
-
-                        asize[a_cut2] = asize[a_cut2] + overlapa
-                        bsize[b_cut2] = bsize[b_cut2] + overlapb
-
-    del (a_cut, a_cut2, b_cut, b_cut2, indicesa, indicesb, overlapa, overlapb, a, b,
-         amodrefindsmall, bmodrefindsmall, afouriergrid, bfouriergrid)
+    ainds, binds, asize, bsize, auf_cdf_a, auf_cdf_b = gsf.get_overlap_indices(
+        a_full[:, 0], a_full[:, 1], b_full[:, 0], b_full[:, 1], ainds, asize, binds, bsize, amaxsize,
+        bmaxsize, a_full[:, 2], b_full[:, 2], cm.r[:-1]+cm.dr/2, cm.rho[:-1], cm.drho, cm.j1s,
+        cm.a_perturb_auf_outputs['fourier_grid'], cm.b_perturb_auf_outputs['fourier_grid'], cm.a_modelrefinds,
+        cm.b_modelrefinds, cm.int_fracs[2])
 
     t = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     print(f"{t} Rank {cm.rank}, chunk {cm.chunk_id}: Cleaning overlaps...")
@@ -395,7 +294,7 @@ def _load_fourier_grid_cutouts(a, sky_rect_coords, perturb_auf_outputs, padding,
     padding : float
         Maximum allowed sky separation the "wrong" side of ``sky_rect_coords``,
         allowing for an increase in sky box size which ensures that all overlaps
-        get caught in ``get_max_overlap`` and ``get_max_indices``.
+        get caught in ``get_overlap_indices``.
     large_sky_slice : boolean
         Slice array containing the ``True`` and ``False`` elements of which
         elements of the full catalogue, in ``con_cat_astro.npy``, are in ``a``.

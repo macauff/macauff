@@ -16,7 +16,7 @@ from macauff.group_sources import _clean_overlaps, _load_fourier_grid_cutouts, m
 from macauff.group_sources_fortran import group_sources_fortran as gsf
 from macauff.macauff import Macauff
 from macauff.matching import CrossMatch
-from macauff.misc_functions import create_auf_params_grid
+from macauff.misc_functions import create_auf_params_grid, calculate_overlap_counts
 from macauff.misc_functions_fortran import misc_functions_fortran as mff
 
 # pylint: enable=no-name-in-module,import-error
@@ -211,25 +211,46 @@ class TestOverlap():
         self.afouriergrid = np.ones((len(self.rho) - 1, 1, 1, 1), float)
         self.bfouriergrid = np.ones((len(self.rho) - 1, 1, 1, 1), float)
 
-    def test_get_max_overlap_fortran(self):
-        a_num, b_num = gsf.get_max_overlap(
-            self.a_ax_1, self.a_ax_2, self.b_ax_1, self.b_ax_2, self.max_sep/3600, self.a_axerr,
-            self.b_axerr, self.r[:-1]+self.dr/2, self.rho[:-1], self.drho, self.j1s,
-            self.afouriergrid, self.bfouriergrid, self.amodrefind, self.bmodrefind, self.max_frac)
+    def test_get_max_overlap(self):
+        a = np.vstack((self.a_ax_1, self.a_ax_2)).T
+        b = np.vstack((self.b_ax_1, self.b_ax_2)).T
+        a_num = calculate_overlap_counts(a, b, -999, 999, self.max_sep/3600, 1, np.nan, 0, 1,
+                                         'equatorial', 'len')
+        b_num = calculate_overlap_counts(b, a, -999, 999, self.max_sep/3600, 1, np.nan, 0, 1,
+                                         'equatorial', 'len')
 
         assert np.all(a_num.shape == (20,))
         assert np.all(b_num.shape == (19,))
         assert np.all(a_num ==
-                      np.array([1, 1, 1, 2, 1, 1, 1, 1, 1, 1, 1, 1, 2, 1, 1, 0, 0, 0, 1, 1]))
+                      np.array([1, 1, 1, 2, 1, 1, 1, 1, 1, 1, 1, 1, 2, 1, 1, 0, 0, 0, 1, 2]))
         assert np.all(b_num ==
-                      np.array([2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 1, 1, 0, 0, 1, 1]))
+                      np.array([2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 1, 1, 0, 0, 2, 1]))
 
-    def test_get_overlap_indices_fortran(self):
+    def test_get_overlap_indices_fortran(self):  # pylint: disable=too-many-locals
         a_max, b_max = 2, 2
+
+        a = np.vstack((self.a_ax_1, self.a_ax_2)).T
+        b = np.vstack((self.b_ax_1, self.b_ax_2)).T
+        _ainds = calculate_overlap_counts(a, b, -999, 999, self.max_sep/3600, 1, np.nan, 0, 1,
+                                          'equatorial', 'array')
+        _binds = calculate_overlap_counts(b, a, -999, 999, self.max_sep/3600, 1, np.nan, 0, 1,
+                                          'equatorial', 'array')
+        amaxsize = np.amax([len(x) for x in _ainds])
+        bmaxsize = np.amax([len(x) for x in _binds])
+        ainds = np.ones(dtype=int, shape=(amaxsize, len(a)), order='F') * -1
+        binds = np.ones(dtype=int, shape=(bmaxsize, len(b)), order='F') * -1
+        for i, x in enumerate(_ainds):
+            ainds[:len(x), i] = x
+        for i, x in enumerate(_binds):
+            binds[:len(x), i] = x
+
+        asize = np.array([np.sum(ainds[:, i] >= 0) for i in range(ainds.shape[1])])
+        bsize = np.array([np.sum(binds[:, i] >= 0) for i in range(binds.shape[1])])
+
         a_inds, b_inds, a_num, b_num, a_cdf, b_cdf = gsf.get_overlap_indices(
-            self.a_ax_1, self.a_ax_2, self.b_ax_1, self.b_ax_2, self.max_sep/3600, a_max, b_max,
-            self.a_axerr, self.b_axerr, self.r[:-1]+self.dr/2, self.rho[:-1], self.drho, self.j1s,
-            self.afouriergrid, self.bfouriergrid, self.amodrefind, self.bmodrefind, self.max_frac)
+            self.a_ax_1, self.a_ax_2, self.b_ax_1, self.b_ax_2, ainds, asize, binds, bsize,
+            a_max, b_max, self.a_axerr, self.b_axerr, self.r[:-1]+self.dr/2, self.rho[:-1], self.drho,
+            self.j1s, self.afouriergrid, self.bfouriergrid, self.amodrefind, self.bmodrefind, self.max_frac)
 
         assert np.all(a_num.shape == (20,))
         assert np.all(b_num.shape == (19,))
@@ -239,21 +260,21 @@ class TestOverlap():
                       np.array([2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 1, 1, 0, 0, 1, 1]))
 
         a_overlaps = -1*np.ones((2, 20), int)
-        for _i, _inds in enumerate([[0], [1], [2], [3, 18], [4], [5], [6], [7], [8], [9], [10],
+        for _j, _inds in enumerate([[0], [1], [2], [3, 18], [4], [5], [6], [7], [8], [9], [10],
                                     [11], [12, 17], [13], [14], [], [], [], [0], [12]]):
-            a_overlaps[:len(_inds), _i] = 1+np.array(_inds)
+            a_overlaps[:len(_inds), _j] = np.array(_inds)
         b_overlaps = -1*np.ones((2, 19), int)
-        for _i, _inds in enumerate([[0, 18], [1], [2], [3], [4], [5], [6], [7], [8], [9], [10],
+        for _j, _inds in enumerate([[0, 18], [1], [2], [3], [4], [5], [6], [7], [8], [9], [10],
                                     [11], [12, 19], [13], [14], [], [], [12], [3]]):
-            b_overlaps[:len(_inds), _i] = 1+np.array(_inds)
+            b_overlaps[:len(_inds), _j] = np.array(_inds)
         assert np.all(a_inds == a_overlaps)
         assert np.all(b_inds == b_overlaps)
 
         fake_a_cdf = np.ones((a_max, len(self.a_ax_1)), float) * 2
         for i, _anum in enumerate(a_num):
             for j in range(_anum):
-                d = mff.haversine_wrapper(self.a_ax_1[i], self.b_ax_1[a_overlaps[j, i]-1], self.a_ax_2[i],
-                                          self.b_ax_2[a_overlaps[j, i]-1])
+                d = mff.haversine_wrapper(self.a_ax_1[i], self.b_ax_1[a_overlaps[j, i]], self.a_ax_2[i],
+                                          self.b_ax_2[a_overlaps[j, i]])
                 fake_a_cdf[j, i] = 1 - np.exp(-0.5 * d**2 / ((self.a_axerr[i]**2 +
                                                               self.b_axerr[a_overlaps[j, i]-1]**2)/3600**2))
         assert_allclose(a_cdf, fake_a_cdf, atol=1e-5, rtol=0.001)
@@ -261,8 +282,8 @@ class TestOverlap():
         fake_b_cdf = np.ones((b_max, len(self.b_ax_1)), float) * 2
         for i, _bnum in enumerate(b_num):
             for j in range(_bnum):
-                d = mff.haversine_wrapper(self.b_ax_1[i], self.a_ax_1[b_overlaps[j, i]-1], self.b_ax_2[i],
-                                          self.a_ax_2[b_overlaps[j, i]-1])
+                d = mff.haversine_wrapper(self.b_ax_1[i], self.a_ax_1[b_overlaps[j, i]], self.b_ax_2[i],
+                                          self.a_ax_2[b_overlaps[j, i]])
                 fake_b_cdf[j, i] = 1 - np.exp(-0.5 * d**2 / ((self.b_axerr[i]**2 +
                                                               self.a_axerr[b_overlaps[j, i]-1]**2)/3600**2))
         assert_allclose(b_cdf, fake_b_cdf, atol=1e-5, rtol=0.001)
