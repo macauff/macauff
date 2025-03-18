@@ -338,24 +338,33 @@ class TestMakeIslandGroupings():  # pylint: disable=too-many-instance-attributes
         seed = 123456  # reproducible seed!
         self.rng = np.random.default_rng(seed)
 
-        a_coords = np.empty((self.n_a, 3), float)
-        a_coords[:, 0] = self.rng.uniform(self.ax_lims[0]+0.5, self.ax_lims[1]-0.5, self.n_a)
-        a_coords[:, 1] = self.rng.uniform(self.ax_lims[2]+0.5, self.ax_lims[3]-0.5, self.n_a)
+        a_coords = np.empty((self.n_a + 4, 3), float)
+        a_coords[:-4, 0] = self.rng.uniform(self.ax_lims[0]+0.5, self.ax_lims[1]-0.5, self.n_a)
+        a_coords[:-4, 1] = self.rng.uniform(self.ax_lims[2]+0.5, self.ax_lims[3]-0.5, self.n_a)
         a_coords[:, 2] = self.sigma
         # Move one source to have a forced overlap of objects
-        a_coords[-1, :2] = a_coords[0, :2] + [0.01*self.sigma/3600, 0.02*self.sigma/3600]
-        b_coords = np.empty((self.n_b, 3), float)
+        a_coords[-5, :2] = a_coords[0, :2] + [0.01*self.sigma/3600, 0.02*self.sigma/3600]
+        b_coords = np.empty((self.n_b + 4, 3), float)
         # Make sure that the N_com=25 matches all return based on Gaussian integrals.
         b_coords[:self.n_com, 0] = a_coords[:self.n_com, 0] + self.rng.uniform(
             -2, 2, self.n_com)*self.sigma/3600
         b_coords[:self.n_com, 1] = a_coords[:self.n_com, 1] + self.rng.uniform(
             -2, 2, self.n_com)*self.sigma/3600
         # This should leave us with 4 "a" and 20 "b" singular matches.
-        b_coords[self.n_com:, 0] = self.rng.uniform(self.ax_lims[0]+0.5,
-                                                    self.ax_lims[1]-0.5, self.n_b-self.n_com)
-        b_coords[self.n_com:, 1] = self.rng.uniform(self.ax_lims[2]+0.5,
-                                                    self.ax_lims[3]-0.5, self.n_b-self.n_com)
+        b_coords[self.n_com:-4, 0] = self.rng.uniform(self.ax_lims[0]+0.5,
+                                                      self.ax_lims[1]-0.5, self.n_b-self.n_com)
+        b_coords[self.n_com:-4, 1] = self.rng.uniform(self.ax_lims[2]+0.5,
+                                                      self.ax_lims[3]-0.5, self.n_b-self.n_com)
         b_coords[:, 2] = self.sigma
+
+        a_coords[-4, [0, 1]] = [self.ax_lims[0], self.ax_lims[2]]
+        a_coords[-3, [0, 1]] = [self.ax_lims[1], self.ax_lims[2]]
+        a_coords[-2, [0, 1]] = [self.ax_lims[0], self.ax_lims[3]]
+        a_coords[-1, [0, 1]] = [self.ax_lims[1], self.ax_lims[3]]
+        b_coords[-4, [0, 1]] = [self.ax_lims[0], self.ax_lims[2]+1.5/3600]
+        b_coords[-3, [0, 1]] = [self.ax_lims[1], self.ax_lims[2]+1.5/3600]
+        b_coords[-2, [0, 1]] = [self.ax_lims[0], self.ax_lims[3]-1.5/3600]
+        b_coords[-1, [0, 1]] = [self.ax_lims[1], self.ax_lims[3]-1.5/3600]
 
         self.a_coords, self.b_coords = a_coords, b_coords
 
@@ -417,7 +426,7 @@ class TestMakeIslandGroupings():  # pylint: disable=too-many-instance-attributes
         for auf_folder, auf_points, filters, n in zip(
                 [self.a_auf_folder_path, self.b_auf_folder_path],
                 [self.a_auf_pointings, self.b_auf_pointings],
-                [self.a_filt_names, self.b_filt_names], [n_a, n_b]):
+                [self.a_filt_names, self.b_filt_names], [n_a + 4, n_b + 4]):
             np.save(f'{auf_folder}/modelrefinds.npy', np.zeros((3, n), int))
             if 'gaia' in auf_folder:
                 self.a_modelrefinds = np.zeros((3, n), int)
@@ -484,10 +493,14 @@ class TestMakeIslandGroupings():  # pylint: disable=too-many-instance-attributes
         alist, blist = self.cm.alist, self.cm.blist
         agrplen, bgrplen = self.cm.agrplen, self.cm.bgrplen
         self._comparisons_in_islands(alist, blist, agrplen, bgrplen, n_a, n_b, n_c)
-        assert self.cm.lenrejecta == 0
-        assert self.cm.lenrejectb == 0
-        assert self.cm.reject_a is None
-        assert self.cm.reject_b is None
+        # We should only have removed the four boundary-defining objects. With
+        # the boundaries defined by the objects themselves we can't ever not
+        # remove any objects unless we turn off the ability to remove edge
+        # sources altogther.
+        assert self.cm.lenrejecta == 4
+        assert self.cm.lenrejectb == 4
+        assert np.all(self.cm.reject_a == np.arange(self.n_a, self.n_a+4))
+        assert np.all(self.cm.reject_b == np.arange(self.n_b, self.n_b+4))
 
     @pytest.mark.filterwarnings("ignore:.*island, containing.*")
     def test_mig_extra_reject(self):  # pylint: disable=too-many-statements
@@ -497,28 +510,36 @@ class TestMakeIslandGroupings():  # pylint: disable=too-many-instance-attributes
         ax_lims = self.ax_lims
         # Fake moving some sources to within max_sep of the axlims edges, to
         # test the removal of these objects -- combined with the above sources.
-        a_coords = np.empty((self.n_a+10, 3), float)
-        a_coords[:self.n_a, 0] = self.a_coords[:, 0]
-        a_coords[:self.n_a, 1] = self.a_coords[:, 1]
-        a_coords[:self.n_a, 2] = self.a_coords[:, 2]
-        b_coords = np.empty((self.n_b+11, 3), float)
-        b_coords[:self.n_b, 0] = self.b_coords[:, 0]
-        b_coords[:self.n_b, 1] = self.b_coords[:, 1]
-        b_coords[:self.n_b, 2] = self.b_coords[:, 2]
+        a_coords = np.empty((self.n_a+10 + 4, 3), float)
+        a_coords[:self.n_a, 0] = self.a_coords[:-4, 0]
+        a_coords[:self.n_a, 1] = self.a_coords[:-4, 1]
+        a_coords[:self.n_a, 2] = self.a_coords[:-4, 2]
+        a_coords[-4:, 0] = self.a_coords[-4:, 0]
+        a_coords[-4:, 1] = self.a_coords[-4:, 1]
+        a_coords[-4:, 2] = self.a_coords[-4:, 2]
+        # +4 for the points defining the extents.
+        b_coords = np.empty((self.n_b+11 + 4, 3), float)
+        b_coords[:self.n_b, 0] = self.b_coords[:-4, 0]
+        b_coords[:self.n_b, 1] = self.b_coords[:-4, 1]
+        b_coords[:self.n_b, 2] = self.b_coords[:-4, 2]
+        b_coords[-4:, 0] = self.b_coords[-4:, 0]
+        b_coords[-4:, 1] = self.b_coords[-4:, 1]
+        b_coords[-4:, 2] = self.b_coords[-4:, 2]
         a_c_diff = a_coords[3:6, 0] - (ax_lims[0] + self.max_sep/3600 - 1/3600)
         a_coords[3:6, 0] = ax_lims[0] + self.max_sep/3600 - 1/3600
         b_coords[3:6, 0] -= a_c_diff
         # Add extra objects to be removed due to group length being
         # exceeded during make_set_list.
-        a_coords[self.n_a:, 0] = 0.5*(ax_lims[0]+ax_lims[1])
-        b_coords[self.n_b:, 0] = 0.5*(ax_lims[0]+ax_lims[1])
-        a_coords[self.n_a:, 1] = 0.5*(ax_lims[2]+ax_lims[3])
-        b_coords[self.n_b:, 1] = 0.5*(ax_lims[2]+ax_lims[3])
-        a_coords[self.n_a:, 2] = 0.5
-        b_coords[self.n_b:, 2] = 0.5
+        a_coords[self.n_a:-4, 0] = 0.5*(ax_lims[0]+ax_lims[1])
+        b_coords[self.n_b:-4, 0] = 0.5*(ax_lims[0]+ax_lims[1])
+        a_coords[self.n_a:-4, 1] = 0.5*(ax_lims[2]+ax_lims[3])
+        b_coords[self.n_b:-4, 1] = 0.5*(ax_lims[2]+ax_lims[3])
+        a_coords[self.n_a:-4, 2] = 0.5
+        b_coords[self.n_b:-4, 2] = 0.5
         np.save(f'{self.a_cat_folder_path}/con_cat_astro.npy', a_coords)
         np.save(f'{self.b_cat_folder_path}/con_cat_astro.npy', b_coords)
 
+        self.cm.chunk_id = 1
         self.cm.a_perturb_auf_outputs = self.a_perturb_auf_outputs
         self.cm.b_perturb_auf_outputs = self.b_perturb_auf_outputs
         self.cm.a_modelrefinds = self.a_modelrefinds
@@ -552,45 +573,58 @@ class TestMakeIslandGroupings():  # pylint: disable=too-many-instance-attributes
 
         areject = self.cm.reject_a
         breject = self.cm.reject_b
-        assert np.all(areject.shape == (10+3,))
-        assert np.all(breject.shape == (11+3,))
-        assert np.all(areject == np.concatenate(([3, 4, 5], np.arange(n_a, n_a+10))))
-        assert np.all(breject == np.concatenate(([3, 4, 5], np.arange(n_b, n_b+11))))
+        assert np.all(areject.shape == (10+3 + 4,))
+        assert np.all(breject.shape == (11+3 + 4,))
+        assert np.all(areject == np.concatenate(([3, 4, 5], [40, 41, 42, 43], np.arange(n_a, n_a+10))))
+        assert np.all(breject == np.concatenate(([3, 4, 5], [56, 57, 58, 59], np.arange(n_b, n_b+11))))
 
     @pytest.mark.filterwarnings("ignore:.*island, containing.*")
+    # pylint: disable-next=too-many-statements
     def test_mig_no_reject_ax_lims(self):
         os.system(f'rm -rf {self.joint_folder_path}/*')
-        self._fake_fourier_grid(self.n_a+10, self.n_b+11)
+        # _fake_fourier_grid pads for an assumed 4 pointing sources, but we
+        # have six here to account for projection effects at the poles.
+        self._fake_fourier_grid(self.n_a + 2, self.n_b + 2)
         n_a, n_b, n_c = self.n_a, self.n_b, self.n_com
-        ax_lims = np.array([0, 360, -90, -88])
+        ax_lims = np.array([0+0.0003, 360-0.0003, -90+0.0003, 90-0.0003])
         # Check if axlims are changed to include wrap-around 0/360, or +-90 latitude,
         # then we don't reject any sources.
-        a_coords = np.empty((self.n_a+10, 3), float)
-        a_coords[:self.n_a, 0] = self.a_coords[:, 0]
+        a_coords = np.empty((self.n_a + 6, 3), float)
+        a_coords[:self.n_a, 0] = self.a_coords[:-4, 0]
         # Set up -26 to -24, and we now want them -90 to -88:
-        a_coords[:self.n_a, 1] = self.a_coords[:, 1] - 64
-        a_coords[:self.n_a, 2] = self.a_coords[:, 2]
-        b_coords = np.empty((self.n_b+11, 3), float)
-        b_coords[:self.n_b, 0] = self.b_coords[:, 0]
-        b_coords[:self.n_b, 1] = self.b_coords[:, 1] - 64
-        b_coords[:self.n_b, 2] = self.b_coords[:, 2]
+        a_coords[:self.n_a, 1] = self.a_coords[:-4, 1] - 64
+        a_coords[:self.n_a, 2] = self.a_coords[:-4, 2]
+        b_coords = np.empty((self.n_b + 6, 3), float)
+        b_coords[:self.n_b, 0] = self.b_coords[:-4, 0]
+        b_coords[:self.n_b, 1] = self.b_coords[:-4, 1] - 64
+        b_coords[:self.n_b, 2] = self.b_coords[:-4, 2]
+        # Force two extra coordinates to make (0, 0) and (360, 0) boundaries.
+        a_coords[-6, [0, 1]] = [ax_lims[0], 0]
+        a_coords[-5, [0, 1]] = [ax_lims[1], 0]
+        a_coords[-4, [0, 1]] = [ax_lims[0], ax_lims[2]]
+        a_coords[-3, [0, 1]] = [ax_lims[1], ax_lims[2]]
+        a_coords[-2, [0, 1]] = [ax_lims[0], ax_lims[3]]
+        a_coords[-1, [0, 1]] = [ax_lims[1], ax_lims[3]]
+        b_coords[-6, [0, 1]] = [ax_lims[0], 0+1.5/3600]
+        b_coords[-5, [0, 1]] = [ax_lims[1], 0+1.5/3600]
+        b_coords[-4, [0, 1]] = [ax_lims[0], ax_lims[2]+1.5/3600]
+        b_coords[-3, [0, 1]] = [ax_lims[1], ax_lims[2]+1.5/3600]
+        b_coords[-2, [0, 1]] = [ax_lims[0], ax_lims[3]-3/3600]
+        b_coords[-1, [0, 1]] = [ax_lims[1], ax_lims[3]-3/3600]
+        a_coords[-6:-4, 2] = self.a_coords[-4:-2, 2]
+        b_coords[-6:-4, 2] = self.b_coords[-4:-2, 2]
+        a_coords[-4:, 2] = self.a_coords[-4:, 2]
+        b_coords[-4:, 2] = self.b_coords[-4:, 2]
         a_c_diff = a_coords[3:6, 0] - (ax_lims[0] + self.max_sep/3600 - 1/3600)
         a_coords[3:6, 0] = ax_lims[0] + self.max_sep/3600 - 1/3600
         b_coords[3:6, 0] -= a_c_diff
-        a_coords[7, :2] = [15, -90+(self.max_sep-3)/3600]
+        a_coords[7, :2] = [180, -90+(self.max_sep-3)/3600]
         b_coords[7, :2] = a_coords[7, :2] + [0.2*self.sigma/3600, -0.15*self.sigma/3600]
-        # Add extra objects to be removed due to group length being
-        # exceeded during make_set_list.
-        a_coords[self.n_a:, 0] = 0.5*(ax_lims[0]+ax_lims[1])
-        b_coords[self.n_b:, 0] = 0.5*(ax_lims[0]+ax_lims[1])
-        a_coords[self.n_a:, 1] = 0.5*(ax_lims[2]+ax_lims[3])
-        b_coords[self.n_b:, 1] = 0.5*(ax_lims[2]+ax_lims[3])
-        a_coords[self.n_a:, 2] = 0.5
-        b_coords[self.n_b:, 2] = 0.5
 
         np.save(f'{self.a_cat_folder_path}/con_cat_astro.npy', a_coords)
         np.save(f'{self.b_cat_folder_path}/con_cat_astro.npy', b_coords)
 
+        self.cm.chunk_id = 1
         self.cm.cross_match_extent = ax_lims
         self.cm.a_perturb_auf_outputs = self.a_perturb_auf_outputs
         self.cm.b_perturb_auf_outputs = self.b_perturb_auf_outputs
@@ -603,14 +637,33 @@ class TestMakeIslandGroupings():  # pylint: disable=too-many-instance-attributes
 
         alist, blist = self.cm.alist, self.cm.blist  # pylint: disable=no-member
         agrplen, bgrplen = self.cm.agrplen, self.cm.bgrplen  # pylint: disable=no-member
-        # The same tests that were ran in make_island_groupings should pass here.
-        self._comparisons_in_islands(alist, blist, agrplen, bgrplen, n_a, n_b, n_c)
-        areject = self.cm.reject_a
-        breject = self.cm.reject_b
-        assert np.all(areject.shape == (10,))
-        assert np.all(breject.shape == (11,))
-        assert np.all(areject == np.arange(n_a, n_a+10))
-        assert np.all(breject == np.arange(n_b, n_b+11))
+        # The same tests that were ran in make_island_groupings should pass here, once
+        # we remove the six additional points that survive at (0, -90), (360, -90),
+        # (0, 0), or (360, 0) that we used to force the box size.
+        q = np.ones(alist.shape[1], bool)
+        for i in range(len(q)):  # pylint: disable=consider-using-enumerate
+            al, bl = alist[:agrplen[i], i], blist[:bgrplen[i], i]
+            q[i] = np.any([np.any(a_coords[al, 0] < 1e-3), np.any(a_coords[al, 0] > 360-1e-3),
+                           np.any(b_coords[bl, 0] < 1e-3), np.any(b_coords[bl, 0] > 360-1e-3)])
+        self._comparisons_in_islands(alist[:, ~q], blist[:, ~q], agrplen[~q], bgrplen[~q], n_a, n_b, n_c)
+        # All fake pointing sources should be lonely by definition.
+        _alist = np.ones((2, np.sum(q)), int) * -1
+        _alist[0, :6] = np.arange(self.n_a, self.n_a+6)
+        assert np.all(alist[:, q] == _alist)
+        _agrplen = np.zeros(np.sum(q), int)
+        _agrplen[:6] = 1
+        assert np.all(agrplen[q] == _agrplen)
+        _blist = np.ones((1, np.sum(q)), int) * -1
+        _blist[0, 6:] = np.arange(self.n_b, self.n_b+6)
+        assert np.all(blist[:, q] == _blist)
+        _bgrplen = np.zeros(np.sum(q), int)
+        _bgrplen[6:] = 1
+        assert np.all(bgrplen[q] == _bgrplen)
+        # We reject no objects in this all-sky scenario.
+        assert self.cm.lenrejecta == 0
+        assert self.cm.lenrejectb == 0
+        assert self.cm.reject_a is None
+        assert self.cm.reject_b is None
 
     def test_make_island_groupings_include_phot_like(self):  # pylint: disable=too-many-statements
         os.system(f'rm -rf {self.joint_folder_path}/*')
@@ -618,6 +671,7 @@ class TestMakeIslandGroupings():  # pylint: disable=too-many-instance-attributes
         np.save(f'{self.a_cat_folder_path}/con_cat_astro.npy', self.a_coords)
         np.save(f'{self.b_cat_folder_path}/con_cat_astro.npy', self.b_coords)
         self.cm.include_phot_like = True
+        self.cm.chunk_id = 1
         self.cm.cross_match_extent = self.ax_lims
         self.cm.a_perturb_auf_outputs = self.a_perturb_auf_outputs
         self.cm.b_perturb_auf_outputs = self.b_perturb_auf_outputs
@@ -634,10 +688,11 @@ class TestMakeIslandGroupings():  # pylint: disable=too-many-instance-attributes
         self._comparisons_in_islands(alist, blist, agrplen, bgrplen, self.n_a, self.n_b,
                                      self.n_com)
 
-        assert self.cm.lenrejecta == 0
-        assert self.cm.lenrejectb == 0
-        assert self.cm.reject_a is None
-        assert self.cm.reject_b is None
+        # Always reject the four "pointer" objects.
+        assert self.cm.lenrejecta == 4
+        assert self.cm.lenrejectb == 4
+        assert np.all(self.cm.reject_a == np.arange(self.n_a, self.n_a+4))
+        assert np.all(self.cm.reject_b == np.arange(self.n_b, self.n_b+4))
 
         aerr = np.load(f'{self.a_cat_folder_path}/con_cat_astro.npy')[:, 2]
         berr = np.load(f'{self.b_cat_folder_path}/con_cat_astro.npy')[:, 2]

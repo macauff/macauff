@@ -18,7 +18,7 @@ from macauff.utils import generate_random_data
 
 
 @pytest.mark.parametrize("x,y", [(131, 0), (0, 0)])
-# pylint: disable=too-many-locals
+# pylint: disable=too-many-locals,too-many-statements
 def test_naive_bayes_match(x, y):
     # Generate a small number of sources randomly, then run through the
     # cross-match process.
@@ -27,12 +27,46 @@ def test_naive_bayes_match(x, y):
     a_astro_sig, b_astro_sig = 0.3, 0.5
     r = 5 * np.sqrt(a_astro_sig**2 + b_astro_sig**2)
     dx = np.sqrt(n_b * np.pi * r**2)/3600
-    extent = [x-dx/2, x+dx/2, y-dx/2, y+dx/2]
+    extent = np.array([x-1.3*dx/2-r/3600, x+1.3*dx/2+r/3600, y-1.3*dx/2-r/3600, y+1.3*dx/2+r/3600])
 
     a_cat, b_cat = 'a_cat', 'b_cat'
 
-    generate_random_data(n_a, n_b, n_c, extent, n_a_filts, n_b_filts, a_astro_sig, b_astro_sig,
-                         a_cat, b_cat, seed=9999)
+    generate_random_data(n_a, n_b, n_c, extent + np.array([1.1*r/3600, -1.1*r/3600, 1.1*r/3600, -1.1*r/3600]),
+                         n_a_filts, n_b_filts, a_astro_sig, b_astro_sig, a_cat, b_cat, seed=9999)
+    a_astro = np.load(f"{a_cat}/con_cat_astro.npy")
+    a_mp = np.load(f"{a_cat}/test_match_indices.npy")
+    lonely_counter = 0
+    for i in range(len(a_astro)):
+        if i not in a_mp:
+            if lonely_counter == 0:
+                a_astro[i, [0, 1]] = [extent[0], extent[2]]
+            if lonely_counter == 1:
+                a_astro[i, [0, 1]] = [extent[1], extent[2]]
+            if lonely_counter == 2:
+                a_astro[i, [0, 1]] = [extent[0], extent[3]]
+            if lonely_counter == 3:
+                a_astro[i, [0, 1]] = [extent[1], extent[3]]
+            if lonely_counter == 4:
+                break
+            lonely_counter += 1
+    b_astro = np.load(f"{b_cat}/con_cat_astro.npy")
+    b_mp = np.load(f"{b_cat}/test_match_indices.npy")
+    lonely_counter = 0
+    for i in range(len(b_astro)):
+        if i not in b_mp:
+            if lonely_counter == 0:
+                b_astro[i, [0, 1]] = [extent[0], extent[2]]
+            if lonely_counter == 1:
+                b_astro[i, [0, 1]] = [extent[1], extent[2]]
+            if lonely_counter == 2:
+                b_astro[i, [0, 1]] = [extent[0], extent[3]]
+            if lonely_counter == 3:
+                b_astro[i, [0, 1]] = [extent[1], extent[3]]
+            if lonely_counter == 4:
+                break
+            lonely_counter += 1
+    np.save(f"{a_cat}/con_cat_astro.npy", a_astro)
+    np.save(f"{b_cat}/con_cat_astro.npy", b_astro)
 
     # Ensure output chunk directory exists
     os.makedirs(os.path.join(os.path.dirname(__file__), "data/chunk0"), exist_ok=True)

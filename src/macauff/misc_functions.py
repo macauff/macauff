@@ -435,7 +435,9 @@ def convex_hull_area(x, y, return_hull=False):
     new_x = x + x_shift
     new_x[new_x > 360] = new_x[new_x > 360] - 360
     new_x[new_x < 0] = new_x[new_x < 0] + 360
-    new_x_cosd = new_x * np.cos(np.radians(y))
+    # Pad cos-delta factor to avoid precisely collapsing to a singularity at
+    # either pole.
+    new_x_cosd = new_x * (np.cos(np.radians(y)) + 1e-10)
     hull = ConvexHull(np.array([new_x_cosd, y]).T)
     area = shoelace_formula_area(new_x_cosd[hull.vertices], y[hull.vertices])
 

@@ -18,9 +18,10 @@ from macauff.make_set_list import set_list
 from macauff.misc_functions import (
     SharedNumpyArray,
     _load_rectangular_slice,
-    hav_dist_constant_lat,
+    convex_hull_area,
     load_small_ref_auf_grid,
 )
+from macauff.misc_functions_fortran import misc_functions_fortran as mff
 
 # pylint: enable=import-error,no-name-in-module
 
@@ -249,39 +250,54 @@ def make_island_groupings(cm):
     num_a_failed_checks = 0
     num_b_failed_checks = 0
 
-    # Here, since we know no source can be outside of extent, we can simply
-    # look at whether any source has a sky separation of less than max_sep
-    # from any of the four lines defining extent in orthogonal sky axes.
-    counter = np.arange(0, alist.shape[1])
-    shared_a = SharedNumpyArray(a_full, f'a_full_{cm.chunk_id}')
-    shared_b = SharedNumpyArray(b_full, f'b_full_{cm.chunk_id}')
-    shared_alist = SharedNumpyArray(alist, f'alist_{cm.chunk_id}')
-    shared_blist = SharedNumpyArray(blist, f'blis_{cm.chunk_id}t')
-    shared_agrplen = SharedNumpyArray(agrplen, f'agrplen_{cm.chunk_id}')
-    shared_bgrplen = SharedNumpyArray(bgrplen, f'bgrplen_{cm.chunk_id}')
-    expand_constants = [itertools.repeat(item) for item in [
-        shared_a, shared_b, shared_alist, shared_blist, shared_agrplen, shared_bgrplen,
-        cm.cross_match_extent, max_sep]]
-    iter_group = zip(counter, *expand_constants)
-    # Initialise the multiprocessing loop setup:
-    with multiprocessing.Pool(cm.n_pool) as pool:
-        for return_items in pool.imap_unordered(_distance_check, iter_group,
-                                                chunksize=max(1, len(counter) // cm.n_pool)):
-            i, dist_check, a, b = return_items
-            if dist_check:
-                passed_check[i] = 1
-                failed_check[i] = 0
-            else:
-                # While "good" islands just need their total number incrementing
-                # for the group, "failed" islands we need to track the number of
-                # sources in each catalogue for.
-                num_a_failed_checks += len(a)
-                num_b_failed_checks += len(b)
+    _, a_hull_points, a_hull_x_shift = convex_hull_area(
+        a_full[:, 0], a_full[:, 1], return_hull=True)
+    _, b_hull_points, b_hull_x_shift = convex_hull_area(
+        b_full[:, 0], b_full[:, 1], return_hull=True)
 
-    pool.join()
+    # "Pad factor" to allow for a percentage of missing search circle in cases
+    # where e.g. we are 0-360 wrapped and have a "missing" meridian slice.
+    # acceptable_lost_circle_frac here is equal to A_segment / A_circle, giving
+    # an inflation factor for our search radius x \equiv d/r.
+    acceptable_lost_circle_frac = 0.1
+    x = np.linspace(0, 1, 1001)
+    f = np.arccos(x) - x * np.sqrt(1 - x**2)
+    ind = np.argmin(np.abs(f - np.pi * acceptable_lost_circle_frac))
+    new_max_sep = max_sep / x[ind]
 
-    for _shared in [shared_a, shared_b, shared_alist, shared_blist, shared_agrplen, shared_bgrplen]:
-        _shared.unlink()
+    seed = np.random.default_rng().choice(100000, size=(mff.get_random_seed_size(), len(a_full)))
+    a_hull_radius_overlap = mff.get_circle_area_overlap(
+        a_full[:, 0] + a_hull_x_shift, a_full[:, 1], new_max_sep,
+        np.append(a_hull_points[:, 0], a_hull_points[0, 0]),
+        np.append(a_hull_points[:, 1], a_hull_points[0, 1]), seed)
+    a_hull_overlap_frac = a_hull_radius_overlap / (np.pi * new_max_sep**2)
+    seed = np.random.default_rng().choice(100000, size=(mff.get_random_seed_size(), len(b_full)))
+    b_hull_radius_overlap = mff.get_circle_area_overlap(
+        b_full[:, 0] + b_hull_x_shift, b_full[:, 1], new_max_sep,
+        np.append(b_hull_points[:, 0], b_hull_points[0, 0]),
+        np.append(b_hull_points[:, 1], b_hull_points[0, 1]), seed)
+    b_hull_overlap_frac = b_hull_radius_overlap / (np.pi * new_max_sep**2)
+
+    for i in range(alist.shape[1]):
+        ahof = a_hull_overlap_frac[alist[:agrplen[i], i]]
+        bhof = b_hull_overlap_frac[blist[:bgrplen[i], i]]
+
+        # A failed check would be any where *hof is too small, and hence we
+        # lost some of the circle to being outside of the hull. If no objects
+        # have fractions that are below some critical value then we can keep
+        # the island.
+        dist_check = np.all(ahof > (1 - acceptable_lost_circle_frac)) & np.all(
+            bhof > (1 - acceptable_lost_circle_frac))
+
+        if dist_check:
+            passed_check[i] = 1
+            failed_check[i] = 0
+        else:
+            # While "good" islands just need their total number incrementing
+            # for the group, "failed" islands we need to track the number of
+            # sources in each catalogue for.
+            num_a_failed_checks += agrplen[i]
+            num_b_failed_checks += bgrplen[i]
 
     # If set_list returned any rejected sources, then add any sources too close
     # to match extent to those now. Ensure that we only reject the unique source IDs
@@ -471,54 +487,3 @@ def _calc_unique_inds(iterable):
     i, inds, cdf = iterable
     x, inds_for_x = np.unique(inds.read()[inds.read()[:, i] > -1, i], return_index=True)
     return i, x, cdf.read()[inds.read()[:, i] > -1, i][inds_for_x]
-
-
-def _distance_check(iterable):
-    i, a_, b_, alist_1, blist_1, agrplen_small, bgrplen_small, ax_lims, max_sep = iterable
-    subset = alist_1.read()[:agrplen_small.read()[i], i]
-    a = a_.read()[subset]
-    subset = blist_1.read()[:bgrplen_small.read()[i], i]
-    b = b_.read()[subset]
-    meets_min_distance = np.zeros(len(a)+len(b), bool)
-    # Do not check for longitudinal "extent" small separations for cases
-    # where all 0-360 degrees are included, as this will result in no loss
-    # of sources from consideration, with the 0->360 wraparound of
-    # coordinates. In either case if there is a small slice of sky not
-    # considered, however, we must remove sources near the "empty" strip.
-    # Likely redundant, explicitly check for either limits being inside of
-    # 0-360 exactly by the top edge being <360 but also the bottom edge
-    # being positive or negative -- i.e., not exactly zero.
-    if ax_lims[0] > 0 or ax_lims[0] < 0 or ax_lims[1] < 360:
-        for lon in ax_lims[:2]:
-            # The Haversine formula doesn't care if lon < 0 or if lon ~ 360,
-            # so no need to consider ax_lims that straddle 0 longitude here.
-            is_within_dist_of_lon = (
-                hav_dist_constant_lat(a[:, 0], a[:, 1], lon) <= max_sep)
-            # Progressively update the boolean for each source in the group
-            # for each distance check for the four extents.
-            meets_min_distance[:len(a)] = (meets_min_distance[:len(a)] |
-                                           is_within_dist_of_lon)
-    # Similarly, if either "latitude" is set to 90 degrees, we cannot have
-    # lack of up-down missing sources, so we must check (individually this
-    # time) for whether we should skip this check.
-    for lat in ax_lims[2:]:
-        if np.abs(lat) < 90:
-            is_within_dist_of_lat = np.abs(a[:, 1] - lat) <= max_sep
-            meets_min_distance[:len(a)] = (meets_min_distance[:len(a)] |
-                                           is_within_dist_of_lat)
-
-    # Because all sources in BOTH catalogues must pass, we continue
-    # to update meets_min_distance for catalogue "b" as well.
-    if ax_lims[0] > 0 or ax_lims[0] < 0 or ax_lims[1] < 360:
-        for lon in ax_lims[:2]:
-            is_within_dist_of_lon = (
-                hav_dist_constant_lat(b[:, 0], b[:, 1], lon) <= max_sep)
-            meets_min_distance[len(a):] = (meets_min_distance[len(a):] |
-                                           is_within_dist_of_lon)
-    for lat in ax_lims[2:]:
-        if np.abs(lat) < 90:
-            is_within_dist_of_lat = np.abs(b[:, 1] - lat) <= max_sep
-            meets_min_distance[len(a):] = (meets_min_distance[len(a):] |
-                                           is_within_dist_of_lat)
-
-    return [i, np.all(meets_min_distance == 0), a, b]
