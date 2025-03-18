@@ -777,7 +777,7 @@ def create_single_perturb_auf(auf_point, r, dr, j0s, num_trials, psf_fwhm, densi
     dm_max = _calculate_magnitude_offsets(count_array, mag_array, b, snr, model_mag_mids, log10y,
                                           model_mags_interval, psf_r, model_count)
 
-    seed = np.random.default_rng().choice(100000, size=(paf.get_random_seed_size(),
+    seed = np.random.default_rng().choice(100000, size=(mff.get_random_seed_size(),
                                                         len(count_array)))
 
     psf_sig = psf_fwhm / (2 * np.sqrt(2 * np.log(2)))

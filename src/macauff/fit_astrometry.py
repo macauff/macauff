@@ -1290,7 +1290,7 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
             self.moden*np.ones_like(self.mag_array), self.mag_array, b_ratio, snr, self.tri_mags,
             self.log10y, self.dtri_mags, self.psf_radius, self.n_norm)
 
-        seed = np.random.default_rng().choice(100000, size=(paf.get_random_seed_size(),
+        seed = np.random.default_rng().choice(100000, size=(mff.get_random_seed_size(),
                                                             len(self.mag_array)))
         _, _, four_off_fw, _, _ = \
             paf.perturb_aufs(
@@ -1299,7 +1299,7 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
                 self.log10y, self.n_norm, (dm_max/self.dm).astype(int), self.dmcut, self.psf_radius,
                 self.psfsig, self.numtrials, seed, self.dd_params, self.l_cut, 'fw')
 
-        seed = np.random.default_rng().choice(100000, size=(paf.get_random_seed_size(),
+        seed = np.random.default_rng().choice(100000, size=(mff.get_random_seed_size(),
                                                             len(self.mag_array)))
         _, _, four_off_ps, _, _ = \
             paf.perturb_aufs(

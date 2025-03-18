@@ -133,7 +133,7 @@ def test_perturb_aufs():
 
     track_pa_fourier = np.zeros(len(rho)-1, float)
 
-    seed_size = paf.get_random_seed_size()
+    seed_size = mff.get_random_seed_size()
     rng = np.random.default_rng(seed=123124)
 
     # Limit the size of each simulation, but run many to aggregate
@@ -214,127 +214,6 @@ def test_histogram():
                                      np.array([True] * (len(x))), np.ones_like(x))
     counts_p, _ = np.histogram(x, bins=bins)
     assert np.all(counts_f == counts_p)
-
-
-@pytest.mark.parametrize("position", ["inside", "corner", "edge", "random"])
-# pylint: disable-next=too-many-branches
-def test_circle_area(position):
-    rng = np.random.default_rng(346675614)
-    r = 0.1
-
-    x_edges = np.array([0, 1])
-    y_edges = np.array([0, 1])
-
-    hull_x = x_edges[[0, 0, 1, 1, 0]]
-    hull_y = y_edges[[0, 1, 1, 0, 0]]
-
-    if position == "inside":
-        # If circle is inside rectangle, get full area:
-        done = 0
-        while done < 100:
-            seed = rng.choice(100000, size=(paf.get_random_seed_size(), 1))
-            [x, y] = rng.uniform(0, 1, size=2)
-            if (x - r >= x_edges[0] and x + r <= x_edges[1] and
-                    y - r >= y_edges[0] and y + r <= y_edges[1]):
-                calc_area = paf.get_circle_area_overlap([x], [y], r, hull_x, hull_y, seed)
-                assert_allclose(calc_area, np.pi * r**2)
-                done += 1
-
-    if position == "corner":
-        # Now, if the circle is exactly on the corners of the rectangle
-        # we should have a quarter the area:
-        for x, y in zip([0, 0, 1, 1], [0, 1, 0, 1]):
-            seed = rng.choice(100000, size=(paf.get_random_seed_size(), 1))
-            calc_area = paf.get_circle_area_overlap([x], [y], r, hull_x, hull_y, seed)
-            # We have a random process in this calculation, will result in small
-            # variations in the area.
-            assert_allclose(calc_area, np.pi * r**2 / 4, rtol=0.02, atol=5e-5)
-
-    if position == "edge":
-        # In the middle of an edge we should have half the circle area:
-        for _ in range(100):
-            for x, y in zip([0, 0.5, 1, 0.5], [0.5, 0, 0.5, 1]):
-                if x == 0.5:
-                    x = rng.uniform(0 + r + 1e-4, 1 - r - 1e-4, size=1)
-                if y == 0.5:
-                    y = rng.uniform(0 + r + 1e-4, 1 - r - 1e-4, size=1)
-                seed = rng.choice(100000, size=(paf.get_random_seed_size(), 1))
-                calc_area = paf.get_circle_area_overlap([x], [y], r, hull_x, hull_y, seed)
-                assert_allclose(calc_area, np.pi * r**2 / 2)
-
-        # Otherwise, we have a more random amount of missing circle:
-        xp = np.linspace(*x_edges, 800)
-        yp = np.linspace(*y_edges, 800)
-        dx, dy = xp[1] - xp[0], yp[1] - yp[0]
-        for _ in range(100):
-            for x0, y0 in zip([0, 0.5, 1, 0.5], [0.5, 0, 0.5, 1]):
-                if x0 == 0.5:
-                    x = rng.uniform(0 + r + 1e-4, 1 - r - 1e-4, size=1)
-                    if y0 == 0:
-                        y = rng.uniform(y0 + 1e-4, y0 + r - 1e-4, size=1)
-                    else:
-                        y = rng.uniform(y0 - r + 1e-4, y0 - 1e-4, size=1)
-                if y0 == 0.5:
-                    y = rng.uniform(0 + r + 1e-4, 1 - r - 1e-4, size=1)
-                    if x0 == 0:
-                        x = rng.uniform(x0 + 1e-4, x0 + r - 1e-4, size=1)
-                    else:
-                        x = rng.uniform(x0 - r + 1e-4, x0 - 1e-4, size=1)
-                seed = rng.choice(100000, size=(paf.get_random_seed_size(), 1))
-                calc_area = paf.get_circle_area_overlap([x], [y], r, hull_x, hull_y, seed)
-                if x0 == 0.5:
-                    if y0 == 0:
-                        h = r - (y - y0)
-                    else:
-                        h = r - (y0 - y)
-                if y0 == 0.5:
-                    if x0 == 0:
-                        h = r - (x - x0)
-                    else:
-                        h = r - (x0 - x)
-                # pylint: disable-next=possibly-used-before-assignment
-                chord_area = r**2 * np.arccos(1 - h / r) - (r - h) * np.sqrt(r**2 - (r - h)**2)
-                remaining_area = np.pi * r**2 - chord_area
-                assert_allclose(calc_area, remaining_area)
-
-    # pylint: disable-next=too-many-nested-blocks
-    if position == "random":
-        # Verify a few randomly placed circles too:
-        done = 0
-        xp = np.linspace(*x_edges, 400)
-        yp = np.linspace(*y_edges, 400)
-        dx, dy = xp[1] - xp[0], yp[1] - yp[0]
-        while done < 100:
-            seed = rng.choice(100000, size=(paf.get_random_seed_size(), 1))
-            [x, y] = rng.uniform(0, 1, size=2)
-            if np.any([x - r < x_edges[0], x + r > x_edges[1],
-                       y - r < y_edges[0], y + r > y_edges[1]]):
-                calc_area = paf.get_circle_area_overlap([x], [y], r, hull_x, hull_y, seed)
-                manual_area = 0
-                for x_p in xp:
-                    for y_p in yp:
-                        if np.sqrt((x_p - x)**2 + (y_p - y)**2) <= r:
-                            manual_area += dx*dy
-                assert_allclose(calc_area, manual_area, rtol=0.05)
-            done += 1
-
-        # Verify that we don't mind if coordinates are negative:
-        x, y = -0.1, 0.08
-        x_edges = np.array([-0.15, 0.15])
-        y_edges = np.array([-0.15, 0.15])
-        hull_x = x_edges[[0, 0, 1, 1, 0]]
-        hull_y = y_edges[[0, 1, 1, 0, 0]]
-        seed = rng.choice(100000, size=(paf.get_random_seed_size(), 1))
-        calc_area = paf.get_circle_area_overlap([x], [y], r, hull_x, hull_y, seed)
-        xp = np.linspace(*x_edges, 200)
-        yp = np.linspace(*y_edges, 200)
-        dx, dy = xp[1] - xp[0], yp[1] - yp[0]
-        manual_area = 0
-        for x_p in xp:
-            for y_p in yp:
-                if np.sqrt((x_p - x)**2 + (y_p - y)**2) <= r:
-                    manual_area += dx*dy
-        assert_allclose(calc_area, manual_area, rtol=0.05)
 
 
 def test_psf_perturb():
