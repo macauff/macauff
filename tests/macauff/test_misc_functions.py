@@ -18,7 +18,6 @@ from macauff.misc_functions import (
     create_auf_params_grid,
     generate_avs_inside_hull,
     hav_dist_constant_lat,
-    load_small_ref_auf_grid,
     min_max_lon,
 )
 from macauff.misc_functions_fortran import misc_functions_fortran as mff
@@ -65,36 +64,6 @@ def test_create_fourier_offsets_grid():
         for i in range(0, len(filt_names)):
             a_manual[:, :a_len[i, j], i, j] = i + len(filt_names)*j
     assert np.all(a == a_manual)
-
-
-def test_load_small_ref_ind_fourier_grid():
-    a_len = np.array([[6, 10, 7], [15, 9, 8], [7, 10, 12], [8, 8, 11]], order='F')
-    auf_pointings = np.array([[10, 20], [50, 50], [100, -40]])
-    filt_names = ['W1', 'W2', 'W3', 'W4']
-    a = np.empty(dtype=float, shape=(9, 15, 4, 3), order='F')
-    for j in range(0, len(auf_pointings)):
-        for i in range(0, len(filt_names)):
-            a[:, :a_len[i, j], i, j] = (i*a_len[i, j] + a_len[i, j]*len(filt_names)*j +
-                                        np.arange(a_len[i, j]).reshape(1, -1))
-    p_a_o = {}
-    p_a_o['fourier_grid'] = a
-    # Unique indices: 0, 1, 2, 5; 0, 3; 0, 1, 2
-    # These map to 0, 1, 2, 3; 0, 1; 0, 1, 2
-    modrefind = np.array([[0, 2, 0, 2, 1, 5], [0, 3, 3, 3, 3, 0], [0, 1, 2, 1, 2, 1]])
-    [a], b = load_small_ref_auf_grid(modrefind, p_a_o, ['fourier'])
-
-    new_small_modrefind = np.array([[0, 2, 0, 2, 1, 3], [0, 1, 1, 1, 1, 0], [0, 1, 2, 1, 2, 1]])
-    new_small_fouriergrid = np.empty((9, 4, 2, 3), float, order='F')
-    for j, j_old in enumerate([0, 1, 2]):
-        for i, i_old in enumerate([0, 3]):
-            for k, k_old in enumerate([0, 1, 2, 5]):
-                new_small_fouriergrid[:, k, i, j] = (
-                    k_old + i_old*a_len[i_old, j_old] + a_len[i_old, j_old]*len(filt_names)*j_old)
-
-    assert np.all(b.shape == (3, 6))
-    assert np.all(a.shape == (9, 4, 2, 3))
-    assert np.all(b == new_small_modrefind)
-    assert np.all(a == new_small_fouriergrid)
 
 
 def test_hav_dist_constant_lat():

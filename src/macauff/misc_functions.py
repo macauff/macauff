@@ -75,57 +75,6 @@ def create_auf_params_grid(perturb_auf_outputs, auf_pointings, filt_names, array
     return grid
 
 
-def load_small_ref_auf_grid(modrefind, perturb_auf_outputs, file_name_prefixes):
-    '''
-    Function to create reference index arrays out of larger arrays, based on
-    the mappings from the original reference index array into a larger grid,
-    such that the corresponding cutout reference index now maps onto the smaller
-    cutout 4-D array.
-
-    Parameters
-    ----------
-    modrefind : numpy.ndarray
-        The reference index array that maps into saved array ``fourier_grid``
-        for each source in the given catalogue.
-    perturb_auf_outputs : dictionary
-        Saved results from the cross-matches' extra AUF component simulations.
-    file_name_prefixes : list
-        Prefixes of the files stored in ``auf_folder_path`` -- the parts before
-        "_grid" -- to be loaded as sub-arrays and returned.
-
-    Returns
-    -------
-    small_grids : list of numpy.ndarray
-        Small cutouts of ``*_grid`` files defined by ``file_name_prefixes``,
-        containing only the appropriate indices for AUF pointing, filter, etc.
-    modrefindsmall : numpy.ndarray
-        The corresponding mappings for each source onto ``fouriergrid``, such
-        that each source still points to the correct entry that it did in
-        ``fourier_grid``.
-    '''
-    nmuniqueind, nmnewind = np.unique(modrefind[0, :], return_inverse=True)
-    filtuniqueind, filtnewind = np.unique(modrefind[1, :], return_inverse=True)
-    axuniqueind, axnewind = np.unique(modrefind[2, :], return_inverse=True)
-
-    x, y, z = np.meshgrid(nmuniqueind, filtuniqueind, axuniqueind, indexing='ij')
-
-    small_grids = []
-    for name in file_name_prefixes:
-        if len(perturb_auf_outputs[f'{name}_grid'].shape) == 4:
-            small_grids.append(np.asfortranarray(
-                perturb_auf_outputs[f'{name}_grid'][:, x, y, z]))
-        else:
-            small_grids.append(np.asfortranarray(
-                perturb_auf_outputs[f'{name}_grid'][x, y, z]))
-    modrefindsmall = np.empty((3, modrefind.shape[1]), int, order='F')
-    del modrefind
-    modrefindsmall[0, :] = nmnewind
-    modrefindsmall[1, :] = filtnewind
-    modrefindsmall[2, :] = axnewind
-
-    return small_grids, modrefindsmall
-
-
 def hav_dist_constant_lat(x_lon, x_lat, lon):
     '''
     Computes the Haversine formula in the limit that sky separation is only
@@ -238,8 +187,7 @@ def _lon_cut(a, lon, padding, inequality, lon_shift):
     if padding > 0:
         sky_cut = (hav_dist_constant_lat(a[:, 0], a[:, 1], lon) <= padding) | inequal_lon_cut
     # However, in both zero and non-zero padding factor cases, we always require
-    # the source to be above or below the longitude for sky_cut_1 and sky_cut_2
-    # in load_fourier_grid_cutouts, respectively.
+    # the source to be above or below the longitude.
     else:
         sky_cut = inequal_lon_cut
 

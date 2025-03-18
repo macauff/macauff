@@ -12,7 +12,7 @@ from scipy.special import j1  # pylint: disable=no-name-in-module
 from test_matching import _replace_line
 
 # pylint: disable=no-name-in-module,import-error
-from macauff.group_sources import _clean_overlaps, _load_fourier_grid_cutouts, make_island_groupings
+from macauff.group_sources import _clean_overlaps, make_island_groupings
 from macauff.group_sources_fortran import group_sources_fortran as gsf
 from macauff.macauff import Macauff
 from macauff.matching import CrossMatch
@@ -20,80 +20,6 @@ from macauff.misc_functions import create_auf_params_grid, calculate_overlap_cou
 from macauff.misc_functions_fortran import misc_functions_fortran as mff
 
 # pylint: enable=no-name-in-module,import-error
-
-
-def test_load_fourier_grid_cutouts():  # pylint:disable=too-many-statements
-    lena = 100000
-    a = np.lib.format.open_memmap('con_cat_astro.npy', mode='w+', dtype=float, shape=(lena, 3))
-    for i in range(0, lena, 10000):
-        a[i:i+10000, :] = 0
-    a[0, :] = [50, 50, 0.1]
-    a[123, :] = [48, 60.02, 0.5]
-    a[555, :] = [39.98, 43, 0.2]
-    a[1000, :] = [45, 45, 0.2]
-
-    del a
-
-    grid = np.empty(dtype=float, shape=(100, 2, 3, 2), order='F')
-
-    for k in range(2):
-        for j in range(3):
-            for i in range(2):
-                grid[:, i, j, k] = i + j*2 + k*6
-
-    m = np.lib.format.open_memmap('modelrefinds.npy', mode='w+', dtype=int, shape=(3, lena),
-                                  fortran_order=True)
-    for i in range(0, lena, 10000):
-        m[:, i:i+10000] = 0
-    m[:, 0] = [0, 2, 1]  # should return 0 * 2*2 + 1*6 = 10 as the single grid option selected
-    m[:, 123] = [0, 2, 1]
-    m[:, 555] = [0, 1, 0]  # should return 0 * 1*2 + 0*6 = 2 as its subset option
-    m[:, 1000] = [0, 2, 1]
-    # However, above we also get in our four-source slice the extra two combinations of:
-    # 0, 1, 1 -> 0 + 2 + 6 = 9; and 0, 2, 0 -> 0 + 4 + 0 = 4. This comes from our total combination
-    # of indices of 0, 1/2, and 0/1
-
-    a = np.lib.format.open_memmap('con_cat_astro.npy', mode='r', dtype=float, shape=(lena, 3))
-    rect = np.array([40, 60, 40, 60])
-
-    padding = 0.1
-    p_a_o = {'fourier_grid': grid}
-    _a, _b, _c, _ = _load_fourier_grid_cutouts(a, rect, p_a_o, padding, np.array([True]*lena),
-                                               modelrefinds=m)
-    assert np.all(_a.shape == (4, 3))
-    assert np.all(_a ==
-                  np.array([[50, 50, 0.1], [48, 60.02, 0.5], [39.98, 43, 0.2], [45, 45, 0.2]]))
-    assert np.all(_b.shape == (100, 1, 2, 2))
-    b_guess = np.empty((100, 1, 2, 2), float)
-    b_guess[:, 0, 0, 0] = 0 + 1 * 2 + 0 * 6
-    b_guess[:, 0, 1, 0] = 0 + 2 * 2 + 0 * 6
-    b_guess[:, 0, 0, 1] = 0 + 1 * 2 + 1 * 6
-    b_guess[:, 0, 1, 1] = 0 + 2 * 2 + 1 * 6
-    assert np.all(_b == b_guess)
-    assert np.all(_c.shape == (3, 4))
-    c_guess = np.empty((3, 4), int)
-    c_guess[:, 0] = [0, 1, 1]
-    c_guess[:, 1] = [0, 1, 1]
-    c_guess[:, 2] = [0, 0, 0]
-    c_guess[:, 3] = [0, 1, 1]
-    assert np.all(_c == c_guess)
-
-    # This should not return sources 123 and 555 above, removing a potential
-    # reference index. Hence we only have one unique grid reference now.
-    padding = 0
-    _a, _b, _c, _ = _load_fourier_grid_cutouts(a, rect, p_a_o, padding, np.array([True]*lena),
-                                               modelrefinds=m)
-    assert np.all(_a.shape == (2, 3))
-    assert np.all(_a == np.array([[50, 50, 0.1], [45, 45, 0.2]]))
-    assert np.all(_b.shape == (100, 1, 1, 1))
-    b_guess = np.empty((100, 1, 1, 1), float)
-    b_guess[:, 0, 0, 0] = 0 + 2 * 2 + 1 * 6
-    assert np.all(_b == b_guess)
-    assert np.all(_c.shape == (3, 2))
-    c_guess = np.empty((3, 2), int)
-    c_guess[:, 0] = [0, 0, 0]
-    c_guess[:, 1] = [0, 0, 0]
-    assert np.all(_c == c_guess)
 
 
 def test_j1s():
