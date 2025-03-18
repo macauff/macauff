@@ -1228,7 +1228,7 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
         narray = create_densities(
             self.b, self.minmag, self.maxmag, self.hull_points, self.hull_x_shift, self.dens_search_radius,
             self.n_pool, self.mag_indices[self.best_mag_index], self.pos_and_err_indices[1][0],
-            self.pos_and_err_indices[1][1], self.coord_system)
+            self.pos_and_err_indices[1][1], self.coord_system, self.file_name)
 
         if self.single_or_repeat == 'repeat':
             # Divide the counts through by the number of repeat visits.

@@ -57,9 +57,9 @@ def make_island_groupings(cm):
     # overlap indices.
 
     _ainds = calculate_overlap_counts(a_full, b_full, -999, 999, max_sep, cm.n_pool, np.nan, 0, 1,
-                                      cm.cf_region_frame, 'array')
+                                      cm.cf_region_frame, 'array', cm.chunk_id)
     _binds = calculate_overlap_counts(b_full, a_full, -999, 999, max_sep, cm.n_pool, np.nan, 0, 1,
-                                      cm.cf_region_frame, 'array')
+                                      cm.cf_region_frame, 'array', cm.chunk_id)
 
     amaxsize = int(np.amax([len(x) for x in _ainds]))
     bmaxsize = int(np.amax([len(x) for x in _binds]))

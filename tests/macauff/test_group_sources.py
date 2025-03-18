@@ -141,9 +141,9 @@ class TestOverlap():
         a = np.vstack((self.a_ax_1, self.a_ax_2)).T
         b = np.vstack((self.b_ax_1, self.b_ax_2)).T
         a_num = calculate_overlap_counts(a, b, -999, 999, self.max_sep/3600, 1, np.nan, 0, 1,
-                                         'equatorial', 'len')
+                                         'equatorial', 'len', '1')
         b_num = calculate_overlap_counts(b, a, -999, 999, self.max_sep/3600, 1, np.nan, 0, 1,
-                                         'equatorial', 'len')
+                                         'equatorial', 'len', '1')
 
         assert np.all(a_num.shape == (20,))
         assert np.all(b_num.shape == (19,))
@@ -158,9 +158,9 @@ class TestOverlap():
         a = np.vstack((self.a_ax_1, self.a_ax_2)).T
         b = np.vstack((self.b_ax_1, self.b_ax_2)).T
         _ainds = calculate_overlap_counts(a, b, -999, 999, self.max_sep/3600, 1, np.nan, 0, 1,
-                                          'equatorial', 'array')
+                                          'equatorial', 'array', '1')
         _binds = calculate_overlap_counts(b, a, -999, 999, self.max_sep/3600, 1, np.nan, 0, 1,
-                                          'equatorial', 'array')
+                                          'equatorial', 'array', '1')
         amaxsize = np.amax([len(x) for x in _ainds])
         bmaxsize = np.amax([len(x) for x in _binds])
         ainds = np.ones(dtype=int, shape=(amaxsize, len(a)), order='F') * -1

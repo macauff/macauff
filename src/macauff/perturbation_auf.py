@@ -226,7 +226,7 @@ def make_perturb_aufs(cm, which_cat):
                 # create_densities' API.
                 x = np.vstack((a_astro[:, 0], a_astro[:, 1], a_photo)).T
                 localn = create_densities(x, -999, dens_mags[j], hull_points, hull_x_shift, density_radius,
-                                          n_pool, 2, 0, 1, auf_region_frame)
+                                          n_pool, 2, 0, 1, auf_region_frame, cm.chunk_id)
                 # Because we always calculate the density from the full
                 # catalogue, using just the astrometry, we should be able
                 # to just over-write this N times if there happen to be N
