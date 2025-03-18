@@ -6,8 +6,6 @@ various photometric integral purposes.
 '''
 
 import datetime
-import itertools
-import multiprocessing
 import sys
 
 import numpy as np
@@ -16,7 +14,6 @@ import numpy as np
 from macauff.group_sources_fortran import group_sources_fortran as gsf
 from macauff.make_set_list import set_list
 from macauff.misc_functions import (
-    SharedNumpyArray,
     calculate_overlap_counts,
     convex_hull_area,
 )
@@ -92,8 +89,13 @@ def make_island_groupings(cm):
     print(f"{t} Rank {cm.rank}, chunk {cm.chunk_id}: Cleaning overlaps...")
     sys.stdout.flush()
 
-    ainds, asize, auf_cdf_a = _clean_overlaps(ainds, asize, auf_cdf_a, cm.n_pool, cm.chunk_id)
-    binds, bsize, auf_cdf_b = _clean_overlaps(binds, bsize, auf_cdf_b, cm.n_pool, cm.chunk_id)
+    # Clean arrays for any potential unnecessary extra rows caused by the largest
+    # overlap number being reduced due to the additional criteria for match in
+    # get_overlap_indices vs a naive radius-based search. In some cases we will
+    # then have e.g. np.all(ainds[-1, :] == -1) evaluating to True, and might
+    # as well get rid of the extraneous column.
+    ainds = np.asfortranarray(ainds[:np.amax(asize), :])
+    binds = np.asfortranarray(binds[:np.amax(bsize), :])
 
     t = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     print(f"{t} Rank {cm.rank}, chunk {cm.chunk_id}: Calculating integral lengths...")
@@ -270,74 +272,3 @@ def make_island_groupings(cm):
     cm.lenrejectb = lenrejectb
     cm.auf_cdf_a = auf_cdf_a
     cm.auf_cdf_b = auf_cdf_b
-
-
-def _clean_overlaps(inds, size, cdf, n_pool, n_mem):
-    '''
-    Convenience function to parse either catalogue's indices array for
-    duplicate references to the opposing array on a per-source basis,
-    and filter duplications.
-
-    Parameters
-    ----------
-    inds : numpy.ndarray
-        Array containing the indices of overlap between this catalogue, for each
-        source, and the opposing catalogue, including potential duplication.
-    size : numpy.ndarray
-        Array containing the number of overlaps between this catalogue and the
-        opposing catalogue prior to duplication removal.
-    cdf : numpy.ndarray
-        Array of the cumulative distribution functions of each ``inds`` pair
-        overlap between the two catalogues, evaluating the chance of counterpart
-        between objects based on sky position, position precision, etc.
-    n_pool : integer
-        Number of multiprocessing threads to use.
-    n_mem : integer
-        Unique value, used to ensure shared-memory operations do not clash.
-
-    Returns
-    -------
-    inds : numpy.ndarray
-        The unique indices of overlap into the opposing catalogue for each
-        source in a given catalogue, stripped of potential duplicates.
-    cdf: numpy.ndarray
-        ``cdf`` filtered by the unique indices in ``inds``.
-    size : numpy.ndarray
-        Newly updated ``size`` array, containing the lengths of the unique
-        indices of overlap into the opposing catalogue for each source.
-    '''
-    maxsize = 0
-    size[:] = 0
-    counter = np.arange(0, inds.shape[1])
-
-    shared_inds = SharedNumpyArray(inds, f'inds_{n_mem}')
-    shared_cdf = SharedNumpyArray(cdf, f'cdf_{n_mem}')
-
-    iter_group = zip(counter, itertools.repeat(shared_inds), itertools.repeat(shared_cdf))
-    with multiprocessing.Pool(n_pool) as pool:
-        for return_items in pool.imap_unordered(_calc_unique_inds, iter_group,
-                                                chunksize=max(1, len(counter) // n_pool)):
-            i, unique_inds, unique_cdf = return_items
-            y = len(unique_inds)
-            inds[:y, i] = unique_inds
-            inds[y:, i] = -1
-            cdf[:y, i] = unique_cdf
-            cdf[y:, i] = -1
-            maxsize = max(maxsize, y)
-            size[i] = y
-
-    pool.join()
-
-    for _shared in [shared_inds, shared_cdf]:
-        _shared.unlink()
-
-    inds = np.asfortranarray(inds[:maxsize, :])
-    cdf = np.asfortranarray(cdf[:maxsize, :])
-
-    return inds, size, cdf
-
-
-def _calc_unique_inds(iterable):
-    i, inds, cdf = iterable
-    x, inds_for_x = np.unique(inds.read()[inds.read()[:, i] > -1, i], return_index=True)
-    return i, x, cdf.read()[inds.read()[:, i] > -1, i][inds_for_x]

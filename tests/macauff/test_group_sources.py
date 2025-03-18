@@ -12,7 +12,7 @@ from scipy.special import j1  # pylint: disable=no-name-in-module
 from test_matching import _replace_line
 
 # pylint: disable=no-name-in-module,import-error
-from macauff.group_sources import _clean_overlaps, make_island_groupings
+from macauff.group_sources import make_island_groupings
 from macauff.group_sources_fortran import group_sources_fortran as gsf
 from macauff.macauff import Macauff
 from macauff.matching import CrossMatch
@@ -213,43 +213,6 @@ class TestOverlap():
                 fake_b_cdf[j, i] = 1 - np.exp(-0.5 * d**2 / ((self.b_axerr[i]**2 +
                                                               self.a_axerr[b_overlaps[j, i]-1]**2)/3600**2))
         assert_allclose(b_cdf, fake_b_cdf, atol=1e-5, rtol=0.001)
-
-
-def test_clean_overlaps():
-    maxsize, size = 5, np.array([3, 5, 3, 4, 4, 5, 4, 2, 5, 4]*3)
-    inds = np.empty(dtype=int, shape=(maxsize, len(size)), order='F')
-    for i in range(0, 3):
-        inds[:, 0+10*i] = [0, 1, 0, -1, -1]
-        inds[:, 1+10*i] = [3, 4, 1, 1, 4]
-        inds[:, 2+10*i] = [2, 3, 4, -1, -1]
-        inds[:, 3+10*i] = [0, 0, 0, 1, -1]
-        inds[:, 4+10*i] = [0, 1, 2, 3, -1]
-        inds[:, 5+10*i] = [0, 0, 1, 1, 2]
-        inds[:, 6+10*i] = [3, 4, 3, 4, -1]
-        inds[:, 7+10*i] = [0, 1, -1, -1, -1]
-        inds[:, 8+10*i] = [2, 2, 2, 2, 2]
-        inds[:, 9+10*i] = [1, 1, 2, 3, -1]
-
-    inds2, size2, cdf2 = _clean_overlaps(inds, size, inds*10, 2, 0)
-    compare_inds2 = np.empty((4, 30), int)
-    for i in range(0, 3):
-        compare_inds2[:, 0+10*i] = [0, 1, -1, -1]
-        compare_inds2[:, 1+10*i] = [1, 3, 4, -1]
-        compare_inds2[:, 2+10*i] = [2, 3, 4, -1]
-        compare_inds2[:, 3+10*i] = [0, 1, -1, -1]
-        compare_inds2[:, 4+10*i] = [0, 1, 2, 3]
-        compare_inds2[:, 5+10*i] = [0, 1, 2, -1]
-        compare_inds2[:, 6+10*i] = [3, 4, -1, -1]
-        compare_inds2[:, 7+10*i] = [0, 1, -1, -1]
-        compare_inds2[:, 8+10*i] = [2, -1, -1, -1]
-        compare_inds2[:, 9+10*i] = [1, 2, 3, -1]
-    assert np.all(inds2 == compare_inds2)
-    assert np.all(size2 == np.array([2, 3, 3, 2, 4, 3, 2, 2, 1, 3]*3))
-    # Fake the CDF array with inds times 10, since it just needs to be
-    # a different array of the same shape.
-    fake_cdf2 = np.copy(compare_inds2*10)
-    fake_cdf2[fake_cdf2 == -10] = -1
-    assert np.all(cdf2 == fake_cdf2)
 
 
 class TestMakeIslandGroupings():  # pylint: disable=too-many-instance-attributes
