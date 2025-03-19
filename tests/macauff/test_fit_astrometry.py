@@ -427,10 +427,11 @@ class TestAstroCorrection:
         assert_allclose(abc_array[0, 0, 0], 1.2e-2, rtol=0.05, atol=0.001)
         assert_allclose(abc_array[0, 0, 1], 8e-17, rtol=0.05, atol=5e-19)
 
-        assert_allclose(ac.ax1_mins[0], 100, rtol=0.01)
-        assert_allclose(ac.ax1_maxs[0], 110, rtol=0.01)
-        assert_allclose(ac.ax2_mins[0], -3, rtol=0.01)
-        assert_allclose(ac.ax2_maxs[0], 3, rtol=0.01)
+        if pregenerate_cutouts is False:
+            assert_allclose(ac.ax1_mins[0], 100, rtol=0.01)
+            assert_allclose(ac.ax1_maxs[0], 110, rtol=0.01)
+            assert_allclose(ac.ax2_mins[0], -3, rtol=0.01)
+            assert_allclose(ac.ax2_maxs[0], 3, rtol=0.01)
 
         if half_run_flag:
             # For the pre-determined set of parameters we should have skipped
@@ -596,11 +597,6 @@ class TestSNRMagRelation:
 
         assert_allclose(abc_array[0, 0, 0], 1.2e-2, rtol=0.05, atol=0.001)
         assert_allclose(abc_array[0, 0, 1], 8e-17, rtol=0.06, atol=5e-19)
-
-        assert_allclose(smr.ax1_mins[0], 100, rtol=0.01)
-        assert_allclose(smr.ax1_maxs[0], 110, rtol=0.01)
-        assert_allclose(smr.ax2_mins[0], -3, rtol=0.01)
-        assert_allclose(smr.ax2_maxs[0], 3, rtol=0.01)
 
         if half_run_flag:
             # For the pre-determined set of parameters we should have skipped

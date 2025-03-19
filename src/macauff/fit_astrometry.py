@@ -33,8 +33,7 @@ from macauff.misc_functions import (
     convex_hull_area,
     create_densities,
     find_model_counts_corrections,
-    generate_avs_inside_hull,
-    min_max_lon)
+    generate_avs_inside_hull)
 from macauff.misc_functions_fortran import misc_functions_fortran as mff
 from macauff.perturbation_auf import (
     _calculate_magnitude_offsets,
@@ -548,11 +547,9 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
         # Making coords/cutouts happens for all sightlines, and then we
         # loop through each individually:
         if self.coord_or_chunk == 'coord':
-            zip_list = (self.ax1_mids, self.ax2_mids, self.ax1_mins, self.ax1_maxs,
-                        self.ax2_mins, self.ax2_maxs)
+            zip_list = (self.ax1_mids, self.ax2_mids)
         else:
-            zip_list = (self.ax1_mids, self.ax2_mids, self.ax1_mins, self.ax1_maxs, self.ax2_mins,
-                        self.ax2_maxs, self.chunks)
+            zip_list = (self.ax1_mids, self.ax2_mids, self.chunks)
 
         if (self.return_nm or overwrite_all_sightlines or
                 not os.path.isfile(f'{self.save_folder}/npy/snr_mag_params.npy') or
@@ -606,11 +603,11 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
             sys.stdout.flush()
 
             if self.coord_or_chunk == 'coord':
-                ax1_mid, ax2_mid, _, _, _, _ = list_of_things
+                ax1_mid, ax2_mid = list_of_things
                 cat_args = (ax1_mid, ax2_mid)
                 file_name = f'{ax1_mid}_{ax2_mid}'
             else:
-                ax1_mid, ax2_mid, _, _, _, _, chunk = list_of_things
+                ax1_mid, ax2_mid, chunk = list_of_things
                 cat_args = (chunk,)
                 file_name = f'{chunk}'
             self.list_of_things = list_of_things
@@ -721,14 +718,14 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
             self.ax1_grid_length = np.ceil(np.sqrt(len(self.ax1_mids))).astype(int)
             self.ax2_grid_length = np.ceil(len(self.ax1_mids) / self.ax1_grid_length).astype(int)
 
-        self.ax1_mins, self.ax1_maxs = np.empty_like(self.ax1_mids), np.empty_like(self.ax1_mids)
-        self.ax2_mins, self.ax2_maxs = np.empty_like(self.ax1_mids), np.empty_like(self.ax1_mids)
-        # Force constant box height, but allow longitude to float to make sure
-        # that we get good area coverage as the cos-delta factor increases
-        # towards the poles.
         if self.pregenerate_cutouts is False:
             # If we don't force pre-generated sightlines then we can generate
-            # corners based on requested size and height, and latitude.
+            # corners based on requested size and height, and latitude. Force
+            # constant box height, but allow longitude to float to make sure
+            # that we get good area coverage as the cos-delta factor increases
+            # towards the poles.
+            self.ax1_mins, self.ax1_maxs = np.empty_like(self.ax1_mids), np.empty_like(self.ax1_mids)
+            self.ax2_mins, self.ax2_maxs = np.empty_like(self.ax1_mids), np.empty_like(self.ax1_mids)
             for i, (ax1_mid, ax2_mid) in enumerate(zip(self.ax1_mids, self.ax2_mids)):
                 self.ax2_mins[i] = ax2_mid-self.cutout_height/2
                 self.ax2_maxs[i] = ax2_mid+self.cutout_height/2
@@ -780,19 +777,6 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
                     if not os.path.isfile(self.b_cat_name.format(*cat_args)):
                         raise ValueError("If pregenerate_cutouts is 'True' all files must "
                                          f"exist already, but {self.b_cat_name.format(*cat_args)} does not.")
-                # Check for both files, but assume they are the same size
-                # for ax1_min et al. purposes.
-                if self.pregenerate_cutouts is None:
-                    b = self.b_cat[i]
-                else:
-                    b = self.load_catalogue('b', cat_args)
-                # Handle "minimum" longitude on the interval [-pi, +pi], such that
-                # if data straddles the 0-360 boundary we don't return 0 and 360
-                # for min and max values.
-                self.ax1_mins[i], self.ax1_maxs[i] = min_max_lon(
-                    b[:, self.pos_and_err_indices[1][0]])
-                self.ax2_mins[i] = np.amin(b[:, self.pos_and_err_indices[1][1]])
-                self.ax2_maxs[i] = np.amax(b[:, self.pos_and_err_indices[1][1]])
 
     def make_catalogue_cutouts(self):
         """
@@ -1068,9 +1052,9 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
         print('Creating simulated star+galaxy counts...')
         sys.stdout.flush()
         if self.coord_or_chunk == 'coord':
-            ax1_mid, ax2_mid, _, _, _, _ = self.list_of_things
+            ax1_mid, ax2_mid = self.list_of_things
         else:
-            ax1_mid, ax2_mid, _, _, _, _, _ = self.list_of_things
+            ax1_mid, ax2_mid, _ = self.list_of_things
 
         mag_ind = self.mag_indices[self.best_mag_index]
         b_mag_data = self.b[~np.isnan(self.b[:, mag_ind]), mag_ind]
@@ -2303,11 +2287,9 @@ class SNRMagnitudeRelationship(AstrometricCorrections):  # pylint: disable=too-m
         # Making coords/cutouts happens for all sightlines, and then we
         # loop through each individually:
         if self.coord_or_chunk == 'coord':
-            zip_list = (self.ax1_mids, self.ax2_mids, self.ax1_mins, self.ax1_maxs,
-                        self.ax2_mins, self.ax2_maxs)
+            zip_list = (self.ax1_mids, self.ax2_mids)
         else:
-            zip_list = (self.ax1_mids, self.ax2_mids, self.ax1_mins, self.ax1_maxs, self.ax2_mins,
-                        self.ax2_maxs, self.chunks)
+            zip_list = (self.ax1_mids, self.ax2_mids, self.chunks)
 
         if (overwrite_all_sightlines or
                 not os.path.isfile(f'{self.save_folder}/npy/snr_mag_params.npy')):
@@ -2325,11 +2307,11 @@ class SNRMagnitudeRelationship(AstrometricCorrections):  # pylint: disable=too-m
             sys.stdout.flush()
 
             if self.coord_or_chunk == 'coord':
-                ax1_mid, ax2_mid, _, _, _, _ = list_of_things
+                ax1_mid, ax2_mid = list_of_things
                 cat_args = (ax1_mid, ax2_mid)
                 file_name = f'{ax1_mid}_{ax2_mid}'
             else:
-                ax1_mid, ax2_mid, _, _, _, _, chunk = list_of_things
+                ax1_mid, ax2_mid, chunk = list_of_things
                 cat_args = (chunk,)
                 file_name = f'{chunk}'
             self.list_of_things = list_of_things
