@@ -144,7 +144,7 @@ class TestConvexHull:
         if high_lat:
             self.y += 70
         if overlay_origin in ("-1", "359"):
-            self.x -= 4
+            self.x -= 7
         if overlay_origin == "359":
             self.x[self.x < 0] = self.x[self.x < 0] + 360
         if high_lat:
@@ -152,7 +152,7 @@ class TestConvexHull:
         else:
             self.y_mid = -0.5
         if overlay_origin in ("-1", "359"):
-            self.x_mid = 4
+            self.x_mid = 1
         else:
             self.x_mid = 8
 
@@ -167,7 +167,10 @@ class TestConvexHull:
         self.generate_points(shape, overlay_origin, high_lat)
         hull_area = convex_hull_area(self.x, self.y)
 
-        ax1_min, ax1_max = min_max_lon(self.x)
+        if overlay_origin is not False:
+            ax1_min, ax1_max = -4, 6
+        else:
+            ax1_min, ax1_max = 3, 13
         ax2_min = np.amin(self.y)
         ax2_max = np.amax(self.y)
         if shape == "rectangle":
@@ -192,7 +195,10 @@ class TestConvexHull:
         self.generate_points(shape, overlay_origin, high_lat)
         _, hull_points, x_shift = convex_hull_area(self.x, self.y, return_hull=True)
 
-        ax1_min, ax1_max = min_max_lon(self.x)
+        if overlay_origin is not False:
+            ax1_min, ax1_max = -4, 6
+        else:
+            ax1_min, ax1_max = 3, 13
         ax2_min = np.amin(self.y)
         ax2_max = np.amax(self.y)
         points_x = self.rng.uniform(ax1_min-0.5, ax1_max+0.5, size=1000)
@@ -218,19 +224,21 @@ class TestConvexHull:
         self.generate_points(shape, overlay_origin, high_lat)
         _, hull_points, x_shift = convex_hull_area(self.x, self.y, return_hull=True)
 
-        ax1_min, ax1_max = min_max_lon(self.x)
+        if overlay_origin == "359":
+            ax1_min, ax1_max = np.amin(self.x[self.x > 180]) - 360, np.amax(self.x[self.x < 180])
+        else:
+            ax1_min, ax1_max = np.amin(self.x), np.amax(self.x)
         ax2_min = np.amin(self.y)
         ax2_max = np.amax(self.y)
 
-        avs = generate_avs_inside_hull(ax1_min - 2, ax1_max + 2, ax2_min - 2, ax2_max + 2, hull_points,
-                                       x_shift, 'galactic')
+        avs = generate_avs_inside_hull(hull_points, x_shift, 'galactic')
 
         assert len(avs) >= 30
 
         n_dim = 7
         while True:
-            ax1s = np.linspace(ax1_min - 2, ax1_max + 2, n_dim)
-            ax2s = np.linspace(ax2_min - 2, ax2_max + 2, n_dim)
+            ax1s = np.linspace(ax1_min, ax1_max, n_dim)
+            ax2s = np.linspace(ax2_min, ax2_max, n_dim)
             ax1s, ax2s = np.meshgrid(ax1s, ax2s, indexing='xy')
             ax1s, ax2s = ax1s.flatten(), ax2s.flatten()
             # Basically just reproduce the code in generate_avs_inside_hull,
@@ -239,7 +247,7 @@ class TestConvexHull:
                 check = np.array([mff.haversine_wrapper(a, self.x_mid, b, self.y_mid) <= self.r for
                                   a, b in zip(ax1s, ax2s)])
             else:
-                check = np.array([(a >= ax1_min) & (a <= ax1_max) & (b >= ax2_min) & (b <= ax2_max)
+                check = np.array([(a > ax1_min) & (a < ax1_max) & (b > ax2_min) & (b < ax2_max)
                                   for a, b in zip(ax1s, ax2s)])
             if np.sum(check) >= 30:
                 break

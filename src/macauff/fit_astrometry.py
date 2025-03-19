@@ -1068,9 +1068,9 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
         print('Creating simulated star+galaxy counts...')
         sys.stdout.flush()
         if self.coord_or_chunk == 'coord':
-            ax1_mid, ax2_mid, ax1_min, ax1_max, ax2_min, ax2_max = self.list_of_things
+            ax1_mid, ax2_mid, _, _, _, _ = self.list_of_things
         else:
-            ax1_mid, ax2_mid, ax1_min, ax1_max, ax2_min, ax2_max, _ = self.list_of_things
+            ax1_mid, ax2_mid, _, _, _, _, _ = self.list_of_things
 
         mag_ind = self.mag_indices[self.best_mag_index]
         b_mag_data = self.b[~np.isnan(self.b[:, mag_ind]), mag_ind]
@@ -1108,8 +1108,7 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
             os.system(f'mv {self.trifolder}/trilegal_auf_simulation.dat '
                       f'{self.trifolder}/{self.triname.format(ax1_mid, ax2_mid)}_faint.dat')
 
-        avs = generate_avs_inside_hull(
-            ax1_min, ax1_max, ax2_min, ax2_max, self.hull_points, self.hull_x_shift, self.coord_system)
+        avs = generate_avs_inside_hull(self.hull_points, self.hull_x_shift, self.coord_system)
 
         if self.trifolder is not None:
             tri_hist, tri_mags, _, dtri_mags, tri_uncert, _ = make_tri_counts(

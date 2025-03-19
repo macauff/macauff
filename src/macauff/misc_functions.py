@@ -417,21 +417,13 @@ def shoelace_formula_area(x, y):
     return area
 
 
-def generate_avs_inside_hull(ax1_min, ax1_max, ax2_min, ax2_max, hull_points, hull_x_shift, coord_system):
+def generate_avs_inside_hull(hull_points, hull_x_shift, coord_system):
     """
     Sample V-band exctinction across an arbitrarily-shaped region, using points
     the area's convex hull.
 
     Parameters
     ----------
-    ax1_min : float
-        Smallest longitudinal coordinate of the bounding box around the region.
-    ax1_max : float
-        Largest longitudinal coordinate of the bounding box around the region.
-    ax2_min : float
-        Smallest latitudinal coordinate of the bounding box around the region.
-    ax2_max : float
-        Largest latitudinal coordinate of the bounding box around the region.
     hull_points : numpy.ndarray
         Array of shape ``(N, 2)`` of the coordinates defining the region's
         external region as a set of coordinate polygons, following
@@ -451,6 +443,8 @@ def generate_avs_inside_hull(ax1_min, ax1_max, ax2_min, ax2_max, hull_points, hu
     """
     not_enough_points = True
     n_dim = 7
+    ax1_min, ax1_max = np.array([np.amin(hull_points[:, 0]), np.amax(hull_points[:, 0])]) - hull_x_shift
+    ax2_min, ax2_max = np.array([np.amin(hull_points[:, 1]), np.amax(hull_points[:, 1])])
     while not_enough_points:
         ax1s = np.linspace(ax1_min, ax1_max, n_dim)
         ax2s = np.linspace(ax2_min, ax2_max, n_dim)

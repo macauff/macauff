@@ -25,7 +25,6 @@ from macauff.misc_functions import (
     create_auf_params_grid,
     find_model_counts_corrections,
     generate_avs_inside_hull,
-    min_max_lon,
 )
 from macauff.misc_functions_fortran import misc_functions_fortran as mff
 from macauff.perturbation_auf_fortran import perturbation_auf_fortran as paf
@@ -146,9 +145,6 @@ def make_perturb_aufs(cm, which_cat):
             a_astro_cut = a_tot_astro[sky_cut]
 
             if len(a_astro_cut) > 0:
-                ax1_min, ax1_max = min_max_lon(a_astro_cut[:, 0])
-                ax2_min, ax2_max = np.amin(a_astro_cut[:, 1]), np.amax(a_astro_cut[:, 1])
-
                 dens_mags = np.empty(len(filters), float)
                 for j in range(len(dens_mags)):  # pylint: disable=consider-using-enumerate
                     # Take the "density" magnitude (i.e., the faint limit down to
@@ -165,8 +161,7 @@ def make_perturb_aufs(cm, which_cat):
 
                 # Also, before beginning the loop of filters, sample the V-band
                 # extinction across the region.
-                avs = generate_avs_inside_hull(ax1_min, ax1_max, ax2_min, ax2_max, hull_points,
-                                               hull_x_shift, auf_region_frame)
+                avs = generate_avs_inside_hull(hull_points, hull_x_shift, auf_region_frame)
 
         # If there are no sources in this entire section of sky, we don't need
         # to bother downloading any TRILEGAL simulations since we'll auto-fill
