@@ -8,6 +8,7 @@ This module provides the high-level framework for performing catalogue-catalogue
 import datetime
 import os
 import sys
+import warnings
 from configparser import ConfigParser
 from time import sleep
 
@@ -167,10 +168,12 @@ class CrossMatch():
         if self.a_correct_astrometry or self.a_compute_snr_mag_relation:
             # Generate from current data: just need the singular chunk mid-points
             # and to leave all other parameters as they are.
-            ax1_mids = np.array([0.1 * np.floor(0.5 * (self.cross_match_extent[0] +
-                                                       self.cross_match_extent[1]) / 0.1)])
-            ax2_mids = np.array([0.1 * np.floor(0.5 * (self.cross_match_extent[2] +
-                                                       self.cross_match_extent[3]) / 0.1)])
+            if len(self.a_auf_region_points) > 1:
+                warnings.warn("a_auf_region_points contains more than one AUF sampling point, but either "
+                              "a_correct_astrometry or a_compute_snr_mag_relation is True. Check results "
+                              "carefully.")
+            ax1_mids = np.array([self.a_auf_region_points[0, 0]])
+            ax2_mids = np.array([self.a_auf_region_points[0, 1]])
             ax_dimension = 2
             a_npy_or_csv = 'csv'
             a_coord_or_chunk = 'chunk'
@@ -243,10 +246,12 @@ class CrossMatch():
         if self.b_correct_astrometry or self.b_compute_snr_mag_relation:
             # Generate from current data: just need the singular chunk mid-points
             # and to leave all other parameters as they are.
-            ax1_mids = np.array([0.1 * np.floor(0.5 * (self.cross_match_extent[0] +
-                                                       self.cross_match_extent[1]) / 0.1)])
-            ax2_mids = np.array([0.1 * np.floor(0.5 * (self.cross_match_extent[2] +
-                                                       self.cross_match_extent[3]) / 0.1)])
+            if len(self.b_auf_region_points) > 1:
+                warnings.warn("b_auf_region_points contains more than one AUF sampling point, but either "
+                              "b_correct_astrometry or b_compute_snr_mag_relation is True. Check results "
+                              "carefully.")
+            ax1_mids = np.array([self.b_auf_region_points[0, 0]])
+            ax2_mids = np.array([self.b_auf_region_points[0, 1]])
             ax_dimension = 2
             b_npy_or_csv = 'csv'
             b_coord_or_chunk = 'chunk'
