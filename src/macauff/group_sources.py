@@ -153,6 +153,10 @@ def make_island_groupings(cm):
         a_full[:, 0], a_full[:, 1], return_hull=True)
     _, b_hull_points, b_hull_x_shift = convex_hull_area(
         b_full[:, 0], b_full[:, 1], return_hull=True)
+    cm.a_hull_points = a_hull_points
+    cm.a_hull_x_shift = a_hull_x_shift
+    cm.b_hull_points = b_hull_points
+    cm.b_hull_x_shift = b_hull_x_shift
 
     # "Pad factor" to allow for a percentage of missing search circle in cases
     # where e.g. we are 0-360 wrapped and have a "missing" meridian slice.

@@ -12,6 +12,7 @@ from test_matching import _replace_line
 # pylint: disable=import-error,no-name-in-module
 from macauff.macauff import Macauff
 from macauff.matching import CrossMatch
+from macauff.misc_functions import convex_hull_area
 from macauff.photometric_likelihood import compute_photometric_likelihoods, make_bins
 from macauff.photometric_likelihood_fortran import photometric_likelihood_fortran as plf
 
@@ -213,6 +214,10 @@ class TestOneSidedPhotometricLikelihood:
         self.cm.auf_cdf_a = None
         self.cm.auf_cdf_b = None
         mcff = Macauff(self.cm)
+        _, self.cm.a_hull_points, self.cm.a_hull_x_shift = convex_hull_area(
+            self.a_astro[:, 0], self.a_astro[:, 1], return_hull=True)
+        _, self.cm.b_hull_points, self.cm.b_hull_x_shift = convex_hull_area(
+            self.b_astro[:, 0], self.b_astro[:, 1], return_hull=True)
         mcff.calculate_phot_like()
 
         abinlen = self.cm.abinlengths

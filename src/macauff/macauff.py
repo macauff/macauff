@@ -12,6 +12,7 @@ import numpy as np
 
 # pylint: disable=import-error,no-name-in-module
 from macauff.group_sources_fortran import group_sources_fortran as gsf
+from macauff.misc_functions import coord_inside_convex_hull
 from macauff.misc_functions_fortran import misc_functions_fortran as mff
 
 # pylint: enable=import-error,no-name-in-module
@@ -133,38 +134,146 @@ class Macauff():
 
     def _calculate_cf_areas(self):
         '''
-        Convenience function to calculate the area around each
-        ``cross_match_extent`` sky coordinate where it is defined as having the
-        smallest on-sky separation.
+        Convenience function to calculate the area around each individual
+        sky coordinate where it is defined as having the smallest on-sky
+        separation.
         '''
+        def _calc_cf_area_call(min_lon, max_lon, min_lat, max_lat, cf_areas, n_lon, n_lat, recursion_level):
+            '''
+            Recursive function to calculate the area within a convex hull
+            nearest to each ``cm.a_hull_point`` and ``cm.b_hull_point`` overlap
+            region.
+
+            Parameters
+            ----------
+            min_lon : float
+                Lowest longitude to generate grid of points to check for
+                overlap with convex hulls and include in respective area.
+            max_lon : float
+                Largest longitude to generate search grid for.
+            min_lat : float
+                Minimum latitude to check area overlap for, to generate
+                array with ``max_lat``.
+            max_lat : float
+                Maximum latitude for which to check hull overlap.
+            cf_areas : numpy.ndarray
+                Array of areas of each coordinate in ``cm.cf_region_points``,
+                for which each lon-lat coordinate is considered and recursively
+                added.
+            n_lon : int
+                Number of longitudinal points to generate between ``min_lon``
+                and ``max_lon``.
+            n_lat : int
+                Number of latitudinal points to search between ``min_lat`` and
+                ``max_lat``.
+            recursion_level : int
+                Flag to indicate how many times we've "zoomed" in on the grid
+                region, depending on whether our grid box lies completely in,
+                completely out, or partially overlapping either convex hull.
+                Once we've zoomed in sufficiently, calculate brute force area
+                overlaps; otherwise zoom in again.
+
+            Returns
+            -------
+            cf_areas : numpy.ndarray
+                Return the same ``cf_areas`` array, updated with new grid
+                searches.
+            '''
+            # If we've hit what we want to call the bottom of the recursion, at
+            # 0.001-deg scale, then we can brute force our way through the area
+            # computation, but otherwise do things more carefully.
+            if recursion_level == 2:
+                test_lons = np.linspace(min_lon, max_lon, n_lon)
+                test_lons = test_lons[:-1] + np.diff(test_lons)/2
+                test_lats = np.linspace(min_lat, max_lat, n_lat)
+                test_lats = test_lats[:-1] + np.diff(test_lats)/2
+
+                points_in_area = (
+                    np.array([coord_inside_convex_hull([ax1 + self.cm.a_hull_x_shift, ax2],
+                              self.cm.a_hull_points) for ax1 in test_lons for ax2 in test_lats]) &
+                    np.array([coord_inside_convex_hull([ax1 + self.cm.b_hull_x_shift, ax2],
+                              self.cm.b_hull_points) for ax1 in test_lons for ax2 in test_lats]))
+
+                test_coords = np.array([[a, b] for a in test_lons for b in test_lats])
+
+                inds = mff.find_nearest_point(
+                    test_coords[:, 0], test_coords[:, 1], self.cm.cf_region_points[:, 0],
+                    self.cm.cf_region_points[:, 1])
+
+                for k, (ind, point_in_area) in enumerate(zip(inds, points_in_area)):
+                    if point_in_area:
+                        cf_areas[ind] += np.cos(np.radians(test_coords[k, 1])) * (
+                            test_lons[1] - test_lons[0]) * (test_lats[1] - test_lats[0])
+
+                return cf_areas
+
+            test_lons = np.linspace(min_lon, max_lon, n_lon)
+            test_lats = np.linspace(min_lat, max_lat, n_lat)
+
+            points_in_area = (
+                np.array([coord_inside_convex_hull([ax1 + self.cm.a_hull_x_shift, ax2], self.cm.a_hull_points)
+                          for ax1 in test_lons for ax2 in test_lats]) &
+                np.array([coord_inside_convex_hull([ax1 + self.cm.b_hull_x_shift, ax2], self.cm.b_hull_points)
+                          for ax1 in test_lons for ax2 in test_lats])).reshape(
+                len(test_lons), len(test_lats))
+
+            for i in range(len(test_lons)-1):
+                for j in range(len(test_lats)-1):
+                    n_points_in_area = np.sum(points_in_area[i:i+2, j:j+2])
+                    # If no coarse grid points are in the area, job done, no need
+                    # to zoom in any further. Otherwise bifurcate based on if all
+                    # points are in the hull or not.
+                    if n_points_in_area == 4:
+                        # If we can skip straight from the 0.1-deg bin to the end,
+                        # we have 100 bins to split into; otherwise it's just 10.
+                        if recursion_level == 0:
+                            small_n_lon = 101
+                            small_n_lat = 101
+                        else:
+                            small_n_lon = 11
+                            small_n_lat = 11
+                        # Make sure to take the centre of grid points now,
+                        # rather than the corners.
+                        small_test_lons = np.linspace(test_lons[i], test_lons[i+1], small_n_lon)
+                        small_test_lons = small_test_lons[:-1] + np.diff(small_test_lons)/2
+                        small_test_lats = np.linspace(test_lats[j], test_lats[j+1], small_n_lat)
+                        small_test_lats = small_test_lats[:-1] + np.diff(small_test_lats)/2
+
+                        test_coords = np.array([[a, b] for a in small_test_lons for b in small_test_lats])
+                        small_inds = mff.find_nearest_point(
+                            test_coords[:, 0], test_coords[:, 1], self.cm.cf_region_points[:, 0],
+                            self.cm.cf_region_points[:, 1])
+
+                        for k, ind in enumerate(small_inds):
+                            cf_areas[ind] += np.cos(
+                                np.radians(test_coords[k, 1])) * (small_test_lons[1] - small_test_lons[0]) * (
+                                small_test_lats[1] - small_test_lats[0])
+                    elif n_points_in_area > 0:
+                        # Start the whole thing again, just 10x smaller,
+                        # returning the recursively updated area grid.
+                        cf_areas = _calc_cf_area_call(
+                            test_lons[i], test_lons[i+1], test_lats[j], test_lats[j+1], cf_areas,
+                            n_lon=11, n_lat=11, recursion_level=recursion_level+1)
+
+            return cf_areas
+
         t = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         print(f'{t} Rank {self.cm.rank}, chunk {self.cm.chunk_id}: Calculating photometric region areas...')
         sys.stdout.flush()
-        dlon, dlat = 0.001, 0.001
-        test_lons = np.arange(self.cm.cross_match_extent[0], self.cm.cross_match_extent[1], dlon)
-        test_lats = np.arange(self.cm.cross_match_extent[2], self.cm.cross_match_extent[3], dlat)
+
+        min_lon = max(np.amin(self.cm.a_hull_points[:, 0] - self.cm.a_hull_x_shift),
+                      np.amin(self.cm.b_hull_points[:, 0] - self.cm.a_hull_x_shift))
+        max_lon = min(np.amax(self.cm.a_hull_points[:, 0] - self.cm.b_hull_x_shift),
+                      np.amax(self.cm.b_hull_points[:, 0] - self.cm.b_hull_x_shift))
+        min_lat = max(np.amin(self.cm.a_hull_points[:, 1]), np.amin(self.cm.b_hull_points[:, 1]))
+        max_lat = min(np.amax(self.cm.a_hull_points[:, 1]), np.amax(self.cm.b_hull_points[:, 1]))
+
+        n_lon = int(np.ceil((max_lon - min_lon) / 0.1)) + 1
+        n_lat = int(np.ceil((max_lat - min_lat) / 0.1)) + 1
 
         cf_areas = np.zeros((len(self.cm.cf_region_points)), float)
-        test_coords = np.empty((len(test_lons), 2), float)
-        test_coords[:, 0] = test_lons
-
-        for test_lat in test_lats:
-            test_coords[:, 1] = test_lat
-
-            inds = mff.find_nearest_point(test_coords[:, 0], test_coords[:, 1],
-                                          self.cm.cf_region_points[:, 0], self.cm.cf_region_points[:, 1])
-
-            # Unit area of a sphere is cos(theta) dtheta dphi if theta goes from -90
-            # to +90 degrees (sin(theta) for 0 to 180 degrees). Note, however, that
-            # dtheta and dphi have to be in radians, so we have to convert the entire
-            # thing from degrees and re-convert at the end. Hence:
-            for i, ind in enumerate(inds):
-                theta = np.radians(test_coords[i, 1])
-                dtheta, dphi = dlat / 180 * np.pi, dlon / 180 * np.pi
-                # Remember to convert back to square degrees:
-                cf_areas[ind] += (np.cos(theta) * dtheta * dphi) * (180 / np.pi)**2
-
-        self.cm.cf_areas = cf_areas
+        self.cm.cf_areas = _calc_cf_area_call(min_lon, max_lon, min_lat, max_lat, cf_areas,
+                                              n_lon=n_lon, n_lat=n_lat, recursion_level=0)
 
     def pair_sources(self):
         '''

@@ -28,6 +28,7 @@ def test_naive_bayes_match(x, y):
     r = 5 * np.sqrt(a_astro_sig**2 + b_astro_sig**2)
     dx = np.sqrt(n_b * np.pi * r**2)/3600
     extent = np.array([x-1.3*dx/2-r/3600, x+1.3*dx/2+r/3600, y-1.3*dx/2-r/3600, y+1.3*dx/2+r/3600])
+    forced_extent = np.array([x-0.06, x+0.06, y-0.06, y+0.06])
 
     a_cat, b_cat = 'a_cat', 'b_cat'
 
@@ -39,13 +40,13 @@ def test_naive_bayes_match(x, y):
     for i in range(len(a_astro)):
         if i not in a_mp:
             if lonely_counter == 0:
-                a_astro[i, [0, 1]] = [extent[0], extent[2]]
+                a_astro[i, [0, 1]] = [forced_extent[0], forced_extent[2]]
             if lonely_counter == 1:
-                a_astro[i, [0, 1]] = [extent[1], extent[2]]
+                a_astro[i, [0, 1]] = [forced_extent[1], forced_extent[2]]
             if lonely_counter == 2:
-                a_astro[i, [0, 1]] = [extent[0], extent[3]]
+                a_astro[i, [0, 1]] = [forced_extent[0], forced_extent[3]]
             if lonely_counter == 3:
-                a_astro[i, [0, 1]] = [extent[1], extent[3]]
+                a_astro[i, [0, 1]] = [forced_extent[1], forced_extent[3]]
             if lonely_counter == 4:
                 break
             lonely_counter += 1
@@ -55,13 +56,13 @@ def test_naive_bayes_match(x, y):
     for i in range(len(b_astro)):
         if i not in b_mp:
             if lonely_counter == 0:
-                b_astro[i, [0, 1]] = [extent[0], extent[2]]
+                b_astro[i, [0, 1]] = [forced_extent[0], forced_extent[2]]
             if lonely_counter == 1:
-                b_astro[i, [0, 1]] = [extent[1], extent[2]]
+                b_astro[i, [0, 1]] = [forced_extent[1], forced_extent[2]]
             if lonely_counter == 2:
-                b_astro[i, [0, 1]] = [extent[0], extent[3]]
+                b_astro[i, [0, 1]] = [forced_extent[0], forced_extent[3]]
             if lonely_counter == 3:
-                b_astro[i, [0, 1]] = [extent[1], extent[3]]
+                b_astro[i, [0, 1]] = [forced_extent[1], forced_extent[3]]
             if lonely_counter == 4:
                 break
             lonely_counter += 1
