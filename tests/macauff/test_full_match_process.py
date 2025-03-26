@@ -83,13 +83,8 @@ def test_naive_bayes_match(x, y):
 
     new_region_points = f'{x} {x} 1 {y} {y} 1'
 
-    new_ext = [extent[0] - r/3600 - 0.1/3600, extent[1] + r/3600 + 0.1/3600,
-               extent[2] - r/3600 - 0.1/3600, extent[3] + r/3600 + 0.1/3600]
-    for ol, nl in zip(['cross_match_extent = 131 138 -3 3', 'joint_folder_path = test_path',
-                       'cf_region_points = 131 134 4 -1 1 3'],
-                      ['cross_match_extent = {:.3f} {:.3f} {:.3f} {:.3f}\n'.format(*new_ext),
-                       'joint_folder_path = new_test_path\n',
-                       f'cf_region_points = {new_region_points}\n']):
+    for ol, nl in zip(['joint_folder_path = test_path', 'cf_region_points = 131 134 4 -1 1 3'],
+                      ['joint_folder_path = new_test_path\n', f'cf_region_points = {new_region_points}\n']):
         with open(os.path.join(os.path.dirname(__file__), 'data/crossmatch_params.txt'),
                   encoding='utf-8') as file:
             f = file.readlines()

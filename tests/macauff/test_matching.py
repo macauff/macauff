@@ -1088,35 +1088,6 @@ class TestInputs:
                                      os.path.join(os.path.dirname(__file__),
                                      f"data/cat_b_params{'_' if '_b_' in in_file else ''}.txt"))
 
-    def test_cross_match_extent(self):
-        cm = CrossMatch(os.path.join(os.path.dirname(__file__), 'data'))
-        cm._initialise_chunk(os.path.join(os.path.dirname(__file__), 'data/crossmatch_params.txt'),
-                             os.path.join(os.path.dirname(__file__), 'data/cat_a_params.txt'),
-                             os.path.join(os.path.dirname(__file__), 'data/cat_b_params.txt'))
-        assert np.all(cm.cross_match_extent == np.array([131, 138, -3, 3]))
-
-        # List of simple one line config file replacements for error message checking
-        in_file = 'crossmatch_params'
-        with open(os.path.join(os.path.dirname(__file__), f'data/{in_file}.txt'), encoding='utf-8') as file:
-            f = file.readlines()
-        old_line = 'cross_match_extent = 131 138 -3 3'
-        for new_line, match_text in zip(
-                ['', 'cross_match_extent = 131 138 -3 word\n', 'cross_match_extent = 131 138 -3\n',
-                 'cross_match_extent = 131 138 -3 3 1'],
-                ['Missing key cross_match_extent', 'All elements of cross_match_extent should be',
-                 'cross_match_extent should contain.', 'cross_match_extent should contain']):
-            idx = np.where([old_line in line for line in f])[0][0]
-            _replace_line(os.path.join(os.path.dirname(__file__), f'data/{in_file}.txt'), idx, new_line,
-                          out_file=os.path.join(os.path.dirname(__file__), f'data/{in_file}_.txt'))
-
-            with pytest.raises(ValueError, match=match_text):
-                cm._initialise_chunk(os.path.join(os.path.dirname(__file__),
-                                     f"data/crossmatch_params{'_' if 'h_p' in in_file else ''}.txt"),
-                                     os.path.join(os.path.dirname(__file__),
-                                     f"data/cat_a_params{'_' if '_a_' in in_file else ''}.txt"),
-                                     os.path.join(os.path.dirname(__file__),
-                                     f"data/cat_b_params{'_' if '_b_' in in_file else ''}.txt"))
-
     def test_int_fracs(self):
         cm = CrossMatch(os.path.join(os.path.dirname(__file__), 'data'))
         cm._initialise_chunk(os.path.join(os.path.dirname(__file__), 'data/crossmatch_params.txt'),
@@ -1240,7 +1211,6 @@ class TestInputs:
         cm._initialise_chunk(os.path.join(os.path.dirname(__file__), 'data/crossmatch_params.txt'),
                              os.path.join(os.path.dirname(__file__), 'data/cat_a_params.txt'),
                              os.path.join(os.path.dirname(__file__), 'data/cat_b_params.txt'))
-        cm.cross_match_extent = np.array([131, 134, -1, 1])
         cm.cf_region_points = np.array([[a, b] for a in [131.5, 132.5, 133.5]
                                         for b in [-0.5, 0.5]])
         cm.chunk_id = 1
@@ -1292,7 +1262,6 @@ class TestInputs:
                 calculated_areas = np.array([chop, chop, semi, semi, chop, chop])
             assert_allclose(cm.cf_areas, calculated_areas, rtol=0.02)
 
-        cm.cross_match_extent = np.array([50, 55, 70, 75])
         cm.cf_region_points = np.array([[a, b] for a in 0.5+np.arange(50, 55, 1)
                                         for b in 0.5+np.arange(70, 75, 1)])
         mcff = Macauff(cm)

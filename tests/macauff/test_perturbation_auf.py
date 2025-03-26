@@ -348,7 +348,6 @@ class TestMakePerturbAUFs():
         self.filters = np.array(['W1'])
         self.tri_filt_names = np.copy(self.filters)
         self.auf_points = np.array([[0.0, 0.0]])
-        self.ax_lims = np.array([0, 1, 0, 1])
 
         self.psf_fwhms = np.array([6.1])
         self.r = np.linspace(0, 1.185 * self.psf_fwhms[0], 2500)
@@ -786,7 +785,6 @@ class TestMakePerturbAUFs():
 
         cm.a_auf_region_points = new_auf_points
         cm.b_auf_region_points = new_auf_points
-        cm.cross_match_extent = self.ax_lims
         cm.a_dens_dist = density_radius
         cm.b_dens_dist = density_radius
         cm.r = self.r
@@ -982,13 +980,11 @@ class TestMakePerturbAUFs():
 
         cm.a_auf_region_points = new_auf_points
         cm.b_auf_region_points = new_auf_points
-        cm.cross_match_extent = self.ax_lims
         cm.r = self.r
         cm.dr = self.dr
         cm.rho = self.rho
         cm.drho = self.drho
         cm.j0s = self.j0s
-        cm.cross_match_extent = self.ax_lims
         cm.num_trials = self.num_trials
         cm.a_fit_gal_flag = True
         cm.b_fit_gal_flag = True

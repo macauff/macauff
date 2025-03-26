@@ -67,14 +67,6 @@ class TestOneSidedPhotometricLikelihood:
         _replace_line(os.path.join(os.path.dirname(__file__), 'data/crossmatch_params.txt'),
                       idx, new_line, out_file=os.path.join(os.path.dirname(__file__),
                       'data/crossmatch_params_.txt'))
-        old_line = 'cross_match_extent = 131 138 -3 3'
-        new_line = 'cross_match_extent = 131 134 -3 3\n'
-        with open(os.path.join(os.path.dirname(__file__), 'data/crossmatch_params_.txt'),
-                  encoding='utf-8') as file:
-            f = file.readlines()
-        idx = np.where([old_line in line for line in f])[0][0]
-        _replace_line(os.path.join(os.path.dirname(__file__), 'data/crossmatch_params_.txt'),
-                      idx, new_line)
 
     def make_class(self):
         class A():  # pylint: disable=too-few-public-methods

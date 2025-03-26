@@ -309,7 +309,6 @@ class TestMakeIslandGroupings():  # pylint: disable=too-many-instance-attributes
                                   os.path.join(os.path.dirname(__file__), 'data/cat_a_params_.txt'),
                                   os.path.join(os.path.dirname(__file__), 'data/cat_b_params_.txt'))
         self.cm.pos_corr_dist = self.max_sep
-        self.cm.cross_match_extent = self.ax_lims
         self.cm.a_filt_names = self.a_filt_names
         self.cm.b_filt_names = self.b_filt_names
         self.cm.a_cat_name = self.a_title
@@ -535,7 +534,6 @@ class TestMakeIslandGroupings():  # pylint: disable=too-many-instance-attributes
         np.save(f'{self.b_cat_folder_path}/con_cat_astro.npy', b_coords)
 
         self.cm.chunk_id = 1
-        self.cm.cross_match_extent = ax_lims
         self.cm.a_perturb_auf_outputs = self.a_perturb_auf_outputs
         self.cm.b_perturb_auf_outputs = self.b_perturb_auf_outputs
         self.cm.a_modelrefinds = self.a_modelrefinds
@@ -582,7 +580,6 @@ class TestMakeIslandGroupings():  # pylint: disable=too-many-instance-attributes
         np.save(f'{self.b_cat_folder_path}/con_cat_astro.npy', self.b_coords)
         self.cm.include_phot_like = True
         self.cm.chunk_id = 1
-        self.cm.cross_match_extent = self.ax_lims
         self.cm.a_perturb_auf_outputs = self.a_perturb_auf_outputs
         self.cm.b_perturb_auf_outputs = self.b_perturb_auf_outputs
         self.cm.a_modelrefinds = self.a_modelrefinds
