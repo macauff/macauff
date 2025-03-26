@@ -17,7 +17,6 @@ from macauff.misc_functions import (
     coord_inside_convex_hull,
     create_auf_params_grid,
     generate_avs_inside_hull,
-    hav_dist_constant_lat,
     min_max_lon,
 )
 from macauff.misc_functions_fortran import misc_functions_fortran as mff
@@ -64,17 +63,6 @@ def test_create_fourier_offsets_grid():
         for i in range(0, len(filt_names)):
             a_manual[:, :a_len[i, j], i, j] = i + len(filt_names)*j
     assert np.all(a == a_manual)
-
-
-def test_hav_dist_constant_lat():
-    lon1s = [0, 124.1, 65.34, 180, 324, 96.34]
-    lon2s = [359.1, 150.23, 165.3, 210, 10.3, 60.34]
-
-    for lat in [-86.4, -40.3, -10.1, 0, 15.5, 45.1, 73.14, 88.54]:
-        for lon1, lon2 in zip(lon1s, lon2s):
-            a = mff.haversine_wrapper(lon1, lon2, lat, lat)
-            b = hav_dist_constant_lat(lon1, lat, lon2)
-            assert_allclose(a, b)
 
 
 def test_load_rectangular_slice():

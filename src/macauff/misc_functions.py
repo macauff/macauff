@@ -75,33 +75,6 @@ def create_auf_params_grid(perturb_auf_outputs, auf_pointings, filt_names, array
     return grid
 
 
-def hav_dist_constant_lat(x_lon, x_lat, lon):
-    '''
-    Computes the Haversine formula in the limit that sky separation is only
-    determined by longitudinal separation (i.e., delta-lat is zero).
-
-    Parameters
-    ----------
-    x_lon : float
-        Sky coordinate of the source in question, in degrees.
-    x_lat : float
-        Orthogonal sky coordinate of the source, in degrees.
-    lon : float
-        Longitudinal sky coordinate to calculate the "horizontal" sky separation
-        of the source to.
-
-    Returns
-    -------
-    dist : float
-        Horizontal sky separation between source and given ``lon``, in degrees.
-    '''
-
-    dist = np.degrees(2 * np.arcsin(np.abs(np.cos(np.radians(x_lat)) *
-                                           np.sin(np.radians((x_lon - lon)/2)))))
-
-    return dist
-
-
 def _load_rectangular_slice(a, lon1, lon2, lat1, lat2, padding):
     '''
     Loads all sources in a catalogue within a given separation of a rectangle
@@ -185,7 +158,9 @@ def _lon_cut(a, lon, padding, inequality, lon_shift):
     # constant latitude this reduces to
     # r = 2 arcsin(|cos(lat) * sin(delta-lon/2)|).
     if padding > 0:
-        sky_cut = (hav_dist_constant_lat(a[:, 0], a[:, 1], lon) <= padding) | inequal_lon_cut
+        hav_dist_const_lat = np.degrees(2 * np.arcsin(np.abs(np.cos(np.radians(a[:, 1])) *
+                                        np.sin(np.radians((a[:, 0] - lon)/2)))))
+        sky_cut = (hav_dist_const_lat <= padding) | inequal_lon_cut
     # However, in both zero and non-zero padding factor cases, we always require
     # the source to be above or below the longitude.
     else:
