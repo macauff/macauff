@@ -1569,6 +1569,7 @@ class TestInputs:
                     os.path.join(os.path.dirname(__file__), 'data/cat_b_params_.txt'))
 
     @pytest.mark.remote_data
+    @pytest.mark.filterwarnings("ignore:.*contains more than one AUF sampling point, .*")
     # pylint: disable-next=too-many-lines,too-many-branches,too-many-statements,too-many-locals
     def test_crossmatch_correct_astrometry_inputs(self):
         cm = CrossMatch(os.path.join(os.path.dirname(__file__), 'data'))
