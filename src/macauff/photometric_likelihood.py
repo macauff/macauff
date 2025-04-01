@@ -11,6 +11,7 @@ import numpy as np
 from scipy.optimize import minimize
 
 # pylint: disable=import-error,no-name-in-module
+from macauff.misc_functions import coord_inside_convex_hull
 from macauff.misc_functions_fortran import misc_functions_fortran as mff
 from macauff.photometric_likelihood_fortran import photometric_likelihood_fortran as plf
 
@@ -77,16 +78,24 @@ def compute_photometric_likelihoods(cm):
     fb_array = np.zeros(dtype=float, shape=(longbbinlen-1, len(cm.b_filt_names), len(cm.a_filt_names),
                                             len(cm.cf_region_points)), order='F')
 
+    a_in_joint_area = np.array([
+        coord_inside_convex_hull([a_astro[p, 0] + cm.a_hull_x_shift, a_astro[p, 1]], cm.a_hull_points) &
+        coord_inside_convex_hull([a_astro[p, 0] + cm.b_hull_x_shift, a_astro[p, 1]], cm.b_hull_points)
+        for p in range(len(a_astro))])
+    b_in_joint_area = np.array([
+        coord_inside_convex_hull([b_astro[p, 0] + cm.a_hull_x_shift, b_astro[p, 1]], cm.a_hull_points) &
+        coord_inside_convex_hull([b_astro[p, 0] + cm.b_hull_x_shift, b_astro[p, 1]], cm.b_hull_points)
+        for p in range(len(b_astro))])
     for m in range(0, len(cm.cf_region_points)):
         area = cm.cf_areas[m]
-        a_sky_cut = a_sky_inds == m
+        a_sky_cut = (a_sky_inds == m) & a_in_joint_area
         a_photo_cut = a_photo[a_sky_cut]
         if cm.include_phot_like or cm.use_phot_priors:
             a_auf_cdf = auf_cdf_a[:, a_sky_cut]
             a_b_area_cut, a_f_area_cut, a_inds_cut, a_size_cut = (
                 cm.ab_area[a_sky_cut], cm.af_area[a_sky_cut], cm.ainds[:, a_sky_cut], cm.asize[a_sky_cut])
 
-        b_sky_cut = b_sky_inds == m
+        b_sky_cut = (b_sky_inds == m) & b_in_joint_area
         b_photo_cut = b_photo[b_sky_cut]
         if cm.include_phot_like or cm.use_phot_priors:
             b_auf_cdf = auf_cdf_b[:, b_sky_cut]
@@ -100,7 +109,9 @@ def compute_photometric_likelihoods(cm):
             else:
                 a_bins = abinsarray[:abinlengths[i, m], i, m]
                 a_mag = a_photo[:, i]
+                a_mag_cut = a_photo_cut[:, i]
                 a_flags = ~np.isnan(a_mag)
+                a_flags_cut = a_flags[a_sky_cut]
             for j in range(0, len(cm.b_filt_names)):
                 if not cm.include_phot_like and not cm.use_phot_priors:
                     b_num_photo_cut = np.sum(~np.isnan(b_photo_cut[:, j]))
@@ -122,16 +133,18 @@ def compute_photometric_likelihoods(cm):
                 else:
                     b_bins = bbinsarray[:bbinlengths[j, m], j, m]
                     b_mag = b_photo[:, j]
+                    b_mag_cut = b_photo_cut[:, j]
                     b_flags = ~np.isnan(b_mag)
+                    b_flags_cut = b_flags[b_sky_cut]
 
                     bright_frac, field_frac = cm.int_fracs[[0, 1]]
                     c_prior, c_like, fa_prior, fa_like, fb_prior, fb_like = create_c_and_f(
                         # pylint: disable-next=possibly-used-before-assignment
-                        a_mag, b_mag, a_inds_cut, a_size_cut, b_inds_cut, b_size_cut, a_b_area_cut,
+                        a_mag, b_mag, a_mag_cut, b_mag_cut, a_inds_cut, a_size_cut, b_inds_cut, b_size_cut,
                         # pylint: disable-next=possibly-used-before-assignment
-                        b_b_area_cut, a_f_area_cut, b_f_area_cut, a_auf_cdf, b_auf_cdf, a_bins, b_bins,
+                        a_b_area_cut, b_b_area_cut, a_f_area_cut, b_f_area_cut, a_auf_cdf, b_auf_cdf, a_bins,
                         # pylint: disable-next=possibly-used-before-assignment
-                        bright_frac, field_frac, a_flags, b_flags, area)
+                        b_bins, bright_frac, field_frac, a_flags, b_flags, a_flags_cut, b_flags_cut, area)
                 if cm.use_phot_priors and not cm.include_phot_like:
                     # If we only used the create_c_and_f routine to derive
                     # priors, then quickly update likelihoods here.
@@ -282,8 +295,9 @@ def make_bins(input_mags):
 
 
 # pylint: disable-next=too-many-locals,too-many-arguments,too-many-statements
-def create_c_and_f(a_mag, b_mag, a_inds, a_size, b_inds, b_size, a_b_area, b_b_area, a_f_area, b_f_area,
-                   auf_cdf_a, auf_cdf_b, a_bins, b_bins, bright_frac, field_frac, a_flags, b_flags, area):
+def create_c_and_f(a_mag, b_mag, a_mag_cut, b_mag_cut, a_inds, a_size, b_inds, b_size, a_b_area, b_b_area,
+                   a_f_area, b_f_area, auf_cdf_a, auf_cdf_b, a_bins, b_bins, bright_frac, field_frac, a_flags,
+                   b_flags, a_flags_cut, b_flags_cut, area):
     '''
     Functionality to create the photometric likelihood and priors from a set
     of photometric data in a given pair of filters.
@@ -291,8 +305,14 @@ def create_c_and_f(a_mag, b_mag, a_inds, a_size, b_inds, b_size, a_b_area, b_b_a
     Parameters
     ----------
     a_mag : numpy.ndarray
-        Catalogue "a" magnitudes for sky area.
+        Catalogue "a" magnitudes for the full catalogue, such that indexing from
+        e.g. ``b_inds`` is correct.
     b_mag : numpy.ndarray
+        Catalogue "b" magnitudes for indexing purposes.
+    a_mag_cut : numpy.ndarray
+        Catalogue "a" magnitudes for sky area in which to determine photometric
+        priors and likelihoods.
+    b_mag_cut : numpy.ndarray
         Catalogue "b" magnitudes for sources in sky region.
     a_inds : numpy.ndarray
         Indices into catalogue "b" for each "a" object, indicating potential
@@ -343,6 +363,11 @@ def create_c_and_f(a_mag, b_mag, a_inds, a_size, b_inds, b_size, a_b_area, b_b_a
         magnitude in ``a_mag``.
     b_flags : numpy.ndarray
         Detection flags for catalogue "b" sources in ``b_mag``.
+    a_flags_cut : numpy.ndarray
+        Boolean flags for whether a source in catalogue "a" has a detected
+        magnitude in ``a_mag_cut``.
+    b_flags_cut : numpy.ndarray
+        Detection flags for catalogue "b" sources in ``b_mag_cut``.
     area : float
         Area of sky region for which photometric likelihood and prior are
         being calculated, in square degrees.
@@ -363,23 +388,26 @@ def create_c_and_f(a_mag, b_mag, a_inds, a_size, b_inds, b_size, a_b_area, b_b_a
     fb : numpy.ndarray
         Field source PDF for catalogue "b".
     '''
-    a_hist, a_bins = np.histogram(a_mag[a_flags], bins=a_bins)
+    a_hist, a_bins = np.histogram(a_mag_cut[a_flags_cut], bins=a_bins)
     pa = a_hist/(np.sum(a_hist)*np.diff(a_bins))
 
-    a_cuts = plf.find_mag_bin_inds(a_mag, a_flags, a_bins)
+    a_cuts = plf.find_mag_bin_inds(a_mag_cut, a_flags_cut, a_bins)
 
     # get_field_dists allows for magnitude slicing, to get f(m | m) instead of f(m),
     # but when we do want f(m) we just pass two impossible magnitudes as the limits.
-    a_masks = plf.get_field_dists(auf_cdf_a, a_inds, a_size, np.array([bright_frac, field_frac]), a_flags,
-                                  a_mag, b_flags, b_mag, -999, 999, -999, 999)
-    b_masks = plf.get_field_dists(auf_cdf_b, b_inds, b_size, np.array([bright_frac, field_frac]), b_flags,
-                                  b_mag, a_flags, a_mag, -999, 999, -999, 999)
+    # Note that the "primary" catalogue passed is the *_mag_cut array, matching
+    # *_inds in length, but the second catalogue has to be the non-cut array such that
+    # counterpart indexes are valid.
+    a_masks = plf.get_field_dists(auf_cdf_a, a_inds, a_size, np.array([bright_frac, field_frac]), a_flags_cut,
+                                  a_mag_cut, b_flags, b_mag, -999, 999, -999, 999)
+    b_masks = plf.get_field_dists(auf_cdf_b, b_inds, b_size, np.array([bright_frac, field_frac]), b_flags_cut,
+                                  b_mag_cut, a_flags, a_mag, -999, 999, -999, 999)
 
     # Generate our chosen field-frac's field source histograms.
     a_mask = a_masks[:, 1].astype(bool)
     b_mask = b_masks[:, 1].astype(bool)
-    a_left = a_mag[a_mask]
-    b_left = b_mag[b_mask]
+    a_left = a_mag_cut[a_mask]
+    b_left = b_mag_cut[b_mask]
 
     hist, a_bins = np.histogram(a_left, bins=a_bins)
     fa = hist / (np.sum(hist)*np.diff(a_bins))
@@ -403,9 +431,9 @@ def create_c_and_f(a_mag, b_mag, a_inds, a_size, b_inds, b_size, a_b_area, b_b_a
     # Values for the case where we don't remove anything, and F = 0. This
     # is used to get a handle on the total combined value of our two contributing
     # densities, X and Y.
-    tot_density_a = np.sum(a_flags) / area
+    tot_density_a = np.sum(a_flags_cut) / area
     tot_dens_a_uncert = np.sqrt(tot_density_a / area)
-    tot_density_b = np.sum(b_flags) / area
+    tot_density_b = np.sum(b_flags_cut) / area
     tot_dens_b_uncert = np.sqrt(tot_density_b / area)
 
     measured_density_a = np.array([tot_density_a, *measured_density_a])
@@ -453,9 +481,11 @@ def create_c_and_f(a_mag, b_mag, a_inds, a_size, b_inds, b_size, a_b_area, b_b_a
     z = np.empty(len(a_bins)-1, float)
 
     # Average area here might be wrong too, but since we deal in small magnitude
-    # slices the approximations should hold.
-    mag_mask, aa = plf.brightest_mag(auf_cdf_a, a_mag, b_mag, a_inds, a_size, bright_frac, a_b_area,
-                                     a_flags, b_flags, a_bins)
+    # slices the approximations should hold. Again, both a-catalogue magnitude
+    # arrays need to be the "cut" versions to match a_size's shape, but catalogue
+    # b versions need to be full to ensure cross-catalogue indexing works.
+    mag_mask, aa = plf.brightest_mag(auf_cdf_a, a_mag_cut, b_mag, a_inds, a_size, bright_frac, a_b_area,
+                                     a_flags_cut, b_flags, a_bins)
     mag_mask = mag_mask.astype(bool)
     for i in range(0, len(a_bins)-1):
         hist, b_bins = np.histogram(b_mag[mag_mask[:, i]], bins=b_bins)
@@ -470,25 +500,27 @@ def create_c_and_f(a_mag, b_mag, a_inds, a_size, b_inds, b_size, a_b_area, b_b_a
         # Within the loop, we only want to consider a catalogue, effectively, of
         # "a" sources with magitude [a_bins[i], a_bins[i+1]]. We therefore
         # get_field_dists with a slice in catalogue a, but no slice in b.
-        b_masks = plf.get_field_dists(auf_cdf_b, b_inds, b_size, np.array([bright_frac, field_frac]), b_flags,
-                                      b_mag, a_flags, a_mag, -999, 999, a_bins[i], a_bins[i+1])
+        b_masks = plf.get_field_dists(
+            auf_cdf_b, b_inds, b_size, np.array([bright_frac, field_frac]), b_flags_cut, b_mag_cut, a_flags,
+            a_mag, -999, 999, a_bins[i], a_bins[i+1])
         # However, to calculate the opposite masking -- and get biased-density
         # measurements of the "field" density of surviving objects in catalogue
         # "a" with narrow-range brightnesses -- we slice in a still, and not in b,
         # remembering that in the function call a and b will be swapped, with "a"
         # now the first-passed catalogue (either a or b).
-        a_masks = plf.get_field_dists(auf_cdf_a, a_inds, a_size, np.array([bright_frac, field_frac]), a_flags,
-                                      a_mag, b_flags, b_mag, a_bins[i], a_bins[i+1], -999, 999)
+        a_masks = plf.get_field_dists(
+            auf_cdf_a, a_inds, a_size, np.array([bright_frac, field_frac]), a_flags_cut, a_mag_cut, b_flags,
+            b_mag, a_bins[i], a_bins[i+1], -999, 999)
 
-        a_mag_filter = (a_mag >= a_bins[i]) & (a_mag <= a_bins[i+1])
+        a_mag_filter = (a_mag_cut >= a_bins[i]) & (a_mag_cut <= a_bins[i+1])
 
         measured_density_a = np.sum(a_masks, axis=0) / area
         measured_density_b = np.sum(b_masks, axis=0) / area
         meas_dens_a_uncert = np.sqrt(measured_density_a / area)
         meas_dens_b_uncert = np.sqrt(measured_density_b / area)
-        tot_density_a = np.sum(a_flags & a_mag_filter) / area
+        tot_density_a = np.sum(a_flags_cut & a_mag_filter) / area
         tot_dens_a_uncert = np.sqrt(tot_density_a / area)
-        tot_density_b = np.sum(b_flags) / area
+        tot_density_b = np.sum(b_flags_cut) / area
         tot_dens_b_uncert = np.sqrt(tot_density_b / area)
 
         measured_density_a = np.array([tot_density_a, *measured_density_a])
@@ -518,7 +550,7 @@ def create_c_and_f(a_mag, b_mag, a_inds, a_size, b_inds, b_size, a_b_area, b_b_a
         _, _, _nfb = res.x
 
         bmask = b_masks[:, 1].astype(bool)
-        b_left = b_mag[bmask]
+        b_left = b_mag_cut[bmask]
         hist, b_bins = np.histogram(b_left, bins=b_bins)
         _fb = hist / (np.sum(hist)*np.diff(b_bins))
 
