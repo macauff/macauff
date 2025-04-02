@@ -21,8 +21,8 @@ from macauff.galaxy_counts import create_galaxy_counts
 from macauff.get_trilegal_wrapper import get_trilegal
 from macauff.misc_functions import (
     convex_hull_area,
-    create_densities,
     create_auf_params_grid,
+    create_densities,
     find_model_counts_corrections,
     generate_avs_inside_hull,
 )

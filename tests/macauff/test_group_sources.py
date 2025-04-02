@@ -16,7 +16,7 @@ from macauff.group_sources import make_island_groupings
 from macauff.group_sources_fortran import group_sources_fortran as gsf
 from macauff.macauff import Macauff
 from macauff.matching import CrossMatch
-from macauff.misc_functions import create_auf_params_grid, calculate_overlap_counts
+from macauff.misc_functions import calculate_overlap_counts, create_auf_params_grid
 from macauff.misc_functions_fortran import misc_functions_fortran as mff
 
 # pylint: enable=no-name-in-module,import-error

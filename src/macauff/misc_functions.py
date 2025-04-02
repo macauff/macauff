@@ -6,11 +6,9 @@ framework.
 
 import itertools
 import multiprocessing
-
 from multiprocessing import shared_memory
 
 import numpy as np
-
 from astropy import units as u
 from astropy.coordinates import Angle, SkyCoord, UnitSphericalRepresentation
 from scipy import spatial
@@ -18,9 +16,9 @@ from scipy.optimize import minimize
 from scipy.spatial import ConvexHull  # pylint: disable=no-name-in-module
 
 from macauff.get_trilegal_wrapper import get_av_infinity
+
 # pylint: disable=import-error,no-name-in-module
 from macauff.misc_functions_fortran import misc_functions_fortran as mff
-
 
 __all__ = []
 

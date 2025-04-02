@@ -13,10 +13,7 @@ import numpy as np
 # pylint: disable=import-error,no-name-in-module
 from macauff.group_sources_fortran import group_sources_fortran as gsf
 from macauff.make_set_list import set_list
-from macauff.misc_functions import (
-    calculate_overlap_counts,
-    convex_hull_area,
-)
+from macauff.misc_functions import calculate_overlap_counts, convex_hull_area
 from macauff.misc_functions_fortran import misc_functions_fortran as mff
 
 # pylint: enable=import-error,no-name-in-module

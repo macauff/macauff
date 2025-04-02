@@ -33,7 +33,8 @@ from macauff.misc_functions import (
     convex_hull_area,
     create_densities,
     find_model_counts_corrections,
-    generate_avs_inside_hull)
+    generate_avs_inside_hull,
+)
 from macauff.misc_functions_fortran import misc_functions_fortran as mff
 from macauff.perturbation_auf import (
     _calculate_magnitude_offsets,
