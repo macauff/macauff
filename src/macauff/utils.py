@@ -9,7 +9,8 @@ import numpy as np
 
 
 def generate_random_data(
-    n_a, n_b, n_c, extent, n_a_filts, n_b_filts, a_astro_sig, b_astro_sig, a_cat, b_cat, seed=None
+    n_a, n_b, n_c, extent, n_a_filts, n_b_filts, a_astro_sig, b_astro_sig, a_cat, b_cat, shape="rectangle",
+    seed=None
 ):
     """
     Convenience function to allow for the generation of two test datasets.
@@ -39,6 +40,9 @@ def generate_random_data(
         catalogue "a"'s astrometric and photometric data.
     b_cat : string
         Folder describing the save location of catalogue "b"'s data.
+    shape : string, optional
+        Either "rectangle" or "circle", determining the shape of the faked
+        datasets. Default is "rectangle".
     seed : integer, optional
         Random number generator seed. If ``None``, will be passed to
         ``np.random.default_rng`` as such, and a seed will be generated
@@ -53,7 +57,8 @@ def generate_random_data(
         bmagref,
         a_pair_indices,
         b_pair_indices,
-    ) = generate_random_catalogs(n_a, n_b, n_c, extent, n_a_filts, n_b_filts, a_astro_sig, b_astro_sig, seed)
+    ) = generate_random_catalogs(n_a, n_b, n_c, extent, n_a_filts, n_b_filts, a_astro_sig, b_astro_sig,
+                                 shape, seed)
 
     for f in [a_cat, b_cat]:
         os.makedirs(f, exist_ok=True)
@@ -74,7 +79,7 @@ def generate_random_data(
 
 
 def generate_random_catalogs(
-    n_a, n_b, n_c, extent, n_a_filts, n_b_filts, a_astro_sig, b_astro_sig, seed=None
+    n_a, n_b, n_c, extent, n_a_filts, n_b_filts, a_astro_sig, b_astro_sig, shape='rectangle', seed=None
 ):
     """
     Convenience function to allow for the generation of two test datasets.
@@ -99,11 +104,9 @@ def generate_random_catalogs(
         The astrometric uncertainty of catalogue "a", in arcseconds.
     b_astro_sig : float
         Catalogue "b"'s astrometric uncertainty, in arcseconds.
-    a_cat : string
-        The folder path into which to save the binary files containing
-        catalogue "a"'s astrometric and photometric data.
-    b_cat : string
-        Folder describing the save location of catalogue "b"'s data.
+    shape : string, optional
+        Either "rectangle" or "circle", determining the shape of the faked
+        datasets. Default is "rectangle".
     seed : integer, optional
         Random number generator seed. If ``None``, will be passed to
         ``np.random.default_rng`` as such, and a seed will be generated
@@ -118,8 +121,14 @@ def generate_random_catalogs(
     b_astro = np.empty((n_b, 3), float)
 
     rng = np.random.default_rng(seed)
-    a_astro[:, 0] = rng.uniform(extent[0], extent[1], size=n_a)
-    a_astro[:, 1] = rng.uniform(extent[2], extent[3], size=n_a)
+    if shape == 'rectangle':
+        a_astro[:, 0] = rng.uniform(extent[0], extent[1], size=n_a)
+        a_astro[:, 1] = rng.uniform(extent[2], extent[3], size=n_a)
+    else:
+        radius = 0.5 * (extent[3] - extent[2])
+        r, t = np.sqrt(rng.uniform(0, 1, size=n_a)) * radius, rng.uniform(0, 2*np.pi, size=n_a)
+        a_astro[:, 0] = r * np.cos(t) + 0.5 * (extent[0] + extent[1])
+        a_astro[:, 1] = r * np.sin(t) + 0.5 * (extent[2] + extent[3])
     if np.isscalar(a_astro_sig):
         a_astro[:, 2] = a_astro_sig
     else:
@@ -132,8 +141,13 @@ def generate_random_catalogs(
     b_astro[b_pair_indices, 0] = a_astro[a_pair_indices, 0]
     b_astro[b_pair_indices, 1] = a_astro[a_pair_indices, 1]
     inv_b_pair = np.delete(np.arange(n_b), b_pair_indices)
-    b_astro[inv_b_pair, 0] = rng.uniform(extent[0], extent[1], size=n_b - n_c)
-    b_astro[inv_b_pair, 1] = rng.uniform(extent[2], extent[3], size=n_b - n_c)
+    if shape == 'rectangle':
+        b_astro[inv_b_pair, 0] = rng.uniform(extent[0], extent[1], size=n_b - n_c)
+        b_astro[inv_b_pair, 1] = rng.uniform(extent[2], extent[3], size=n_b - n_c)
+    else:
+        r, t = np.sqrt(rng.uniform(0, 1, size=n_b - n_c)) * radius, rng.uniform(0, 2*np.pi, size=n_b - n_c)
+        b_astro[inv_b_pair, 0] = r * np.cos(t) + 0.5 * (extent[0] + extent[1])
+        b_astro[inv_b_pair, 1] = r * np.sin(t) + 0.5 * (extent[2] + extent[3])
     if np.isscalar(b_astro_sig):
         b_astro[:, 2] = b_astro_sig
     else:
@@ -141,19 +155,21 @@ def generate_random_catalogs(
         # with magnitude
         raise ValueError("b_sig currently has to be an integer for all generated data.")
 
-    a_circ_dist = rng.normal(loc=0, scale=a_astro[:, 2], size=n_a) / 3600
+    a_circ_dist = rng.rayleigh(scale=a_astro[:, 2], size=n_a) / 3600
     a_circ_angle = rng.uniform(0, 2 * np.pi, size=n_a)
     a_astro[:, 0] = a_astro[:, 0] + a_circ_dist * np.cos(a_circ_angle)
     a_astro[:, 1] = a_astro[:, 1] + a_circ_dist * np.sin(a_circ_angle)
-    b_circ_dist = rng.normal(loc=0, scale=b_astro[:, 2], size=n_b) / 3600
+    b_circ_dist = rng.rayleigh(scale=b_astro[:, 2], size=n_b) / 3600
     b_circ_angle = rng.uniform(0, 2 * np.pi, size=n_b)
     b_astro[:, 0] = b_astro[:, 0] + b_circ_dist * np.cos(b_circ_angle)
     b_astro[:, 1] = b_astro[:, 1] + b_circ_dist * np.sin(b_circ_angle)
 
-    # Currently all we do, given the only option available is a naive Bayes match,
-    # is ignore the photometry -- but we still require its file to be present.
-    a_photo = rng.uniform(0.9, 1.1, size=(n_a, n_a_filts))
-    b_photo = rng.uniform(0.9, 1.1, size=(n_b, n_b_filts))
+    a_photo = rng.uniform(0.9, 4.1, size=(n_a, n_a_filts))
+    b_photo = rng.uniform(0.9, 4.1, size=(n_b, n_b_filts))
+    b_photo[b_pair_indices, 0] = a_photo[a_pair_indices, 0]
+    b_photo[b_pair_indices, 1] = a_photo[a_pair_indices, 1]
+    b_photo[b_pair_indices, 2] = a_photo[a_pair_indices, 2]
+    b_photo[b_pair_indices, 3] = a_photo[a_pair_indices, 2]
 
     # Similarly, we need magref for each catalogue, but don't care what's in it.
     amagref = rng.choice(n_a_filts, size=n_a)

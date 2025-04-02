@@ -29,7 +29,7 @@ four_hankel_points = 10000
 four_max_rho = 100
 
 # Integral fractions for various error circle cutouts used during the cross-match process. Should be space-separated floats, in the order of <bright error circle fraction>, <field error circle fraction>, <potential counterpart integral limit>
-int_fracs = 0.63 0.9 0.99
+int_fracs = 0.63 0.9 0.999
 
 # Number of PSF realisations to draw when simulating perturbation component of AUF
 num_trials = 10000

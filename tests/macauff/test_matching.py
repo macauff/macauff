@@ -1093,13 +1093,13 @@ class TestInputs:
         cm._initialise_chunk(os.path.join(os.path.dirname(__file__), 'data/crossmatch_params.txt'),
                              os.path.join(os.path.dirname(__file__), 'data/cat_a_params.txt'),
                              os.path.join(os.path.dirname(__file__), 'data/cat_b_params.txt'))
-        assert np.all(cm.int_fracs == np.array([0.63, 0.9, 0.99]))
+        assert np.all(cm.int_fracs == np.array([0.63, 0.9, 0.999]))
 
         # List of simple one line config file replacements for error message checking
         in_file = 'crossmatch_params'
         with open(os.path.join(os.path.dirname(__file__), f'data/{in_file}.txt'), encoding='utf-8') as file:
             f = file.readlines()
-        old_line = 'int_fracs = 0.63 0.9 0.99'
+        old_line = 'int_fracs = 0.63 0.9 0.999'
         for new_line, match_text in zip(
                 ['', 'int_fracs = 0.63 0.9 word\n', 'int_fracs = 0.63 0.9\n'],
                 ['Missing key int_fracs', 'All elements of int_fracs should be',

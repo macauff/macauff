@@ -17,57 +17,82 @@ from macauff.utils import generate_random_data
 # pylint: disable=duplicate-code
 
 
+@pytest.mark.parametrize("shape", ['circle', 'rectangle'])
 @pytest.mark.parametrize("x,y", [(131, 0), (0, 0)])
-# pylint: disable=too-many-locals,too-many-statements
-def test_naive_bayes_match(x, y):
+# pylint: disable-next=too-many-locals,too-many-statements,too-many-branches
+def test_naive_bayes_match(shape, x, y):
     # Generate a small number of sources randomly, then run through the
     # cross-match process.
-    n_a, n_b, n_c = 40, 50, 35
+    if shape == 'rectangle':
+        n_a, n_b, n_c = 40, 50, 35
+    else:
+        n_a, n_b, n_c = 400, 500, 370
     n_a_filts, n_b_filts = 3, 4
     a_astro_sig, b_astro_sig = 0.3, 0.5
     r = 5 * np.sqrt(a_astro_sig**2 + b_astro_sig**2)
     dx = np.sqrt(n_b * np.pi * r**2)/3600
+    if shape == 'circle':
+        dx *= 3
     extent = np.array([x-1.3*dx/2-r/3600, x+1.3*dx/2+r/3600, y-1.3*dx/2-r/3600, y+1.3*dx/2+r/3600])
-    forced_extent = np.array([x-0.06, x+0.06, y-0.06, y+0.06])
+    if shape == 'rectangle':
+        forced_extent = np.array([x-0.06, x+0.06, y-0.06, y+0.06])
+    else:
+        t = np.linspace(0, 2*np.pi, 31)
+        radius = 0.5 * (extent[3] - extent[2]) * 1.1
+        mid_lon, mid_lat = 0.5 * (extent[0] + extent[1]), 0.5 * (extent[2] + extent[3])
+        forced_extent = np.array([radius * np.cos(t) + mid_lon, radius * np.sin(t) + mid_lat]).T
 
     a_cat, b_cat = 'a_cat', 'b_cat'
 
     generate_random_data(n_a, n_b, n_c, extent + np.array([1.1*r/3600, -1.1*r/3600, 1.1*r/3600, -1.1*r/3600]),
-                         n_a_filts, n_b_filts, a_astro_sig, b_astro_sig, a_cat, b_cat, seed=9999)
+                         n_a_filts, n_b_filts, a_astro_sig, b_astro_sig, a_cat, b_cat, shape=shape, seed=9999)
     a_astro = np.load(f"{a_cat}/con_cat_astro.npy")
     a_mp = np.load(f"{a_cat}/test_match_indices.npy")
     lonely_counter = 0
     for i in range(len(a_astro)):
         if i not in a_mp:
-            if lonely_counter == 0:
-                a_astro[i, [0, 1]] = [forced_extent[0], forced_extent[2]]
-            if lonely_counter == 1:
-                a_astro[i, [0, 1]] = [forced_extent[1], forced_extent[2]]
-            if lonely_counter == 2:
-                a_astro[i, [0, 1]] = [forced_extent[0], forced_extent[3]]
-            if lonely_counter == 3:
-                a_astro[i, [0, 1]] = [forced_extent[1], forced_extent[3]]
-            if lonely_counter == 4:
-                break
+            if shape == 'rectangle':
+                if lonely_counter == 0:
+                    a_astro[i, [0, 1]] = [forced_extent[0], forced_extent[2]]
+                if lonely_counter == 1:
+                    a_astro[i, [0, 1]] = [forced_extent[1], forced_extent[2]]
+                if lonely_counter == 2:
+                    a_astro[i, [0, 1]] = [forced_extent[0], forced_extent[3]]
+                if lonely_counter == 3:
+                    a_astro[i, [0, 1]] = [forced_extent[1], forced_extent[3]]
+                if lonely_counter == 4:
+                    break
+            else:
+                a_astro[i, [0, 1]] = forced_extent[lonely_counter]
+                if lonely_counter == len(t)-1:
+                    break
             lonely_counter += 1
     b_astro = np.load(f"{b_cat}/con_cat_astro.npy")
     b_mp = np.load(f"{b_cat}/test_match_indices.npy")
     lonely_counter = 0
     for i in range(len(b_astro)):
         if i not in b_mp:
-            if lonely_counter == 0:
-                b_astro[i, [0, 1]] = [forced_extent[0], forced_extent[2]]
-            if lonely_counter == 1:
-                b_astro[i, [0, 1]] = [forced_extent[1], forced_extent[2]]
-            if lonely_counter == 2:
-                b_astro[i, [0, 1]] = [forced_extent[0], forced_extent[3]]
-            if lonely_counter == 3:
-                b_astro[i, [0, 1]] = [forced_extent[1], forced_extent[3]]
-            if lonely_counter == 4:
-                break
+            if shape == 'rectangle':
+                if lonely_counter == 0:
+                    b_astro[i, [0, 1]] = [forced_extent[0], forced_extent[2]]
+                if lonely_counter == 1:
+                    b_astro[i, [0, 1]] = [forced_extent[1], forced_extent[2]]
+                if lonely_counter == 2:
+                    b_astro[i, [0, 1]] = [forced_extent[0], forced_extent[3]]
+                if lonely_counter == 3:
+                    b_astro[i, [0, 1]] = [forced_extent[1], forced_extent[3]]
+                if lonely_counter == 4:
+                    break
+            else:
+                b_astro[i, [0, 1]] = forced_extent[lonely_counter]
+                if lonely_counter == len(t)-1:
+                    break
             lonely_counter += 1
     np.save(f"{a_cat}/con_cat_astro.npy", a_astro)
     np.save(f"{b_cat}/con_cat_astro.npy", b_astro)
+
+    if shape == 'circle':
+        n_a, n_b, n_c = len(a_astro), len(b_astro), len(a_mp)
 
     # Ensure output chunk directory exists
     os.makedirs(os.path.join(os.path.dirname(__file__), "data/chunk0"), exist_ok=True)
@@ -81,7 +106,10 @@ def test_naive_bayes_match(x, y):
                   idx, nl, out_file=os.path.join(os.path.dirname(__file__),
                   'data/chunk0/crossmatch_params_.txt'))
 
-    new_region_points = f'{x} {x} 1 {y} {y} 1'
+    if shape == 'rectangle':
+        new_region_points = f'{x} {x} 1 {y} {y} 1'
+    else:
+        new_region_points = f'{x-radius/2:.2f} {x+radius/2:.2f} 2 {y} {y} 1'
 
     for ol, nl in zip(['joint_folder_path = test_path', 'cf_region_points = 131 134 4 -1 1 3'],
                       ['joint_folder_path = new_test_path\n', f'cf_region_points = {new_region_points}\n']):
@@ -91,6 +119,15 @@ def test_naive_bayes_match(x, y):
         idx = np.where([ol in line for line in f])[0][0]
         _replace_line(os.path.join(os.path.dirname(__file__), 'data/chunk0/crossmatch_params_.txt'),
                       idx, nl)
+    if shape == 'circle':
+        for ol, nl in zip(['include_phot_like = no', 'use_phot_priors = no'],
+                          ['include_phot_like = yes\n', 'use_phot_priors = yes\n']):
+            with open(os.path.join(os.path.dirname(__file__), 'data/crossmatch_params.txt'),
+                      encoding='utf-8') as file:
+                f = file.readlines()
+            idx = np.where([ol in line for line in f])[0][0]
+            _replace_line(os.path.join(os.path.dirname(__file__), 'data/chunk0/crossmatch_params_.txt'),
+                          idx, nl)
 
     ol = 'auf_region_points = 131 134 4 -1 1 {}'
     nl = f'auf_region_points = {new_region_points}\n'
