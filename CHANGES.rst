@@ -4,8 +4,15 @@
 General
 ^^^^^^^
 
+- Relaxed the assumption of rectlinearity in shape of match regions, no longer
+  assuming rectangles aligned with a particular coordinate system. [#88]
+
 New Features
 ^^^^^^^^^^^^
+
+- ``_calculate_cf_areas`` and ``create_c_and_f`` use convex hull overlap for
+  both catalogues, as well as nearest-``cf_points`` calculations, to determine
+  region areas and photometric priors and likelihoods. [#88]
 
 - Split new class ``Macauff`` out from ``CrossMatch``, with the latter now handling
   the I/O and the former a smaller class to run the actual cross-match. [#76]
@@ -13,11 +20,44 @@ New Features
 Bug Fixes
 ^^^^^^^^^
 
-- Fixed an issue where, in very crowded but asymetrically dense fields, photometric
+- Fixed issue with rounding of coordinates when calling ``AstrometricCorrections``
+  from within ``macauff``, resulting in two separately saved sets of Galaxy
+  source counts in two different files.  [#88]
+
+- Fixed ``create_c_and_f`` magnitude indexing issue. [#88]
+
+- Fixed an issue where, in very crowded but asymmetrically dense fields, photometric
   priors could become negative. [#86]
 
 API Changes
 ^^^^^^^^^^^
+
+- ``generate_random_data`` generalised to allow for circular test regions to be
+  generated, as well as rectangular ones. [#88]
+
+- Moved ``get_random_seed_size`` from ``perturbation_auf_fortran`` to
+  ``misc_functions_fortran``. [#88]
+
+- Removed ``load_small_ref_auf_grid``, ``_load_fourier_grid_cutouts``,
+  ``hav_dist_constant_lat``, and ``_clean_overlaps``. [#88]
+
+- ``group_sources_fortran.get_overlap_indices`` uses pre-generated potential overlaps
+  in its call, instead of determining potential counterparts from scratch.  [#88]
+
+- Removed ``group_sources_fortran.get_max_overlap``. [#88]
+
+- Removed ``_distance_check``, using ``get_circle_area_overlap`` instead. [#88]
+
+- Removed ``calculate_local_density``, using ``create_densities`` where called. [#88]
+
+- Moved ``create_densities``, generalising to use ``calculate_overlap_counts`` and
+  a call to the also-moved ``misc_functions_fortran.get_circle_area_overlap``,
+  which also saw algorithmic improvements. [#88]
+
+- Added ``convex_hull_area``, ``coord_inside_convex_hull``, and
+  ``generate_avs_inside_hull`` to handle generalised convex hull maths. [#88]
+
+- Removed ``cross_match_extent`` as necessary input parameter. [#88]
 
 - ``AstrometricCorrections`` has keyword inputs ``mn_fit_type``, ``seeing_ranges``,
   ``single_or_repeat``, and ``repeat_unique_visits_list``, which are accordingly

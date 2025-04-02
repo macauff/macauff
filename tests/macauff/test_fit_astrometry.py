@@ -17,9 +17,10 @@ from macauff.fit_astrometry import AstrometricCorrections, SNRMagnitudeRelations
 class TestAstroCorrection:
     def setup_method(self):
         self.rng = np.random.default_rng(seed=43578345)
-        self.n = 5000
-        choice = self.rng.choice(self.n, size=self.n, replace=False)
+        self.n = 25000
+        choice = self.rng.choice(self.n, size=self.n, replace=True)
         self.true_ra = np.linspace(100, 110, self.n)[choice]
+        choice = self.rng.choice(self.n, size=self.n, replace=True)
         self.true_dec = np.linspace(-3, 3, self.n)[choice]
 
         os.makedirs('store_data', exist_ok=True)
@@ -290,6 +291,8 @@ class TestAstroCorrection:
                a_cat_func=None, b_cat_func=None, tri_download=False, make_plots=True,
                make_summary_plot=True, seeing_ranges=np.array([1, 2]), single_or_repeat='repeat')
 
+        os.system('rm -r store_data')
+
     @pytest.mark.remote_data
     @pytest.mark.parametrize("npy_or_csv,coord_or_chunk,coord_system,pregenerate_cutouts,return_nm,in_memory",
                              [("csv", "chunk", "equatorial", True, False, False),
@@ -322,7 +325,7 @@ class TestAstroCorrection:
                 chunks = [2017]
             ax_dimension = 2
         ac = AstrometricCorrections(
-            psf_fwhm=6.1, numtrials=1000, nn_radius=30, dens_search_radius=0.25,
+            psf_fwhm=6.1, numtrials=1000, nn_radius=30, dens_search_radius=1,
             save_folder='ac_save_folder', trifolder='tri_folder', triname='trilegal_sim_{}_{}',
             maglim_f=25, magnum=11, tri_num_faint=1500000, trifilterset='2mass_spitzer_wise',
             trifiltname='W1', gal_wav_micron=3.35, gal_ab_offset=2.699, gal_filtname='wise2010-W1',
@@ -424,10 +427,11 @@ class TestAstroCorrection:
         assert_allclose(abc_array[0, 0, 0], 1.2e-2, rtol=0.05, atol=0.001)
         assert_allclose(abc_array[0, 0, 1], 8e-17, rtol=0.05, atol=5e-19)
 
-        assert_allclose(ac.ax1_mins[0], 100, rtol=0.01)
-        assert_allclose(ac.ax1_maxs[0], 110, rtol=0.01)
-        assert_allclose(ac.ax2_mins[0], -3, rtol=0.01)
-        assert_allclose(ac.ax2_maxs[0], 3, rtol=0.01)
+        if pregenerate_cutouts is False:
+            assert_allclose(ac.ax1_mins[0], 100, rtol=0.01)
+            assert_allclose(ac.ax1_maxs[0], 110, rtol=0.01)
+            assert_allclose(ac.ax2_mins[0], -3, rtol=0.01)
+            assert_allclose(ac.ax2_maxs[0], 3, rtol=0.01)
 
         if half_run_flag:
             # For the pre-determined set of parameters we should have skipped
@@ -437,6 +441,8 @@ class TestAstroCorrection:
             assert_allclose(abc_array[0, 1, 0], -1, atol=0.001)
             assert_allclose(abc_array[0, 1, 1], -2, atol=0.001)
             assert_allclose(abc_array[0, 1, 3], -4, atol=0.001)
+
+        os.system('rm -r store_data')
 
 
 class TestSNRMagRelation:
@@ -492,6 +498,8 @@ class TestSNRMagRelation:
             smr(b_cat=None, b_cat_name=None)
         with pytest.raises(ValueError, match="Only one of b_cat and b_cat_name "):
             smr(b_cat=np.array([0]), b_cat_name='name')
+
+        os.system('rm -r store_data')
 
     @pytest.mark.parametrize("npy_or_csv,coord_or_chunk,coord_system,return_nm,in_memory",
                              [("csv", "chunk", "equatorial", True, False),
@@ -590,11 +598,6 @@ class TestSNRMagRelation:
         assert_allclose(abc_array[0, 0, 0], 1.2e-2, rtol=0.05, atol=0.001)
         assert_allclose(abc_array[0, 0, 1], 8e-17, rtol=0.06, atol=5e-19)
 
-        assert_allclose(smr.ax1_mins[0], 100, rtol=0.01)
-        assert_allclose(smr.ax1_maxs[0], 110, rtol=0.01)
-        assert_allclose(smr.ax2_mins[0], -3, rtol=0.01)
-        assert_allclose(smr.ax2_maxs[0], 3, rtol=0.01)
-
         if half_run_flag:
             # For the pre-determined set of parameters we should have skipped
             # one of the sightlines and want to check if its parameters are
@@ -602,3 +605,5 @@ class TestSNRMagRelation:
             assert_allclose(abc_array[0, 1, 0], -1, atol=0.001)
             assert_allclose(abc_array[0, 1, 1], -2, atol=0.001)
             assert_allclose(abc_array[0, 1, 3], -4, atol=0.001)
+
+        os.system('rm -r store_data')

@@ -133,7 +133,7 @@ def test_perturb_aufs():
 
     track_pa_fourier = np.zeros(len(rho)-1, float)
 
-    seed_size = paf.get_random_seed_size()
+    seed_size = mff.get_random_seed_size()
     rng = np.random.default_rng(seed=123124)
 
     # Limit the size of each simulation, but run many to aggregate
@@ -214,73 +214,6 @@ def test_histogram():
                                      np.array([True] * (len(x))), np.ones_like(x))
     counts_p, _ = np.histogram(x, bins=bins)
     assert np.all(counts_f == counts_p)
-
-
-def test_circle_area():
-    rng = np.random.default_rng(123897123)
-    r = 0.1
-
-    x_edges = [0, 1]
-    y_edges = [0, 1]
-
-    # If circle is inside rectangle, get full area:
-    done = 0
-    while done < 10:
-        [x, y] = rng.uniform(0, 1, size=2)
-        if (x - r >= x_edges[0] and x + r <= x_edges[1] and
-                y - r >= y_edges[0] and y + r <= y_edges[1]):
-            calc_area = paf.get_circle_area_overlap([x], [y], r, x_edges[0], x_edges[1],
-                                                    y_edges[0], y_edges[1])
-            assert_allclose(calc_area, np.pi * r**2)
-            done += 1
-
-    # Now, if the circle is exactly on the corners of the rectangle
-    # we should have a quarter the area:
-    for x, y in zip([0, 0, 1, 1], [0, 1, 0, 1]):
-        calc_area = paf.get_circle_area_overlap([x], [y], r, x_edges[0], x_edges[1],
-                                                y_edges[0], y_edges[1])
-        assert_allclose(calc_area, np.pi * r**2 / 4)
-
-    # In the middle of an edge we should have half the circle area:
-    for x, y in zip([0, 0.5, 1, 0.5], [0.5, 0, 0.5, 1]):
-        calc_area = paf.get_circle_area_overlap([x], [y], r, x_edges[0], x_edges[1],
-                                                y_edges[0], y_edges[1])
-        assert_allclose(calc_area, np.pi * r**2 / 2)
-
-    # Verify a few randomly placed circles too:
-    done = 0
-    xp = np.linspace(*x_edges, 100)
-    yp = np.linspace(*y_edges, 100)
-    dx, dy = xp[1] - xp[0], yp[1] - yp[0]
-    while done < 20:
-        [x, y] = rng.uniform(0, 1, size=2)
-        if np.any([x - r < x_edges[0], x + r > x_edges[1],
-                   y - r < y_edges[0], y + r > y_edges[1]]):
-            calc_area = paf.get_circle_area_overlap([x], [y], r, x_edges[0], x_edges[1],
-                                                    y_edges[0], y_edges[1])
-            manual_area = 0
-            for x_p in xp:
-                for y_p in yp:
-                    if np.sqrt((x_p - x)**2 + (y_p - y)**2) <= r:
-                        manual_area += dx*dy
-            assert_allclose(calc_area, manual_area, rtol=0.05)
-        done += 1
-
-    # Verify that we don't mind if coordinates are negative:
-    x, y = -0.1, 0.08
-    x_edges = [-0.15, 0.15]
-    y_edges = [-0.15, 0.15]
-    calc_area = paf.get_circle_area_overlap([x], [y], r, x_edges[0], x_edges[1],
-                                            y_edges[0], y_edges[1])
-    xp = np.linspace(*x_edges, 100)
-    yp = np.linspace(*y_edges, 100)
-    dx, dy = xp[1] - xp[0], yp[1] - yp[0]
-    manual_area = 0
-    for x_p in xp:
-        for y_p in yp:
-            if np.sqrt((x_p - x)**2 + (y_p - y)**2) <= r:
-                manual_area += dx*dy
-    assert_allclose(calc_area, manual_area, rtol=0.05)
 
 
 def test_psf_perturb():
@@ -415,7 +348,6 @@ class TestMakePerturbAUFs():
         self.filters = np.array(['W1'])
         self.tri_filt_names = np.copy(self.filters)
         self.auf_points = np.array([[0.0, 0.0]])
-        self.ax_lims = np.array([0, 1, 0, 1])
 
         self.psf_fwhms = np.array([6.1])
         self.r = np.linspace(0, 1.185 * self.psf_fwhms[0], 2500)
@@ -502,6 +434,9 @@ class TestMakePerturbAUFs():
         self.fake_cm.b_gal_al_avs = [0]
         self.fake_cm.b_download_tri = False
         self.fake_cm.b_astro = np.array([[0.3, 0.3, 0.1]] * 101)
+        self.fake_cm.b_astro[0, [0, 1]] = [0.3, 0.31]
+        self.fake_cm.b_astro[1, [0, 1]] = [0.31, 0.3]
+        self.fake_cm.b_astro[2, [0, 1]] = [0.31, 0.31]
         self.fake_cm.b_photo = np.array([np.concatenate(([14.99], [100]*100))]).T
         self.fake_cm.b_magref = np.array([0] * 101)
         self.fake_cm.b_dens_hist_tri_list = [None] * len(self.filters)
@@ -509,6 +444,7 @@ class TestMakePerturbAUFs():
         self.fake_cm.b_tri_model_mag_mids_list = [None] * len(self.filters)
         self.fake_cm.b_tri_model_mags_interval_list = [None] * len(self.filters)
         self.fake_cm.b_tri_n_bright_sources_star_list = [None] * len(self.filters)
+        self.fake_cm.n_pool = 1
 
         with pytest.raises(ValueError, match="The number of simulated objects in this sky patch "):
             make_perturb_aufs(self.fake_cm, 'b')
@@ -564,7 +500,7 @@ class TestMakePerturbAUFs():
             if mag > 17:
                 keep_flux = np.zeros((1,), float)
 
-            photo_array = np.array([np.concatenate(([14.99], [100]*100, [10], [10]))]).T
+            photo_array = np.array([np.concatenate(([14.99], [100]*100, [10], [10], [10], [10]))]).T
             # Catalogue bins for the source:
             a_photo = photo_array[0, :]
             dmag = 0.25
@@ -615,10 +551,13 @@ class TestMakePerturbAUFs():
             self.fake_cm.b_tri_n_bright_sources_star_list = [None] * len(self.filters)
             # Have to fudge extra sources to keep our 15th mag source in the local
             # density cutout.
+            # Add extra sources to force a 0.1-0.9 square convex hull cutout.
             self.fake_cm.b_astro = np.concatenate(
-                ([0.3, 0.3, 0.1] * 101, [0.1, 0.1, 0.1], [0.9, 0.9, 0.1])).reshape(-1, 3)
+                ([0.3, 0.3, 0.1] * 101, [0.1, 0.1, 0.1], [0.1, 0.9, 0.1],
+                 [0.9, 0.1, 0.1], [0.9, 0.9, 0.1])).reshape(-1, 3)
             self.fake_cm.b_photo = photo_array
-            self.fake_cm.b_magref = np.array([0] * 103)
+            self.fake_cm.b_magref = np.array([0] * 105)
+            self.fake_cm.n_pool = 1
             _, p_a_o = make_perturb_aufs(self.fake_cm, 'b')
 
             perturb_auf_combo = f'{ax1}-{ax2}-{self.filters[0]}'
@@ -672,11 +611,13 @@ class TestMakePerturbAUFs():
 
         # Have to fudge extra sources to keep our 15th mag source in the local
         # density cutout.
-        np.save(f'{self.cat_folder}/con_cat_astro.npy',
-                np.concatenate(([0.3, 0.3, 0.1] * 101, [0.1, 0.1, 0.1], [0.9, 0.9, 0.1])).reshape(-1, 3))
+        # Force the 0.1-0.9 square with extra objects for the convex hull to pick up.
+        x = np.concatenate(([0.3, 0.3, 0.1] * 101, [0.1, 0.1, 0.1], [0.1, 0.9, 0.1],
+                            [0.9, 0.1, 0.1], [0.9, 0.9, 0.1])).reshape(-1, 3)
+        np.save(f'{self.cat_folder}/con_cat_astro.npy', x)
         np.save(f'{self.cat_folder}/con_cat_photo.npy',
-                np.array([np.concatenate(([14.99], [100]*100, [10], [10]))]).T)
-        np.save(f'{self.cat_folder}/magref.npy', np.array([0] * 103))
+                np.array([np.concatenate(([14.99], [100]*100, [10], [10], [10], [10]))]).T)
+        np.save(f'{self.cat_folder}/magref.npy', np.array([0] * 105))
 
         # Fake up a TRILEGAL simulation data file.
         text = ('#area = 140.0 sq deg\n#Av at infinity = 1\n'
@@ -844,7 +785,6 @@ class TestMakePerturbAUFs():
 
         cm.a_auf_region_points = new_auf_points
         cm.b_auf_region_points = new_auf_points
-        cm.cross_match_extent = self.ax_lims
         cm.a_dens_dist = density_radius
         cm.b_dens_dist = density_radius
         cm.r = self.r
@@ -898,13 +838,15 @@ class TestMakePerturbAUFs():
 
         new_auf_points = np.vstack((self.auf_points, np.array([[10, 10]])))
 
-        np.save(f'{self.cat_folder}/con_cat_astro.npy',
-                np.concatenate(([0.3, 0.3, 0.1] * 101, [0.1, 0.1, 0.1], [0.9, 0.9, 0.1])).reshape(-1, 3))
+        # Force the 0.1-0.9 square with extra objects for the convex hull to pick up.
+        x = np.concatenate(([0.3, 0.3, 0.1] * 101, [0.1, 0.1, 0.1], [0.1, 0.9, 0.1],
+                            [0.9, 0.1, 0.1], [0.9, 0.9, 0.1])).reshape(-1, 3)
+        np.save(f'{self.cat_folder}/con_cat_astro.npy', x)
         rng = np.random.default_rng(seed=83458923)
         main_mags = rng.uniform(24.95, 25.05, size=100)
         np.save(f'{self.cat_folder}/con_cat_photo.npy',
-                np.array([np.concatenate(([14.99], main_mags, [10], [10]))]).T)
-        np.save(f'{self.cat_folder}/magref.npy', np.array([0] * 103))
+                np.array([np.concatenate(([14.99], main_mags, [10], [10], [10], [10]))]).T)
+        np.save(f'{self.cat_folder}/magref.npy', np.array([0] * 105))
 
         # Fake up a TRILEGAL simulation data file.
         text = ('#area = 140.0 sq deg\n#Av at infinity = 1\n'
@@ -1038,13 +980,11 @@ class TestMakePerturbAUFs():
 
         cm.a_auf_region_points = new_auf_points
         cm.b_auf_region_points = new_auf_points
-        cm.cross_match_extent = self.ax_lims
         cm.r = self.r
         cm.dr = self.dr
         cm.rho = self.rho
         cm.drho = self.drho
         cm.j0s = self.j0s
-        cm.cross_match_extent = self.ax_lims
         cm.num_trials = self.num_trials
         cm.a_fit_gal_flag = True
         cm.b_fit_gal_flag = True

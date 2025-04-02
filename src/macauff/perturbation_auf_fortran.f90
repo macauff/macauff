@@ -48,91 +48,6 @@ subroutine get_density(a_ax1, a_ax2, b_ax1, b_ax2, maxdist, counts)
 
 end subroutine get_density
 
-subroutine get_circle_area_overlap(cat_ax1, cat_ax2, density_radius, min_lon, max_lon, min_lat, max_lat, circ_overlap_area)
-    ! Calculates the amount of circle overlap with a rectangle of particular coordinates. Adapted from
-    ! code provided by B. Retter, from Retter, Hatchell & Naylor (2019, MNRAS, 487, 887).
-    integer, parameter :: dp = kind(0.0d0)  ! double precision
-    ! Coordinates in orthogonal sky axies, and radius of, circles to calculate the overlap with sky position of.
-    real(dp), intent(in) :: cat_ax1(:), cat_ax2(:), density_radius
-    ! Defining limits of rectangle inside which to calculate overlap amount of each circle.
-    real(dp), intent(in) :: min_lon, max_lon, min_lat, max_lat
-    ! Relative amount of circle inside rectangle for each unique point.
-    real(dp), intent(out) :: circ_overlap_area(size(cat_ax1))
-
-    ! Loop counters, and array to keep track of whether the circle overlaps any rectangle edges or not.
-    integer :: i, j, has_overlapped_edge(4)
-    ! Area of circle inside rectangle; rectangle edges; circle coordinates repeated to match each rectangle edge.
-    real(dp) :: area, edges(4), coords(4)
-    ! Distance between circle and a particular rectangle edge; furthest edges of intersection between circle and
-    ! rectangle; amount of circle outside a particular rectangle edge; and integral evaluations of chord of circle.
-    real(dp) :: h, a, b, chord_area_overlap, a_eval, b_eval
-
-    edges = (/ min_lon, min_lat, max_lon, max_lat /)
-!$OMP PARALLEL DO DEFAULT(NONE) PRIVATE(i, j, area, has_overlapped_edge, coords, h, a, b, a_eval, b_eval, chord_area_overlap) &
-!$OMP& SHARED(density_radius, cat_ax1, cat_ax2, edges, circ_overlap_area, min_lon, max_lon, min_lat, max_lat)
-    do j = 1, size(cat_ax1)
-        area = pi * density_radius**2
-        has_overlapped_edge = (/ 0, 0, 0, 0 /)
-
-        coords = (/ cat_ax1(j), cat_ax2(j), cat_ax1(j), cat_ax2(j) /)
-        do i = 1, 4
-            h = abs(coords(i) - edges(i))
-            if (h < density_radius) then
-                ! The first chord integration is "free", and does not have
-                ! truncated limits based on overlaps; the final chord integration,
-                ! however, cares about truncation on both sides. The "middle two"
-                ! integrations only truncate to the previous side.
-                a = -1.0_dp * sqrt(density_radius**2 - h**2)
-                b = sqrt(density_radius**2 - h**2)
-                if (i == 2 .and. has_overlapped_edge(1) == 1) then
-                    a = max(a, min_lon - coords(1))
-                end if
-                if (i == 3 .and. has_overlapped_edge(2) == 1) then
-                    a = max(a, min_lat - coords(2))
-                end if
-                if (i == 4 .and. has_overlapped_edge(1) == 1) then
-                    a = max(a, min_lon - coords(1))
-                end if
-                if (i == 4 .and. has_overlapped_edge(3) == 1) then
-                    b = min(b, max_lon - coords(1))
-                end if
-
-                call chord_integral_eval(a, density_radius, h, a_eval)
-                call chord_integral_eval(b, density_radius, h, b_eval)
-                chord_area_overlap = b_eval - a_eval
-                has_overlapped_edge(i) = 1
-
-                area = area - chord_area_overlap
-            end if
-        end do
-        circ_overlap_area(j) = area
-    end do
-!$OMP END PARALLEL DO
-
-end subroutine get_circle_area_overlap
-
-subroutine chord_integral_eval(x, r, h, integral)
-    ! Evaluate the indefinite integral of a chord along its orthogonal axis.
-    integer, parameter :: dp = kind(0.0d0)  ! double precision
-    ! x-axis limit to evaluate indefinite integral at; radius of circle; orthogonal distance
-    ! between the center of the circle and the rectangle boundary.
-    real(dp), intent(in) :: x, r, h
-    ! Indefinite integral evaluated at a particular x value.
-    real(dp), intent(out) :: integral
-    ! Orthogonal distance between center of circle and top of circle.
-    real(dp) :: d
-
-    d = sqrt(r**2 - x**2)
-
-    if (d <= 1e-7) then
-        ! If d is zero, x / d is +-infinity (depending on sign of x) and arctan(+-infinity) = +-pi/2
-        integral = 0.5_dp * (x * d + r**2 * sign(1.0_dp, x) * pi / 2.0_dp) - h * x
-    else
-        integral = 0.5_dp * (x * d + r**2 * atan(x / d)) - h * x
-    end if
-
-end subroutine chord_integral_eval
-
 subroutine perturb_aufs(Narray, magarray, r, dr, rbins, j0s, mag_D, dmag_D, Ds, N_norm, num_int, dmcut, psfr, &
     psfsig, lentrials, seed, dd_params, l_cut, algorithm_type, Fracgrid, Fluxav, fouriergrid, rgrid, intrgrid)
     ! Fortran wrapper for the perturbation AUF component calculation for a set of density-magnitude
@@ -686,13 +601,5 @@ subroutine fourier_transform(pr, r, dr, j0s, G)
     end do
 
 end subroutine fourier_transform
-
-subroutine get_random_seed_size(size)
-    ! Number of initial seeds expected by random_seed, to be initialised for a specified RNG setup.
-    integer, intent(out) :: size
-
-    call random_seed(size=size)
-
-end subroutine get_random_seed_size
 
 end module perturbation_auf_fortran

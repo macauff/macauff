@@ -15,16 +15,16 @@ import timeit
 
 import numpy as np
 import requests
-from astropy.coordinates import SkyCoord
 
 # pylint: disable=import-error,no-name-in-module
 from macauff.galaxy_counts import create_galaxy_counts
-from macauff.get_trilegal_wrapper import get_av_infinity, get_trilegal
+from macauff.get_trilegal_wrapper import get_trilegal
 from macauff.misc_functions import (
-    _load_rectangular_slice,
+    convex_hull_area,
     create_auf_params_grid,
+    create_densities,
     find_model_counts_corrections,
-    min_max_lon,
+    generate_avs_inside_hull,
 )
 from macauff.misc_functions_fortran import misc_functions_fortran as mff
 from macauff.perturbation_auf_fortran import perturbation_auf_fortran as paf
@@ -99,6 +99,8 @@ def make_perturb_aufs(cm, which_cat):
         tri_model_mags_interval = getattr(cm, f'{which_cat}_tri_model_mags_interval_list')
         tri_n_bright_sources_star = getattr(cm, f'{which_cat}_tri_n_bright_sources_star_list')
 
+        n_pool = cm.n_pool
+
     a_tot_astro = getattr(cm, f'{which_cat}_astro')
     if cm.include_perturb_auf:
         a_tot_photo = getattr(cm, f'{which_cat}_photo')
@@ -143,9 +145,6 @@ def make_perturb_aufs(cm, which_cat):
             a_astro_cut = a_tot_astro[sky_cut]
 
             if len(a_astro_cut) > 0:
-                ax1_min, ax1_max = min_max_lon(a_astro_cut[:, 0])
-                ax2_min, ax2_max = np.amin(a_astro_cut[:, 1]), np.amax(a_astro_cut[:, 1])
-
                 dens_mags = np.empty(len(filters), float)
                 for j in range(len(dens_mags)):  # pylint: disable=consider-using-enumerate
                     # Take the "density" magnitude (i.e., the faint limit down to
@@ -155,22 +154,24 @@ def make_perturb_aufs(cm, which_cat):
                     # TODO: relax half-mag cut, make input parameter  pylint: disable=fixme
                     dens_mags[j] = (bins[:-1]+np.diff(bins)/2)[np.argmax(hist)] - 0.5
 
+                # Calculate the area of the current patch, assuming it is
+                # sufficiently convex to be defineable by its convex hull.
+                sky_area, hull_points, hull_x_shift = convex_hull_area(
+                    a_astro_cut[:, 0], a_astro_cut[:, 1], return_hull=True)
+
+                # Also, before beginning the loop of filters, sample the V-band
+                # extinction across the region.
+                avs = generate_avs_inside_hull(hull_points, hull_x_shift, auf_region_frame)
+
         # If there are no sources in this entire section of sky, we don't need
         # to bother downloading any TRILEGAL simulations since we'll auto-fill
         # dummy data (and never use it) in the filter loop.
         if auf_folder is not None and cm.include_perturb_auf and len(a_astro_cut) > 0 and (
                 # pylint: disable-next=possibly-used-before-assignment
                 tri_download_flag or not os.path.isfile(f'{ax_folder}/trilegal_auf_simulation_faint.dat')):
-            # Currently assume that the area of each small patch is a rectangle
-            # on the sky, implicitly assuming that the large region is also a
-            # rectangle, after any spherical projection cos(delta) effects.
-            # pylint: disable=used-before-assignment
-            rect_area = (ax1_max - ax1_min) * (
-                # pylint: disable=used-before-assignment
-                np.sin(np.radians(ax2_max)) - np.sin(np.radians(ax2_min))) * 180/np.pi
 
             data_bright_dens = np.array([np.sum(~np.isnan(a_photo_cut[:, q]) &
-                                         (a_photo_cut[:, q] <= dens_mags[q])) / rect_area
+                                         (a_photo_cut[:, q] <= dens_mags[q])) / sky_area
                                         for q in range(len(dens_mags))])
             # TODO: un-hardcode min_bright_tri_number  pylint: disable=fixme
             min_bright_tri_number = 1000
@@ -190,6 +191,7 @@ def make_perturb_aufs(cm, which_cat):
 
             if cm.include_perturb_auf:
                 good_mag_slice = ~np.isnan(a_photo_cut[:, j])
+                a_astro = a_astro_cut[good_mag_slice]
                 a_photo = a_photo_cut[good_mag_slice, j]
                 if len(a_photo) == 0:
                     arraylengths[j, i] = 0
@@ -215,25 +217,21 @@ def make_perturb_aufs(cm, which_cat):
                         single_perturb_auf_output[name] = entry
                     perturb_auf_outputs[perturb_auf_combo] = single_perturb_auf_output
                     continue
-                localn = calculate_local_density(
-                    a_astro_cut[good_mag_slice], a_tot_astro, a_tot_photo[:, j], density_radius, dens_mags[j])
+                # Should be x[:, 0] = ax1, x[:, 1] = ax2, x[:, 2] = mag, for
+                # create_densities' API.
+                x = np.vstack((a_astro[:, 0], a_astro[:, 1], a_photo)).T
+                localn = create_densities(x, -999, dens_mags[j], hull_points, hull_x_shift, density_radius,
+                                          n_pool, 2, 0, 1, auf_region_frame, cm.chunk_id)
                 # Because we always calculate the density from the full
                 # catalogue, using just the astrometry, we should be able
                 # to just over-write this N times if there happen to be N
                 # good detections of a source.
-                index_slice = med_index_slice[good_mag_slice]
-                for ii, ind_slice in enumerate(index_slice):
-                    local_n[ind_slice, j] = localn[ii]
-                if fit_gal_flag:
-                    rect_area = (ax1_max - ax1_min) * (
-                        np.sin(np.radians(ax2_max)) - np.sin(np.radians(ax2_min))) * 180/np.pi
-                ax1_list = np.linspace(ax1_min, ax1_max, 7)
-                ax2_list = np.linspace(ax2_min, ax2_max, 7)
+                local_n[med_index_slice[good_mag_slice], j] = localn
                 if fit_gal_flag:
                     single_perturb_auf_output = create_single_perturb_auf(
                         auf_points[i], cm.r, cm.dr, cm.j0s, num_trials, psf_fwhms[j], dens_mags[j], a_photo,
                         localn, d_mag, delta_mag_cuts, dd_params, l_cut, run_fw, run_psf, snr_mag_params[j],
-                        al_avs[j], auf_region_frame, ax1_list, ax2_list, fit_gal_flag, rect_area,
+                        al_avs[j], avs, fit_gal_flag, sky_area,
                         saturation_magnitudes[j], cmau_array, wavs[j], z_maxs[j], nzs[j], alpha0, alpha1,
                         alpha_weight, ab_offsets[j], filter_names[j], tri_folder=ax_folder,
                         filt_header=tri_filt_names[j], dens_hist_tri=dens_hist_tri[j],
@@ -244,7 +242,7 @@ def make_perturb_aufs(cm, which_cat):
                     single_perturb_auf_output = create_single_perturb_auf(
                         auf_points[i], cm.r, cm.dr, cm.j0s, num_trials, psf_fwhms[j], dens_mags[j], a_photo,
                         localn, d_mag, delta_mag_cuts, dd_params, l_cut, run_fw, run_psf, snr_mag_params[j],
-                        al_avs[j], auf_region_frame, ax1_list, ax2_list, fit_gal_flag, tri_folder=ax_folder,
+                        al_avs[j], avs, fit_gal_flag, tri_folder=ax_folder,
                         filt_header=tri_filt_names[j], dens_hist_tri=dens_hist_tri[j],
                         model_mags=tri_model_mags[j], model_mag_mids=tri_model_mag_mids[j],
                         model_mags_interval=tri_model_mags_interval[j],
@@ -516,104 +514,14 @@ def download_trilegal_simulation(tri_folder, tri_filter_set, ax1, ax2, mag_num, 
         f.write(contents)
 
 
-def calculate_local_density(a_astro, a_tot_astro, a_tot_photo, density_radius, density_mag):
-    '''
-    Calculates the number of sources above a given brightness within a specified
-    radius of each source in a catalogue, to provide a local density for
-    normalisation purposes.
-
-    Parameters
-    ----------
-    a_astro : numpy.ndarray
-        Sub-set of astrometric portion of total catalogue, for which local
-        densities are to be calculated.
-    a_tot_astro : numpy.ndarray
-        Full astrometric catalogue, from which all potential sources above
-        ``density_mag`` and coeval with ``a_astro`` sources are to be extracted.
-    a_tot_photo : numpy.ndarray
-        The photometry of the full catalogue, matching ``a_tot_astro``.
-    density_radius : float
-        The radius, in degrees, out to which to consider the number of sources
-        for the normalising density.
-    density_mag : float
-        The brightness, in magnitudes, above which to count sources for density
-        purposes.
-
-    Returns
-    -------
-    count_density : numpy.ndarray
-        The number of sources per square degree near to each source in
-        ``a_astro`` that are above ``density_mag`` in ``a_tot_astro``.
-    '''
-
-    min_lon, max_lon = min_max_lon(a_astro[:, 0])
-    min_lat, max_lat = np.amin(a_astro[:, 1]), np.amax(a_astro[:, 1])
-
-    overlap_sky_cut = _load_rectangular_slice(a_tot_astro, min_lon, max_lon, min_lat, max_lat, density_radius)
-    cut = overlap_sky_cut & (a_tot_photo <= density_mag)
-    a_astro_overlap_cut = a_tot_astro[cut]
-    a_photo_overlap_cut = a_tot_photo[cut]
-
-    ax1_loops = np.linspace(min_lon, max_lon, 11)
-    # Force the sub-division of the sky area in question to be 100 chunks, or
-    # roughly square degree chunks, whichever is larger in area.
-    if ax1_loops[1] - ax1_loops[0] < 1:
-        ax1_loops = np.linspace(min_lon, max_lon,
-                                int(np.ceil(max_lon - min_lon) + 1))
-    ax2_loops = np.linspace(min_lat, max_lat, 11)
-    if ax2_loops[1] - ax2_loops[0] < 1:
-        ax2_loops = np.linspace(min_lat, max_lat,
-                                int(np.ceil(max_lat - min_lat) + 1))
-    full_counts = np.empty(len(a_astro), float)
-    for ax1_start, ax1_end in zip(ax1_loops[:-1], ax1_loops[1:]):
-        for ax2_start, ax2_end in zip(ax2_loops[:-1], ax2_loops[1:]):
-            small_sky_cut = _load_rectangular_slice(a_astro, ax1_start, ax1_end, ax2_start, ax2_end, 0)
-            a_astro_small = a_astro[small_sky_cut]
-            if len(a_astro_small) == 0:
-                continue
-
-            overlap_sky_cut = _load_rectangular_slice(a_astro_overlap_cut, ax1_start, ax1_end, ax2_start,
-                                                      ax2_end, density_radius)
-            cut = overlap_sky_cut & (a_photo_overlap_cut <= density_mag)
-            a_astro_overlap_cut_small = a_astro_overlap_cut[cut]
-
-            if len(a_astro_overlap_cut_small) > 0:
-                counts = paf.get_density(a_astro_small[:, 0], a_astro_small[:, 1],
-                                         a_astro_overlap_cut_small[:, 0],
-                                         a_astro_overlap_cut_small[:, 1], density_radius)
-                # If objects return with zero bright sources in their error circle,
-                # like in the else below we force at least themselves to be in the
-                # circle, slightly over-representing any object below the
-                # brightness cutoff, but 1/area is still a very low density.
-                counts[counts == 0] = 1
-                full_counts[small_sky_cut] = counts
-            else:
-                # If we have sources to check the surrounding density of, but
-                # no bright sources around them, just set them to be alone
-                # in the error circle, slightly over-representing bright objects
-                # but still giving them a very low normalising sky density.
-                full_counts[small_sky_cut] = 1
-    min_lon, max_lon = min_max_lon(a_astro_overlap_cut[:, 0])
-    min_lat, max_lat = np.amin(a_astro_overlap_cut[:, 1]), np.amax(a_astro_overlap_cut[:, 1])
-
-    circle_overlap_area = paf.get_circle_area_overlap(a_astro[:, 0], a_astro[:, 1], density_radius,
-                                                      min_lon, max_lon, min_lat, max_lat)
-
-    count_density = full_counts / circle_overlap_area
-
-    del cut
-
-    return count_density
-
-
 # pylint: disable=too-many-locals,too-many-arguments,too-many-statements,too-many-positional-arguments
 def create_single_perturb_auf(auf_point, r, dr, j0s, num_trials, psf_fwhm, density_mag, a_photo, localn,
                               d_mag, mag_cut, dd_params, l_cut, run_fw, run_psf, snr_mag_params, al_av,
-                              region_frame, ax1s, ax2s, fit_gal_flag, rect_area=None,
-                              saturation_magnitude=None, cmau_array=None, wav=None, z_max=None, nz=None,
-                              alpha0=None, alpha1=None, alpha_weight=None, ab_offset=None, filter_name=None,
-                              tri_folder=None, filt_header=None, dens_hist_tri=None, model_mags=None,
-                              model_mag_mids=None, model_mags_interval=None, n_bright_sources_star=None):
+                              avs, fit_gal_flag, sky_area=None, saturation_magnitude=None, cmau_array=None,
+                              wav=None, z_max=None, nz=None, alpha0=None, alpha1=None, alpha_weight=None,
+                              ab_offset=None, filter_name=None, tri_folder=None, filt_header=None,
+                              dens_hist_tri=None, model_mags=None, model_mag_mids=None,
+                              model_mags_interval=None, n_bright_sources_star=None):
     r'''
     Creates the associated parameters for describing a single perturbation AUF
     component, for a single sky position.
@@ -667,19 +575,13 @@ def create_single_perturb_auf(auf_point, r, dr, j0s, num_trials, psf_fwhm, densi
         sightlines for this particular filter.
     al_av : float
         Reddening vector for the filter, :math:`\frac{A_\lambda}{A_V}`.
-    region_frame : string
-        Indicator as to whether we are in ``equatorial`` or ``galactic``
-        coordinates.
-    ax1s : list or numpy.ndarray of floats
-        The unique longitudinal coordinates which, when combined with ``ax1s``,
-        form a rectangular grid of extinctions to sample for model counts.
-    ax2s : list or numpy.ndarray of floats
-        Unique latitudinal coordinates to combine with ``ax1s`` for individual
-        ra-dec or l-b pairings for which to simulate extinction-at-infinity.
+    avs : list or numpy.ndarray of floats
+        Sampling of V-band extinctions from within the region for which we wish
+        to define the AUF perturbation components.
     fit_gal_flag : bool
         Flag to indicate whether to simulate galaxy counts for the purposes of
         simulating the perturbation component of the AUF.
-    rect_area : float, optional
+    sky_area : float, optional
         Area of the region in question, in square degrees. Required if
         ``fit_gal_flag`` is ``True``.
     saturation_magnitude : float, optional
@@ -757,18 +659,6 @@ def create_single_perturb_auf(auf_point, r, dr, j0s, num_trials, psf_fwhm, densi
     # TODO: extend to allow a Galactic source model that doesn't depend on TRILEGAL  pylint: disable=fixme
     if tri_folder is not None:
         tri_name = 'trilegal_auf_simulation'
-    avs = np.empty((len(ax1s), len(ax2s)), float)
-    for j, ax1 in enumerate(ax1s):
-        for k, ax2 in enumerate(ax2s):
-            if region_frame == 'equatorial':
-                c = SkyCoord(ra=ax1, dec=ax2, unit='deg', frame='icrs')
-                l, b = c.galactic.l.degree, c.galactic.b.degree
-            else:
-                l, b = ax1, ax2
-            av = get_av_infinity(l, b, frame='galactic')[0]
-            avs[j, k] = av
-    avs = avs.flatten()
-    if tri_folder is not None:
         (dens_hist_tri, model_mags, model_mag_mids, model_mags_interval, _,
          n_bright_sources_star) = make_tri_counts(
             tri_folder, tri_name, filt_header, d_mag, np.amin(a_photo), density_mag, al_av=al_av,
@@ -812,8 +702,8 @@ def create_single_perturb_auf(auf_point, r, dr, j0s, num_trials, psf_fwhm, densi
         data_dbins = np.diff(_data_bins)[d_hc]
         data_bins = _data_bins[d_hc]
 
-        data_uncert = np.sqrt(data_hist) / data_dbins / rect_area
-        data_hist = data_hist / data_dbins / rect_area
+        data_uncert = np.sqrt(data_hist) / data_dbins / sky_area
+        data_hist = data_hist / data_dbins / sky_area
         data_loghist = np.log10(data_hist)
         data_dloghist = 1/np.log(10) * data_uncert / data_hist
 
@@ -882,7 +772,7 @@ def create_single_perturb_auf(auf_point, r, dr, j0s, num_trials, psf_fwhm, densi
     dm_max = _calculate_magnitude_offsets(count_array, mag_array, b, snr, model_mag_mids, log10y,
                                           model_mags_interval, psf_r, model_count)
 
-    seed = np.random.default_rng().choice(100000, size=(paf.get_random_seed_size(),
+    seed = np.random.default_rng().choice(100000, size=(mff.get_random_seed_size(),
                                                         len(count_array)))
 
     psf_sig = psf_fwhm / (2 * np.sqrt(2 * np.log(2)))

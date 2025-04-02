@@ -17,6 +17,7 @@ from test_fit_astrometry import TestAstroCorrection as TAC
 # pylint: disable=import-error,no-name-in-module
 from macauff.macauff import Macauff
 from macauff.matching import CrossMatch
+from macauff.misc_functions import convex_hull_area
 from macauff.perturbation_auf import make_tri_counts
 
 # pylint: enable=import-error,no-name-in-module
@@ -1087,47 +1088,18 @@ class TestInputs:
                                      os.path.join(os.path.dirname(__file__),
                                      f"data/cat_b_params{'_' if '_b_' in in_file else ''}.txt"))
 
-    def test_cross_match_extent(self):
-        cm = CrossMatch(os.path.join(os.path.dirname(__file__), 'data'))
-        cm._initialise_chunk(os.path.join(os.path.dirname(__file__), 'data/crossmatch_params.txt'),
-                             os.path.join(os.path.dirname(__file__), 'data/cat_a_params.txt'),
-                             os.path.join(os.path.dirname(__file__), 'data/cat_b_params.txt'))
-        assert np.all(cm.cross_match_extent == np.array([131, 138, -3, 3]))
-
-        # List of simple one line config file replacements for error message checking
-        in_file = 'crossmatch_params'
-        with open(os.path.join(os.path.dirname(__file__), f'data/{in_file}.txt'), encoding='utf-8') as file:
-            f = file.readlines()
-        old_line = 'cross_match_extent = 131 138 -3 3'
-        for new_line, match_text in zip(
-                ['', 'cross_match_extent = 131 138 -3 word\n', 'cross_match_extent = 131 138 -3\n',
-                 'cross_match_extent = 131 138 -3 3 1'],
-                ['Missing key cross_match_extent', 'All elements of cross_match_extent should be',
-                 'cross_match_extent should contain.', 'cross_match_extent should contain']):
-            idx = np.where([old_line in line for line in f])[0][0]
-            _replace_line(os.path.join(os.path.dirname(__file__), f'data/{in_file}.txt'), idx, new_line,
-                          out_file=os.path.join(os.path.dirname(__file__), f'data/{in_file}_.txt'))
-
-            with pytest.raises(ValueError, match=match_text):
-                cm._initialise_chunk(os.path.join(os.path.dirname(__file__),
-                                     f"data/crossmatch_params{'_' if 'h_p' in in_file else ''}.txt"),
-                                     os.path.join(os.path.dirname(__file__),
-                                     f"data/cat_a_params{'_' if '_a_' in in_file else ''}.txt"),
-                                     os.path.join(os.path.dirname(__file__),
-                                     f"data/cat_b_params{'_' if '_b_' in in_file else ''}.txt"))
-
     def test_int_fracs(self):
         cm = CrossMatch(os.path.join(os.path.dirname(__file__), 'data'))
         cm._initialise_chunk(os.path.join(os.path.dirname(__file__), 'data/crossmatch_params.txt'),
                              os.path.join(os.path.dirname(__file__), 'data/cat_a_params.txt'),
                              os.path.join(os.path.dirname(__file__), 'data/cat_b_params.txt'))
-        assert np.all(cm.int_fracs == np.array([0.63, 0.9, 0.99]))
+        assert np.all(cm.int_fracs == np.array([0.63, 0.9, 0.999]))
 
         # List of simple one line config file replacements for error message checking
         in_file = 'crossmatch_params'
         with open(os.path.join(os.path.dirname(__file__), f'data/{in_file}.txt'), encoding='utf-8') as file:
             f = file.readlines()
-        old_line = 'int_fracs = 0.63 0.9 0.99'
+        old_line = 'int_fracs = 0.63 0.9 0.999'
         for new_line, match_text in zip(
                 ['', 'int_fracs = 0.63 0.9 word\n', 'int_fracs = 0.63 0.9\n'],
                 ['Missing key int_fracs', 'All elements of int_fracs should be',
@@ -1220,28 +1192,146 @@ class TestInputs:
                                                   'data/cat_b_params.txt'))
             self.setup_class()
 
-    def test_calculate_cf_areas(self):
+    @pytest.mark.parametrize("shape", ["rectangle", "circle"])
+    @pytest.mark.parametrize("shifted", [True, False])
+    # pylint: disable-next=too-many-branches,too-many-statements
+    def test_calculate_cf_areas(self, shape, shifted):
+        def circle_integral(R, x):
+            if 0 < x < 2*R:
+                return 0.5 * ((2 * R**2 * np.arctan(
+                    np.sqrt(x / (2 * R - x)))) + (x - R) * np.sqrt(x * (2 * R - x)))
+            if x == 0:
+                # arctan(0) = 0, sqrt(x (2R - x)) = 0
+                return 0
+            if x == 2 * R:
+                # arctan(1/0) = pi/2, sqrt(x (2R - x)) = 0
+                return R**2 * np.pi / 2
+            return None
         cm = CrossMatch(os.path.join(os.path.dirname(__file__), 'data'))
         cm._initialise_chunk(os.path.join(os.path.dirname(__file__), 'data/crossmatch_params.txt'),
                              os.path.join(os.path.dirname(__file__), 'data/cat_a_params.txt'),
                              os.path.join(os.path.dirname(__file__), 'data/cat_b_params.txt'))
-        cm.cross_match_extent = np.array([131, 134, -1, 1])
         cm.cf_region_points = np.array([[a, b] for a in [131.5, 132.5, 133.5]
                                         for b in [-0.5, 0.5]])
         cm.chunk_id = 1
         mcff = Macauff(cm)
+        if shape == 'rectangle':
+            if shifted:
+                a_astro = np.array([[131.5, 134, 131.5, 134], [-1, -1, 1, 1]]).T
+                b_astro = np.array([[131, 133.5, 131, 133.5], [-1, -1, 1, 1]]).T
+            else:
+                a_astro = np.array([[131, 134, 131, 134], [-1, -1, 1, 1]]).T
+                b_astro = np.array([[131, 134, 131, 134], [-1, -1, 1, 1]]).T
+        else:
+            t = np.linspace(0, 2*np.pi, 31)
+            r = 1
+            a_astro = np.array([r * np.cos(t) + 132.5, r * np.sin(t)]).T
+            b_astro = np.array([r * np.cos(t) + 132.5, r * np.sin(t)]).T
+            if shifted:
+                b_astro[:, 0] = b_astro[:, 0] - 0.5
+        _, cm.a_hull_points, cm.a_hull_x_shift = convex_hull_area(
+            a_astro[:, 0], a_astro[:, 1], return_hull=True)
+        _, cm.b_hull_points, cm.b_hull_x_shift = convex_hull_area(
+            b_astro[:, 0], b_astro[:, 1], return_hull=True)
         mcff._calculate_cf_areas()
-        assert_allclose(cm.cf_areas, np.ones((6), float), rtol=0.02)
+        if shape == "rectangle":
+            if shifted:
+                assert_allclose(cm.cf_areas, np.array([0.5, 0.5, 1, 1, 0.5, 0.5]), rtol=0.02)
+            else:
+                assert_allclose(cm.cf_areas, np.ones((6), float), rtol=0.02)
+        else:
+            if shifted:
+                calculated_areas = np.zeros(len(cm.cf_region_points), float)
+                xs = np.linspace(-0.5, 0.5, 1001)
+                xs = xs[:-1] + np.diff(xs)/2
+                for i, c in enumerate(cm.cf_region_points):
+                    dx = (xs[1] - xs[0]) * np.cos(np.radians(c[1]))
+                    for _x in xs:
+                        # Get lon.
+                        x = _x + c[0]
+                        # Get boundaries in lat of circle, skipping lons outside R.
+                        if np.abs(x - 132.5) <= r and np.abs(x - (132.5 - 0.5)) <= r:
+                            lat1 = np.sqrt(r**2 - (x - 132.5)**2) * np.array([1, -1]) + 0
+                            lat2 = np.sqrt(r**2 - (x - (132.5 - 0.5))**2) * np.array([1, -1]) + 0
+                            min_lat = max(lat1[1], lat2[1], c[1] - 0.5)
+                            max_lat = min(lat1[0], lat2[0], c[1] + 0.5)
+                            calculated_areas[i] += max(0, max_lat - min_lat) * dx
+            else:
+                chop = circle_integral(r, 0.5) - circle_integral(r, 0)
+                semi = circle_integral(r, 1.5) - circle_integral(r, 0.5)
+                calculated_areas = np.array([chop, chop, semi, semi, chop, chop])
+            assert_allclose(cm.cf_areas, calculated_areas, rtol=0.02)
 
-        cm.cross_match_extent = np.array([50, 55, 85, 90])
         cm.cf_region_points = np.array([[a, b] for a in 0.5+np.arange(50, 55, 1)
-                                        for b in 0.5+np.arange(85, 90, 1)])
+                                        for b in 0.5+np.arange(70, 75, 1)])
         mcff = Macauff(cm)
+        if shape == 'rectangle':
+            if shifted:
+                a_astro = np.array([[50, 54.5, 50, 54.5], [70, 70, 75, 75]]).T
+                b_astro = np.array([[50.5, 55, 50.5, 55], [70, 70, 75, 75]]).T
+            else:
+                a_astro = np.array([[50, 55, 50, 55], [70, 70, 75, 75]]).T
+                b_astro = np.array([[50, 55, 50, 55], [70, 70, 75, 75]]).T
+        else:
+            t = np.linspace(0, 2*np.pi, 361)
+            r = 2.5
+            a_astro = np.array([r * np.cos(t) + 52.5, r * np.sin(t) + 72.5]).T
+            b_astro = np.array([r * np.cos(t) + 52.5, r * np.sin(t) + 72.5]).T
+            if shifted:
+                b_astro[:, 0] = b_astro[:, 0] - 0.3
+        _, cm.a_hull_points, cm.a_hull_x_shift = convex_hull_area(
+            a_astro[:, 0], a_astro[:, 1], return_hull=True)
+        _, cm.b_hull_points, cm.b_hull_x_shift = convex_hull_area(
+            b_astro[:, 0], b_astro[:, 1], return_hull=True)
         mcff._calculate_cf_areas()
-        calculated_areas = np.array(
-            [(c[0]+0.5 - (c[0]-0.5))*180/np.pi * (np.sin(np.radians(c[1]+0.5)) -
-             np.sin(np.radians(c[1]-0.5))) for c in cm.cf_region_points])
-        assert_allclose(cm.cf_areas, calculated_areas, rtol=0.025)
+        if shape == 'rectangle':
+            if shifted:
+                plusses = np.ones((5, 5), float) * 0.5
+                plusses[-1, :] = 0
+                plusses = plusses.flatten()
+                minuses = np.ones((5, 5), float) * 0.5
+                minuses[0, :] = 0
+                minuses = minuses.flatten()
+                calculated_areas = np.array(
+                    [(c[0]+p - (c[0]-m))*180/np.pi * (np.sin(np.radians(c[1]+0.5)) -
+                     np.sin(np.radians(c[1]-0.5))) for c, p, m in zip(cm.cf_region_points, plusses, minuses)])
+            else:
+                calculated_areas = np.array(
+                    [(c[0]+0.5 - (c[0]-0.5))*180/np.pi * (np.sin(np.radians(c[1]+0.5)) -
+                     np.sin(np.radians(c[1]-0.5))) for c in cm.cf_region_points])
+        else:
+            if shifted:
+                calculated_areas = np.zeros(len(cm.cf_region_points), float)
+                xs = np.linspace(-0.5, 0.5, 1001)
+                xs = xs[:-1] + np.diff(xs)/2
+                for i, c in enumerate(cm.cf_region_points):
+                    dx = (xs[1] - xs[0]) * np.cos(np.radians(c[1]))
+                    for _x in xs:
+                        # Get lon.
+                        x = _x + c[0]
+                        # Get boundaries in lat of circle, skipping lons outside R.
+                        if np.abs(x - 52.5) <= r and np.abs(x - (52.5 - 0.3)) <= r:
+                            lat1 = np.sqrt(r**2 - (x - 52.5)**2) * np.array([1, -1]) + 72.5
+                            lat2 = np.sqrt(r**2 - (x - (52.5 - 0.3))**2) * np.array([1, -1]) + 72.5
+                            min_lat = max(lat1[1], lat2[1], c[1] - 0.5)
+                            max_lat = min(lat1[0], lat2[0], c[1] + 0.5)
+                            calculated_areas[i] += max(0, max_lat - min_lat) * dx
+            else:
+                calculated_areas = np.zeros(len(cm.cf_region_points), float)
+                xs = np.linspace(-0.5, 0.5, 1001)
+                xs = xs[:-1] + np.diff(xs)/2
+                for i, c in enumerate(cm.cf_region_points):
+                    dx = (xs[1] - xs[0]) * np.cos(np.radians(c[1]))
+                    for _x in xs:
+                        # Get lat.
+                        x = _x + c[1]
+                        # Get boundaries in lon of circle.
+                        lon = np.sqrt(r**2 - (x - 72.5)**2) * np.array([1, -1]) + 52.5
+                        min_lon = max(lon[1], c[0] - 0.5)
+                        max_lon = min(lon[0], c[0] + 0.5)
+                        calculated_areas[i] += max(0, max_lon - min_lon) * dx
+
+        assert_allclose(cm.cf_areas, calculated_areas, rtol=0.03 if shifted else 0.025)
 
     # pylint: disable-next=too-many-statements
     def test_csv_inputs(self):
@@ -1479,6 +1569,7 @@ class TestInputs:
                     os.path.join(os.path.dirname(__file__), 'data/cat_b_params_.txt'))
 
     @pytest.mark.remote_data
+    @pytest.mark.filterwarnings("ignore:.*contains more than one AUF sampling point, .*")
     # pylint: disable-next=too-many-lines,too-many-branches,too-many-statements,too-many-locals
     def test_crossmatch_correct_astrometry_inputs(self):
         cm = CrossMatch(os.path.join(os.path.dirname(__file__), 'data'))
@@ -1769,9 +1860,20 @@ class TestInputs:
         t_a_c.npy_or_csv = 'csv'
         t_a_c.n = 5000
         t_a_c.rng = self.rng
-        choice = t_a_c.rng.choice(t_a_c.n, size=t_a_c.n, replace=False)
-        t_a_c.true_ra = np.linspace(100, 110, t_a_c.n)[choice]
-        t_a_c.true_dec = np.linspace(-3, 3, t_a_c.n)[choice]
+        # Fake sources for fake_catb_cutout. We need all N-25 objects
+        # to be within 0.25 degrees of each of the first 25 data points,
+        # except the 26-100th objects, which can be wherever.
+        x_25 = self.rng.uniform(100, 110, size=25)
+        y_25 = self.rng.uniform(-3, 3, size=25)
+        x_25_100 = self.rng.uniform(100, 110, size=75)
+        y_25_100 = self.rng.uniform(-3, 3, size=75)
+        spawn_choice = self.rng.choice(25, size=t_a_c.n-100, replace=True)
+        spawn_radius = np.sqrt(self.rng.uniform(0, 1, size=t_a_c.n-100)) * 0.25
+        spawn_angle = self.rng.uniform(0, 2*np.pi, size=t_a_c.n-100)
+        spawn_x = x_25[spawn_choice] + spawn_radius * np.cos(spawn_angle)
+        spawn_y = y_25[spawn_choice] + spawn_radius * np.sin(spawn_angle)
+        t_a_c.true_ra = np.append(np.append(x_25, x_25_100), spawn_x)
+        t_a_c.true_dec = np.append(np.append(y_25, y_25_100), spawn_y)
         t_a_c.a_cat_name = 'ref_{}.csv'
         t_a_c.b_cat_name = 'file_{}.csv'
         t_a_c.fake_cata_cutout(ax1_min, ax1_max, ax2_min, ax2_max, *cat_args)

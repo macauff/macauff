@@ -7,8 +7,6 @@ catalogue and one for which precisions are less well known.
 # pylint: disable=too-many-lines
 # pylint: disable=duplicate-code
 
-import itertools
-import multiprocessing
 import os
 import shutil
 import sys
@@ -16,11 +14,9 @@ import warnings
 
 import matplotlib.pyplot as plt
 import numpy as np
-from astropy import units as u
-from astropy.coordinates import Angle, SkyCoord, UnitSphericalRepresentation, match_coordinates_sky
+from astropy.coordinates import SkyCoord, match_coordinates_sky
 from matplotlib import gridspec
 from numpy.lib.format import open_memmap
-from scipy import spatial
 from scipy.optimize import minimize
 from scipy.special import factorial
 from scipy.stats import binned_statistic, poisson
@@ -33,8 +29,12 @@ if usetex:
 
 # pylint: disable=wrong-import-position,import-error,no-name-in-module
 from macauff.galaxy_counts import create_galaxy_counts
-from macauff.get_trilegal_wrapper import get_av_infinity
-from macauff.misc_functions import find_model_counts_corrections, min_max_lon
+from macauff.misc_functions import (
+    convex_hull_area,
+    create_densities,
+    find_model_counts_corrections,
+    generate_avs_inside_hull,
+)
 from macauff.misc_functions_fortran import misc_functions_fortran as mff
 from macauff.perturbation_auf import (
     _calculate_magnitude_offsets,
@@ -548,11 +548,9 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
         # Making coords/cutouts happens for all sightlines, and then we
         # loop through each individually:
         if self.coord_or_chunk == 'coord':
-            zip_list = (self.ax1_mids, self.ax2_mids, self.ax1_mins, self.ax1_maxs,
-                        self.ax2_mins, self.ax2_maxs)
+            zip_list = (self.ax1_mids, self.ax2_mids)
         else:
-            zip_list = (self.ax1_mids, self.ax2_mids, self.ax1_mins, self.ax1_maxs, self.ax2_mins,
-                        self.ax2_maxs, self.chunks)
+            zip_list = (self.ax1_mids, self.ax2_mids, self.chunks)
 
         if (self.return_nm or overwrite_all_sightlines or
                 not os.path.isfile(f'{self.save_folder}/npy/snr_mag_params.npy') or
@@ -606,11 +604,11 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
             sys.stdout.flush()
 
             if self.coord_or_chunk == 'coord':
-                ax1_mid, ax2_mid, ax1_min, ax1_max, ax2_min, ax2_max = list_of_things
+                ax1_mid, ax2_mid = list_of_things
                 cat_args = (ax1_mid, ax2_mid)
                 file_name = f'{ax1_mid}_{ax2_mid}'
             else:
-                ax1_mid, ax2_mid, ax1_min, ax1_max, ax2_min, ax2_max, chunk = list_of_things
+                ax1_mid, ax2_mid, chunk = list_of_things
                 cat_args = (chunk,)
                 file_name = f'{chunk}'
             self.list_of_things = list_of_things
@@ -626,16 +624,17 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
                 self.a = self.load_catalogue('a', self.cat_args)
                 self.b = self.load_catalogue('b', self.cat_args)
 
-            rect_area = (ax1_max - (ax1_min)) * (
-                np.sin(np.radians(ax2_max)) - np.sin(np.radians(ax2_min))) * 180/np.pi
+            self.area, self.hull_points, self.hull_x_shift = convex_hull_area(
+                self.b[:, 0], self.b[:, 1], return_hull=True)
+
             if self.single_or_repeat == 'repeat':
                 # Divide the density through by the number of repeat visits,
                 # since we want the average density of the visits, not the
                 # sum of all repeated visits.
                 n_visits = len(np.unique(self.repeat_unique_visits))
-                self.avg_b_dens[index_] = len(self.b) / rect_area / n_visits
+                self.avg_b_dens[index_] = len(self.b) / self.area / n_visits
             else:
-                self.avg_b_dens[index_] = len(self.b) / rect_area
+                self.avg_b_dens[index_] = len(self.b) / self.area
 
             self.a_array, self.b_array, self.c_array = self.make_snr_model()
             abc_array[:, index_, 0] = self.a_array
@@ -720,14 +719,14 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
             self.ax1_grid_length = np.ceil(np.sqrt(len(self.ax1_mids))).astype(int)
             self.ax2_grid_length = np.ceil(len(self.ax1_mids) / self.ax1_grid_length).astype(int)
 
-        self.ax1_mins, self.ax1_maxs = np.empty_like(self.ax1_mids), np.empty_like(self.ax1_mids)
-        self.ax2_mins, self.ax2_maxs = np.empty_like(self.ax1_mids), np.empty_like(self.ax1_mids)
-        # Force constant box height, but allow longitude to float to make sure
-        # that we get good area coverage as the cos-delta factor increases
-        # towards the poles.
         if self.pregenerate_cutouts is False:
             # If we don't force pre-generated sightlines then we can generate
-            # corners based on requested size and height, and latitude.
+            # corners based on requested size and height, and latitude. Force
+            # constant box height, but allow longitude to float to make sure
+            # that we get good area coverage as the cos-delta factor increases
+            # towards the poles.
+            self.ax1_mins, self.ax1_maxs = np.empty_like(self.ax1_mids), np.empty_like(self.ax1_mids)
+            self.ax2_mins, self.ax2_maxs = np.empty_like(self.ax1_mids), np.empty_like(self.ax1_mids)
             for i, (ax1_mid, ax2_mid) in enumerate(zip(self.ax1_mids, self.ax2_mids)):
                 self.ax2_mins[i] = ax2_mid-self.cutout_height/2
                 self.ax2_maxs[i] = ax2_mid+self.cutout_height/2
@@ -779,19 +778,6 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
                     if not os.path.isfile(self.b_cat_name.format(*cat_args)):
                         raise ValueError("If pregenerate_cutouts is 'True' all files must "
                                          f"exist already, but {self.b_cat_name.format(*cat_args)} does not.")
-                # Check for both files, but assume they are the same size
-                # for ax1_min et al. purposes.
-                if self.pregenerate_cutouts is None:
-                    b = self.b_cat[i]
-                else:
-                    b = self.load_catalogue('b', cat_args)
-                # Handle "minimum" longitude on the interval [-pi, +pi], such that
-                # if data straddles the 0-360 boundary we don't return 0 and 360
-                # for min and max values.
-                self.ax1_mins[i], self.ax1_maxs[i] = min_max_lon(
-                    b[:, self.pos_and_err_indices[1][0]])
-                self.ax2_mins[i] = np.amin(b[:, self.pos_and_err_indices[1][1]])
-                self.ax2_maxs[i] = np.amax(b[:, self.pos_and_err_indices[1][1]])
 
     def make_catalogue_cutouts(self):
         """
@@ -1067,9 +1053,9 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
         print('Creating simulated star+galaxy counts...')
         sys.stdout.flush()
         if self.coord_or_chunk == 'coord':
-            ax1_mid, ax2_mid, ax1_min, ax1_max, ax2_min, ax2_max = self.list_of_things
+            ax1_mid, ax2_mid = self.list_of_things
         else:
-            ax1_mid, ax2_mid, ax1_min, ax1_max, ax2_min, ax2_max, _ = self.list_of_things
+            ax1_mid, ax2_mid, _ = self.list_of_things
 
         mag_ind = self.mag_indices[self.best_mag_index]
         b_mag_data = self.b[~np.isnan(self.b[:, mag_ind]), mag_ind]
@@ -1095,10 +1081,7 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
             if not os.path.exists(base_auf_folder):
                 os.makedirs(base_auf_folder, exist_ok=True)
 
-            rect_area = (ax1_max - (ax1_min)) * (
-                np.sin(np.radians(ax2_max)) - np.sin(np.radians(ax2_min))) * 180/np.pi
-
-            data_bright_dens = np.sum(~np.isnan(b_mag_data) & (b_mag_data <= maxmag)) / rect_area
+            data_bright_dens = np.sum(~np.isnan(b_mag_data) & (b_mag_data <= maxmag)) / self.area
             # pylint: disable-next=fixme
             # TODO: un-hardcode min_bright_tri_number
             min_bright_tri_number = 1000
@@ -1110,19 +1093,7 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
             os.system(f'mv {self.trifolder}/trilegal_auf_simulation.dat '
                       f'{self.trifolder}/{self.triname.format(ax1_mid, ax2_mid)}_faint.dat')
 
-        ax1s = np.linspace(ax1_min, ax1_max, 7)
-        ax2s = np.linspace(ax2_min, ax2_max, 7)
-        avs = np.empty((len(ax1s), len(ax2s)), float)
-        for j, ax1 in enumerate(ax1s):
-            for k, ax2 in enumerate(ax2s):
-                if self.coord_system == 'equatorial':
-                    c = SkyCoord(ra=ax1, dec=ax2, unit='deg', frame='icrs')
-                    l, b = c.galactic.l.degree, c.galactic.b.degree
-                else:
-                    l, b = ax1, ax2
-                av = get_av_infinity(l, b, frame='galactic')[0]
-                avs[j, k] = av
-        avs = avs.flatten()
+        avs = generate_avs_inside_hull(self.hull_points, self.hull_x_shift, self.coord_system)
 
         if self.trifolder is not None:
             tri_hist, tri_mags, _, dtri_mags, tri_uncert, _ = make_tri_counts(
@@ -1145,11 +1116,8 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
         data_dbins = np.diff(data_bins)[d_hc]
         data_bins = data_bins[d_hc]
 
-        rect_area = (ax1_max - (ax1_min)) * (
-            np.sin(np.radians(ax2_max)) - np.sin(np.radians(ax2_min))) * 180/np.pi
-
-        data_uncert = np.sqrt(data_hist) / data_dbins / rect_area
-        data_hist = data_hist / data_dbins / rect_area
+        data_uncert = np.sqrt(data_hist) / data_dbins / self.area
+        data_hist = data_hist / data_dbins / self.area
 
         if self.single_or_repeat == 'repeat':
             # Divide the counts through by the number of repeat visits.
@@ -1185,17 +1153,6 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
         print('Plotting data and model counts...')
         sys.stdout.flush()
 
-        if self.coord_or_chunk == 'coord':
-            _, _, ax1_min, ax1_max, ax2_min, ax2_max = self.list_of_things
-        else:
-            _, _, ax1_min, ax1_max, ax2_min, ax2_max, _ = self.list_of_things
-
-        # Unit area is cos(t) dt dx for 0 <= t <= 90deg, 0 <= x <= 360 deg,
-        # integrated between ax2_min < t < ax2_max, ax1_min < x < ax1_max, converted
-        # to degrees.
-        rect_area = (ax1_max - (ax1_min)) * (
-            np.sin(np.radians(ax2_max)) - np.sin(np.radians(ax2_min))) * 180/np.pi
-
         mag_ind = self.mag_indices[self.best_mag_index]
         data_mags = self.b[~np.isnan(self.b[:, mag_ind]), mag_ind]
 
@@ -1209,8 +1166,8 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
         data_dbins = np.diff(data_bins)[d_hc]
         data_bins = data_bins[d_hc]
 
-        data_uncert = np.sqrt(data_hist) / data_dbins / rect_area
-        data_hist = data_hist / data_dbins / rect_area
+        data_uncert = np.sqrt(data_hist) / data_dbins / self.area
+        data_hist = data_hist / data_dbins / self.area
 
         if self.single_or_repeat == 'repeat':
             # Divide the counts through by the number of repeat visits.
@@ -1252,15 +1209,10 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
         print('Creating local densities and nearest neighbour matches...')
         sys.stdout.flush()
 
-        if self.coord_or_chunk == 'coord':
-            _, _, ax1_min, ax1_max, ax2_min, ax2_max = self.list_of_things
-        else:
-            _, _, ax1_min, ax1_max, ax2_min, ax2_max, _ = self.list_of_things
-
         narray = create_densities(
-            self.b, self.minmag, self.maxmag, ax1_min, ax1_max, ax2_min, ax2_max,
-            self.dens_search_radius, self.n_pool, self.mag_indices[self.best_mag_index],
-            self.pos_and_err_indices[1][0], self.pos_and_err_indices[1][1], self.coord_system)
+            self.b, self.minmag, self.maxmag, self.hull_points, self.hull_x_shift, self.dens_search_radius,
+            self.n_pool, self.mag_indices[self.best_mag_index], self.pos_and_err_indices[1][0],
+            self.pos_and_err_indices[1][1], self.coord_system, self.file_name)
 
         if self.single_or_repeat == 'repeat':
             # Divide the counts through by the number of repeat visits.
@@ -1322,7 +1274,7 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
             self.moden*np.ones_like(self.mag_array), self.mag_array, b_ratio, snr, self.tri_mags,
             self.log10y, self.dtri_mags, self.psf_radius, self.n_norm)
 
-        seed = np.random.default_rng().choice(100000, size=(paf.get_random_seed_size(),
+        seed = np.random.default_rng().choice(100000, size=(mff.get_random_seed_size(),
                                                             len(self.mag_array)))
         _, _, four_off_fw, _, _ = \
             paf.perturb_aufs(
@@ -1331,7 +1283,7 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
                 self.log10y, self.n_norm, (dm_max/self.dm).astype(int), self.dmcut, self.psf_radius,
                 self.psfsig, self.numtrials, seed, self.dd_params, self.l_cut, 'fw')
 
-        seed = np.random.default_rng().choice(100000, size=(paf.get_random_seed_size(),
+        seed = np.random.default_rng().choice(100000, size=(mff.get_random_seed_size(),
                                                             len(self.mag_array)))
         _, _, four_off_ps, _, _ = \
             paf.perturb_aufs(
@@ -1486,14 +1438,9 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
                 new_sig = m * sig_orig + n
             self.fit_sigs[i, 0] = new_sig
 
-            if self.coord_or_chunk == 'coord':
-                _, _, ax1_min, ax1_max, ax2_min, ax2_max = self.list_of_things
-            else:
-                _, _, ax1_min, ax1_max, ax2_min, ax2_max, _ = self.list_of_things
             (y, q, bins, sig, snr, num) = (pdf, self.q_pdfs[i], self.pdf_bins[i],
                                            self.avg_sig[i, 0], self.avg_snr[i, 0], self.nums[i])
-            res = minimize(self.calc_single_joint_auf, x0=[sig],
-                           args=(i, ax1_min, ax1_max, ax2_min, ax2_max, bins, y, q, num, snr),
+            res = minimize(self.calc_single_joint_auf, x0=[sig], args=(i, bins, y, q, num, snr),
                            method='L-BFGS-B', options={'ftol': 1e-9}, bounds=[(0, None)])
 
             self.fit_sigs[i, 1] = res.x[0]
@@ -1517,10 +1464,6 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
             Negative-log-likelihood of the fit, to be minimised in the wrapping
             function call.
         """
-        if self.coord_or_chunk == 'coord':
-            _, _, ax1_min, ax1_max, ax2_min, ax2_max = self.list_of_things
-        else:
-            _, _, ax1_min, ax1_max, ax2_min, ax2_max, _ = self.list_of_things
         m, n = p
 
         neg_log_like = 0
@@ -1535,12 +1478,11 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
             else:
                 o = m * sig + n
 
-            neg_log_like += self.calc_single_joint_auf(o, i, ax1_min, ax1_max, ax2_min, ax2_max, bins,
-                                                       y, q, num, snr)
+            neg_log_like += self.calc_single_joint_auf(o, i, bins, y, q, num, snr)
 
         return neg_log_like
 
-    def calc_single_joint_auf(self, o, i, ax1_min, ax1_max, ax2_min, ax2_max, bins, y, q, num, snr):
+    def calc_single_joint_auf(self, o, i, bins, y, q, num, snr):
         """
         Calculates the negative-log-likelihood of a single magnitude slice of
         match separations as fit with an AUF.
@@ -1551,18 +1493,6 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
             The Gaussian uncertainty of the centroid component of the AUF.
         i : int
             Index to access particular magnitude slice.
-        ax1_min : float
-            Minimum of the first orthogonal sky axis, used to calculate
-            rectangular sky area.
-        ax1_max : float
-            Maximum of the first orthogonal sky axis, used to calculate
-            rectangular sky area.
-        ax2_min : float
-            Minimum of the second orthogonal sky axis, used to calculate
-            rectangular sky area.
-        ax2_max : float
-            Maximum of the second orthogonal sky axis, used to calculate
-            rectangular sky area.
         bins : numpy.ndarray
             Array of floats, bin edges of histogram of cross-match distances.
         y : numpy.ndarray
@@ -1606,12 +1536,7 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
         # distribution of counterparts and C(r) = \int_0^r c(r') dr'.
         # Finally, the combination y(r) = F n(r) + (1 - F) m(r).
 
-        # Unit area is cos(t) dt dx for 0 <= t <= 90deg, 0 <= x <= 360 deg,
-        # integrated between ax2_min < t < ax2_max, ax1_min < x < ax1_max, converted
-        # to degrees.
-        rect_area = (ax1_max - (ax1_min)) * (
-            np.sin(np.radians(ax2_max)) - np.sin(np.radians(ax2_min))) * 180/np.pi
-        avg_a_dens = len(self.a) / rect_area
+        avg_a_dens = len(self.a) / self.area
         # For a symmetric nearest neighbour distribution we need to use the
         # combined density of sources -- this is derived from consideration
         # of the probability of no NN object inside r being the chance that
@@ -1630,13 +1555,15 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
         reduced_nn_model, _, _ = binned_statistic(self.r[:-1]+self.dr/2, nn_model, bins=bins)
         reduced_m_conv_plus_nn, _, _ = binned_statistic(self.r[:-1]+self.dr/2,
                                                         m_conv_plus_nn, bins=bins)
+        # Empty binned_statistic bins return as NaNs.
+        _q = q & ~np.isnan(reduced_nn_model) & ~np.isnan(reduced_m_conv_plus_nn)
         # For the subset of data in the single magnitude slice we need
         # a nearest neighbour fraction, which we can fit for on-the-fly
         # for each slice separately (for the same m/n).
         _nll = 1e10
         nnf = -1
 
-        k = y[q] * np.diff(bins)[q] * num
+        k = y[_q] * np.diff(bins)[_q] * num
         log_fac_k = np.log(factorial(k))
         # Ramanujan, The Lost Notebook and other Unpublished Papers, gives
         # an approximation for ln(n!) as n ln(n) - n + 1/6 ln(8 n^3 +
@@ -1653,7 +1580,7 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
             # L - k*ln(L) + ln(k!). Have to convert from PDF to counts through
             # bin width and number of objects, forcing a non-zero rate to avoid
             # logarithmic issues.
-            _l = modely[q] * np.diff(bins)[q] * num
+            _l = modely[_q] * np.diff(bins)[_q] * num
             _l[_l <= 1e-10] = 1e-10
             temp_neg_log_like = np.sum(_l - k*np.log(_l) + log_fac_k)
             if temp_neg_log_like < _nll:
@@ -1662,8 +1589,8 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
 
         modely = nnf * reduced_nn_model + (1 - nnf) * reduced_m_conv_plus_nn
 
-        k = y[q] * np.diff(bins)[q] * num
-        _l = modely[q] * np.diff(bins)[q] * num
+        k = y[_q] * np.diff(bins)[_q] * num
+        _l = modely[_q] * np.diff(bins)[_q] * num
         _l[_l <= 1e-10] = 1e-10
         neg_log_like_part = np.sum(_l - k*np.log(_l) + log_fac_k)
 
@@ -1674,10 +1601,6 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
         Calculate poisson CDFs and create verification plots showing the
         quality of the fits.
         """
-        if self.coord_or_chunk == 'coord':
-            _, _, ax1_min, ax1_max, ax2_min, ax2_max = self.list_of_things
-        else:
-            _, _, ax1_min, ax1_max, ax2_min, ax2_max, _ = self.list_of_things
         mn_poisson_cdfs = np.array([], float)
         ind_poisson_cdfs = np.array([], float)
 
@@ -1727,9 +1650,7 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
             else:
                 final_slice = sig_cut & mag_cut & n_cut & (self.dists <= 20*self.psfsig*bsig)
 
-            rect_area = (ax1_max - (ax1_min)) * (
-                np.sin(np.radians(ax2_max)) - np.sin(np.radians(ax2_min))) * 180/np.pi
-            avg_a_dens = len(self.a) / rect_area
+            avg_a_dens = len(self.a) / self.area
             density = (np.percentile(self.narray[self.bmatch][final_slice], 50) +
                        avg_a_dens) / 3600**2
             nn_model = 2 * np.pi * (self.r[:-1]+self.dr/2) * density * np.exp(
@@ -2110,144 +2031,6 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
         return x
 
 
-def create_densities(b, minmag, maxmag, ax1_min, ax1_max, ax2_min, ax2_max, search_radius,
-                     n_pool, mag_ind, ax1_ind, ax2_ind, coord_system):
-    """
-    Generate local normalising densities for all sources in catalogue "b".
-
-    Parameters
-    ----------
-    b : numpy.ndarray
-        Catalogue of the sources for which astrometric corrections should be
-        determined.
-    minmag : float
-        Bright limiting magnitude, fainter than which objects are used when
-        determining the number of nearby sources for density purposes.
-    maxmag : float
-        Faintest magnitude within which to determine the density of catalogue
-        ``b`` objects.
-    ax1_min : float
-        The minimum longitude of the box of the cutout region.
-    ax1_max : float
-        The maximum longitude of the box of the cutout region.
-    ax2_min : float
-        The minimum latitude of the box of the cutout region.
-    ax2_max : float
-        The maximum latitude of the box of the cutout region.
-    search_radius : float
-        Radius, in degrees, around which to calculate the density of objects.
-        Smaller values will allow for more fluctuations and handle smaller scale
-        variation better, but be subject to low-number statistics.
-    n_pool : integer
-        Number of parallel threads to run when calculating densities via
-        ``multiprocessing``.
-    mag_ind : integer
-        Index in ``b`` where the magnitude being used is stored.
-    ax1_ind : integer
-        Index of ``b`` for the longitudinal coordinate column.
-    ax2_ind : integer
-        ``b`` index for the latitude data.
-    coord_system : string
-        Determines whether we are in equatorial or galactic coordinates for
-        separation considerations.
-
-    Returns
-    -------
-    narray : numpy.ndarray
-        The density of objects within ``search_radius`` degrees of each object
-        in catalogue ``b``.
-
-    """
-    def _get_cart_kdt(coord):
-        """
-        Convenience function to create a KDTree of a set of sky coordinates,
-        represented in Cartesian space on the unit sphere.
-
-        Parameters
-        ----------
-        coord : ~`astropy.coordinates.SkyCoord`
-            The `astropy` object containing all of the objects coordinates,
-            as represented as Cartesian (x, y, z) coordinates on the unit sphere.
-
-        Returns
-        -------
-        kdt : ~`scipy.spatial.KDTree`
-            The KDTree for ``coord`` evaluated with Cartesian coordinates.
-        """
-        # Largely based on astropy.coordinates._get_cartesian_kdtree.
-        KDTree = spatial.KDTree
-        cartxyz = coord.cartesian.xyz
-        flatxyz = cartxyz.reshape((3, np.prod(cartxyz.shape) // 3))
-        kdt = KDTree(flatxyz.value.T, compact_nodes=False, balanced_tree=False)
-        return kdt
-
-    cutmag = (b[:, mag_ind] >= minmag) & (b[:, mag_ind] <= maxmag)
-
-    if coord_system == 'galactic':
-        full_cat = SkyCoord(l=b[:, ax1_ind], b=b[:, ax2_ind], unit='deg', frame='galactic')
-        mag_cut_cat = SkyCoord(l=b[cutmag, ax1_ind], b=b[cutmag, ax2_ind], unit='deg',
-                               frame='galactic')
-    else:
-        full_cat = SkyCoord(ra=b[:, ax1_ind], dec=b[:, ax2_ind], unit='deg', frame='icrs')
-        mag_cut_cat = SkyCoord(ra=b[cutmag, ax1_ind], dec=b[cutmag, ax2_ind], unit='deg',
-                               frame='icrs')
-
-    full_urepr = full_cat.data.represent_as(UnitSphericalRepresentation)
-    full_ucoords = full_cat.realize_frame(full_urepr)
-
-    mag_cut_urepr = mag_cut_cat.data.represent_as(UnitSphericalRepresentation)
-    mag_cut_ucoords = mag_cut_cat.realize_frame(mag_cut_urepr)
-    mag_cut_kdt = _get_cart_kdt(mag_cut_ucoords)
-
-    r = (2 * np.sin(Angle(search_radius * u.degree) / 2.0)).value  # pylint: disable=no-member
-    overlap_number = np.empty(len(b), int)
-
-    counter = np.arange(0, len(b))
-    iter_group = zip(counter, itertools.repeat([full_ucoords, mag_cut_kdt, r]))
-    with multiprocessing.Pool(n_pool) as pool:
-        for stuff in pool.imap_unordered(ball_point_query, iter_group, chunksize=len(b)//n_pool):
-            i, len_query = stuff
-            overlap_number[i] = len_query
-
-    pool.join()
-
-    area = paf.get_circle_area_overlap(b[:, ax1_ind], b[:, ax2_ind], search_radius,
-                                       ax1_min, ax1_max, ax2_min, ax2_max)
-
-    narray = overlap_number / area
-
-    return narray
-
-
-def ball_point_query(iterable):
-    """
-    Wrapper function to distribute calculation of the number of neighbours
-    around a particular sky coordinate via KDTree query.
-
-    Parameters
-    ----------
-    iterable : list
-        List of variables passed through ``multiprocessing``, including index
-        into object having its neighbours determined, the Spherical Cartesian
-        representation of objects to search for neighbours around, the KDTree
-        containing all potential neighbours, and the Cartesian angle
-        representing the maximum on-sky separation.
-
-    Returns
-    -------
-    i : integer
-        The index of the object whose neighbour count was calculated.
-    integer
-        The number of neighbours in ``mag_cut_kdt`` within ``r`` of
-        ``full_ucoords[i]``.
-    """
-    i, (full_ucoords, mag_cut_kdt, r) = iterable
-    # query_ball_point returns the neighbours of x (full_ucoords) around self
-    # (mag_cut_kdt) within r.
-    kdt_query = mag_cut_kdt.query_ball_point(full_ucoords[i].cartesian.xyz, r)
-    return i, len(kdt_query)
-
-
 def create_distances(a, b, nn_radius, a_ax1_ind, a_ax2_ind, b_ax1_ind, b_ax2_ind, coord_system):
     """
     Calculate nearest neighbour matches between two catalogues.
@@ -2505,11 +2288,9 @@ class SNRMagnitudeRelationship(AstrometricCorrections):  # pylint: disable=too-m
         # Making coords/cutouts happens for all sightlines, and then we
         # loop through each individually:
         if self.coord_or_chunk == 'coord':
-            zip_list = (self.ax1_mids, self.ax2_mids, self.ax1_mins, self.ax1_maxs,
-                        self.ax2_mins, self.ax2_maxs)
+            zip_list = (self.ax1_mids, self.ax2_mids)
         else:
-            zip_list = (self.ax1_mids, self.ax2_mids, self.ax1_mins, self.ax1_maxs, self.ax2_mins,
-                        self.ax2_maxs, self.chunks)
+            zip_list = (self.ax1_mids, self.ax2_mids, self.chunks)
 
         if (overwrite_all_sightlines or
                 not os.path.isfile(f'{self.save_folder}/npy/snr_mag_params.npy')):
@@ -2527,11 +2308,11 @@ class SNRMagnitudeRelationship(AstrometricCorrections):  # pylint: disable=too-m
             sys.stdout.flush()
 
             if self.coord_or_chunk == 'coord':
-                ax1_mid, ax2_mid, _, _, _, _ = list_of_things
+                ax1_mid, ax2_mid = list_of_things
                 cat_args = (ax1_mid, ax2_mid)
                 file_name = f'{ax1_mid}_{ax2_mid}'
             else:
-                ax1_mid, ax2_mid, _, _, _, _, chunk = list_of_things
+                ax1_mid, ax2_mid, chunk = list_of_things
                 cat_args = (chunk,)
                 file_name = f'{chunk}'
             self.list_of_things = list_of_things

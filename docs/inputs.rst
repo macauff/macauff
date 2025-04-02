@@ -6,7 +6,7 @@ This page details the various inputs expected by `~macauff.CrossMatch` via its i
 
 These input parameters are required to be in ``crossmatch_params*.txt`` for the `Joint Parameters`_ options, and ``cat_a_params*.txt``, ``cat_b_params*.txt`` for the `Catalogue-specific Parameters`_ options, where the asterisk indicates a wildcard -- i.e., the text files must end ``.txt`` and begin e.g. ``crossmatch_params``,  but can contain text between those two parts of the file.
 
-Depending on the size of the match being performed, it is likely that you may want to use the MPI parallelisation option to save runtime or memory overhead, splitting your matches into "chunks." Even if your cross-match area is small enough that you only have a single file per catalogue, this is treated as a single chunk. Each individual chunk -- or your only chunk -- is required to have its own set of three input text parameter files, within folders inside ``chunks_folder_path`` as passed to `~macauff.CrossMatch`. Most of the parameters within these files will be the same across all chunks -- you'll likely always want to include the perturbation component of the AUF or include photometric likelihoods, or use the same filters across all sub-catalogue cross-matches -- but some will vary on a per-chunk basis, most notably anything that involves astrometric coordinates, like ``cross_match_extent``.
+Depending on the size of the match being performed, it is likely that you may want to use the MPI parallelisation option to save runtime or memory overhead, splitting your matches into "chunks." Even if your cross-match area is small enough that you only have a single file per catalogue, this is treated as a single chunk. Each individual chunk -- or your only chunk -- is required to have its own set of three input text parameter files, within folders inside ``chunks_folder_path`` as passed to `~macauff.CrossMatch`. Most of the parameters within these files will be the same across all chunks -- you'll likely always want to include the perturbation component of the AUF or include photometric likelihoods, or use the same filters across all sub-catalogue cross-matches -- but some will vary on a per-chunk basis, most notably anything that involves astrometric coordinates.
 
 The sub-folder structure should look something like::
 
@@ -51,7 +51,7 @@ These parameters are only provided in the single, common-parameter input file, a
 
 There are some parameters that must be given in all runs:
 
-``joint_folder_path``, ``include_perturb_auf``, ``include_phot_like``, ``use_phot_priors``, ``cross_match_extent``, ``pos_corr_dist``, ``cf_region_type``, ``cf_region_frame``, ``cf_region_points``, ``real_hankel_points``, ``four_hankel_points``, ``four_max_rho``, ``int_fracs``, ``make_output_csv``, and ``n_pool``;
+``joint_folder_path``, ``include_perturb_auf``, ``include_phot_like``, ``use_phot_priors``, ``pos_corr_dist``, ``cf_region_type``, ``cf_region_frame``, ``cf_region_points``, ``real_hankel_points``, ``four_hankel_points``, ``four_max_rho``, ``int_fracs``, ``make_output_csv``, and ``n_pool``;
 
 options which need to be supplied if ``make_output_csv`` is ``True``:
 
@@ -86,13 +86,6 @@ Flag for the inclusion of the likelihood of match or non-match based on the phot
 
 Flag to determine whether to calculate the priors on match or non-match using the photometry (if set to ``True``) or calculate them based on a naive asymmetric density argument (``False``).
 
-``cross_match_extent``
-
-The maximum extent of the matching process. When not matching all-sky catalogues, these extents are used to eliminate potential matches within "island" overlap range of the edge of the data, whose potential incompleteness renders the probabilities of match derived uncertain. Must be of the form ``lower-longitude upper-longitude lower-latitude upper-latitude``; accepts four space-separated floats.
-
-.. note::
-    In cases where the boundary defining the cross-match overlaps the 0-360 boundary of the given coordinate system, the longitudes should be given relative to 0 degrees. For example, if we had a boundary that ran from 350 degrees up to 360 (0) degrees, and on to 10 degrees, ``cross_match_extent`` would have for its input longitudes ``-10 10``. Internally the software is able to handle the boundary for source coordinates, but requires the extents to be correctly input for these regions.
-
 ``pos_corr_dist``
 
 The floating point precision number determining the maximum possible separation between two sources in opposing catalogues.
@@ -110,7 +103,7 @@ This allows either ``equatorial`` or ``galactic`` frame coordinates to be used i
 The list of pointings for which to run simulations of perturbations due to blended sources, if applicable. If ``cf_region_type`` is ``rectangle``, then ``cf_region_points`` accepts six numbers: ``start longitude, end longitude, number of longitude points, start latitude, end latitude, number of latitude points``; if ``points`` then tuples must be of the syntax ``(a, b), (c, d)`` where ``a`` and ``c`` are RA or Galactic Longitude, and ``b`` and ``d`` are Declination or Galactic Latitude.
 
 .. note::
-    For consistency with ``cross_match_extent``, ``cf_region_points`` longitudes may be given with negative coordinates for cases where the region ``cross_match_extent`` defines is both above and below zero degrees, but they can also be given within the [0, 360] phase space, as 350 degrees and -10 degrees are handled the same where needed by ``cf_region_points``.
+    ``cf_region_points`` longitudes may be given with negative coordinates for cases where the match area is both above and below zero degrees, but they can also be given within the [0, 360] phase space, as 350 degrees and -10 degrees are handled the same where needed by ``cf_region_points``.
 
 ``real_hankel_points``
 
@@ -225,7 +218,7 @@ As with ``auf_region_frame``, this flag indicates which frame the data, and thus
 Based on ``auf_region_type``, this must either by six space-separated floats, controlling the start and end, and number of, longitude and latitude points in ``start lon end lon # steps start lat end lat #steps`` order (see ``cf_region_points``), or a series of comma-separated tuples cf. ``(a, b), (c, d)``.
 
 .. note::
-    For consistency with ``cross_match_extent``, ``auf_region_points`` longitudes may be given with negative coordinates for cases where the region ``cross_match_extent`` defines is both above and below zero degrees, but they can also be given within the [0, 360] phase space, as 350 degrees and -10 degrees are handled the same where needed by ``auf_region_points``.
+    ``auf_region_points`` longitudes may be given with negative coordinates for cases where the match area is both above and below zero degrees, but they can also be given within the [0, 360] phase space, as 350 degrees and -10 degrees are handled the same where needed by ``auf_region_points``.
 
 ``correct_astrometry``
 
@@ -445,7 +438,8 @@ The inter-dependency of input parameters on one another, and the output ``CrossM
     │                     │             ├─* gal_zmax
     │                     │             ├─* gal_nzs
     │                     │             ├─* gal_aboffsets
-    │                     │             └─* gal_filternames
+    │                     │             ├─* gal_filternames
+    │                     │             └─* saturation_magnitudes
     │                     ├─* snr_mag_params_path -> snr_mag_params
     │                     ├─* tri_set_name[3a]
     │                     ├─* tri_filt_names[3a]
@@ -475,7 +469,6 @@ The inter-dependency of input parameters on one another, and the output ``CrossM
     ├─> real_hankel_points
     ├─> four_hankel_points
     ├─> four_max_rho
-    ├─> cross_match_extent
     ├─> int_fracs
     ├─> make_output_csv
     │                 ├─> output_csv_folder
@@ -511,7 +504,8 @@ The inter-dependency of input parameters on one another, and the output ``CrossM
     │                    ├─* correct_sig_slice
     │                    ├─* chunk_overlap_col
     │                    ├─* best_mag_index_col
-    │                    └─* use_photometric_uncertainties
+    │                    ├-* use_photometric_uncertainties
+    │                    └─* saturation_magnitudes
     ├─* compute_snr_mag_relation[1]
     │                          ├─* correct_astro_save_folder
     │                          ├─* csv_cat_file_string

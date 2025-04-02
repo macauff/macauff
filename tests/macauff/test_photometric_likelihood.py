@@ -6,12 +6,14 @@ Tests for the "photometric_likelihood" module.
 import os
 
 import numpy as np
+import pytest
 from numpy.testing import assert_allclose
 from test_matching import _replace_line
 
 # pylint: disable=import-error,no-name-in-module
 from macauff.macauff import Macauff
 from macauff.matching import CrossMatch
+from macauff.misc_functions import convex_hull_area
 from macauff.photometric_likelihood import compute_photometric_likelihoods, make_bins
 from macauff.photometric_likelihood_fortran import photometric_likelihood_fortran as plf
 
@@ -66,14 +68,6 @@ class TestOneSidedPhotometricLikelihood:
         _replace_line(os.path.join(os.path.dirname(__file__), 'data/crossmatch_params.txt'),
                       idx, new_line, out_file=os.path.join(os.path.dirname(__file__),
                       'data/crossmatch_params_.txt'))
-        old_line = 'cross_match_extent = 131 138 -3 3'
-        new_line = 'cross_match_extent = 131 134 -3 3\n'
-        with open(os.path.join(os.path.dirname(__file__), 'data/crossmatch_params_.txt'),
-                  encoding='utf-8') as file:
-            f = file.readlines()
-        idx = np.where([old_line in line for line in f])[0][0]
-        _replace_line(os.path.join(os.path.dirname(__file__), 'data/crossmatch_params_.txt'),
-                      idx, new_line)
 
     def make_class(self):
         class A():  # pylint: disable=too-few-public-methods
@@ -98,6 +92,11 @@ class TestOneSidedPhotometricLikelihood:
 
         a.auf_cdf_a = None
         a.auf_cdf_b = None
+
+        _, a.a_hull_points, a.a_hull_x_shift = convex_hull_area(
+            self.a_astro[:, 0], self.a_astro[:, 1], return_hull=True)
+        _, a.b_hull_points, a.b_hull_x_shift = convex_hull_area(
+            self.b_astro[:, 0], self.b_astro[:, 1], return_hull=True)
 
         return a
 
@@ -213,6 +212,10 @@ class TestOneSidedPhotometricLikelihood:
         self.cm.auf_cdf_a = None
         self.cm.auf_cdf_b = None
         mcff = Macauff(self.cm)
+        _, self.cm.a_hull_points, self.cm.a_hull_x_shift = convex_hull_area(
+            self.a_astro[:, 0], self.a_astro[:, 1], return_hull=True)
+        _, self.cm.b_hull_points, self.cm.b_hull_x_shift = convex_hull_area(
+            self.b_astro[:, 0], self.b_astro[:, 1], return_hull=True)
         mcff.calculate_phot_like()
 
         abinlen = self.cm.abinlengths
@@ -339,8 +342,8 @@ def test_make_bins():
 
 class TestFullPhotometricLikelihood:  # pylint: disable=too-many-instance-attributes
     def setup_class(self):  # pylint: disable=too-many-statements
-        self.cf_points = np.array([[131.5, -0.5]])
-        self.cf_areas = 0.25 * np.ones((1), float)
+        self.cf_points = np.array([[131.5, -0.5], [131.5, 0]])
+        self.cf_areas = 0.25 * np.ones((2), float)
         self.joint_folder_path = 'test_path'
         self.a_cat_folder_path = 'gaia_folder'
         self.b_cat_folder_path = 'wise_folder'
@@ -360,11 +363,12 @@ class TestFullPhotometricLikelihood:  # pylint: disable=too-many-instance-attrib
         rng = np.random.default_rng(seed)
 
         asig, bsig = 0.1, 0.15
-        self.ntot = 45000
+        self.ntot = 90000
 
         aa = np.empty((self.ntot, 3), float)
         aa[:, 0] = rng.uniform(131.25, 131.75, self.ntot)
-        aa[:, 1] = rng.uniform(-0.75, -0.25, self.ntot)
+        aa[:, 1] = np.concatenate((rng.uniform(-0.75, -0.255, int(self.ntot/2)),
+                                   rng.uniform(-0.245, 0.25, int(self.ntot/2))))
         aa[:, 2] = asig
 
         ba = np.empty((self.ntot, 3), float)
@@ -380,13 +384,18 @@ class TestFullPhotometricLikelihood:  # pylint: disable=too-many-instance-attrib
         bp = ap + rng.normal(loc=0, scale=b_phot_sig, size=(self.ntot, len(self.bfilts)))
         ap = ap + rng.normal(loc=0, scale=a_phot_sig, size=(self.ntot, len(self.afilts)))
 
-        a_cut, b_cut = ap[:, 0] > 11, bp[:, 0] < 14.5
-        self.nc = np.sum(a_cut & b_cut)
+        a_cut, b_cut = (ap[:, 0] > 11) & (aa[:, 1] <= -0.25), (bp[:, 0] < 14.5) & (ba[:, 1] <= -0.25)
+        a_cut2, b_cut2 = (ap[:, 0] > 10.5) & (aa[:, 1] > -0.25), (bp[:, 0] < 14) & (ba[:, 1] > -0.25)
+        self.nc = np.array([np.sum(a_cut & b_cut), np.sum(a_cut2 & b_cut2)])
 
-        aa[~a_cut, 0] = rng.uniform(131.25, 131.75, np.sum(~a_cut))
-        aa[~a_cut, 1] = rng.uniform(-0.75, -0.25, np.sum(~a_cut))
-        ba[~b_cut, 0] = rng.uniform(131.25, 131.75, np.sum(~b_cut))
-        ba[~b_cut, 1] = rng.uniform(-0.75, -0.25, np.sum(~b_cut))
+        a_q = (aa[:, 1] <= -0.25)
+        aa[~a_cut & ~a_cut2, 0] = rng.uniform(131.25, 131.75, np.sum(~a_cut & ~a_cut2))
+        aa[~a_cut & a_q, 1] = rng.uniform(-0.75, -0.255, np.sum(~a_cut & a_q))
+        aa[~a_cut2 & ~a_q, 1] = rng.uniform(-0.245, 0.25, np.sum(~a_cut2 & ~a_q))
+        b_q = (ba[:, 1] <= -0.25)
+        ba[~b_cut & ~b_cut2, 0] = rng.uniform(131.25, 131.75, np.sum(~b_cut & ~b_cut2))
+        ba[~b_cut & b_q, 1] = rng.uniform(-0.75, -0.255, np.sum(~b_cut & b_q))
+        ba[~b_cut2 & ~b_q, 1] = rng.uniform(-0.245, 0.25, np.sum(~b_cut2 & ~b_q))
 
         self.a_astro = aa
         self.b_astro = ba
@@ -395,19 +404,19 @@ class TestFullPhotometricLikelihood:  # pylint: disable=too-many-instance-attrib
 
         # Have to pre-create the various overlap arrays, and integral lengths:
         self.asize = np.ones(self.ntot, int)
-        self.asize[~a_cut] = 0
-        self.asize[~b_cut] = 0
+        self.asize[~a_cut & ~a_cut2] = 0
+        self.asize[~b_cut & ~b_cut2] = 0
         self.ainds = -1*np.ones((1, self.ntot), int, order='F')
         self.ainds[0, :] = np.arange(0, self.ntot)
-        self.ainds[0, ~a_cut] = -1
-        self.ainds[0, ~b_cut] = -1
+        self.ainds[0, ~a_cut & ~a_cut2] = -1
+        self.ainds[0, ~b_cut & ~b_cut2] = -1
         self.bsize = np.ones(self.ntot, int)
-        self.bsize[~a_cut] = 0
-        self.bsize[~b_cut] = 0
+        self.bsize[~a_cut & ~a_cut2] = 0
+        self.bsize[~b_cut & ~b_cut2] = 0
         self.binds = -1*np.ones((1, self.ntot), int, order='F')
         self.binds[0, :] = np.arange(0, self.ntot)
-        self.binds[0, ~a_cut] = -1
-        self.binds[0, ~b_cut] = -1
+        self.binds[0, ~a_cut & ~a_cut2] = -1
+        self.binds[0, ~b_cut & ~b_cut2] = -1
 
         # Integrate 2-D Gaussian to N*sigma radius gives probability Y of
         # 1 - exp(-0.5 N^2 sigma^2 / sigma^2) = 1 - exp(-0.5 N^2).
@@ -426,13 +435,13 @@ class TestFullPhotometricLikelihood:  # pylint: disable=too-many-instance-attrib
         # when resetting the bonds. This way we have no false-match overlap,
         # but that's a <1% error. This is also true above, where we have to
         # remove the *size and *inds bonds for bright and faint magnitudes.
-        self.auf_cdf_a[0, ~a_cut] = 1.0
-        self.auf_cdf_a[0, ~b_cut] = 1.0
+        self.auf_cdf_a[0, ~a_cut & ~a_cut2] = 1.0
+        self.auf_cdf_a[0, ~b_cut & ~b_cut2] = 1.0
         self.auf_cdf_b = (1 - np.exp(-0.5 * d**2 / ((asig**2 + bsig**2) / 3600**2))).reshape(1, -1, order='F')
-        self.auf_cdf_b[0, ~a_cut] = 1.0
-        self.auf_cdf_b[0, ~b_cut] = 1.0
+        self.auf_cdf_b[0, ~a_cut & ~a_cut2] = 1.0
+        self.auf_cdf_b[0, ~b_cut & ~b_cut2] = 1.0
 
-    def make_class(self):
+    def make_class(self, N):  # pylint: disable=too-many-statements
         class A():  # pylint: disable=too-few-public-methods
             def __init__(self):
                 pass
@@ -442,33 +451,84 @@ class TestFullPhotometricLikelihood:  # pylint: disable=too-many-instance-attrib
         a.b_cat_folder_path = self.b_cat_folder_path
         a.a_filt_names = self.afilts
         a.b_filt_names = self.bfilts
-        a.cf_region_points = self.cf_points
-        a.cf_areas = self.cf_areas
+        if N == 1:
+            a.cf_region_points = self.cf_points[0].reshape(1, -1)
+        else:
+            a.cf_region_points = self.cf_points
+        if N == 1:
+            a.cf_areas = np.array([self.cf_areas[0]])
+        else:
+            a.cf_areas = self.cf_areas
         a.include_phot_like = self.include_phot_like
         a.use_phot_priors = self.include_phot_like
         a.int_fracs = np.array([self.y_b, self.y_f])
         a.rank = 0
         a.chunk_id = 1
-        a.ab_area = self.ab_area
-        a.af_area = self.af_area
-        a.bb_area = self.bb_area
-        a.bf_area = self.bf_area
-        a.ainds = self.ainds
-        a.asize = self.asize
-        a.binds = self.binds
-        a.bsize = self.bsize
-        a.a_astro = self.a_astro
-        a.a_photo = self.a_photo
-        a.b_astro = self.b_astro
-        a.b_photo = self.b_photo
+        if N == 1:
+            q_a = self.a_astro[:, 1] <= -0.25
+            q_b = self.b_astro[:, 1] <= -0.25
 
-        a.auf_cdf_a = self.auf_cdf_a
-        a.auf_cdf_b = self.auf_cdf_b
+            a.ab_area = self.ab_area[q_a]
+            a.af_area = self.af_area[q_a]
+            a.bb_area = self.bb_area[q_b]
+            a.bf_area = self.bf_area[q_b]
+            a.ainds = self.ainds[:, q_a]
+            map_array = np.empty(self.ainds.shape[1] + 1, int)
+            map_array[-1] = -1
+            map_array[np.arange(len(map_array)-1, dtype=int)[q_b]] = np.arange(np.sum(q_b), dtype=int)
+            for i in range(a.ainds.shape[1]):
+                for j in range(a.ainds.shape[0]):
+                    a.ainds[j, i] = map_array[a.ainds[j, i]]
+            a.asize = self.asize[q_a]
+            a.binds = self.binds[:, q_b]
+            map_array = np.empty(self.binds.shape[1] + 1, int)
+            map_array[-1] = -1
+            map_array[np.arange(len(map_array)-1, dtype=int)[q_a]] = np.arange(np.sum(q_a), dtype=int)
+            for i in range(a.binds.shape[1]):
+                for j in range(a.binds.shape[0]):
+                    a.binds[j, i] = map_array[a.binds[j, i]]
+            a.bsize = self.bsize[q_b]
+            a.a_astro = self.a_astro[q_a]
+            a.a_photo = self.a_photo[q_a]
+            a.b_astro = self.b_astro[q_b]
+            a.b_photo = self.b_photo[q_b]
+
+            a.auf_cdf_a = self.auf_cdf_a[:, q_a]
+            a.auf_cdf_b = self.auf_cdf_b[:, q_b]
+        else:
+            a.ab_area = self.ab_area
+            a.af_area = self.af_area
+            a.bb_area = self.bb_area
+            a.bf_area = self.bf_area
+            a.ainds = self.ainds
+            a.asize = self.asize
+            a.binds = self.binds
+            a.bsize = self.bsize
+            a.a_astro = self.a_astro
+            a.a_photo = self.a_photo
+            a.b_astro = self.b_astro
+            a.b_photo = self.b_photo
+
+            a.auf_cdf_a = self.auf_cdf_a
+            a.auf_cdf_b = self.auf_cdf_b
+
+        _, a.a_hull_points, a.a_hull_x_shift = convex_hull_area(
+            a.a_astro[:, 0], a.a_astro[:, 1], return_hull=True)
+        _, a.b_hull_points, a.b_hull_x_shift = convex_hull_area(
+            a.b_astro[:, 0], a.b_astro[:, 1], return_hull=True)
+
+        # Keep a record of changing n values in the dummy class.
+        if N == 1:
+            a._nc = self.nc[0]
+        else:
+            a._nc = self.nc
+        a._ntot = self.ntot / 2
 
         return a
 
-    def test_compute_phot_like(self):
-        fake_cm = self.make_class()
+    @pytest.mark.parametrize('N', [1, 2])
+    def test_compute_phot_like(self, N):  # pylint: disable=too-many-statements,too-many-locals
+        fake_cm = self.make_class(N)
         compute_photometric_likelihoods(fake_cm)
 
         # pylint: disable=no-member
@@ -480,51 +540,101 @@ class TestFullPhotometricLikelihood:  # pylint: disable=too-many-instance-attrib
         fb_l = fake_cm.fb_array
         # pylint: enable=no-member
 
-        fake_c_p = self.nc / self.area
-        fake_fa_p = (self.ntot - self.nc) / self.area
-        fake_fb_p = (self.ntot - self.nc) / self.area
-        assert_allclose(c_p, fake_c_p, rtol=0.05)
-        assert_allclose(fa_p, fake_fa_p, rtol=0.02)
-        assert_allclose(fb_p, fake_fb_p, rtol=0.02)
+        fake_c_p = fake_cm._nc / self.area
+        fake_fa_p = (fake_cm._ntot - fake_cm._nc) / self.area
+        fake_fb_p = (fake_cm._ntot - fake_cm._nc) / self.area
+        assert_allclose(c_p[0, 0], fake_c_p, rtol=0.05)
+        assert_allclose(fa_p[0, 0], fake_fa_p, rtol=0.02)
+        assert_allclose(fb_p[0, 0], fake_fb_p, rtol=0.02)
 
-        abins = make_bins(self.a_photo[~np.isnan(self.a_photo[:, 0]), 0])
-        bbins = make_bins(self.b_photo[~np.isnan(self.b_photo[:, 0]), 0])
-        a = self.a_photo[~np.isnan(self.a_photo[:, 0]), 0]
-        b = self.b_photo[~np.isnan(self.b_photo[:, 0]), 0]
-        q = (a <= 11) | (b >= 14.5)
+        if N == 1:
+            abins = make_bins(fake_cm.a_photo[~np.isnan(fake_cm.a_photo[:, 0]), 0])
+            bbins = make_bins(fake_cm.b_photo[~np.isnan(fake_cm.b_photo[:, 0]), 0])
+            a = self.a_photo[~np.isnan(self.a_photo[:, 0]), 0]
+            b = self.b_photo[~np.isnan(self.b_photo[:, 0]), 0]
+            _q = (a <= 11) | (b >= 14.5)
+            q = _q & (self.a_astro[:, 1] <= -0.25) & (self.b_astro[:, 1] <= -0.25)
 
-        fake_fa_l = np.zeros((len(abins) - 1, 1, 1, 1), float)
-        h, _ = np.histogram(a[q], bins=abins, density=True)
-        fake_fa_l[:, 0, 0, 0] = h
-        fake_abins = fake_cm.abinsarray[:, 0, 0]  # pylint: disable=no-member
-        assert np.all(abins == fake_abins)
-        assert np.all(fake_fa_l.shape == fa_l.shape)
-        assert_allclose(fa_l, fake_fa_l, atol=0.02)
+            fake_fa_l = np.zeros((len(abins) - 1, 1, 1, 1), float)
+            h, _ = np.histogram(a[q], bins=abins, density=True)
+            fake_fa_l[:, 0, 0, 0] = h
+            fake_abins = fake_cm.abinsarray[:, 0, 0]  # pylint: disable=no-member
+            assert np.all(abins == fake_abins)
+            assert np.all(fake_fa_l.shape == fa_l.shape)
+            assert_allclose(fa_l, fake_fa_l, rtol=0.03, atol=0.02)
 
-        fake_fb_l = np.zeros((len(bbins) - 1, 1, 1, 1), float)
-        h, _ = np.histogram(b[q], bins=bbins, density=True)
-        fake_fb_l[:, 0, 0, 0] = h
-        fake_bbins = fake_cm.bbinsarray[:, 0, 0]  # pylint: disable=no-member
-        assert np.all(bbins == fake_bbins)
-        assert np.all(fake_fb_l.shape == fb_l.shape)
-        assert_allclose(fb_l, fake_fb_l, atol=0.02)
+            fake_fb_l = np.zeros((len(bbins) - 1, 1, 1, 1), float)
+            h, _ = np.histogram(b[q], bins=bbins, density=True)
+            fake_fb_l[:, 0, 0, 0] = h
+            fake_bbins = fake_cm.bbinsarray[:, 0, 0]  # pylint: disable=no-member
+            assert np.all(bbins == fake_bbins)
+            assert np.all(fake_fb_l.shape == fb_l.shape)
+            assert_allclose(fb_l, fake_fb_l, rtol=0.03, atol=0.02)
 
-        h, _, _ = np.histogram2d(a[~q], b[~q], bins=[abins, bbins])
-        fake_c_l = np.zeros((len(bbins)-1, len(abins) - 1, 1, 1, 1), float, order='F')
-        pa, _ = np.histogram(a, bins=abins, density=True)
-        integral = 0
-        for i in range(len(abins)-1):
-            if np.sum(h[i]) > 0:
-                fake_c_l[:, i, 0, 0, 0] = h[i] / np.sum(h[i]) / np.diff(bbins) * pa[i]
-            else:
-                fake_c_l[:, i, 0, 0, 0] = 0
-            integral += np.sum(fake_c_l[:, i, 0, 0, 0] * np.diff(bbins) * (abins[i+1] - abins[i]))
-        fake_c_l /= integral
-        assert np.all(fake_c_l.shape == c_l.shape)
-        assert_allclose(c_l, fake_c_l, rtol=0.1, atol=0.05)
+            q = ~_q & (self.a_astro[:, 1] <= -0.25) & (self.b_astro[:, 1] <= -0.25)
 
-    def test_compute_phot_like_use_priors_only(self):
-        fake_cm = self.make_class()
+            h, _, _ = np.histogram2d(a[q], b[q], bins=[abins, bbins])
+            fake_c_l = np.zeros((len(bbins) - 1, len(abins) - 1, 1, 1, 1), float, order='F')
+            pa, _ = np.histogram(a, bins=abins, density=True)
+            integral = 0
+            for i in range(len(abins)-1):
+                if np.sum(h[i]) > 0:
+                    fake_c_l[:, i, 0, 0, 0] = h[i] / np.sum(h[i]) / np.diff(bbins) * pa[i]
+                else:
+                    fake_c_l[:, i, 0, 0, 0] = 0
+                integral += np.sum(fake_c_l[:, i, 0, 0, 0] * np.diff(bbins) * (abins[i+1] - abins[i]))
+            fake_c_l /= integral
+            assert np.all(fake_c_l.shape == c_l.shape)
+            assert_allclose(c_l, fake_c_l, rtol=0.1, atol=0.05)
+        else:
+            chunk_slice = (self.a_astro[:, 1] <= -0.25) & (self.b_astro[:, 1] <= -0.25)
+            cs = [chunk_slice, ~chunk_slice]
+            abins = [make_bins(self.a_photo[x][~np.isnan(self.a_photo[x, 0]), 0]) for x in cs]
+            bbins = [make_bins(self.b_photo[x][~np.isnan(self.b_photo[x, 0]), 0]) for x in cs]
+            a = self.a_photo[~np.isnan(self.a_photo[:, 0]), 0]
+            b = self.b_photo[~np.isnan(self.b_photo[:, 0]), 0]
+            ps = [(a <= 11) | (b >= 14.5), (a <= 10.5) | (b >= 14)]
+
+            fake_fa_l = np.zeros((np.amax([len(x) for x in abins]) - 1, 1, 1, 2), float)
+            for i, (q, q2) in enumerate(zip(ps, cs)):
+                h, _ = np.histogram(a[q & q2], bins=abins[i], density=True)
+                fake_fa_l[:len(abins[i])-1, 0, 0, i] = h
+            fake_abins = fake_cm.abinsarray[:, 0, :]  # pylint: disable=no-member
+            fake_abinlens = fake_cm.abinlengths[0, :]  # pylint: disable=no-member
+            assert np.all([np.all(abins[i] == fake_abins[:fake_abinlens[i], i]) for i in range(2)])
+            assert np.all(fake_fa_l.shape == fa_l.shape)
+            assert_allclose(fa_l, fake_fa_l, rtol=0.03, atol=0.02)
+
+            fake_fb_l = np.zeros((np.amax([len(x) for x in bbins]) - 1, 1, 1, 2), float)
+            for i, (q, q2) in enumerate(zip(ps, cs)):
+                h, _ = np.histogram(b[q & q2], bins=bbins[i], density=True)
+                fake_fb_l[:len(bbins[i])-1, 0, 0, i] = h
+            fake_bbins = fake_cm.bbinsarray[:, 0, :]  # pylint: disable=no-member
+            fake_bbinlens = fake_cm.bbinlengths[0, :]  # pylint: disable=no-member
+            assert np.all([np.all(bbins[i] == fake_bbins[:fake_bbinlens[i], i]) for i in range(2)])
+            assert np.all(fake_fb_l.shape == fb_l.shape)
+            assert_allclose(fb_l, fake_fb_l, rtol=0.03, atol=0.02)
+
+            fake_c_l = np.zeros((np.amax([len(x) for x in bbins]) - 1,
+                                 np.amax([len(x) for x in abins]) - 1, 1, 1, 2), float, order='F')
+            for j, (q, q2) in enumerate(zip(ps, cs)):
+                h, _, _ = np.histogram2d(a[~q & q2], b[~q & q2], bins=[abins[j], bbins[j]])
+                pa, _ = np.histogram(a[q2], bins=abins[j], density=True)
+                integral = 0
+                for i in range(len(abins[j])-1):
+                    if np.sum(h[i]) > 0:
+                        fake_c_l[:, i, 0, 0, j] = h[i] / np.sum(h[i]) / np.diff(bbins[j]) * pa[i]
+                    else:
+                        fake_c_l[:, i, 0, 0, j] = 0
+                    integral += np.sum(fake_c_l[:, i, 0, 0, j] * np.diff(bbins[j]) * (
+                        abins[j][i+1] - abins[j][i]))
+                fake_c_l[:, :, 0, 0, j] /= integral
+            assert np.all(fake_c_l.shape == c_l.shape)
+            assert_allclose(c_l, fake_c_l, rtol=0.1, atol=0.05)
+
+    @pytest.mark.parametrize('N', [1, 2])
+    def test_compute_phot_like_use_priors_only(self, N):  # pylint: disable=too-many-statements
+        fake_cm = self.make_class(N)
         fake_cm.include_phot_like = False
         compute_photometric_likelihoods(fake_cm)
 
@@ -537,28 +647,53 @@ class TestFullPhotometricLikelihood:  # pylint: disable=too-many-instance-attrib
         fb_l = fake_cm.fb_array
         # pylint: enable=no-member
 
-        fake_c_p = self.nc / self.area
-        fake_fa_p = (self.ntot - self.nc) / self.area
-        fake_fb_p = (self.ntot - self.nc) / self.area
-        assert_allclose(c_p, fake_c_p, rtol=0.05)
-        assert_allclose(fa_p, fake_fa_p, rtol=0.02)
-        assert_allclose(fb_p, fake_fb_p, rtol=0.02)
+        fake_c_p = fake_cm._nc / self.area
+        fake_fa_p = (fake_cm._ntot - fake_cm._nc) / self.area
+        fake_fb_p = (fake_cm._ntot - fake_cm._nc) / self.area
+        assert_allclose(c_p[0, 0], fake_c_p, rtol=0.05)
+        assert_allclose(fa_p[0, 0], fake_fa_p, rtol=0.02)
+        assert_allclose(fb_p[0, 0], fake_fb_p, rtol=0.02)
 
-        abins = make_bins(self.a_photo[~np.isnan(self.a_photo[:, 0]), 0])
-        bbins = make_bins(self.b_photo[~np.isnan(self.b_photo[:, 0]), 0])
+        if N == 1:
+            abins = make_bins(fake_cm.a_photo[~np.isnan(fake_cm.a_photo[:, 0]), 0])
+            bbins = make_bins(fake_cm.b_photo[~np.isnan(fake_cm.b_photo[:, 0]), 0])
 
-        fake_fa_l = np.ones((len(abins) - 1, 1, 1, 1), float)
-        fake_abins = fake_cm.abinsarray[:, 0, 0]  # pylint: disable=no-member
-        assert np.all(abins == fake_abins)
-        assert np.all(fake_fa_l.shape == fa_l.shape)
-        assert_allclose(fa_l, fake_fa_l)
+            fake_fa_l = np.ones((len(abins) - 1, 1, 1, 1), float)
+            fake_abins = fake_cm.abinsarray[:, 0, 0]  # pylint: disable=no-member
+            assert np.all(abins == fake_abins)
+            assert np.all(fake_fa_l.shape == fa_l.shape)
+            assert_allclose(fa_l, fake_fa_l)
 
-        fake_fb_l = np.ones((len(bbins) - 1, 1, 1, 1), float)
-        fake_bbins = fake_cm.bbinsarray[:, 0, 0]  # pylint: disable=no-member
-        assert np.all(bbins == fake_bbins)
-        assert np.all(fake_fb_l.shape == fb_l.shape)
-        assert_allclose(fb_l, fake_fb_l)
+            fake_fb_l = np.ones((len(bbins) - 1, 1, 1, 1), float)
+            fake_bbins = fake_cm.bbinsarray[:, 0, 0]  # pylint: disable=no-member
+            assert np.all(bbins == fake_bbins)
+            assert np.all(fake_fb_l.shape == fb_l.shape)
+            assert_allclose(fb_l, fake_fb_l)
 
-        fake_c_l = np.ones((len(bbins)-1, len(abins) - 1, 1, 1, 1), float, order='F')
-        assert np.all(fake_c_l.shape == c_l.shape)
-        assert_allclose(c_l, fake_c_l)
+            fake_c_l = np.ones((len(bbins)-1, len(abins) - 1, 1, 1, 1), float, order='F')
+            assert np.all(fake_c_l.shape == c_l.shape)
+            assert_allclose(c_l, fake_c_l)
+        else:
+            chunk_slice = (self.a_astro[:, 1] <= -0.25) & (self.b_astro[:, 1] <= -0.25)
+            cs = [chunk_slice, ~chunk_slice]
+            abins = [make_bins(self.a_photo[q][~np.isnan(self.a_photo[q, 0]), 0]) for q in cs]
+            bbins = [make_bins(self.b_photo[q][~np.isnan(self.b_photo[q, 0]), 0]) for q in cs]
+
+            fake_fa_l = np.ones((np.amax([len(x) for x in abins]) - 1, 1, 1, 2), float)
+            fake_abins = fake_cm.abinsarray[:, 0, :]  # pylint: disable=no-member
+            fake_abinlens = fake_cm.abinlengths[0, :]  # pylint:disable=no-member
+            assert np.all([np.all(abins[i] == fake_abins[:fake_abinlens[i], i]) for i in range(2)])
+            assert np.all(fake_fa_l.shape == fa_l.shape)
+            assert_allclose(fa_l, fake_fa_l)
+
+            fake_fb_l = np.ones((np.amax([len(x) for x in bbins]) - 1, 1, 1, 2), float)
+            fake_bbins = fake_cm.bbinsarray[:, 0, :]  # pylint: disable=no-member
+            fake_bbinlens = fake_cm.bbinlengths[0, :]  # pylint:disable=no-member
+            assert np.all([np.all(bbins[i] == fake_bbins[:fake_bbinlens[i], i]) for i in range(2)])
+            assert np.all(fake_fb_l.shape == fb_l.shape)
+            assert_allclose(fb_l, fake_fb_l)
+
+            fake_c_l = np.ones((np.amax([len(x) for x in bbins])-1,
+                                np.amax([len(x) for x in abins]) - 1, 1, 1, 2), float, order='F')
+            assert np.all(fake_c_l.shape == c_l.shape)
+            assert_allclose(c_l, fake_c_l)

@@ -4,10 +4,21 @@ This module provides miscellaneous scripts, called in other parts of the cross-m
 framework.
 '''
 
+import itertools
+import multiprocessing
 from multiprocessing import shared_memory
 
 import numpy as np
+from astropy import units as u
+from astropy.coordinates import Angle, SkyCoord, UnitSphericalRepresentation
+from scipy import spatial
 from scipy.optimize import minimize
+from scipy.spatial import ConvexHull  # pylint: disable=no-name-in-module
+
+from macauff.get_trilegal_wrapper import get_av_infinity
+
+# pylint: disable=import-error,no-name-in-module
+from macauff.misc_functions_fortran import misc_functions_fortran as mff
 
 __all__ = []
 
@@ -62,84 +73,6 @@ def create_auf_params_grid(perturb_auf_outputs, auf_pointings, filt_names, array
     return grid
 
 
-def load_small_ref_auf_grid(modrefind, perturb_auf_outputs, file_name_prefixes):
-    '''
-    Function to create reference index arrays out of larger arrays, based on
-    the mappings from the original reference index array into a larger grid,
-    such that the corresponding cutout reference index now maps onto the smaller
-    cutout 4-D array.
-
-    Parameters
-    ----------
-    modrefind : numpy.ndarray
-        The reference index array that maps into saved array ``fourier_grid``
-        for each source in the given catalogue.
-    perturb_auf_outputs : dictionary
-        Saved results from the cross-matches' extra AUF component simulations.
-    file_name_prefixes : list
-        Prefixes of the files stored in ``auf_folder_path`` -- the parts before
-        "_grid" -- to be loaded as sub-arrays and returned.
-
-    Returns
-    -------
-    small_grids : list of numpy.ndarray
-        Small cutouts of ``*_grid`` files defined by ``file_name_prefixes``,
-        containing only the appropriate indices for AUF pointing, filter, etc.
-    modrefindsmall : numpy.ndarray
-        The corresponding mappings for each source onto ``fouriergrid``, such
-        that each source still points to the correct entry that it did in
-        ``fourier_grid``.
-    '''
-    nmuniqueind, nmnewind = np.unique(modrefind[0, :], return_inverse=True)
-    filtuniqueind, filtnewind = np.unique(modrefind[1, :], return_inverse=True)
-    axuniqueind, axnewind = np.unique(modrefind[2, :], return_inverse=True)
-
-    x, y, z = np.meshgrid(nmuniqueind, filtuniqueind, axuniqueind, indexing='ij')
-
-    small_grids = []
-    for name in file_name_prefixes:
-        if len(perturb_auf_outputs[f'{name}_grid'].shape) == 4:
-            small_grids.append(np.asfortranarray(
-                perturb_auf_outputs[f'{name}_grid'][:, x, y, z]))
-        else:
-            small_grids.append(np.asfortranarray(
-                perturb_auf_outputs[f'{name}_grid'][x, y, z]))
-    modrefindsmall = np.empty((3, modrefind.shape[1]), int, order='F')
-    del modrefind
-    modrefindsmall[0, :] = nmnewind
-    modrefindsmall[1, :] = filtnewind
-    modrefindsmall[2, :] = axnewind
-
-    return small_grids, modrefindsmall
-
-
-def hav_dist_constant_lat(x_lon, x_lat, lon):
-    '''
-    Computes the Haversine formula in the limit that sky separation is only
-    determined by longitudinal separation (i.e., delta-lat is zero).
-
-    Parameters
-    ----------
-    x_lon : float
-        Sky coordinate of the source in question, in degrees.
-    x_lat : float
-        Orthogonal sky coordinate of the source, in degrees.
-    lon : float
-        Longitudinal sky coordinate to calculate the "horizontal" sky separation
-        of the source to.
-
-    Returns
-    -------
-    dist : float
-        Horizontal sky separation between source and given ``lon``, in degrees.
-    '''
-
-    dist = np.degrees(2 * np.arcsin(np.abs(np.cos(np.radians(x_lat)) *
-                                           np.sin(np.radians((x_lon - lon)/2)))))
-
-    return dist
-
-
 def _load_rectangular_slice(a, lon1, lon2, lat1, lat2, padding):
     '''
     Loads all sources in a catalogue within a given separation of a rectangle
@@ -192,7 +125,7 @@ def _lon_cut(a, lon, padding, inequality, lon_shift):
     padding : float
         Maximum allowed sky separation the "wrong" side of ``lon``, to allow
         for an increase in sky box size to ensure all overlaps are caught in
-        ``get_max_overlap`` or ``get_max_indices``.
+        ``get_overlap_indices``.
     inequality : string, ``greater`` or ``lesser``
         Flag to determine whether a source is either above or below the
         given ``lon`` value.
@@ -223,10 +156,11 @@ def _lon_cut(a, lon, padding, inequality, lon_shift):
     # constant latitude this reduces to
     # r = 2 arcsin(|cos(lat) * sin(delta-lon/2)|).
     if padding > 0:
-        sky_cut = (hav_dist_constant_lat(a[:, 0], a[:, 1], lon) <= padding) | inequal_lon_cut
+        hav_dist_const_lat = np.degrees(2 * np.arcsin(np.abs(np.cos(np.radians(a[:, 1])) *
+                                        np.sin(np.radians((a[:, 0] - lon)/2)))))
+        sky_cut = (hav_dist_const_lat <= padding) | inequal_lon_cut
     # However, in both zero and non-zero padding factor cases, we always require
-    # the source to be above or below the longitude for sky_cut_1 and sky_cut_2
-    # in load_fourier_grid_cutouts, respectively.
+    # the source to be above or below the longitude.
     else:
         sky_cut = inequal_lon_cut
 
@@ -247,7 +181,7 @@ def _lat_cut(a, lat, padding, inequality):
     padding : float
         Maximum allowed sky separation the "wrong" side of ``lat``, to allow
         for an increase in sky box size to ensure all overlaps are caught in
-        ``get_max_overlap`` or ``get_max_indices``.
+        ``get_overlap_indices``.
     inequality : string, ``greater`` or ``lesser``
         Flag to determine whether a source is either above or below the
         given ``lat`` value.
@@ -392,6 +326,384 @@ def find_model_counts_corrections(data_loghist, data_dloghist, data_bin_mids, tr
                                  tri_log_hist_at_data[q], gal_log_hist_at_data[q]), x0=[1, 1], jac=True,
                    method='L-BFGS-B', options={'ftol': 1e-12}, bounds=[(0.01, None), (0.01, None)])
     return res.x
+
+
+def convex_hull_area(x, y, return_hull=False):
+    """
+    Function to calculate the convex hull vertices and the area enclosed by
+    those verticies.
+
+    Parameters
+    ----------
+    x : list or numpy.ndarray
+        Coordinates in the longitudinal, or RA, sky axis, in degrees.
+    y : list or numpy.ndarray
+        Latitudinal, or Declination, sky axis coordinates, in degrees.
+    return_hull : boolean, optional
+        Boolean flag indicating whether to return the coordinates of the points
+        defining the convex hull, or just return the area.
+
+    Returns
+    -------
+    area : float
+        The sky area, in square degrees, of the convex hull enclosing the
+        points.
+    """
+    # min_max_lon returns negative minimum longitude for cases where area sits
+    # either side of the 0/360 degree boundary but doesn't fully wrap around
+    # the entire longitudinal ring.
+    x_shift = 180 - np.sum(min_max_lon(x))/2
+    new_x = x + x_shift
+    new_x[new_x > 360] = new_x[new_x > 360] - 360
+    new_x[new_x < 0] = new_x[new_x < 0] + 360
+    # Pad cos-delta factor to avoid precisely collapsing to a singularity at
+    # either pole.
+    new_x_cosd = new_x * (np.cos(np.radians(y)) + 1e-10)
+    hull = ConvexHull(np.array([new_x_cosd, y]).T)
+    area = shoelace_formula_area(new_x_cosd[hull.vertices], y[hull.vertices])
+
+    if return_hull:
+        return area, np.array([new_x[hull.vertices], y[hull.vertices]]).T, x_shift
+    return area
+
+
+def shoelace_formula_area(x, y):
+    """
+    Performs the calculation of an area defined by a set of vertices as per the
+    Shoelace formula.
+
+    Parameters
+    ----------
+    x : list or numpy.ndarray
+        Coordinates in the longitudinal, or RA, sky axis, in degrees.
+    y : list or numpy.ndarray
+        Latitudinal, or Declination, sky axis coordinates, in degrees.
+
+    Returns
+    -------
+    area : float
+        The sky area, in square degrees, of the region defined by the set of
+        vertices.
+    """
+    area = abs(0.5 * np.array(np.dot(x, np.roll(y, 1)) - np.dot(y, np.roll(x, 1))))
+
+    return area
+
+
+def generate_avs_inside_hull(hull_points, hull_x_shift, coord_system):
+    """
+    Sample V-band exctinction across an arbitrarily-shaped region, using points
+    the area's convex hull.
+
+    Parameters
+    ----------
+    hull_points : numpy.ndarray
+        Array of shape ``(N, 2)`` of the coordinates defining the region's
+        external region as a set of coordinate polygons, following
+        `~macauff.convex_hull_area`.
+    hull_x_shift : float
+        The longitudinal shift in coordinates used by the hull to avoid 0-360
+        degree wraparound issues.
+    coord_system : string, "equatorial" or "galactic"
+        Frame in which the coordinates are defined, used to sample the on-sky
+        V-band extinction in the right coordinate system.
+
+    Returns
+    -------
+    avs : numpy.ndarray
+        V-band extinctions within the convex region, sampled sufficiently highly
+        to give good differential extinction measurements.
+    """
+    not_enough_points = True
+    n_dim = 7
+    ax1_min, ax1_max = np.array([np.amin(hull_points[:, 0]), np.amax(hull_points[:, 0])]) - hull_x_shift
+    ax2_min, ax2_max = np.array([np.amin(hull_points[:, 1]), np.amax(hull_points[:, 1])])
+    while not_enough_points:
+        ax1s = np.linspace(ax1_min, ax1_max, n_dim)
+        ax2s = np.linspace(ax2_min, ax2_max, n_dim)
+        ax1s, ax2s = np.meshgrid(ax1s, ax2s, indexing='xy')
+        ax1s, ax2s = ax1s.flatten(), ax2s.flatten()
+        points_in_area = np.array([coord_inside_convex_hull(
+            [ax1 + hull_x_shift, ax2], hull_points) for ax1, ax2 in zip(ax1s, ax2s)])
+        if np.sum(points_in_area) >= 30:
+            not_enough_points = False
+        else:
+            n_dim += 1
+        ax1s, ax2s = ax1s[points_in_area], ax2s[points_in_area]
+
+    avs = np.empty(len(ax1s), float)
+    for j, (ax1, ax2) in enumerate(zip(ax1s, ax2s)):
+        if coord_system == 'equatorial':
+            c = SkyCoord(ra=ax1, dec=ax2, unit='deg', frame='icrs')
+            l, b = c.galactic.l.degree, c.galactic.b.degree
+        else:
+            l, b = ax1, ax2
+        av = get_av_infinity(l, b, frame='galactic')[0]
+        avs[j] = av
+
+    return avs
+
+
+def coord_inside_convex_hull(p, hull):
+    """
+    Given a set of convex hull points from `~macauff.convex_hull_area`, determine
+    if a single coordinate is within or outside the area defined by the points,
+    using the sum of the oriented angles between the point and each set of
+    neighbouring hull coordinates.
+
+    Parameters
+    ----------
+    p : list or numpy.ndarray
+        The coordinates of the point to determine the location of. Should be a
+        two-element list or array, first longitudinal then latitudinal
+        coordinates.
+    hull : numpy.ndarray
+        Array of hull points, from `~macauff.convex_hull_area`. Should be shape
+        ``(N, 2)``, with pairs of longitudinal coordinates in the first element
+        of the second axis and latitudinal points in the second element.
+
+    Returns
+    -------
+    boolean
+        ``True`` if ``p`` is inside the ``hull`` polygon, ``False`` otherwise.
+
+    Notes
+    -----
+    As ``hull`` returns from `~macauff.convex_hull_area` with an ``x_shift``
+    translation to avoid 0-360 degree wraparound effects, the same shift must
+    be applied to ``p`` prior to passing to this function.
+    """
+    hull = np.vstack((hull, hull[0]))
+    i, j = np.arange(len(hull)-1), np.arange(1, len(hull))
+    x1, y1 = hull[i, 0] - p[0], hull[i, 1] - p[1]
+    x2, y2 = hull[j, 0] - p[0], hull[j, 1] - p[1]
+
+    dot_prod, cross_prod = x1*x2 + y1*y2, x1*y2 - x2*y1
+    theta = np.arctan2(cross_prod, dot_prod)
+    sum_of_angles = np.abs(np.sum(theta))
+
+    if sum_of_angles < np.pi:
+        return False
+    return True
+
+
+def create_densities(b, minmag, maxmag, hull, hull_x_shift, search_radius, n_pool, mag_ind, ax1_ind, ax2_ind,
+                     coord_system, unique_shared_id):
+    """
+    Generate local normalising densities for all sources in catalogue "b".
+
+    Parameters
+    ----------
+    b : numpy.ndarray
+        Catalogue of the sources for which astrometric corrections should be
+        determined.
+    minmag : float
+        Bright limiting magnitude, fainter than which objects are used when
+        determining the number of nearby sources for density purposes.
+    maxmag : float
+        Faintest magnitude within which to determine the density of catalogue
+        ``b`` objects.
+    hull : numpy.ndarray
+        Array of shape ``(N, 2)``, giving the ``(ax1, ax2)`` coordinates for
+        each of the ``N`` polygon points defining the convex hull of the
+        region in which the objects are contained.
+    hull_x_shift : float
+        Amount by which ``hull`` points were shifted in longitude during
+        area calculation, to avoid 0/360 wraparound issues, and the amount
+        by which coordinates should be moved to mirror "new" coord system.
+    search_radius : float
+        Radius, in degrees, around which to calculate the density of objects.
+        Smaller values will allow for more fluctuations and handle smaller scale
+        variation better, but be subject to low-number statistics.
+    n_pool : integer
+        Number of parallel threads to run when calculating densities via
+        ``multiprocessing``.
+    mag_ind : integer
+        Index in ``b`` where the magnitude being used is stored.
+    ax1_ind : integer
+        Index of ``b`` for the longitudinal coordinate column.
+    ax2_ind : integer
+        ``b`` index for the latitude data.
+    coord_system : string
+        Determines whether we are in equatorial or galactic coordinates for
+        separation considerations.
+    unique_shared_id : string
+        ID to distinguish ``SharedNumpyArray`` memory across parallelisations.
+
+    Returns
+    -------
+    narray : numpy.ndarray
+        The density of objects within ``search_radius`` degrees of each object
+        in catalogue ``b``.
+
+    """
+    overlap_number = calculate_overlap_counts(b, b, minmag, maxmag, search_radius, n_pool, mag_ind, ax1_ind,
+                                              ax2_ind, coord_system, 'len', unique_shared_id)
+
+    seed = np.random.default_rng().choice(100000, size=(mff.get_random_seed_size(), len(b)))
+
+    area = mff.get_circle_area_overlap(
+        b[:, ax1_ind] + hull_x_shift, b[:, ax2_ind], search_radius,
+        np.append(hull[:, 0], hull[0, 0]), np.append(hull[:, 1], hull[0, 1]), seed)
+
+    narray = overlap_number / area
+
+    return narray
+
+
+def calculate_overlap_counts(a, b, minmag, maxmag, search_radius, n_pool, mag_ind, ax1_ind, ax2_ind,
+                             coord_system, len_or_inds, unique_shared_id):
+    """
+    Calculate number of overlapping objects in catalogue "b" that are within
+    an optionally-set dynamic range and also within a given radius of each
+    object in catalogue "a".
+
+    Parameters
+    ----------
+    a : numpy.ndarray
+        Catalogue of sources for which number of opposing catalogue overlap
+        counts should be calculated.
+    b : numpy.ndarray
+        Catalogue to search for overlapping ``a`` objects in.
+    minmag : float
+        Bright limiting magnitude, fainter than which objects are used when
+        determining the number of nearby sources for density purposes.
+    maxmag : float
+        Faintest magnitude within which to determine the density of catalogue
+        ``b`` objects.
+    search_radius : float
+        Radius, in degrees, around which to calculate the density of objects.
+        Smaller values will allow for more fluctuations and handle smaller scale
+        variation better, but be subject to low-number statistics.
+    n_pool : integer
+        Number of parallel threads to run when calculating densities via
+        ``multiprocessing``.
+    mag_ind : integer
+        Index in ``b`` where the magnitude being used is stored. If `mag_ind`
+        is NaN, then skip magnitude cut.
+    ax1_ind : integer
+        Index of ``b`` for the longitudinal coordinate column.
+    ax2_ind : integer
+        ``b`` index for the latitude data.
+    coord_system : string
+        Determines whether we are in equatorial or galactic coordinates for
+        separation considerations.
+    len_or_inds : string, 'len' or 'array'
+        Flag for whether to return the number of overlaps ('len') or list of
+        each array index for overlaps ('array') for each primary object.
+    unique_shared_id : string
+        ID to distinguish ``SharedNumpyArray`` memory across parallelisations.
+
+    Returns
+    -------
+    numpy.ndarray
+        The number of catalogue b objects near each catalogue a object, or the
+        indices of all objects near each catalogue a source.
+    """
+    def _get_cart_kdt(coord):
+        """
+        Convenience function to create a KDTree of a set of sky coordinates,
+        represented in Cartesian space on the unit sphere.
+
+        Parameters
+        ----------
+        coord : ~`astropy.coordinates.SkyCoord`
+            The `astropy` object containing all of the objects coordinates,
+            as represented as Cartesian (x, y, z) coordinates on the unit sphere.
+
+        Returns
+        -------
+        kdt : ~`scipy.spatial.KDTree`
+            The KDTree for ``coord`` evaluated with Cartesian coordinates.
+        """
+        # Largely based on astropy.coordinates._get_cartesian_kdtree.
+        KDTree = spatial.KDTree
+        cartxyz = coord.cartesian.xyz
+        flatxyz = cartxyz.reshape((3, np.prod(cartxyz.shape) // 3))
+        kdt = KDTree(flatxyz.value.T, compact_nodes=False, balanced_tree=False)
+        return kdt
+
+    if ~np.isnan(mag_ind):
+        cutmag = (b[:, mag_ind] >= minmag) & (b[:, mag_ind] <= maxmag)
+    else:
+        cutmag = np.ones(len(b), bool)
+
+    if coord_system == 'galactic':
+        full_cat = SkyCoord(l=a[:, ax1_ind], b=a[:, ax2_ind], unit='deg', frame='galactic')
+        mag_cut_cat = SkyCoord(l=b[cutmag, ax1_ind], b=b[cutmag, ax2_ind], unit='deg',
+                               frame='galactic')
+    else:
+        full_cat = SkyCoord(ra=a[:, ax1_ind], dec=a[:, ax2_ind], unit='deg', frame='icrs')
+        mag_cut_cat = SkyCoord(ra=b[cutmag, ax1_ind], dec=b[cutmag, ax2_ind], unit='deg',
+                               frame='icrs')
+
+    full_urepr = full_cat.data.represent_as(UnitSphericalRepresentation)
+    full_ucoords = full_cat.realize_frame(full_urepr)
+    # Load the cartesian representation array into shared memory.
+    shared_full_ucoords_xyz = SharedNumpyArray(full_ucoords.cartesian.xyz, f'ucoords_{unique_shared_id}')
+    del full_urepr, full_ucoords
+
+    mag_cut_urepr = mag_cut_cat.data.represent_as(UnitSphericalRepresentation)
+    mag_cut_ucoords = mag_cut_cat.realize_frame(mag_cut_urepr)
+    mag_cut_kdt = _get_cart_kdt(mag_cut_ucoords)
+    del mag_cut_urepr, mag_cut_ucoords
+
+    r = (2 * np.sin(Angle(search_radius * u.degree) / 2.0)).value  # pylint: disable=no-member
+    if len_or_inds == 'len':
+        overlap_number = np.empty(len(a), int)
+    else:
+        overlap_inds = [0] * len(a)
+
+    counter = np.arange(0, len(a))
+    iter_group = zip(counter, itertools.repeat([shared_full_ucoords_xyz, mag_cut_kdt, r, len_or_inds]))
+    with multiprocessing.Pool(n_pool) as pool:
+        for stuff in pool.imap_unordered(ball_point_query, iter_group, chunksize=len(a)//n_pool):
+            i, result = stuff
+            if len_or_inds == 'len':
+                overlap_number[i] = result
+            else:
+                overlap_inds[i] = result
+
+    pool.join()
+
+    shared_full_ucoords_xyz.unlink()
+
+    if len_or_inds == 'len':
+        return overlap_number
+    return overlap_inds
+
+
+def ball_point_query(iterable):
+    """
+    Wrapper function to distribute calculation of the number of neighbours
+    around a particular sky coordinate via KDTree query.
+
+    Parameters
+    ----------
+    iterable : list
+        List of variables passed through ``multiprocessing``, including index
+        into object having its neighbours determined, the Spherical Cartesian
+        representation of objects to search for neighbours around, the KDTree
+        containing all potential neighbours, the Cartesian angle
+        representing the maximum on-sky separation, and the length-or-array
+        flag.
+
+    Returns
+    -------
+    i : integer
+        The index of the object whose neighbour count was calculated.
+    integer or numpy.ndarray
+        Either number of neighbours in ``mag_cut_kdt`` within ``r`` of
+        ``full_ucoords[i]``, or the indices into ``mag_cut_kdt`` that are
+        within the specified range.
+    """
+    i, (shared_full_ucoords_xyz, mag_cut_kdt, r, len_or_inds) = iterable
+    # query_ball_point returns the neighbours of x (full_ucoords) around self
+    # (mag_cut_kdt) within r.
+    kdt_query = mag_cut_kdt.query_ball_point(shared_full_ucoords_xyz.read()[:, i], r, return_sorted=True)
+    if len_or_inds == 'len':
+        return i, len(kdt_query)
+    return i, kdt_query
 
 
 class SharedNumpyArray:
