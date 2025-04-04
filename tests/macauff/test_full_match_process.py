@@ -120,9 +120,11 @@ def test_naive_bayes_match(shape, x, y):
         _replace_line(os.path.join(os.path.dirname(__file__), 'data/chunk0/crossmatch_params_.txt'),
                       idx, nl)
     if shape == 'circle':
+        wowp = "yes" if x == 131 else "no"
         for ol, nl in zip(['include_phot_like = no', 'use_phot_priors = no'],
-                          ['include_phot_like = yes\n', 'use_phot_priors = yes\n']):
-            with open(os.path.join(os.path.dirname(__file__), 'data/crossmatch_params.txt'),
+                          [f'include_phot_like = yes\nwith_and_without_photometry = {wowp}\n',
+                           'use_phot_priors = yes\n']):
+            with open(os.path.join(os.path.dirname(__file__), 'data/chunk0/crossmatch_params_.txt'),
                       encoding='utf-8') as file:
                 f = file.readlines()
             idx = np.where([ol in line for line in f])[0][0]
@@ -165,5 +167,16 @@ def test_naive_bayes_match(shape, x, y):
         assert b_right_inds[i] in bc
         q = np.where(a_right_inds[i] == ac)[0][0]
         assert np.all([a_right_inds[i], b_right_inds[i]] == [ac[q], bc[q]])
+
+    if shape == 'circle' and x == 131:
+        ac = np.load(f'{cm.joint_folder_path}/ac_without_photometry.npy')
+        bc = np.load(f'{cm.joint_folder_path}/bc_without_photometry.npy')
+        assert len(ac) == n_c
+        assert len(bc) == n_c
+        for i in range(0, n_c):
+            assert a_right_inds[i] in ac
+            assert b_right_inds[i] in bc
+            q = np.where(a_right_inds[i] == ac)[0][0]
+            assert np.all([a_right_inds[i], b_right_inds[i]] == [ac[q], bc[q]])
 
     os.system('rm -r new_test_path')

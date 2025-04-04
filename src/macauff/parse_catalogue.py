@@ -165,7 +165,7 @@ def csv_to_npy(input_folder, input_filename, output_folder, astro_cols, photo_co
 def npy_to_csv(input_csv_folders, input_match_folder, output_folder, csv_filenames,
                output_filenames, column_name_lists, column_num_lists, extra_col_cat_names,
                input_npy_folders, headers=[False, False], extra_col_name_lists=[None, None],
-               extra_col_num_lists=[None, None]):
+               extra_col_num_lists=[None, None], file_extension=''):
     '''
     Function to convert output .npy files, as created during the cross-match
     process, and create a .csv file of matches and non-matches, combining columns
@@ -226,6 +226,12 @@ def npy_to_csv(input_csv_folders, input_match_folder, output_folder, csv_filenam
         output datafiles. Like ``extra_col_name_lists``, for either catalogue
         ``None`` can be entered for no additional columns; for the above example
         we would use ``extra_col_num_lists=[None, [7]]``.
+    file_extension : string, optional
+        Additional string to insert into loaded cross-match-specific files (such
+        as ``ac.npy``) and into saved files. Defaults to empty string, but should
+        be given for cases of "with and without photometry" match runs, where
+        a single cross-match run is used to create two separate match tables, and
+        hence two separate output sets of .csv files.
     '''
     # Need IDs/coordinates x2, mags (xN), then our columns: match probability, average
     # contaminant flux, eta/xi, and then M contaminant fractions for M relative fluxes.
@@ -244,16 +250,16 @@ def npy_to_csv(input_csv_folders, input_match_folder, output_folder, csv_filenam
                               "catalogue.")
         if extra_col_num_lists[i] is not None:
             cols = np.append(cols, extra_col_name_lists[i])
-    ac = np.load(f'{input_match_folder}/ac.npy')
-    bc = np.load(f'{input_match_folder}/bc.npy')
-    p = np.load(f'{input_match_folder}/pc.npy')
-    eta = np.load(f'{input_match_folder}/eta.npy')
-    xi = np.load(f'{input_match_folder}/xi.npy')
-    a_avg_cont = np.load(f'{input_match_folder}/acontamflux.npy')
-    b_avg_cont = np.load(f'{input_match_folder}/bcontamflux.npy')
-    acontprob = np.load(f'{input_match_folder}/pacontam.npy')
-    bcontprob = np.load(f'{input_match_folder}/pbcontam.npy')
-    seps = np.load(f'{input_match_folder}/crptseps.npy')
+    ac = np.load(f'{input_match_folder}/ac{file_extension}.npy')
+    bc = np.load(f'{input_match_folder}/bc{file_extension}.npy')
+    p = np.load(f'{input_match_folder}/pc{file_extension}.npy')
+    eta = np.load(f'{input_match_folder}/eta{file_extension}.npy')
+    xi = np.load(f'{input_match_folder}/xi{file_extension}.npy')
+    a_avg_cont = np.load(f'{input_match_folder}/acontamflux{file_extension}.npy')
+    b_avg_cont = np.load(f'{input_match_folder}/bcontamflux{file_extension}.npy')
+    acontprob = np.load(f'{input_match_folder}/pacontam{file_extension}.npy')
+    bcontprob = np.load(f'{input_match_folder}/pbcontam{file_extension}.npy')
+    seps = np.load(f'{input_match_folder}/crptseps{file_extension}.npy')
 
     if input_npy_folders[0] is not None:
         cols = np.append(cols, [f'{extra_col_cat_names[0]}_FIT_SIG'])
@@ -320,16 +326,23 @@ def npy_to_csv(input_csv_folders, input_match_folder, output_folder, csv_filenam
                (len(extra_col_name_lists[1]) if extra_col_name_lists[1] is not None else 0)) + _dx
         match_df.iloc[:, ind] = b_concatastro[bc, 2]
 
-    match_df.to_csv(f'{output_folder}/{output_filenames[0]}', encoding='utf-8', index=False, header=False)
+    if file_extension == '':
+        _output_filename = output_filenames[0]
+    else:
+        # Insert the file_extension keyword into the middle of
+        # /path/to/file/foo.bar.
+        f, f_ext = os.path.splitext(output_filenames[0])
+        _output_filename = f + file_extension + f_ext
+    match_df.to_csv(f'{output_folder}/{_output_filename}', encoding='utf-8', index=False, header=False)
 
     # For non-match, ID/coordinates/mags, then island probability + average
     # contamination.
-    af = np.load(f'{input_match_folder}/af.npy')
-    a_avg_cont = np.load(f'{input_match_folder}/afieldflux.npy')
-    p = np.load(f'{input_match_folder}/pfa.npy')
-    seps = np.load(f'{input_match_folder}/afieldseps.npy')
-    afeta = np.load(f'{input_match_folder}/afieldeta.npy')
-    afxi = np.load(f'{input_match_folder}/afieldxi.npy')
+    af = np.load(f'{input_match_folder}/af{file_extension}.npy')
+    a_avg_cont = np.load(f'{input_match_folder}/afieldflux{file_extension}.npy')
+    p = np.load(f'{input_match_folder}/pfa{file_extension}.npy')
+    seps = np.load(f'{input_match_folder}/afieldseps{file_extension}.npy')
+    afeta = np.load(f'{input_match_folder}/afieldeta{file_extension}.npy')
+    afxi = np.load(f'{input_match_folder}/afieldxi{file_extension}.npy')
     our_columns = ['MATCH_P', 'NNM_SEPARATION', 'NNM_ETA', 'NNM_XI', f'{extra_col_cat_names[0]}_AVG_CONT']
     cols = np.append(column_name_lists[0], our_columns)
     if extra_col_num_lists[0] is not None:
@@ -355,15 +368,22 @@ def npy_to_csv(input_csv_folders, input_match_folder, output_folder, csv_filenam
                (len(extra_col_name_lists[0]) if extra_col_name_lists[0] is not None else 0))
         a_nonmatch_df.iloc[:, ind] = a_concatastro[af, 2]
 
-    a_nonmatch_df.to_csv(f'{output_folder}/{output_filenames[1]}', encoding='utf-8',
+    if file_extension == '':
+        _output_filename = output_filenames[1]
+    else:
+        # Insert the file_extension keyword into the middle of
+        # /path/to/file/foo.bar.
+        f, f_ext = os.path.splitext(output_filenames[1])
+        _output_filename = f + file_extension + f_ext
+    a_nonmatch_df.to_csv(f'{output_folder}/{_output_filename}', encoding='utf-8',
                          index=False, header=False)
 
-    bf = np.load(f'{input_match_folder}/bf.npy')
-    b_avg_cont = np.load(f'{input_match_folder}/bfieldflux.npy')
-    p = np.load(f'{input_match_folder}/pfb.npy')
-    seps = np.load(f'{input_match_folder}/bfieldseps.npy')
-    bfeta = np.load(f'{input_match_folder}/bfieldeta.npy')
-    bfxi = np.load(f'{input_match_folder}/bfieldxi.npy')
+    bf = np.load(f'{input_match_folder}/bf{file_extension}.npy')
+    b_avg_cont = np.load(f'{input_match_folder}/bfieldflux{file_extension}.npy')
+    p = np.load(f'{input_match_folder}/pfb{file_extension}.npy')
+    seps = np.load(f'{input_match_folder}/bfieldseps{file_extension}.npy')
+    bfeta = np.load(f'{input_match_folder}/bfieldeta{file_extension}.npy')
+    bfxi = np.load(f'{input_match_folder}/bfieldxi{file_extension}.npy')
     our_columns = ['MATCH_P', 'NNM_SEPARATION', 'NNM_ETA', 'NNM_XI', f'{extra_col_cat_names[1]}_AVG_CONT']
     cols = np.append(column_name_lists[1], our_columns)
     if extra_col_num_lists[1] is not None:
@@ -389,7 +409,14 @@ def npy_to_csv(input_csv_folders, input_match_folder, output_folder, csv_filenam
                (len(extra_col_name_lists[1]) if extra_col_name_lists[1] is not None else 0))
         b_nonmatch_df.iloc[:, ind] = b_concatastro[bf, 2]
 
-    b_nonmatch_df.to_csv(f'{output_folder}/{output_filenames[2]}', encoding='utf-8',
+    if file_extension == '':
+        _output_filename = output_filenames[2]
+    else:
+        # Insert the file_extension keyword into the middle of
+        # /path/to/file/foo.bar.
+        f, f_ext = os.path.splitext(output_filenames[2])
+        _output_filename = f + file_extension + f_ext
+    b_nonmatch_df.to_csv(f'{output_folder}/{_output_filename}', encoding='utf-8',
                          index=False, header=False)
 
 

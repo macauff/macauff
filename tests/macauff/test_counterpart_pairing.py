@@ -559,7 +559,8 @@ class TestCounterpartPairing:  # pylint: disable=too-many-instance-attributes
                           idx, nl, out_file=os.path.join(os.path.dirname(__file__),
                           f'data/chunk0/{file_name}_.txt'))
 
-    def test_pair_sources(self):  # pylint: disable=too-many-statements
+    @pytest.mark.parametrize("with_and_without_photometry", [True, False])
+    def test_pair_sources(self, with_and_without_photometry):  # pylint: disable=too-many-statements
         # pylint: disable=no-member
         os.system(f'rm -r {self.joint_folder_path}/*')
         # Same run as test_source_pairing, but called from CrossMatch rather than
@@ -599,6 +600,11 @@ class TestCounterpartPairing:  # pylint: disable=too-many-instance-attributes
         self.cm.lenrejecta = 0
         self.cm.lenrejectb = 0
 
+        if with_and_without_photometry:
+            self.cm.include_phot_like = True
+            self.cm.with_and_without_photometry = True
+            self.cm.c_array = self.cm.c_array * 1.5
+
         mcff = Macauff(self.cm)
         mcff.pair_sources()
 
@@ -621,17 +627,67 @@ class TestCounterpartPairing:  # pylint: disable=too-many-instance-attributes
         assert np.all([q in b_field for q in [2, 3]])
         assert np.all([q not in b_field for q in [0, 1]])
 
+        if with_and_without_photometry:
+            bflux = self.cm.bcontamflux_without_photometry
+            assert np.all(bflux == np.zeros((2), float))
+
+            a_matches = self.cm.ac_without_photometry
+            assert np.all([q in a_matches for q in [0, 1]])
+            assert np.all([q not in a_matches for q in [2, 3, 4, 5, 6]])
+
+            a_field = self.cm.af_without_photometry
+            assert np.all([q in a_field for q in [2, 3, 4, 5, 6]])
+            assert np.all([q not in a_field for q in [0, 1]])
+
+            b_matches = self.cm.bc_without_photometry
+            assert np.all([q in b_matches for q in [0, 1]])
+            assert np.all([q not in b_matches for q in [2, 3]])
+
+            b_field = self.cm.bf_without_photometry
+            assert np.all([q in b_field for q in [2, 3]])
+            assert np.all([q not in b_field for q in [0, 1]])
+        else:
+            assert np.all([not hasattr(self.cm, f'{x}_without_photometry') for x in
+                           ['bcontamflux', 'ac', 'af', 'bc', 'bf']])
+
         prob_counterpart = self.cm.pc
         self._calculate_prob_integral()
-        _integral = self.nc*self.g*self.nfa + self.nc*self.g_wrong*self.nfa + \
-            self.nfa*self.nfa*self.nfb
-        _prob = self.nc*self.g*self.nfa
+        if with_and_without_photometry:
+            _integral = self.nc*self.g*self.nfa * 1.5 + self.nc*self.g_wrong*self.nfa * 1.5 + \
+                self.nfa*self.nfa*self.nfb
+            _prob = self.nc*self.g*self.nfa * 1.5
+        else:
+            _integral = self.nc*self.g*self.nfa + self.nc*self.g_wrong*self.nfa + \
+                self.nfa*self.nfa*self.nfb
+            _prob = self.nc*self.g*self.nfa
         norm_prob = _prob/_integral
         q = np.where(a_matches == 0)[0][0]
         assert_allclose(prob_counterpart[q], norm_prob, rtol=1e-5)
         xicrpts = self.cm.xi
         assert_allclose(xicrpts[q], np.array([np.log10(self.g / self.fa_priors[0, 0, 0])]),
                         rtol=1e-6)
+        etacrpts = self.cm.eta
+        fake_eta = np.log10(1.5) if with_and_without_photometry else np.log10(1.0)
+        assert_allclose(etacrpts[q], np.array([fake_eta]), rtol=1e-6)
+
+        if with_and_without_photometry:
+            prob_counterpart = self.cm.pc_without_photometry
+            self._calculate_prob_integral()
+            _integral = self.nc*self.g*self.nfa + self.nc*self.g_wrong*self.nfa + \
+                self.nfa*self.nfa*self.nfb
+            _prob = self.nc*self.g*self.nfa
+            norm_prob = _prob/_integral
+            q = np.where(a_matches == 0)[0][0]
+            assert_allclose(prob_counterpart[q], norm_prob, rtol=1e-5)
+            xicrpts = self.cm.xi_without_photometry
+            assert_allclose(xicrpts[q], np.array([np.log10(self.g / self.fa_priors[0, 0, 0])]),
+                            rtol=1e-6)
+            etacrpts = self.cm.eta_without_photometry
+            fake_eta = np.log10(1.0)
+            assert_allclose(etacrpts[q], np.array([fake_eta]), rtol=1e-6)
+        else:
+            assert np.all([not hasattr(self.cm, f'{x}_without_photometry') for x in
+                           ['pc', 'xi']])
 
         prob_a_field = self.cm.pfa
         a_field = self.cm.af
@@ -657,7 +713,37 @@ class TestCounterpartPairing:  # pylint: disable=too-many-instance-attributes
         # Being in log space we can be relatively forgiving in our assertion limits.
         assert_allclose(afxi[q], np.log10(fake_field_g / self.nfa), rtol=0.01, atol=0.01)
         # Ignoring photometry here, so this should be equal probability.
-        assert_allclose(afeta[q], np.log10(1.0))
+        assert_allclose(afeta[q], np.log10(1.5) if with_and_without_photometry else np.log10(1.0))
+
+        if with_and_without_photometry:
+            prob_a_field = self.cm.pfa_without_photometry
+            a_field = self.cm.af_without_photometry
+            q = np.where(a_field == 6)[0][0]
+            assert prob_a_field[q] == 1
+
+            prob_b_field = self.cm.pfb_without_photometry
+            b_field = self.cm.bf_without_photometry
+            q = np.where(b_field == 2)[0][0]
+            assert prob_b_field[q] == 1
+
+            afs = self.cm.afieldseps_without_photometry
+            afeta = self.cm.afieldeta_without_photometry
+            afxi = self.cm.afieldxi_without_photometry
+            q = np.where(a_field == 2)[0][0]
+            fake_field_sep = np.sqrt(((self.a_astro[2, 0] -
+                                       self.b_astro[3, 0])*np.cos(np.radians(self.b_astro[3, 1])))**2 +
+                                     (self.a_astro[2, 1] - self.b_astro[3, 1])**2)
+            assert_allclose(afs[q], fake_field_sep * 3600, rtol=1e-6)
+
+            fake_field_g = 1/(2 * np.pi * self.o**2) * np.exp(-0.5 * fake_field_sep**2 / self.o**2)
+            # c_priors and fb_priors are the same, so they cancel in the division.
+            # Being in log space we can be relatively forgiving in our assertion limits.
+            assert_allclose(afxi[q], np.log10(fake_field_g / self.nfa), rtol=0.01, atol=0.01)
+            # Ignoring photometry here, so this should be equal probability.
+            assert_allclose(afeta[q], np.log10(1.0))
+        else:
+            assert np.all([not hasattr(self.cm, f'{x}_without_photometry') for x in
+                           ['pfa', 'af', 'pfb', 'bf', 'afieldseps', 'afieldeta', 'afieldxi']])
 
 
 def test_f90_comb():

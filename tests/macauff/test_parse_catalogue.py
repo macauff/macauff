@@ -498,7 +498,7 @@ class TestParseCatalogueNpyToCsv:  # pylint: disable=too-many-instance-attribute
                        headers=[False, False], extra_col_name_lists=[[1], [2]],
                        input_npy_folders=[None, None])
 
-    def test_npy_to_csv_both_cat_extra_col(self):
+    def test_npy_to_csv_both_cat_extra_col_file_extension(self):
         a_cols = ['A_Designation', 'A_RA', 'A_Dec', 'G', 'G_RP']
         b_cols = ['B_Designation', 'B_RA', 'B_Dec', 'W1', 'W2', 'W3']
         extra_cols = ['MATCH_P', 'SEPARATION', 'ETA', 'XI', 'A_AVG_CONT', 'B_AVG_CONT',
@@ -509,19 +509,42 @@ class TestParseCatalogueNpyToCsv:  # pylint: disable=too-many-instance-attribute
         add_a_nums = [3]
         add_b_nums = [3]
 
+        np.save('test_folder/ac_second_file.npy', self.ac)
+        np.save('test_folder/bc_second_file.npy', self.bc)
+        np.save('test_folder/af_second_file.npy', self.af)
+        np.save('test_folder/bf_second_file.npy', self.bf)
+        np.save('test_folder/pc_second_file.npy', self.pc)
+        np.save('test_folder/pfa_second_file.npy', self.pfa)
+        np.save('test_folder/pfb_second_file.npy', self.pfb)
+        np.save('test_folder/eta_second_file.npy', self.eta)
+        np.save('test_folder/xi_second_file.npy', self.xi)
+        np.save('test_folder/pacontam_second_file.npy', self.pac)
+        np.save('test_folder/pbcontam_second_file.npy', self.pbc)
+        np.save('test_folder/acontamflux_second_file.npy', self.acf)
+        np.save('test_folder/bcontamflux_second_file.npy', self.bcf)
+        np.save('test_folder/afieldflux_second_file.npy', self.aff)
+        np.save('test_folder/bfieldflux_second_file.npy', self.bff)
+        np.save('test_folder/crptseps_second_file.npy', self.csep)
+        np.save('test_folder/afieldseps_second_file.npy', self.afs)
+        np.save('test_folder/afieldeta_second_file.npy', self.afeta)
+        np.save('test_folder/afieldxi_second_file.npy', self.afxi)
+        np.save('test_folder/bfieldseps_second_file.npy', self.bfs)
+        np.save('test_folder/bfieldeta_second_file.npy', self.bfeta)
+        np.save('test_folder/bfieldxi_second_file.npy', self.bfxi)
+
         npy_to_csv(['.', '.'], 'test_folder', '.', ['test_a_data.csv', 'test_b_data.csv'],
                    ['match_csv.csv', 'a_nonmatch_csv.csv', 'b_nonmatch_csv.csv'], [a_cols, b_cols],
                    [[0, 1, 2, 4, 5], [0, 1, 2, 4, 5, 6]], ['A', 'B'], headers=[False, False],
-                   extra_col_name_lists=[add_a_cols, add_b_cols],
+                   extra_col_name_lists=[add_a_cols, add_b_cols], file_extension='_second_file',
                    extra_col_num_lists=[add_a_nums, add_b_nums], input_npy_folders=[None, None])
 
-        assert os.path.isfile('match_csv.csv')
-        assert os.path.isfile('a_nonmatch_csv.csv')
+        assert os.path.isfile('match_csv_second_file.csv')
+        assert os.path.isfile('a_nonmatch_csv_second_file.csv')
 
         add_cols = np.append(add_a_cols, add_b_cols)
         names = np.append(np.append(np.append(a_cols, b_cols), extra_cols), add_cols)
 
-        df = pd.read_csv('match_csv.csv', header=None, names=names)
+        df = pd.read_csv('match_csv_second_file.csv', header=None, names=names)
         for i, col in zip([1, 2, 4, 5], a_cols[1:]):
             assert_allclose(df[col], self.data[self.ac, i])
         for i, col in zip(add_a_nums, add_a_cols):
@@ -544,7 +567,7 @@ class TestParseCatalogueNpyToCsv:  # pylint: disable=too-many-instance-attribute
 
         names = np.append(np.append(a_cols, ['MATCH_P', 'NNM_SEPARATION', 'NNM_ETA', 'NNM_XI',
                                              'A_AVG_CONT']), add_a_cols)
-        df = pd.read_csv('a_nonmatch_csv.csv', header=None, names=names)
+        df = pd.read_csv('a_nonmatch_csv_second_file.csv', header=None, names=names)
         for i, col in zip([1, 2, 4, 5], a_cols[1:]):
             assert_allclose(df[col], self.data[self.af, i])
         for i, col in zip(add_a_nums, add_a_cols):
@@ -558,7 +581,7 @@ class TestParseCatalogueNpyToCsv:  # pylint: disable=too-many-instance-attribute
         assert_allclose(df['NNM_XI'], self.afxi)
         names = np.append(np.append(b_cols, ['MATCH_P', 'NNM_SEPARATION', 'NNM_ETA', 'NNM_XI',
                                              'B_AVG_CONT']), add_b_cols)
-        df = pd.read_csv('b_nonmatch_csv.csv', header=None, names=names)
+        df = pd.read_csv('b_nonmatch_csv_second_file.csv', header=None, names=names)
         for i, col in zip([1, 2, 4, 5, 6], b_cols[1:]):
             assert_allclose(df[col], self.datab[self.bf, i])
         for i, col in zip(add_b_nums, add_b_cols):

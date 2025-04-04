@@ -285,3 +285,6 @@ class Macauff():
         print(f'{t} Rank {self.cm.rank}, chunk {self.cm.chunk_id}: Determining counterparts...')
         sys.stdout.flush()
         self.cm.count_pair_func(self.cm)
+
+        if self.cm.include_phot_like and self.cm.with_and_without_photometry:
+            self.cm.count_pair_func(self.cm, force_no_phot_like=True)

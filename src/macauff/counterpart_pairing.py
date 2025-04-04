@@ -17,7 +17,7 @@ __all__ = ['source_pairing']
 
 
 # pylint: disable-next=too-many-locals
-def source_pairing(cm):
+def source_pairing(cm, force_no_phot_like=False):
     '''
     Function to iterate over all grouped islands of sources, calculating the
     probabilities of all permutations of matches and deriving the most likely
@@ -28,6 +28,10 @@ def source_pairing(cm):
     cm : Class
         The cross-match wrapper, containing all of the necessary metadata to
         perform the cross-match and determine match islands.
+    force_no_phot_like : boolean
+        Flag for whether to override pre-generated photometric match and
+        non-match likelihoods and create placeholder arrays, to simulate
+        an astrometry-only match from a with-photometry match.
     '''
     t = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     print(f"{t} Rank {cm.rank}, chunk {cm.chunk_id}: Pairing sources...")
@@ -59,12 +63,21 @@ def source_pairing(cm):
     # crpts_max_len is the maximum number of counterparts at 100% match rate.
     cprt_max_len = np.sum(np.minimum(cm.agrplen, cm.bgrplen))
 
+    if force_no_phot_like:
+        c_array = np.ones_like(cm.c_array)
+        fa_array = np.ones_like(cm.fa_array)
+        fb_array = np.ones_like(cm.fb_array)
+    else:
+        c_array = cm.c_array
+        fa_array = cm.fa_array
+        fb_array = cm.fb_array
+
     (acountinds, bcountinds, afieldinds, bfieldinds, acontamprob, bcontamprob, etaarray,
      xiarray, acontamflux, bcontamflux, probcarray, crptseps, probfaarray, afieldfluxs,
      afieldseps, afieldetas, afieldxis, probfbarray, bfieldfluxs, bfieldseps, bfieldetas,
      bfieldxis) = cpf.find_island_probabilities(
         a_astro, a_photo, b_astro, b_photo, cm.alist, cm.blist, cm.agrplen, cm.bgrplen,
-        cm.c_array, cm.fa_array, cm.fb_array, cm.c_priors, cm.fa_priors, cm.fb_priors, amagref, bmagref,
+        c_array, fa_array, fb_array, cm.c_priors, cm.fa_priors, cm.fb_priors, amagref, bmagref,
         cm.a_modelrefinds, cm.b_modelrefinds, cm.abinsarray, cm.abinlengths, cm.bbinsarray, cm.bbinlengths,
         afrac_grids, aflux_grids, bfrac_grids, bflux_grids, afourier_grids, bfourier_grids,
         cm.a_sky_inds, cm.b_sky_inds, cm.rho, cm.drho, len(cm.delta_mag_cuts), large_len, cprt_max_len)
@@ -88,6 +101,11 @@ def source_pairing(cm):
     afieldsum = int(np.sum(afieldfilter))
     bfieldsum = int(np.sum(bfieldfilter))
 
+    if force_no_phot_like:
+        file_extension = '_without_photometry'
+    else:
+        file_extension = ''
+
     # Reduce size of output files, removing anything that doesn't meet the
     # criteria above from all saved numpy arrays.
     for file_name, variable, filter_variable in zip(
@@ -107,7 +125,7 @@ def source_pairing(cm):
             temp_variable = variable[:, filter_variable]
         else:
             temp_variable = variable[filter_variable]
-        setattr(cm, file_name, temp_variable)
+        setattr(cm, file_name + file_extension, temp_variable)
 
     tot = countsum + afieldsum + cm.lenrejecta
     if tot < big_len_a:

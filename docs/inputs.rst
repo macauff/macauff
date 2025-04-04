@@ -57,6 +57,10 @@ options which need to be supplied if ``make_output_csv`` is ``True``:
 
 ``output_csv_folder``, ``match_out_csv_name``, and ``nonmatch_out_csv_name``;
 
+options that must be supplied if ``include_phot_like`` is ``True``:
+
+``with_and_without_photometry``;
+
 and those options which only need to be supplied if ``include_perturb_auf`` is ``True``:
 
 ``num_trials``, and ``d_mag``.
@@ -136,6 +140,10 @@ Name of the band-merged, cross-matched dataset of counterpart associations and a
 ``nonmatch_out_csv_name``
 
 Filename to save out the respective non-match catalogue objects and metadata to. Will have appended to the front ``cat_name`` to distinguish the two non-match files. ``nonmatch_out_csv_name`` should contain the appropriate file extension.
+
+``with_and_without_photometry``
+
+Boolean flag that should be given if ``include_phot_like`` is ``True``, to indicate whether to run an astrometry-only cross-match in addition to a full astrometry-plus-photometry match. In this case, a second counterpart determination is called with photometric likelihoods ignored, and a second set of counterparts, match probabilities, etc. is recorded.
 
 ``num_trials``
 
@@ -460,6 +468,7 @@ The inter-dependency of input parameters on one another, and the output ``CrossM
     │                     ├─* tri_model_mags_uncert_location[3b] -> tri_model_mags_uncert_list
     │                     └─* tri_n_bright_sources_star_location[3b] -> tri_n_bright_sources_star_list
     ├─> include_phot_like
+    │                   └─> with_and_without_photometry
     ├─> use_phot_priors
     ├─> cf_region_type
     ├─> cf_region_frame[2]
