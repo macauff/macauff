@@ -548,47 +548,58 @@ class CrossMatch():
         a_in_overlaps = np.load(f'{self.a_cat_folder_path}/in_chunk_overlap.npy')
         b_in_overlaps = np.load(f'{self.b_cat_folder_path}/in_chunk_overlap.npy')
 
-        core_matches = ~a_in_overlaps[self.ac] | ~b_in_overlaps[self.bc]
-        np.save(f'{self.joint_folder_path}/ac.npy', self.ac[core_matches])
-        np.save(f'{self.joint_folder_path}/bc.npy', self.bc[core_matches])
-        for fname in ['pc', 'eta', 'xi', 'crptseps', 'acontamflux', 'bcontamflux']:
-            np.save(f'{self.joint_folder_path}/{fname}.npy', getattr(self, fname)[core_matches])
-        for fname in ['pacontam', 'pbcontam']:
-            np.save(f'{self.joint_folder_path}/{fname}.npy', getattr(self, fname)[:, core_matches])
-
-        a_core_nonmatches = ~a_in_overlaps[self.af]
-        b_core_nonmatches = ~b_in_overlaps[self.bf]
-        np.save(f'{self.joint_folder_path}/af.npy', self.af[a_core_nonmatches])
-        np.save(f'{self.joint_folder_path}/bf.npy', self.bf[b_core_nonmatches])
-        for fnametype, cnm in zip(['a', 'b'], [a_core_nonmatches, b_core_nonmatches]):
-            for fname_ in ['{}fieldflux', 'pf{}', '{}fieldeta', '{}fieldxi', '{}fieldseps']:
-                fname = fname_.format(fnametype)
-                np.save(f'{self.joint_folder_path}/{fname}.npy', getattr(self, fname)[cnm])
-
-        if self.reject_a is not None:
-            np.save(f'{self.joint_folder_path}/reject_a.npy',
-                    np.append(np.append(self.reject_a, self.ac[~core_matches]), self.af[~a_core_nonmatches]))
+        if self.include_phot_like and self.with_and_without_photometry:
+            loop_array_extensions = ['', '_without_photometry']
         else:
-            np.save(f'{self.joint_folder_path}/reject_a.npy',
-                    np.append(self.ac[~core_matches], self.af[~a_core_nonmatches]))
-        if self.reject_b is not None:
-            np.save(f'{self.joint_folder_path}/reject_b.npy',
-                    np.append(np.append(self.reject_b, self.bc[~core_matches]), self.bf[~b_core_nonmatches]))
-        else:
-            np.save(f'{self.joint_folder_path}/reject_b.npy',
-                    np.append(self.bc[~core_matches], self.bf[~b_core_nonmatches]))
+            loop_array_extensions = ['']
 
-        if self.make_output_csv:
-            npy_to_csv(
-                [self.a_input_csv_folder, self.b_input_csv_folder], self.joint_folder_path,
-                self.output_csv_folder, [self.a_cat_csv_name, self.b_cat_csv_name],
-                [self.match_out_csv_name, self.a_nonmatch_out_csv_name,
-                 self.b_nonmatch_out_csv_name], [self.a_cat_col_names, self.b_cat_col_names],
-                [self.a_cat_col_nums, self.b_cat_col_nums], [self.a_cat_name, self.b_cat_name],
-                [self.a_input_npy_folder, self.b_input_npy_folder],
-                headers=[self.a_csv_has_header, self.b_csv_has_header],
-                extra_col_name_lists=[self.a_extra_col_names, self.b_extra_col_names],
-                extra_col_num_lists=[self.a_extra_col_nums, self.b_extra_col_nums])
+        for lae in loop_array_extensions:
+            ac, bc = getattr(self, f'ac{lae}'), getattr(self, f'bc{lae}')
+            core_matches = ~a_in_overlaps[ac] | ~b_in_overlaps[bc]
+            np.save(f'{self.joint_folder_path}/ac{lae}.npy', ac[core_matches])
+            np.save(f'{self.joint_folder_path}/bc{lae}.npy', bc[core_matches])
+            for fname in ['pc', 'eta', 'xi', 'crptseps', 'acontamflux', 'bcontamflux']:
+                np.save(f'{self.joint_folder_path}/{fname}{lae}.npy',
+                        getattr(self, f'{fname}{lae}')[core_matches])
+            for fname in ['pacontam', 'pbcontam']:
+                np.save(f'{self.joint_folder_path}/{fname}{lae}.npy',
+                        getattr(self, f'{fname}{lae}')[:, core_matches])
+
+            af, bf = getattr(self, f'af{lae}'), getattr(self, f'bf{lae}')
+            a_core_nonmatches = ~a_in_overlaps[af]
+            b_core_nonmatches = ~b_in_overlaps[bf]
+            np.save(f'{self.joint_folder_path}/af{lae}.npy', af[a_core_nonmatches])
+            np.save(f'{self.joint_folder_path}/bf{lae}.npy', bf[b_core_nonmatches])
+            for fnametype, cnm in zip(['a', 'b'], [a_core_nonmatches, b_core_nonmatches]):
+                for fname_ in ['{}fieldflux', 'pf{}', '{}fieldeta', '{}fieldxi', '{}fieldseps']:
+                    fname = fname_.format(fnametype)
+                    np.save(f'{self.joint_folder_path}/{fname}{lae}.npy', getattr(self, f'{fname}{lae}')[cnm])
+
+            if self.reject_a is not None:
+                np.save(f'{self.joint_folder_path}/reject_a{lae}.npy',
+                        np.append(np.append(self.reject_a, ac[~core_matches]), af[~a_core_nonmatches]))
+            else:
+                np.save(f'{self.joint_folder_path}/reject_a{lae}.npy',
+                        np.append(ac[~core_matches], af[~a_core_nonmatches]))
+            if self.reject_b is not None:
+                np.save(f'{self.joint_folder_path}/reject_b{lae}.npy',
+                        np.append(np.append(self.reject_b, bc[~core_matches]), bf[~b_core_nonmatches]))
+            else:
+                np.save(f'{self.joint_folder_path}/reject_b{lae}.npy',
+                        np.append(bc[~core_matches], bf[~b_core_nonmatches]))
+
+            if self.make_output_csv:
+                npy_to_csv(
+                    [self.a_input_csv_folder, self.b_input_csv_folder], self.joint_folder_path,
+                    self.output_csv_folder, [self.a_cat_csv_name, self.b_cat_csv_name],
+                    [self.match_out_csv_name, self.a_nonmatch_out_csv_name,
+                     self.b_nonmatch_out_csv_name], [self.a_cat_col_names, self.b_cat_col_names],
+                    [self.a_cat_col_nums, self.b_cat_col_nums], [self.a_cat_name, self.b_cat_name],
+                    [self.a_input_npy_folder, self.b_input_npy_folder],
+                    headers=[self.a_csv_has_header, self.b_csv_has_header],
+                    extra_col_name_lists=[self.a_extra_col_names, self.b_extra_col_names],
+                    extra_col_num_lists=[self.a_extra_col_nums, self.b_extra_col_nums],
+                    file_extension=lae)
 
     def _make_chunk_queue(self, completed_chunks):
         '''
@@ -806,6 +817,11 @@ class CrossMatch():
 
         for run_flag in ['include_perturb_auf', 'include_phot_like', 'use_phot_priors']:
             setattr(self, run_flag, self._str2bool(joint_config[run_flag]))
+
+        if self.include_phot_like:
+            if "with_and_without_photometry" not in joint_config:
+                raise ValueError("Missing key with_and_without_photometry from joint metadata file.")
+            self.with_and_without_photometry = self._str2bool(joint_config["with_and_without_photometry"])
 
         for config, catname in zip([cat_a_config, cat_b_config], ['a_', 'b_']):
             self._make_regions_points([f'{catname}auf_region_type', config['auf_region_type']],
