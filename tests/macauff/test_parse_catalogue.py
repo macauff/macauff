@@ -498,6 +498,7 @@ class TestParseCatalogueNpyToCsv:  # pylint: disable=too-many-instance-attribute
                        headers=[False, False], extra_col_name_lists=[[1], [2]],
                        input_npy_folders=[None, None])
 
+    # pylint: disable-next=too-many-statements
     def test_npy_to_csv_both_cat_extra_col_file_extension(self):
         a_cols = ['A_Designation', 'A_RA', 'A_Dec', 'G', 'G_RP']
         b_cols = ['B_Designation', 'B_RA', 'B_Dec', 'W1', 'W2', 'W3']
