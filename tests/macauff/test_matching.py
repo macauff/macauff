@@ -274,6 +274,41 @@ class TestInputs:
                                       [131, 0], [132, 0], [133, 0], [134, 0],
                                       [131, 1], [132, 1], [133, 1], [134, 1]]))
 
+        with open(os.path.join(os.path.dirname(__file__), 'data/crossmatch_params.txt'),
+                  encoding='utf-8') as file:
+            f = file.readlines()
+        old_line = 'include_phot_like = no'
+        new_line = 'include_phot_like = yes\nwith_and_without_photometry = no\n'
+        idx = np.where([old_line in line for line in f])[0][0]
+        _replace_line(os.path.join(os.path.dirname(__file__), 'data/crossmatch_params.txt'),
+                      idx, new_line, out_file=os.path.join(
+                      os.path.dirname(__file__), 'data/crossmatch_params_.txt'))
+
+        cm._initialise_chunk(os.path.join(os.path.dirname(__file__), 'data/crossmatch_params_.txt'),
+                             os.path.join(os.path.dirname(__file__), 'data/cat_a_params_new.txt'),
+                             os.path.join(os.path.dirname(__file__), 'data/cat_b_params_new.txt'))
+
+        assert cm.include_phot_like
+        assert not cm.with_and_without_photometry
+
+        with open(os.path.join(os.path.dirname(__file__), 'data/crossmatch_params_.txt'),
+                  encoding='utf-8') as file:
+            f = file.readlines()
+        for old_line, new_line, match_text in zip(
+                ['with_and_without_photometry = no', 'with_and_without_photometry = no',
+                 'with_and_without_photometry = no'],
+                ['', 'with_and_without_photometry = banana\n'],
+                ['Missing key with_and_without', 'Boolean flag key not set to allowed']):
+            idx = np.where([old_line in line for line in f])[0][0]
+            _replace_line(os.path.join(os.path.dirname(__file__), 'data/crossmatch_params_.txt'), idx,
+                          new_line, out_file=os.path.join(os.path.dirname(__file__),
+                                                          'data/crossmatch_params_2.txt'))
+
+            with pytest.raises(ValueError, match=match_text):
+                cm._initialise_chunk(os.path.join(os.path.dirname(__file__), 'data/crossmatch_params_2.txt'),
+                                     os.path.join(os.path.dirname(__file__), 'data/cat_a_params_new.txt'),
+                                     os.path.join(os.path.dirname(__file__), 'data/cat_b_params_new.txt'))
+
     def test_crossmatch_load_tri_hists(self):  # pylint: disable=too-many-statements
         # pylint: disable=no-member
         with open(os.path.join(os.path.dirname(__file__), 'data/crossmatch_params.txt'),
@@ -2296,43 +2331,76 @@ class TestPostProcess:
         data1[:, 0] = [f'{designation}{i}' for i in data1[:, 0]]
         return data, data1
 
-    def test_postprocess(self):
+    @pytest.mark.parametrize("include_phot_like", [True, False])
+    def test_postprocess(self, include_phot_like):
         self.cm.joint_folder_path = self.joint_folder_path
         self.cm.a_cat_folder_path = self.a_cat_folder_path
         self.cm.b_cat_folder_path = self.b_cat_folder_path
 
+        self.cm.include_phot_like = include_phot_like
+        if include_phot_like:
+            self.cm.with_and_without_photometry = True
         self.cm.make_output_csv = False
+
+        if include_phot_like:
+            for n in ['ac', 'af']:
+                setattr(self.cm, f'{n}_without_photometry', getattr(self.cm, f'{n}')[::-1])
+            for n in ['bc', 'bf']:
+                setattr(self.cm, f'{n}_without_photometry', getattr(self.cm, f'{n}'))
+
+            for n in ['pc', 'eta', 'xi', 'acontamflux', 'bcontamflux', 'pacontam', 'pbcontam', 'crptseps']:
+                setattr(self.cm, f'{n}_without_photometry', 2*getattr(self.cm, f'{n}'))
+
+            for t in ['a', 'b']:
+                setattr(self.cm, f'pf{t}_without_photometry', 2*getattr(self.cm, f'pf{t}'))
+                for n in ['fieldflux', 'fieldseps', 'fieldeta', 'fieldxi']:
+                    setattr(self.cm, f'{t}{n}_without_photometry', 2*getattr(self.cm, f'{t}{n}'))
 
         self.cm.chunk_id = 1
 
         self.cm._postprocess_chunk()
 
-        aino = np.load(f'{self.a_cat_folder_path}/in_chunk_overlap.npy')
-        bino = np.load(f'{self.b_cat_folder_path}/in_chunk_overlap.npy')
-        ac = np.load(f'{self.joint_folder_path}/ac.npy')
-        af = np.load(f'{self.joint_folder_path}/af.npy')
-        bc = np.load(f'{self.joint_folder_path}/bc.npy')
-        bf = np.load(f'{self.joint_folder_path}/bf.npy')
+        if include_phot_like:
+            exts = ['', '_without_photometry']
+        else:
+            exts = ['']
 
-        assert np.all(~aino[ac] | ~bino[bc])
-        assert np.all(~aino[af])
-        assert np.all(~bino[bf])
+        for ext in exts:
+            aino = np.load(f'{self.a_cat_folder_path}/in_chunk_overlap.npy')
+            bino = np.load(f'{self.b_cat_folder_path}/in_chunk_overlap.npy')
+            ac = np.load(f'{self.joint_folder_path}/ac{ext}.npy')
+            af = np.load(f'{self.joint_folder_path}/af{ext}.npy')
+            bc = np.load(f'{self.joint_folder_path}/bc{ext}.npy')
+            bf = np.load(f'{self.joint_folder_path}/bf{ext}.npy')
 
-        deleted_ac = np.delete(self.ac, np.array([np.argmin(np.abs(q - self.ac)) for q in ac]))
-        deleted_bc = np.delete(self.bc, np.array([np.argmin(np.abs(q - self.bc)) for q in bc]))
-        assert np.all((aino[deleted_ac] & bino[deleted_bc]))
+            assert np.all(~aino[ac] | ~bino[bc])
+            assert np.all(~aino[af])
+            assert np.all(~bino[bf])
 
-        deleted_af = np.delete(self.af, np.array([np.argmin(np.abs(q - self.af)) for q in af]))
-        deleted_bf = np.delete(self.bf, np.array([np.argmin(np.abs(q - self.bf)) for q in bf]))
-        assert np.all(aino[deleted_af])
-        assert np.all(bino[deleted_bf])
+            if ext == '_without_photometry':
+                self_ac, self_af = self.ac[::-1], self.af[::-1]
+            else:
+                self_ac, self_af = self.ac, self.af
 
+            deleted_ac = np.delete(self_ac, np.array([np.argmin(np.abs(q - self_ac)) for q in ac]))
+            deleted_bc = np.delete(self.bc, np.array([np.argmin(np.abs(q - self.bc)) for q in bc]))
+            assert np.all((aino[deleted_ac] & bino[deleted_bc]))
+
+            deleted_af = np.delete(self_af, np.array([np.argmin(np.abs(q - self_af)) for q in af]))
+            deleted_bf = np.delete(self.bf, np.array([np.argmin(np.abs(q - self.bf)) for q in bf]))
+            assert np.all(aino[deleted_af])
+            assert np.all(bino[deleted_bf])
+
+    @pytest.mark.parametrize("include_phot_like", [True, False])
     # pylint: disable-next=too-many-statements,too-many-locals
-    def test_postprocess_with_csv(self):
+    def test_postprocess_with_csv(self, include_phot_like):
         self.cm.joint_folder_path = self.joint_folder_path
         self.cm.a_cat_folder_path = self.a_cat_folder_path
         self.cm.b_cat_folder_path = self.b_cat_folder_path
 
+        self.cm.include_phot_like = include_phot_like
+        if include_phot_like:
+            self.cm.with_and_without_photometry = True
         self.cm.make_output_csv = True
 
         # Set a whole load of fake inputs
@@ -2373,100 +2441,121 @@ class TestPostProcess:
         self.cm.b_extra_col_nums = [3]
         self.cm.chunk_id = 1
 
+        if include_phot_like:
+            for n in ['ac', 'af']:
+                setattr(self.cm, f'{n}_without_photometry', getattr(self.cm, f'{n}')[::-1])
+            for n in ['bc', 'bf']:
+                setattr(self.cm, f'{n}_without_photometry', getattr(self.cm, f'{n}'))
+
+            for n in ['pc', 'eta', 'xi', 'acontamflux', 'bcontamflux', 'pacontam', 'pbcontam', 'crptseps']:
+                setattr(self.cm, f'{n}_without_photometry', 2*getattr(self.cm, f'{n}'))
+
+            for t in ['a', 'b']:
+                setattr(self.cm, f'pf{t}_without_photometry', 2*getattr(self.cm, f'pf{t}'))
+                for n in ['fieldflux', 'fieldseps', 'fieldeta', 'fieldxi']:
+                    setattr(self.cm, f'{t}{n}_without_photometry', 2*getattr(self.cm, f'{t}{n}'))
+
         self.cm._postprocess_chunk()
 
-        aino = np.load(f'{self.a_cat_folder_path}/in_chunk_overlap.npy')
-        bino = np.load(f'{self.b_cat_folder_path}/in_chunk_overlap.npy')
-        ac = np.load(f'{self.joint_folder_path}/ac.npy')
-        af = np.load(f'{self.joint_folder_path}/af.npy')
-        bc = np.load(f'{self.joint_folder_path}/bc.npy')
-        bf = np.load(f'{self.joint_folder_path}/bf.npy')
+        if include_phot_like:
+            exts = ['', '_without_photometry']
+        else:
+            exts = ['']
 
-        assert np.all(~aino[ac] | ~bino[bc])
-        assert np.all(~aino[af])
-        assert np.all(~bino[bf])
+        for ext in exts:
+            aino = np.load(f'{self.a_cat_folder_path}/in_chunk_overlap.npy')
+            bino = np.load(f'{self.b_cat_folder_path}/in_chunk_overlap.npy')
+            ac = np.load(f'{self.joint_folder_path}/ac{ext}.npy')
+            af = np.load(f'{self.joint_folder_path}/af{ext}.npy')
+            bc = np.load(f'{self.joint_folder_path}/bc{ext}.npy')
+            bf = np.load(f'{self.joint_folder_path}/bf{ext}.npy')
 
-        deleted_ac = np.delete(self.ac, np.array([np.argmin(np.abs(q - self.ac)) for q in ac]))
-        deleted_bc = np.delete(self.bc, np.array([np.argmin(np.abs(q - self.bc)) for q in bc]))
-        assert np.all((aino[deleted_ac] & bino[deleted_bc]))
+            if ext == '_without_photometry':
+                self_ac, self_af = self.ac[::-1], self.af[::-1]
+            else:
+                self_ac, self_af = self.ac, self.af
 
-        deleted_af = np.delete(self.af, np.array([np.argmin(np.abs(q - self.af)) for q in af]))
-        deleted_bf = np.delete(self.bf, np.array([np.argmin(np.abs(q - self.bf)) for q in bf]))
-        assert np.all(aino[deleted_af])
-        assert np.all(bino[deleted_bf])
+            deleted_ac = np.delete(self_ac, np.array([np.argmin(np.abs(q - self_ac)) for q in ac]))
+            deleted_bc = np.delete(self.bc, np.array([np.argmin(np.abs(q - self.bc)) for q in bc]))
+            assert np.all((aino[deleted_ac] & bino[deleted_bc]))
 
-        # Check that the outputs make sense, treating this more like a
-        # parse_catalogue test than anything else, but importantly
-        # checking for correct lengths of produced outputs like pc.
-        assert os.path.isfile(f'{self.cm.output_csv_folder}/{self.cm.match_out_csv_name}')
-        assert os.path.isfile(f'{self.cm.output_csv_folder}/{self.cm.a_nonmatch_out_csv_name}')
-        assert os.path.isfile(f'{self.cm.output_csv_folder}/{self.cm.b_nonmatch_out_csv_name}')
+            deleted_af = np.delete(self_af, np.array([np.argmin(np.abs(q - self_af)) for q in af]))
+            deleted_bf = np.delete(self.bf, np.array([np.argmin(np.abs(q - self.bf)) for q in bf]))
+            assert np.all(aino[deleted_af])
+            assert np.all(bino[deleted_bf])
 
-        pc = np.load(f'{self.joint_folder_path}/pc.npy')
-        eta = np.load(f'{self.joint_folder_path}/eta.npy')
-        xi = np.load(f'{self.joint_folder_path}/xi.npy')
-        acf = np.load(f'{self.joint_folder_path}/acontamflux.npy')
-        bcf = np.load(f'{self.joint_folder_path}/bcontamflux.npy')
-        pac = np.load(f'{self.joint_folder_path}/pacontam.npy')
-        pbc = np.load(f'{self.joint_folder_path}/pbcontam.npy')
-        csep = np.load(f'{self.joint_folder_path}/crptseps.npy')
-        pfa = np.load(f'{self.joint_folder_path}/pfa.npy')
-        afs = np.load(f'{self.joint_folder_path}/afieldseps.npy')
-        afeta = np.load(f'{self.joint_folder_path}/afieldeta.npy')
-        afxi = np.load(f'{self.joint_folder_path}/afieldxi.npy')
-        aff = np.load(f'{self.joint_folder_path}/afieldflux.npy')
-        pfb = np.load(f'{self.joint_folder_path}/pfb.npy')
-        bfs = np.load(f'{self.joint_folder_path}/bfieldseps.npy')
-        bfeta = np.load(f'{self.joint_folder_path}/bfieldeta.npy')
-        bfxi = np.load(f'{self.joint_folder_path}/bfieldxi.npy')
-        bff = np.load(f'{self.joint_folder_path}/bfieldflux.npy')
+            # Check that the outputs make sense, treating this more like a
+            # parse_catalogue test than anything else, but importantly
+            # checking for correct lengths of produced outputs like pc.
+            assert os.path.isfile(f'{self.cm.output_csv_folder}/{self.cm.match_out_csv_name}')
+            assert os.path.isfile(f'{self.cm.output_csv_folder}/{self.cm.a_nonmatch_out_csv_name}')
+            assert os.path.isfile(f'{self.cm.output_csv_folder}/{self.cm.b_nonmatch_out_csv_name}')
 
-        extra_cols = ['MATCH_P', 'SEPARATION', 'ETA', 'XI', 'A_AVG_CONT', 'B_AVG_CONT',
-                      'A_CONT_F1', 'A_CONT_F10', 'B_CONT_F1', 'B_CONT_F10']
-        names = np.append(np.append(self.cm.a_cat_col_names, self.cm.b_cat_col_names),
-                          np.append(extra_cols, self.cm.b_extra_col_names))
+            pc = np.load(f'{self.joint_folder_path}/pc{ext}.npy')
+            eta = np.load(f'{self.joint_folder_path}/eta{ext}.npy')
+            xi = np.load(f'{self.joint_folder_path}/xi{ext}.npy')
+            acf = np.load(f'{self.joint_folder_path}/acontamflux{ext}.npy')
+            bcf = np.load(f'{self.joint_folder_path}/bcontamflux{ext}.npy')
+            pac = np.load(f'{self.joint_folder_path}/pacontam{ext}.npy')
+            pbc = np.load(f'{self.joint_folder_path}/pbcontam{ext}.npy')
+            csep = np.load(f'{self.joint_folder_path}/crptseps{ext}.npy')
+            pfa = np.load(f'{self.joint_folder_path}/pfa{ext}.npy')
+            afs = np.load(f'{self.joint_folder_path}/afieldseps{ext}.npy')
+            afeta = np.load(f'{self.joint_folder_path}/afieldeta{ext}.npy')
+            afxi = np.load(f'{self.joint_folder_path}/afieldxi{ext}.npy')
+            aff = np.load(f'{self.joint_folder_path}/afieldflux{ext}.npy')
+            pfb = np.load(f'{self.joint_folder_path}/pfb{ext}.npy')
+            bfs = np.load(f'{self.joint_folder_path}/bfieldseps{ext}.npy')
+            bfeta = np.load(f'{self.joint_folder_path}/bfieldeta{ext}.npy')
+            bfxi = np.load(f'{self.joint_folder_path}/bfieldxi{ext}.npy')
+            bff = np.load(f'{self.joint_folder_path}/bfieldflux{ext}.npy')
 
-        df = pd.read_csv(f'{self.cm.output_csv_folder}/{self.cm.match_out_csv_name}',
-                         header=None, names=names)
-        for i, col in zip([1, 2, 4, 5], self.cm.a_cat_col_names[1:]):
-            assert_allclose(df[col], acat[ac, i])
+            extra_cols = ['MATCH_P', 'SEPARATION', 'ETA', 'XI', 'A_AVG_CONT', 'B_AVG_CONT',
+                          'A_CONT_F1', 'A_CONT_F10', 'B_CONT_F1', 'B_CONT_F10']
+            names = np.append(np.append(self.cm.a_cat_col_names, self.cm.b_cat_col_names),
+                              np.append(extra_cols, self.cm.b_extra_col_names))
 
-        assert np.all([df[self.cm.a_cat_col_names[0]].iloc[i] == acatstring[ac[i], 0] for i in
-                       range(len(ac))])
+            _name = self.cm.match_out_csv_name[:-4] + ext + self.cm.match_out_csv_name[-4:]
+            df = pd.read_csv(f'{self.cm.output_csv_folder}/{_name}', header=None, names=names)
+            for i, col in zip([1, 2, 4, 5], self.cm.a_cat_col_names[1:]):
+                assert_allclose(df[col], acat[ac, i])
 
-        for i, col in zip([1, 2, 4, 5, 6], self.cm.b_cat_col_names[1:]):
-            assert_allclose(df[col], bcat[bc, i])
-        assert np.all([df[self.cm.b_cat_col_names[0]].iloc[i] == bcatstring[bc[i], 0] for i in
-                       range(len(bc))])
+            assert np.all([df[self.cm.a_cat_col_names[0]].iloc[i] == acatstring[ac[i], 0] for i in
+                           range(len(ac))])
 
-        for f, col in zip([pc, csep, eta, xi, acf, bcf, pac[0], pac[1], pbc[0], pbc[1]],
-                          extra_cols):
-            assert_allclose(df[col], f)
+            for i, col in zip([1, 2, 4, 5, 6], self.cm.b_cat_col_names[1:]):
+                assert_allclose(df[col], bcat[bc, i])
+            assert np.all([df[self.cm.b_cat_col_names[0]].iloc[i] == bcatstring[bc[i], 0] for i in
+                           range(len(bc))])
 
-        names = np.append(self.cm.a_cat_col_names,
-                          ['MATCH_P', 'NNM_SEPARATION', 'NNM_ETA', 'NNM_XI', 'A_AVG_CONT'])
-        df = pd.read_csv(f'{self.cm.output_csv_folder}/{self.cm.a_nonmatch_out_csv_name}', header=None,
-                         names=names)
-        for i, col in zip([1, 2, 4, 5], self.cm.a_cat_col_names[1:]):
-            assert_allclose(df[col], acat[af, i])
-        assert np.all([df[self.cm.a_cat_col_names[0]].iloc[i] == acatstring[af[i], 0] for i in
-                       range(len(af))])
-        assert_allclose(df['MATCH_P'], pfa)
-        assert_allclose(df['A_AVG_CONT'], aff)
-        assert_allclose(df['NNM_SEPARATION'], afs)
-        assert_allclose(df['NNM_ETA'], afeta)
-        assert_allclose(df['NNM_XI'], afxi)
-        names = np.append(np.append(self.cm.b_cat_col_names,
-                          ['MATCH_P', 'NNM_SEPARATION', 'NNM_ETA', 'NNM_XI', 'B_AVG_CONT']),
-                          self.cm.b_extra_col_names)
-        df = pd.read_csv(f'{self.cm.output_csv_folder}/{self.cm.b_nonmatch_out_csv_name}', header=None,
-                         names=names)
-        for i, col in zip([1, 2, 4, 5, 6], self.cm.b_cat_col_names[1:]):
-            assert_allclose(df[col], bcat[bf, i])
-        assert np.all([df[self.cm.b_cat_col_names[0]].iloc[i] == bcatstring[bf[i], 0] for i in
-                       range(len(bf))])
-        assert_allclose(df['MATCH_P'], pfb)
-        assert_allclose(df['B_AVG_CONT'], bff)
-        assert_allclose(df['NNM_SEPARATION'], bfs)
-        assert_allclose(df['NNM_ETA'], bfeta)
-        assert_allclose(df['NNM_XI'], bfxi)
+            for f, col in zip([pc, csep, eta, xi, acf, bcf, pac[0], pac[1], pbc[0], pbc[1]],
+                              extra_cols):
+                assert_allclose(df[col], f)
+
+            names = np.append(self.cm.a_cat_col_names,
+                              ['MATCH_P', 'NNM_SEPARATION', 'NNM_ETA', 'NNM_XI', 'A_AVG_CONT'])
+            _name = self.cm.a_nonmatch_out_csv_name[:-4] + ext + self.cm.a_nonmatch_out_csv_name[-4:]
+            df = pd.read_csv(f'{self.cm.output_csv_folder}/{_name}', header=None, names=names)
+            for i, col in zip([1, 2, 4, 5], self.cm.a_cat_col_names[1:]):
+                assert_allclose(df[col], acat[af, i])
+            assert np.all([df[self.cm.a_cat_col_names[0]].iloc[i] == acatstring[af[i], 0] for i in
+                           range(len(af))])
+            assert_allclose(df['MATCH_P'], pfa)
+            assert_allclose(df['A_AVG_CONT'], aff)
+            assert_allclose(df['NNM_SEPARATION'], afs)
+            assert_allclose(df['NNM_ETA'], afeta)
+            assert_allclose(df['NNM_XI'], afxi)
+            names = np.append(np.append(self.cm.b_cat_col_names,
+                              ['MATCH_P', 'NNM_SEPARATION', 'NNM_ETA', 'NNM_XI', 'B_AVG_CONT']),
+                              self.cm.b_extra_col_names)
+            _name = self.cm.b_nonmatch_out_csv_name[:-4] + ext + self.cm.b_nonmatch_out_csv_name[-4:]
+            df = pd.read_csv(f'{self.cm.output_csv_folder}/{_name}', header=None, names=names)
+            for i, col in zip([1, 2, 4, 5, 6], self.cm.b_cat_col_names[1:]):
+                assert_allclose(df[col], bcat[bf, i])
+            assert np.all([df[self.cm.b_cat_col_names[0]].iloc[i] == bcatstring[bf[i], 0] for i in
+                           range(len(bf))])
+            assert_allclose(df['MATCH_P'], pfb)
+            assert_allclose(df['B_AVG_CONT'], bff)
+            assert_allclose(df['NNM_SEPARATION'], bfs)
+            assert_allclose(df['NNM_ETA'], bfeta)
+            assert_allclose(df['NNM_XI'], bfxi)

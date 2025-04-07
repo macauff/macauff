@@ -10,6 +10,11 @@ General
 New Features
 ^^^^^^^^^^^^
 
+- Added ``with_and_without_photometry`` input keyword, to allow for cases where
+  ``include_phot_like`` is ``True`` but an astrometry-only cross-match is also
+  desired, saving two sets of counterparts and corresponding data in one
+  run. [#89]
+
 - ``_calculate_cf_areas`` and ``create_c_and_f`` use convex hull overlap for
   both catalogues, as well as nearest-``cf_points`` calculations, to determine
   region areas and photometric priors and likelihoods. [#88]
