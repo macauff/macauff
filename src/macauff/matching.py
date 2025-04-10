@@ -302,29 +302,10 @@ class CrossMatch():
                 raise ValueError('b_snr_mag_params should be of shape (X, Y, 5)')
             self.b_snr_mag_params = a
 
-        # Ensure that we can save to the folders for outputs.
-        if not os.path.exists(self.joint_folder_path):
-            raise OSError("Error when trying to check temporary folder for joint outputs. "
-                          "Please ensure that joint_folder_path is correct.")
-
-        for path, catname, flag in zip([self.a_auf_folder_path, self.b_auf_folder_path],
-                                       ['"a"', '"b"'], ['a_', 'b_']):
-            if path is not None:
-                try:
-                    os.makedirs(path, exist_ok=True)
-                except OSError as exc:
-                    raise OSError(f"Error when trying to create temporary folder for catalogue {catname} AUF "
-                                  f"outputs. Please ensure that {flag}auf_folder_path is correct.") from exc
-
-        # Unlike the AUF folder paths, which are allowed to not exist at
-        # runtime, we simply check that cat_folder_path exists for both
-        # input catalogues, with three appropriately shaped arrays in it,
-        # and error if not.
+        # Check cat_folder_path for three appropriately shaped arrays,
+        # and error if they aren't there.
         for path, catname, flag in zip([self.a_cat_folder_path, self.b_cat_folder_path],
                                        ['"a"', '"b"'], ['a_', 'b_']):
-            if not os.path.exists(path):
-                raise OSError(f'{flag}cat_folder_path does not exist. Please ensure that '
-                              f'path for catalogue {catname} is correct.')
             # Currently forcing hard-coded three-part numpy array names,
             # to come out of "skinny table" consolidated catalogue
             # generation.
@@ -509,6 +490,8 @@ class CrossMatch():
         self.group_func = make_island_groupings
         self.phot_like_func = compute_photometric_likelihoods
         self.count_pair_func = source_pairing
+
+        self._initialise_chunk()
 
         mcff = Macauff(self)
         mcff()
@@ -704,7 +687,7 @@ class CrossMatch():
                     # re-making the SNR-mag relations so skip loading.
                     a = np.load(config['snr_mag_params_file_path'].format(chunk_id))
                     if not (len(a.shape) == 3 and a.shape[2] == 5 and
-                            a.shape[0] == len(getattr(self, f'{flag}filt_names'))):
+                            a.shape[0] == len(config['tri_filt_names'])):
                         raise ValueError(f'{flag}snr_mag_params should be of shape (X, Y, 5).')
                     setattr(self, f'{flag}snr_mag_params', a)
                 else:
@@ -870,6 +853,11 @@ class CrossMatch():
             raise ValueError("Region frames for c/f and AUF creation must all be the same.")
 
         joint_config['joint_folder_path'] = os.path.abspath(joint_config['joint_folder_path'])
+        # Ensure that we can save to the folders for outputs.
+        if not os.path.exists(joint_config['joint_folder_path']):
+            raise OSError("Error when trying to check temporary folder for joint outputs. "
+                          "Please ensure that joint_folder_path is correct.")
+
         if cat_a_config['auf_folder_path'] == "None":
             cat_a_config['auf_folder_path'] = None
         else:
@@ -879,8 +867,23 @@ class CrossMatch():
         else:
             cat_b_config['auf_folder_path'] = os.path.abspath(cat_b_config['auf_folder_path'])
 
+        for config, catname, flag in zip([cat_a_config, cat_b_config], ['"a"', '"b"'], ['a_', 'b_']):
+            if config['auf_folder_path'] is not None:
+                try:
+                    os.makedirs(config['auf_folder_path'], exist_ok=True)
+                except OSError as exc:
+                    raise OSError(f"Error when trying to create temporary folder for catalogue {catname} AUF "
+                                  f"outputs. Please ensure that {flag}auf_folder_path is correct.") from exc
+
         cat_a_config['cat_folder_path'] = os.path.abspath(cat_a_config['cat_folder_path'])
         cat_b_config['cat_folder_path'] = os.path.abspath(cat_b_config['cat_folder_path'])
+        # Unlike the AUF folder paths, which are allowed to not exist at
+        # runtime, we simply check that cat_folder_path exists for both
+        # input catalogues.
+        for config, catname, flag in zip([cat_a_config, cat_b_config], ['"a"', '"b"'], ['a_', 'b_']):
+            if not os.path.exists(config['cat_folder_path']):
+                raise OSError(f'{flag}cat_folder_path does not exist. Please ensure that '
+                              f'path for catalogue {catname} is correct.')
 
         # Only have to check for the existence of Pertubation AUF-related
         # parameters if we are using the perturbation AUF component.
@@ -913,7 +916,7 @@ class CrossMatch():
             a = joint_config['num_trials']
             try:
                 a = float(a)
-            except ValueError as exc:
+            except (ValueError, TypeError) as exc:
                 raise ValueError("num_trials should be an integer.") from exc
             if not a.is_integer():
                 raise ValueError("num_trials should be an integer.")
@@ -921,7 +924,7 @@ class CrossMatch():
             for flag in ['d_mag']:
                 try:
                     a = float(joint_config[flag])
-                except ValueError as exc:
+                except (ValueError, TypeError) as exc:
                     raise ValueError(f"{flag} must be a float.") from exc
 
         # Nominally these are all of the parameters required if include_perturb_auf
@@ -940,7 +943,7 @@ class CrossMatch():
                         raise ValueError(f"Missing key {check_flag} from catalogue {catname} metadata file.")
                 try:
                     a = float(config['dens_dist'])
-                except ValueError as exc:
+                except (ValueError, TypeError) as exc:
                     raise ValueError(f"dens_dist in catalogue {catname} must be a float.") from exc
 
             if joint_config['include_perturb_auf']:
@@ -1047,7 +1050,7 @@ class CrossMatch():
                         if not float(a).is_integer():
                             raise ValueError("tri_filt_num should be a single integer number in "
                                              f"catalogue {catname} metadata file, or None.")
-                except ValueError as exc:
+                except (ValueError, TypeError) as exc:
                     raise ValueError("tri_filt_num should be a single integer number in "
                                      f"catalogue {catname} metadata file, or None.") from exc
 
@@ -1060,7 +1063,7 @@ class CrossMatch():
                             if not float(a).is_integer():
                                 raise ValueError(f"tri_num{suffix} should be a single integer number in "
                                                  f"catalogue {catname} metadata file, or None.")
-                    except ValueError as exc:
+                    except (ValueError, TypeError) as exc:
                         raise ValueError(f"tri_num{suffix} should be a single integer number in "
                                          f"catalogue {catname} metadata file, or None.") from exc
 
@@ -1069,7 +1072,7 @@ class CrossMatch():
                             config[f'tri_maglim{suffix}'] = None
                         else:
                             a = float(config[f'tri_maglim{suffix}'])
-                    except ValueError as exc:
+                    except (ValueError, TypeError) as exc:
                         raise ValueError(f"tri_maglim{suffix} in catalogue {catname} must be a "
                                          "float, or None.") from exc
 
@@ -1091,7 +1094,7 @@ class CrossMatch():
                             raise ValueError(f"File could not be loaded from {name}.") from exc
                         if name == "dens_hist_tri":
                             shape_dht = g.shape
-                            if g.shape[0] != len(getattr(self, f'{flag}filt_names')):
+                            if g.shape[0] != len(config['tri_filt_names']):
                                 raise ValueError(f"The number of filters in {flag}filt_names and "
                                                  f"{flag}dens_hist_tri do not match.")
                         else:
@@ -1115,10 +1118,10 @@ class CrossMatch():
                     raise ValueError("Either all flags related to running TRILEGAL histogram generation "
                                      f"within the catalogue {catname} cross-match call -- tri_filt_names, "
                                      "tri_set_name, etc. -- should be None or zero of them should be None.")
-                run_external_none_flag = [np.all([b is None for b in config[name]]) for
-                                          name in ['dens_hist_tri_list', 'tri_model_mags_list',
-                                                   'tri_model_mag_mids_list', 'tri_model_mags_interval_list',
-                                                   'tri_n_bright_sources_star_list']]
+                run_external_none_flag = [config[name] == "None" for name in
+                                          ['dens_hist_tri_location', 'tri_model_mags_location',
+                                           'tri_model_mag_mids_location', 'tri_model_mags_interval_location',
+                                           'tri_n_bright_sources_star_location']]
                 if not (np.sum(run_external_none_flag) == 0 or
                         np.sum(run_external_none_flag) == len(run_external_none_flag)):
                     raise ValueError("Either all flags related to running TRILEGAL histogram generation "
@@ -1146,7 +1149,7 @@ class CrossMatch():
                         except ValueError as exc:
                             raise ValueError(f'{var} should be a list of floats in catalogue '
                                              f'{catname} metadata file') from exc
-                        if len(b) != len(getattr(self, f'{flag}filt_names')):
+                        if len(b) != len(config['tri_filt_names']):
                             raise ValueError(f'{flag}{var} and {flag}filt_names should contain the same '
                                              'number of entries.')
                     # galaxy_nzs should be a list of integers.
@@ -1156,7 +1159,7 @@ class CrossMatch():
                     except ValueError as exc:
                         raise ValueError('gal_nzs should be a list of integers '
                                          f'in catalogue {catname} metadata file') from exc
-                    if len(b) != len(getattr(self, f'{flag}filt_names')):
+                    if len(b) != len(config['tri_filt_names']):
                         raise ValueError(f'{flag}gal_nzs and {flag}filt_names should contain the same '
                                          'number of entries.')
                     if not np.all([c.is_integer() for c in b]):
@@ -1169,14 +1172,14 @@ class CrossMatch():
 
         try:
             a = float(joint_config['pos_corr_dist'])
-        except ValueError as exc:
+        except (ValueError, TypeError) as exc:
             raise ValueError("pos_corr_dist must be a float.") from exc
 
         for flag in ['real_hankel_points', 'four_hankel_points', 'four_max_rho']:
             a = joint_config[flag]
             try:
                 a = float(a)
-            except ValueError as exc:
+            except (ValueError, TypeError) as exc:
                 raise ValueError(f"{flag} should be an integer.") from exc
             if not a.is_integer():
                 raise ValueError(f"{flag} should be an integer.")
@@ -1203,7 +1206,7 @@ class CrossMatch():
                 a = int(a)
             else:
                 raise ValueError("n_pool should be a single integer number.")
-        except ValueError as exc:
+        except (ValueError, TypeError) as exc:
             raise ValueError("n_pool should be a single integer number.") from exc
 
         for correct_astro, compute_snr_mag_relation, config, catname, flag in zip(
@@ -1229,7 +1232,7 @@ class CrossMatch():
                 except ValueError as exc:
                     raise ValueError('mag_indices should be a list of integers '
                                      f'in the catalogue {catname} metadata file') from exc
-                if len(b) != len(getattr(self, f'{flag}filt_names')):
+                if len(b) != len(config['tri_filt_names']):
                     raise ValueError(f'{flag}filt_names and {flag}mag_indices should contain the '
                                      'same number of entries.')
                 if not np.all([c.is_integer() for c in b]):
@@ -1311,20 +1314,20 @@ class CrossMatch():
                 a = config['best_mag_index']
                 try:
                     a = float(a)
-                except ValueError as exc:
+                except (ValueError, TypeError) as exc:
                     raise ValueError(f"best_mag_index should be an integer in the catalogue {catname} "
                                      "metadata file.") from exc
                 if not a.is_integer():
                     raise ValueError(f"best_mag_index should be an integer in the catalogue {catname} "
                                      "metadata file.")
-                if int(a) >= len(getattr(self, f'{flag}filt_names')):
+                if int(a) >= len(config['tri_filt_names']):
                     raise ValueError("best_mag_index cannot be a larger index than the list of "
                                      f"filters in the catalogue {catname} metadata file.")
 
                 a = config['best_mag_index_col']
                 try:
                     a = float(a)
-                except ValueError as exc:
+                except (ValueError, TypeError) as exc:
                     raise ValueError(f"best_mag_index_col should be an integer in the catalogue {catname} "
                                      "metadata file.") from exc
                 if not a.is_integer():
@@ -1337,7 +1340,7 @@ class CrossMatch():
                 else:
                     try:
                         a = float(a)
-                    except ValueError as exc:
+                    except (ValueError, TypeError) as exc:
                         raise ValueError("chunk_overlap_col should be an integer in the "
                                          f"catalogue {catname} metadata file.") from exc
                     if not a.is_integer():
@@ -1346,7 +1349,7 @@ class CrossMatch():
 
                 try:
                     a = float(config['nn_radius'])
-                except ValueError as exc:
+                except (ValueError, TypeError) as exc:
                     raise ValueError(f"nn_radius must be a float in the catalogue {catname} metadata "
                                      "file.") from exc
 
