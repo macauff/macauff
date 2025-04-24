@@ -388,7 +388,6 @@ class TestInputs:
             _cmp = self.cm_p_text.replace(old_line, new_line) if fn == 'c' else self.cm_p_text
             _cap = self.ca_p_text.replace(old_line, new_line) if fn == 'a' else self.ca_p_text
             _cbp = self.cb_p_text.replace(old_line, new_line) if fn == 'b' else self.cb_p_text
-            print(match_text)
             with pytest.raises(error, match=match_text):
                 cm = CrossMatch(self.mock_filename(_cmp.encode("utf-8")),
                                 self.mock_filename(_cap.encode("utf-8")),
@@ -502,8 +501,6 @@ class TestInputs:
                 np.save('a_snr_mag_9/snr_mag_params.npy', np.ones((2, 1, 5), float))
             _cap = ca_p_.replace(old_line, new_line) if '_a_' in in_file else ca_p_
             _cbp = cb_p_.replace(old_line, new_line) if '_b_' in in_file else cb_p_
-            print(old_line, new_line)
-            print(_cap)
             with pytest.raises(ValueError, match=match_text):
                 cm = CrossMatch(self.mock_filename(cm_p_.encode("utf-8")),
                                 self.mock_filename(_cap.encode("utf-8")),
@@ -513,289 +510,173 @@ class TestInputs:
                 np.save('a_snr_mag_9/snr_mag_params.npy', np.ones((3, 1, 5), float))
 
     def test_crossmatch_cat_name_inputs(self):
-        cm = CrossMatch(os.path.join(os.path.dirname(__file__), 'data'))
-        cm._initialise_chunk(os.path.join(os.path.dirname(__file__), 'data/crossmatch_params.txt'),
-                             os.path.join(os.path.dirname(__file__), 'data/cat_a_params.txt'),
-                             os.path.join(os.path.dirname(__file__), 'data/cat_b_params.txt'))
+        cm = CrossMatch(os.path.join(os.path.dirname(__file__), 'data/crossmatch_params.yaml'),
+                        os.path.join(os.path.dirname(__file__), 'data/cat_a_params.yaml'),
+                        os.path.join(os.path.dirname(__file__), 'data/cat_b_params.yaml'))
+        cm._load_metadata_config(self.chunk_id)
         assert cm.b_cat_name == 'WISE'
 
-        with open(os.path.join(os.path.dirname(__file__), 'data/cat_a_params.txt'), encoding='utf-8') as file:
-            f = file.readlines()
-        old_line = 'cat_name = Gaia'
-        new_line = ''
-        idx = np.where([old_line in line for line in f])[0][0]
-        _replace_line(os.path.join(os.path.dirname(__file__),
-                      'data/cat_a_params.txt'), idx, new_line, out_file=os.path.join(
-                      os.path.dirname(__file__), 'data/cat_a_params_.txt'))
-
+        ca_p_ = self.ca_p_text.replace('cat_name: Gaia', '')
         match_text = 'Missing key cat_name from catalogue "a"'
         with pytest.raises(ValueError, match=match_text):
-            cm._initialise_chunk(os.path.join(os.path.dirname(__file__),
-                                              'data/crossmatch_params.txt'),
-                                 os.path.join(os.path.dirname(__file__), 'data/cat_a_params_.txt'),
-                                 os.path.join(os.path.dirname(__file__), 'data/cat_b_params.txt'))
+            cm = CrossMatch(os.path.join(os.path.dirname(__file__), 'data/crossmatch_params.yaml'),
+                            self.mock_filename(ca_p_.encode('utf-8')),
+                            os.path.join(os.path.dirname(__file__), 'data/cat_b_params.yaml'))
 
     def test_crossmatch_search_inputs(self):
-        cm = CrossMatch(os.path.join(os.path.dirname(__file__), 'data'))
-        cm._initialise_chunk(os.path.join(os.path.dirname(__file__), 'data/crossmatch_params.txt'),
-                             os.path.join(os.path.dirname(__file__), 'data/cat_a_params.txt'),
-                             os.path.join(os.path.dirname(__file__), 'data/cat_b_params.txt'))
+        cm = CrossMatch(os.path.join(os.path.dirname(__file__), 'data/crossmatch_params.yaml'),
+                        os.path.join(os.path.dirname(__file__), 'data/cat_a_params.yaml'),
+                        os.path.join(os.path.dirname(__file__), 'data/cat_b_params.yaml'))
+        cm._load_metadata_config(self.chunk_id)
         assert cm.pos_corr_dist == 11
-        assert not hasattr(cm, 'a_dens_dist')
-        with open(os.path.join(os.path.dirname(__file__), 'data/crossmatch_params.txt'),
-                  encoding='utf-8') as file:
-            f = file.readlines()
-        old_line = 'include_perturb_auf = no'
-        new_line = 'include_perturb_auf = yes\n'
-        idx = np.where([old_line in line for line in f])[0][0]
-        _replace_line(os.path.join(os.path.dirname(__file__),
-                      'data/crossmatch_params.txt'), idx, new_line, out_file=os.path.join(
-                      os.path.dirname(__file__), 'data/crossmatch_params_.txt'))
 
-        with open(os.path.join(os.path.dirname(__file__), 'data/cat_a_params.txt'),
-                  encoding='utf-8') as file:
-            f = file.readlines()
-        old_line = 'auf_folder_path = gaia_auf_folder'
-        new_line = ('auf_folder_path = gaia_auf_folder\ndens_hist_tri_location = None\n'
-                    'tri_model_mags_location = None\ntri_model_mag_mids_location = None\n'
-                    'tri_model_mags_interval_location = None\ntri_dens_uncert_location = None\n'
-                    'tri_n_bright_sources_star_location = None\n')
-        idx = np.where([old_line in line for line in f])[0][0]
-        _replace_line(os.path.join(os.path.dirname(__file__), 'data/cat_a_params.txt'),
-                      idx, new_line, out_file=os.path.join(
-                      os.path.dirname(__file__), 'data/cat_a_params_new.txt'))
-        with open(os.path.join(os.path.dirname(__file__), 'data/cat_b_params.txt'),
-                  encoding='utf-8') as file:
-            f = file.readlines()
-        old_line = 'auf_folder_path = wise_auf_folder'
-        new_line = ('auf_folder_path = wise_auf_folder\ndens_hist_tri_location = None\n'
-                    'tri_model_mags_location = None\ntri_model_mag_mids_location = None\n'
-                    'tri_model_mags_interval_location = None\ntri_dens_uncert_location = None\n'
-                    'tri_n_bright_sources_star_location = None\n')
-        idx = np.where([old_line in line for line in f])[0][0]
-        _replace_line(os.path.join(os.path.dirname(__file__), 'data/cat_b_params.txt'),
-                      idx, new_line, out_file=os.path.join(
-                      os.path.dirname(__file__), 'data/cat_b_params_new.txt'))
+        cm_p_ = self.cm_p_text.replace('include_perturb_auf: False', 'include_perturb_auf: True')
+        ca_p_ = self.ca_p_text.replace(r'auf_folder_path: gaia_auf_folder_{}',
+                                       r'auf_folder_path: gaia_auf_folder_{}'
+                                       '\ndens_hist_tri_location: None\ntri_model_mags_location: None\n'
+                                       'tri_model_mag_mids_location: None\n'
+                                       'tri_model_mags_interval_location: None\n'
+                                       'tri_dens_uncert_location: None\n'
+                                       'tri_n_bright_sources_star_location: None')
+        cb_p_ = self.cb_p_text.replace(r'auf_folder_path: wise_auf_folder_{}',
+                                       r'auf_folder_path: wise_auf_folder_{}'
+                                       '\ndens_hist_tri_location: None\ntri_model_mags_location: None\n'
+                                       'tri_model_mag_mids_location: None\n'
+                                       'tri_model_mags_interval_location: None\n'
+                                       'tri_dens_uncert_location: None\n'
+                                       'tri_n_bright_sources_star_location: None')
 
-        cm._initialise_chunk(os.path.join(os.path.dirname(__file__), 'data/crossmatch_params_.txt'),
-                             os.path.join(os.path.dirname(__file__), 'data/cat_a_params_new.txt'),
-                             os.path.join(os.path.dirname(__file__), 'data/cat_b_params_new.txt'))
+        cm = CrossMatch(self.mock_filename(cm_p_.encode("utf-8")), self.mock_filename(ca_p_.encode("utf-8")),
+                        self.mock_filename(cb_p_.encode("utf-8")))
+        cm._load_metadata_config(self.chunk_id)
         assert np.all(cm.a_psf_fwhms == np.array([0.12, 0.12, 0.12]))  # pylint: disable=no-member
         assert cm.b_dens_dist == 0.25
 
         # List of simple one line config file replacements for error message checking
-        for old_line, new_line, match_text, in_file in zip(
-                ['pos_corr_dist = 11', 'pos_corr_dist = 11', 'dens_dist = 0.25',
-                 'dens_dist = 0.25'],
-                ['', 'pos_corr_dist = word\n', '', 'dens_dist = word\n'],
+        for old_line, new_line, match_text, fn in zip(
+                ['pos_corr_dist: 11', 'pos_corr_dist: 11', 'dens_dist: 0.25',
+                 'dens_dist: 0.25'], ['', 'pos_corr_dist: word\n', '', 'dens_dist: word\n'],
                 ['Missing key pos_corr_dist', 'pos_corr_dist must be a float',
                  'Missing key dens_dist from catalogue "b"', 'dens_dist in catalogue "a" must'],
-                ['crossmatch_params', 'crossmatch_params', 'cat_b_params_new', 'cat_a_params_new']):
-            with open(os.path.join(os.path.dirname(__file__), f'data/{in_file}.txt'),
-                      encoding='utf-8') as file:
-                f = file.readlines()
-            idx = np.where([old_line in line for line in f])[0][0]
-            _replace_line(os.path.join(os.path.dirname(__file__),
-                          f"data/{in_file}{'_' if 'h_p' in in_file else ''}.txt"), idx,
-                          new_line, out_file=os.path.join(os.path.dirname(__file__),
-                          f"data/{in_file}_{'2' if 'h_p' in in_file else ''}.txt"))
+                ['c', 'c', 'b', 'a']):
+            _cmp = cm_p_.replace(old_line, new_line) if fn == 'c' else cm_p_
+            _cap = ca_p_.replace(old_line, new_line) if fn == 'a' else ca_p_
+            _cbp = cb_p_.replace(old_line, new_line) if fn == 'b' else cb_p_
             with pytest.raises(ValueError, match=match_text):
-                cm._initialise_chunk(os.path.join(os.path.dirname(__file__),
-                                     f"data/crossmatch_params{'_2' if 'h_p' in in_file else '_'}.txt"),
-                                     os.path.join(os.path.dirname(__file__),
-                                     f"data/cat_a_params{'_new_' if '_a_' in in_file else '_new'}.txt"),
-                                     os.path.join(os.path.dirname(__file__),
-                                     f"data/cat_b_params{'_new_' if '_b_' in in_file else '_new'}.txt"))
+                cm = CrossMatch(self.mock_filename(_cmp.encode("utf-8")),
+                                self.mock_filename(_cap.encode("utf-8")),
+                                self.mock_filename(_cbp.encode("utf-8")))
+                cm._load_metadata_config(self.chunk_id)
 
     # pylint: disable-next=too-many-statements
     def test_crossmatch_perturb_auf_inputs(self):
-        with open(os.path.join(os.path.dirname(__file__), 'data/crossmatch_params.txt'),
-                  encoding='utf-8') as file:
-            f = file.readlines()
-        old_line = 'include_perturb_auf = no'
-        new_line = 'include_perturb_auf = yes\n'
-        idx = np.where([old_line in line for line in f])[0][0]
-        _replace_line(os.path.join(os.path.dirname(__file__),
-                      'data/crossmatch_params.txt'), idx, new_line, out_file=os.path.join(
-                      os.path.dirname(__file__), 'data/crossmatch_params_.txt'))
+        cm_p_ = self.cm_p_text.replace('include_perturb_auf: False', 'include_perturb_auf: True')
+        ca_p_ = self.ca_p_text.replace(r'auf_folder_path: gaia_auf_folder_{}',
+                                       r'auf_folder_path: gaia_auf_folder_{}'
+                                       '\ndens_hist_tri_location: None\ntri_model_mags_location: None\n'
+                                       'tri_model_mag_mids_location: None\n'
+                                       'tri_model_mags_interval_location: None\n'
+                                       'tri_dens_uncert_location: None\n'
+                                       'tri_n_bright_sources_star_location: None')
+        cb_p_ = self.cb_p_text.replace(r'auf_folder_path: wise_auf_folder_{}',
+                                       r'auf_folder_path: wise_auf_folder_{}'
+                                       '\ndens_hist_tri_location: None\ntri_model_mags_location: None\n'
+                                       'tri_model_mag_mids_location: None\n'
+                                       'tri_model_mags_interval_location: None\n'
+                                       'tri_dens_uncert_location: None\n'
+                                       'tri_n_bright_sources_star_location: None')
 
-        with open(os.path.join(os.path.dirname(__file__), 'data/cat_a_params.txt'),
-                  encoding='utf-8') as file:
-            f = file.readlines()
-        old_line = 'auf_folder_path = gaia_auf_folder'
-        new_line = ('auf_folder_path = gaia_auf_folder\ndens_hist_tri_location = None\n'
-                    'tri_model_mags_location = None\ntri_model_mag_mids_location = None\n'
-                    'tri_model_mags_interval_location = None\ntri_dens_uncert_location = None\n'
-                    'tri_n_bright_sources_star_location = None\n')
-        idx = np.where([old_line in line for line in f])[0][0]
-        _replace_line(os.path.join(os.path.dirname(__file__), 'data/cat_a_params.txt'),
-                      idx, new_line, out_file=os.path.join(
-                      os.path.dirname(__file__), 'data/cat_a_params_new.txt'))
-        with open(os.path.join(os.path.dirname(__file__), 'data/cat_b_params.txt'),
-                  encoding='utf-8') as file:
-            f = file.readlines()
-        old_line = 'auf_folder_path = wise_auf_folder'
-        new_line = ('auf_folder_path = wise_auf_folder\ndens_hist_tri_location = None\n'
-                    'tri_model_mags_location = None\ntri_model_mag_mids_location = None\n'
-                    'tri_model_mags_interval_location = None\ntri_dens_uncert_location = None\n'
-                    'tri_n_bright_sources_star_location = None\n')
-        idx = np.where([old_line in line for line in f])[0][0]
-        _replace_line(os.path.join(os.path.dirname(__file__), 'data/cat_b_params.txt'),
-                      idx, new_line, out_file=os.path.join(
-                      os.path.dirname(__file__), 'data/cat_b_params_new.txt'))
-
-        cm = CrossMatch(os.path.join(os.path.dirname(__file__), 'data'))
-        cm._initialise_chunk(os.path.join(os.path.dirname(__file__), 'data/crossmatch_params_.txt'),
-                             os.path.join(os.path.dirname(__file__), 'data/cat_a_params_new.txt'),
-                             os.path.join(os.path.dirname(__file__), 'data/cat_b_params_new.txt'))
+        cm = CrossMatch(self.mock_filename(cm_p_.encode("utf-8")), self.mock_filename(ca_p_.encode("utf-8")),
+                        self.mock_filename(cb_p_.encode("utf-8")))
+        cm._load_metadata_config(self.chunk_id)
         assert cm.num_trials == 10000
         assert cm.d_mag == 0.1  # pylint: disable=no-member
 
         for old_line, new_line, match_text in zip(
-                ['num_trials = 10000', 'num_trials = 10000', 'num_trials = 10000',
-                 'd_mag = 0.1', 'd_mag = 0.1'],
-                ['', 'num_trials = word\n', 'num_trials = 10000.1\n', '', 'd_mag = word\n'],
+                ['num_trials: 10000', 'num_trials: 10000', 'num_trials: 10000',
+                 'd_mag: 0.1', 'd_mag: 0.1'],
+                ['', 'num_trials: word\n', 'num_trials: 10000.1\n', '', 'd_mag: word\n'],
                 ['Missing key num_trials from joint', 'num_trials should be an integer',
-                 'num_trials should be an integer', 'Missing key d_mag from joint',
-                 'd_mag must be a float']):
+                 'num_trials should be an integer', 'Missing key d_mag from joint', 'd_mag must be a float']):
             # Make sure to keep the first edit of crossmatch_params, adding each
             # second change in turn.
-            with open(os.path.join(os.path.dirname(__file__), 'data/crossmatch_params_.txt'),
-                      encoding='utf-8') as file:
-                f = file.readlines()
-            idx = np.where([old_line in line for line in f])[0][0]
-            _replace_line(os.path.join(os.path.dirname(__file__),
-                          'data/crossmatch_params_.txt'), idx, new_line, out_file=os.path.join(
-                          os.path.dirname(__file__), 'data/crossmatch_params_2.txt'))
-            with open(os.path.join(os.path.dirname(__file__), 'data/crossmatch_params_2.txt'),
-                      encoding='utf-8') as file:
-                f = file.readlines()
-
+            _cmp = cm_p_.replace(old_line, new_line)
             with pytest.raises(ValueError, match=match_text):
-                cm._initialise_chunk(os.path.join(os.path.dirname(__file__),
-                                     'data/crossmatch_params_2.txt'),
-                                     os.path.join(os.path.dirname(__file__),
-                                     'data/cat_a_params_new.txt'),
-                                     os.path.join(os.path.dirname(__file__),
-                                     'data/cat_b_params_new.txt'))
+                cm = CrossMatch(self.mock_filename(_cmp.encode("utf-8")),
+                                self.mock_filename(ca_p_.encode("utf-8")),
+                                self.mock_filename(cb_p_.encode("utf-8")))
 
-        for old_line, var_name in zip(['fit_gal_flag = no', 'run_fw_auf = yes', 'run_psf_auf = no',
-                                       'snr_mag_params_path = '],
+        for old_line, var_name in zip(['fit_gal_flag: False', 'run_fw_auf: True', 'run_psf_auf: False',
+                                       'snr_mag_params_file_path: '],
                                       ['fit_gal_flag', 'run_fw_auf', 'run_psf_auf',
-                                       'snr_mag_params_path']):
-            for cat_reg, cat_name in zip(['"a"', '"b"'], ['cat_a_params_new', 'cat_b_params_new']):
-                with open(os.path.join(os.path.dirname(__file__), f'data/{cat_name}.txt'),
-                          encoding='utf-8') as file:
-                    f = file.readlines()
-                new_line = ''
-                idx = np.where([old_line in line for line in f])[0][0]
-                _replace_line(os.path.join(os.path.dirname(__file__),
-                              f'data/{cat_name}.txt'), idx, new_line, out_file=os.path.join(
-                              os.path.dirname(__file__), f'data/{cat_name}_.txt'))
+                                       'snr_mag_params_file_path']):
+            for cat_reg, fn in zip(['"a"', '"b"'], ['a', 'b']):
+                if 'snr_mag' in var_name:
+                    old_line = f'snr_mag_params_file_path: {fn}_snr_mag_{{}}/snr_mag_params.npy'
+                _cap = ca_p_.replace(old_line, '') if fn == 'a' else ca_p_
+                _cbp = cb_p_.replace(old_line, '') if fn == 'b' else cb_p_
                 with pytest.raises(ValueError, match=f'Missing key {var_name} from catalogue {cat_reg}'):
-                    cm._initialise_chunk(os.path.join(os.path.dirname(__file__),
-                                         'data/crossmatch_params_.txt'),
-                                         os.path.join(os.path.dirname(__file__),
-                                         f"data/cat_a_params_new{'_' if 'a' in cat_reg else ''}.txt"),
-                                         os.path.join(os.path.dirname(__file__),
-                                         f"data/cat_b_params_new{'_' if 'b' in cat_reg else ''}.txt"))
+                    cm = CrossMatch(self.mock_filename(cm_p_.encode("utf-8")),
+                                    self.mock_filename(_cap.encode("utf-8")),
+                                    self.mock_filename(_cbp.encode("utf-8")))
 
-        os.makedirs('a_snr_mag', exist_ok=True)
-        os.makedirs('b_snr_mag', exist_ok=True)
-        np.save('a_snr_mag/snr_mag_params.npy', np.ones((3, 1, 5), float))
-        np.save('b_snr_mag/snr_mag_params.npy', np.ones((4, 1, 5), float))
+        os.makedirs('a_snr_mag_9', exist_ok=True)
+        os.makedirs('b_snr_mag_9', exist_ok=True)
+        np.save('a_snr_mag_9/snr_mag_params.npy', np.ones((3, 1, 5), float))
+        np.save('b_snr_mag_9/snr_mag_params.npy', np.ones((4, 1, 5), float))
 
-        cm = CrossMatch(os.path.join(os.path.dirname(__file__), 'data'))
-        cm._initialise_chunk(os.path.join(os.path.dirname(__file__),
-                             'data/crossmatch_params_.txt'),
-                             os.path.join(os.path.dirname(__file__),
-                             'data/cat_a_params_new.txt'),
-                             os.path.join(os.path.dirname(__file__),
-                             'data/cat_b_params_new.txt'))
+        cm = CrossMatch(self.mock_filename(cm_p_.encode("utf-8")), self.mock_filename(ca_p_.encode("utf-8")),
+                        self.mock_filename(cb_p_.encode("utf-8")))
+        cm._load_metadata_config(self.chunk_id)
         assert not hasattr(cm, 'a_dd_params_path')
         assert not hasattr(cm, 'b_l_cut_path')
 
         for cat_reg, cat_name in zip(['"a"', '"b"'], ['cat_a_params_new', 'cat_b_params_new']):
-            with open(os.path.join(os.path.dirname(__file__), f'data/{cat_name}.txt'),
-                      encoding='utf-8') as file:
-                f = file.readlines()
-            old_line = 'run_psf_auf = no'
-            new_line = 'run_psf_auf = yes\n'
-            idx = np.where([old_line in line for line in f])[0][0]
-            _replace_line(os.path.join(os.path.dirname(__file__), f'data/{cat_name}.txt'), idx, new_line,
-                          out_file=os.path.join(os.path.dirname(__file__), f'data/{cat_name}_.txt'))
-            with open(os.path.join(os.path.dirname(__file__), f'data/{cat_name}_.txt'),
-                      encoding='utf-8') as file:
-                f = file.readlines()
-            old_line = 'snr_mag_params_path = '
-            new_line = (f'snr_mag_params_path = {cat_reg[1]}_snr_mag\ndd_params_path = .\n'
-                        'l_cut_path = .\n')
-            idx = np.where([old_line in line for line in f])[0][0]
-            _replace_line(os.path.join(os.path.dirname(__file__), f'data/{cat_name}_.txt'), idx, new_line)
-            for old_line, var_name in zip(['dd_params_path = .', 'l_cut_path = .'],
+            if cat_reg[1] == 'a':
+                x = ca_p_.replace('run_psf_auf: False', 'run_psf_auf: True')
+            else:
+                x = cb_p_.replace('run_psf_auf: False', 'run_psf_auf: True')
+            x = x.replace(f'snr_mag_params_file_path: {cat_reg[1]}_snr_mag_{{}}/snr_mag_params.npy',
+                          f'snr_mag_params_file_path: {cat_reg[1]}_snr_mag_{{}}/snr_mag_params.npy'
+                          '\ndd_params_path: .\nl_cut_path: .')
+            for old_line, var_name in zip(['dd_params_path: .', 'l_cut_path: .'],
                                           ['dd_params_path', 'l_cut_path']):
-                with open(os.path.join(os.path.dirname(__file__), f'data/{cat_name}_.txt'),
-                          encoding='utf-8') as file:
-                    f = file.readlines()
-                new_line = ''
-                idx = np.where([old_line in line for line in f])[0][0]
-                _replace_line(os.path.join(os.path.dirname(__file__),
-                              f'data/{cat_name}_.txt'), idx, new_line, out_file=os.path.join(
-                              os.path.dirname(__file__), f'data/{cat_name}__.txt'))
+                x2 = x.replace(old_line, '')
+                b, c = (x2, cb_p_) if cat_reg[1] == 'a' else (ca_p_, x2)
                 with pytest.raises(ValueError, match=f'Missing key {var_name} from catalogue {cat_reg}'):
-                    cm._initialise_chunk(os.path.join(os.path.dirname(__file__),
-                                         'data/crossmatch_params_.txt'),
-                                         os.path.join(os.path.dirname(__file__),
-                                         f"data/cat_a_params_new{'__' if 'a' in cat_reg else ''}.txt"),
-                                         os.path.join(os.path.dirname(__file__),
-                                         f"data/cat_b_params_new{'__' if 'b' in cat_reg else ''}.txt"))
+                    cm = CrossMatch(self.mock_filename(cm_p_.encode("utf-8")),
+                                    self.mock_filename(b.encode("utf-8")),
+                                    self.mock_filename(c.encode("utf-8")))
+                    cm._load_metadata_config(self.chunk_id)
 
         ddp = np.ones((5, 15, 2), float)
         np.save('dd_params.npy', ddp)
         lc = np.ones(3, float)
         np.save('l_cut.npy', lc)
-        for cat_name in ['cat_a_params_new', 'cat_b_params_new']:
-            with open(os.path.join(os.path.dirname(__file__), f'data/{cat_name}.txt'),
-                      encoding='utf-8') as file:
-                f = file.readlines()
-            old_line = 'run_psf_auf = no'
-            new_line = 'run_psf_auf = yes\n'
-            idx = np.where([old_line in line for line in f])[0][0]
-            _replace_line(os.path.join(os.path.dirname(__file__), f'data/{cat_name}.txt'), idx, new_line,
-                          out_file=os.path.join(os.path.dirname(__file__), f'data/{cat_name}_.txt'))
-            with open(os.path.join(os.path.dirname(__file__), f'data/{cat_name}_.txt'),
-                      encoding='utf-8') as file:
-                f = file.readlines()
-            old_line = f'snr_mag_params_path = {cat_name[4]}_snr_mag'
-            new_line = (f'snr_mag_params_path = {cat_name[4]}_snr_mag\ndd_params_path = .\n'
-                        'l_cut_path = .\n')
-            idx = np.where([old_line in line for line in f])[0][0]
-            _replace_line(os.path.join(os.path.dirname(__file__), f'data/{cat_name}_.txt'), idx, new_line)
-        with open(os.path.join(os.path.dirname(__file__), 'data/cat_b_params_new_.txt'),
-                  encoding='utf-8') as file:
-            f = file.readlines()
-        old_line = 'snr_mag_params_path = b_snr_mag'
-        new_line = 'snr_mag_params_path = /some/path/or/other\n'
-        idx = np.where([old_line in line for line in f])[0][0]
-        _replace_line(os.path.join(os.path.dirname(__file__),
-                      'data/cat_b_params_new_.txt'), idx, new_line,
-                      out_file=os.path.join(os.path.dirname(__file__), 'data/cat_b_params_new__.txt'))
-        with pytest.raises(OSError, match='b_snr_mag_params_path does not exist.'):
-            cm._initialise_chunk(os.path.join(os.path.dirname(__file__),
-                                 'data/crossmatch_params_.txt'),
-                                 os.path.join(os.path.dirname(__file__),
-                                 'data/cat_a_params_new_.txt'),
-                                 os.path.join(os.path.dirname(__file__),
-                                 'data/cat_b_params_new__.txt'))
-        os.remove('a_snr_mag/snr_mag_params.npy')
+
+        ca_p_2 = ca_p_.replace('run_psf_auf: False', 'run_psf_auf: True')
+        ca_p_2 = ca_p_2.replace(r'snr_mag_params_file_path: a_snr_mag_{}/snr_mag_params.npy',
+                                r'snr_mag_params_file_path: a_snr_mag_{}/snr_mag_params.npy'
+                                '\ndd_params_path: .\nl_cut_path: .')
+        cb_p_2 = cb_p_.replace('run_psf_auf: False', 'run_psf_auf: True')
+        cb_p_2 = cb_p_2.replace(r'snr_mag_params_file_path: b_snr_mag_{}/snr_mag_params.npy',
+                                r'snr_mag_params_file_path: b_snr_mag_{}/snr_mag_params.npy'
+                                '\ndd_params_path: .\nl_cut_path: .')
+
+        cb_p_3 = cb_p_2.replace(r'snr_mag_params_file_path: b_snr_mag_{}/snr_mag_params.npy',
+                                'snr_mag_params_file_path: /some/path/or/other')
+        with pytest.raises(OSError, match="b_snr_mag_params_file_path's folder does not exist."):
+            cm = CrossMatch(self.mock_filename(cm_p_.encode("utf-8")),
+                            self.mock_filename(ca_p_2.encode("utf-8")),
+                            self.mock_filename(cb_p_3.encode("utf-8")))
+            cm._load_metadata_config(self.chunk_id)
+        os.remove('a_snr_mag_9/snr_mag_params.npy')
         with pytest.raises(FileNotFoundError,
-                           match='snr_mag_params file not found in catalogue "a" path'):
-            cm._initialise_chunk(os.path.join(os.path.dirname(__file__),
-                                 'data/crossmatch_params_.txt'),
-                                 os.path.join(os.path.dirname(__file__),
-                                 'data/cat_a_params_new_.txt'),
-                                 os.path.join(os.path.dirname(__file__),
-                                 'data/cat_b_params_new_.txt'))
+                           match='file in a_snr_mag_params_file_path does not exist.'):
+            cm = CrossMatch(self.mock_filename(cm_p_.encode("utf-8")),
+                            self.mock_filename(ca_p_2.encode("utf-8")),
+                            self.mock_filename(cb_p_2.encode("utf-8")))
+            cm._load_metadata_config(self.chunk_id)
         for fn, array, err_msg in zip([
                 'snr_mag_params', 'snr_mag_params', 'snr_mag_params', 'dd_params', 'dd_params',
                 'dd_params', 'dd_params', 'l_cut', 'l_cut'],
@@ -811,87 +692,60 @@ class TestInputs:
                  r'a_dd_params should be of shape \(5, X, 2\)',
                  r'a_l_cut should be of shape \(3,\) only.',
                  r'a_l_cut should be of shape \(3,\) only.']):
-            np.save(f"{'a_snr_mag/' if 'snr_mag' in fn else ''}{fn}.npy", array)
+            np.save(f"{'a_snr_mag_9/' if 'snr_mag' in fn else ''}{fn}.npy", array)
             with pytest.raises(ValueError, match=err_msg):
-                cm._initialise_chunk(os.path.join(os.path.dirname(__file__),
-                                     'data/crossmatch_params_.txt'),
-                                     os.path.join(os.path.dirname(__file__),
-                                     'data/cat_a_params_new_.txt'),
-                                     os.path.join(os.path.dirname(__file__),
-                                     'data/cat_b_params_new_.txt'))
+                cm = CrossMatch(self.mock_filename(cm_p_.encode("utf-8")),
+                                self.mock_filename(ca_p_2.encode("utf-8")),
+                                self.mock_filename(cb_p_2.encode("utf-8")))
+                cm._load_metadata_config(self.chunk_id)
             # Re-make "good" fake arrays
             snr_mag_params = np.ones((3, 3, 5), float)
-            np.save('a_snr_mag/snr_mag_params.npy', snr_mag_params)
+            np.save('a_snr_mag_9/snr_mag_params.npy', snr_mag_params)
             ddp = np.ones((5, 15, 2), float)
             np.save('dd_params.npy', ddp)
             lc = np.ones(3, float)
             np.save('l_cut.npy', lc)
 
-        with open(os.path.join(os.path.dirname(__file__), 'data/cat_a_params_new.txt'),
-                  encoding='utf-8') as file:
-            f = file.readlines()
-        old_line = 'fit_gal_flag = no'
-        new_line = ('fit_gal_flag = yes\ngal_wavs = 0.513 0.641 0.778\n'
-                    'gal_zmax = 4.5 4.5 5\ngal_nzs = 46 46 51\n'
-                    'gal_aboffsets = 0.5 0.5 0.5\n'
-                    'gal_filternames = gaiadr2-BP gaiadr2-G gaiadr2-RP\n'
-                    'saturation_magnitudes = 5 5 5\n')
-        idx = np.where([old_line in line for line in f])[0][0]
-        _replace_line(os.path.join(os.path.dirname(__file__), 'data/cat_a_params_new.txt'), idx,
-                      new_line, out_file=os.path.join(os.path.dirname(__file__),
-                      'data/cat_a_params_new_.txt'))
-        with open(os.path.join(os.path.dirname(__file__), 'data/cat_b_params_new.txt'),
-                  encoding='utf-8') as file:
-            f = file.readlines()
-        old_line = 'fit_gal_flag = no'
-        new_line = ('fit_gal_flag = yes\ngal_wavs = 3.37 4.62 12.08 22.19\n'
-                    'gal_zmax = 3.2 4.0 1 4\ngal_nzs = 33 41 11 41\n'
-                    'gal_aboffsets = 0.5 0.5 0.5 0.5\n'
-                    'gal_filternames = wise2010-W1 wise2010-W2 wise2010-W3 wise2010-W4\n'
-                    'saturation_magnitudes = 5 5 5 5\n')
-        idx = np.where([old_line in line for line in f])[0][0]
-        _replace_line(os.path.join(os.path.dirname(__file__), 'data/cat_b_params_new.txt'), idx,
-                      new_line, out_file=os.path.join(os.path.dirname(__file__),
-                      'data/cat_b_params_new_.txt'))
-
-        cm._initialise_chunk(os.path.join(os.path.dirname(__file__),
-                             'data/crossmatch_params_.txt'),
-                             os.path.join(os.path.dirname(__file__),
-                             'data/cat_a_params_new_.txt'),
-                             os.path.join(os.path.dirname(__file__),
-                             'data/cat_b_params_new_.txt'))
+        ca_p_2 = ca_p_.replace('fit_gal_flag: False', 'fit_gal_flag: True\ngal_wavs: [0.513, 0.641, 0.778]\n'
+                               'gal_zmax: [4.5, 4.5, 5]\ngal_nzs: [46, 46, 51]\n'
+                               'gal_aboffsets: [0.5, 0.5, 0.5]\n'
+                               'gal_filternames: [gaiadr2-BP, gaiadr2-G, gaiadr2-RP]\n'
+                               'saturation_magnitudes: [5, 5, 5]\n')
+        cb_p_2 = cb_p_.replace('fit_gal_flag: False', 'fit_gal_flag: True\n'
+                               'gal_wavs: [3.37, 4.62, 12.08, 22.19]\ngal_zmax: [3.2, 4.0, 1, 4]\n'
+                               'gal_nzs: [33, 41, 11, 41]\ngal_aboffsets: [0.5, 0.5, 0.5, 0.5]\n'
+                               'gal_filternames: [wise2010-W1, wise2010-W2, wise2010-W3, wise2010-W4]\n'
+                               'saturation_magnitudes: [5, 5, 5, 5]\n')
+        cm = CrossMatch(self.mock_filename(cm_p_.encode("utf-8")),
+                        self.mock_filename(ca_p_2.encode("utf-8")),
+                        self.mock_filename(cb_p_2.encode("utf-8")))
+        cm._load_metadata_config(self.chunk_id)
         assert_allclose(cm.a_gal_zmax, np.array([4.5, 4.5, 5.0]))
         assert np.all(cm.b_gal_nzs == np.array([33, 41, 11, 41]))
         assert np.all(cm.a_gal_filternames == ['gaiadr2-BP', 'gaiadr2-G', 'gaiadr2-RP'])
 
-        with open(os.path.join(os.path.dirname(__file__), 'data/cat_b_params_new_.txt'),
-                  encoding='utf-8') as file:
-            f = file.readlines()
         for key in ['gal_wavs', 'gal_zmax', 'gal_nzs', 'gal_aboffsets', 'gal_filternames', 'gal_al_avs']:
-            idx = np.where([key in line for line in f])[0][0]
-            _replace_line(os.path.join(os.path.dirname(__file__), 'data/cat_b_params_new_.txt'),
-                          idx, '', out_file=os.path.join(os.path.dirname(__file__),
-                          'data/cat_b_params_new__.txt'))
+            lines = cb_p_2.split('\n')
+            ind = np.where([key in x for x in lines])[0][0]
+            cb_p_3 = cb_p_2.replace(lines[ind], '')
             with pytest.raises(ValueError,
                                match=f'Missing key {key} from catalogue "b"'):
-                cm._initialise_chunk(os.path.join(os.path.dirname(__file__),
-                                     'data/crossmatch_params_.txt'),
-                                     os.path.join(os.path.dirname(__file__),
-                                     'data/cat_a_params_new_.txt'),
-                                     os.path.join(os.path.dirname(__file__),
-                                     'data/cat_b_params_new__.txt'))
+                cm = CrossMatch(self.mock_filename(cm_p_.encode("utf-8")),
+                                self.mock_filename(ca_p_2.encode("utf-8")),
+                                self.mock_filename(cb_p_3.encode("utf-8")))
+                cm._load_metadata_config(self.chunk_id)
 
         for old_line, new_line, match_text, in_file in zip(
-                ['gal_wavs = 0.513 0.641 0.778', 'gal_aboffsets = 0.5 0.5 0.5 0.5',
-                 'gal_nzs = 46 46 51', 'gal_nzs = 33 41 11 41', 'gal_nzs = 33 41 11 41',
-                 'gal_filternames = gaiadr2-BP gaiadr2-G gaiadr2-RP',
-                 'gal_al_avs = 1.002 0.789 0.589', 'gal_al_avs = 1.002 0.789 0.589',
-                 'saturation_magnitudes = ', 'saturation_magnitudes = '],
-                ['gal_wavs = 0.513 0.641\n', 'gal_aboffsets = a 0.5 0.5 0.5\n',
-                 'gal_nzs = 46 a 51\n', 'gal_nzs = 33.1 41 11 41\n', 'gal_nzs = 33 41 11\n',
-                 'gal_filternames = gaiadr2-BP gaiadr2-G gaiadr2-RP wise2010-W1\n',
-                 'gal_al_avs = words\n', 'gal_al_avs = 0.789 1.002\n',
-                 'saturation_magnitudes = words\n', 'saturation_magnitudes = 4 4\n'],
+                ['gal_wavs: [0.513, 0.641, 0.778]', 'gal_aboffsets: [0.5, 0.5, 0.5, 0.5]',
+                 'gal_nzs: [46, 46, 51]', 'gal_nzs: [33, 41, 11, 41]', 'gal_nzs: [33, 41, 11, 41]',
+                 'gal_filternames: [gaiadr2-BP, gaiadr2-G, gaiadr2-RP]',
+                 'gal_al_avs: [1.002, 0.789, 0.589]', 'gal_al_avs: [1.002, 0.789, 0.589]',
+                 'saturation_magnitudes: [5, 5, 5, 5]', 'saturation_magnitudes: [5, 5, 5, 5]'],
+                ['gal_wavs: [0.513, 0.641]', 'gal_aboffsets: [a, 0.5, 0.5, 0.5]',
+                 'gal_nzs: [46, a, 51]', 'gal_nzs: [33.1, 41, 11, 41]', 'gal_nzs: [33, 41, 11]',
+                 'gal_filternames: [gaiadr2-BP, gaiadr2-G, gaiadr2-RP, wise2010-W1]',
+                 'gal_al_avs: words', 'gal_al_avs: [0.789, 1.002]',
+                 'saturation_magnitudes: [words]', 'saturation_magnitudes: [4, 4]'],
                 ['a_gal_wavs and a_filt_names should contain the same number',
                  'gal_aboffsets should be a list of floats in catalogue "b"',
                  'gal_nzs should be a list of integers in catalogue "a"',
@@ -902,61 +756,43 @@ class TestInputs:
                  'a_gal_al_avs and a_filt_names should contain the same number of entries.',
                  'saturation_magnitudes should be a list of floats in catalogue "b"',
                  'b_saturation_magnitudes and b_filt_names should contain the same number of entries.'],
-                ['cat_a_params_new', 'cat_b_params_new', 'cat_a_params_new', 'cat_b_params_new',
-                 'cat_b_params_new', 'cat_a_params_new', 'cat_a_params_new', 'cat_a_params_new',
-                 'cat_b_params_new', 'cat_b_params_new']):
-            with open(os.path.join(os.path.dirname(__file__), f'data/{in_file}_.txt'),
-                      encoding='utf-8') as file:
-                f = file.readlines()
-            idx = np.where([old_line in line for line in f])[0][0]
-            _replace_line(os.path.join(os.path.dirname(__file__),
-                          f'data/{in_file}_.txt'), idx, new_line, out_file=os.path.join(
-                          os.path.dirname(__file__), f'data/{in_file}__.txt'))
-
+                ['a', 'b', 'a', 'b', 'b', 'a', 'a', 'a', 'b', 'b']):
+            b = ca_p_2 if in_file == 'b' else ca_p_2.replace(old_line, new_line)
+            c = cb_p_2 if in_file == 'a' else cb_p_2.replace(old_line, new_line)
             with pytest.raises(ValueError, match=match_text):
-                cm._initialise_chunk(os.path.join(os.path.dirname(__file__),
-                                     'data/crossmatch_params_.txt'),
-                                     os.path.join(os.path.dirname(__file__),
-                                     f"data/cat_a_params_new{'_' if '_b_' in in_file else '__'}.txt"),
-                                     os.path.join(os.path.dirname(__file__),
-                                     f"data/cat_b_params_new{'_' if '_a_' in in_file else '__'}.txt"))
+                cm = CrossMatch(self.mock_filename(cm_p_.encode("utf-8")),
+                                self.mock_filename(b.encode("utf-8")),
+                                self.mock_filename(c.encode("utf-8")))
+                cm._load_metadata_config(self.chunk_id)
 
     def test_crossmatch_fourier_inputs(self):
-        cm = CrossMatch(os.path.join(os.path.dirname(__file__), 'data'))
-        cm._initialise_chunk(os.path.join(os.path.dirname(__file__), 'data/crossmatch_params.txt'),
-                             os.path.join(os.path.dirname(__file__), 'data/cat_a_params.txt'),
-                             os.path.join(os.path.dirname(__file__), 'data/cat_b_params.txt'))
+        cm = CrossMatch(self.mock_filename(self.cm_p_text.encode("utf-8")),
+                        self.mock_filename(self.ca_p_text.encode("utf-8")),
+                        self.mock_filename(self.cb_p_text.encode("utf-8")))
+        cm._load_metadata_config(self.chunk_id)
         assert cm.real_hankel_points == 10000  # pylint: disable=no-member
         assert cm.four_hankel_points == 10000  # pylint: disable=no-member
         assert cm.four_max_rho == 100  # pylint: disable=no-member
 
         # List of simple one line config file replacements for error message checking
         for old_line, new_line, match_text in zip(
-                ['real_hankel_points = 10000', 'four_hankel_points = 10000', 'four_max_rho = 100'],
-                ['', 'four_hankel_points = 10000.1\n', 'four_max_rho = word\n'],
+                ['real_hankel_points: 10000', 'four_hankel_points: 10000', 'four_max_rho: 100'],
+                ['', 'four_hankel_points: 10000.1\n', 'four_max_rho: word\n'],
                 ['Missing key real_hankel_points', 'four_hankel_points should be an integer.',
                  'four_max_rho should be an integer.']):
-            with open(os.path.join(os.path.dirname(__file__), 'data/crossmatch_params.txt'),
-                      encoding='utf-8') as file:
-                f = file.readlines()
-            idx = np.where([old_line in line for line in f])[0][0]
-            _replace_line(os.path.join(os.path.dirname(__file__),
-                          'data/crossmatch_params.txt'), idx, new_line, out_file=os.path.join(
-                          os.path.dirname(__file__), 'data/crossmatch_params_.txt'))
+            cm_p_ = self.cm_p_text.replace(old_line, new_line)
 
             with pytest.raises(ValueError, match=match_text):
-                cm._initialise_chunk(os.path.join(os.path.dirname(__file__),
-                                     'data/crossmatch_params_.txt'),
-                                     os.path.join(os.path.dirname(__file__),
-                                     'data/cat_a_params.txt'),
-                                     os.path.join(os.path.dirname(__file__),
-                                     'data/cat_b_params.txt'))
+                cm = CrossMatch(self.mock_filename(cm_p_.encode("utf-8")),
+                                self.mock_filename(self.ca_p_text.encode("utf-8")),
+                                self.mock_filename(self.cb_p_text.encode("utf-8")))
+                cm._load_metadata_config(self.chunk_id)
 
     def test_crossmatch_frame_equality(self):
-        cm = CrossMatch(os.path.join(os.path.dirname(__file__), 'data'))
-        cm._initialise_chunk(os.path.join(os.path.dirname(__file__), 'data/crossmatch_params.txt'),
-                             os.path.join(os.path.dirname(__file__), 'data/cat_a_params.txt'),
-                             os.path.join(os.path.dirname(__file__), 'data/cat_b_params.txt'))
+        cm = CrossMatch(self.mock_filename(self.cm_p_text.encode("utf-8")),
+                        self.mock_filename(self.ca_p_text.encode("utf-8")),
+                        self.mock_filename(self.cb_p_text.encode("utf-8")))
+        cm._load_metadata_config(self.chunk_id)
         assert cm.a_auf_region_frame == 'equatorial'  # pylint: disable=no-member
         assert cm.b_auf_region_frame == 'equatorial'  # pylint: disable=no-member
         assert cm.cf_region_frame == 'equatorial'  # pylint: disable=no-member
@@ -964,69 +800,55 @@ class TestInputs:
         # List of simple one line config file replacements for error message checking
         match_text = 'Region frames for c/f and AUF creation must all be the same.'
         for old_line, new_line, in_file in zip(
-                ['cf_region_frame = equatorial', 'auf_region_frame = equatorial',
-                 'auf_region_frame = equatorial'],
-                ['cf_region_frame = galactic\n', 'auf_region_frame = galactic\n',
-                 'auf_region_frame = galactic\n'],
-                ['crossmatch_params', 'cat_a_params', 'cat_b_params']):
-            with open(os.path.join(os.path.dirname(__file__), f'data/{in_file}.txt'),
-                      encoding='utf-8') as file:
-                f = file.readlines()
-            idx = np.where([old_line in line for line in f])[0][0]
-            _replace_line(os.path.join(os.path.dirname(__file__), f'data/{in_file}.txt'), idx, new_line,
-                          out_file=os.path.join(os.path.dirname(__file__), f'data/{in_file}_.txt'))
-
+                ['cf_region_frame: equatorial', 'auf_region_frame: equatorial',
+                 'auf_region_frame: equatorial'],
+                ['cf_region_frame: galactic', 'auf_region_frame: galactic',
+                 'auf_region_frame: galactic'], ['c', 'a', 'b']):
+            a = self.cm_p_text.replace(old_line, new_line) if in_file == 'c' else self.cm_p_text
+            b = self.ca_p_text.replace(old_line, new_line) if in_file == 'a' else self.ca_p_text
+            c = self.cb_p_text.replace(old_line, new_line) if in_file == 'b' else self.cb_p_text
             with pytest.raises(ValueError, match=match_text):
-                cm._initialise_chunk(os.path.join(os.path.dirname(__file__),
-                                     f"data/crossmatch_params{'_' if 'h_p' in in_file else ''}.txt"),
-                                     os.path.join(os.path.dirname(__file__),
-                                     f"data/cat_a_params{'_' if '_a_' in in_file else ''}.txt"),
-                                     os.path.join(os.path.dirname(__file__),
-                                     f"data/cat_b_params{'_' if '_b_' in in_file else ''}.txt"))
+                cm = CrossMatch(self.mock_filename(a.encode("utf-8")),
+                                self.mock_filename(b.encode("utf-8")),
+                                self.mock_filename(c.encode("utf-8")))
+                cm._load_metadata_config(self.chunk_id)
 
     def test_int_fracs(self):
-        cm = CrossMatch(os.path.join(os.path.dirname(__file__), 'data'))
-        cm._initialise_chunk(os.path.join(os.path.dirname(__file__), 'data/crossmatch_params.txt'),
-                             os.path.join(os.path.dirname(__file__), 'data/cat_a_params.txt'),
-                             os.path.join(os.path.dirname(__file__), 'data/cat_b_params.txt'))
+        cm = CrossMatch(self.mock_filename(self.cm_p_text.encode("utf-8")),
+                        self.mock_filename(self.ca_p_text.encode("utf-8")),
+                        self.mock_filename(self.cb_p_text.encode("utf-8")))
+        cm._load_metadata_config(self.chunk_id)
         assert np.all(cm.int_fracs == np.array([0.63, 0.9, 0.999]))
 
         # List of simple one line config file replacements for error message checking
-        in_file = 'crossmatch_params'
-        with open(os.path.join(os.path.dirname(__file__), f'data/{in_file}.txt'), encoding='utf-8') as file:
-            f = file.readlines()
-        old_line = 'int_fracs = 0.63 0.9 0.999'
+        old_line = 'int_fracs: [0.63, 0.9, 0.999]'
         for new_line, match_text in zip(
-                ['', 'int_fracs = 0.63 0.9 word\n', 'int_fracs = 0.63 0.9\n'],
+                ['', 'int_fracs: [0.63, 0.9, word]', 'int_fracs: [0.63, 0.9]'],
                 ['Missing key int_fracs', 'All elements of int_fracs should be',
                  'int_fracs should contain.']):
-            idx = np.where([old_line in line for line in f])[0][0]
-            _replace_line(os.path.join(os.path.dirname(__file__), f'data/{in_file}.txt'), idx, new_line,
-                          out_file=os.path.join(os.path.dirname(__file__), f'data/{in_file}_.txt'))
-
+            a = self.cm_p_text.replace(old_line, new_line)
             with pytest.raises(ValueError, match=match_text):
-                cm._initialise_chunk(os.path.join(os.path.dirname(__file__),
-                                     f"data/crossmatch_params{'_' if 'h_p' in in_file else ''}.txt"),
-                                     os.path.join(os.path.dirname(__file__),
-                                     f"data/cat_a_params{'_' if '_a_' in in_file else ''}.txt"),
-                                     os.path.join(os.path.dirname(__file__),
-                                     f"data/cat_b_params{'_' if '_b_' in in_file else ''}.txt"))
+                cm = CrossMatch(self.mock_filename(a.encode("utf-8")),
+                                self.mock_filename(self.ca_p_text.encode("utf-8")),
+                                self.mock_filename(self.cb_p_text.encode("utf-8")))
+                cm._load_metadata_config(self.chunk_id)
 
     def test_crossmatch_shared_data(self):
-        cm = CrossMatch(os.path.join(os.path.dirname(__file__), 'data'))
-        cm._initialise_chunk(os.path.join(os.path.dirname(__file__), 'data/crossmatch_params.txt'),
-                             os.path.join(os.path.dirname(__file__), 'data/cat_a_params.txt'),
-                             os.path.join(os.path.dirname(__file__), 'data/cat_b_params.txt'))
+        cm = CrossMatch(self.mock_filename(self.cm_p_text.encode("utf-8")),
+                        self.mock_filename(self.ca_p_text.encode("utf-8")),
+                        self.mock_filename(self.cb_p_text.encode("utf-8")))
+        cm._load_metadata_config(self.chunk_id)
+        cm._initialise_chunk()
         assert np.all(cm.r == np.linspace(0, 11, 10000))
         assert_allclose(cm.dr, np.ones(9999, float) * 11/9999)
         assert np.all(cm.rho == np.linspace(0, 100, 10000))
         assert_allclose(cm.drho, np.ones(9999, float) * 100/9999)
 
     def test_cat_folder_path(self):
-        cm = CrossMatch(os.path.join(os.path.dirname(__file__), 'data'))
-        cm._initialise_chunk(os.path.join(os.path.dirname(__file__), 'data/crossmatch_params.txt'),
-                             os.path.join(os.path.dirname(__file__), 'data/cat_a_params.txt'),
-                             os.path.join(os.path.dirname(__file__), 'data/cat_b_params.txt'))
+        cm = CrossMatch(self.mock_filename(self.cm_p_text.encode("utf-8")),
+                        self.mock_filename(self.ca_p_text.encode("utf-8")),
+                        self.mock_filename(self.cb_p_text.encode("utf-8")))
+        cm._load_metadata_config(self.chunk_id)
         assert os.path.exists(self.a_cat_folder_path)
         assert os.path.exists(self.b_cat_folder_path)
         assert cm.a_cat_folder_path == self.a_cat_folder_path
@@ -1036,18 +858,18 @@ class TestInputs:
 
         os.system(f'rm -rf {self.a_cat_folder_path}')
         with pytest.raises(OSError, match="a_cat_folder_path does not exist."):
-            cm._initialise_chunk(os.path.join(os.path.dirname(__file__),
-                                              'data/crossmatch_params.txt'),
-                                 os.path.join(os.path.dirname(__file__), 'data/cat_a_params.txt'),
-                                 os.path.join(os.path.dirname(__file__), 'data/cat_b_params.txt'))
+            cm = CrossMatch(self.mock_filename(self.cm_p_text.encode("utf-8")),
+                            self.mock_filename(self.ca_p_text.encode("utf-8")),
+                            self.mock_filename(self.cb_p_text.encode("utf-8")))
+            cm._load_metadata_config(self.chunk_id)
         self.setup_class()
 
         os.system(f'rm -rf {self.b_cat_folder_path}')
         with pytest.raises(OSError, match="b_cat_folder_path does not exist."):
-            cm._initialise_chunk(os.path.join(os.path.dirname(__file__),
-                                              'data/crossmatch_params.txt'),
-                                 os.path.join(os.path.dirname(__file__), 'data/cat_a_params.txt'),
-                                 os.path.join(os.path.dirname(__file__), 'data/cat_b_params.txt'))
+            cm = CrossMatch(self.mock_filename(self.cm_p_text.encode("utf-8")),
+                            self.mock_filename(self.ca_p_text.encode("utf-8")),
+                            self.mock_filename(self.cb_p_text.encode("utf-8")))
+            cm._load_metadata_config(self.chunk_id)
         self.setup_class()
 
         for catpath, file in zip([self.a_cat_folder_path, self.b_cat_folder_path],
@@ -1055,12 +877,11 @@ class TestInputs:
             os.system(f'rm {catpath}/{file}.npy')
             with pytest.raises(FileNotFoundError,
                                match=f'{file} file not found in catalogue '):
-                cm._initialise_chunk(os.path.join(os.path.dirname(__file__),
-                                     'data/crossmatch_params.txt'),
-                                     os.path.join(os.path.dirname(__file__),
-                                                  'data/cat_a_params.txt'),
-                                     os.path.join(os.path.dirname(__file__),
-                                                  'data/cat_b_params.txt'))
+                cm = CrossMatch(self.mock_filename(self.cm_p_text.encode("utf-8")),
+                                self.mock_filename(self.ca_p_text.encode("utf-8")),
+                                self.mock_filename(self.cb_p_text.encode("utf-8")))
+                cm._load_metadata_config(self.chunk_id)
+                cm._initialise_chunk()
             self.setup_class()
 
         for name, data, match in zip(['con_cat_astro', 'con_cat_photo', 'con_cat_astro',
@@ -1080,12 +901,11 @@ class TestInputs:
                                       'Consolidated catalogue arrays for catalogue "b"']):
             np.save(f'{self.b_cat_folder_path}/{name}.npy', data)
             with pytest.raises(ValueError, match=match):
-                cm._initialise_chunk(os.path.join(os.path.dirname(__file__),
-                                     'data/crossmatch_params.txt'),
-                                     os.path.join(os.path.dirname(__file__),
-                                                  'data/cat_a_params.txt'),
-                                     os.path.join(os.path.dirname(__file__),
-                                                  'data/cat_b_params.txt'))
+                cm = CrossMatch(self.mock_filename(self.cm_p_text.encode("utf-8")),
+                                self.mock_filename(self.ca_p_text.encode("utf-8")),
+                                self.mock_filename(self.cb_p_text.encode("utf-8")))
+                cm._load_metadata_config(self.chunk_id)
+                cm._initialise_chunk()
             self.setup_class()
 
     @pytest.mark.parametrize("shape", ["rectangle", "circle"])
@@ -1103,10 +923,10 @@ class TestInputs:
                 # arctan(1/0) = pi/2, sqrt(x (2R - x)) = 0
                 return R**2 * np.pi / 2
             return None
-        cm = CrossMatch(os.path.join(os.path.dirname(__file__), 'data'))
-        cm._initialise_chunk(os.path.join(os.path.dirname(__file__), 'data/crossmatch_params.txt'),
-                             os.path.join(os.path.dirname(__file__), 'data/cat_a_params.txt'),
-                             os.path.join(os.path.dirname(__file__), 'data/cat_b_params.txt'))
+        cm = CrossMatch(self.mock_filename(self.cm_p_text.encode("utf-8")),
+                        self.mock_filename(self.ca_p_text.encode("utf-8")),
+                        self.mock_filename(self.cb_p_text.encode("utf-8")))
+        cm._load_metadata_config(self.chunk_id)
         cm.cf_region_points = np.array([[a, b] for a in [131.5, 132.5, 133.5]
                                         for b in [-0.5, 0.5]])
         cm.chunk_id = 1

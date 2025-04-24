@@ -652,6 +652,17 @@ class CrossMatch():
                     _item = np.array(item) if item is list else item
                     setattr(self, f'{cat_prefix}{key}', _item)
 
+        for catname, flag in zip(['"a"', '"b"'], ['a_', 'b_']):
+            if not os.path.exists(getattr(self, f'{flag[0]}_cat_folder_path')):
+                raise OSError(f'{flag}cat_folder_path does not exist. Please ensure that '
+                              f'path for catalogue {catname} is correct.')
+            if getattr(self, f'{flag[0]}_auf_folder_path') is not None:
+                try:
+                    os.makedirs(getattr(self, f'{flag[0]}_auf_folder_path'), exist_ok=True)
+                except OSError as exc:
+                    raise OSError(f"Error when trying to create temporary folder for catalogue {catname} AUF "
+                                  f"outputs. Please ensure that {flag}auf_folder_path is correct.") from exc
+
         for config, catname in zip([self.cat_a_params_dict, self.cat_b_params_dict], ['a_', 'b_']):
             ind = np.where(chunk_id == np.array(config['chunk_id_list']))[0][0]
             self._make_regions_points([f'{catname}auf_region_type', config['auf_region_type']],
@@ -674,13 +685,14 @@ class CrossMatch():
                 # exists.
                 if not os.path.exists(os.path.dirname(os.path.abspath(
                         config['snr_mag_params_file_path'].format(chunk_id)))):
-                    raise OSError(f"{catname}snr_mag_params_file_path's folder does not exist. Please ensure "
-                                  f"that path for catalogue {catname} is correct.")
+                    raise OSError(f"{flag}snr_mag_params_file_path's folder does not exist. Please ensure "
+                                  f"that path for catalogue {flag[0]} is correct.")
                 if self.crossmatch_params_dict['include_perturb_auf']:
                     if not os.path.isfile(os.path.abspath(
                             config['snr_mag_params_file_path'].format(chunk_id))):
-                        raise OSError(f"The file in {catname}snr_mag_params_file_path does not exist. Please "
-                                      f"ensure that path for catalogue {catname} is correct.")
+                        raise FileNotFoundError(f"The file in {flag}snr_mag_params_file_path does not exist."
+                                                f" Please ensure that path for catalogue {flag[0]} is "
+                                                "correct.")
 
                 if not (config['correct_astrometry'] or config['compute_snr_mag_relation']):
                     # If we are correcting the astrometry, we will be
@@ -701,8 +713,7 @@ class CrossMatch():
                 for check_flag, f in zip(['dd_params_path', 'l_cut_path'], ['dd_params', 'l_cut']):
                     setattr(self, f'{flag}{f}', np.load(f'{config[check_flag]}/{f}.npy'))
 
-        for config, catname, flag in zip([self.cat_a_params_dict, self.cat_b_params_dict], ['"a"', '"b"'],
-                                         ['a_', 'b_']):
+        for config, flag in zip([self.cat_a_params_dict, self.cat_b_params_dict], ['a_', 'b_']):
             if self.crossmatch_params_dict['include_perturb_auf'] or config['correct_astrometry']:
                 for name in ['dens_hist_tri', 'tri_model_mags', 'tri_model_mag_mids',
                              'tri_model_mags_interval', 'tri_dens_uncert', 'tri_n_bright_sources_star']:
@@ -711,8 +722,7 @@ class CrossMatch():
                     # above already.
                     if config[f'{name}_location'] != "None":
                         setattr(self, f'{flag}{name}_list', np.load(config[f'{name}_location']))
-        for config, catname, flag in zip(
-                [self.cat_a_params_dict, self.cat_b_params_dict], ['"a"', '"b"'], ['a_', 'b_']):
+        for config, flag in zip([self.cat_a_params_dict, self.cat_b_params_dict], ['a_', 'b_']):
             if config['correct_astrometry'] or config['compute_snr_mag_relation']:
                 if config['correct_astrometry']:
                     # The reshape puts the first three elements in a[0], and hence
@@ -867,23 +877,8 @@ class CrossMatch():
         else:
             cat_b_config['auf_folder_path'] = os.path.abspath(cat_b_config['auf_folder_path'])
 
-        for config, catname, flag in zip([cat_a_config, cat_b_config], ['"a"', '"b"'], ['a_', 'b_']):
-            if config['auf_folder_path'] is not None:
-                try:
-                    os.makedirs(config['auf_folder_path'], exist_ok=True)
-                except OSError as exc:
-                    raise OSError(f"Error when trying to create temporary folder for catalogue {catname} AUF "
-                                  f"outputs. Please ensure that {flag}auf_folder_path is correct.") from exc
-
         cat_a_config['cat_folder_path'] = os.path.abspath(cat_a_config['cat_folder_path'])
         cat_b_config['cat_folder_path'] = os.path.abspath(cat_b_config['cat_folder_path'])
-        # Unlike the AUF folder paths, which are allowed to not exist at
-        # runtime, we simply check that cat_folder_path exists for both
-        # input catalogues.
-        for config, catname, flag in zip([cat_a_config, cat_b_config], ['"a"', '"b"'], ['a_', 'b_']):
-            if not os.path.exists(config['cat_folder_path']):
-                raise OSError(f'{flag}cat_folder_path does not exist. Please ensure that '
-                              f'path for catalogue {catname} is correct.')
 
         # Only have to check for the existence of Pertubation AUF-related
         # parameters if we are using the perturbation AUF component.
@@ -948,7 +943,7 @@ class CrossMatch():
 
             if joint_config['include_perturb_auf']:
                 if 'fit_gal_flag' not in config:
-                    raise ValueError(f"Missing key {check_flag} from catalogue {catname} metadata file.")
+                    raise ValueError(f"Missing key fit_gal_flag from catalogue {catname} metadata file.")
                 if config['fit_gal_flag'] not in (True, False):
                     raise ValueError("Boolean key fit_gal_flag not set to allowed value in catalogue "
                                      f"{catname} metadata file.")
@@ -1153,7 +1148,7 @@ class CrossMatch():
                             raise ValueError(f'{flag}{var} and {flag}filt_names should contain the same '
                                              'number of entries.')
                     # galaxy_nzs should be a list of integers.
-                    a = config['gal_nzs'].split(' ')
+                    a = config['gal_nzs']
                     try:
                         b = np.array([float(f) for f in a])
                     except ValueError as exc:
@@ -1165,7 +1160,7 @@ class CrossMatch():
                     if not np.all([c.is_integer() for c in b]):
                         raise ValueError(f'All elements of {flag}gal_nzs should be integers.')
                     # Filter names are simple lists of strings
-                    b = config['gal_filternames'].split(' ')
+                    b = config['gal_filternames']
                     if len(b) != len(config['filt_names']):
                         raise ValueError(f'{flag}gal_filternames and {flag}filt_names should contain the '
                                          'same number of entries.')
@@ -1226,7 +1221,7 @@ class CrossMatch():
 
                 config['csv_cat_file_string'] = os.path.abspath(config['csv_cat_file_string'])
 
-                a = config['mag_indices'].split(' ')
+                a = config['mag_indices']
                 try:
                     b = np.array([float(f) for f in a])
                 except ValueError as exc:
@@ -1239,7 +1234,7 @@ class CrossMatch():
                     raise ValueError(f'All elements of {flag}mag_indices should be '
                                      'integers.')
 
-                a = config['mag_unc_indices'].split(' ')
+                a = config['mag_unc_indices']
                 try:
                     b = np.array([float(f) for f in a])
                 except ValueError as exc:
@@ -1256,7 +1251,7 @@ class CrossMatch():
                 # where each *_cat_inds is a three-element list [x, y, z],
                 # or just this_cat_inds in the case of
                 # compute_snr_mag_relation=True.
-                a = config['pos_and_err_indices'].split(' ')
+                a = config['pos_and_err_indices']
                 try:
                     b = np.array([float(f) for f in a])
                 except ValueError as exc:
@@ -1294,7 +1289,7 @@ class CrossMatch():
                                      "metadata file.")
 
                 # Since make_plots is always True, we always need seeing_ranges.
-                a = config['seeing_ranges'].split(' ')
+                a = config['seeing_ranges']
                 try:
                     b = np.array([float(f) for f in a])
                     if len(b.shape) != 1 or len(b) not in [1, 2, 3]:
@@ -1355,14 +1350,14 @@ class CrossMatch():
 
                 config['ref_csv_cat_file_string'] = os.path.abspath(config['ref_csv_cat_file_string'])
 
-                a = config['correct_mag_array'].split()
+                a = config['correct_mag_array']
                 try:
                     b = np.array([float(f) for f in a])
                 except ValueError as exc:
                     raise ValueError('correct_mag_array should be a list of floats in the '
                                      f'catalogue {catname} metadata file.') from exc
 
-                a = config['correct_mag_slice'].split()
+                a = config['correct_mag_slice']
                 try:
                     b = np.array([float(f) for f in a])
                 except ValueError as exc:
@@ -1372,7 +1367,7 @@ class CrossMatch():
                     raise ValueError(f'{flag}correct_mag_array and {flag}correct_mag_slice should contain '
                                      'the same number of entries.')
 
-                a = config['correct_sig_slice'].split()
+                a = config['correct_sig_slice']
                 try:
                     b = np.array([float(f) for f in a])
                 except ValueError as exc:
