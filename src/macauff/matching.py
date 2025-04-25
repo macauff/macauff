@@ -652,6 +652,11 @@ class CrossMatch():
                     _item = np.array(item) if item is list else item
                     setattr(self, f'{cat_prefix}{key}', _item)
 
+        # Ensure that we can save to the folders for outputs.
+        if not os.path.exists(self.joint_folder_path):
+            raise OSError("Error when trying to check temporary folder for joint outputs. "
+                          "Please ensure that joint_folder_path is correct.")
+
         for catname, flag in zip(['"a"', '"b"'], ['a_', 'b_']):
             if not os.path.exists(getattr(self, f'{flag[0]}_cat_folder_path')):
                 raise OSError(f'{flag}cat_folder_path does not exist. Please ensure that '
@@ -704,7 +709,7 @@ class CrossMatch():
                     setattr(self, f'{flag}snr_mag_params', a)
                 else:
                     setattr(self, f'{flag}snr_mag_params_file_path',
-                            os.path.abspath(config['snr_mag_params_file_path']))
+                            os.path.abspath(config['snr_mag_params_file_path'].format(chunk_id)))
 
             # Only need dd_params or l_cut if we're using run_psf_auf or
             # correct_astrometry is True.
@@ -727,7 +732,8 @@ class CrossMatch():
                 if config['correct_astrometry']:
                     # The reshape puts the first three elements in a[0], and hence
                     # those are ref_cat_inds, with a[1] this_cat_inds.
-                    setattr(self, f'{flag}pos_and_err_indices', config['pos_and_err_indices'].reshape(2, 3))
+                    setattr(self, f'{flag}pos_and_err_indices',
+                            np.array(config['pos_and_err_indices']).reshape(2, 3))
                 else:
                     # If we only want to compute the SNR-mag relation, then we've
                     # only got three elements, so we just store them in a (3,)
@@ -863,10 +869,6 @@ class CrossMatch():
             raise ValueError("Region frames for c/f and AUF creation must all be the same.")
 
         joint_config['joint_folder_path'] = os.path.abspath(joint_config['joint_folder_path'])
-        # Ensure that we can save to the folders for outputs.
-        if not os.path.exists(joint_config['joint_folder_path']):
-            raise OSError("Error when trying to check temporary folder for joint outputs. "
-                          "Please ensure that joint_folder_path is correct.")
 
         if cat_a_config['auf_folder_path'] == "None":
             cat_a_config['auf_folder_path'] = None
@@ -1240,7 +1242,7 @@ class CrossMatch():
                 except ValueError as exc:
                     raise ValueError('mag_unc_indices should be a list of integers '
                                      f'in the catalogue {catname} metadata file') from exc
-                if len(b) != len(getattr(self, f'{flag}mag_indices')):
+                if len(b) != len(config['mag_indices']):
                     raise ValueError(f'{flag}mag_unc_indices and {flag}mag_indices should contain the '
                                      'same number of entries.')
                 if not np.all([c.is_integer() for c in b]):
@@ -1363,7 +1365,7 @@ class CrossMatch():
                 except ValueError as exc:
                     raise ValueError('correct_mag_slice should be a list of floats in the '
                                      f'catalogue {catname} metadata file.') from exc
-                if len(b) != len(getattr(self, f'{flag}correct_mag_array')):
+                if len(b) != len(config['correct_mag_array']):
                     raise ValueError(f'{flag}correct_mag_array and {flag}correct_mag_slice should contain '
                                      'the same number of entries.')
 
@@ -1373,7 +1375,7 @@ class CrossMatch():
                 except ValueError as exc:
                     raise ValueError('correct_sig_slice should be a list of floats in the '
                                      f'catalogue {catname} metadata file.') from exc
-                if len(b) != len(getattr(self, f'{flag}correct_mag_array')):
+                if len(b) != len(config['correct_mag_array']):
                     raise ValueError(f'{flag}correct_mag_array and {flag}correct_sig_slice should contain '
                                      'the same number of entries.')
 
@@ -1430,10 +1432,10 @@ class CrossMatch():
             # this is defined in joint_config, not each individual
             # catalogue config!
             nonmatch_out_name = joint_config['nonmatch_out_csv_name']
-            joint_config['nonmatch_out_csv_name'] = f'{config["cat_name"]}_{nonmatch_out_name}'
+            config['nonmatch_out_csv_name'] = f'{config["cat_name"]}_{nonmatch_out_name}'
 
-            input_csv_folder = os.path.abspath(config['input_csv_folder'])
-            if not os.path.exists(input_csv_folder):
+            config['input_csv_folder'] = os.path.abspath(config['input_csv_folder'])
+            if not os.path.exists(config['input_csv_folder']):
                 raise OSError(f'input_csv_folder from catalogue "{catname[0]}" does not exist.')
 
             # cat_col_names is simply a list/array of strings. However, to
@@ -1449,7 +1451,7 @@ class CrossMatch():
             except ValueError as exc:
                 raise ValueError('cat_col_nums should be a list of integers '
                                  f'in catalogue "{catname[0]}" metadata file') from exc
-            if len(b) != len(getattr(self, f'{catname}cat_col_names')):
+            if len(b) != len(config['cat_col_names']):
                 raise ValueError(f'{catname}cat_col_names and {catname}cat_col_nums should contain the same '
                                  'number of entries.')
             if not np.all([c.is_integer() for c in b]):
@@ -1489,7 +1491,7 @@ class CrossMatch():
                 except ValueError as exc:
                     raise ValueError('extra_col_nums should be a list of integers '
                                      f'in catalogue "{catname[0]}" metadata file') from exc
-                if len(b) != len(getattr(self, f'{catname}extra_col_names')):
+                if len(b) != len(config['extra_col_names']):
                     raise ValueError(f'{catname}extra_col_names and {catname}extra_col_nums should '
                                      'contain the same number of entries.')
                 if not np.all([c.is_integer() for c in b]):
