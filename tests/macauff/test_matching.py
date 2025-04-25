@@ -1650,7 +1650,19 @@ class TestPostProcess:
         na, nb, nmatch = 10000, 7000, 4000
         self.na, self.nb, self.nmatch = na, nb, nmatch
 
-        self.cm = CrossMatch(os.path.join(os.path.dirname(__file__), 'data'))
+        with open(os.path.join(os.path.dirname(__file__), 'data/crossmatch_params.yaml'),
+                  encoding='utf-8') as cm_p:
+            self.cm_p_text = cm_p.read()
+        with open(os.path.join(os.path.dirname(__file__), 'data/cat_a_params.yaml'),
+                  encoding='utf-8') as ca_p:
+            self.ca_p_text = ca_p.read()
+        with open(os.path.join(os.path.dirname(__file__), 'data/cat_b_params.yaml'),
+                  encoding='utf-8') as cb_p:
+            self.cb_p_text = cb_p.read()
+
+        self.cm = CrossMatch(self.mock_filename(self.cm_p_text.encode("utf-8")),
+                             self.mock_filename(self.ca_p_text.encode("utf-8")),
+                             self.mock_filename(self.cb_p_text.encode("utf-8")))
 
         rng = np.random.default_rng(seed=7893467234)
         self.ac = rng.choice(na, size=nmatch, replace=False)
@@ -1685,6 +1697,12 @@ class TestPostProcess:
 
         self.cm.reject_a = None
         self.cm.reject_b = None
+
+    def mock_filename(self, content: bytes) -> int:
+        r, w = os.pipe()
+        with open(w, "wb") as wf:
+            wf.write(content)
+        return r
 
     def make_temp_catalogue(self, nrow, ncol, nnans, designation):
         # Fake a ID/ra/dec/err/[mags xN]/bestflag/inchunk csv file.
