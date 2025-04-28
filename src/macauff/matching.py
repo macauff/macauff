@@ -480,7 +480,7 @@ class CrossMatch():
         # Clean up and shut down
         self._cleanup()
 
-    def _process_chunk(self, joint_file_path, cat_a_file_path, cat_b_file_path):
+    def _process_chunk(self):
         '''
         Runs the various stages of cross-matching two photometric catalogues
         '''
@@ -1188,6 +1188,7 @@ class CrossMatch():
             raise ValueError("All elements of int_fracs should be floats.") from exc
         if len(b) != 3:
             raise ValueError("int_fracs should contain three elements.")
+        joint_config['int_fracs'] = np.array(joint_config['int_fracs'])
 
         if joint_config["make_output_csv"] not in (True, False):
             raise ValueError('Boolean flag key make_output_csv not set to allowed value '

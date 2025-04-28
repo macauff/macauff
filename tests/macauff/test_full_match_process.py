@@ -7,8 +7,7 @@ import os
 
 import numpy as np
 import pytest
-from test_matching import _replace_line
-
+from test_utils import mock_filename
 # pylint: disable=import-error,no-name-in-module
 from macauff.matching import CrossMatch
 from macauff.utils import generate_random_data
@@ -97,61 +96,42 @@ def test_naive_bayes_match(shape, x, y):
     # Ensure output chunk directory exists
     os.makedirs(os.path.join(os.path.dirname(__file__), "data/chunk0"), exist_ok=True)
 
-    ol, nl = 'pos_corr_dist = 11', f'pos_corr_dist = {r:.2f}\n'
-    with open(os.path.join(os.path.dirname(__file__), 'data/crossmatch_params.txt'),
-              encoding='utf-8') as file:
-        f = file.readlines()
-    idx = np.where([ol in line for line in f])[0][0]
-    _replace_line(os.path.join(os.path.dirname(__file__), 'data/crossmatch_params.txt'),
-                  idx, nl, out_file=os.path.join(os.path.dirname(__file__),
-                  'data/chunk0/crossmatch_params_.txt'))
+    with open(os.path.join(os.path.dirname(__file__), 'data/crossmatch_params.yaml'),
+              encoding='utf-8') as cm_p:
+        cm_p_text = cm_p.read()
+    with open(os.path.join(os.path.dirname(__file__), 'data/cat_a_params.yaml'),
+              encoding='utf-8') as ca_p:
+        ca_p_text = ca_p.read()
+    with open(os.path.join(os.path.dirname(__file__), 'data/cat_b_params.yaml'),
+              encoding='utf-8') as cb_p:
+        cb_p_text = cb_p.read()
+    cm_p_ = cm_p_text.replace('pos_corr_dist: 11', f'pos_corr_dist: {r:.2f}')
 
     if shape == 'rectangle':
-        new_region_points = f'{x} {x} 1 {y} {y} 1'
+        new_region_points = f'[{x}, {x}, 1, {y}, {y}, 1]'
     else:
-        new_region_points = f'{x-radius/2:.2f} {x+radius/2:.2f} 2 {y} {y} 1'
+        new_region_points = f'[{x-radius/2:.2f}, {x+radius/2:.2f}, 2, {y}, {y}, 1]'
 
-    for ol, nl in zip(['joint_folder_path = test_path', 'cf_region_points = 131 134 4 -1 1 3'],
-                      ['joint_folder_path = new_test_path\n', f'cf_region_points = {new_region_points}\n']):
-        with open(os.path.join(os.path.dirname(__file__), 'data/crossmatch_params.txt'),
-                  encoding='utf-8') as file:
-            f = file.readlines()
-        idx = np.where([ol in line for line in f])[0][0]
-        _replace_line(os.path.join(os.path.dirname(__file__), 'data/chunk0/crossmatch_params_.txt'),
-                      idx, nl)
+    for ol, nl in zip([r'joint_folder_path: test_path_{}', '  - [131, 134, 4, -1, 1, 3]'],
+                      [r'joint_folder_path: new_test_path_{}', f'  - {new_region_points}']):
+        cm_p_ = cm_p_.replace(ol, nl)
     if shape == 'circle':
-        wowp = "yes" if x == 131 else "no"
-        for ol, nl in zip(['include_phot_like = no', 'use_phot_priors = no'],
-                          [f'include_phot_like = yes\nwith_and_without_photometry = {wowp}\n',
-                           'use_phot_priors = yes\n']):
-            with open(os.path.join(os.path.dirname(__file__), 'data/chunk0/crossmatch_params_.txt'),
-                      encoding='utf-8') as file:
-                f = file.readlines()
-            idx = np.where([ol in line for line in f])[0][0]
-            _replace_line(os.path.join(os.path.dirname(__file__), 'data/chunk0/crossmatch_params_.txt'),
-                          idx, nl)
+        wowp = "True" if x == 131 else "False"
+        for ol, nl in zip(['include_phot_like: False', 'use_phot_priors: False'],
+                          [f'include_phot_like: True\nwith_and_without_photometry: {wowp}',
+                           'use_phot_priors: True']):
+            cm_p_ = cm_p_.replace(ol, nl)
 
-    ol = 'auf_region_points = 131 134 4 -1 1 {}'
-    nl = f'auf_region_points = {new_region_points}\n'
-    for file_name in ['cat_a_params', 'cat_b_params']:
-        _ol = ol.format('3' if '_a_' in file_name else '4')
-        with open(os.path.join(os.path.dirname(__file__), f'data/{file_name}.txt'), encoding='utf-8') as file:
-            f = file.readlines()
-        idx = np.where([_ol in line for line in f])[0][0]
-        _replace_line(os.path.join(os.path.dirname(__file__), f'data/{file_name}.txt'),
-                      idx, nl, out_file=os.path.join(os.path.dirname(__file__),
-                      f'data/chunk0/{file_name}_.txt'))
+    ca_p_ = ca_p_text.replace('auf_region_points: [131, 134, 4, -1, 1, 3]',
+                              f'auf_region_points: {new_region_points}')
+    cb_p_ = cb_p_text.replace('auf_region_points: [131, 134, 4, -1, 1, 4]',
+                              f'auf_region_points: {new_region_points}')
+    ca_p_ = ca_p_.replace(r'cat_folder_path: gaia_folder_{}', 'cat_folder_path: a_cat')
+    cb_p_ = cb_p_.replace(r'cat_folder_path: wise_folder_{}', 'cat_folder_path: b_cat')
 
-    for cat, ol, nl in zip(['cat_a_params', 'cat_b_params'], ['cat_folder_path = gaia_folder',
-                           'cat_folder_path = wise_folder'], ['cat_folder_path = a_cat\n',
-                           'cat_folder_path = b_cat\n']):
-        with open(os.path.join(os.path.dirname(__file__), f'data/{cat}.txt'), encoding='utf-8') as file:
-            f = file.readlines()
-        idx = np.where([ol in line for line in f])[0][0]
-        _replace_line(os.path.join(os.path.dirname(__file__), f'data/chunk0/{cat}_.txt'), idx, nl)
-
-    os.makedirs('new_test_path', exist_ok=True)
-    cm = CrossMatch(os.path.join(os.path.dirname(__file__), 'data'))
+    os.makedirs('new_test_path_9', exist_ok=True)
+    cm = CrossMatch(mock_filename(cm_p_.encode("utf-8")), mock_filename(ca_p_.encode("utf-8")),
+                    mock_filename(cb_p_.encode("utf-8")))
     cm()
 
     ac = np.load(f'{cm.joint_folder_path}/ac.npy')

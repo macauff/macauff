@@ -10,7 +10,7 @@ import os
 import numpy as np
 import pytest
 from numpy.testing import assert_allclose
-from test_matching import _replace_line
+from test_utils import mock_filename
 
 # pylint: disable=no-name-in-module,import-error
 from macauff.counterpart_pairing import source_pairing
@@ -116,11 +116,11 @@ class TestCounterpartPairing:  # pylint: disable=too-many-instance-attributes
 
         # We have to save various files for the source_pairing function to
         # pick up again.
-        self.joint_folder_path = 'test_path'
-        self.a_cat_folder_path = 'gaia_folder'
-        self.b_cat_folder_path = 'wise_folder'
-        self.a_auf_folder_path = 'gaia_auf_folder'
-        self.b_auf_folder_path = 'wise_auf_folder'
+        self.joint_folder_path = 'test_path_9'
+        self.a_cat_folder_path = 'gaia_folder_9'
+        self.b_cat_folder_path = 'wise_folder_9'
+        self.a_auf_folder_path = 'gaia_auf_folder_9'
+        self.b_auf_folder_path = 'wise_auf_folder_9'
 
         os.system(f'rm -r {self.joint_folder_path}')
         os.makedirs(f'{self.joint_folder_path}', exist_ok=True)
@@ -146,6 +146,16 @@ class TestCounterpartPairing:  # pylint: disable=too-many-instance-attributes
         self.b_perturb_auf_outputs['flux_grid'] = self.bflux_grids
 
         self.large_len = max(len(self.a_astro), len(self.b_astro))
+
+        with open(os.path.join(os.path.dirname(__file__), 'data/crossmatch_params.yaml'),
+                  encoding='utf-8') as cm_p:
+            self.cm_p_text = cm_p.read()
+        with open(os.path.join(os.path.dirname(__file__), 'data/cat_a_params.yaml'),
+                  encoding='utf-8') as ca_p:
+            self.ca_p_text = ca_p.read()
+        with open(os.path.join(os.path.dirname(__file__), 'data/cat_b_params.yaml'),
+                  encoding='utf-8') as cb_p:
+            self.cb_p_text = cb_p.read()
 
     def make_class(self):
         class A():  # pylint: disable=too-few-public-methods
@@ -533,52 +543,26 @@ class TestCounterpartPairing:  # pylint: disable=too-many-instance-attributes
         assert np.all([q in b_field for q in [2]])
         assert np.all([q not in b_field for q in [0, 1, 3]])
 
-    def _setup_cross_match_parameters(self):
-        # Ensure output chunk directory exists
-        os.makedirs(os.path.join(os.path.dirname(__file__), "data/chunk0"), exist_ok=True)
-
-        for ol, nl in zip(['cf_region_points = 131 134 4 -1 1 3'],
-                          ['cf_region_points = 131 131 1 0 0 1\n']):
-
-            with open(os.path.join(os.path.dirname(__file__), 'data/crossmatch_params.txt'),
-                      encoding='utf-8') as file:
-                f = file.readlines()
-            idx = np.where([ol in line for line in f])[0][0]
-            _replace_line(os.path.join(os.path.dirname(__file__), 'data/crossmatch_params.txt'),
-                          idx, nl, out_file=os.path.join(os.path.dirname(__file__),
-                          'data/chunk0/crossmatch_params_.txt'))
-
-        ol, nl = 'auf_region_points = 131 134 4 -1 1 {}', 'auf_region_points = 0 0 1 0 0 1\n'
-        for file_name in ['cat_a_params', 'cat_b_params']:
-            _ol = ol.format('3' if '_a_' in file_name else '4')
-            with open(os.path.join(os.path.dirname(__file__), f'data/{file_name}.txt'),
-                      encoding='utf-8') as file:
-                f = file.readlines()
-            idx = np.where([_ol in line for line in f])[0][0]
-            _replace_line(os.path.join(os.path.dirname(__file__), f'data/{file_name}.txt'),
-                          idx, nl, out_file=os.path.join(os.path.dirname(__file__),
-                          f'data/chunk0/{file_name}_.txt'))
-
     @pytest.mark.parametrize("with_and_without_photometry", [True, False])
     def test_pair_sources(self, with_and_without_photometry):  # pylint: disable=too-many-statements
         # pylint: disable=no-member
         os.system(f'rm -r {self.joint_folder_path}/*')
         # Same run as test_source_pairing, but called from CrossMatch rather than
         # directly this time.
-        self._setup_cross_match_parameters()
-        self.cm = CrossMatch(os.path.join(os.path.dirname(__file__), 'data'))
+        cm_p_ = self.cm_p_text.replace('  - [131, 134, 4, -1, 1, 3]', '  - [131, 131, 1, 0, 0, 1]')
+        ca_p_ = self.ca_p_text.replace('  - [131, 134, 4, -1, 1, 3]', '  - [0, 0, 1, 0, 0, 1]')
+        cb_p_ = self.cb_p_text.replace('  - [131, 134, 4, -1, 1, 4]', '  - [0, 0, 1, 0, 0, 1]')
+        self.cm = CrossMatch(mock_filename(cm_p_.encode("utf-8")), mock_filename(ca_p_.encode("utf-8")),
+                             mock_filename(cb_p_.encode("utf-8")))
+        self.cm._load_metadata_config(9)
+        self.cm._initialise_chunk()
         self.cm.delta_mag_cuts = np.array([2.5, 5])
         self.cm.a_modelrefinds = self.amodelrefinds
         self.cm.b_modelrefinds = self.bmodelrefinds
         self.cm.chunk_id = 1
         self.cm.a_perturb_auf_outputs = self.a_perturb_auf_outputs
         self.cm.b_perturb_auf_outputs = self.b_perturb_auf_outputs
-        self.cm._initialise_chunk(os.path.join(os.path.dirname(__file__),
-                                               'data/chunk0/crossmatch_params_.txt'),
-                                  os.path.join(os.path.dirname(__file__),
-                                               'data/chunk0/cat_a_params_.txt'),
-                                  os.path.join(os.path.dirname(__file__),
-                                               'data/chunk0/cat_b_params_.txt'))
+
         self.cm.count_pair_func = source_pairing
 
         self.cm.abinsarray = self.abinsarray
