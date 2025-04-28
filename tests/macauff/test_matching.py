@@ -13,6 +13,7 @@ import pandas as pd
 import pytest
 from numpy.testing import assert_allclose
 from test_fit_astrometry import TestAstroCorrection as TAC
+from test_utils import mock_filename
 
 # pylint: disable=import-error,no-name-in-module
 from macauff.macauff import Macauff
@@ -93,12 +94,6 @@ class TestInputs:
                   encoding='utf-8') as cb_p:
             self.cb_p_text = cb_p.read()
 
-    def mock_filename(self, content: bytes) -> int:
-        r, w = os.pipe()
-        with open(w, "wb") as wf:
-            wf.write(content)
-        return r
-
     def test_crossmatch_run_input(self):
         with pytest.raises(FileNotFoundError):
             CrossMatch(*[os.path.join(os.path.dirname(__file__), f'data/{x}') for x in [
@@ -140,8 +135,8 @@ class TestInputs:
                                        'tri_dens_uncert_location: None\n'
                                        'tri_n_bright_sources_star_location: None')
 
-        cm = CrossMatch(self.mock_filename(cm_p_.encode("utf-8")), self.mock_filename(ca_p_.encode("utf-8")),
-                        self.mock_filename(cb_p_.encode("utf-8")))
+        cm = CrossMatch(mock_filename(cm_p_.encode("utf-8")), mock_filename(ca_p_.encode("utf-8")),
+                        mock_filename(cb_p_.encode("utf-8")))
         cm._load_metadata_config(self.chunk_id)
         assert cm.a_auf_region_frame == 'equatorial'  # pylint: disable=no-member
         assert_allclose(cm.a_auf_region_points,
@@ -177,9 +172,9 @@ class TestInputs:
                 new_in_file = in_file.replace(old_line, new_line)
 
                 a = (os.path.join(os.path.dirname(__file__), 'data/crossmatch_params.yaml') if 'cf'
-                     not in kind else self.mock_filename(new_in_file.encode('utf-8')))
+                     not in kind else mock_filename(new_in_file.encode('utf-8')))
                 b = (os.path.join(os.path.dirname(__file__), 'data/cat_a_params.yaml') if 'cf'
-                     in kind else self.mock_filename(new_in_file.encode('utf-8')))
+                     in kind else mock_filename(new_in_file.encode('utf-8')))
                 with pytest.raises(ValueError, match=match_text):
                     cm = CrossMatch(a, b, c)
                     cm._load_metadata_config(self.chunk_id)
@@ -189,9 +184,9 @@ class TestInputs:
             new_in_file = new_in_file.replace(f'{kind}points_per_chunk:\n  - [131, 134, 4, -1, 1, 3]',
                                               f'{kind}points_per_chunk:\n  - [[131, 0], [133, 0], [132, -1]]')
             a = (os.path.join(os.path.dirname(__file__), 'data/crossmatch_params.yaml') if 'cf'
-                 not in kind else self.mock_filename(new_in_file.encode('utf-8')))
+                 not in kind else mock_filename(new_in_file.encode('utf-8')))
             b = (os.path.join(os.path.dirname(__file__), 'data/cat_a_params.yaml') if 'cf'
-                 in kind else self.mock_filename(new_in_file.encode('utf-8')))
+                 in kind else mock_filename(new_in_file.encode('utf-8')))
             cm = CrossMatch(a, b, c)
             cm._load_metadata_config(self.chunk_id)
             assert_allclose(getattr(cm, f"{'' if 'cf' in kind else 'a_'}{kind}points"),
@@ -206,9 +201,9 @@ class TestInputs:
 
                 with pytest.raises(ValueError):
                     a = (os.path.join(os.path.dirname(__file__), 'data/crossmatch_params.yaml') if 'cf'
-                         not in kind else self.mock_filename(new_in_file.encode('utf-8')))
+                         not in kind else mock_filename(new_in_file.encode('utf-8')))
                     b = (os.path.join(os.path.dirname(__file__), 'data/cat_a_params.yaml') if 'cf'
-                         in kind else self.mock_filename(new_in_file.encode('utf-8')))
+                         in kind else mock_filename(new_in_file.encode('utf-8')))
                     cm = CrossMatch(a, b, c)
                     cm._load_metadata_config(self.chunk_id)
 
@@ -216,9 +211,9 @@ class TestInputs:
             new_in_file = in_file.replace(f'{kind}points_per_chunk:\n  - [131, 134, 4, -1, 1, 3]',
                                           f'{kind}points_per_chunk:\n  - [131, 131, 1, 0, 0, 1]')
             a = (os.path.join(os.path.dirname(__file__), 'data/crossmatch_params.yaml') if 'cf'
-                 not in kind else self.mock_filename(new_in_file.encode('utf-8')))
+                 not in kind else mock_filename(new_in_file.encode('utf-8')))
             b = (os.path.join(os.path.dirname(__file__), 'data/cat_a_params.yaml') if 'cf'
-                 in kind else self.mock_filename(new_in_file.encode('utf-8')))
+                 in kind else mock_filename(new_in_file.encode('utf-8')))
             cm = CrossMatch(a, b, c)
             cm._load_metadata_config(self.chunk_id)
             assert_allclose(getattr(cm, f"{'' if 'cf' in kind else 'a_'}{kind}points"), np.array([[131, 0]]))
@@ -227,9 +222,9 @@ class TestInputs:
             new_in_file = new_in_file.replace(f'{kind}points_per_chunk:\n  - [131, 134, 4, -1, 1, 3]',
                                               f'{kind}points_per_chunk:\n  - [[131, 0]]')
             a = (os.path.join(os.path.dirname(__file__), 'data/crossmatch_params.yaml') if 'cf'
-                 not in kind else self.mock_filename(new_in_file.encode('utf-8')))
+                 not in kind else mock_filename(new_in_file.encode('utf-8')))
             b = (os.path.join(os.path.dirname(__file__), 'data/cat_a_params.yaml') if 'cf'
-                 in kind else self.mock_filename(new_in_file.encode('utf-8')))
+                 in kind else mock_filename(new_in_file.encode('utf-8')))
             cm = CrossMatch(a, b, c)
             cm._load_metadata_config(self.chunk_id)
             assert_allclose(getattr(cm, f"{'' if 'cf' in kind else 'a_'}{kind}points"), np.array([[131, 0]]))
@@ -240,7 +235,7 @@ class TestInputs:
         for i, in_file in enumerate([self.cm_p_text, self.ca_p_text, self.cb_p_text]):
             kind = 'cf_region_' if i == 0 else 'auf_region_'
             new_in_files[i] = in_file.replace(f'{kind}frame: equatorial', f'{kind}frame: galactic')
-        cm = CrossMatch(*[self.mock_filename(x.encode("utf-8")) for x in new_in_files])
+        cm = CrossMatch(*[mock_filename(x.encode("utf-8")) for x in new_in_files])
         cm._load_metadata_config(self.chunk_id)
         for kind in ['auf_region_', 'cf_region_']:
             assert getattr(cm, f"{'' if 'cf' in kind else 'a_'}{kind}frame") == 'galactic'
@@ -251,7 +246,7 @@ class TestInputs:
 
         cm_p_ = self.cm_p_text.replace('include_phot_like: False',
                                        'include_phot_like: True\nwith_and_without_photometry: False')
-        cm = CrossMatch(self.mock_filename(cm_p_.encode("utf-8")),
+        cm = CrossMatch(mock_filename(cm_p_.encode("utf-8")),
                         os.path.join(os.path.dirname(__file__), 'data/cat_a_params.yaml'),
                         os.path.join(os.path.dirname(__file__), 'data/cat_b_params.yaml'))
         cm._load_metadata_config(self.chunk_id)
@@ -267,7 +262,7 @@ class TestInputs:
                                            'include_phot_like: True\nwith_and_without_photometry: False')
             cm_p_ = cm_p_.replace(old_line, new_line)
             with pytest.raises(ValueError, match=match_text):
-                cm = CrossMatch(self.mock_filename(cm_p_.encode("utf-8")),
+                cm = CrossMatch(mock_filename(cm_p_.encode("utf-8")),
                                 os.path.join(os.path.dirname(__file__), 'data/cat_a_params.yaml'),
                                 os.path.join(os.path.dirname(__file__), 'data/cat_b_params.yaml'))
                 cm._load_metadata_config(self.chunk_id)
@@ -283,8 +278,8 @@ class TestInputs:
                                        'tri_n_bright_sources_star_location: None')
         with pytest.raises(ValueError,
                            match="Either all flags related to running TRILEGAL histogram generation within"):
-            cm = CrossMatch(self.mock_filename(cm_p_.encode("utf-8")),
-                            self.mock_filename(ca_p_.encode("utf-8")),
+            cm = CrossMatch(mock_filename(cm_p_.encode("utf-8")),
+                            mock_filename(ca_p_.encode("utf-8")),
                             os.path.join(os.path.dirname(__file__), 'data/cat_b_params.yaml'))
             cm._load_metadata_config(self.chunk_id)
 
@@ -306,9 +301,9 @@ class TestInputs:
                     cb_p_ = cb_p_.replace(lines[ind], f'{lines[ind].split(":")[0]}: None')
         # With everything set to None we hit the "can't have anything set" error:
         with pytest.raises(ValueError, match="Ambiguity in whether TRILEGAL histogram generation is being "):
-            cm = CrossMatch(self.mock_filename(cm_p_.encode("utf-8")),
-                            self.mock_filename(ca_p_.encode("utf-8")),
-                            self.mock_filename(cb_p_.encode("utf-8")))
+            cm = CrossMatch(mock_filename(cm_p_.encode("utf-8")),
+                            mock_filename(ca_p_.encode("utf-8")),
+                            mock_filename(cb_p_.encode("utf-8")))
             cm._load_metadata_config(self.chunk_id)
         for location, error, match_text in zip(
                 ['some_fake_folder', 'data/dens_hist_tri.npy',
@@ -326,9 +321,9 @@ class TestInputs:
             ind = np.where(['dens_hist_tri_location' in x for x in lines])[0][0]
             ca_p_2 = ca_p_.replace(lines[ind], f'dens_hist_tri_location: {location}')
             with pytest.raises(error, match=match_text):
-                cm = CrossMatch(self.mock_filename(cm_p_.encode("utf-8")),
-                                self.mock_filename(ca_p_2.encode("utf-8")),
-                                self.mock_filename(cb_p_.encode("utf-8")))
+                cm = CrossMatch(mock_filename(cm_p_.encode("utf-8")),
+                                mock_filename(ca_p_2.encode("utf-8")),
+                                mock_filename(cb_p_.encode("utf-8")))
         np.save('data/dens_hist_tri.npy', np.ones((3, 10), float))
         lines = ca_p_.split('\n')
         ind = np.where(['dens_hist_tri_location' in x for x in lines])[0][0]
@@ -342,9 +337,9 @@ class TestInputs:
             location = os.path.join(os.path.dirname(__file__), 'data/tri_model_mags.npy')
             ca_p_2 = ca_p_2.replace(lines[ind], f'tri_model_mags_location: {location}')
             with pytest.raises(ValueError, match=match_text):
-                cm = CrossMatch(self.mock_filename(cm_p_.encode("utf-8")),
-                                self.mock_filename(ca_p_2.encode("utf-8")),
-                                self.mock_filename(cb_p_.encode("utf-8")))
+                cm = CrossMatch(mock_filename(cm_p_.encode("utf-8")),
+                                mock_filename(ca_p_2.encode("utf-8")),
+                                mock_filename(cb_p_.encode("utf-8")))
         for catname, nfilts in zip(['a', 'b'], [3, 4]):
             for file, file_name in zip(
                     [np.ones((nfilts, 10), float), np.ones((nfilts, 10), float), np.ones((nfilts, 10), float),
@@ -359,9 +354,9 @@ class TestInputs:
                     ca_p_ = ca_p_.replace(lines[ind], f'{file_name}_location: {location}')
                 else:
                     cb_p_ = cb_p_.replace(lines[ind], f'{file_name}_location: {location}')
-        cm = CrossMatch(self.mock_filename(cm_p_.encode("utf-8")),
-                        self.mock_filename(ca_p_.encode("utf-8")),
-                        self.mock_filename(cb_p_.encode("utf-8")))
+        cm = CrossMatch(mock_filename(cm_p_.encode("utf-8")),
+                        mock_filename(ca_p_.encode("utf-8")),
+                        mock_filename(cb_p_.encode("utf-8")))
         cm._load_metadata_config(self.chunk_id)
         assert cm.b_auf_folder_path is None
         assert np.all([b is None for b in cm.a_tri_filt_names])
@@ -393,9 +388,9 @@ class TestInputs:
             _cap = self.ca_p_text.replace(old_line, new_line) if fn == 'a' else self.ca_p_text
             _cbp = self.cb_p_text.replace(old_line, new_line) if fn == 'b' else self.cb_p_text
             with pytest.raises(error, match=match_text):
-                cm = CrossMatch(self.mock_filename(_cmp.encode("utf-8")),
-                                self.mock_filename(_cap.encode("utf-8")),
-                                self.mock_filename(_cbp.encode("utf-8")))
+                cm = CrossMatch(mock_filename(_cmp.encode("utf-8")),
+                                mock_filename(_cap.encode("utf-8")),
+                                mock_filename(_cbp.encode("utf-8")))
                 cm._load_metadata_config(self.chunk_id)
 
     def test_crossmatch_tri_inputs(self):
@@ -414,9 +409,9 @@ class TestInputs:
                                        'tri_model_mags_interval_location: None\n'
                                        'tri_dens_uncert_location: None\n'
                                        'tri_n_bright_sources_star_location: None')
-        cm = CrossMatch(self.mock_filename(cm_p_.encode("utf-8")),
-                        self.mock_filename(ca_p_.encode("utf-8")),
-                        self.mock_filename(cb_p_.encode("utf-8")))
+        cm = CrossMatch(mock_filename(cm_p_.encode("utf-8")),
+                        mock_filename(ca_p_.encode("utf-8")),
+                        mock_filename(cb_p_.encode("utf-8")))
         cm._load_metadata_config(self.chunk_id)
         assert cm.a_tri_set_name == 'gaiaDR2'  # pylint: disable=no-member
         assert np.all(cm.b_tri_filt_names == np.array(['W1', 'W2', 'W3', 'W4']))  # pylint: disable=no-member
@@ -447,9 +442,9 @@ class TestInputs:
             _cap = ca_p_.replace(old_line, new_line) if '_a_' in in_file else ca_p_
             _cbp = cb_p_.replace(old_line, new_line) if '_b_' in in_file else cb_p_
             with pytest.raises(ValueError, match=match_text):
-                cm = CrossMatch(self.mock_filename(cm_p_.encode("utf-8")),
-                                self.mock_filename(_cap.encode("utf-8")),
-                                self.mock_filename(_cbp.encode("utf-8")))
+                cm = CrossMatch(mock_filename(cm_p_.encode("utf-8")),
+                                mock_filename(_cap.encode("utf-8")),
+                                mock_filename(_cbp.encode("utf-8")))
                 cm._load_metadata_config(self.chunk_id)
 
     def test_crossmatch_psf_param_inputs(self):
@@ -474,17 +469,17 @@ class TestInputs:
                                        'tri_model_mags_interval_location: None\n'
                                        'tri_dens_uncert_location: None\n'
                                        'tri_n_bright_sources_star_location: None')
-        cm = CrossMatch(self.mock_filename(cm_p_.encode("utf-8")),
-                        self.mock_filename(ca_p_.encode("utf-8")),
-                        self.mock_filename(cb_p_.encode("utf-8")))
+        cm = CrossMatch(mock_filename(cm_p_.encode("utf-8")),
+                        mock_filename(ca_p_.encode("utf-8")),
+                        mock_filename(cb_p_.encode("utf-8")))
         cm._load_metadata_config(self.chunk_id)
 
         np.save('a_snr_mag_9/snr_mag_params.npy', np.ones((3, 1, 5), float))
         np.save('b_snr_mag_9/snr_mag_params.npy', np.ones((4, 1, 5), float))
 
-        cm = CrossMatch(self.mock_filename(cm_p_.encode("utf-8")),
-                        self.mock_filename(ca_p_.encode("utf-8")),
-                        self.mock_filename(cb_p_.encode("utf-8")))
+        cm = CrossMatch(mock_filename(cm_p_.encode("utf-8")),
+                        mock_filename(ca_p_.encode("utf-8")),
+                        mock_filename(cb_p_.encode("utf-8")))
         cm._load_metadata_config(self.chunk_id)
         assert np.all(cm.a_psf_fwhms == np.array([0.12, 0.12, 0.12]))  # pylint: disable=no-member
 
@@ -506,9 +501,9 @@ class TestInputs:
             _cap = ca_p_.replace(old_line, new_line) if '_a_' in in_file else ca_p_
             _cbp = cb_p_.replace(old_line, new_line) if '_b_' in in_file else cb_p_
             with pytest.raises(ValueError, match=match_text):
-                cm = CrossMatch(self.mock_filename(cm_p_.encode("utf-8")),
-                                self.mock_filename(_cap.encode("utf-8")),
-                                self.mock_filename(_cbp.encode("utf-8")))
+                cm = CrossMatch(mock_filename(cm_p_.encode("utf-8")),
+                                mock_filename(_cap.encode("utf-8")),
+                                mock_filename(_cbp.encode("utf-8")))
                 cm._load_metadata_config(self.chunk_id)
             if 'G\n' in new_line:
                 np.save('a_snr_mag_9/snr_mag_params.npy', np.ones((3, 1, 5), float))
@@ -524,7 +519,7 @@ class TestInputs:
         match_text = 'Missing key cat_name from catalogue "a"'
         with pytest.raises(ValueError, match=match_text):
             cm = CrossMatch(os.path.join(os.path.dirname(__file__), 'data/crossmatch_params.yaml'),
-                            self.mock_filename(ca_p_.encode('utf-8')),
+                            mock_filename(ca_p_.encode('utf-8')),
                             os.path.join(os.path.dirname(__file__), 'data/cat_b_params.yaml'))
 
     def test_crossmatch_search_inputs(self):
@@ -550,8 +545,8 @@ class TestInputs:
                                        'tri_dens_uncert_location: None\n'
                                        'tri_n_bright_sources_star_location: None')
 
-        cm = CrossMatch(self.mock_filename(cm_p_.encode("utf-8")), self.mock_filename(ca_p_.encode("utf-8")),
-                        self.mock_filename(cb_p_.encode("utf-8")))
+        cm = CrossMatch(mock_filename(cm_p_.encode("utf-8")), mock_filename(ca_p_.encode("utf-8")),
+                        mock_filename(cb_p_.encode("utf-8")))
         cm._load_metadata_config(self.chunk_id)
         assert np.all(cm.a_psf_fwhms == np.array([0.12, 0.12, 0.12]))  # pylint: disable=no-member
         assert cm.b_dens_dist == 0.25
@@ -567,9 +562,9 @@ class TestInputs:
             _cap = ca_p_.replace(old_line, new_line) if fn == 'a' else ca_p_
             _cbp = cb_p_.replace(old_line, new_line) if fn == 'b' else cb_p_
             with pytest.raises(ValueError, match=match_text):
-                cm = CrossMatch(self.mock_filename(_cmp.encode("utf-8")),
-                                self.mock_filename(_cap.encode("utf-8")),
-                                self.mock_filename(_cbp.encode("utf-8")))
+                cm = CrossMatch(mock_filename(_cmp.encode("utf-8")),
+                                mock_filename(_cap.encode("utf-8")),
+                                mock_filename(_cbp.encode("utf-8")))
                 cm._load_metadata_config(self.chunk_id)
 
     # pylint: disable-next=too-many-statements
@@ -590,8 +585,8 @@ class TestInputs:
                                        'tri_dens_uncert_location: None\n'
                                        'tri_n_bright_sources_star_location: None')
 
-        cm = CrossMatch(self.mock_filename(cm_p_.encode("utf-8")), self.mock_filename(ca_p_.encode("utf-8")),
-                        self.mock_filename(cb_p_.encode("utf-8")))
+        cm = CrossMatch(mock_filename(cm_p_.encode("utf-8")), mock_filename(ca_p_.encode("utf-8")),
+                        mock_filename(cb_p_.encode("utf-8")))
         cm._load_metadata_config(self.chunk_id)
         assert cm.num_trials == 10000
         assert cm.d_mag == 0.1  # pylint: disable=no-member
@@ -606,9 +601,9 @@ class TestInputs:
             # second change in turn.
             _cmp = cm_p_.replace(old_line, new_line)
             with pytest.raises(ValueError, match=match_text):
-                cm = CrossMatch(self.mock_filename(_cmp.encode("utf-8")),
-                                self.mock_filename(ca_p_.encode("utf-8")),
-                                self.mock_filename(cb_p_.encode("utf-8")))
+                cm = CrossMatch(mock_filename(_cmp.encode("utf-8")),
+                                mock_filename(ca_p_.encode("utf-8")),
+                                mock_filename(cb_p_.encode("utf-8")))
 
         for old_line, var_name in zip(['fit_gal_flag: False', 'run_fw_auf: True', 'run_psf_auf: False',
                                        'snr_mag_params_file_path: '],
@@ -620,17 +615,17 @@ class TestInputs:
                 _cap = ca_p_.replace(old_line, '') if fn == 'a' else ca_p_
                 _cbp = cb_p_.replace(old_line, '') if fn == 'b' else cb_p_
                 with pytest.raises(ValueError, match=f'Missing key {var_name} from catalogue {cat_reg}'):
-                    cm = CrossMatch(self.mock_filename(cm_p_.encode("utf-8")),
-                                    self.mock_filename(_cap.encode("utf-8")),
-                                    self.mock_filename(_cbp.encode("utf-8")))
+                    cm = CrossMatch(mock_filename(cm_p_.encode("utf-8")),
+                                    mock_filename(_cap.encode("utf-8")),
+                                    mock_filename(_cbp.encode("utf-8")))
 
         os.makedirs('a_snr_mag_9', exist_ok=True)
         os.makedirs('b_snr_mag_9', exist_ok=True)
         np.save('a_snr_mag_9/snr_mag_params.npy', np.ones((3, 1, 5), float))
         np.save('b_snr_mag_9/snr_mag_params.npy', np.ones((4, 1, 5), float))
 
-        cm = CrossMatch(self.mock_filename(cm_p_.encode("utf-8")), self.mock_filename(ca_p_.encode("utf-8")),
-                        self.mock_filename(cb_p_.encode("utf-8")))
+        cm = CrossMatch(mock_filename(cm_p_.encode("utf-8")), mock_filename(ca_p_.encode("utf-8")),
+                        mock_filename(cb_p_.encode("utf-8")))
         cm._load_metadata_config(self.chunk_id)
         assert not hasattr(cm, 'a_dd_params_path')
         assert not hasattr(cm, 'b_l_cut_path')
@@ -648,9 +643,9 @@ class TestInputs:
                 x2 = x.replace(old_line, '')
                 b, c = (x2, cb_p_) if cat_reg[1] == 'a' else (ca_p_, x2)
                 with pytest.raises(ValueError, match=f'Missing key {var_name} from catalogue {cat_reg}'):
-                    cm = CrossMatch(self.mock_filename(cm_p_.encode("utf-8")),
-                                    self.mock_filename(b.encode("utf-8")),
-                                    self.mock_filename(c.encode("utf-8")))
+                    cm = CrossMatch(mock_filename(cm_p_.encode("utf-8")),
+                                    mock_filename(b.encode("utf-8")),
+                                    mock_filename(c.encode("utf-8")))
                     cm._load_metadata_config(self.chunk_id)
 
         ddp = np.ones((5, 15, 2), float)
@@ -670,16 +665,16 @@ class TestInputs:
         cb_p_3 = cb_p_2.replace(r'snr_mag_params_file_path: b_snr_mag_{}/snr_mag_params.npy',
                                 'snr_mag_params_file_path: /some/path/or/other')
         with pytest.raises(OSError, match="b_snr_mag_params_file_path's folder does not exist."):
-            cm = CrossMatch(self.mock_filename(cm_p_.encode("utf-8")),
-                            self.mock_filename(ca_p_2.encode("utf-8")),
-                            self.mock_filename(cb_p_3.encode("utf-8")))
+            cm = CrossMatch(mock_filename(cm_p_.encode("utf-8")),
+                            mock_filename(ca_p_2.encode("utf-8")),
+                            mock_filename(cb_p_3.encode("utf-8")))
             cm._load_metadata_config(self.chunk_id)
         os.remove('a_snr_mag_9/snr_mag_params.npy')
         with pytest.raises(FileNotFoundError,
                            match='file in a_snr_mag_params_file_path does not exist.'):
-            cm = CrossMatch(self.mock_filename(cm_p_.encode("utf-8")),
-                            self.mock_filename(ca_p_2.encode("utf-8")),
-                            self.mock_filename(cb_p_2.encode("utf-8")))
+            cm = CrossMatch(mock_filename(cm_p_.encode("utf-8")),
+                            mock_filename(ca_p_2.encode("utf-8")),
+                            mock_filename(cb_p_2.encode("utf-8")))
             cm._load_metadata_config(self.chunk_id)
         for fn, array, err_msg in zip([
                 'snr_mag_params', 'snr_mag_params', 'snr_mag_params', 'dd_params', 'dd_params',
@@ -698,9 +693,9 @@ class TestInputs:
                  r'a_l_cut should be of shape \(3,\) only.']):
             np.save(f"{'a_snr_mag_9/' if 'snr_mag' in fn else ''}{fn}.npy", array)
             with pytest.raises(ValueError, match=err_msg):
-                cm = CrossMatch(self.mock_filename(cm_p_.encode("utf-8")),
-                                self.mock_filename(ca_p_2.encode("utf-8")),
-                                self.mock_filename(cb_p_2.encode("utf-8")))
+                cm = CrossMatch(mock_filename(cm_p_.encode("utf-8")),
+                                mock_filename(ca_p_2.encode("utf-8")),
+                                mock_filename(cb_p_2.encode("utf-8")))
                 cm._load_metadata_config(self.chunk_id)
             # Re-make "good" fake arrays
             snr_mag_params = np.ones((3, 3, 5), float)
@@ -720,9 +715,9 @@ class TestInputs:
                                'gal_nzs: [33, 41, 11, 41]\ngal_aboffsets: [0.5, 0.5, 0.5, 0.5]\n'
                                'gal_filternames: [wise2010-W1, wise2010-W2, wise2010-W3, wise2010-W4]\n'
                                'saturation_magnitudes: [5, 5, 5, 5]\n')
-        cm = CrossMatch(self.mock_filename(cm_p_.encode("utf-8")),
-                        self.mock_filename(ca_p_2.encode("utf-8")),
-                        self.mock_filename(cb_p_2.encode("utf-8")))
+        cm = CrossMatch(mock_filename(cm_p_.encode("utf-8")),
+                        mock_filename(ca_p_2.encode("utf-8")),
+                        mock_filename(cb_p_2.encode("utf-8")))
         cm._load_metadata_config(self.chunk_id)
         assert_allclose(cm.a_gal_zmax, np.array([4.5, 4.5, 5.0]))
         assert np.all(cm.b_gal_nzs == np.array([33, 41, 11, 41]))
@@ -734,9 +729,9 @@ class TestInputs:
             cb_p_3 = cb_p_2.replace(lines[ind], '')
             with pytest.raises(ValueError,
                                match=f'Missing key {key} from catalogue "b"'):
-                cm = CrossMatch(self.mock_filename(cm_p_.encode("utf-8")),
-                                self.mock_filename(ca_p_2.encode("utf-8")),
-                                self.mock_filename(cb_p_3.encode("utf-8")))
+                cm = CrossMatch(mock_filename(cm_p_.encode("utf-8")),
+                                mock_filename(ca_p_2.encode("utf-8")),
+                                mock_filename(cb_p_3.encode("utf-8")))
                 cm._load_metadata_config(self.chunk_id)
 
         for old_line, new_line, match_text, in_file in zip(
@@ -764,15 +759,15 @@ class TestInputs:
             b = ca_p_2 if in_file == 'b' else ca_p_2.replace(old_line, new_line)
             c = cb_p_2 if in_file == 'a' else cb_p_2.replace(old_line, new_line)
             with pytest.raises(ValueError, match=match_text):
-                cm = CrossMatch(self.mock_filename(cm_p_.encode("utf-8")),
-                                self.mock_filename(b.encode("utf-8")),
-                                self.mock_filename(c.encode("utf-8")))
+                cm = CrossMatch(mock_filename(cm_p_.encode("utf-8")),
+                                mock_filename(b.encode("utf-8")),
+                                mock_filename(c.encode("utf-8")))
                 cm._load_metadata_config(self.chunk_id)
 
     def test_crossmatch_fourier_inputs(self):
-        cm = CrossMatch(self.mock_filename(self.cm_p_text.encode("utf-8")),
-                        self.mock_filename(self.ca_p_text.encode("utf-8")),
-                        self.mock_filename(self.cb_p_text.encode("utf-8")))
+        cm = CrossMatch(mock_filename(self.cm_p_text.encode("utf-8")),
+                        mock_filename(self.ca_p_text.encode("utf-8")),
+                        mock_filename(self.cb_p_text.encode("utf-8")))
         cm._load_metadata_config(self.chunk_id)
         assert cm.real_hankel_points == 10000  # pylint: disable=no-member
         assert cm.four_hankel_points == 10000  # pylint: disable=no-member
@@ -787,15 +782,15 @@ class TestInputs:
             cm_p_ = self.cm_p_text.replace(old_line, new_line)
 
             with pytest.raises(ValueError, match=match_text):
-                cm = CrossMatch(self.mock_filename(cm_p_.encode("utf-8")),
-                                self.mock_filename(self.ca_p_text.encode("utf-8")),
-                                self.mock_filename(self.cb_p_text.encode("utf-8")))
+                cm = CrossMatch(mock_filename(cm_p_.encode("utf-8")),
+                                mock_filename(self.ca_p_text.encode("utf-8")),
+                                mock_filename(self.cb_p_text.encode("utf-8")))
                 cm._load_metadata_config(self.chunk_id)
 
     def test_crossmatch_frame_equality(self):
-        cm = CrossMatch(self.mock_filename(self.cm_p_text.encode("utf-8")),
-                        self.mock_filename(self.ca_p_text.encode("utf-8")),
-                        self.mock_filename(self.cb_p_text.encode("utf-8")))
+        cm = CrossMatch(mock_filename(self.cm_p_text.encode("utf-8")),
+                        mock_filename(self.ca_p_text.encode("utf-8")),
+                        mock_filename(self.cb_p_text.encode("utf-8")))
         cm._load_metadata_config(self.chunk_id)
         assert cm.a_auf_region_frame == 'equatorial'  # pylint: disable=no-member
         assert cm.b_auf_region_frame == 'equatorial'  # pylint: disable=no-member
@@ -812,15 +807,15 @@ class TestInputs:
             b = self.ca_p_text.replace(old_line, new_line) if in_file == 'a' else self.ca_p_text
             c = self.cb_p_text.replace(old_line, new_line) if in_file == 'b' else self.cb_p_text
             with pytest.raises(ValueError, match=match_text):
-                cm = CrossMatch(self.mock_filename(a.encode("utf-8")),
-                                self.mock_filename(b.encode("utf-8")),
-                                self.mock_filename(c.encode("utf-8")))
+                cm = CrossMatch(mock_filename(a.encode("utf-8")),
+                                mock_filename(b.encode("utf-8")),
+                                mock_filename(c.encode("utf-8")))
                 cm._load_metadata_config(self.chunk_id)
 
     def test_int_fracs(self):
-        cm = CrossMatch(self.mock_filename(self.cm_p_text.encode("utf-8")),
-                        self.mock_filename(self.ca_p_text.encode("utf-8")),
-                        self.mock_filename(self.cb_p_text.encode("utf-8")))
+        cm = CrossMatch(mock_filename(self.cm_p_text.encode("utf-8")),
+                        mock_filename(self.ca_p_text.encode("utf-8")),
+                        mock_filename(self.cb_p_text.encode("utf-8")))
         cm._load_metadata_config(self.chunk_id)
         assert np.all(cm.int_fracs == np.array([0.63, 0.9, 0.999]))
 
@@ -832,15 +827,15 @@ class TestInputs:
                  'int_fracs should contain.']):
             a = self.cm_p_text.replace(old_line, new_line)
             with pytest.raises(ValueError, match=match_text):
-                cm = CrossMatch(self.mock_filename(a.encode("utf-8")),
-                                self.mock_filename(self.ca_p_text.encode("utf-8")),
-                                self.mock_filename(self.cb_p_text.encode("utf-8")))
+                cm = CrossMatch(mock_filename(a.encode("utf-8")),
+                                mock_filename(self.ca_p_text.encode("utf-8")),
+                                mock_filename(self.cb_p_text.encode("utf-8")))
                 cm._load_metadata_config(self.chunk_id)
 
     def test_crossmatch_shared_data(self):
-        cm = CrossMatch(self.mock_filename(self.cm_p_text.encode("utf-8")),
-                        self.mock_filename(self.ca_p_text.encode("utf-8")),
-                        self.mock_filename(self.cb_p_text.encode("utf-8")))
+        cm = CrossMatch(mock_filename(self.cm_p_text.encode("utf-8")),
+                        mock_filename(self.ca_p_text.encode("utf-8")),
+                        mock_filename(self.cb_p_text.encode("utf-8")))
         cm._load_metadata_config(self.chunk_id)
         cm._initialise_chunk()
         assert np.all(cm.r == np.linspace(0, 11, 10000))
@@ -849,9 +844,9 @@ class TestInputs:
         assert_allclose(cm.drho, np.ones(9999, float) * 100/9999)
 
     def test_cat_folder_path(self):
-        cm = CrossMatch(self.mock_filename(self.cm_p_text.encode("utf-8")),
-                        self.mock_filename(self.ca_p_text.encode("utf-8")),
-                        self.mock_filename(self.cb_p_text.encode("utf-8")))
+        cm = CrossMatch(mock_filename(self.cm_p_text.encode("utf-8")),
+                        mock_filename(self.ca_p_text.encode("utf-8")),
+                        mock_filename(self.cb_p_text.encode("utf-8")))
         cm._load_metadata_config(self.chunk_id)
         assert os.path.exists(self.a_cat_folder_path)
         assert os.path.exists(self.b_cat_folder_path)
@@ -862,17 +857,17 @@ class TestInputs:
 
         os.system(f'rm -rf {self.a_cat_folder_path}')
         with pytest.raises(OSError, match="a_cat_folder_path does not exist."):
-            cm = CrossMatch(self.mock_filename(self.cm_p_text.encode("utf-8")),
-                            self.mock_filename(self.ca_p_text.encode("utf-8")),
-                            self.mock_filename(self.cb_p_text.encode("utf-8")))
+            cm = CrossMatch(mock_filename(self.cm_p_text.encode("utf-8")),
+                            mock_filename(self.ca_p_text.encode("utf-8")),
+                            mock_filename(self.cb_p_text.encode("utf-8")))
             cm._load_metadata_config(self.chunk_id)
         self.setup_class()
 
         os.system(f'rm -rf {self.b_cat_folder_path}')
         with pytest.raises(OSError, match="b_cat_folder_path does not exist."):
-            cm = CrossMatch(self.mock_filename(self.cm_p_text.encode("utf-8")),
-                            self.mock_filename(self.ca_p_text.encode("utf-8")),
-                            self.mock_filename(self.cb_p_text.encode("utf-8")))
+            cm = CrossMatch(mock_filename(self.cm_p_text.encode("utf-8")),
+                            mock_filename(self.ca_p_text.encode("utf-8")),
+                            mock_filename(self.cb_p_text.encode("utf-8")))
             cm._load_metadata_config(self.chunk_id)
         self.setup_class()
 
@@ -881,9 +876,9 @@ class TestInputs:
             os.system(f'rm {catpath}/{file}.npy')
             with pytest.raises(FileNotFoundError,
                                match=f'{file} file not found in catalogue '):
-                cm = CrossMatch(self.mock_filename(self.cm_p_text.encode("utf-8")),
-                                self.mock_filename(self.ca_p_text.encode("utf-8")),
-                                self.mock_filename(self.cb_p_text.encode("utf-8")))
+                cm = CrossMatch(mock_filename(self.cm_p_text.encode("utf-8")),
+                                mock_filename(self.ca_p_text.encode("utf-8")),
+                                mock_filename(self.cb_p_text.encode("utf-8")))
                 cm._load_metadata_config(self.chunk_id)
                 cm._initialise_chunk()
             self.setup_class()
@@ -905,9 +900,9 @@ class TestInputs:
                                       'Consolidated catalogue arrays for catalogue "b"']):
             np.save(f'{self.b_cat_folder_path}/{name}.npy', data)
             with pytest.raises(ValueError, match=match):
-                cm = CrossMatch(self.mock_filename(self.cm_p_text.encode("utf-8")),
-                                self.mock_filename(self.ca_p_text.encode("utf-8")),
-                                self.mock_filename(self.cb_p_text.encode("utf-8")))
+                cm = CrossMatch(mock_filename(self.cm_p_text.encode("utf-8")),
+                                mock_filename(self.ca_p_text.encode("utf-8")),
+                                mock_filename(self.cb_p_text.encode("utf-8")))
                 cm._load_metadata_config(self.chunk_id)
                 cm._initialise_chunk()
             self.setup_class()
@@ -927,9 +922,9 @@ class TestInputs:
                 # arctan(1/0) = pi/2, sqrt(x (2R - x)) = 0
                 return R**2 * np.pi / 2
             return None
-        cm = CrossMatch(self.mock_filename(self.cm_p_text.encode("utf-8")),
-                        self.mock_filename(self.ca_p_text.encode("utf-8")),
-                        self.mock_filename(self.cb_p_text.encode("utf-8")))
+        cm = CrossMatch(mock_filename(self.cm_p_text.encode("utf-8")),
+                        mock_filename(self.ca_p_text.encode("utf-8")),
+                        mock_filename(self.cb_p_text.encode("utf-8")))
         cm._load_metadata_config(self.chunk_id)
         cm.cf_region_points = np.array([[a, b] for a in [131.5, 132.5, 133.5]
                                         for b in [-0.5, 0.5]])
@@ -1058,9 +1053,9 @@ class TestInputs:
         cm_p_ = self.cm_p_text.replace('make_output_csv: False', '')
 
         with pytest.raises(ValueError, match="Missing key make_output_csv"):
-            cm = CrossMatch(self.mock_filename(cm_p_.encode("utf-8")),
-                            self.mock_filename(self.ca_p_text.encode("utf-8")),
-                            self.mock_filename(self.cb_p_text.encode("utf-8")))
+            cm = CrossMatch(mock_filename(cm_p_.encode("utf-8")),
+                            mock_filename(self.ca_p_text.encode("utf-8")),
+                            mock_filename(self.cb_p_text.encode("utf-8")))
             cm._load_metadata_config(self.chunk_id)
 
         lines = ['make_output_csv: True', '\noutput_csv_folder: output_csv_folder',
@@ -1072,9 +1067,9 @@ class TestInputs:
                 new_line = new_line + lines[j]
             cm_p_ = self.cm_p_text.replace('make_output_csv: False', new_line)
             with pytest.raises(ValueError, match=f"Missing key {key} from joint"):
-                cm = CrossMatch(self.mock_filename(cm_p_.encode("utf-8")),
-                                self.mock_filename(self.ca_p_text.encode("utf-8")),
-                                self.mock_filename(self.cb_p_text.encode("utf-8")))
+                cm = CrossMatch(mock_filename(cm_p_.encode("utf-8")),
+                                mock_filename(self.ca_p_text.encode("utf-8")),
+                                mock_filename(self.cb_p_text.encode("utf-8")))
                 cm._load_metadata_config(self.chunk_id)
 
         new_line = ''
@@ -1096,9 +1091,9 @@ class TestInputs:
                 new_line = new_line + lines[j]
             ca_p_ = self.ca_p_text.replace(old_line, new_line)
             with pytest.raises(ValueError, match=f'Missing key {key} from catalogue "a"'):
-                cm = CrossMatch(self.mock_filename(cm_p_.encode("utf-8")),
-                                self.mock_filename(ca_p_.encode("utf-8")),
-                                self.mock_filename(self.cb_p_text.encode("utf-8")))
+                cm = CrossMatch(mock_filename(cm_p_.encode("utf-8")),
+                                mock_filename(ca_p_.encode("utf-8")),
+                                mock_filename(self.cb_p_text.encode("utf-8")))
                 cm._load_metadata_config(self.chunk_id)
 
         new_line = ''
@@ -1116,16 +1111,16 @@ class TestInputs:
             if os.path.exists(folder):
                 os.rmdir(folder)
             with pytest.raises(OSError, match=f'{error_key} from catalogue "{cat_}" does '):
-                cm = CrossMatch(self.mock_filename(cm_p_.encode("utf-8")),
-                                self.mock_filename(ca_p_.encode("utf-8")),
-                                self.mock_filename(cb_p_.encode("utf-8")))
+                cm = CrossMatch(mock_filename(cm_p_.encode("utf-8")),
+                                mock_filename(ca_p_.encode("utf-8")),
+                                mock_filename(cb_p_.encode("utf-8")))
                 cm._load_metadata_config(self.chunk_id)
             os.makedirs(folder, exist_ok=True)
 
         # At this point we should successfully load the csv-related parameters.
-        cm = CrossMatch(self.mock_filename(cm_p_.encode("utf-8")),
-                        self.mock_filename(ca_p_.encode("utf-8")),
-                        self.mock_filename(cb_p_.encode("utf-8")))
+        cm = CrossMatch(mock_filename(cm_p_.encode("utf-8")),
+                        mock_filename(ca_p_.encode("utf-8")),
+                        mock_filename(cb_p_.encode("utf-8")))
         cm._load_metadata_config(self.chunk_id)
         assert cm.output_csv_folder == os.path.abspath('output_csv_folder')
         assert cm.match_out_csv_name == 'match.csv'
@@ -1156,9 +1151,9 @@ class TestInputs:
             a = ca_p_.replace(old_line, new_line) if cfg_type == 'a' else ca_p_
             b = cb_p_.replace(old_line, new_line) if cfg_type == 'b' else cb_p_
             with pytest.raises(err_type, match=error_msg):
-                cm = CrossMatch(self.mock_filename(j.encode("utf-8")),
-                                self.mock_filename(a.encode("utf-8")),
-                                self.mock_filename(b.encode("utf-8")))
+                cm = CrossMatch(mock_filename(j.encode("utf-8")),
+                                mock_filename(a.encode("utf-8")),
+                                mock_filename(b.encode("utf-8")))
                 cm._load_metadata_config(self.chunk_id)
 
         # Finally, to check for extra_col_* issues, we need to set both
@@ -1166,9 +1161,9 @@ class TestInputs:
         ca_p_2 = ca_p_.replace('extra_col_names: None', 'extra_col_names: [D, E, F]')
         ca_p_2 = ca_p_2.replace('extra_col_nums: None', 'extra_col_nums: [1, 2, 3]')
         # First check this passes fine
-        cm = CrossMatch(self.mock_filename(cm_p_.encode("utf-8")),
-                        self.mock_filename(ca_p_2.encode("utf-8")),
-                        self.mock_filename(cb_p_.encode("utf-8")))
+        cm = CrossMatch(mock_filename(cm_p_.encode("utf-8")),
+                        mock_filename(ca_p_2.encode("utf-8")),
+                        mock_filename(cb_p_.encode("utf-8")))
         cm._load_metadata_config(self.chunk_id)
         assert np.all(cm.a_extra_col_names == np.array(['Gaia_D', 'Gaia_E', 'Gaia_F']))
         assert np.all(cm.a_extra_col_nums == np.array([1, 2, 3]))
@@ -1181,18 +1176,18 @@ class TestInputs:
                  'All elements of a_extra_col_nums should be integers']):
             ca_p_3 = ca_p_2.replace(old_line, new_line)
             with pytest.raises(ValueError, match=error_msg):
-                cm = CrossMatch(self.mock_filename(cm_p_.encode("utf-8")),
-                                self.mock_filename(ca_p_3.encode("utf-8")),
-                                self.mock_filename(cb_p_.encode("utf-8")))
+                cm = CrossMatch(mock_filename(cm_p_.encode("utf-8")),
+                                mock_filename(ca_p_3.encode("utf-8")),
+                                mock_filename(cb_p_.encode("utf-8")))
                 cm._load_metadata_config(self.chunk_id)
 
     @pytest.mark.remote_data
     @pytest.mark.filterwarnings("ignore:.*contains more than one AUF sampling point, .*")
     # pylint: disable-next=too-many-lines,too-many-branches,too-many-statements,too-many-locals
     def test_crossmatch_correct_astrometry_inputs(self):
-        cm = CrossMatch(self.mock_filename(self.cm_p_text.encode("utf-8")),
-                        self.mock_filename(self.ca_p_text.encode("utf-8")),
-                        self.mock_filename(self.cb_p_text.encode("utf-8")))
+        cm = CrossMatch(mock_filename(self.cm_p_text.encode("utf-8")),
+                        mock_filename(self.ca_p_text.encode("utf-8")),
+                        mock_filename(self.cb_p_text.encode("utf-8")))
         cm._load_metadata_config(self.chunk_id)
         assert cm.n_pool == 2
         assert cm.a_correct_astrometry is False
@@ -1205,22 +1200,22 @@ class TestInputs:
             x = x.replace('compute_snr_mag_relation: False', 'compute_snr_mag_relation: True')
             b, c = (x, self.cb_p_text) if cat_n == 'a' else (self.ca_p_text, x)
             with pytest.raises(ValueError, match=f"Ambiguity in catalogue '{cat_n}' hav"):
-                cm = CrossMatch(self.mock_filename(self.cm_p_text.encode("utf-8")),
-                                self.mock_filename(b.encode("utf-8")),
-                                self.mock_filename(c.encode("utf-8")))
+                cm = CrossMatch(mock_filename(self.cm_p_text.encode("utf-8")),
+                                mock_filename(b.encode("utf-8")),
+                                mock_filename(c.encode("utf-8")))
                 cm._load_metadata_config(self.chunk_id)
 
         cm_p_ = self.cm_p_text.replace('n_pool: 2', '')
         with pytest.raises(ValueError, match="Missing key n_pool from joint"):
-            cm = CrossMatch(self.mock_filename(cm_p_.encode("utf-8")),
-                            self.mock_filename(self.ca_p_text.encode("utf-8")),
-                            self.mock_filename(self.cb_p_text.encode("utf-8")))
+            cm = CrossMatch(mock_filename(cm_p_.encode("utf-8")),
+                            mock_filename(self.ca_p_text.encode("utf-8")),
+                            mock_filename(self.cb_p_text.encode("utf-8")))
             cm._load_metadata_config(self.chunk_id)
         cb_p_ = self.cb_p_text.replace('correct_astrometry: False', '')
         with pytest.raises(ValueError, match='Missing key correct_astrometry from catalogue "b"'):
-            cm = CrossMatch(self.mock_filename(self.cm_p_text.encode("utf-8")),
-                            self.mock_filename(self.ca_p_text.encode("utf-8")),
-                            self.mock_filename(cb_p_.encode("utf-8")))
+            cm = CrossMatch(mock_filename(self.cm_p_text.encode("utf-8")),
+                            mock_filename(self.ca_p_text.encode("utf-8")),
+                            mock_filename(cb_p_.encode("utf-8")))
             cm._load_metadata_config(self.chunk_id)
 
         ca_p_ = self.ca_p_text.replace('correct_astrometry: False', 'correct_astrometry: True')
@@ -1229,9 +1224,9 @@ class TestInputs:
         for new_line in ["n_pool: A", "n_pool: [1, 2]", "n_pool: 1.5"]:
             cm_p_ = self.cm_p_text.replace('n_pool: 2', new_line)
             with pytest.raises(ValueError, match="n_pool should be a single integer number."):
-                cm = CrossMatch(self.mock_filename(cm_p_.encode("utf-8")),
-                                self.mock_filename(self.ca_p_text.encode("utf-8")),
-                                self.mock_filename(self.cb_p_text.encode("utf-8")))
+                cm = CrossMatch(mock_filename(cm_p_.encode("utf-8")),
+                                mock_filename(self.ca_p_text.encode("utf-8")),
+                                mock_filename(self.cb_p_text.encode("utf-8")))
                 cm._load_metadata_config(self.chunk_id)
 
         # Fake dd_params and l_cut
@@ -1281,9 +1276,9 @@ class TestInputs:
                 new_line = new_line + lines[j]
             ca_p_2 = ca_p_.replace('correct_astrometry: False', new_line)
             with pytest.raises(ValueError, match=f'Missing key {key} from catalogue "a"'):
-                cm = CrossMatch(self.mock_filename(self.cm_p_text.encode("utf-8")),
-                                self.mock_filename(ca_p_2.encode("utf-8")),
-                                self.mock_filename(self.cb_p_text.encode("utf-8")))
+                cm = CrossMatch(mock_filename(self.cm_p_text.encode("utf-8")),
+                                mock_filename(ca_p_2.encode("utf-8")),
+                                mock_filename(self.cb_p_text.encode("utf-8")))
                 cm._load_metadata_config(self.chunk_id)
         # Test use_photometric_uncertainties for failure.
         new_line = ''
@@ -1293,27 +1288,27 @@ class TestInputs:
         ca_p_3 = ca_p_2.replace('use_photometric_uncertainties: False',
                                 'use_photometric_uncertainties: something else')
         with pytest.raises(ValueError, match='Boolean flag key use_photometric_uncertainties not set to '):
-            cm = CrossMatch(self.mock_filename(self.cm_p_text.encode("utf-8")),
-                            self.mock_filename(ca_p_3.encode("utf-8")),
-                            self.mock_filename(self.cb_p_text.encode("utf-8")))
+            cm = CrossMatch(mock_filename(self.cm_p_text.encode("utf-8")),
+                            mock_filename(ca_p_3.encode("utf-8")),
+                            mock_filename(self.cb_p_text.encode("utf-8")))
             cm._load_metadata_config(self.chunk_id)
         ca_p_3 = ca_p_2.replace('mn_fit_type: quadratic', 'mn_fit_type: something else')
         with pytest.raises(ValueError, match="mn_fit_type must be 'quadratic' or 'linear' in"):
-            cm = CrossMatch(self.mock_filename(self.cm_p_text.encode("utf-8")),
-                            self.mock_filename(ca_p_3.encode("utf-8")),
-                            self.mock_filename(self.cb_p_text.encode("utf-8")))
+            cm = CrossMatch(mock_filename(self.cm_p_text.encode("utf-8")),
+                            mock_filename(ca_p_3.encode("utf-8")),
+                            mock_filename(self.cb_p_text.encode("utf-8")))
             cm._load_metadata_config(self.chunk_id)
         ca_p_3 = ca_p_2.replace('seeing_ranges: [0.9, 1.1]', 'seeing_ranges: a')
         with pytest.raises(ValueError, match="seeing_ranges must be a 1-D list or array of ints, length 1, "):
-            cm = CrossMatch(self.mock_filename(self.cm_p_text.encode("utf-8")),
-                            self.mock_filename(ca_p_3.encode("utf-8")),
-                            self.mock_filename(self.cb_p_text.encode("utf-8")))
+            cm = CrossMatch(mock_filename(self.cm_p_text.encode("utf-8")),
+                            mock_filename(ca_p_3.encode("utf-8")),
+                            mock_filename(self.cb_p_text.encode("utf-8")))
             cm._load_metadata_config(self.chunk_id)
         ca_p_3 = ca_p_2.replace('seeing_ranges: [0.9, 1.1]', 'seeing_ranges: [1, 2, 3, 4]')
         with pytest.raises(ValueError, match="seeing_ranges must be a 1-D list or array of ints, length 1, "):
-            cm = CrossMatch(self.mock_filename(self.cm_p_text.encode("utf-8")),
-                            self.mock_filename(ca_p_3.encode("utf-8")),
-                            self.mock_filename(self.cb_p_text.encode("utf-8")))
+            cm = CrossMatch(mock_filename(self.cm_p_text.encode("utf-8")),
+                            mock_filename(ca_p_3.encode("utf-8")),
+                            mock_filename(self.cb_p_text.encode("utf-8")))
             cm._load_metadata_config(self.chunk_id)
         # Set up a completely valid test of cat_a_params and cat_b_params
         cb_p_2 = cb_p_.replace('correct_astrometry: False', new_line)
@@ -1391,9 +1386,9 @@ class TestInputs:
         cm_p_ = cm_p_.replace('four_hankel_points: 10000', 'four_hankel_points: 1000')
         # Using the ORIGINAL cat_a_params means we don't fit for corrections
         # to catalogue 'a'.
-        cm = CrossMatch(self.mock_filename(cm_p_.encode("utf-8")),
-                        self.mock_filename(self.ca_p_text.encode("utf-8")),
-                        self.mock_filename(cb_p_2.encode("utf-8")))
+        cm = CrossMatch(mock_filename(cm_p_.encode("utf-8")),
+                        mock_filename(self.ca_p_text.encode("utf-8")),
+                        mock_filename(cb_p_2.encode("utf-8")))
         cm._load_metadata_config(self.chunk_id)
         cm.chunk_id = self.chunk_id
         cm._initialise_chunk()
@@ -1430,9 +1425,9 @@ class TestInputs:
         os.system('cp -r a_snr_mag_9 a_snr_mag_100')
         os.system('cp -r b_snr_mag_9 b_snr_mag_100')
         os.system('cp -r wise_auf_folder_9 wise_auf_folder_100')
-        cm = CrossMatch(self.mock_filename(cm_p_2.encode("utf-8")),
-                        self.mock_filename(cb_p_3.encode("utf-8")),
-                        self.mock_filename(ca_p_3.encode("utf-8")))
+        cm = CrossMatch(mock_filename(cm_p_2.encode("utf-8")),
+                        mock_filename(cb_p_3.encode("utf-8")),
+                        mock_filename(ca_p_3.encode("utf-8")))
         cm._load_metadata_config(100)
         cm.chunk_id = 100
         os.system('cp ref_9.csv ref_100.csv')
@@ -1468,9 +1463,9 @@ class TestInputs:
         cb_p_ = cb_p_.replace('[4, 6, 8]', '[4, 6, 8, 10]')
         if os.path.isfile('ac_folder/npy/snr_mag_params.npy'):
             os.remove('ac_folder/npy/snr_mag_params.npy')
-        cm = CrossMatch(self.mock_filename(cm_p_.encode("utf-8")),
-                        self.mock_filename(self.ca_p_text.encode("utf-8")),
-                        self.mock_filename(cb_p_.encode("utf-8")))
+        cm = CrossMatch(mock_filename(cm_p_.encode("utf-8")),
+                        mock_filename(self.ca_p_text.encode("utf-8")),
+                        mock_filename(cb_p_.encode("utf-8")))
         cm._load_metadata_config(self.chunk_id)
         cm.chunk_id = self.chunk_id
         cm._initialise_chunk()
@@ -1487,9 +1482,9 @@ class TestInputs:
         assert_allclose([marray[0], narray[0]], [2, 0], rtol=0.1, atol=0.01)
         if os.path.isfile('ac_folder/npy/snr_mag_params.npy'):
             os.remove('ac_folder/npy/snr_mag_params.npy')
-        cm = CrossMatch(self.mock_filename(cm_p_.encode("utf-8")),
-                        self.mock_filename(ca_p_.encode("utf-8")),
-                        self.mock_filename(self.cb_p_text.encode("utf-8")))
+        cm = CrossMatch(mock_filename(cm_p_.encode("utf-8")),
+                        mock_filename(ca_p_.encode("utf-8")),
+                        mock_filename(self.cb_p_text.encode("utf-8")))
         cm._load_metadata_config(self.chunk_id)
         cm.chunk_id = self.chunk_id
         cm._initialise_chunk()
@@ -1536,9 +1531,9 @@ class TestInputs:
             cb_p_3 = cb_p_3.replace(lines[ind], nl)
         if os.path.isfile('ac_folder/npy/snr_mag_params.npy'):
             os.remove('ac_folder/npy/snr_mag_params.npy')
-        cm = CrossMatch(self.mock_filename(cm_p_.encode("utf-8")),
-                        self.mock_filename(cb_p_3.encode("utf-8")),
-                        self.mock_filename(self.ca_p_text.encode("utf-8")))
+        cm = CrossMatch(mock_filename(cm_p_.encode("utf-8")),
+                        mock_filename(cb_p_3.encode("utf-8")),
+                        mock_filename(self.ca_p_text.encode("utf-8")))
         cm._load_metadata_config(self.chunk_id)
         cm.chunk_id = self.chunk_id
         cm._initialise_chunk()
@@ -1620,9 +1615,9 @@ class TestInputs:
             else:
                 type_of_error = FileNotFoundError
             with pytest.raises(type_of_error, match=match_text):
-                cm = CrossMatch(self.mock_filename(self.cm_p_text.encode("utf-8")),
-                                self.mock_filename(b.encode("utf-8")),
-                                self.mock_filename(c.encode("utf-8")))
+                cm = CrossMatch(mock_filename(self.cm_p_text.encode("utf-8")),
+                                mock_filename(b.encode("utf-8")),
+                                mock_filename(c.encode("utf-8")))
                 cm._load_metadata_config(self.chunk_id)
 
         cb_p_3 = cb_p_2.replace('correct_astrometry: True', 'correct_astrometry: False')
@@ -1631,9 +1626,9 @@ class TestInputs:
                                 'pos_and_err_indices: [1, 2, 3, 4, 5]')
         match_text = 'b_pos_and_err_indices should contain three elements when compute_snr_mag_relation '
         with pytest.raises(ValueError, match=match_text):
-            cm = CrossMatch(self.mock_filename(self.cm_p_text.encode("utf-8")),
-                            self.mock_filename(ca_p_2.encode("utf-8")),
-                            self.mock_filename(cb_p_3.encode("utf-8")))
+            cm = CrossMatch(mock_filename(self.cm_p_text.encode("utf-8")),
+                            mock_filename(ca_p_2.encode("utf-8")),
+                            mock_filename(cb_p_3.encode("utf-8")))
             cm._load_metadata_config(self.chunk_id)
 
 
@@ -1660,9 +1655,9 @@ class TestPostProcess:
                   encoding='utf-8') as cb_p:
             self.cb_p_text = cb_p.read()
 
-        self.cm = CrossMatch(self.mock_filename(self.cm_p_text.encode("utf-8")),
-                             self.mock_filename(self.ca_p_text.encode("utf-8")),
-                             self.mock_filename(self.cb_p_text.encode("utf-8")))
+        self.cm = CrossMatch(mock_filename(self.cm_p_text.encode("utf-8")),
+                             mock_filename(self.ca_p_text.encode("utf-8")),
+                             mock_filename(self.cb_p_text.encode("utf-8")))
 
         rng = np.random.default_rng(seed=7893467234)
         self.ac = rng.choice(na, size=nmatch, replace=False)
