@@ -705,7 +705,7 @@ class TestMakePerturbAUFs():
         # Fake this the easy way both times, then below correct the parameters
         # for the precompute_hist version of the test.
         old_line = r'auf_folder_path: auf_folder_{}'
-        new_line = (r'auf_folder_path: auf_folder_{}''\ndens_hist_tri_location: None\n'
+        new_line = (r'auf_folder_path: auf_folder_{}' + '\ndens_hist_tri_location: None\n'
                     'tri_model_mags_location: None\ntri_model_mag_mids_location: None\n'
                     'tri_model_mags_interval_location: None\ntri_dens_uncert_location: None\n'
                     'tri_n_bright_sources_star_location: None')
@@ -892,7 +892,7 @@ class TestMakePerturbAUFs():
         np.save('b_snr_mag_9/snr_mag_params.npy', np.array([[[0.0109, 46.08, 0.119, 130, 0]]]))
 
         old_line = r'auf_folder_path: auf_folder_{}'
-        new_line = (r'auf_folder_path: auf_folder_{}''\ndens_hist_tri_location: None\n'
+        new_line = (r'auf_folder_path: auf_folder_{}' + '\ndens_hist_tri_location: None\n'
                     'tri_model_mags_location: None\ntri_model_mag_mids_location: None\n'
                     'tri_model_mags_interval_location: None\ntri_dens_uncert_location: None\n'
                     'tri_n_bright_sources_star_location: None')

@@ -11,10 +11,7 @@ import pytest
 from astropy.coordinates import SkyCoord
 from numpy.testing import assert_allclose
 
-# pylint: disable=import-error,no-name-in-module
 from macauff.parse_catalogue import csv_to_npy, npy_to_csv, rect_slice_csv, rect_slice_npy
-
-# pylint: enable=import-error,no-name-in-module
 
 
 class TestParseCatalogue:
@@ -53,7 +50,7 @@ class TestParseCatalogue:
             assert_allclose(astro, self.data[:, [0, 1, 2]])
             assert_allclose(photo, self.data[:, [4, 5]])
             assert_allclose(best_index, self.data[:, 6])
-            assert np.all(~chunk_overlaps)  # pylint: disable=invalid-unary-operand-type
+            assert np.all(~chunk_overlaps)
 
     def test_csv_to_npy_chunk_overlap(self):
         # Convert data to string to get expected Pandas-esque .csv formatting where
@@ -79,7 +76,7 @@ class TestParseCatalogue:
             assert_allclose(best_index, self.data[:, 6])
             assert np.all(chunk_overlaps == self.data[:, 7])
 
-    def test_csv_to_npy_process_uncert(self):  # pylint: disable=too-many-statements
+    def test_csv_to_npy_process_uncert(self):
         # Convert data to string to get expected Pandas-esque .csv formatting where
         # NaN values are empty strings.
         data1 = self.data.astype(str)
@@ -194,7 +191,7 @@ class TestParseCatalogue:
             assert_allclose(self.data[q][:, [1, 2, 3]], astro)
             assert_allclose(self.data[q][:, [4, 5]], photo)
             assert_allclose(self.data[q][:, 6], best_index)
-            assert np.all(~chunk_overlaps)  # pylint: disable=invalid-unary-operand-type
+            assert np.all(~chunk_overlaps)
 
     def test_rect_slice_csv(self):
         # Convert data to string to get expected Pandas-esque .csv formatting where

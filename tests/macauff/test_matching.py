@@ -15,13 +15,10 @@ from numpy.testing import assert_allclose
 from test_fit_astrometry import TestAstroCorrection as TAC
 from test_utils import mock_filename
 
-# pylint: disable=import-error,no-name-in-module
 from macauff.macauff import Macauff
 from macauff.matching import CrossMatch
 from macauff.misc_functions import convex_hull_area
 from macauff.perturbation_auf import make_tri_counts
-
-# pylint: enable=import-error,no-name-in-module
 
 
 def _replace_line(file_name, line_num, text, out_file=None):
@@ -55,10 +52,13 @@ class TestInputs:
         self.chunk_id = 9
         os.makedirs('a_cat', exist_ok=True)
         os.makedirs('b_cat', exist_ok=True)
-        joint_config = yaml.safe_load(open(os.path.join(os.path.dirname(__file__),
-                                                        'data/crossmatch_params.yaml')))
-        cat_a_config = yaml.safe_load(open(os.path.join(os.path.dirname(__file__), 'data/cat_a_params.yaml')))
-        cat_b_config = yaml.safe_load(open(os.path.join(os.path.dirname(__file__), 'data/cat_b_params.yaml')))
+        with open(os.path.join(os.path.dirname(__file__), 'data/crossmatch_params.yaml'),
+                  encoding='utf-8') as f:
+            joint_config = yaml.safe_load(f)
+        with open(os.path.join(os.path.dirname(__file__), 'data/cat_a_params.yaml'), encoding='utf-8') as f:
+            cat_a_config = f
+        with open(os.path.join(os.path.dirname(__file__), 'data/cat_b_params.yaml'), encoding='utf-8') as f:
+            cat_b_config = f
         self.a_cat_folder_path = os.path.abspath(cat_a_config['cat_folder_path'].format(self.chunk_id))
         self.b_cat_folder_path = os.path.abspath(cat_b_config['cat_folder_path'].format(self.chunk_id))
 
@@ -128,7 +128,7 @@ class TestInputs:
                                        'tri_dens_uncert_location: None\n'
                                        'tri_n_bright_sources_star_location: None')
         cb_p_ = self.cb_p_text.replace(r'auf_folder_path: wise_auf_folder_{}',
-                                       r'auf_folder_path: wise_auf_folder_{}''\n'
+                                       r'auf_folder_path: wise_auf_folder_{}' + '\n'
                                        'dens_hist_tri_location: None\ntri_model_mags_location: None\n'
                                        'tri_model_mag_mids_location: None\n'
                                        'tri_model_mags_interval_location: None\n'
@@ -360,8 +360,9 @@ class TestInputs:
         cm._load_metadata_config(self.chunk_id)
         assert cm.b_auf_folder_path is None
         assert np.all([b is None for b in cm.a_tri_filt_names])
-        assert np.all(cm.a_dens_hist_tri_list == np.ones((3, 10), float))
-        assert np.all(cm.a_tri_dens_uncert_list == np.ones((3, 10), float))
+        assert np.all(cm.a_dens_hist_tri_list == np.ones((3, 10), float))  # pylint: disable=no-member
+        assert np.all(cm.a_tri_dens_uncert_list == np.ones((3, 10), float))  # pylint: disable=no-member
+        # pylint: disable-next=no-member
         assert np.all(cm.b_tri_n_bright_sources_star_list == np.ones((4,), float))
 
     def test_crossmatch_folder_path_inputs(self):
@@ -413,10 +414,10 @@ class TestInputs:
                         mock_filename(ca_p_.encode("utf-8")),
                         mock_filename(cb_p_.encode("utf-8")))
         cm._load_metadata_config(self.chunk_id)
-        assert cm.a_tri_set_name == 'gaiaDR2'  # pylint: disable=no-member
+        assert cm.a_tri_set_name == 'gaiaDR2'
         assert np.all(cm.b_tri_filt_names == np.array(['W1', 'W2', 'W3', 'W4']))  # pylint: disable=no-member
-        assert cm.a_tri_filt_num == 1  # pylint: disable=no-member
-        assert not cm.b_download_tri  # pylint: disable=no-member
+        assert cm.a_tri_filt_num == 1
+        assert not cm.b_download_tri
 
         # List of simple one line config file replacements for error message checking
         for old_line, new_line, match_text, in_file in zip(
@@ -630,7 +631,7 @@ class TestInputs:
         assert not hasattr(cm, 'a_dd_params_path')
         assert not hasattr(cm, 'b_l_cut_path')
 
-        for cat_reg, cat_name in zip(['"a"', '"b"'], ['cat_a_params_new', 'cat_b_params_new']):
+        for cat_reg in ['"a"', '"b"']:
             if cat_reg[1] == 'a':
                 x = ca_p_.replace('run_psf_auf: False', 'run_psf_auf: True')
             else:
@@ -817,7 +818,7 @@ class TestInputs:
                         mock_filename(self.ca_p_text.encode("utf-8")),
                         mock_filename(self.cb_p_text.encode("utf-8")))
         cm._load_metadata_config(self.chunk_id)
-        assert np.all(cm.int_fracs == np.array([0.63, 0.9, 0.999]))
+        assert np.all(cm.int_fracs == np.array([0.63, 0.9, 0.999]))  # pylint: disable=no-member
 
         # List of simple one line config file replacements for error message checking
         old_line = 'int_fracs: [0.63, 0.9, 0.999]'
@@ -1183,16 +1184,16 @@ class TestInputs:
 
     @pytest.mark.remote_data
     @pytest.mark.filterwarnings("ignore:.*contains more than one AUF sampling point, .*")
-    # pylint: disable-next=too-many-lines,too-many-branches,too-many-statements,too-many-locals
+    # pylint: disable-next=too-many-statements,too-many-locals
     def test_crossmatch_correct_astrometry_inputs(self):
         cm = CrossMatch(mock_filename(self.cm_p_text.encode("utf-8")),
                         mock_filename(self.ca_p_text.encode("utf-8")),
                         mock_filename(self.cb_p_text.encode("utf-8")))
         cm._load_metadata_config(self.chunk_id)
-        assert cm.n_pool == 2
-        assert cm.a_correct_astrometry is False
-        assert cm.b_correct_astrometry is False
-        assert cm.a_compute_snr_mag_relation is False
+        assert cm.n_pool == 2  # pylint: disable=no-member
+        assert cm.a_correct_astrometry is False  # pylint: disable=no-member
+        assert cm.b_correct_astrometry is False  # pylint: disable=no-member
+        assert cm.a_compute_snr_mag_relation is False  # pylint: disable=no-member
 
         for cat_n in ['a', 'b']:
             x = self.ca_p_text if cat_n == 'a' else self.cb_p_text
@@ -1454,7 +1455,7 @@ class TestInputs:
 
         # Set up a completely valid test of cat_a_params and cat_b_params
         # for compute_snr_mag_relation.
-        new_line = (r'compute_snr_mag_relation: True''\ncorrect_astro_save_folder: ac_folder\n'
+        new_line = (r'compute_snr_mag_relation: True' + '\ncorrect_astro_save_folder: ac_folder\n'
                     r'csv_cat_file_string: file_{}.csv''\npos_and_err_indices: [0, 1, 2]\n'
                     'mag_indices: [3, 5, 7]\nmag_unc_indices: [4, 6, 8]')
         ca_p_ = self.ca_p_text.replace('compute_snr_mag_relation: False', new_line)

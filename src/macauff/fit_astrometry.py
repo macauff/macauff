@@ -1023,7 +1023,7 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
 
         return res, s_bins, s_d_snr_med, s_d_snr_dmed, snr_med, snr_dmed
 
-    def make_star_galaxy_counts(self):  # pylint: disable=too-many-locals
+    def make_star_galaxy_counts(self):
         """
         Generate differential source counts for each cutout region, simulating
         both stars and galaxies.

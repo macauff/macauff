@@ -9,17 +9,16 @@ import datetime
 import os
 import sys
 import warnings
-import yaml
 from time import sleep
 
 import numpy as np
+import yaml
 
 try:
-    from mpi4py import MPI  # pylint:disable=import-error
+    from mpi4py import MPI
 except ModuleNotFoundError:
     MPI = None
 
-# pylint: disable=import-error,no-name-in-module
 from macauff.counterpart_pairing import source_pairing
 from macauff.fit_astrometry import AstrometricCorrections, SNRMagnitudeRelationship
 from macauff.group_sources import make_island_groupings
@@ -27,8 +26,6 @@ from macauff.macauff import Macauff
 from macauff.parse_catalogue import csv_to_npy, npy_to_csv
 from macauff.perturbation_auf import make_perturb_aufs
 from macauff.photometric_likelihood import compute_photometric_likelihoods
-
-# pylint: enable=import-error,no-name-in-module
 
 __all__ = ['CrossMatch']
 
@@ -76,12 +73,12 @@ class CrossMatch():
 
         # Initialise MPI if available and enabled
         if MPI is not None and use_mpi:
-            self.comm = MPI.COMM_WORLD  # pylint: disable=c-extension-no-member
+            self.comm = MPI.COMM_WORLD
             self.rank = self.comm.Get_rank()
             self.comm_size = self.comm.Get_size()
             # Set MPI error handling to return exceptions rather than MPI_Abort the
             # application. Allows for recovery of crashed workers.
-            self.comm.Set_errhandler(MPI.ERRORS_RETURN)  # pylint: disable=c-extension-no-member
+            self.comm.Set_errhandler(MPI.ERRORS_RETURN)
         else:
             if use_mpi:
                 print("Warning: MPI initialisation failed. Check mpi4py is correctly installed. "
@@ -104,7 +101,6 @@ class CrossMatch():
             completed_chunks = set()
             try:
                 # Open and read existing resume file
-                # pylint: disable-next=consider-using-with
                 self.resume_file = open(resume_file_path, 'r+', encoding='utf-8')
                 for line in self.resume_file:
                     completed_chunks.add(line.rstrip())
@@ -173,11 +169,8 @@ class CrossMatch():
                 self.a_psf_fwhms[acbi], self.num_trials, self.a_nn_radius, self.a_dens_dist,
                 self.a_correct_astro_save_folder, self.a_gal_wavs[acbi], self.a_gal_aboffsets[acbi],
                 self.a_gal_filternames[acbi], self.a_gal_al_avs[acbi], self.d_mag, self.a_dd_params,
-                # pylint: disable-next=possibly-used-before-assignment
                 self.a_l_cut, ax1_mids, ax2_mids, ax_dimension, self.a_correct_mag_array,
-                # pylint: disable-next=possibly-used-before-assignment
                 self.a_correct_mag_slice, self.a_correct_sig_slice, self.n_pool, a_npy_or_csv,
-                # pylint: disable-next=possibly-used-before-assignment
                 a_coord_or_chunk, self.a_pos_and_err_indices, self.a_mag_indices, self.a_mag_unc_indices,
                 self.a_filt_names, self.a_best_mag_index, self.a_auf_region_frame,
                 self.a_saturation_magnitudes, trifolder=self.a_auf_folder_path,
@@ -251,9 +244,7 @@ class CrossMatch():
                 self.b_correct_astro_save_folder, self.b_gal_wavs[bcbi], self.b_gal_aboffsets[bcbi],
                 self.b_gal_filternames[bcbi], self.b_gal_al_avs[bcbi], self.d_mag, self.b_dd_params,
                 self.b_l_cut, ax1_mids, ax2_mids, ax_dimension, self.b_correct_mag_array,
-                # pylint: disable-next=possibly-used-before-assignment
                 self.b_correct_mag_slice, self.b_correct_sig_slice, self.n_pool, b_npy_or_csv,
-                # pylint: disable-next=possibly-used-before-assignment
                 b_coord_or_chunk, self.b_pos_and_err_indices, self.b_mag_indices, self.b_mag_unc_indices,
                 self.b_filt_names, self.b_best_mag_index, self.b_auf_region_frame,
                 self.b_saturation_magnitudes, trifolder=self.b_auf_folder_path,
@@ -590,6 +581,9 @@ class CrossMatch():
 
         chunk_sizes = np.empty(len(chunk_queue), dtype=float)
         for i, chunk_id in enumerate(chunk_queue):
+            # Skip completed chunks
+            if chunk_id in completed_chunks:
+                continue
             cat_a_file_path = self.cat_a_params_dict['cat_folder_path'].format(chunk_id)
             cat_b_file_path = self.cat_b_params_dict['cat_folder_path'].format(chunk_id)
 
@@ -788,7 +782,7 @@ class CrossMatch():
                 raise ValueError(f"{region_points[0]} should be a list of two-element lists "
                                  f"'[[a, b], [c, d]]', separated by a comma in chunk {chunk_id}.") from exc
 
-        setattr(self, region_points[0], points)
+        setattr(self, region_points[0], points)  # pylint: disable=possibly-used-before-assignment
 
     # pylint: disable=too-many-statements,too-many-branches
     def read_metadata(self):
@@ -806,9 +800,12 @@ class CrossMatch():
         cat_b_config : dict
             Dictionary with all of catalogue b's metadata parameters.
         '''
-        joint_config = yaml.safe_load(open(self.crossmatch_params_file_path))
-        cat_a_config = yaml.safe_load(open(self.cat_a_params_file_path))
-        cat_b_config = yaml.safe_load(open(self.cat_b_params_file_path))
+        with open(self.crossmatch_params_file_path, encoding='utf-8') as f:
+            joint_config = yaml.safe_load(f)
+        with open(self.cat_a_params_file_path, encoding='utf-8') as f:
+            cat_a_config = f
+        with open(self.cat_b_params_file_path, encoding='utf-8') as f:
+            cat_b_config = f
 
         for check_flag in ['include_perturb_auf', 'include_phot_like', 'use_phot_priors',
                            'cf_region_type', 'cf_region_frame', 'cf_region_points_per_chunk',

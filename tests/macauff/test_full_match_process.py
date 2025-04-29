@@ -8,11 +8,9 @@ import os
 import numpy as np
 import pytest
 from test_utils import mock_filename
-# pylint: disable=import-error,no-name-in-module
 from macauff.matching import CrossMatch
 from macauff.utils import generate_random_data
 
-# pylint: enable=import-error,no-name-in-module
 # pylint: disable=duplicate-code
 
 

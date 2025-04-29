@@ -21,7 +21,7 @@ from macauff.misc_functions_fortran import misc_functions_fortran as mff
 __all__ = ['make_island_groupings']
 
 
-# pylint: disable-next=too-many-arguments,too-many-locals,too-many-statements
+# pylint: disable-next=too-many-locals,too-many-statements
 def make_island_groupings(cm):
     '''
     Function to handle the creation of "islands" of astrometrically coeval

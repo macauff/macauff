@@ -10,7 +10,6 @@ import numpy as np
 import pytest
 from numpy.testing import assert_allclose
 
-# pylint: disable-next=import-error,no-name-in-module
 from macauff.fit_astrometry import AstrometricCorrections, SNRMagnitudeRelationship
 
 

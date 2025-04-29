@@ -8,10 +8,7 @@ import numpy as np
 from numpy.testing import assert_allclose
 from test_perturbation_auf import GalCountValues
 
-# pylint: disable=import-error,no-name-in-module
 from macauff.galaxy_counts import create_galaxy_counts, generate_speclite_filters
-
-# pylint: enable=import-error,no-name-in-module
 
 gal_values = GalCountValues()
 
@@ -84,7 +81,7 @@ class TestCreateGalaxyCounts():
         filter_name = f'{f}-{n}'
 
         generate_speclite_filters(f, [n], [np.array([0.159, 0.16, 0.161])], [np.array([0, 1, 0])],
-                                  u.micron)  # pylint: disable=no-member
+                                  u.micron)
 
         gal_dens = create_galaxy_counts(gal_values.cmau, self.mag_bins, self.z_array, wav,
                                         gal_values.alpha0, gal_values.alpha1,

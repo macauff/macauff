@@ -143,7 +143,6 @@ def compute_photometric_likelihoods(cm):
                         a_mag, b_mag, a_mag_cut, b_mag_cut, a_inds_cut, a_size_cut, b_inds_cut, b_size_cut,
                         # pylint: disable-next=possibly-used-before-assignment
                         a_b_area_cut, b_b_area_cut, a_f_area_cut, b_f_area_cut, a_auf_cdf, b_auf_cdf, a_bins,
-                        # pylint: disable-next=possibly-used-before-assignment
                         b_bins, bright_frac, field_frac, a_flags, b_flags, a_flags_cut, b_flags_cut, area)
                 if cm.use_phot_priors and not cm.include_phot_like:
                     # If we only used the create_c_and_f routine to derive

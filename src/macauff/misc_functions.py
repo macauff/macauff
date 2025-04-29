@@ -648,7 +648,7 @@ def calculate_overlap_counts(a, b, minmag, maxmag, search_radius, n_pool, mag_in
     mag_cut_kdt = _get_cart_kdt(mag_cut_ucoords)
     del mag_cut_urepr, mag_cut_ucoords
 
-    r = (2 * np.sin(Angle(search_radius * u.degree) / 2.0)).value  # pylint: disable=no-member
+    r = (2 * np.sin(Angle(search_radius * u.degree) / 2.0)).value
     if len_or_inds == 'len':
         overlap_number = np.empty(len(a), int)
     else:

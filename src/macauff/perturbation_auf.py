@@ -34,7 +34,7 @@ from macauff.perturbation_auf_fortran import perturbation_auf_fortran as paf
 __all__ = ['make_perturb_aufs', 'create_single_perturb_auf']
 
 
-# pylint: disable-next=too-many-locals,too-many-arguments,too-many-branches,too-many-statements
+# pylint: disable-next=too-many-locals,too-many-statements
 def make_perturb_aufs(cm, which_cat):
     r"""
     cm : Class
@@ -514,7 +514,7 @@ def download_trilegal_simulation(tri_folder, tri_filter_set, ax1, ax2, mag_num, 
         f.write(contents)
 
 
-# pylint: disable=too-many-locals,too-many-arguments,too-many-statements,too-many-positional-arguments
+# pylint: disable=too-many-locals,too-many-arguments,too-many-positional-arguments
 def create_single_perturb_auf(auf_point, r, dr, j0s, num_trials, psf_fwhm, density_mag, a_photo, localn,
                               d_mag, mag_cut, dd_params, l_cut, run_fw, run_psf, snr_mag_params, al_av,
                               avs, fit_gal_flag, sky_area=None, saturation_magnitude=None, cmau_array=None,

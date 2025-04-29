@@ -456,8 +456,8 @@ class TestMakeIslandGroupings():  # pylint: disable=too-many-instance-attributes
 
         make_island_groupings(self.cm)
 
-        alist, blist = self.cm.alist, self.cm.blist  # pylint: disable=no-member
-        agrplen, bgrplen = self.cm.agrplen, self.cm.bgrplen  # pylint: disable=no-member
+        alist, blist = self.cm.alist, self.cm.blist
+        agrplen, bgrplen = self.cm.agrplen, self.cm.bgrplen
         # We removed 3 extra sources this time around, which should all be 1:1 islands.
         assert np.all(alist.shape == (2, n_a - 4 + n_b - n_c))
         assert np.all(blist.shape == (1, n_a - 4 + n_b - n_c))
@@ -541,8 +541,8 @@ class TestMakeIslandGroupings():  # pylint: disable=too-many-instance-attributes
 
         make_island_groupings(self.cm)
 
-        alist, blist = self.cm.alist, self.cm.blist  # pylint: disable=no-member
-        agrplen, bgrplen = self.cm.agrplen, self.cm.bgrplen  # pylint: disable=no-member
+        alist, blist = self.cm.alist, self.cm.blist
+        agrplen, bgrplen = self.cm.agrplen, self.cm.bgrplen
         # The same tests that were ran in make_island_groupings should pass here, once
         # we remove the six additional points that survive at (0, -90), (360, -90),
         # (0, 0), or (360, 0) that we used to force the box size.
@@ -588,8 +588,8 @@ class TestMakeIslandGroupings():  # pylint: disable=too-many-instance-attributes
 
         # Verify that make_island_groupings doesn't change when the extra arrays
         # are calculated, as an initial test.
-        alist, blist = self.cm.alist, self.cm.blist  # pylint: disable=no-member
-        agrplen, bgrplen = self.cm.agrplen, self.cm.bgrplen  # pylint: disable=no-member
+        alist, blist = self.cm.alist, self.cm.blist
+        agrplen, bgrplen = self.cm.agrplen, self.cm.bgrplen
         self._comparisons_in_islands(alist, blist, agrplen, bgrplen, self.n_a, self.n_b,
                                      self.n_com)
 

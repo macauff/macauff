@@ -313,7 +313,7 @@ class TestCounterpartPairing:  # pylint: disable=too-many-instance-attributes
         assert np.all(bcrpts == np.array([self.large_len+1]))
         assert_allclose(prob/integral, 1)
 
-    def test_source_pairing(self):  # pylint: disable=too-many-statements
+    def test_source_pairing(self):
         # pylint: disable=no-member
         fake_cm = self.make_class()
         source_pairing(fake_cm)
