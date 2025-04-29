@@ -8,6 +8,7 @@ import os
 import numpy as np
 import pytest
 from test_utils import mock_filename
+
 from macauff.matching import CrossMatch
 from macauff.utils import generate_random_data
 

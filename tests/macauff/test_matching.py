@@ -6,11 +6,11 @@ Tests for the "matching" module.
 # pylint: disable=too-many-lines,duplicate-code
 
 import os
-import yaml
 
 import numpy as np
 import pandas as pd
 import pytest
+import yaml
 from numpy.testing import assert_allclose
 from test_fit_astrometry import TestAstroCorrection as TAC
 from test_utils import mock_filename
