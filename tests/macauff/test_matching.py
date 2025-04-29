@@ -56,9 +56,9 @@ class TestInputs:
                   encoding='utf-8') as f:
             joint_config = yaml.safe_load(f)
         with open(os.path.join(os.path.dirname(__file__), 'data/cat_a_params.yaml'), encoding='utf-8') as f:
-            cat_a_config = f
+            cat_a_config = yaml.safe_load(f)
         with open(os.path.join(os.path.dirname(__file__), 'data/cat_b_params.yaml'), encoding='utf-8') as f:
-            cat_b_config = f
+            cat_b_config = yaml.safe_load(f)
         self.a_cat_folder_path = os.path.abspath(cat_a_config['cat_folder_path'].format(self.chunk_id))
         self.b_cat_folder_path = os.path.abspath(cat_b_config['cat_folder_path'].format(self.chunk_id))
 

@@ -662,6 +662,16 @@ class CrossMatch():
                     raise OSError(f"Error when trying to create temporary folder for catalogue {catname} AUF "
                                   f"outputs. Please ensure that {flag}auf_folder_path is correct.") from exc
 
+            if self.make_output_csv and not os.path.exists(getattr(self, f'{flag[0]}_input_csv_folder')):
+                raise OSError(f'input_csv_folder from catalogue "{catname[1]}" does not exist.')
+
+        if self.make_output_csv:
+            try:
+                os.makedirs(self.output_csv_folder, exist_ok=True)
+            except OSError as exc:
+                raise OSError("Error when trying to create folder to store output csv files in. Please "
+                              "ensure that output_csv_folder is correct in joint config file.") from exc
+
         for config, catname in zip([self.cat_a_params_dict, self.cat_b_params_dict], ['a_', 'b_']):
             ind = np.where(chunk_id == np.array(config['chunk_id_list']))[0][0]
             self._make_regions_points([f'{catname}auf_region_type', config['auf_region_type']],
@@ -803,9 +813,9 @@ class CrossMatch():
         with open(self.crossmatch_params_file_path, encoding='utf-8') as f:
             joint_config = yaml.safe_load(f)
         with open(self.cat_a_params_file_path, encoding='utf-8') as f:
-            cat_a_config = f
+            cat_a_config = yaml.safe_load(f)
         with open(self.cat_b_params_file_path, encoding='utf-8') as f:
-            cat_b_config = f
+            cat_b_config = yaml.safe_load(f)
 
         for check_flag in ['include_perturb_auf', 'include_phot_like', 'use_phot_priors',
                            'cf_region_type', 'cf_region_frame', 'cf_region_points_per_chunk',
@@ -1418,11 +1428,6 @@ class CrossMatch():
                     raise ValueError(f"Missing key {check_flag} from catalogue {catname} metadata file.")
 
         joint_config['output_csv_folder'] = os.path.abspath(joint_config['output_csv_folder'])
-        try:
-            os.makedirs(joint_config['output_csv_folder'], exist_ok=True)
-        except OSError as exc:
-            raise OSError("Error when trying to create folder to store output csv files in. "
-                          "Please ensure that output_csv_folder is correct in joint config file.") from exc
 
         for config, catname in zip([cat_a_config, cat_b_config], ['a_', 'b_']):
             # Non-match csv name should be of the format
@@ -1433,8 +1438,6 @@ class CrossMatch():
             config['nonmatch_out_csv_name'] = f'{config["cat_name"]}_{nonmatch_out_name}'
 
             config['input_csv_folder'] = os.path.abspath(config['input_csv_folder'])
-            if not os.path.exists(config['input_csv_folder']):
-                raise OSError(f'input_csv_folder from catalogue "{catname[0]}" does not exist.')
 
             # cat_col_names is simply a list/array of strings. However, to
             # avoid any issues with generic names like "RA" being added to the
