@@ -548,17 +548,20 @@ class CrossMatch():
                         np.append(bc[~core_matches], bf[~b_core_nonmatches]))
 
             if self.make_output_csv:
+                # Need to determine if astrometric corrections were performed.
+                # This only happens if the flag is set in here, so set
+                # accordingly.
+                acfp = None if not self.a_correct_astrometry else self.a_cat_folder_path
+                bcfp = None if not self.b_correct_astrometry else self.b_cat_folder_path
                 npy_to_csv(
                     [self.a_input_csv_folder, self.b_input_csv_folder], self.joint_folder_path,
                     self.output_csv_folder, [self.a_cat_csv_name, self.b_cat_csv_name],
                     [self.match_out_csv_name, self.a_nonmatch_out_csv_name,
                      self.b_nonmatch_out_csv_name], [self.a_cat_col_names, self.b_cat_col_names],
                     [self.a_cat_col_nums, self.b_cat_col_nums], [self.a_cat_name, self.b_cat_name],
-                    [self.a_input_npy_folder, self.b_input_npy_folder],
-                    headers=[self.a_csv_has_header, self.b_csv_has_header],
+                    [acfp, bcfp], headers=[self.a_csv_has_header, self.b_csv_has_header],
                     extra_col_name_lists=[self.a_extra_col_names, self.b_extra_col_names],
-                    extra_col_num_lists=[self.a_extra_col_nums, self.b_extra_col_nums],
-                    file_extension=lae)
+                    extra_col_num_lists=[self.a_extra_col_nums, self.b_extra_col_nums], file_extension=lae)
 
     def _make_chunk_queue(self, completed_chunks):
         '''
@@ -1422,8 +1425,7 @@ class CrossMatch():
 
         for config, catname in zip([cat_a_config, cat_b_config], ['"a"', '"b"']):
             for check_flag in ['input_csv_folder', 'cat_csv_name', 'cat_col_names', 'cat_col_nums',
-                               'input_npy_folder', 'csv_has_header', 'extra_col_names',
-                               'extra_col_nums']:
+                               'csv_has_header', 'extra_col_names', 'extra_col_nums']:
                 if check_flag not in config:
                     raise ValueError(f"Missing key {check_flag} from catalogue {catname} metadata file.")
 
@@ -1458,14 +1460,6 @@ class CrossMatch():
             if not np.all([c.is_integer() for c in b]):
                 raise ValueError(f'All elements of {catname}cat_col_nums should be '
                                  'integers.')
-
-            input_npy_folder = config['input_npy_folder']
-            if input_npy_folder != 'None' and not os.path.exists(input_npy_folder):
-                raise OSError(f'input_npy_folder from catalogue "{catname[0]}" does not exist.')
-            if input_npy_folder == 'None':
-                config['input_npy_folder'] = None
-            else:
-                config['input_npy_folder'] = os.path.abspath(input_npy_folder)
 
             if config['csv_has_header'] not in (True, False):
                 raise ValueError('Boolean flag key csv_has_header not set to allowed value in catalogue '

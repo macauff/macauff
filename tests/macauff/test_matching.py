@@ -1082,10 +1082,10 @@ class TestInputs:
         old_line = 'snr_mag_params_file_path: a_snr_mag_{}/snr_mag_params.npy'
         lines = ['snr_mag_params_file_path: a_snr_mag_{}/snr_mag_params.npy\n',
                  '\ninput_csv_folder: input_csv_folder', '\ncat_csv_name: catalogue.csv',
-                 '\ncat_col_names: [A, B, C]', '\ncat_col_nums: [1, 2, 3]', '\ninput_npy_folder: blah',
+                 '\ncat_col_names: [A, B, C]', '\ncat_col_nums: [1, 2, 3]',
                  '\ncsv_has_header: False', '\nextra_col_names: None']
         for i, key in enumerate(['input_csv_folder', 'cat_csv_name', 'cat_col_names',
-                                 'cat_col_nums', 'input_npy_folder', 'csv_has_header',
+                                 'cat_col_nums', 'csv_has_header',
                                  'extra_col_names', 'extra_col_nums']):
             new_line = ''
             for j in range(i+1):
@@ -1103,20 +1103,16 @@ class TestInputs:
         new_line = new_line + '\nextra_col_nums: None'
         ca_p_ = self.ca_p_text.replace(old_line, new_line)
         cb_p_ = self.cb_p_text.replace(old_line.replace('a_snr_mag', 'b_snr_mag'), new_line)
-        ca_p_ = ca_p_.replace('input_npy_folder: blah', 'input_npy_folder: None')
 
-        # Initially this will fail because we don't have input_csv_folder
-        # created, then it will fail without input_npy_folder:
-        for error_key, folder, cat_ in zip(['input_csv_folder', 'input_npy_folder'],
-                                           ['input_csv_folder', 'blah'], ['a', 'b']):
-            if os.path.exists(folder):
-                os.rmdir(folder)
-            with pytest.raises(OSError, match=f'{error_key} from catalogue "{cat_}" does '):
-                cm = CrossMatch(mock_filename(cm_p_.encode("utf-8")),
-                                mock_filename(ca_p_.encode("utf-8")),
-                                mock_filename(cb_p_.encode("utf-8")))
-                cm._load_metadata_config(self.chunk_id)
-            os.makedirs(folder, exist_ok=True)
+        # This will fail without input_csv_folder:
+        if os.path.exists('input_csv_folder'):
+            os.rmdir('input_csv_folder')
+        with pytest.raises(OSError, match='input_csv_folder from catalogue "a" does '):
+            cm = CrossMatch(mock_filename(cm_p_.encode("utf-8")),
+                            mock_filename(ca_p_.encode("utf-8")),
+                            mock_filename(cb_p_.encode("utf-8")))
+            cm._load_metadata_config(self.chunk_id)
+        os.makedirs('input_csv_folder', exist_ok=True)
 
         # At this point we should successfully load the csv-related parameters.
         cm = CrossMatch(mock_filename(cm_p_.encode("utf-8")),
@@ -1131,8 +1127,6 @@ class TestInputs:
         assert cm.a_cat_csv_name == 'catalogue.csv'
         assert np.all(cm.a_cat_col_names == np.array(['Gaia_A', 'Gaia_B', 'Gaia_C']))
         assert np.all(cm.b_cat_col_nums == np.array([1, 2, 3]))
-        assert cm.a_input_npy_folder is None
-        assert cm.b_input_npy_folder == os.path.abspath('blah')
         assert cm.a_csv_has_header is False
         assert cm.a_extra_col_names is None
         assert cm.a_extra_col_nums is None
@@ -1818,12 +1812,12 @@ class TestPostProcess:
         self.cm.b_cat_col_nums = [0, 1, 2, 4, 5, 6, 7]
         self.cm.a_cat_name = 'Gaia'
         self.cm.b_cat_name = 'WISE'
-        self.cm.a_input_npy_folder = None
-        self.cm.b_input_npy_folder = None
         self.cm.a_extra_col_names = None
         self.cm.a_extra_col_nums = None
         self.cm.b_extra_col_names = ['WErr']
         self.cm.b_extra_col_nums = [3]
+        self.cm.a_correct_astrometry = False
+        self.cm.b_correct_astrometry = False
         self.cm.chunk_id = 1
 
         if include_phot_like:

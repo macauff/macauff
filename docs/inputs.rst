@@ -166,7 +166,7 @@ the inputs required in each catalogue parameters file if ``fit_gal_flag`` is ``T
 
 inputs required if ``make_output_csv`` is ``True``:
 
-``input_csv_folder``, ``cat_csv_name``, ``cat_col_names``, ``cat_col_nums``, ``input_npy_folder``, ``csv_has_header``, ``extra_col_names``, and ``extra_col_nums``;
+``input_csv_folder``, ``cat_csv_name``, ``cat_col_names``, ``cat_col_nums``, ``csv_has_header``, ``extra_col_names``, and ``extra_col_nums``;
 
 the inputs required if either ``correct_astrometry`` or ``compute_snr_mag_relation`` are ``True``:
 
@@ -348,10 +348,6 @@ The names of the mandatory columns from each respctive catalogue. Should contain
 
 For each column name in ``cat_col_names``, ``cat_col_nums`` is the zero-indexed position of the column. For example, if we had ``['ID', 'RA', 'Dec', 'V']`` as our ``cat_col_names``, we might have ``[0, 1, 2, 5]`` as our ``cat_col_nums``, in which our designation and coordinates are the first three columns, but our V-band magnitude is a few columns down.
 
-``input_npy_folder``
-
-The location on disk of the folder that contains the converted binary ``.npy`` files used as inputs to the software. Likely the same as ``cat_folder_path``, or ``None`` can be given if we do not need to load a converted astrometric uncertainty from the binary files and instead can rely solely on the original quoted astrometric uncertainty from the ``.csv`` files. Requires ``_{}`` to correctly identify each catalogue fileset on a per-chunk basis.
-
 ``csv_has_header``
 
 A boolean, yes/no, for whether there is a header in the first line of the ``.csv`` input catalogue files (``yes``), or if the first line is a line of data (``no``).
@@ -481,7 +477,6 @@ The inter-dependency of input parameters on one another, and the output ``CrossM
     │                 ├─* cat_csv_name[4]
     │                 ├─* cat_col_names
     │                 ├─* cat_col_nums
-    │                 ├─* input_npy_folder[4]
     │                 ├─* csv_has_header
     │                 ├─* extra_col_names
     │                 └─* extra_col_nums
