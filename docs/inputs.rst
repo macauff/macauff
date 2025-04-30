@@ -120,15 +120,15 @@ The integral fractions of the various so-called "error circles" used in the cros
 
 ``output_csv_folder``
 
-The folder path into which to save the stored ``.csv`` files that are created if ``make_output_csv`` is ``True``. Must be a single string containing ``_{}``, into which the chunk ID is inserted.
+The folder path into which to save the stored ``.csv`` files that are created if ``make_output_csv`` is ``True``.
 
 ``match_out_csv_name``
 
-Name of the band-merged, cross-matched dataset of counterpart associations and accompanying metadata, including the appropriate file extension (currently ``.csv``).
+Name of the band-merged, cross-matched dataset of counterpart associations and accompanying metadata, including the appropriate file extension. Must be a single string containing ``_{}``, into which the chunk ID is inserted.
 
 ``nonmatch_out_csv_name``
 
-Filename to save out the respective non-match catalogue objects and metadata to. Will have appended to the front ``cat_name`` to distinguish the two non-match files. ``nonmatch_out_csv_name`` should contain the appropriate file extension.
+Filename to save out the respective non-match catalogue objects and metadata to. Will have appended to the front ``cat_name`` to distinguish the two non-match files. ``nonmatch_out_csv_name`` should contain the appropriate file extension. Must be a single string containing ``_{}``, into which the chunk ID is inserted.
 
 ``with_and_without_photometry``
 
@@ -470,9 +470,9 @@ The inter-dependency of input parameters on one another, and the output ``CrossM
     ├─> four_max_rho
     ├─> int_fracs
     ├─> make_output_csv
-    │                 ├─> output_csv_folder[4]
-    │                 ├─> match_out_csv_name
-    │                 ├─> nonmatch_out_csv_name
+    │                 ├─> output_csv_folder
+    │                 ├─> match_out_csv_name[4]
+    │                 ├─> nonmatch_out_csv_name[4]
     │                 ├─* input_csv_folder[4]
     │                 ├─* cat_csv_name[4]
     │                 ├─* cat_col_names
