@@ -321,7 +321,7 @@ class TestParseCatalogueNpyToCsv:  # pylint: disable=too-many-instance-attribute
         extra_cols = ['MATCH_P', 'SEPARATION', 'ETA', 'XI', 'A_AVG_CONT', 'B_AVG_CONT',
                       'A_CONT_F1', 'A_CONT_F10', 'B_CONT_F1', 'B_CONT_F10']
 
-        npy_to_csv(['.', '.'], 'test_folder', '.', ['test_a_data.csv', 'test_b_data.csv'],
+        npy_to_csv(['./test_a_data.csv', './test_b_data.csv'], 'test_folder', '.',
                    ['match_csv.csv', 'a_nonmatch_csv.csv', 'b_nonmatch_csv.csv'], [a_cols, b_cols],
                    [[0, 1, 2, 4, 5], [0, 1, 2, 4, 5, 6]], ['A', 'B'], headers=[False, False],
                    input_npy_folders=[None, None])
@@ -383,7 +383,7 @@ class TestParseCatalogueNpyToCsv:  # pylint: disable=too-many-instance-attribute
         os.makedirs('test_b_out', exist_ok=True)
         np.save('test_b_out/con_cat_astro.npy', self.datab[:, [1, 2, 3]])
 
-        npy_to_csv(['.', '.'], 'test_folder', '.', ['test_a_data.csv', 'test_b_data.csv'],
+        npy_to_csv(['./test_a_data.csv', './test_b_data.csv'], 'test_folder', '.',
                    ['match_csv.csv', 'a_nonmatch_csv.csv', 'b_nonmatch_csv.csv'], [a_cols, b_cols],
                    [[0, 1, 2, 4, 5], [0, 1, 2, 4, 5, 6]], ['A', 'B'], headers=[False, False],
                    input_npy_folders=['test_a_out', 'test_b_out'])
@@ -434,7 +434,7 @@ class TestParseCatalogueNpyToCsv:  # pylint: disable=too-many-instance-attribute
         extra_cols = ['MATCH_P', 'SEPARATION', 'ETA', 'XI', 'A_AVG_CONT', 'B_AVG_CONT',
                       'A_CONT_F1', 'A_CONT_F10', 'B_CONT_F1', 'B_CONT_F10']
 
-        npy_to_csv(['.', '.'], 'test_folder', '.', ['test_a_data.csv', 'test_b_data.csv'],
+        npy_to_csv(['./test_a_data.csv', './test_b_data.csv'], 'test_folder', '.',
                    ['match_csv.csv', 'a_nonmatch_csv.csv', 'b_nonmatch_csv.csv'], [a_cols, b_cols],
                    [[1, 2, 0, 4, 5], [4, 5, 6, 0, 1, 2]], ['A', 'B'], headers=[False, False],
                    input_npy_folders=[None, None])
@@ -489,7 +489,7 @@ class TestParseCatalogueNpyToCsv:  # pylint: disable=too-many-instance-attribute
         b_cols = ['B_Designation', 'B_RA', 'B_Dec', 'W1', 'W2', 'W3']
 
         with pytest.raises(UserWarning, match="either both need to be None, or both"):
-            npy_to_csv(['.', '.'], 'test_folder', '.', ['test_a_data.csv', 'test_b_data.csv'],
+            npy_to_csv(['./test_a_data.csv', './test_b_data.csv'], 'test_folder', '.',
                        ['match_csv.csv', 'a_nonmatch_csv.csv', 'b_nonmatch_csv.csv'],
                        [a_cols, b_cols], [[0, 1, 2, 4, 5], [0, 1, 2, 4, 5, 6]], ['A', 'B'],
                        headers=[False, False], extra_col_name_lists=[[1], [2]],
@@ -530,7 +530,7 @@ class TestParseCatalogueNpyToCsv:  # pylint: disable=too-many-instance-attribute
         np.save('test_folder/bfieldeta_second_file.npy', self.bfeta)
         np.save('test_folder/bfieldxi_second_file.npy', self.bfxi)
 
-        npy_to_csv(['.', '.'], 'test_folder', '.', ['test_a_data.csv', 'test_b_data.csv'],
+        npy_to_csv(['./test_a_data.csv', './test_b_data.csv'], 'test_folder', '.',
                    ['match_csv.csv', 'a_nonmatch_csv.csv', 'b_nonmatch_csv.csv'], [a_cols, b_cols],
                    [[0, 1, 2, 4, 5], [0, 1, 2, 4, 5, 6]], ['A', 'B'], headers=[False, False],
                    extra_col_name_lists=[add_a_cols, add_b_cols], file_extension='_second_file',
@@ -603,7 +603,7 @@ class TestParseCatalogueNpyToCsv:  # pylint: disable=too-many-instance-attribute
         add_a_nums = [3]
         add_b_nums = []
 
-        npy_to_csv(['.', '.'], 'test_folder', '.', ['test_a_data.csv', 'test_b_data.csv'],
+        npy_to_csv(['./test_a_data.csv', './test_b_data.csv'], 'test_folder', '.',
                    ['match_csv.csv', 'a_nonmatch_csv.csv', 'b_nonmatch_csv.csv'], [a_cols, b_cols],
                    [[0, 1, 2, 4, 5], [0, 1, 2, 4, 5, 6]], ['A', 'B'], headers=[False, False],
                    extra_col_name_lists=[add_a_cols, add_b_cols],

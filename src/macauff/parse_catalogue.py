@@ -162,10 +162,9 @@ def csv_to_npy(input_folder, input_filename, output_folder, astro_cols, photo_co
 
 
 # pylint: disable-next=dangerous-default-value,too-many-locals,too-many-statements
-def npy_to_csv(input_csv_folders, input_match_folder, output_folder, csv_filenames,
-               output_filenames, column_name_lists, column_num_lists, extra_col_cat_names,
-               input_npy_folders, headers=[False, False], extra_col_name_lists=[None, None],
-               extra_col_num_lists=[None, None], file_extension=''):
+def npy_to_csv(input_csv_file_paths, input_match_folder, output_folder, output_filenames, column_name_lists,
+               column_num_lists, extra_col_cat_names, input_npy_folders, headers=[False, False],
+               extra_col_name_lists=[None, None], extra_col_num_lists=[None, None], file_extension=''):
     '''
     Function to convert output .npy files, as created during the cross-match
     process, and create a .csv file of matches and non-matches, combining columns
@@ -173,15 +172,13 @@ def npy_to_csv(input_csv_folders, input_match_folder, output_folder, csv_filenam
 
     Parameters
     ----------
-    input_csv_folders : list of strings
-        List of the folders in which the two respective .csv file catalogues
-        are stored.
+    input_csv_file_paths : list of strings
+        List of the locations in which the two respective .csv file catalogues
+        are stored, including filename and extension.
     input_match_folder : string
         Folder in which all intermediate cross-match files have been stored.
     output_folder : string
         Folder into which to save the resulting .csv output files.
-    csv_filenames : list of strings
-        List of names, including extensions, of the two catalogues that were matched.
     output_filenames : list of strings
         List of the names, including extensions, out to which to save merged
         datasets.
@@ -202,7 +199,7 @@ def npy_to_csv(input_csv_folders, input_match_folder, output_folder, csv_filenam
     input_npy_folders : list of strings
         List of folders in which the respective catalogues' .npy files were
         saved to, as part of ``csv_to_npy``, in the same order as
-        ``input_csv_folders``. If a catalogue did not have its uncertainties
+        ``input_csv_file_paths``. If a catalogue did not have its uncertainties
         processed, its entry should be None, so a case where both catalogues in
         a match had their uncertainties treated as given would be
         ``[None, None]``.
@@ -283,9 +280,9 @@ def npy_to_csv(input_csv_folders, input_match_folder, output_folder, csv_filenam
         b_names = np.append(column_name_lists[1], extra_col_name_lists[1])
     a_names, b_names = np.array(a_names)[np.argsort(a_cols)], np.array(b_names)[np.argsort(b_cols)]
 
-    cat_a = pd.read_csv(f'{input_csv_folders[0]}/{csv_filenames[0]}', memory_map=True,
+    cat_a = pd.read_csv(input_csv_file_paths[0], memory_map=True,
                         header=None if not headers[0] else 0, usecols=a_cols, names=a_names)
-    cat_b = pd.read_csv(f'{input_csv_folders[1]}/{csv_filenames[1]}', memory_map=True,
+    cat_b = pd.read_csv(input_csv_file_paths[1], memory_map=True,
                         header=None if not headers[1] else 0, usecols=b_cols, names=b_names)
     n_matches = len(ac)
     match_df = pd.DataFrame(columns=cols, index=np.arange(0, n_matches))

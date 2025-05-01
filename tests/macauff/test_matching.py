@@ -1081,10 +1081,10 @@ class TestInputs:
 
         old_line = 'snr_mag_params_file_path: a_snr_mag_{}/snr_mag_params.npy'
         lines = ['snr_mag_params_file_path: a_snr_mag_{}/snr_mag_params.npy\n',
-                 '\ninput_csv_folder: input_csv_folder', '\ncat_csv_name: catalogue.csv',
+                 '\ninput_csv_file_path: input_csv_folder/catalogue.csv',
                  '\ncat_col_names: [A, B, C]', '\ncat_col_nums: [1, 2, 3]',
                  '\ncsv_has_header: False', '\nextra_col_names: None']
-        for i, key in enumerate(['input_csv_folder', 'cat_csv_name', 'cat_col_names',
+        for i, key in enumerate(['input_csv_file_path', 'cat_col_names',
                                  'cat_col_nums', 'csv_has_header',
                                  'extra_col_names', 'extra_col_nums']):
             new_line = ''
@@ -1104,15 +1104,18 @@ class TestInputs:
         ca_p_ = self.ca_p_text.replace(old_line, new_line)
         cb_p_ = self.cb_p_text.replace(old_line.replace('a_snr_mag', 'b_snr_mag'), new_line)
 
-        # This will fail without input_csv_folder:
+        # This will fail without input_csv_file_path's folder:
+        if os.path.isfile('input_csv_folder/catalogue.csv'):
+            os.remove('input_csv_folder/catalogue.csv')
         if os.path.exists('input_csv_folder'):
             os.rmdir('input_csv_folder')
-        with pytest.raises(OSError, match='input_csv_folder from catalogue "a" does '):
+        with pytest.raises(OSError, match='input_csv_file_path from catalogue "a" does '):
             cm = CrossMatch(mock_filename(cm_p_.encode("utf-8")),
                             mock_filename(ca_p_.encode("utf-8")),
                             mock_filename(cb_p_.encode("utf-8")))
             cm._load_metadata_config(self.chunk_id)
         os.makedirs('input_csv_folder', exist_ok=True)
+        os.system('touch input_csv_folder/catalogue.csv')
 
         # At this point we should successfully load the csv-related parameters.
         cm = CrossMatch(mock_filename(cm_p_.encode("utf-8")),
@@ -1123,8 +1126,7 @@ class TestInputs:
         assert cm.match_out_csv_name == 'match.csv'
         assert cm.b_nonmatch_out_csv_name == 'WISE_nonmatch.csv'
 
-        assert cm.b_input_csv_folder == os.path.abspath('input_csv_folder')
-        assert cm.a_cat_csv_name == 'catalogue.csv'
+        assert cm.b_input_csv_file_path == os.path.abspath('input_csv_folder/catalogue.csv')
         assert np.all(cm.a_cat_col_names == np.array(['Gaia_A', 'Gaia_B', 'Gaia_C']))
         assert np.all(cm.b_cat_col_nums == np.array([1, 2, 3]))
         assert cm.a_csv_has_header is False
@@ -1785,20 +1787,17 @@ class TestPostProcess:
         # Set a whole load of fake inputs
         self.cm.output_csv_folder = 'output_csv_folder'
         os.makedirs(self.cm.output_csv_folder, exist_ok=True)
-        self.cm.a_input_csv_folder = 'a_input_csv_folder'
-        os.makedirs(self.cm.a_input_csv_folder, exist_ok=True)
-        self.cm.a_cat_csv_name = 'gaia_catalogue.csv'
+        self.cm.a_input_csv_file_path = 'a_input_csv_folder/gaia_catalogue.csv'
+        os.makedirs(os.path.splitext(self.cm.a_input_csv_file_path)[0], exist_ok=True)
         self.cm.a_csv_has_header = False
         acat, acatstring = self.make_temp_catalogue(self.na, 8, 100, 'Gaia ')
-        np.savetxt(f'{self.cm.a_input_csv_folder}/{self.cm.a_cat_csv_name}', acatstring, delimiter=',',
-                   fmt='%s', header='')
-        self.cm.b_input_csv_folder = 'b_input_csv_folder'
-        os.makedirs(self.cm.b_input_csv_folder, exist_ok=True)
-        self.cm.b_cat_csv_name = 'wise_catalogue.csv'
+        np.savetxt(self.cm.a_input_csv_file_path, acatstring, delimiter=',', fmt='%s', header='')
+        self.cm.b_input_csv_file_path = 'b_input_csv_folder/wise_catalogue.csv'
+        os.makedirs(os.path.splitext(self.cm.b_input_csv_file_path)[0], exist_ok=True)
         self.cm.b_csv_has_header = True
         bcat, bcatstring = self.make_temp_catalogue(self.nb, 10, 500, 'J')
-        np.savetxt(f'{self.cm.b_input_csv_folder}/{self.cm.b_cat_csv_name}', bcatstring, delimiter=',',
-                   fmt='%s', header='ID, RA, Dec, Err, W1, W2, W3, W4, bestflag, inchunk')
+        np.savetxt(self.cm.b_input_csv_file_path, bcatstring, delimiter=',', fmt='%s',
+                   header='ID, RA, Dec, Err, W1, W2, W3, W4, bestflag, inchunk')
         self.cm.match_out_csv_name = 'match.csv'
         self.cm.a_nonmatch_out_csv_name = 'gaia_nonmatch.csv'
         self.cm.b_nonmatch_out_csv_name = 'wise_nonmatch.csv'

@@ -166,7 +166,7 @@ the inputs required in each catalogue parameters file if ``fit_gal_flag`` is ``T
 
 inputs required if ``make_output_csv`` is ``True``:
 
-``input_csv_folder``, ``cat_csv_name``, ``cat_col_names``, ``cat_col_nums``, ``csv_has_header``, ``extra_col_names``, and ``extra_col_nums``;
+``input_csv_file_path``, ``cat_col_names``, ``cat_col_nums``, ``csv_has_header``, ``extra_col_names``, and ``extra_col_nums``;
 
 the inputs required if either ``correct_astrometry`` or ``compute_snr_mag_relation`` are ``True``:
 
@@ -332,13 +332,9 @@ Name of each filter as appropriate for providing to ``speclite`` for each filter
 
 Differential extinction relative to the V-band for each filter, a list of floats. Must be provided if ``include_perturb_auf`` is ``True``.
 
-``input_csv_folder``
+``input_csv_file_path``
 
-Location of the catalogue's original input ``.csv`` file, generally converted to a binary file for use within the main code via ``csv_to_npy``. Should have ``_{}`` formatting within the string for chunk-identification purposes.
-
-``cat_csv_name``
-
-Name, including extension, of the ``.csv`` file located in ``input_csv_folder``. Should have ``_{}`` formatting within the string for chunk-identification purposes.
+Full filepath of the catalogue's original input ``.csv`` file, generally converted to a binary file for use within the main code via ``csv_to_npy``, including filename and extension. Should have ``_{}`` formatting within the string for chunk-identification purposes.
 
 ``cat_col_names``
 
@@ -473,8 +469,7 @@ The inter-dependency of input parameters on one another, and the output ``CrossM
     │                 ├─> output_csv_folder
     │                 ├─> match_out_csv_name[4]
     │                 ├─> nonmatch_out_csv_name[4]
-    │                 ├─* input_csv_folder[4]
-    │                 ├─* cat_csv_name[4]
+    │                 ├─* input_csv_file_path[4]
     │                 ├─* cat_col_names
     │                 ├─* cat_col_nums
     │                 ├─* csv_has_header

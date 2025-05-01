@@ -554,10 +554,10 @@ class CrossMatch():
                 acfp = None if not self.a_correct_astrometry else self.a_cat_folder_path
                 bcfp = None if not self.b_correct_astrometry else self.b_cat_folder_path
                 npy_to_csv(
-                    [self.a_input_csv_folder, self.b_input_csv_folder], self.joint_folder_path,
-                    self.output_csv_folder, [self.a_cat_csv_name, self.b_cat_csv_name],
-                    [self.match_out_csv_name, self.a_nonmatch_out_csv_name,
-                     self.b_nonmatch_out_csv_name], [self.a_cat_col_names, self.b_cat_col_names],
+                    [self.a_input_csv_file_path, self.b_input_csv_file_path], self.joint_folder_path,
+                    self.output_csv_folder, [self.match_out_csv_name, self.a_nonmatch_out_csv_name,
+                                             self.b_nonmatch_out_csv_name],
+                    [self.a_cat_col_names, self.b_cat_col_names],
                     [self.a_cat_col_nums, self.b_cat_col_nums], [self.a_cat_name, self.b_cat_name],
                     [acfp, bcfp], headers=[self.a_csv_has_header, self.b_csv_has_header],
                     extra_col_name_lists=[self.a_extra_col_names, self.b_extra_col_names],
@@ -665,8 +665,8 @@ class CrossMatch():
                     raise OSError(f"Error when trying to create temporary folder for catalogue {catname} AUF "
                                   f"outputs. Please ensure that {flag}auf_folder_path is correct.") from exc
 
-            if self.make_output_csv and not os.path.exists(getattr(self, f'{flag[0]}_input_csv_folder')):
-                raise OSError(f'input_csv_folder from catalogue "{catname[1]}" does not exist.')
+            if self.make_output_csv and not os.path.isfile(getattr(self, f'{flag[0]}_input_csv_file_path')):
+                raise OSError(f'input_csv_file_path from catalogue "{catname[1]}" does not exist.')
 
         for config, catname in zip([self.cat_a_params_dict, self.cat_b_params_dict], ['a_', 'b_']):
             ind = np.where(chunk_id == np.array(config['chunk_id_list']))[0][0]
@@ -1417,7 +1417,7 @@ class CrossMatch():
                 raise ValueError(f"Missing key {check_flag} from joint metadata file.")
 
         for config, catname in zip([cat_a_config, cat_b_config], ['"a"', '"b"']):
-            for check_flag in ['input_csv_folder', 'cat_csv_name', 'cat_col_names', 'cat_col_nums',
+            for check_flag in ['input_csv_file_path', 'cat_col_names', 'cat_col_nums',
                                'csv_has_header', 'extra_col_names', 'extra_col_nums']:
                 if check_flag not in config:
                     raise ValueError(f"Missing key {check_flag} from catalogue {catname} metadata file.")
@@ -1437,7 +1437,7 @@ class CrossMatch():
             nonmatch_out_name = joint_config['nonmatch_out_csv_name']
             config['nonmatch_out_csv_name'] = f'{config["cat_name"]}_{nonmatch_out_name}'
 
-            config['input_csv_folder'] = os.path.abspath(config['input_csv_folder'])
+            config['input_csv_file_path'] = os.path.abspath(config['input_csv_file_path'])
 
             # cat_col_names is simply a list/array of strings. However, to
             # avoid any issues with generic names like "RA" being added to the
