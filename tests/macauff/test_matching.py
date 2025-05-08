@@ -1246,7 +1246,7 @@ class TestInputs:
         cb_p_2 = cb_p_.replace('correct_astrometry: False', new_line)
         cb_p_2 = cb_p_2.replace('mag_unc_indices: [4, 6, 8]', 'mag_unc_indices: [4, 6, 8, 10]')
         cb_p_2 = cb_p_2.replace('pos_and_err_indices: [0, 1, 2]', 'pos_and_err_indices: [0, 1, 2, 0, 1, 2]')
-        cb_p_2 = cb_p_2.replace(r'cat_csv_file_path: wise_folder_{}/wise.csv',
+        cb_p_2 = cb_p_2.replace(r'cat_csv_file_path: wise_folder/wise_{}.csv',
                                 r'cat_csv_file_path: file_{}.csv')
         cb_p_2 = cb_p_2.replace('[3, 4, 5, 6]', '[3, 5, 7, 9]')
         cb_p_2 = cb_p_2.replace('chunk_overlap_col: 7', 'chunk_overlap_col: 12')
@@ -1351,7 +1351,7 @@ class TestInputs:
         # Swapped a+b to test a_* versions of things
         cm_p_2 = cm_p_.replace('  - 9', '  - 100')
         ca_p_3 = self.ca_p_text.replace('  - 9', '  - 100')
-        ca_p_3 = ca_p_3.replace(r'cat_csv_file_path: gaia_folder_{}/gaia.csv',
+        ca_p_3 = ca_p_3.replace(r'cat_csv_file_path: gaia_folder/gaia_{}.csv',
                                 r'cat_csv_file_path: file_{}.csv')
         cb_p_3 = cb_p_2.replace('  - 9', '  - 100')
         os.system('cp -r test_path_9 test_path_100')
@@ -1395,14 +1395,14 @@ class TestInputs:
         ca_p_ = self.ca_p_text.replace('compute_snr_mag_relation: False', new_line)
         ca_p_ = ca_p_.replace('chunk_overlap_col: 6', 'chunk_overlap_col: 12')
         ca_p_ = ca_p_.replace('best_mag_index_col: 7', 'best_mag_index_col: 11')
-        ca_p_ = ca_p_.replace(r'cat_csv_file_path: gaia_folder_{}/gaia.csv',
+        ca_p_ = ca_p_.replace(r'cat_csv_file_path: gaia_folder/gaia_{}.csv',
                               r'cat_csv_file_path: file_{}.csv')
         ca_p_ = ca_p_.replace('mag_indices: [3, 4, 5]', 'mag_indices: [3, 5, 7]')
         ca_p_ = ca_p_.replace('mag_unc_indices: [4, 6, 8, 10]', 'mag_unc_indices: [4, 6, 8]')
 
         cb_p_ = self.cb_p_text.replace('compute_snr_mag_relation: False', new_line)
         cb_p_ = cb_p_.replace('mag_indices: [3, 4, 5, 6]', 'mag_indices: [3, 5, 7, 9]')
-        cb_p_ = cb_p_.replace(r'cat_csv_file_path: wise_folder_{}/wise.csv',
+        cb_p_ = cb_p_.replace(r'cat_csv_file_path: wise_folder/wise_{}.csv',
                               r'cat_csv_file_path: file_{}.csv')
         cb_p_ = cb_p_.replace('chunk_overlap_col: 7', 'chunk_overlap_col: 12')
         if os.path.isfile('ac_folder/npy/snr_mag_params.npy'):

@@ -32,10 +32,10 @@ from macauff.perturbation_auf_fortran import perturbation_auf_fortran as paf
 
 class TestCreatePerturbAUF:
     def setup_class(self):
-        os.makedirs('gaia_auf_folder_9', exist_ok=True)
-        os.makedirs('wise_auf_folder_9', exist_ok=True)
-        os.makedirs('gaia_folder_9', exist_ok=True)
-        os.makedirs('wise_folder_9', exist_ok=True)
+        os.makedirs('gaia_auf_folder', exist_ok=True)
+        os.makedirs('wise_auf_folder', exist_ok=True)
+        os.makedirs('gaia_folder', exist_ok=True)
+        os.makedirs('wise_folder', exist_ok=True)
         os.makedirs('test_path_9', exist_ok=True)
         self.cm = CrossMatch(os.path.join(os.path.dirname(__file__), 'data/crossmatch_params.yaml'),
                              os.path.join(os.path.dirname(__file__), 'data/cat_a_params.yaml'),
@@ -340,7 +340,7 @@ gal_values = GalCountValues()
 class TestMakePerturbAUFs():
     def setup_class(self):
         self.auf_folder = 'auf_folder'
-        self.cat_folder = 'cat_folder_9'
+        self.cat_folder = 'cat_folder'
         os.system(f'rm -r {self.auf_folder}')
         os.system(f'rm -r {self.cat_folder}')
         os.makedirs(self.auf_folder)
@@ -617,7 +617,7 @@ class TestMakePerturbAUFs():
         y = np.array([np.concatenate(([14.99], [100]*100, [10], [10], [10], [10]))]).T
         z = np.array([0] * 105)
         a = np.hstack((x, y, np.zeros((len(x), 1), bool), z.reshape(-1, 1)))
-        with open('cat_folder_9/cat.csv', "w", encoding='utf-8') as f:
+        with open('cat_folder/cat_9.csv', "w", encoding='utf-8') as f:
             np.savetxt(f, a, delimiter=",")
 
         # Fake up a TRILEGAL simulation data file.
@@ -712,10 +712,10 @@ class TestMakePerturbAUFs():
                     'tri_n_bright_sources_star_location: None')
         ca_p_ = ca_p_.replace(old_line, new_line)
         cb_p_ = cb_p_.replace(old_line, new_line)
-        ca_p_ = ca_p_.replace(r'cat_csv_file_path: gaia_folder_{}/gaia.csv',
-                              r'cat_csv_file_path: cat_folder_{}/cat.csv')
-        cb_p_ = cb_p_.replace(r'cat_csv_file_path: wise_folder_{}/wise.csv',
-                              r'cat_csv_file_path: cat_folder_{}/cat.csv')
+        ca_p_ = ca_p_.replace(r'cat_csv_file_path: gaia_folder/gaia_{}.csv',
+                              r'cat_csv_file_path: cat_folder/cat_{}.csv')
+        cb_p_ = cb_p_.replace(r'cat_csv_file_path: wise_folder/wise_{}.csv',
+                              r'cat_csv_file_path: cat_folder/cat_{}.csv')
 
         cm = CrossMatch(mock_filename(cm_p_.encode("utf-8")), mock_filename(ca_p_.encode("utf-8")),
                         mock_filename(cb_p_.encode("utf-8")))
@@ -815,7 +815,7 @@ class TestMakePerturbAUFs():
         y = np.array([np.concatenate(([14.99], main_mags, [10], [10], [10], [10]))]).T
         z = np.array([0] * 105)
         a = np.hstack((x, y, np.zeros((len(x), 1), bool), z.reshape(-1, 1)))
-        with open('cat_folder_9/cat.csv', "w", encoding='utf-8') as f:
+        with open('cat_folder/cat_9.csv', "w", encoding='utf-8') as f:
             np.savetxt(f, a, delimiter=",")
 
         # Fake up a TRILEGAL simulation data file.
@@ -906,10 +906,10 @@ class TestMakePerturbAUFs():
                     'tri_n_bright_sources_star_location: None')
         ca_p_ = ca_p_.replace(old_line, new_line)
         cb_p_ = cb_p_.replace(old_line, new_line)
-        ca_p_ = ca_p_.replace(r'cat_csv_file_path: gaia_folder_{}/gaia.csv',
-                              r'cat_csv_file_path: cat_folder_{}/cat.csv')
-        cb_p_ = cb_p_.replace(r'cat_csv_file_path: wise_folder_{}/wise.csv',
-                              r'cat_csv_file_path: cat_folder_{}/cat.csv')
+        ca_p_ = ca_p_.replace(r'cat_csv_file_path: gaia_folder/gaia_{}.csv',
+                              r'cat_csv_file_path: cat_folder/cat_{}.csv')
+        cb_p_ = cb_p_.replace(r'cat_csv_file_path: wise_folder/wise_{}.csv',
+                              r'cat_csv_file_path: cat_folder/cat_{}.csv')
 
         cm = CrossMatch(mock_filename(cm_p_.encode("utf-8")), mock_filename(ca_p_.encode("utf-8")),
                         mock_filename(cb_p_.encode("utf-8")))

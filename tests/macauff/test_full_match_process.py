@@ -84,11 +84,11 @@ def test_naive_bayes_match(shape, x, y):
 
     a_cat = np.hstack((a_astro, a_photo, np.zeros((len(a_astro), 1), bool), amagref.reshape(-1, 1)))
     b_cat = np.hstack((b_astro, b_photo, np.zeros((len(b_astro), 1), bool), bmagref.reshape(-1, 1)))
-    os.makedirs('gaia_folder_9', exist_ok=True)
-    with open('gaia_folder_9/gaia.csv', "w", encoding='utf-8') as f:
+    os.makedirs('gaia_folder', exist_ok=True)
+    with open('gaia_folder/gaia_9.csv', "w", encoding='utf-8') as f:
         np.savetxt(f, a_cat, delimiter=",")
-    os.makedirs('wise_folder_9', exist_ok=True)
-    with open('wise_folder_9/wise.csv', "w", encoding='utf-8') as f:
+    os.makedirs('wise_folder', exist_ok=True)
+    with open('wise_folder/wise_9.csv', "w", encoding='utf-8') as f:
         np.savetxt(f, b_cat, delimiter=",")
 
     if shape == 'circle':
@@ -153,5 +153,5 @@ def test_naive_bayes_match(shape, x, y):
             assert np.all([a_mp[i], b_mp[i]] == [ac[q], bc[q]])
 
     os.system('rm -r new_test_path_9')
-    os.system('rm -r gaia_folder_9')
-    os.system('rm -r wise_folder_9')
+    os.system('rm -r gaia_folder')
+    os.system('rm -r wise_folder')

@@ -26,8 +26,8 @@ class TestOneSidedPhotometricLikelihood:
         self.cf_points = np.array([[a, b] for a in [131.5, 132.5, 133.5] for b in [-0.5, 0.5]])
         self.cf_areas = np.ones((6), float)
         self.joint_folder_path = 'test_path_9'
-        self.a_cat_folder_path = 'gaia_folder_9'
-        self.b_cat_folder_path = 'wise_folder_9'
+        self.a_cat_folder_path = 'gaia_folder'
+        self.b_cat_folder_path = 'wise_folder'
 
         self.area = (134-131)*(1--1)
 
@@ -203,7 +203,7 @@ class TestOneSidedPhotometricLikelihood:
             x, y = getattr(self, f'{name}_astro'), getattr(self, f'{name}_photo')
             z = np.zeros((len(getattr(self, f'{name}_astro'))))
             a = np.hstack((x, y, np.zeros((len(x), 1), bool), z.reshape(-1, 1)))
-            with open(f'{folder}/{folder[:4]}.csv', "w", encoding='utf-8') as f:
+            with open(f'{folder}/{folder[:4]}_9.csv', "w", encoding='utf-8') as f:
                 np.savetxt(f, a, delimiter=",")
 
         self.cm = CrossMatch(mock_filename(self.cm_p_.encode("utf-8")),

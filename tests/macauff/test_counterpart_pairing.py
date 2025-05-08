@@ -120,19 +120,19 @@ class TestCounterpartPairing:  # pylint: disable=too-many-instance-attributes
         # We have to save various files for the source_pairing function to
         # pick up again.
         self.joint_folder_path = 'test_path_9'
-        self.a_cat_folder_path = 'gaia_folder_9'
-        self.b_cat_folder_path = 'wise_folder_9'
-        self.a_auf_folder_path = 'gaia_auf_folder_9'
-        self.b_auf_folder_path = 'wise_auf_folder_9'
+        self.a_cat_folder_path = 'gaia_folder'
+        self.b_cat_folder_path = 'wise_folder'
+        self.a_auf_folder_path = 'gaia_auf_folder'
+        self.b_auf_folder_path = 'wise_auf_folder'
 
         os.system(f'rm -r {self.joint_folder_path}')
         os.makedirs(f'{self.joint_folder_path}', exist_ok=True)
         for f in [self.a_cat_folder_path, self.b_cat_folder_path,
                   self.a_auf_folder_path, self.b_auf_folder_path]:
             os.makedirs(f, exist_ok=True)
-        with open(f'{self.a_cat_folder_path}/gaia.csv', "w", encoding='utf-8') as f:
+        with open(f'{self.a_cat_folder_path}/gaia_9.csv', "w", encoding='utf-8') as f:
             np.savetxt(f, self.a_cat, delimiter=",")
-        with open(f'{self.b_cat_folder_path}/wise.csv', "w", encoding='utf-8') as f:
+        with open(f'{self.b_cat_folder_path}/wise_9.csv', "w", encoding='utf-8') as f:
             np.savetxt(f, self.b_cat, delimiter=",")
 
         # We should have already made fourier_grid, frac_grid, and flux_grid

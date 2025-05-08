@@ -99,7 +99,7 @@ cat_a_params.yaml::
 
     # Catalogue name -- used both for folder creation and output file names
     cat_name: Gaia
-    cat_csv_file_path: test_macauff_outputs/name_of_a_folder_{}/catalogue_a.csv
+    cat_csv_file_path: test_macauff_outputs/name_of_a_folder/catalogue_a_{}.csv
     # Folder for all AUF-related files to be created in. Should be an absolute path, or relative to folder script called in.
     auf_folder_path: test_macauff_outputs/cat_a_auf_folder_{}
 
@@ -147,7 +147,7 @@ cat_b_params.yaml::
     cat_name: Gaia
     cat_csv_file_path: test_macauff_outputs/name_of_b_folder_{}
     # Folder for all AUF-related files to be created in. Should be an absolute path, or relative to folder script called in.
-    auf_folder_path: test_macauff_outputs/cat_b_auf_folder_{}/catalogue_b.csv
+    auf_folder_path: test_macauff_outputs/cat_b_auf_folder/catalogue_b_{}.csv
 
     pos_and_err_indices: [0, 1, 2]
     mag_indices: [3, 4, 5, 6]

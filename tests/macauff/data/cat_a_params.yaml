@@ -1,6 +1,6 @@
 # Catalogue name -- used both for folder creation and output file names
 cat_name: Gaia
-cat_csv_file_path: gaia_folder_{}/gaia.csv
+cat_csv_file_path: gaia_folder/gaia_{}.csv
 # Folder for all AUF-related files to be created in. Should be an absolute path, or relative to folder script called in.
 auf_file_path: gaia_auf_folder/trilegal_download_{}.dat
 
