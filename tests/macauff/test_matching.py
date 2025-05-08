@@ -1783,10 +1783,10 @@ class TestPostProcess:
         for ext in exts:
             aino = self.cm.a_in_overlaps
             bino = self.cm.b_in_overlaps
-            ac = np.load(f'{self.joint_folder_path}/ac{ext}.npy')
-            af = np.load(f'{self.joint_folder_path}/af{ext}.npy')
-            bc = np.load(f'{self.joint_folder_path}/bc{ext}.npy')
-            bf = np.load(f'{self.joint_folder_path}/bf{ext}.npy')
+            ac = getattr(self.cm, f'ac{ext}')
+            af = getattr(self.cm, f'af{ext}')
+            bc = getattr(self.cm, f'bc{ext}')
+            bf = getattr(self.cm, f'bf{ext}')
 
             if ext == '_without_photometry':
                 self_ac, self_af = self.ac[::-1], self.af[::-1]
@@ -1809,24 +1809,24 @@ class TestPostProcess:
             assert os.path.isfile(f'{self.cm.output_csv_folder}/{self.cm.a_nonmatch_out_csv_name}')
             assert os.path.isfile(f'{self.cm.output_csv_folder}/{self.cm.b_nonmatch_out_csv_name}')
 
-            pc = np.load(f'{self.joint_folder_path}/pc{ext}.npy')
-            eta = np.load(f'{self.joint_folder_path}/eta{ext}.npy')
-            xi = np.load(f'{self.joint_folder_path}/xi{ext}.npy')
-            acf = np.load(f'{self.joint_folder_path}/acontamflux{ext}.npy')
-            bcf = np.load(f'{self.joint_folder_path}/bcontamflux{ext}.npy')
-            pac = np.load(f'{self.joint_folder_path}/pacontam{ext}.npy')
-            pbc = np.load(f'{self.joint_folder_path}/pbcontam{ext}.npy')
-            csep = np.load(f'{self.joint_folder_path}/crptseps{ext}.npy')
-            pfa = np.load(f'{self.joint_folder_path}/pfa{ext}.npy')
-            afs = np.load(f'{self.joint_folder_path}/afieldseps{ext}.npy')
-            afeta = np.load(f'{self.joint_folder_path}/afieldeta{ext}.npy')
-            afxi = np.load(f'{self.joint_folder_path}/afieldxi{ext}.npy')
-            aff = np.load(f'{self.joint_folder_path}/afieldflux{ext}.npy')
-            pfb = np.load(f'{self.joint_folder_path}/pfb{ext}.npy')
-            bfs = np.load(f'{self.joint_folder_path}/bfieldseps{ext}.npy')
-            bfeta = np.load(f'{self.joint_folder_path}/bfieldeta{ext}.npy')
-            bfxi = np.load(f'{self.joint_folder_path}/bfieldxi{ext}.npy')
-            bff = np.load(f'{self.joint_folder_path}/bfieldflux{ext}.npy')
+            pc = getattr(self.cm, f'pc{ext}')
+            eta = getattr(self.cm, f'eta{ext}')
+            xi = getattr(self.cm, f'xi{ext}')
+            acf = getattr(self.cm, f'acontamflux{ext}')
+            bcf = getattr(self.cm, f'bcontamflux{ext}')
+            pac = getattr(self.cm, f'pacontam{ext}')
+            pbc = getattr(self.cm, f'pbcontam{ext}')
+            csep = getattr(self.cm, f'crptseps{ext}')
+            pfa = getattr(self.cm, f'pfa{ext}')
+            afs = getattr(self.cm, f'afieldseps{ext}')
+            afeta = getattr(self.cm, f'afieldeta{ext}')
+            afxi = getattr(self.cm, f'afieldxi{ext}')
+            aff = getattr(self.cm, f'afieldflux{ext}')
+            pfb = getattr(self.cm, f'pfb{ext}')
+            bfs = getattr(self.cm, f'bfieldseps{ext}')
+            bfeta = getattr(self.cm, f'bfieldeta{ext}')
+            bfxi = getattr(self.cm, f'bfieldxi{ext}')
+            bff = getattr(self.cm, f'bfieldflux{ext}')
 
             extra_cols = ['MATCH_P', 'SEPARATION', 'ETA', 'XI', 'A_AVG_CONT', 'B_AVG_CONT',
                           'A_CONT_F1', 'A_CONT_F10', 'B_CONT_F1', 'B_CONT_F10']

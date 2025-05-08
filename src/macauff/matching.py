@@ -488,55 +488,53 @@ class CrossMatch():
             loop_array_extensions = ['']
 
         for lae in loop_array_extensions:
-            ac, bc = getattr(self, f'ac{lae}'), getattr(self, f'bc{lae}')
-            core_matches = ~a_in_overlaps[ac] | ~b_in_overlaps[bc]
-            np.save(f'{self.joint_folder_path}/ac{lae}.npy', ac[core_matches])
-            np.save(f'{self.joint_folder_path}/bc{lae}.npy', bc[core_matches])
-            for fname in ['pc', 'eta', 'xi', 'crptseps', 'acontamflux', 'bcontamflux']:
-                np.save(f'{self.joint_folder_path}/{fname}{lae}.npy',
-                        getattr(self, f'{fname}{lae}')[core_matches])
-            for fname in ['pacontam', 'pbcontam']:
-                np.save(f'{self.joint_folder_path}/{fname}{lae}.npy',
-                        getattr(self, f'{fname}{lae}')[:, core_matches])
-
-            af, bf = getattr(self, f'af{lae}'), getattr(self, f'bf{lae}')
-            a_core_nonmatches = ~a_in_overlaps[af]
-            b_core_nonmatches = ~b_in_overlaps[bf]
-            np.save(f'{self.joint_folder_path}/af{lae}.npy', af[a_core_nonmatches])
-            np.save(f'{self.joint_folder_path}/bf{lae}.npy', bf[b_core_nonmatches])
-            for fnametype, cnm in zip(['a', 'b'], [a_core_nonmatches, b_core_nonmatches]):
-                for fname_ in ['{}fieldflux', 'pf{}', '{}fieldeta', '{}fieldxi', '{}fieldseps']:
-                    fname = fname_.format(fnametype)
-                    np.save(f'{self.joint_folder_path}/{fname}{lae}.npy', getattr(self, f'{fname}{lae}')[cnm])
-
-            if self.reject_a is not None:
-                np.save(f'{self.joint_folder_path}/reject_a{lae}.npy',
-                        np.append(np.append(self.reject_a, ac[~core_matches]), af[~a_core_nonmatches]))
-            else:
-                np.save(f'{self.joint_folder_path}/reject_a{lae}.npy',
-                        np.append(ac[~core_matches], af[~a_core_nonmatches]))
-            if self.reject_b is not None:
-                np.save(f'{self.joint_folder_path}/reject_b{lae}.npy',
-                        np.append(np.append(self.reject_b, bc[~core_matches]), bf[~b_core_nonmatches]))
-            else:
-                np.save(f'{self.joint_folder_path}/reject_b{lae}.npy',
-                        np.append(bc[~core_matches], bf[~b_core_nonmatches]))
-
             if self.make_output_csv:
-                # Need to determine if astrometric corrections were performed.
-                # This only happens if the flag is set in here, so set
-                # accordingly.
-                acfp = None if not self.a_correct_astrometry else self.a_cat_csv_file_path
-                bcfp = None if not self.b_correct_astrometry else self.b_cat_csv_file_path
                 npy_to_csv(
-                    [self.a_cat_csv_file_path, self.b_cat_csv_file_path], self.joint_folder_path,
-                    self.output_csv_folder, [self.match_out_csv_name, self.a_nonmatch_out_csv_name,
-                                             self.b_nonmatch_out_csv_name],
-                    [self.a_cat_col_names, self.b_cat_col_names],
-                    [self.a_cat_col_nums, self.b_cat_col_nums], [self.a_cat_name, self.b_cat_name],
-                    [acfp, bcfp], headers=[self.a_csv_has_header, self.b_csv_has_header],
+                    [self.a_cat_csv_file_path, self.b_cat_csv_file_path], self, self.output_csv_folder,
+                    [self.match_out_csv_name, self.a_nonmatch_out_csv_name, self.b_nonmatch_out_csv_name],
+                    [self.a_cat_col_names, self.b_cat_col_names], [self.a_cat_col_nums, self.b_cat_col_nums],
+                    [self.a_cat_name, self.b_cat_name],
+                    [self.a_correct_astrometry, self.b_correct_astrometry],
+                    headers=[self.a_csv_has_header, self.b_csv_has_header],
                     extra_col_name_lists=[self.a_extra_col_names, self.b_extra_col_names],
                     extra_col_num_lists=[self.a_extra_col_nums, self.b_extra_col_nums], file_extension=lae)
+            else:
+                # Only need to save the outputs to binary files if we don't
+                # want a set of .csv tables.
+                ac, bc = getattr(self, f'ac{lae}'), getattr(self, f'bc{lae}')
+                core_matches = ~a_in_overlaps[ac] | ~b_in_overlaps[bc]
+                np.save(f'{self.joint_folder_path}/ac{lae}.npy', ac[core_matches])
+                np.save(f'{self.joint_folder_path}/bc{lae}.npy', bc[core_matches])
+                for fname in ['pc', 'eta', 'xi', 'crptseps', 'acontamflux', 'bcontamflux']:
+                    np.save(f'{self.joint_folder_path}/{fname}{lae}.npy',
+                            getattr(self, f'{fname}{lae}')[core_matches])
+                for fname in ['pacontam', 'pbcontam']:
+                    np.save(f'{self.joint_folder_path}/{fname}{lae}.npy',
+                            getattr(self, f'{fname}{lae}')[:, core_matches])
+
+                af, bf = getattr(self, f'af{lae}'), getattr(self, f'bf{lae}')
+                a_core_nonmatches = ~a_in_overlaps[af]
+                b_core_nonmatches = ~b_in_overlaps[bf]
+                np.save(f'{self.joint_folder_path}/af{lae}.npy', af[a_core_nonmatches])
+                np.save(f'{self.joint_folder_path}/bf{lae}.npy', bf[b_core_nonmatches])
+                for fnametype, cnm in zip(['a', 'b'], [a_core_nonmatches, b_core_nonmatches]):
+                    for fname_ in ['{}fieldflux', 'pf{}', '{}fieldeta', '{}fieldxi', '{}fieldseps']:
+                        fname = fname_.format(fnametype)
+                        np.save(f'{self.joint_folder_path}/{fname}{lae}.npy',
+                                getattr(self, f'{fname}{lae}')[cnm])
+
+                if self.reject_a is not None:
+                    np.save(f'{self.joint_folder_path}/reject_a{lae}.npy',
+                            np.append(np.append(self.reject_a, ac[~core_matches]), af[~a_core_nonmatches]))
+                else:
+                    np.save(f'{self.joint_folder_path}/reject_a{lae}.npy',
+                            np.append(ac[~core_matches], af[~a_core_nonmatches]))
+                if self.reject_b is not None:
+                    np.save(f'{self.joint_folder_path}/reject_b{lae}.npy',
+                            np.append(np.append(self.reject_b, bc[~core_matches]), bf[~b_core_nonmatches]))
+                else:
+                    np.save(f'{self.joint_folder_path}/reject_b{lae}.npy',
+                            np.append(bc[~core_matches], bf[~b_core_nonmatches]))
 
     def _make_chunk_queue(self, completed_chunks):
         '''

@@ -175,8 +175,8 @@ def csv_to_npy(input_filename, astro_cols, photo_cols, bestindex_col,
 
 
 # pylint: disable-next=dangerous-default-value,too-many-locals,too-many-statements
-def npy_to_csv(input_csv_file_paths, input_match_folder, output_folder, output_filenames, column_name_lists,
-               column_num_lists, extra_col_cat_names, input_npy_folders, headers=[False, False],
+def npy_to_csv(input_csv_file_paths, cm, output_folder, output_filenames, column_name_lists,
+               column_num_lists, extra_col_cat_names, correct_astro_flags, headers=[False, False],
                extra_col_name_lists=[None, None], extra_col_num_lists=[None, None], file_extension=''):
     '''
     Function to convert output .npy files, as created during the cross-match
@@ -188,8 +188,9 @@ def npy_to_csv(input_csv_file_paths, input_match_folder, output_folder, output_f
     input_csv_file_paths : list of strings
         List of the locations in which the two respective .csv file catalogues
         are stored, including filename and extension.
-    input_match_folder : string
-        Folder in which all intermediate cross-match files have been stored.
+    cm : Class
+        ``CrossMatch`` class, containing all of the necessary arrays of derived
+        information from a cross-match run to save out to files.
     output_folder : string
         Folder into which to save the resulting .csv output files.
     output_filenames : list of strings
@@ -209,13 +210,13 @@ def npy_to_csv(input_csv_file_paths, input_match_folder, output_folder, output_f
         List of two strings, one per catalogue, indicating the names of the two
         catalogues, to append to the front of the derived contamination-based
         values included in the output datasets.
-    input_npy_folders : list of strings
-        List of folders in which the respective catalogues' .npy files were
-        saved to, as part of ``csv_to_npy``, in the same order as
-        ``input_csv_file_paths``. If a catalogue did not have its uncertainties
-        processed, its entry should be None, so a case where both catalogues in
+    correct_astro_flags : list of booleans
+        Flags, in the same order as ``input_csv_file_paths``, for whether to
+        save uncorrected and corrected astrometric uncertainties for each
+        catalogue respectively. If a catalogue did not have its uncertainties
+        processed, its entry should be False, so a case where both catalogues in
         a match had their uncertainties treated as given would be
-        ``[None, None]``.
+        ``[False, False]``.
     headers : list of booleans, optional
         List of two boolmean flags, one per catalogue, indicating whether the
         original input .csv file for this catalogue had a header which provides
@@ -260,23 +261,24 @@ def npy_to_csv(input_csv_file_paths, input_match_folder, output_folder, output_f
                               "catalogue.")
         if extra_col_num_lists[i] is not None:
             cols = np.append(cols, extra_col_name_lists[i])
-    ac = np.load(f'{input_match_folder}/ac{file_extension}.npy')
-    bc = np.load(f'{input_match_folder}/bc{file_extension}.npy')
-    p = np.load(f'{input_match_folder}/pc{file_extension}.npy')
-    eta = np.load(f'{input_match_folder}/eta{file_extension}.npy')
-    xi = np.load(f'{input_match_folder}/xi{file_extension}.npy')
-    a_avg_cont = np.load(f'{input_match_folder}/acontamflux{file_extension}.npy')
-    b_avg_cont = np.load(f'{input_match_folder}/bcontamflux{file_extension}.npy')
-    acontprob = np.load(f'{input_match_folder}/pacontam{file_extension}.npy')
-    bcontprob = np.load(f'{input_match_folder}/pbcontam{file_extension}.npy')
-    seps = np.load(f'{input_match_folder}/crptseps{file_extension}.npy')
 
-    if input_npy_folders[0] is not None:
+    ac = getattr(cm, f'ac{file_extension}')
+    bc = getattr(cm, f'bc{file_extension}')
+    p = getattr(cm, f'pc{file_extension}')
+    eta = getattr(cm, f'eta{file_extension}')
+    xi = getattr(cm, f'xi{file_extension}')
+    a_avg_cont = getattr(cm, f'acontamflux{file_extension}')
+    b_avg_cont = getattr(cm, f'bcontamflux{file_extension}')
+    acontprob = getattr(cm, f'pacontam{file_extension}')
+    bcontprob = getattr(cm, f'pbcontam{file_extension}')
+    seps = getattr(cm, f'crptseps{file_extension}')
+
+    if correct_astro_flags[0]:
         cols = np.append(cols, [f'{extra_col_cat_names[0]}_FIT_SIG'])
-        a_concatastro = np.load(f'{input_npy_folders[0]}/con_cat_astro.npy')
-    if input_npy_folders[1] is not None:
+        a_concatastro = cm.a_astro
+    if correct_astro_flags[1]:
         cols = np.append(cols, [f'{extra_col_cat_names[1]}_FIT_SIG'])
-        b_concatastro = np.load(f'{input_npy_folders[1]}/con_cat_astro.npy')
+        b_concatastro = cm.b_astro
 
     n_amags, n_bmags = len(column_name_lists[0]) - 3, len(column_name_lists[1]) - 3
     if extra_col_num_lists[0] is None:
@@ -323,14 +325,14 @@ def npy_to_csv(input_csv_file_paths, input_match_folder, output_folder, output_f
 
     # FIT_SIG are the last 0-2 columns, after [ID+coords(x2)+mag(xN)]x2 +
     # Q match-made columns, plus len(extra_col_name_lists)x2.
-    if input_npy_folders[0] is not None:
+    if correct_astro_flags[0]:
         ind = (len(column_name_lists[0]) + len(column_name_lists[1]) + len(our_columns) +
                (len(extra_col_name_lists[0]) if extra_col_name_lists[0] is not None else 0) +
                (len(extra_col_name_lists[1]) if extra_col_name_lists[1] is not None else 0))
         match_df.iloc[:, ind] = a_concatastro[ac, 2]
-    if input_npy_folders[1] is not None:
+    if correct_astro_flags[1]:
         # Here we also need to check if catalogue "a" has processed uncertainties too.
-        _dx = 1 if input_npy_folders[0] is not None else 0
+        _dx = 1 if correct_astro_flags[0] else 0
         ind = (len(column_name_lists[0]) + len(column_name_lists[1]) + len(our_columns) +
                (len(extra_col_name_lists[0]) if extra_col_name_lists[0] is not None else 0) +
                (len(extra_col_name_lists[1]) if extra_col_name_lists[1] is not None else 0)) + _dx
@@ -347,19 +349,19 @@ def npy_to_csv(input_csv_file_paths, input_match_folder, output_folder, output_f
 
     # For non-match, ID/coordinates/mags, then island probability + average
     # contamination.
-    af = np.load(f'{input_match_folder}/af{file_extension}.npy')
-    a_avg_cont = np.load(f'{input_match_folder}/afieldflux{file_extension}.npy')
-    p = np.load(f'{input_match_folder}/pfa{file_extension}.npy')
-    seps = np.load(f'{input_match_folder}/afieldseps{file_extension}.npy')
-    afeta = np.load(f'{input_match_folder}/afieldeta{file_extension}.npy')
-    afxi = np.load(f'{input_match_folder}/afieldxi{file_extension}.npy')
+    af = getattr(cm, f'af{file_extension}')
+    a_avg_cont = getattr(cm, f'afieldflux{file_extension}')
+    p = getattr(cm, f'pfa{file_extension}')
+    seps = getattr(cm, f'afieldseps{file_extension}')
+    afeta = getattr(cm, f'afieldeta{file_extension}')
+    afxi = getattr(cm, f'afieldxi{file_extension}')
     our_columns = ['MATCH_P', 'NNM_SEPARATION', 'NNM_ETA', 'NNM_XI', f'{extra_col_cat_names[0]}_AVG_CONT']
     cols = np.append(column_name_lists[0], our_columns)
     if extra_col_num_lists[0] is not None:
         cols = np.append(cols, extra_col_name_lists[0])
-    if input_npy_folders[0] is not None:
+    if correct_astro_flags[0]:
         cols = np.append(cols, [f'{extra_col_cat_names[0]}_FIT_SIG'])
-        a_concatastro = np.load(f'{input_npy_folders[0]}/con_cat_astro.npy')
+        a_concatastro = cm.a_astro
     n_anonmatches = len(af)
     a_nonmatch_df = pd.DataFrame(columns=cols, index=np.arange(0, n_anonmatches))
     for i in column_name_lists[0]:
@@ -373,7 +375,7 @@ def npy_to_csv(input_csv_file_paths, input_match_folder, output_folder, output_f
         for i in extra_col_name_lists[0]:
             a_nonmatch_df.loc[:, i] = cat_a.loc[af, i].values
 
-    if input_npy_folders[0] is not None:
+    if correct_astro_flags[0]:
         ind = (len(column_name_lists[0]) + len(our_columns) +
                (len(extra_col_name_lists[0]) if extra_col_name_lists[0] is not None else 0))
         a_nonmatch_df.iloc[:, ind] = a_concatastro[af, 2]
@@ -388,19 +390,19 @@ def npy_to_csv(input_csv_file_paths, input_match_folder, output_folder, output_f
     a_nonmatch_df.to_csv(f'{output_folder}/{_output_filename}', encoding='utf-8',
                          index=False, header=False)
 
-    bf = np.load(f'{input_match_folder}/bf{file_extension}.npy')
-    b_avg_cont = np.load(f'{input_match_folder}/bfieldflux{file_extension}.npy')
-    p = np.load(f'{input_match_folder}/pfb{file_extension}.npy')
-    seps = np.load(f'{input_match_folder}/bfieldseps{file_extension}.npy')
-    bfeta = np.load(f'{input_match_folder}/bfieldeta{file_extension}.npy')
-    bfxi = np.load(f'{input_match_folder}/bfieldxi{file_extension}.npy')
+    bf = getattr(cm, f'bf{file_extension}')
+    b_avg_cont = getattr(cm, f'bfieldflux{file_extension}')
+    p = getattr(cm, f'pfb{file_extension}')
+    seps = getattr(cm, f'bfieldseps{file_extension}')
+    bfeta = getattr(cm, f'bfieldeta{file_extension}')
+    bfxi = getattr(cm, f'bfieldxi{file_extension}')
     our_columns = ['MATCH_P', 'NNM_SEPARATION', 'NNM_ETA', 'NNM_XI', f'{extra_col_cat_names[1]}_AVG_CONT']
     cols = np.append(column_name_lists[1], our_columns)
     if extra_col_num_lists[1] is not None:
         cols = np.append(cols, extra_col_name_lists[1])
-    if input_npy_folders[1] is not None:
+    if correct_astro_flags[1]:
         cols = np.append(cols, [f'{extra_col_cat_names[1]}_FIT_SIG'])
-        b_concatastro = np.load(f'{input_npy_folders[1]}/con_cat_astro.npy')
+        b_concatastro = cm.b_astro
     n_bnonmatches = len(bf)
     b_nonmatch_df = pd.DataFrame(columns=cols, index=np.arange(0, n_bnonmatches))
     for i in column_name_lists[1]:
@@ -414,7 +416,7 @@ def npy_to_csv(input_csv_file_paths, input_match_folder, output_folder, output_f
         for i in extra_col_name_lists[1]:
             b_nonmatch_df.loc[:, i] = cat_b.loc[bf, i].values
 
-    if input_npy_folders[1] is not None:
+    if correct_astro_flags[1]:
         ind = (len(column_name_lists[1]) + len(our_columns) +
                (len(extra_col_name_lists[1]) if extra_col_name_lists[1] is not None else 0))
         b_nonmatch_df.iloc[:, ind] = b_concatastro[bf, 2]

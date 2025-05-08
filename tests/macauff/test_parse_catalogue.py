@@ -224,6 +224,7 @@ class TestParseCatalogueNpyToCsv:  # pylint: disable=too-many-instance-attribute
         self.data1[self.data1 == 'nan'] = ''
         self.data1[:, 0] = [f'Gaia {i}' for i in self.data1[:, 0]]
         np.savetxt('test_a_data.csv', self.data1, delimiter=',', fmt='%s', header='')
+        self.a_astro = self.data[:, 1:4]
 
         rng = np.random.default_rng(seed=43587232)
 
@@ -238,6 +239,7 @@ class TestParseCatalogueNpyToCsv:  # pylint: disable=too-many-instance-attribute
         self.data2[self.data2 == 'nan'] = ''
         self.data2[:, 0] = [f'J{i}' for i in self.data2[:, 0]]
         np.savetxt('test_b_data.csv', self.data2, delimiter=',', fmt='%s', header='')
+        self.b_astro = self.data2[:, 1:4]
 
         # Fake 3x match probability, eta/xi/2x contamination/match+non-match
         # index arrays.
@@ -245,57 +247,35 @@ class TestParseCatalogueNpyToCsv:  # pylint: disable=too-many-instance-attribute
         os.makedirs('test_folder', exist_ok=True)
         self.n_match = int(0.6*self.n)
         self.ac = rng.choice(self.n, size=self.n_match, replace=False)
-        np.save('test_folder/ac.npy', self.ac)
         self.bc = rng.choice(self.nb, size=self.n_match, replace=False)
-        np.save('test_folder/bc.npy', self.bc)
         self.af = np.delete(np.arange(0, self.n), self.ac)
-        np.save('test_folder/af.npy', self.af)
         self.bf = np.delete(np.arange(0, self.nb), self.bc)
-        np.save('test_folder/bf.npy', self.bf)
 
         self.pc = rng.uniform(0.5, 1, size=self.n_match)
-        np.save('test_folder/pc.npy', self.pc)
         self.pfa = rng.uniform(0.5, 1, size=len(self.af))
-        np.save('test_folder/pfa.npy', self.pfa)
         self.pfb = rng.uniform(0.5, 1, size=len(self.bf))
-        np.save('test_folder/pfb.npy', self.pfb)
 
         self.eta = rng.uniform(-10, 10, size=self.n_match)
-        np.save('test_folder/eta.npy', self.eta)
         self.xi = rng.uniform(-10, 10, size=self.n_match)
-        np.save('test_folder/xi.npy', self.xi)
 
-        self.pac = rng.uniform(0, 1, size=(2, self.n_match))
-        np.save('test_folder/pacontam.npy', self.pac)
-        self.pbc = rng.uniform(0, 1, size=(2, self.n_match))
-        np.save('test_folder/pbcontam.npy', self.pbc)
+        self.pacontam = rng.uniform(0, 1, size=(2, self.n_match))
+        self.pbcontam = rng.uniform(0, 1, size=(2, self.n_match))
 
-        self.acf = rng.uniform(0, 0.2, size=self.n_match)
-        np.save('test_folder/acontamflux.npy', self.acf)
-        self.bcf = rng.uniform(0, 3, size=self.n_match)
-        np.save('test_folder/bcontamflux.npy', self.bcf)
+        self.acontamflux = rng.uniform(0, 0.2, size=self.n_match)
+        self.bcontamflux = rng.uniform(0, 3, size=self.n_match)
 
-        self.aff = rng.uniform(0, 0.2, size=len(self.af))
-        np.save('test_folder/afieldflux.npy', self.aff)
-        self.bff = rng.uniform(0, 3, size=len(self.bf))
-        np.save('test_folder/bfieldflux.npy', self.bff)
+        self.afieldflux = rng.uniform(0, 0.2, size=len(self.af))
+        self.bfieldflux = rng.uniform(0, 3, size=len(self.bf))
 
-        self.csep = rng.uniform(0, 0.5, size=self.n_match)
-        np.save('test_folder/crptseps.npy', self.csep)
+        self.crptseps = rng.uniform(0, 0.5, size=self.n_match)
 
-        self.afs = rng.uniform(0, 0.5, size=len(self.af))
-        np.save('test_folder/afieldseps.npy', self.afs)
-        self.afeta = rng.uniform(-3, 0, size=len(self.af))
-        np.save('test_folder/afieldeta.npy', self.afeta)
-        self.afxi = rng.uniform(-3, 0, size=len(self.af))
-        np.save('test_folder/afieldxi.npy', self.afxi)
+        self.afieldseps = rng.uniform(0, 0.5, size=len(self.af))
+        self.afieldeta = rng.uniform(-3, 0, size=len(self.af))
+        self.afieldxi = rng.uniform(-3, 0, size=len(self.af))
 
-        self.bfs = rng.uniform(0, 0.5, size=len(self.bf))
-        np.save('test_folder/bfieldseps.npy', self.bfs)
-        self.bfeta = rng.uniform(0, 0.5, size=len(self.bf))
-        np.save('test_folder/bfieldeta.npy', self.bfeta)
-        self.bfxi = rng.uniform(0, 0.5, size=len(self.bf))
-        np.save('test_folder/bfieldxi.npy', self.bfxi)
+        self.bfieldseps = rng.uniform(0, 0.5, size=len(self.bf))
+        self.bfieldeta = rng.uniform(0, 0.5, size=len(self.bf))
+        self.bfieldxi = rng.uniform(0, 0.5, size=len(self.bf))
 
     def test_npy_to_csv(self):
         a_cols = ['A_Designation', 'A_RA', 'A_Dec', 'G', 'G_RP']
@@ -303,10 +283,10 @@ class TestParseCatalogueNpyToCsv:  # pylint: disable=too-many-instance-attribute
         extra_cols = ['MATCH_P', 'SEPARATION', 'ETA', 'XI', 'A_AVG_CONT', 'B_AVG_CONT',
                       'A_CONT_F1', 'A_CONT_F10', 'B_CONT_F1', 'B_CONT_F10']
 
-        npy_to_csv(['./test_a_data.csv', './test_b_data.csv'], 'test_folder', '.',
+        npy_to_csv(['./test_a_data.csv', './test_b_data.csv'], self, '.',
                    ['match_csv.csv', 'a_nonmatch_csv.csv', 'b_nonmatch_csv.csv'], [a_cols, b_cols],
                    [[0, 1, 2, 4, 5], [0, 1, 2, 4, 5, 6]], ['A', 'B'], headers=[False, False],
-                   input_npy_folders=[None, None])
+                   correct_astro_flags=[False, False])
 
         assert os.path.isfile('match_csv.csv')
         assert os.path.isfile('a_nonmatch_csv.csv')
@@ -325,8 +305,8 @@ class TestParseCatalogueNpyToCsv:  # pylint: disable=too-many-instance-attribute
         assert np.all([df[b_cols[0]].iloc[i] == self.data2[self.bc[i], 0] for i in
                        range(len(self.bc))])
 
-        for f, col in zip([self.pc, self.csep, self.eta, self.xi, self.acf, self.bcf,
-                           self.pac[0], self.pac[1], self.pbc[0], self.pbc[1]],
+        for f, col in zip([self.pc, self.crptseps, self.eta, self.xi, self.acontamflux, self.bcontamflux,
+                           self.pacontam[0], self.pacontam[1], self.pbcontam[0], self.pbcontam[1]],
                           extra_cols):
             assert_allclose(df[col], f)
 
@@ -337,10 +317,10 @@ class TestParseCatalogueNpyToCsv:  # pylint: disable=too-many-instance-attribute
         assert np.all([df[a_cols[0]].iloc[i] == self.data1[self.af[i], 0] for i in
                        range(len(self.af))])
         assert_allclose(df['MATCH_P'], self.pfa)
-        assert_allclose(df['A_AVG_CONT'], self.aff)
-        assert_allclose(df['NNM_SEPARATION'], self.afs)
-        assert_allclose(df['NNM_ETA'], self.afeta)
-        assert_allclose(df['NNM_XI'], self.afxi)
+        assert_allclose(df['A_AVG_CONT'], self.afieldflux)
+        assert_allclose(df['NNM_SEPARATION'], self.afieldseps)
+        assert_allclose(df['NNM_ETA'], self.afieldeta)
+        assert_allclose(df['NNM_XI'], self.afieldxi)
         names = np.append(b_cols, ['MATCH_P', 'NNM_SEPARATION', 'NNM_ETA', 'NNM_XI', 'B_AVG_CONT'])
         df = pd.read_csv('b_nonmatch_csv.csv', header=None, names=names)
         for i, col in zip([1, 2, 4, 5, 6], b_cols[1:]):
@@ -348,10 +328,10 @@ class TestParseCatalogueNpyToCsv:  # pylint: disable=too-many-instance-attribute
         assert np.all([df[b_cols[0]].iloc[i] == self.data2[self.bf[i], 0] for i in
                        range(len(self.bf))])
         assert_allclose(df['MATCH_P'], self.pfb)
-        assert_allclose(df['B_AVG_CONT'], self.bff)
-        assert_allclose(df['NNM_SEPARATION'], self.bfs)
-        assert_allclose(df['NNM_ETA'], self.bfeta)
-        assert_allclose(df['NNM_XI'], self.bfxi)
+        assert_allclose(df['B_AVG_CONT'], self.bfieldflux)
+        assert_allclose(df['NNM_SEPARATION'], self.bfieldseps)
+        assert_allclose(df['NNM_ETA'], self.bfieldeta)
+        assert_allclose(df['NNM_XI'], self.bfieldxi)
 
     def test_npy_to_csv_process_uncerts(self):
         a_cols = ['A_Designation', 'A_RA', 'A_Dec', 'G', 'G_RP']
@@ -359,16 +339,10 @@ class TestParseCatalogueNpyToCsv:  # pylint: disable=too-many-instance-attribute
         extra_cols = ['MATCH_P', 'SEPARATION', 'ETA', 'XI', 'A_AVG_CONT', 'B_AVG_CONT',
                       'A_CONT_F1', 'A_CONT_F10', 'B_CONT_F1', 'B_CONT_F10']
 
-        # Save original .npy files to test loading extra step
-        os.makedirs('test_a_out', exist_ok=True)
-        np.save('test_a_out/con_cat_astro.npy', self.data[:, [1, 2, 3]])
-        os.makedirs('test_b_out', exist_ok=True)
-        np.save('test_b_out/con_cat_astro.npy', self.datab[:, [1, 2, 3]])
-
-        npy_to_csv(['./test_a_data.csv', './test_b_data.csv'], 'test_folder', '.',
+        npy_to_csv(['./test_a_data.csv', './test_b_data.csv'], self, '.',
                    ['match_csv.csv', 'a_nonmatch_csv.csv', 'b_nonmatch_csv.csv'], [a_cols, b_cols],
                    [[0, 1, 2, 4, 5], [0, 1, 2, 4, 5, 6]], ['A', 'B'], headers=[False, False],
-                   input_npy_folders=['test_a_out', 'test_b_out'])
+                   correct_astro_flags=[True, True])
 
         assert os.path.isfile('match_csv.csv')
         assert os.path.isfile('a_nonmatch_csv.csv')
@@ -407,7 +381,7 @@ class TestParseCatalogueNpyToCsv:  # pylint: disable=too-many-instance-attribute
             assert_allclose(df[col], self.datab[self.bf, i])
         assert np.all([df[b_cols[0]].iloc[i] == self.data2[self.bf[i], 0] for i in
                        range(len(self.bf))])
-        assert_allclose(df['NNM_XI'], self.bfxi)
+        assert_allclose(df['NNM_XI'], self.bfieldxi)
         assert_allclose(df['B_FIT_SIG'], self.datab[self.bf, 3])
 
     def test_npy_to_csv_cols_out_of_order(self):
@@ -416,10 +390,10 @@ class TestParseCatalogueNpyToCsv:  # pylint: disable=too-many-instance-attribute
         extra_cols = ['MATCH_P', 'SEPARATION', 'ETA', 'XI', 'A_AVG_CONT', 'B_AVG_CONT',
                       'A_CONT_F1', 'A_CONT_F10', 'B_CONT_F1', 'B_CONT_F10']
 
-        npy_to_csv(['./test_a_data.csv', './test_b_data.csv'], 'test_folder', '.',
+        npy_to_csv(['./test_a_data.csv', './test_b_data.csv'], self, '.',
                    ['match_csv.csv', 'a_nonmatch_csv.csv', 'b_nonmatch_csv.csv'], [a_cols, b_cols],
                    [[1, 2, 0, 4, 5], [4, 5, 6, 0, 1, 2]], ['A', 'B'], headers=[False, False],
-                   input_npy_folders=[None, None])
+                   correct_astro_flags=[False, False])
 
         assert os.path.isfile('match_csv.csv')
         assert os.path.isfile('a_nonmatch_csv.csv')
@@ -438,8 +412,8 @@ class TestParseCatalogueNpyToCsv:  # pylint: disable=too-many-instance-attribute
         assert np.all([df[b_cols[3]].iloc[i] == self.data2[self.bc[i], 0] for i in
                        range(len(self.bc))])
 
-        for f, col in zip([self.pc, self.csep, self.eta, self.xi, self.acf, self.bcf,
-                           self.pac[0], self.pac[1], self.pbc[0], self.pbc[1]],
+        for f, col in zip([self.pc, self.crptseps, self.eta, self.xi, self.acontamflux, self.bcontamflux,
+                           self.pacontam[0], self.pacontam[1], self.pbcontam[0], self.pbcontam[1]],
                           extra_cols):
             assert_allclose(df[col], f)
 
@@ -450,10 +424,10 @@ class TestParseCatalogueNpyToCsv:  # pylint: disable=too-many-instance-attribute
         assert np.all([df[a_cols[2]].iloc[i] == self.data1[self.af[i], 0] for i in
                        range(len(self.af))])
         assert_allclose(df['MATCH_P'], self.pfa)
-        assert_allclose(df['A_AVG_CONT'], self.aff)
-        assert_allclose(df['NNM_SEPARATION'], self.afs)
-        assert_allclose(df['NNM_ETA'], self.afeta)
-        assert_allclose(df['NNM_XI'], self.afxi)
+        assert_allclose(df['A_AVG_CONT'], self.afieldflux)
+        assert_allclose(df['NNM_SEPARATION'], self.afieldseps)
+        assert_allclose(df['NNM_ETA'], self.afieldeta)
+        assert_allclose(df['NNM_XI'], self.afieldxi)
         names = np.append(b_cols, ['MATCH_P', 'NNM_SEPARATION', 'NNM_ETA', 'NNM_XI', 'B_AVG_CONT'])
         df = pd.read_csv('b_nonmatch_csv.csv', header=None, names=names)
         for i, col in zip([4, 5, 6, 1, 2], np.array(b_cols)[[0, 1, 2, 4, 5]]):
@@ -461,21 +435,21 @@ class TestParseCatalogueNpyToCsv:  # pylint: disable=too-many-instance-attribute
         assert np.all([df[b_cols[3]].iloc[i] == self.data2[self.bf[i], 0] for i in
                        range(len(self.bf))])
         assert_allclose(df['MATCH_P'], self.pfb)
-        assert_allclose(df['B_AVG_CONT'], self.bff)
-        assert_allclose(df['NNM_SEPARATION'], self.bfs)
-        assert_allclose(df['NNM_ETA'], self.bfeta)
-        assert_allclose(df['NNM_XI'], self.bfxi)
+        assert_allclose(df['B_AVG_CONT'], self.bfieldflux)
+        assert_allclose(df['NNM_SEPARATION'], self.bfieldseps)
+        assert_allclose(df['NNM_ETA'], self.bfieldeta)
+        assert_allclose(df['NNM_XI'], self.bfieldxi)
 
     def test_npy_to_csv_incorrect_extra_cols(self):
         a_cols = ['A_Designation', 'A_RA', 'A_Dec', 'G', 'G_RP']
         b_cols = ['B_Designation', 'B_RA', 'B_Dec', 'W1', 'W2', 'W3']
 
         with pytest.raises(UserWarning, match="either both need to be None, or both"):
-            npy_to_csv(['./test_a_data.csv', './test_b_data.csv'], 'test_folder', '.',
+            npy_to_csv(['./test_a_data.csv', './test_b_data.csv'], self, '.',
                        ['match_csv.csv', 'a_nonmatch_csv.csv', 'b_nonmatch_csv.csv'],
                        [a_cols, b_cols], [[0, 1, 2, 4, 5], [0, 1, 2, 4, 5, 6]], ['A', 'B'],
                        headers=[False, False], extra_col_name_lists=[[1], [2]],
-                       input_npy_folders=[None, None])
+                       correct_astro_flags=[False, False])
 
     # pylint: disable-next=too-many-statements
     def test_npy_to_csv_both_cat_extra_col_file_extension(self):
@@ -489,34 +463,16 @@ class TestParseCatalogueNpyToCsv:  # pylint: disable=too-many-instance-attribute
         add_a_nums = [3]
         add_b_nums = [3]
 
-        np.save('test_folder/ac_second_file.npy', self.ac)
-        np.save('test_folder/bc_second_file.npy', self.bc)
-        np.save('test_folder/af_second_file.npy', self.af)
-        np.save('test_folder/bf_second_file.npy', self.bf)
-        np.save('test_folder/pc_second_file.npy', self.pc)
-        np.save('test_folder/pfa_second_file.npy', self.pfa)
-        np.save('test_folder/pfb_second_file.npy', self.pfb)
-        np.save('test_folder/eta_second_file.npy', self.eta)
-        np.save('test_folder/xi_second_file.npy', self.xi)
-        np.save('test_folder/pacontam_second_file.npy', self.pac)
-        np.save('test_folder/pbcontam_second_file.npy', self.pbc)
-        np.save('test_folder/acontamflux_second_file.npy', self.acf)
-        np.save('test_folder/bcontamflux_second_file.npy', self.bcf)
-        np.save('test_folder/afieldflux_second_file.npy', self.aff)
-        np.save('test_folder/bfieldflux_second_file.npy', self.bff)
-        np.save('test_folder/crptseps_second_file.npy', self.csep)
-        np.save('test_folder/afieldseps_second_file.npy', self.afs)
-        np.save('test_folder/afieldeta_second_file.npy', self.afeta)
-        np.save('test_folder/afieldxi_second_file.npy', self.afxi)
-        np.save('test_folder/bfieldseps_second_file.npy', self.bfs)
-        np.save('test_folder/bfieldeta_second_file.npy', self.bfeta)
-        np.save('test_folder/bfieldxi_second_file.npy', self.bfxi)
+        for x in ['ac', 'bc', 'af', 'bf', 'pc', 'pfa', 'pfb', 'eta', 'xi', 'pacontam', 'pbcontam',
+                  'acontamflux', 'bcontamflux', 'afieldflux', 'bfieldflux', 'crptseps', 'afieldseps',
+                  'afieldeta', 'afieldxi', 'bfieldseps', 'bfieldeta', 'bfieldxi']:
+            setattr(self, x + '_second_file', getattr(self, x))
 
-        npy_to_csv(['./test_a_data.csv', './test_b_data.csv'], 'test_folder', '.',
+        npy_to_csv(['./test_a_data.csv', './test_b_data.csv'], self, '.',
                    ['match_csv.csv', 'a_nonmatch_csv.csv', 'b_nonmatch_csv.csv'], [a_cols, b_cols],
                    [[0, 1, 2, 4, 5], [0, 1, 2, 4, 5, 6]], ['A', 'B'], headers=[False, False],
                    extra_col_name_lists=[add_a_cols, add_b_cols], file_extension='_second_file',
-                   extra_col_num_lists=[add_a_nums, add_b_nums], input_npy_folders=[None, None])
+                   extra_col_num_lists=[add_a_nums, add_b_nums], correct_astro_flags=[False, False])
 
         assert os.path.isfile('match_csv_second_file.csv')
         assert os.path.isfile('a_nonmatch_csv_second_file.csv')
@@ -540,8 +496,8 @@ class TestParseCatalogueNpyToCsv:  # pylint: disable=too-many-instance-attribute
         assert np.all([df[b_cols[0]].iloc[i] == self.data2[self.bc[i], 0] for i in
                        range(len(self.bc))])
 
-        for f, col in zip([self.pc, self.csep, self.eta, self.xi, self.acf, self.bcf,
-                           self.pac[0], self.pac[1], self.pbc[0], self.pbc[1]],
+        for f, col in zip([self.pc, self.crptseps, self.eta, self.xi, self.acontamflux, self.bcontamflux,
+                           self.pacontam[0], self.pacontam[1], self.pbcontam[0], self.pbcontam[1]],
                           extra_cols):
             assert_allclose(df[col], f)
 
@@ -555,10 +511,10 @@ class TestParseCatalogueNpyToCsv:  # pylint: disable=too-many-instance-attribute
         assert np.all([df[a_cols[0]].iloc[i] == self.data1[self.af[i], 0] for i in
                        range(len(self.af))])
         assert_allclose(df['MATCH_P'], self.pfa)
-        assert_allclose(df['A_AVG_CONT'], self.aff)
-        assert_allclose(df['NNM_SEPARATION'], self.afs)
-        assert_allclose(df['NNM_ETA'], self.afeta)
-        assert_allclose(df['NNM_XI'], self.afxi)
+        assert_allclose(df['A_AVG_CONT'], self.afieldflux)
+        assert_allclose(df['NNM_SEPARATION'], self.afieldseps)
+        assert_allclose(df['NNM_ETA'], self.afieldeta)
+        assert_allclose(df['NNM_XI'], self.afieldxi)
         names = np.append(np.append(b_cols, ['MATCH_P', 'NNM_SEPARATION', 'NNM_ETA', 'NNM_XI',
                                              'B_AVG_CONT']), add_b_cols)
         df = pd.read_csv('b_nonmatch_csv_second_file.csv', header=None, names=names)
@@ -569,10 +525,10 @@ class TestParseCatalogueNpyToCsv:  # pylint: disable=too-many-instance-attribute
         assert np.all([df[b_cols[0]].iloc[i] == self.data2[self.bf[i], 0] for i in
                        range(len(self.bf))])
         assert_allclose(df['MATCH_P'], self.pfb)
-        assert_allclose(df['B_AVG_CONT'], self.bff)
-        assert_allclose(df['NNM_SEPARATION'], self.bfs)
-        assert_allclose(df['NNM_ETA'], self.bfeta)
-        assert_allclose(df['NNM_XI'], self.bfxi)
+        assert_allclose(df['B_AVG_CONT'], self.bfieldflux)
+        assert_allclose(df['NNM_SEPARATION'], self.bfieldseps)
+        assert_allclose(df['NNM_ETA'], self.bfieldeta)
+        assert_allclose(df['NNM_XI'], self.bfieldxi)
 
     def test_npy_to_csv_one_cat_extra_col(self):
         a_cols = ['A_Designation', 'A_RA', 'A_Dec', 'G', 'G_RP']
@@ -585,11 +541,11 @@ class TestParseCatalogueNpyToCsv:  # pylint: disable=too-many-instance-attribute
         add_a_nums = [3]
         add_b_nums = []
 
-        npy_to_csv(['./test_a_data.csv', './test_b_data.csv'], 'test_folder', '.',
+        npy_to_csv(['./test_a_data.csv', './test_b_data.csv'], self, '.',
                    ['match_csv.csv', 'a_nonmatch_csv.csv', 'b_nonmatch_csv.csv'], [a_cols, b_cols],
                    [[0, 1, 2, 4, 5], [0, 1, 2, 4, 5, 6]], ['A', 'B'], headers=[False, False],
                    extra_col_name_lists=[add_a_cols, add_b_cols],
-                   extra_col_num_lists=[add_a_nums, add_b_nums], input_npy_folders=[None, None])
+                   extra_col_num_lists=[add_a_nums, add_b_nums], correct_astro_flags=[False, False])
 
         assert os.path.isfile('match_csv.csv')
         assert os.path.isfile('a_nonmatch_csv.csv')
@@ -616,8 +572,8 @@ class TestParseCatalogueNpyToCsv:  # pylint: disable=too-many-instance-attribute
         assert np.all([df[b_cols[0]].iloc[i] == self.data2[self.bc[i], 0] for i in
                        range(len(self.bc))])
 
-        for f, col in zip([self.pc, self.csep, self.eta, self.xi, self.acf, self.bcf,
-                           self.pac[0], self.pac[1], self.pbc[0], self.pbc[1]],
+        for f, col in zip([self.pc, self.crptseps, self.eta, self.xi, self.acontamflux, self.bcontamflux,
+                           self.pacontam[0], self.pacontam[1], self.pbcontam[0], self.pbcontam[1]],
                           extra_cols):
             assert_allclose(df[col], f)
 
@@ -631,10 +587,10 @@ class TestParseCatalogueNpyToCsv:  # pylint: disable=too-many-instance-attribute
         assert np.all([df[a_cols[0]].iloc[i] == self.data1[self.af[i], 0] for i in
                        range(len(self.af))])
         assert_allclose(df['MATCH_P'], self.pfa)
-        assert_allclose(df['A_AVG_CONT'], self.aff)
-        assert_allclose(df['NNM_SEPARATION'], self.afs)
-        assert_allclose(df['NNM_ETA'], self.afeta)
-        assert_allclose(df['NNM_XI'], self.afxi)
+        assert_allclose(df['A_AVG_CONT'], self.afieldflux)
+        assert_allclose(df['NNM_SEPARATION'], self.afieldseps)
+        assert_allclose(df['NNM_ETA'], self.afieldeta)
+        assert_allclose(df['NNM_XI'], self.afieldxi)
         names = np.append(np.append(b_cols, ['MATCH_P', 'NNM_SEPARATION', 'NNM_ETA', 'NNM_XI',
                                              'B_AVG_CONT']), add_b_cols)
         df = pd.read_csv('b_nonmatch_csv.csv', header=None, names=names)
@@ -648,7 +604,7 @@ class TestParseCatalogueNpyToCsv:  # pylint: disable=too-many-instance-attribute
         assert np.all([df[b_cols[0]].iloc[i] == self.data2[self.bf[i], 0] for i in
                        range(len(self.bf))])
         assert_allclose(df['MATCH_P'], self.pfb)
-        assert_allclose(df['B_AVG_CONT'], self.bff)
-        assert_allclose(df['NNM_SEPARATION'], self.bfs)
-        assert_allclose(df['NNM_ETA'], self.bfeta)
-        assert_allclose(df['NNM_XI'], self.bfxi)
+        assert_allclose(df['B_AVG_CONT'], self.bfieldflux)
+        assert_allclose(df['NNM_SEPARATION'], self.bfieldseps)
+        assert_allclose(df['NNM_ETA'], self.bfieldeta)
+        assert_allclose(df['NNM_XI'], self.bfieldxi)
