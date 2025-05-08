@@ -131,8 +131,8 @@ class TestOneSidedPhotometricLikelihood:
         abins = fake_cm.abinsarray
         bbins = fake_cm.bbinsarray
         for which_cat, filts, _bins in zip(['a', 'b'], [self.afilts, self.bfilts], [abins, bbins]):
-            a = getattr(fake_cm, f'{which_cat}_astro')  # np.load(f'{folder}/con_cat_astro.npy')
-            b = getattr(fake_cm, f'{which_cat}_photo')  # np.load(f'{folder}/con_cat_photo.npy')
+            a = getattr(fake_cm, f'{which_cat}_astro')
+            b = getattr(fake_cm, f'{which_cat}_photo')
             for i, (ax1, ax2) in enumerate(self.cf_points):
                 q = ((a[:, 0] >= ax1-0.5) & (a[:, 0] <= ax1+0.5) &
                      (a[:, 1] >= ax2-0.5) & (a[:, 1] <= ax2+0.5))
@@ -200,9 +200,11 @@ class TestOneSidedPhotometricLikelihood:
         # Here we also have to dump a random "magref" file to placate the
         # checks on CrossMatch.
         for folder, name in zip([self.a_cat_folder_path, self.b_cat_folder_path], ['a', 'b']):
-            np.save(f'{folder.format(9)}/con_cat_astro.npy', getattr(self, f'{name}_astro'))
-            np.save(f'{folder.format(9)}/con_cat_photo.npy', getattr(self, f'{name}_photo'))
-            np.save(f'{folder.format(9)}/magref.npy', np.zeros((len(getattr(self, f'{name}_astro')))))
+            x, y = getattr(self, f'{name}_astro'), getattr(self, f'{name}_photo')
+            z = np.zeros((len(getattr(self, f'{name}_astro'))))
+            a = np.hstack((x, y, np.zeros((len(x), 1), bool), z.reshape(-1, 1)))
+            with open(f'{folder}/{folder[:4]}.csv', "w", encoding='utf-8') as f:
+                np.savetxt(f, a, delimiter=",")
 
         self.cm = CrossMatch(mock_filename(self.cm_p_.encode("utf-8")),
                              mock_filename(self.ca_p_text.encode("utf-8")),
@@ -235,10 +237,9 @@ class TestOneSidedPhotometricLikelihood:
 
         abins = self.cm.abinsarray
         bbins = self.cm.bbinsarray
-        for folder, filts, _bins in zip([self.a_cat_folder_path, self.b_cat_folder_path],
-                                        [self.afilts, self.bfilts], [abins, bbins]):
-            a = np.load(f'{folder}/con_cat_astro.npy')
-            b = np.load(f'{folder}/con_cat_photo.npy')
+        for name, filts, _bins in zip(['a', 'b'], [self.afilts, self.bfilts], [abins, bbins]):
+            a = getattr(self, f'{name}_astro')
+            b = getattr(self, f'{name}_photo')
             for i, (ax1, ax2) in enumerate(self.cf_points):
                 q = ((a[:, 0] >= ax1-0.5) & (a[:, 0] <= ax1+0.5) &
                      (a[:, 1] >= ax2-0.5) & (a[:, 1] <= ax2+0.5))

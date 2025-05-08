@@ -37,12 +37,8 @@ class TestParseCatalogue:
         for header_text, header in zip(['', '# a, b, c, d, e, f, g, h'], [False, True]):
             np.savetxt('test_data.csv', data1, delimiter=',', fmt='%s', header=header_text)
 
-            csv_to_npy('.', 'test_data.csv', '.', [0, 1, 2], [4, 5], 6, None, header=header)
-
-            astro = np.load('con_cat_astro.npy')
-            photo = np.load('con_cat_photo.npy')
-            best_index = np.load('magref.npy')
-            chunk_overlaps = np.load('in_chunk_overlap.npy')
+            astro, photo, best_index, chunk_overlaps = csv_to_npy(
+                'test_data.csv', [0, 1, 2], [4, 5], 6, None, header=header)
 
             assert np.all(astro.shape == (self.n, 3))
             assert np.all(photo.shape == (self.n, 2))
@@ -61,12 +57,8 @@ class TestParseCatalogue:
         for header_text, header in zip(['', '# a, b, c, d, e, f, g, h'], [False, True]):
             np.savetxt('test_data.csv', data1, delimiter=',', fmt='%s', header=header_text)
 
-            csv_to_npy('.', 'test_data.csv', '.', [0, 1, 2], [4, 5], 6, 7, header=header)
-
-            astro = np.load('con_cat_astro.npy')
-            photo = np.load('con_cat_photo.npy')
-            best_index = np.load('magref.npy')
-            chunk_overlaps = np.load('in_chunk_overlap.npy')
+            astro, photo, best_index, chunk_overlaps = csv_to_npy(
+                'test_data.csv', [0, 1, 2], [4, 5], 6, 7, header=header)
 
             assert np.all(astro.shape == (self.n, 3))
             assert np.all(photo.shape == (self.n, 2))
@@ -86,24 +78,22 @@ class TestParseCatalogue:
         np.savetxt('test_data.csv', data1, delimiter=',', fmt='%s', header=header_text)
 
         with pytest.raises(ValueError, match='process_uncerts must either be True or'):
-            csv_to_npy('.', 'test_data.csv', '.', [0, 1, 2], [4, 5], 6, None, header=header,
-                       process_uncerts=None)
+            csv_to_npy('test_data.csv', [0, 1, 2], [4, 5], 6, None, header=header, process_uncerts=None)
         with pytest.raises(ValueError, match='astro_sig_fits_filepath must given if process'):
-            csv_to_npy('.', 'test_data.csv', '.', [0, 1, 2], [4, 5], 6, None, header=header,
-                       process_uncerts=True)
+            csv_to_npy('test_data.csv', [0, 1, 2], [4, 5], 6, None, header=header, process_uncerts=True)
         with pytest.raises(ValueError, match='cat_in_radec must given if process_uncerts is '):
-            csv_to_npy('.', 'test_data.csv', '.', [0, 1, 2], [4, 5], 6, None, header=header,
+            csv_to_npy('test_data.csv', [0, 1, 2], [4, 5], 6, None, header=header,
                        process_uncerts=True, astro_sig_fits_filepath='test_sig_folder')
         with pytest.raises(ValueError, match='mn_in_radec must given if process_uncerts is '):
-            csv_to_npy('.', 'test_data.csv', '.', [0, 1, 2], [4, 5], 6, None, header=header,
+            csv_to_npy('test_data.csv', [0, 1, 2], [4, 5], 6, None, header=header,
                        process_uncerts=True, astro_sig_fits_filepath='test_sig_folder',
                        cat_in_radec='something else')
         with pytest.raises(ValueError, match='If process_uncerts is True, cat_in_radec must '):
-            csv_to_npy('.', 'test_data.csv', '.', [0, 1, 2], [4, 5], 6, None, header=header,
+            csv_to_npy('test_data.csv', [0, 1, 2], [4, 5], 6, None, header=header,
                        process_uncerts=True, astro_sig_fits_filepath='test_sig_folder',
                        cat_in_radec='something else', mn_in_radec='something else')
         with pytest.raises(ValueError, match='If process_uncerts is True, mn_in_radec must '):
-            csv_to_npy('.', 'test_data.csv', '.', [0, 1, 2], [4, 5], 6, None, header=header,
+            csv_to_npy('test_data.csv', [0, 1, 2], [4, 5], 6, None, header=header,
                        process_uncerts=True, astro_sig_fits_filepath='test_sig_folder',
                        cat_in_radec=False, mn_in_radec='something else')
 
@@ -111,7 +101,7 @@ class TestParseCatalogue:
             os.system('rm -rf ./test_sig_folder')
 
         with pytest.raises(ValueError, match='astro_sig_fits_filepath does not exist.'):
-            csv_to_npy('.', 'test_data.csv', '.', [0, 1, 2], [4, 5], 6, None, header=header,
+            csv_to_npy('test_data.csv', [0, 1, 2], [4, 5], 6, None, header=header,
                        process_uncerts=True, astro_sig_fits_filepath='test_sig_folder',
                        cat_in_radec=False, mn_in_radec=False)
 
@@ -120,13 +110,9 @@ class TestParseCatalogue:
         np.save('test_sig_folder/n_sigs_array.npy', np.array([0.01]))
         np.save('test_sig_folder/snr_mag_params.npy', np.array([[[0, 0, 0, 10.0, 0.0]]]))
 
-        csv_to_npy('.', 'test_data.csv', '.', [0, 1, 2], [4, 5], 6, None, header=header,
-                   process_uncerts=True, astro_sig_fits_filepath='test_sig_folder',
-                   cat_in_radec=False, mn_in_radec=False)
-
-        astro = np.load('con_cat_astro.npy')
-        photo = np.load('con_cat_photo.npy')
-        best_index = np.load('magref.npy')
+        astro, photo, best_index, chunk_overlaps = csv_to_npy(
+            'test_data.csv', [0, 1, 2], [4, 5], 6, None, header=header, process_uncerts=True,
+            astro_sig_fits_filepath='test_sig_folder', cat_in_radec=False, mn_in_radec=False)
 
         assert np.all(astro.shape == (self.n, 3))
         assert np.all(photo.shape == (self.n, 2))
@@ -140,13 +126,9 @@ class TestParseCatalogue:
         np.save('test_sig_folder/snr_mag_params.npy',
                 np.array([[[0, 0, 0, a.galactic.l.degree[0], a.galactic.b.degree[0]]]]))
 
-        csv_to_npy('.', 'test_data.csv', '.', [0, 1, 2], [4, 5], 6, None, header=header,
-                   process_uncerts=True, astro_sig_fits_filepath='test_sig_folder',
-                   cat_in_radec=False, mn_in_radec=False)
-
-        astro = np.load('con_cat_astro.npy')
-        photo = np.load('con_cat_photo.npy')
-        best_index = np.load('magref.npy')
+        astro, photo, best_index, chunk_overlaps = csv_to_npy(
+            'test_data.csv', [0, 1, 2], [4, 5], 6, None, header=header, process_uncerts=True,
+            astro_sig_fits_filepath='test_sig_folder', cat_in_radec=False, mn_in_radec=False)
 
         assert np.all(astro.shape == (self.n, 3))
         assert np.all(photo.shape == (self.n, 2))

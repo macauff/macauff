@@ -47,35 +47,35 @@ class TestCounterpartPairing:  # pylint: disable=too-many-instance-attributes
         # Test will have three overlap islands: two with 2 a sources and 1 b
         # source, with 1 unmatched a source, and one with 2 a + 1 b all unmatched
         # sources. Also two islands each with just one "field" object.
-        self.a_astro = np.empty((7, 3), float)
-        self.b_astro = np.empty((4, 3), float)
+        self.a_cat = np.empty((7, 8), float)
+        self.b_cat = np.empty((4, 9), float)
         self.a_sig, self.b_sig = 0.1, 0.08
 
-        self.a_astro[:3, :2] = np.array([[0, 0], [0.1, 0.1], [0.1, 0]])
-        self.a_astro[3:6, :2] = self.a_astro[:3, :2] + rng.choice([-1, 1], size=(3, 2)) * \
+        self.a_cat[:3, :2] = np.array([[0, 0], [0.1, 0.1], [0.1, 0]])
+        self.a_cat[3:6, :2] = self.a_cat[:3, :2] + rng.choice([-1, 1], size=(3, 2)) * \
             rng.uniform(2.1*self.a_sig/3600, 3*self.a_sig/3600, size=(3, 2))
-        self.a_astro[6, :2] = np.array([0.1, 0.1])
+        self.a_cat[6, :2] = np.array([0.1, 0.1])
         # Force the second source in the island with the counterpart a/b pair
         # in "a" to be 2-3 sigma away, while the counterpart is <=1 sigma distant.
-        self.b_astro[:3, :2] = self.a_astro[:3, :2] + \
+        self.b_cat[:3, :2] = self.a_cat[:3, :2] + \
             rng.uniform(-1*self.b_sig/3600, self.b_sig/3600, size=(3, 2))
         # Swap the first and second indexes around
-        self.b_astro[:2, 0] = self.b_astro[[1, 0], 0]
-        self.b_astro[:2, 1] = self.b_astro[[1, 0], 1]
-        self.b_astro[-1, :2] = np.array([0.05, 0.05])
+        self.b_cat[:2, 0] = self.b_cat[[1, 0], 0]
+        self.b_cat[:2, 1] = self.b_cat[[1, 0], 1]
+        self.b_cat[-1, :2] = np.array([0.05, 0.05])
         # Swap the last two indexes as well
-        self.b_astro[-2:, 0] = self.b_astro[[-1, -2], 0]
-        self.b_astro[-2:, 1] = self.b_astro[[-1, -2], 1]
+        self.b_cat[-2:, 0] = self.b_cat[[-1, -2], 0]
+        self.b_cat[-2:, 1] = self.b_cat[[-1, -2], 1]
         # Force no match between the third island by adding distance between
         # a[2] and b[3]. Unphysical but effective.
-        self.b_astro[3, 1] += 7*self.b_sig/3600
+        self.b_cat[3, 1] += 7*self.b_sig/3600
 
-        self.a_astro[:, 2] = self.a_sig
-        self.b_astro[:, 2] = self.b_sig
+        self.a_cat[:, 2] = self.a_sig
+        self.b_cat[:, 2] = self.b_sig
         # Currently we don't care about the photometry, setting both
         # include_phot_like and use_phot_priors to False, so just fake:
-        self.a_photo = np.ones((7, 3), float)
-        self.b_photo = np.ones((4, 4), float)
+        self.a_cat[:, 3:6] = np.ones((7, 3), float)
+        self.b_cat[:, 3:7] = np.ones((4, 4), float)
 
         self.alist = np.array([[0, 3], [1, 4], [2, 5], [6, -1], [-1, -1]]).T
         self.blist = np.array([[1], [0], [3], [-1], [2]]).T
@@ -99,8 +99,11 @@ class TestCounterpartPairing:  # pylint: disable=too-many-instance-attributes
                                            np.ones((4, 3, 1), float))
         self.fb_priors = np.asfortranarray((3/0.001**2 * 0.5) * np.ones((4, 3, 1), float))
 
-        self.amagref = np.zeros((self.a_astro.shape[0]), int)
-        self.bmagref = np.zeros((self.b_astro.shape[0]), int)
+        # best_mag_index and chunk_overlap respectively.
+        self.a_cat[:, 7] = np.zeros((self.a_cat.shape[0]), int)
+        self.b_cat[:, 8] = np.zeros((self.b_cat.shape[0]), int)
+        self.a_cat[:, 6] = np.ones((self.a_cat.shape[0]), bool)
+        self.b_cat[:, 7] = np.ones((self.b_cat.shape[0]), bool)
 
         self.amodelrefinds = np.zeros((3, 7), int, order='F')
         self.bmodelrefinds = np.zeros((3, 4), int, order='F')
@@ -127,12 +130,10 @@ class TestCounterpartPairing:  # pylint: disable=too-many-instance-attributes
         for f in [self.a_cat_folder_path, self.b_cat_folder_path,
                   self.a_auf_folder_path, self.b_auf_folder_path]:
             os.makedirs(f, exist_ok=True)
-        np.save(f'{self.a_cat_folder_path}/con_cat_astro.npy', self.a_astro)
-        np.save(f'{self.b_cat_folder_path}/con_cat_astro.npy', self.b_astro)
-        np.save(f'{self.a_cat_folder_path}/con_cat_photo.npy', self.a_photo)
-        np.save(f'{self.b_cat_folder_path}/con_cat_photo.npy', self.b_photo)
-        np.save(f'{self.a_cat_folder_path}/magref.npy', self.amagref)
-        np.save(f'{self.b_cat_folder_path}/magref.npy', self.bmagref)
+        with open(f'{self.a_cat_folder_path}/gaia.csv', "w", encoding='utf-8') as f:
+            np.savetxt(f, self.a_cat, delimiter=",")
+        with open(f'{self.b_cat_folder_path}/wise.csv', "w", encoding='utf-8') as f:
+            np.savetxt(f, self.b_cat, delimiter=",")
 
         # We should have already made fourier_grid, frac_grid, and flux_grid
         # for each catalogue.
@@ -145,7 +146,7 @@ class TestCounterpartPairing:  # pylint: disable=too-many-instance-attributes
         self.a_perturb_auf_outputs['flux_grid'] = self.aflux_grids
         self.b_perturb_auf_outputs['flux_grid'] = self.bflux_grids
 
-        self.large_len = max(len(self.a_astro), len(self.b_astro))
+        self.large_len = max(len(self.a_cat), len(self.b_cat))
 
         with open(os.path.join(os.path.dirname(__file__), 'data/crossmatch_params.yaml'),
                   encoding='utf-8') as cm_p:
@@ -193,24 +194,24 @@ class TestCounterpartPairing:  # pylint: disable=too-many-instance-attributes
         a.bgrplen = self.bgrplen
         a.lenrejecta = 0
         a.lenrejectb = 0
-        a.a_astro = self.a_astro
-        a.a_photo = self.a_photo
-        a.b_astro = self.b_astro
-        a.b_photo = self.b_photo
-        a.a_magref = self.amagref
-        a.b_magref = self.bmagref
+        a.a_astro = self.a_cat[:, :3]
+        a.a_photo = self.a_cat[:, 3:6]
+        a.b_astro = self.b_cat[:, :3]
+        a.b_photo = self.b_cat[:, 3:7]
+        a.a_magref = self.a_cat[:, 7]
+        a.b_magref = self.b_cat[:, 8]
 
         return a
 
     def _calculate_prob_integral(self):
         self.o = np.sqrt(self.a_sig**2 + self.b_sig**2) / 3600
-        self.sep = np.sqrt(((self.a_astro[0, 0] -
-                             self.b_astro[1, 0])*np.cos(np.radians(self.b_astro[1, 1])))**2 +
-                           (self.a_astro[0, 1] - self.b_astro[1, 1])**2)
+        self.sep = np.sqrt(((self.a_cat[0, 0] -
+                             self.b_cat[1, 0])*np.cos(np.radians(self.b_cat[1, 1])))**2 +
+                           (self.a_cat[0, 1] - self.b_cat[1, 1])**2)
         self.g = 1/(2 * np.pi * self.o**2) * np.exp(-0.5 * self.sep**2 / self.o**2)
-        self.sep_wrong = np.sqrt(((self.a_astro[3, 0] -
-                                   self.b_astro[1, 0])*np.cos(np.radians(self.a_astro[3, 1])))**2 +
-                                 (self.a_astro[3, 1] - self.b_astro[1, 1])**2)
+        self.sep_wrong = np.sqrt(((self.a_cat[3, 0] -
+                                   self.b_cat[1, 0])*np.cos(np.radians(self.a_cat[3, 1])))**2 +
+                                 (self.a_cat[3, 1] - self.b_cat[1, 1])**2)
         self.g_wrong = 1/(2 * np.pi * self.o**2) * np.exp(-0.5 * self.sep_wrong**2 / self.o**2)
         self.nc = self.c_priors[0, 0, 0]
         self.nfa, self.nfb = self.fa_priors[0, 0, 0], self.fb_priors[0, 0, 0]
@@ -220,15 +221,15 @@ class TestCounterpartPairing:  # pylint: disable=too-many-instance-attributes
         os.makedirs(f'{self.joint_folder_path}', exist_ok=True)
         i = 0
         wrapper = [
-            self.a_astro, self.a_photo, self.b_astro, self.b_photo, self.c_array, self.fa_array,
-            self.fb_array, self.c_priors, self.fa_priors, self.fb_priors, self.abinsarray,
+            self.a_cat[:, :3], self.a_cat[:, 3:6], self.b_cat[:, :3], self.b_cat[:, 3:7], self.c_array,
+            self.fa_array, self.fb_array, self.c_priors, self.fa_priors, self.fb_priors, self.abinsarray,
             self.bbinsarray, self.abinlengths, self.bbinlengths, self.afrac_grids,
             self.aflux_grids, self.afourier_grids, self.bfrac_grids, self.bflux_grids,
             self.bfourier_grids, self.rho, self.drho, self.n_fracs, self.large_len,
             self.alist[:self.agrplen[i], i]+1, self.blist[:self.bgrplen[i], i]+1,
-            self.amagref[self.alist[:self.agrplen[i], i]]+1,
+            self.a_cat[self.alist[:self.agrplen[i], i], 7]+1,
             self.a_sky_inds[self.alist[:self.agrplen[i], i]]+1,
-            self.bmagref[self.blist[:self.bgrplen[i], i]]+1,
+            self.b_cat[self.blist[:self.bgrplen[i], i], 8]+1,
             self.b_sky_inds[self.blist[:self.bgrplen[i], i]]+1,
             self.amodelrefinds[:, self.alist[:self.agrplen[i], i]]+1,
             self.bmodelrefinds[:, self.blist[:self.bgrplen[i], i]]+1]
@@ -269,15 +270,15 @@ class TestCounterpartPairing:  # pylint: disable=too-many-instance-attributes
         fb_priors = np.zeros_like(self.fb_priors) + 1e-10
         i = 0
         wrapper = [
-            self.a_astro, self.a_photo, self.b_astro, self.b_photo, self.c_array, fa_array,
-            fb_array, self.c_priors, fa_priors, fb_priors, self.abinsarray,
+            self.a_cat[:, :3], self.a_cat[:, 3:6], self.b_cat[:, :3], self.b_cat[:, 3:7], self.c_array,
+            fa_array, fb_array, self.c_priors, fa_priors, fb_priors, self.abinsarray,
             self.bbinsarray, self.abinlengths, self.bbinlengths, self.afrac_grids,
             self.aflux_grids, self.afourier_grids, self.bfrac_grids, self.bflux_grids,
             self.bfourier_grids, self.rho, self.drho, self.n_fracs, self.large_len,
             self.alist[:self.agrplen[i], i]+1, self.blist[:self.bgrplen[i], i]+1,
-            self.amagref[self.alist[:self.agrplen[i], i]]+1,
+            self.a_cat[self.alist[:self.agrplen[i], i], 7]+1,
             self.a_sky_inds[self.alist[:self.agrplen[i], i]]+1,
-            self.bmagref[self.blist[:self.bgrplen[i], i]]+1,
+            self.b_cat[self.blist[:self.bgrplen[i], i], 8]+1,
             self.b_sky_inds[self.blist[:self.bgrplen[i], i]]+1,
             self.amodelrefinds[:, self.alist[:self.agrplen[i], i]]+1,
             self.bmodelrefinds[:, self.blist[:self.bgrplen[i], i]]+1]
@@ -291,15 +292,15 @@ class TestCounterpartPairing:  # pylint: disable=too-many-instance-attributes
         c_array = np.zeros_like(self.c_array) + 1e-10
         c_priors = np.zeros_like(self.c_priors) + 1e-10
         wrapper = [
-            self.a_astro, self.a_photo, self.b_astro, self.b_photo, c_array, fa_array,
-            fb_array, c_priors, fa_priors, fb_priors, self.abinsarray,
+            self.a_cat[:, :3], self.a_cat[:, 3:6], self.b_cat[:, :3], self.b_cat[:, 3:7], c_array,
+            self.fa_array, self.fb_array, c_priors, self.fa_priors, self.fb_priors, self.abinsarray,
             self.bbinsarray, self.abinlengths, self.bbinlengths, self.afrac_grids,
             self.aflux_grids, self.afourier_grids, self.bfrac_grids, self.bflux_grids,
             self.bfourier_grids, self.rho, self.drho, self.n_fracs, self.large_len,
             self.alist[:self.agrplen[i], i]+1, self.blist[:self.bgrplen[i], i]+1,
-            self.amagref[self.alist[:self.agrplen[i], i]]+1,
+            self.a_cat[self.alist[:self.agrplen[i], i], 7]+1,
             self.a_sky_inds[self.alist[:self.agrplen[i], i]]+1,
-            self.bmagref[self.blist[:self.bgrplen[i], i]]+1,
+            self.b_cat[self.blist[:self.bgrplen[i], i], 8]+1,
             self.b_sky_inds[self.blist[:self.bgrplen[i], i]]+1,
             self.amodelrefinds[:, self.alist[:self.agrplen[i], i]]+1,
             self.bmodelrefinds[:, self.blist[:self.bgrplen[i], i]]+1]
@@ -371,9 +372,9 @@ class TestCounterpartPairing:  # pylint: disable=too-many-instance-attributes
         afeta = fake_cm.afieldeta
         afxi = fake_cm.afieldxi
         q = np.where(a_field == 2)[0][0]
-        fake_field_sep = np.sqrt(((self.a_astro[2, 0] -
-                                   self.b_astro[3, 0])*np.cos(np.radians(self.b_astro[3, 1])))**2 +
-                                 (self.a_astro[2, 1] - self.b_astro[3, 1])**2)
+        fake_field_sep = np.sqrt(((self.a_cat[2, 0] -
+                                   self.b_cat[3, 0])*np.cos(np.radians(self.b_cat[3, 1])))**2 +
+                                 (self.a_cat[2, 1] - self.b_cat[3, 1])**2)
         assert_allclose(afs[q], fake_field_sep * 3600, rtol=1e-6)
 
         fake_field_g = 1/(2 * np.pi * self.o**2) * np.exp(-0.5 * fake_field_sep**2 / self.o**2)
@@ -687,9 +688,9 @@ class TestCounterpartPairing:  # pylint: disable=too-many-instance-attributes
         afeta = self.cm.afieldeta
         afxi = self.cm.afieldxi
         q = np.where(a_field == 2)[0][0]
-        fake_field_sep = np.sqrt(((self.a_astro[2, 0] -
-                                   self.b_astro[3, 0])*np.cos(np.radians(self.b_astro[3, 1])))**2 +
-                                 (self.a_astro[2, 1] - self.b_astro[3, 1])**2)
+        fake_field_sep = np.sqrt(((self.a_cat[2, 0] -
+                                   self.b_cat[3, 0])*np.cos(np.radians(self.b_cat[3, 1])))**2 +
+                                 (self.a_cat[2, 1] - self.b_cat[3, 1])**2)
         assert_allclose(afs[q], fake_field_sep * 3600, rtol=1e-6)
 
         fake_field_g = 1/(2 * np.pi * self.o**2) * np.exp(-0.5 * fake_field_sep**2 / self.o**2)
@@ -714,9 +715,9 @@ class TestCounterpartPairing:  # pylint: disable=too-many-instance-attributes
             afeta = self.cm.afieldeta_without_photometry
             afxi = self.cm.afieldxi_without_photometry
             q = np.where(a_field == 2)[0][0]
-            fake_field_sep = np.sqrt(((self.a_astro[2, 0] -
-                                       self.b_astro[3, 0])*np.cos(np.radians(self.b_astro[3, 1])))**2 +
-                                     (self.a_astro[2, 1] - self.b_astro[3, 1])**2)
+            fake_field_sep = np.sqrt(((self.a_cat[2, 0] -
+                                       self.b_cat[3, 0])*np.cos(np.radians(self.b_cat[3, 1])))**2 +
+                                     (self.a_cat[2, 1] - self.b_cat[3, 1])**2)
             assert_allclose(afs[q], fake_field_sep * 3600, rtol=1e-6)
 
             fake_field_g = 1/(2 * np.pi * self.o**2) * np.exp(-0.5 * fake_field_sep**2 / self.o**2)

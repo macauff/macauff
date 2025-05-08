@@ -109,7 +109,7 @@ class TestAstroCorrection:
             'ax2_mids': ax2_mids, 'cutout_area': 60, 'cutout_height': 6, 'mag_array': magarray,
             'mag_slice': magslice, 'sig_slice': sigslice, 'n_pool': 1,
             'pos_and_err_indices': [[0, 1, 2], [0, 1, 2]], 'mag_indices': [3],
-            'mag_unc_indices': [4], 'mag_names': ['W1'], 'best_mag_index': 0,
+            'mag_unc_indices': [4], 'mag_names': ['W1'], 'correct_astro_mag_indices_index': 0,
             'n_r': 5000, 'n_rho': 5000, 'max_rho': 100, 'saturation_magnitudes': [15],
             'mn_fit_type': 'quadratic'}
 
@@ -209,9 +209,9 @@ class TestAstroCorrection:
             ax2_mids=ax2_mids, ax_dimension=ax_dimension, cutout_area=60, cutout_height=6,
             mag_array=magarray, mag_slice=magslice, sig_slice=sigslice, n_pool=1, npy_or_csv='npy',
             coord_or_chunk='coord', pos_and_err_indices=[[0, 1, 2], [0, 1, 2]], mag_indices=[3],
-            mag_unc_indices=[4], mag_names=['W1'], best_mag_index=0, coord_system='equatorial',
-            chunks=chunks, pregenerate_cutouts=True, n_r=2000, n_rho=2000, max_rho=40,
-            saturation_magnitudes=[15], mn_fit_type='quadratic')
+            mag_unc_indices=[4], mag_names=['W1'], correct_astro_mag_indices_index=0,
+            coord_system='equatorial', chunks=chunks, pregenerate_cutouts=True, n_r=2000, n_rho=2000,
+            max_rho=40, saturation_magnitudes=[15], mn_fit_type='quadratic')
         with pytest.raises(ValueError, match="a_cat and b_cat must either both be None or "):
             ac(a_cat=None, b_cat=np.array([0]), a_cat_name=None, b_cat_name=None, a_cat_func=None,
                b_cat_func=None, tri_download=False, make_plots=True, make_summary_plot=True)
@@ -332,7 +332,7 @@ class TestAstroCorrection:
             ax2_mids=ax2_mids, ax_dimension=ax_dimension, mag_array=magarray, mag_slice=magslice,
             sig_slice=sigslice, n_pool=1, npy_or_csv=npy_or_csv, coord_or_chunk=coord_or_chunk,
             pos_and_err_indices=[[0, 1, 2], [0, 1, 2]], mag_indices=[3], mag_unc_indices=[4],
-            mag_names=['W1'], best_mag_index=0, coord_system=coord_system, chunks=chunks,
+            mag_names=['W1'], correct_astro_mag_indices_index=0, coord_system=coord_system, chunks=chunks,
             pregenerate_cutouts=pregenerate_cutouts,
             cutout_area=60 if pregenerate_cutouts is False else None,
             cutout_height=6 if pregenerate_cutouts is False else None, n_r=2000, n_rho=2000, max_rho=40,

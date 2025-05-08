@@ -160,7 +160,7 @@ class CrossMatch():
             a_npy_or_csv = 'csv'
             a_coord_or_chunk = 'chunk'
         if self.a_correct_astrometry:
-            acbi = self.a_best_mag_index
+            acbi = self.a_correct_astro_mag_indices_index
             a_correct_astro_tri_name = '{}/{}/trilegal_auf_simulation'
             t = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             print(f"{t} Rank {self.rank}, chunk {self.chunk_id}: Calculating catalogue 'a' "
@@ -172,7 +172,7 @@ class CrossMatch():
                 self.a_l_cut, ax1_mids, ax2_mids, ax_dimension, self.a_correct_mag_array,
                 self.a_correct_mag_slice, self.a_correct_sig_slice, self.n_pool, a_npy_or_csv,
                 a_coord_or_chunk, self.a_pos_and_err_indices, self.a_mag_indices, self.a_mag_unc_indices,
-                self.a_filt_names, self.a_best_mag_index, self.a_auf_region_frame,
+                self.a_filt_names, self.a_correct_astro_mag_indices_index, self.a_auf_region_frame,
                 self.a_saturation_magnitudes, trifolder=self.a_auf_folder_path,
                 triname=a_correct_astro_tri_name, maglim_f=self.a_tri_maglim_faint,
                 magnum=self.a_tri_filt_num, tri_num_faint=self.a_tri_num_faint,
@@ -183,20 +183,23 @@ class CrossMatch():
                 use_photometric_uncertainties=self.a_use_photometric_uncertainties, pregenerate_cutouts=True,
                 chunks=[self.chunk_id], n_r=self.real_hankel_points, n_rho=self.four_hankel_points,
                 max_rho=self.four_max_rho, mn_fit_type=self.a_mn_fit_type)
-            ac(a_cat_name=self.a_ref_csv_cat_file_string, b_cat_name=self.a_csv_cat_file_string,
+            ac(a_cat_name=self.a_ref_cat_csv_file_path, b_cat_name=self.a_cat_csv_file_path,
                tri_download=self.a_download_tri, make_plots=True, overwrite_all_sightlines=True,
                seeing_ranges=self.a_seeing_ranges)
 
             # Having corrected the astrometry, we have to call csv_to_npy
             # now, rather than pre-generating our binary input catalogues.
-            csv_folder, csv_filename = os.path.split(
-                self.a_csv_cat_file_string.format(self.chunk_id))
-            csv_to_npy(csv_folder, csv_filename, self.a_cat_folder_path,
-                       self.a_pos_and_err_indices[1], self.a_mag_indices, self.a_best_mag_index_col,
-                       self.a_chunk_overlap_col, header=False, process_uncerts=True,
-                       astro_sig_fits_filepath=f'{self.a_correct_astro_save_folder}/npy',
-                       cat_in_radec=self.a_auf_region_frame == 'equatorial',
-                       mn_in_radec=self.a_auf_region_frame == 'equatorial')
+            self.a_astro, self.a_photo, self.a_magref, self.a_in_overlaps = csv_to_npy(
+                self.a_cat_csv_file_path, self.a_pos_and_err_indices[0], self.a_mag_indices,
+                self.a_best_mag_index_col, self.a_chunk_overlap_col, header=False, process_uncerts=True,
+                astro_sig_fits_filepath=f'{self.a_correct_astro_save_folder}/npy',
+                cat_in_radec=self.a_auf_region_frame == 'equatorial',
+                mn_in_radec=self.a_auf_region_frame == 'equatorial')
+        else:
+            # Otherwise, just load the files without correcting anything.
+            self.a_astro, self.a_photo, self.a_magref, self.a_in_overlaps = csv_to_npy(
+                self.a_cat_csv_file_path, self.a_pos_and_err_indices, self.a_mag_indices,
+                self.a_best_mag_index_col, self.a_chunk_overlap_col, header=False)
         if self.a_compute_snr_mag_relation:
             t = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             print(f"{t} Rank {self.rank}, chunk {self.chunk_id}: Calculating catalogue 'a' "
@@ -206,7 +209,7 @@ class CrossMatch():
                 a_coord_or_chunk, self.a_pos_and_err_indices, self.a_mag_indices,
                 self.a_mag_unc_indices, self.a_filt_names, self.a_auf_region_frame,
                 chunks=[self.chunk_id])
-            smr(b_cat_name=self.a_csv_cat_file_string, make_plots=True, overwrite_all_sightlines=True)
+            smr(b_cat_name=self.a_cat_csv_file_path, make_plots=True, overwrite_all_sightlines=True)
         if self.a_correct_astrometry or self.a_compute_snr_mag_relation:
             # If we re-made either side's astrometry then we need to load its
             # SNR-mag relation now.
@@ -234,7 +237,7 @@ class CrossMatch():
             b_npy_or_csv = 'csv'
             b_coord_or_chunk = 'chunk'
         if self.b_correct_astrometry:
-            bcbi = self.b_best_mag_index
+            bcbi = self.b_correct_astro_mag_indices_index
             b_correct_astro_tri_name = '{}/{}/trilegal_auf_simulation'
             t = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             print(f"{t} Rank {self.rank}, chunk {self.chunk_id}: Calculating catalogue 'b' "
@@ -246,7 +249,7 @@ class CrossMatch():
                 self.b_l_cut, ax1_mids, ax2_mids, ax_dimension, self.b_correct_mag_array,
                 self.b_correct_mag_slice, self.b_correct_sig_slice, self.n_pool, b_npy_or_csv,
                 b_coord_or_chunk, self.b_pos_and_err_indices, self.b_mag_indices, self.b_mag_unc_indices,
-                self.b_filt_names, self.b_best_mag_index, self.b_auf_region_frame,
+                self.b_filt_names, self.b_correct_astro_mag_indices_index, self.b_auf_region_frame,
                 self.b_saturation_magnitudes, trifolder=self.b_auf_folder_path,
                 triname=b_correct_astro_tri_name, maglim_f=self.b_tri_maglim_faint,
                 magnum=self.b_tri_filt_num, tri_num_faint=self.b_tri_num_faint,
@@ -258,18 +261,26 @@ class CrossMatch():
                 pregenerate_cutouts=True, chunks=[self.chunk_id],
                 n_r=self.real_hankel_points, n_rho=self.four_hankel_points, max_rho=self.four_max_rho,
                 mn_fit_type=self.b_mn_fit_type)
-            ac(a_cat_name=self.b_ref_csv_cat_file_string, b_cat_name=self.b_csv_cat_file_string,
+            ac(a_cat_name=self.b_ref_cat_csv_file_path, b_cat_name=self.b_cat_csv_file_path,
                tri_download=self.b_download_tri, make_plots=True, overwrite_all_sightlines=True,
                seeing_ranges=self.b_seeing_ranges)
 
-            csv_folder, csv_filename = os.path.split(
-                self.b_csv_cat_file_string.format(self.chunk_id))
-            csv_to_npy(csv_folder, csv_filename, self.b_cat_folder_path,
-                       self.b_pos_and_err_indices[1], self.b_mag_indices, self.b_best_mag_index_col,
-                       self.b_chunk_overlap_col, header=False, process_uncerts=True,
-                       astro_sig_fits_filepath=f'{self.b_correct_astro_save_folder}/npy',
-                       cat_in_radec=self.b_auf_region_frame == 'equatorial',
-                       mn_in_radec=self.b_auf_region_frame == 'equatorial')
+            if not os.path.isfile(self.b_cat_csv_file_path):
+                raise FileNotFoundError('Catalogue file not found in catalogue "b" path. '
+                                        'Please ensure photometric catalogue is correctly saved.')
+            self.b_astro, self.b_photo, self.b_magref, self.b_in_overlaps = csv_to_npy(
+                self.b_cat_csv_file_path, self.b_pos_and_err_indices[0], self.b_mag_indices,
+                self.b_best_mag_index_col, self.b_chunk_overlap_col, header=False, process_uncerts=True,
+                astro_sig_fits_filepath=f'{self.b_correct_astro_save_folder}/npy',
+                cat_in_radec=self.b_auf_region_frame == 'equatorial',
+                mn_in_radec=self.b_auf_region_frame == 'equatorial')
+        else:
+            if not os.path.isfile(self.b_cat_csv_file_path):
+                raise FileNotFoundError('Catalogue file not found in catalogue "b" path. '
+                                        'Please ensure photometric catalogue is correctly saved.')
+            self.b_astro, self.b_photo, self.b_magref, self.b_in_overlaps = csv_to_npy(
+                self.b_cat_csv_file_path, self.b_pos_and_err_indices, self.b_mag_indices,
+                self.b_best_mag_index_col, self.b_chunk_overlap_col, header=False)
         if self.b_compute_snr_mag_relation:
             t = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             print(f"{t} Rank {self.rank}, chunk {self.chunk_id}: Calculating catalogue 'b' "
@@ -279,7 +290,7 @@ class CrossMatch():
                 b_coord_or_chunk, self.b_pos_and_err_indices, self.b_mag_indices,
                 self.b_mag_unc_indices, self.b_filt_names, self.b_auf_region_frame,
                 chunks=[self.chunk_id])
-            smr(b_cat_name=self.b_csv_cat_file_string, make_plots=True, overwrite_all_sightlines=True)
+            smr(b_cat_name=self.b_cat_csv_file_path, make_plots=True, overwrite_all_sightlines=True)
         if self.b_correct_astrometry or self.b_compute_snr_mag_relation:
             os.system(f'cp {self.b_correct_astro_save_folder}/npy/snr_mag_params.npy '
                       f'{self.b_snr_mag_params_file_path}')
@@ -292,40 +303,6 @@ class CrossMatch():
                     a.shape[0] == len(self.b_filt_names)):
                 raise ValueError('b_snr_mag_params should be of shape (X, Y, 5)')
             self.b_snr_mag_params = a
-
-        # Check cat_folder_path for three appropriately shaped arrays,
-        # and error if they aren't there.
-        for path, catname, flag in zip([self.a_cat_folder_path, self.b_cat_folder_path],
-                                       ['"a"', '"b"'], ['a_', 'b_']):
-            # Currently forcing hard-coded three-part numpy array names,
-            # to come out of "skinny table" consolidated catalogue
-            # generation.
-            for file_name in ['con_cat_astro', 'con_cat_photo', 'magref']:
-                if not os.path.isfile(f'{path}/{file_name}.npy'):
-                    raise FileNotFoundError(f'{file_name} file not found in catalogue {catname} path. '
-                                            'Please run catalogue consolidation')
-            # Shape, mapped to each of astro/photo/magref respectively,
-            # should map to 3, number of magnitudes, and 1, where magref is
-            # a 1-D array but the other two are 2-D.
-            fn_a = np.load(f'{path}/con_cat_astro.npy')
-            fn_p = np.load(f'{path}/con_cat_photo.npy')
-            fn_m = np.load(f'{path}/magref.npy')
-            if len(fn_a.shape) != 2 or len(fn_p.shape) != 2 or len(fn_m.shape) != 1:
-                raise ValueError("Incorrect number of dimensions in consolidated "
-                                 f"catalogue {catname} files.")
-            if fn_a.shape[1] != 3:
-                raise ValueError(f"Second dimension of con_cat_astro in catalogue {catname} "
-                                 "should be 3.")
-            if fn_p.shape[1] != len(getattr(self, f'{flag}filt_names')):
-                raise ValueError(f"Second dimension of con_cat_photo in catalogue {catname} "
-                                 "should be the same as the number of filters listed "
-                                 f"in {flag}filt_names.")
-            if fn_m.shape[0] != fn_a.shape[0] or fn_p.shape[0] != fn_a.shape[0]:
-                raise ValueError(f"Consolidated catalogue arrays for catalogue {catname} should "
-                                 "all be consistent lengths.")
-            setattr(self, f'{flag}astro', fn_a)
-            setattr(self, f'{flag}photo', fn_p)
-            setattr(self, f'{flag}magref', fn_m)
 
         self.make_shared_data()
 
@@ -504,8 +481,8 @@ class CrossMatch():
         t = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         print(f"{t} Rank {self.rank}, chunk {self.chunk_id}: Removing halo matches and non-matches...")
 
-        a_in_overlaps = np.load(f'{self.a_cat_folder_path}/in_chunk_overlap.npy')
-        b_in_overlaps = np.load(f'{self.b_cat_folder_path}/in_chunk_overlap.npy')
+        a_in_overlaps = self.a_in_overlaps
+        b_in_overlaps = self.b_in_overlaps
 
         if self.include_phot_like and self.with_and_without_photometry:
             loop_array_extensions = ['', '_without_photometry']
@@ -551,10 +528,10 @@ class CrossMatch():
                 # Need to determine if astrometric corrections were performed.
                 # This only happens if the flag is set in here, so set
                 # accordingly.
-                acfp = None if not self.a_correct_astrometry else self.a_cat_folder_path
-                bcfp = None if not self.b_correct_astrometry else self.b_cat_folder_path
+                acfp = None if not self.a_correct_astrometry else self.a_cat_csv_file_path
+                bcfp = None if not self.b_correct_astrometry else self.b_cat_csv_file_path
                 npy_to_csv(
-                    [self.a_input_csv_file_path, self.b_input_csv_file_path], self.joint_folder_path,
+                    [self.a_cat_csv_file_path, self.b_cat_csv_file_path], self.joint_folder_path,
                     self.output_csv_folder, [self.match_out_csv_name, self.a_nonmatch_out_csv_name,
                                              self.b_nonmatch_out_csv_name],
                     [self.a_cat_col_names, self.b_cat_col_names],
@@ -587,14 +564,12 @@ class CrossMatch():
             # Skip completed chunks
             if chunk_id in completed_chunks:
                 continue
-            cat_a_file_path = self.cat_a_params_dict['cat_folder_path'].format(chunk_id)
-            cat_b_file_path = self.cat_b_params_dict['cat_folder_path'].format(chunk_id)
+            cat_a_file_path = self.cat_a_params_dict['cat_csv_file_path'].format(chunk_id)
+            cat_b_file_path = self.cat_b_params_dict['cat_csv_file_path'].format(chunk_id)
 
-            for cat_folder_path in [cat_a_file_path, cat_b_file_path]:
-                for path, _, files in os.walk(cat_folder_path):
-                    for f in files:
-                        file_path = os.path.join(path, f)
-                        chunk_sizes[i] += os.path.getsize(file_path)
+            for file_path in [cat_a_file_path, cat_b_file_path]:
+                for path, _, files in os.walk(file_path):
+                    chunk_sizes[i] += os.path.getsize(file_path)
 
         # Sort chunk list by size, largest to smallest
         chunk_queue_sorted = chunk_queue[np.argsort(chunk_sizes)[::-1]]
@@ -655,8 +630,9 @@ class CrossMatch():
                           "Please ensure that joint_folder_path is correct.")
 
         for catname, flag in zip(['"a"', '"b"'], ['a_', 'b_']):
-            if not os.path.exists(getattr(self, f'{flag[0]}_cat_folder_path')):
-                raise OSError(f'{flag}cat_folder_path does not exist. Please ensure that '
+            if (not os.path.exists(getattr(self, f'{flag[0]}_cat_csv_file_path')) or
+                    not os.path.isfile(getattr(self, f'{flag[0]}_cat_csv_file_path'))):
+                raise OSError(f'{flag}cat_csv_file_path does not exist. Please ensure that '
                               f'path for catalogue {catname} is correct.')
             if getattr(self, f'{flag[0]}_auf_folder_path') is not None:
                 try:
@@ -664,9 +640,6 @@ class CrossMatch():
                 except OSError as exc:
                     raise OSError(f"Error when trying to create temporary folder for catalogue {catname} AUF "
                                   f"outputs. Please ensure that {flag}auf_folder_path is correct.") from exc
-
-            if self.make_output_csv and not os.path.isfile(getattr(self, f'{flag[0]}_input_csv_file_path')):
-                raise OSError(f'input_csv_file_path from catalogue "{catname[1]}" does not exist.')
 
         for config, catname in zip([self.cat_a_params_dict, self.cat_b_params_dict], ['a_', 'b_']):
             ind = np.where(chunk_id == np.array(config['chunk_id_list']))[0][0]
@@ -728,17 +701,15 @@ class CrossMatch():
                     if config[f'{name}_location'] != "None":
                         setattr(self, f'{flag}{name}_list', np.load(config[f'{name}_location']))
         for config, flag in zip([self.cat_a_params_dict, self.cat_b_params_dict], ['a_', 'b_']):
-            if config['correct_astrometry'] or config['compute_snr_mag_relation']:
-                if config['correct_astrometry']:
-                    # The reshape puts the first three elements in a[0], and hence
-                    # those are ref_cat_inds, with a[1] this_cat_inds.
-                    setattr(self, f'{flag}pos_and_err_indices',
-                            np.array(config['pos_and_err_indices']).reshape(2, 3))
-                else:
-                    # If we only want to compute the SNR-mag relation, then we've
-                    # only got three elements, so we just store them in a (3,)
-                    # shape array.
-                    setattr(self, f'{flag}pos_and_err_indices', config['pos_and_err_indices'])
+            if config['correct_astrometry']:
+                # The reshape puts the first three elements in a[0], and hence
+                # those are this_cat_inds, with a[1] ref_cat_inds.
+                setattr(self, f'{flag}pos_and_err_indices',
+                        np.array(config['pos_and_err_indices']).reshape(2, 3))
+            else:
+                # Otherwise we only need three elements, so we just store them
+                # in a (3,) shape array.
+                setattr(self, f'{flag}pos_and_err_indices', config['pos_and_err_indices'])
 
     def _make_regions_points(self, region_type, region_points, chunk_id):
         '''
@@ -822,10 +793,75 @@ class CrossMatch():
 
         for config, catname in zip([cat_a_config, cat_b_config], ['"a"', '"b"']):
             for check_flag in ['auf_region_type', 'auf_region_frame', 'auf_region_points_per_chunk',
-                               'filt_names', 'cat_name', 'auf_folder_path', 'cat_folder_path',
-                               'correct_astrometry', 'compute_snr_mag_relation', 'chunk_id_list']:
+                               'filt_names', 'cat_name', 'auf_folder_path', 'cat_csv_file_path',
+                               'correct_astrometry', 'compute_snr_mag_relation', 'chunk_id_list',
+                               'pos_and_err_indices', 'mag_indices', 'chunk_overlap_col',
+                               'best_mag_index_col', 'csv_has_header']:
                 if check_flag not in config:
                     raise ValueError(f"Missing key {check_flag} from catalogue {catname} metadata file.")
+
+        for config, flag, correct_astro in zip(
+                [cat_a_config, cat_b_config], ['a_', 'b_'], [cat_a_config['correct_astrometry'],
+                                                             cat_b_config['correct_astrometry']]):
+            a = config['mag_indices']
+            try:
+                b = np.array([float(f) for f in a])
+            except ValueError as exc:
+                raise ValueError('mag_indices should be a list of integers '
+                                 f'in the catalogue "{flag[0]}" metadata file') from exc
+            if len(b) != len(config['filt_names']):
+                raise ValueError(f'{flag}filt_names and {flag}mag_indices should contain the '
+                                 'same number of entries.')
+            if not np.all([c.is_integer() for c in b]):
+                raise ValueError(f'All elements of {flag}mag_indices should be '
+                                 'integers.')
+
+            # pos_and_err_indices should be a three- or six-integer list that
+            # we then transform into [reference_cat_inds, this_cat_inds]
+            # where each *_cat_inds is a three-element list [x, y, z],
+            # or just this_cat_inds in the case of
+            # compute_snr_mag_relation=True.
+            a = config['pos_and_err_indices']
+            try:
+                b = np.array([float(f) for f in a])
+            except ValueError as exc:
+                raise ValueError('pos_and_err_indices should be a list of integers '
+                                 f'in the catalogue "{flag[0]}"" metadata file') from exc
+            if len(b) != 6 and correct_astro:
+                raise ValueError(f'{flag}pos_and_err_indices should contain six elements '
+                                 'when correct_astrometry is True.')
+            if len(b) != 3 and not correct_astro:
+                raise ValueError(f'{flag}pos_and_err_indices should contain three elements '
+                                 'when compute_snr_mag_relation is True.')
+            if not np.all([c.is_integer() for c in b]):
+                raise ValueError(f'All elements of {flag}pos_and_err_indices should be integers.')
+
+            a = config['best_mag_index_col']
+            try:
+                a = float(a)
+            except (ValueError, TypeError) as exc:
+                raise ValueError(f'best_mag_index_col should be an integer in the catalogue "{flag[0]}" '
+                                 'metadata file.') from exc
+            if not a.is_integer():
+                raise ValueError(f'best_mag_index_col should be an integer in the catalogue "{flag[0]}" '
+                                 'metadata file.')
+
+            a = config['chunk_overlap_col']
+            if a == "None":
+                config['chunk_overlap_col'] = None
+            else:
+                try:
+                    a = float(a)
+                except (ValueError, TypeError) as exc:
+                    raise ValueError('chunk_overlap_col should be an integer in the '
+                                     f'catalogue "{flag[0]}" metadata file.') from exc
+                if not a.is_integer():
+                    raise ValueError('chunk_overlap_col should be an integer in the '
+                                     f'catalogue "{flag[0]}" metadata file.')
+
+            if config['csv_has_header'] not in (True, False):
+                raise ValueError('Boolean flag key csv_has_header not set to allowed value in catalogue '
+                                 f'{flag[0]} metadata file.')
 
         for run_flag in ['include_perturb_auf', 'include_phot_like', 'use_phot_priors']:
             if joint_config[run_flag] not in (True, False):
@@ -882,8 +918,8 @@ class CrossMatch():
         else:
             cat_b_config['auf_folder_path'] = os.path.abspath(cat_b_config['auf_folder_path'])
 
-        cat_a_config['cat_folder_path'] = os.path.abspath(cat_a_config['cat_folder_path'])
-        cat_b_config['cat_folder_path'] = os.path.abspath(cat_b_config['cat_folder_path'])
+        cat_a_config['cat_csv_file_path'] = os.path.abspath(cat_a_config['cat_csv_file_path'])
+        cat_b_config['cat_csv_file_path'] = os.path.abspath(cat_b_config['cat_csv_file_path'])
 
         # Only have to check for the existence of Pertubation AUF-related
         # parameters if we are using the perturbation AUF component.
@@ -1002,7 +1038,7 @@ class CrossMatch():
                 except ValueError as exc:
                     raise ValueError(f'psf_fwhms should be a list of floats in catalogue {catname} '
                                      'metadata file.') from exc
-                if len(b) != len(config['tri_filt_names']):
+                if len(b) != len(config['filt_names']):
                     raise ValueError(f'{flag}psf_fwhms and {flag}filt_names should contain the '
                                      'same number of entries.')
 
@@ -1094,7 +1130,7 @@ class CrossMatch():
                             raise ValueError(f"File could not be loaded from {name}.") from exc
                         if name == "dens_hist_tri":
                             shape_dht = g.shape
-                            if g.shape[0] != len(config['tri_filt_names']):
+                            if g.shape[0] != len(config['filt_names']):
                                 raise ValueError(f"The number of filters in {flag}filt_names and "
                                                  f"{flag}dens_hist_tri do not match.")
                         else:
@@ -1149,7 +1185,7 @@ class CrossMatch():
                         except ValueError as exc:
                             raise ValueError(f'{var} should be a list of floats in catalogue '
                                              f'{catname} metadata file') from exc
-                        if len(b) != len(config['tri_filt_names']):
+                        if len(b) != len(config['filt_names']):
                             raise ValueError(f'{flag}{var} and {flag}filt_names should contain the same '
                                              'number of entries.')
                     # galaxy_nzs should be a list of integers.
@@ -1159,7 +1195,7 @@ class CrossMatch():
                     except ValueError as exc:
                         raise ValueError('gal_nzs should be a list of integers '
                                          f'in catalogue {catname} metadata file') from exc
-                    if len(b) != len(config['tri_filt_names']):
+                    if len(b) != len(config['filt_names']):
                         raise ValueError(f'{flag}gal_nzs and {flag}filt_names should contain the same '
                                          'number of entries.')
                     if not np.all([c.is_integer() for c in b]):
@@ -1218,27 +1254,11 @@ class CrossMatch():
             # required for the simpler case of just doing SNR-mag relation
             # calculations, instead of the full astrometry correction.
             if correct_astro or compute_snr_mag_relation:
-                for check_flag in ['correct_astro_save_folder', 'csv_cat_file_string',
-                                   'pos_and_err_indices', 'mag_indices', 'mag_unc_indices']:
+                for check_flag in ['correct_astro_save_folder', 'mag_unc_indices']:
                     if check_flag not in config:
                         raise ValueError(f"Missing key {check_flag} from catalogue {catname} metadata file.")
 
                 config['correct_astro_save_folder'] = os.path.abspath(config['correct_astro_save_folder'])
-
-                config['csv_cat_file_string'] = os.path.abspath(config['csv_cat_file_string'])
-
-                a = config['mag_indices']
-                try:
-                    b = np.array([float(f) for f in a])
-                except ValueError as exc:
-                    raise ValueError('mag_indices should be a list of integers '
-                                     f'in the catalogue {catname} metadata file') from exc
-                if len(b) != len(config['tri_filt_names']):
-                    raise ValueError(f'{flag}filt_names and {flag}mag_indices should contain the '
-                                     'same number of entries.')
-                if not np.all([c.is_integer() for c in b]):
-                    raise ValueError(f'All elements of {flag}mag_indices should be '
-                                     'integers.')
 
                 a = config['mag_unc_indices']
                 try:
@@ -1252,35 +1272,14 @@ class CrossMatch():
                 if not np.all([c.is_integer() for c in b]):
                     raise ValueError(f'All elements of {flag}mag_unc_indices should be integers.')
 
-                # pos_and_err_indices should be a three- or six-integer list that
-                # we then transform into [reference_cat_inds, this_cat_inds]
-                # where each *_cat_inds is a three-element list [x, y, z],
-                # or just this_cat_inds in the case of
-                # compute_snr_mag_relation=True.
-                a = config['pos_and_err_indices']
-                try:
-                    b = np.array([float(f) for f in a])
-                except ValueError as exc:
-                    raise ValueError('pos_and_err_indices should be a list of integers '
-                                     f'in the catalogue {catname} metadata file') from exc
-                if len(b) != 6 and correct_astro:
-                    raise ValueError(f'{flag}pos_and_err_indices should contain six elements '
-                                     'when correct_astrometry is True.')
-                if len(b) != 3 and compute_snr_mag_relation:
-                    raise ValueError(f'{flag}pos_and_err_indices should contain three elements '
-                                     'when compute_snr_mag_relation is True.')
-                if not np.all([c.is_integer() for c in b]):
-                    raise ValueError(f'All elements of {flag}pos_and_err_indices should be integers.')
-
             if correct_astro:
                 # If this particular catalogue requires a systematic correction
                 # for astrometric biases from ensemble match distributions before
                 # we can do a probability-based cross-match, then load some extra
                 # pieces of information, over and above those already loaded
                 # for just the SNR-mag case.
-                for check_flag in ['best_mag_index', 'nn_radius', 'ref_csv_cat_file_string',
+                for check_flag in ['correct_astro_mag_indices_index', 'nn_radius', 'ref_cat_csv_file_path',
                                    'correct_mag_array', 'correct_mag_slice', 'correct_sig_slice',
-                                   'chunk_overlap_col', 'best_mag_index_col',
                                    'use_photometric_uncertainties', 'mn_fit_type', 'seeing_ranges']:
                     if check_flag not in config:
                         raise ValueError(f"Missing key {check_flag} from catalogue {catname} metadata file.")
@@ -1312,41 +1311,18 @@ class CrossMatch():
                 # and therefore need to pass neither parameter through to
                 # the fitting routine.
 
-                a = config['best_mag_index']
+                a = config['correct_astro_mag_indices_index']
                 try:
                     a = float(a)
                 except (ValueError, TypeError) as exc:
-                    raise ValueError(f"best_mag_index should be an integer in the catalogue {catname} "
-                                     "metadata file.") from exc
+                    raise ValueError("correct_astro_mag_indices_index should be an integer in the catalogue "
+                                     f"{catname} metadata file.") from exc
                 if not a.is_integer():
-                    raise ValueError(f"best_mag_index should be an integer in the catalogue {catname} "
-                                     "metadata file.")
-                if int(a) >= len(config['tri_filt_names']):
-                    raise ValueError("best_mag_index cannot be a larger index than the list of "
-                                     f"filters in the catalogue {catname} metadata file.")
-
-                a = config['best_mag_index_col']
-                try:
-                    a = float(a)
-                except (ValueError, TypeError) as exc:
-                    raise ValueError(f"best_mag_index_col should be an integer in the catalogue {catname} "
-                                     "metadata file.") from exc
-                if not a.is_integer():
-                    raise ValueError(f"best_mag_index_col should be an integer in the catalogue {catname} "
-                                     "metadata file.")
-
-                a = config['chunk_overlap_col']
-                if a == "None":
-                    config['chunk_overlap_col'] = None
-                else:
-                    try:
-                        a = float(a)
-                    except (ValueError, TypeError) as exc:
-                        raise ValueError("chunk_overlap_col should be an integer in the "
-                                         f"catalogue {catname} metadata file.") from exc
-                    if not a.is_integer():
-                        raise ValueError("chunk_overlap_col should be an integer in the "
-                                         f"catalogue {catname} metadata file.")
+                    raise ValueError("correct_astro_mag_indices_index should be an integer in the catalogue "
+                                     f"{catname} metadata file.")
+                if int(a) >= len(config['filt_names']):
+                    raise ValueError("correct_astro_mag_indices_index cannot be a larger index than the list "
+                                     f"of filters in the catalogue {catname} metadata file.")
 
                 try:
                     a = float(config['nn_radius'])
@@ -1354,7 +1330,7 @@ class CrossMatch():
                     raise ValueError(f"nn_radius must be a float in the catalogue {catname} metadata "
                                      "file.") from exc
 
-                config['ref_csv_cat_file_string'] = os.path.abspath(config['ref_csv_cat_file_string'])
+                config['ref_cat_csv_file_path'] = os.path.abspath(config['ref_cat_csv_file_path'])
 
                 a = config['correct_mag_array']
                 try:
@@ -1417,8 +1393,7 @@ class CrossMatch():
                 raise ValueError(f"Missing key {check_flag} from joint metadata file.")
 
         for config, catname in zip([cat_a_config, cat_b_config], ['"a"', '"b"']):
-            for check_flag in ['input_csv_file_path', 'cat_col_names', 'cat_col_nums',
-                               'csv_has_header', 'extra_col_names', 'extra_col_nums']:
+            for check_flag in ['cat_col_names', 'cat_col_nums', 'extra_col_names', 'extra_col_nums']:
                 if check_flag not in config:
                     raise ValueError(f"Missing key {check_flag} from catalogue {catname} metadata file.")
 
@@ -1436,8 +1411,6 @@ class CrossMatch():
             # catalogue config!
             nonmatch_out_name = joint_config['nonmatch_out_csv_name']
             config['nonmatch_out_csv_name'] = f'{config["cat_name"]}_{nonmatch_out_name}'
-
-            config['input_csv_file_path'] = os.path.abspath(config['input_csv_file_path'])
 
             # cat_col_names is simply a list/array of strings. However, to
             # avoid any issues with generic names like "RA" being added to the
@@ -1458,10 +1431,6 @@ class CrossMatch():
             if not np.all([c.is_integer() for c in b]):
                 raise ValueError(f'All elements of {catname}cat_col_nums should be '
                                  'integers.')
-
-            if config['csv_has_header'] not in (True, False):
-                raise ValueError('Boolean flag key csv_has_header not set to allowed value in catalogue '
-                                 f'{catname[0]} metadata file.')
 
             # As above, extra_col_names is just strings but extra_col_names
             # is a list of integers.

@@ -40,12 +40,9 @@ def test_naive_bayes_match(shape, x, y):
         mid_lon, mid_lat = 0.5 * (extent[0] + extent[1]), 0.5 * (extent[2] + extent[3])
         forced_extent = np.array([radius * np.cos(t) + mid_lon, radius * np.sin(t) + mid_lat]).T
 
-    a_cat, b_cat = 'a_cat', 'b_cat'
-
-    generate_random_data(n_a, n_b, n_c, extent + np.array([1.1*r/3600, -1.1*r/3600, 1.1*r/3600, -1.1*r/3600]),
-                         n_a_filts, n_b_filts, a_astro_sig, b_astro_sig, a_cat, b_cat, shape=shape, seed=9999)
-    a_astro = np.load(f"{a_cat}/con_cat_astro.npy")
-    a_mp = np.load(f"{a_cat}/test_match_indices.npy")
+    a_astro, b_astro, a_photo, b_photo, amagref, bmagref, a_mp, b_mp = generate_random_data(
+        n_a, n_b, n_c, extent + np.array([1.1*r/3600, -1.1*r/3600, 1.1*r/3600, -1.1*r/3600]),
+        n_a_filts, n_b_filts, a_astro_sig, b_astro_sig, shape=shape, seed=9999)
     lonely_counter = 0
     for i in range(len(a_astro)):
         if i not in a_mp:
@@ -65,8 +62,6 @@ def test_naive_bayes_match(shape, x, y):
                 if lonely_counter == len(t)-1:
                     break
             lonely_counter += 1
-    b_astro = np.load(f"{b_cat}/con_cat_astro.npy")
-    b_mp = np.load(f"{b_cat}/test_match_indices.npy")
     lonely_counter = 0
     for i in range(len(b_astro)):
         if i not in b_mp:
@@ -86,14 +81,18 @@ def test_naive_bayes_match(shape, x, y):
                 if lonely_counter == len(t)-1:
                     break
             lonely_counter += 1
-    np.save(f"{a_cat}/con_cat_astro.npy", a_astro)
-    np.save(f"{b_cat}/con_cat_astro.npy", b_astro)
+
+    a_cat = np.hstack((a_astro, a_photo, np.zeros((len(a_astro), 1), bool), amagref.reshape(-1, 1)))
+    b_cat = np.hstack((b_astro, b_photo, np.zeros((len(b_astro), 1), bool), bmagref.reshape(-1, 1)))
+    os.makedirs('gaia_folder_9', exist_ok=True)
+    with open('gaia_folder_9/gaia.csv', "w", encoding='utf-8') as f:
+        np.savetxt(f, a_cat, delimiter=",")
+    os.makedirs('wise_folder_9', exist_ok=True)
+    with open('wise_folder_9/wise.csv', "w", encoding='utf-8') as f:
+        np.savetxt(f, b_cat, delimiter=",")
 
     if shape == 'circle':
         n_a, n_b, n_c = len(a_astro), len(b_astro), len(a_mp)
-
-    # Ensure output chunk directory exists
-    os.makedirs(os.path.join(os.path.dirname(__file__), "data/chunk0"), exist_ok=True)
 
     with open(os.path.join(os.path.dirname(__file__), 'data/crossmatch_params.yaml'),
               encoding='utf-8') as cm_p:
@@ -125,8 +124,6 @@ def test_naive_bayes_match(shape, x, y):
                               f'auf_region_points: {new_region_points}')
     cb_p_ = cb_p_text.replace('auf_region_points: [131, 134, 4, -1, 1, 4]',
                               f'auf_region_points: {new_region_points}')
-    ca_p_ = ca_p_.replace(r'cat_folder_path: gaia_folder_{}', 'cat_folder_path: a_cat')
-    cb_p_ = cb_p_.replace(r'cat_folder_path: wise_folder_{}', 'cat_folder_path: b_cat')
 
     os.makedirs('new_test_path_9', exist_ok=True)
     cm = CrossMatch(mock_filename(cm_p_.encode("utf-8")), mock_filename(ca_p_.encode("utf-8")),
@@ -138,14 +135,11 @@ def test_naive_bayes_match(shape, x, y):
     assert len(ac) == n_c
     assert len(bc) == n_c
 
-    a_right_inds = np.load(f'{a_cat}/test_match_indices.npy')
-    b_right_inds = np.load(f'{b_cat}/test_match_indices.npy')
-
     for i in range(0, n_c):
-        assert a_right_inds[i] in ac
-        assert b_right_inds[i] in bc
-        q = np.where(a_right_inds[i] == ac)[0][0]
-        assert np.all([a_right_inds[i], b_right_inds[i]] == [ac[q], bc[q]])
+        assert a_mp[i] in ac
+        assert b_mp[i] in bc
+        q = np.where(a_mp[i] == ac)[0][0]
+        assert np.all([a_mp[i], b_mp[i]] == [ac[q], bc[q]])
 
     if shape == 'circle' and x == 131:
         ac = np.load(f'{cm.joint_folder_path}/ac_without_photometry.npy')
@@ -153,9 +147,11 @@ def test_naive_bayes_match(shape, x, y):
         assert len(ac) == n_c
         assert len(bc) == n_c
         for i in range(0, n_c):
-            assert a_right_inds[i] in ac
-            assert b_right_inds[i] in bc
-            q = np.where(a_right_inds[i] == ac)[0][0]
-            assert np.all([a_right_inds[i], b_right_inds[i]] == [ac[q], bc[q]])
+            assert a_mp[i] in ac
+            assert b_mp[i] in bc
+            q = np.where(a_mp[i] == ac)[0][0]
+            assert np.all([a_mp[i], b_mp[i]] == [ac[q], bc[q]])
 
-    os.system('rm -r new_test_path')
+    os.system('rm -r new_test_path_9')
+    os.system('rm -r gaia_folder_9')
+    os.system('rm -r wise_folder_9')

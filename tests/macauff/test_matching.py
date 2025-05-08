@@ -21,32 +21,6 @@ from macauff.misc_functions import convex_hull_area
 from macauff.perturbation_auf import make_tri_counts
 
 
-def _replace_line(file_name, line_num, text, out_file=None):
-    '''
-    Helper function to update the metadata file on-the-fly, allowing for
-    "run" flags to be set from run to no run once they have finished.
-
-    Parameters
-    ----------
-    file_name : string
-        Name of the file to read in and change lines of.
-    line_num : integer
-        Line number of line to edit in ``file_name``.
-    text : string
-        New line to replace original line in ``file_name`` with.
-    out_file : string, optional
-        Name of the file to save new, edited version of ``file_name`` to.
-        If ``None`` then ``file_name`` is overwritten.
-    '''
-    if out_file is None:
-        out_file = file_name
-    with open(file_name, 'r', encoding='utf-8') as file:
-        lines = file.readlines()
-    lines[line_num] = text
-    with open(out_file, 'w', encoding='utf-8') as out:
-        out.writelines(lines)
-
-
 class TestInputs:
     def setup_class(self):
         self.chunk_id = 9
@@ -59,25 +33,19 @@ class TestInputs:
             cat_a_config = yaml.safe_load(f)
         with open(os.path.join(os.path.dirname(__file__), 'data/cat_b_params.yaml'), encoding='utf-8') as f:
             cat_b_config = yaml.safe_load(f)
-        self.a_cat_folder_path = os.path.abspath(cat_a_config['cat_folder_path'].format(self.chunk_id))
-        self.b_cat_folder_path = os.path.abspath(cat_b_config['cat_folder_path'].format(self.chunk_id))
+        self.a_cat_csv_file_path = os.path.abspath(cat_a_config['cat_csv_file_path'].format(self.chunk_id))
+        self.b_cat_csv_file_path = os.path.abspath(cat_b_config['cat_csv_file_path'].format(self.chunk_id))
 
         os.makedirs(joint_config['joint_folder_path'].format(self.chunk_id), exist_ok=True)
-        os.makedirs(self.a_cat_folder_path, exist_ok=True)
-        os.makedirs(self.b_cat_folder_path, exist_ok=True)
+        os.makedirs(os.path.splitext(self.a_cat_csv_file_path)[0], exist_ok=True)
+        os.makedirs(os.path.splitext(self.b_cat_csv_file_path)[0], exist_ok=True)
 
-        np.save(f'{self.a_cat_folder_path}/con_cat_astro.npy', np.zeros((2, 3), float))
-        np.save(f'{self.a_cat_folder_path}/con_cat_photo.npy', np.zeros((2, 3), float))
-        np.save(f'{self.a_cat_folder_path}/magref.npy', np.zeros(2, float))
-
-        np.save(f'{self.b_cat_folder_path}/con_cat_astro.npy', np.zeros((2, 3), float))
-        np.save(f'{self.b_cat_folder_path}/con_cat_photo.npy', np.zeros((2, 4), float))
-        np.save(f'{self.b_cat_folder_path}/magref.npy', np.zeros(2, float))
-
-        rng = np.random.default_rng(seed=9)
-        np.save(f'{self.a_cat_folder_path}/in_chunk_overlap.npy', rng.choice(3, 2).astype(bool))
-        np.save(f'{self.b_cat_folder_path}/in_chunk_overlap.npy', rng.choice(4, 2).astype(bool))
-
+        self.a_cat = '0, 0, 0, 0, 0, 0, 0, 1\n0, 0, 0, 0, 0, 0, 0, 2'
+        self.b_cat = '0, 0, 0, 0, 0, 0, 0, 0, 0\n0, 0, 0, 0, 0, 0, 0, 0, 3'
+        with open(self.a_cat_csv_file_path, "w", encoding='utf-8') as f:
+            f.write(self.a_cat)
+        with open(self.b_cat_csv_file_path, "w", encoding='utf-8') as f:
+            f.write(self.b_cat)
         os.makedirs('data', exist_ok=True)
         os.makedirs('a_snr_mag_9', exist_ok=True)
         os.makedirs('b_snr_mag_9', exist_ok=True)
@@ -331,11 +299,10 @@ class TestInputs:
         for file, match_text in zip([np.ones((5, 10), float), np.ones((3, 4), float)],
                                     ['The number of filter-elements in dens_hist_tri and tri_model_mags',
                                      'The number of magnitude-elements in dens_hist_tri and tri_model_mags']):
-            np.save(os.path.join(os.path.dirname(__file__), 'data/tri_model_mags.npy'), file)
+            np.save('tri_model_mags.npy', file)
             lines = ca_p_2.split('\n')
             ind = np.where(['tri_model_mags_location' in x for x in lines])[0][0]
-            location = os.path.join(os.path.dirname(__file__), 'data/tri_model_mags.npy')
-            ca_p_2 = ca_p_2.replace(lines[ind], f'tri_model_mags_location: {location}')
+            ca_p_2 = ca_p_2.replace(lines[ind], 'tri_model_mags_location: tri_model_mags.npy')
             with pytest.raises(ValueError, match=match_text):
                 cm = CrossMatch(mock_filename(cm_p_.encode("utf-8")),
                                 mock_filename(ca_p_2.encode("utf-8")),
@@ -501,6 +468,8 @@ class TestInputs:
                 np.save('a_snr_mag_9/snr_mag_params.npy', np.ones((2, 1, 5), float))
             _cap = ca_p_.replace(old_line, new_line) if '_a_' in in_file else ca_p_
             _cbp = cb_p_.replace(old_line, new_line) if '_b_' in in_file else cb_p_
+            if 'gal_al_avs' in match_text:
+                _cap = _cap.replace('mag_indices: [3, 4, 5]', 'mag_indices: [3, 4]')
             with pytest.raises(ValueError, match=match_text):
                 cm = CrossMatch(mock_filename(cm_p_.encode("utf-8")),
                                 mock_filename(_cap.encode("utf-8")),
@@ -844,63 +813,44 @@ class TestInputs:
         assert np.all(cm.rho == np.linspace(0, 100, 10000))
         assert_allclose(cm.drho, np.ones(9999, float) * 100/9999)
 
-    def test_cat_folder_path(self):
+    def test_cat_csv_file_path(self):
         cm = CrossMatch(mock_filename(self.cm_p_text.encode("utf-8")),
                         mock_filename(self.ca_p_text.encode("utf-8")),
                         mock_filename(self.cb_p_text.encode("utf-8")))
         cm._load_metadata_config(self.chunk_id)
-        assert os.path.exists(self.a_cat_folder_path)
-        assert os.path.exists(self.b_cat_folder_path)
-        assert cm.a_cat_folder_path == self.a_cat_folder_path
-        assert np.all(np.load(f'{self.a_cat_folder_path}/con_cat_astro.npy').shape == (2, 3))
-        assert np.all(np.load(f'{self.b_cat_folder_path}/con_cat_photo.npy').shape == (2, 4))
-        assert np.all(np.load(f'{self.a_cat_folder_path}/magref.npy').shape == (2,))
+        assert os.path.exists(os.path.splitext(self.a_cat_csv_file_path)[0])
+        assert os.path.exists(os.path.splitext(self.b_cat_csv_file_path)[0])
+        assert os.path.isfile(self.a_cat_csv_file_path)
+        assert os.path.isfile(self.b_cat_csv_file_path)
+        assert cm.a_cat_csv_file_path == self.a_cat_csv_file_path
+        f = pd.read_csv(self.a_cat_csv_file_path, header=None)
+        assert np.all(f.shape == (2, 8))
+        assert np.all(f.values[:, :-1] == 0)
+        assert np.all(f.values[:, -1] == [1, 2])
+        f = pd.read_csv(self.b_cat_csv_file_path, header=None)
+        assert np.all(f.shape == (2, 9))
+        assert np.all(f.values[:, :-1] == 0)
+        assert np.all(f.values[:, -1] == [0, 3])
 
-        os.system(f'rm -rf {self.a_cat_folder_path}')
-        with pytest.raises(OSError, match="a_cat_folder_path does not exist."):
+        os.system(f'rm -rf {self.a_cat_csv_file_path}')
+        with pytest.raises(OSError, match="a_cat_csv_file_path does not exist."):
             cm = CrossMatch(mock_filename(self.cm_p_text.encode("utf-8")),
                             mock_filename(self.ca_p_text.encode("utf-8")),
                             mock_filename(self.cb_p_text.encode("utf-8")))
             cm._load_metadata_config(self.chunk_id)
         self.setup_class()
 
-        os.system(f'rm -rf {self.b_cat_folder_path}')
-        with pytest.raises(OSError, match="b_cat_folder_path does not exist."):
+        os.system(f'rm -rf {self.b_cat_csv_file_path}')
+        with pytest.raises(OSError, match="b_cat_csv_file_path does not exist."):
             cm = CrossMatch(mock_filename(self.cm_p_text.encode("utf-8")),
                             mock_filename(self.ca_p_text.encode("utf-8")),
                             mock_filename(self.cb_p_text.encode("utf-8")))
             cm._load_metadata_config(self.chunk_id)
         self.setup_class()
 
-        for catpath, file in zip([self.a_cat_folder_path, self.b_cat_folder_path],
-                                 ['con_cat_astro', 'magref']):
-            os.system(f'rm {catpath}/{file}.npy')
-            with pytest.raises(FileNotFoundError,
-                               match=f'{file} file not found in catalogue '):
-                cm = CrossMatch(mock_filename(self.cm_p_text.encode("utf-8")),
-                                mock_filename(self.ca_p_text.encode("utf-8")),
-                                mock_filename(self.cb_p_text.encode("utf-8")))
-                cm._load_metadata_config(self.chunk_id)
-                cm._initialise_chunk()
-            self.setup_class()
-
-        for name, data, match in zip(['con_cat_astro', 'con_cat_photo', 'con_cat_astro',
-                                      'con_cat_photo', 'magref', 'con_cat_astro', 'con_cat_photo',
-                                      'magref'],
-                                     [np.zeros((2, 2), float), np.zeros((2, 5), float),
-                                      np.zeros((2, 3, 4), float), np.zeros(2, float),
-                                      np.zeros((2, 2), float), np.zeros((1, 3), float),
-                                      np.zeros((3, 4), float), np.zeros(3, float)],
-                                     ["Second dimension of con_cat_astro",
-                                      "Second dimension of con_cat_photo in",
-                                      "Incorrect number of dimensions",
-                                      "Incorrect number of dimensions",
-                                      "Incorrect number of dimensions",
-                                      'Consolidated catalogue arrays for catalogue "b"',
-                                      'Consolidated catalogue arrays for catalogue "b"',
-                                      'Consolidated catalogue arrays for catalogue "b"']):
-            np.save(f'{self.b_cat_folder_path}/{name}.npy', data)
-            with pytest.raises(ValueError, match=match):
+        for catpath, f in zip([self.a_cat_csv_file_path, self.b_cat_csv_file_path], ['a', 'b']):
+            os.system(f'rm {catpath}')
+            with pytest.raises(OSError, match=f'{f}_cat_csv_file_path does not exist. '):
                 cm = CrossMatch(mock_filename(self.cm_p_text.encode("utf-8")),
                                 mock_filename(self.ca_p_text.encode("utf-8")),
                                 mock_filename(self.cb_p_text.encode("utf-8")))
@@ -1081,12 +1031,8 @@ class TestInputs:
 
         old_line = 'snr_mag_params_file_path: a_snr_mag_{}/snr_mag_params.npy'
         lines = ['snr_mag_params_file_path: a_snr_mag_{}/snr_mag_params.npy\n',
-                 '\ninput_csv_file_path: input_csv_folder/catalogue.csv',
-                 '\ncat_col_names: [A, B, C]', '\ncat_col_nums: [1, 2, 3]',
-                 '\ncsv_has_header: False', '\nextra_col_names: None']
-        for i, key in enumerate(['input_csv_file_path', 'cat_col_names',
-                                 'cat_col_nums', 'csv_has_header',
-                                 'extra_col_names', 'extra_col_nums']):
+                 '\ncat_col_names: [A, B, C]', '\ncat_col_nums: [1, 2, 3]', '\nextra_col_names: None']
+        for i, key in enumerate(['cat_col_names', 'cat_col_nums', 'extra_col_names', 'extra_col_nums']):
             new_line = ''
             for j in range(i+1):
                 new_line = new_line + lines[j]
@@ -1104,19 +1050,6 @@ class TestInputs:
         ca_p_ = self.ca_p_text.replace(old_line, new_line)
         cb_p_ = self.cb_p_text.replace(old_line.replace('a_snr_mag', 'b_snr_mag'), new_line)
 
-        # This will fail without input_csv_file_path's folder:
-        if os.path.isfile('input_csv_folder/catalogue.csv'):
-            os.remove('input_csv_folder/catalogue.csv')
-        if os.path.exists('input_csv_folder'):
-            os.rmdir('input_csv_folder')
-        with pytest.raises(OSError, match='input_csv_file_path from catalogue "a" does '):
-            cm = CrossMatch(mock_filename(cm_p_.encode("utf-8")),
-                            mock_filename(ca_p_.encode("utf-8")),
-                            mock_filename(cb_p_.encode("utf-8")))
-            cm._load_metadata_config(self.chunk_id)
-        os.makedirs('input_csv_folder', exist_ok=True)
-        os.system('touch input_csv_folder/catalogue.csv')
-
         # At this point we should successfully load the csv-related parameters.
         cm = CrossMatch(mock_filename(cm_p_.encode("utf-8")),
                         mock_filename(ca_p_.encode("utf-8")),
@@ -1126,7 +1059,6 @@ class TestInputs:
         assert cm.match_out_csv_name == 'match.csv'
         assert cm.b_nonmatch_out_csv_name == 'WISE_nonmatch.csv'
 
-        assert cm.b_input_csv_file_path == os.path.abspath('input_csv_folder/catalogue.csv')
         assert np.all(cm.a_cat_col_names == np.array(['Gaia_A', 'Gaia_B', 'Gaia_C']))
         assert np.all(cm.b_cat_col_nums == np.array([1, 2, 3]))
         assert cm.a_csv_has_header is False
@@ -1195,6 +1127,7 @@ class TestInputs:
             x = self.ca_p_text if cat_n == 'a' else self.cb_p_text
             x = x.replace('correct_astrometry: False', 'correct_astrometry: True')
             x = x.replace('compute_snr_mag_relation: False', 'compute_snr_mag_relation: True')
+            x = x.replace('pos_and_err_indices: [0, 1, 2]', 'pos_and_err_indices: [0, 1, 2, 0, 1, 2]')
             b, c = (x, self.cb_p_text) if cat_n == 'a' else (self.ca_p_text, x)
             with pytest.raises(ValueError, match=f"Ambiguity in catalogue '{cat_n}' hav"):
                 cm = CrossMatch(mock_filename(self.cm_p_text.encode("utf-8")),
@@ -1249,24 +1182,21 @@ class TestInputs:
                               '\ndens_hist_tri_location: None\ntri_model_mags_location: None\n'
                               'tri_model_mag_mids_location: None\ntri_model_mags_interval_location: None\n'
                               'tri_dens_uncert_location: None\ntri_n_bright_sources_star_location: None')
+        ca_p_ = ca_p_.replace('pos_and_err_indices: [0, 1, 2]', 'pos_and_err_indices: [0, 1, 2, 0, 1, 2]')
 
         # Test all of the inputs being needed one by one loading into cat_a_params:
         dd_l_path = os.path.join(os.path.dirname(__file__), 'data')
         lines = [f'correct_astrometry: True\n\ndd_params_path: {dd_l_path}\nl_cut_path: {dd_l_path}',
-                 '\ncorrect_astro_save_folder: ac_folder', '\ncsv_cat_file_string: file_{}.csv',
-                 '\npos_and_err_indices: [0, 1, 2, 0, 1, 2]', '\nmag_indices: [3, 5, 7]',
-                 '\nmag_unc_indices: [4, 6, 8]', '\nbest_mag_index: 0', '\nnn_radius: 30',
-                 '\nref_csv_cat_file_string: ref_{}.csv',
+                 '\ncorrect_astro_save_folder: ac_folder', '\nmag_unc_indices: [4, 6, 8]',
+                 '\ncorrect_astro_mag_indices_index: 0', '\nnn_radius: 30',
+                 '\nref_cat_csv_file_path: ref_{}.csv',
                  '\ncorrect_mag_array: [14.07, 14.17, 14.27, 14.37, 14.47]',
                  '\ncorrect_mag_slice: [0.05, 0.05, 0.05, 0.05, 0.05]',
-                 '\ncorrect_sig_slice: [0.1, 0.1, 0.1, 0.1, 0.1]', '\nchunk_overlap_col: None',
-                 '\nbest_mag_index_col: 8', '\nuse_photometric_uncertainties: False',
+                 '\ncorrect_sig_slice: [0.1, 0.1, 0.1, 0.1, 0.1]', '\nuse_photometric_uncertainties: False',
                  '\nmn_fit_type: quadratic', '\nseeing_ranges: [0.9, 1.1]']
-        for i, key in enumerate(['correct_astro_save_folder', 'csv_cat_file_string',
-                                 'pos_and_err_indices', 'mag_indices', 'mag_unc_indices',
-                                 'best_mag_index', 'nn_radius', 'ref_csv_cat_file_string',
+        for i, key in enumerate(['correct_astro_save_folder', 'mag_unc_indices',
+                                 'correct_astro_mag_indices_index', 'nn_radius', 'ref_cat_csv_file_path',
                                  'correct_mag_array', 'correct_mag_slice', 'correct_sig_slice',
-                                 'chunk_overlap_col', 'best_mag_index_col',
                                  'use_photometric_uncertainties', 'mn_fit_type', 'seeing_ranges']):
             new_line = ''
             for j in range(i+1):
@@ -1309,10 +1239,12 @@ class TestInputs:
             cm._load_metadata_config(self.chunk_id)
         # Set up a completely valid test of cat_a_params and cat_b_params
         cb_p_2 = cb_p_.replace('correct_astrometry: False', new_line)
-        cb_p_2 = cb_p_2.replace('mag_indices: [3, 5, 7]', 'mag_indices: [3, 5, 7, 9]')
         cb_p_2 = cb_p_2.replace('mag_unc_indices: [4, 6, 8]', 'mag_unc_indices: [4, 6, 8, 10]')
-        cb_p_2 = cb_p_2.replace('best_mag_index_col: 8', 'best_mag_index_col: 11')
-        cb_p_2 = cb_p_2.replace('chunk_overlap_col: None', 'chunk_overlap_col: 12')
+        cb_p_2 = cb_p_2.replace('pos_and_err_indices: [0, 1, 2]', 'pos_and_err_indices: [0, 1, 2, 0, 1, 2]')
+        cb_p_2 = cb_p_2.replace(r'cat_csv_file_path: wise_folder_{}/wise.csv',
+                                r'cat_csv_file_path: file_{}.csv')
+        cb_p_2 = cb_p_2.replace('[3, 4, 5, 6]', '[3, 5, 7, 9]')
+        cb_p_2 = cb_p_2.replace('chunk_overlap_col: 7', 'chunk_overlap_col: 12')
         # Fake some TRILEGAL downloads with random data.
         os.makedirs('wise_auf_folder_9/131.0/-1.0', exist_ok=True)
         text = ('#area = 4.0 sq deg\n#Av at infinity = 1\n' +
@@ -1390,11 +1322,11 @@ class TestInputs:
         cm.chunk_id = self.chunk_id
         cm._initialise_chunk()
         # pylint: disable=no-member
-        assert cm.b_best_mag_index == 0
+        assert cm.b_correct_astro_mag_indices_index == 0
         assert_allclose(cm.b_nn_radius, 30)
         assert cm.b_correct_astro_save_folder == os.path.abspath('ac_folder')
-        assert cm.b_csv_cat_file_string == os.path.abspath('file_9.csv')
-        assert cm.b_ref_csv_cat_file_string == os.path.abspath('ref_9.csv')
+        assert cm.b_cat_csv_file_path == os.path.abspath('file_9.csv')
+        assert cm.b_ref_cat_csv_file_path == os.path.abspath('ref_9.csv')
         assert_allclose(cm.b_correct_mag_array, np.array([14.07, 14.17, 14.27, 14.37, 14.47]))
         assert_allclose(cm.b_correct_mag_slice, np.array([0.05, 0.05, 0.05, 0.05, 0.05]))
         assert_allclose(cm.b_correct_sig_slice, np.array([0.1, 0.1, 0.1, 0.1, 0.1]))
@@ -1405,8 +1337,7 @@ class TestInputs:
         narray = np.load('ac_folder/npy/n_sigs_array.npy')
         assert_allclose([marray[0], narray[0]], [2, 0], rtol=0.1, atol=0.01)
         # pylint: enable=no-member
-
-        assert np.all(np.load('wise_folder_9/in_chunk_overlap.npy') == y[:, 12].astype(int))
+        assert np.all(cm.b_in_overlaps == y[:, 12].astype(int))
 
         cb_p_2 = cb_p_2.replace('chunk_overlap_col: 12', 'chunk_overlap_col: None')
 
@@ -1415,6 +1346,8 @@ class TestInputs:
         # Swapped a+b to test a_* versions of things
         cm_p_2 = cm_p_.replace('  - 9', '  - 100')
         ca_p_3 = self.ca_p_text.replace('  - 9', '  - 100')
+        ca_p_3 = ca_p_3.replace(r'cat_csv_file_path: gaia_folder_{}/gaia.csv',
+                                r'cat_csv_file_path: file_{}.csv')
         cb_p_3 = cb_p_2.replace('  - 9', '  - 100')
         os.system('cp -r test_path_9 test_path_100')
         os.system('cp -r gaia_folder_9 gaia_folder_100')
@@ -1425,17 +1358,17 @@ class TestInputs:
         cm = CrossMatch(mock_filename(cm_p_2.encode("utf-8")),
                         mock_filename(cb_p_3.encode("utf-8")),
                         mock_filename(ca_p_3.encode("utf-8")))
-        cm._load_metadata_config(100)
-        cm.chunk_id = 100
         os.system('cp ref_9.csv ref_100.csv')
         os.system('cp file_9.csv file_100.csv')
+        cm._load_metadata_config(100)
+        cm.chunk_id = 100
         cm._initialise_chunk()
         # pylint: disable=no-member
-        assert cm.a_best_mag_index == 0
+        assert cm.a_correct_astro_mag_indices_index == 0
         assert_allclose(cm.a_nn_radius, 30)
         assert cm.a_correct_astro_save_folder == os.path.abspath('ac_folder')
-        assert cm.a_csv_cat_file_string == os.path.abspath('file_100.csv')
-        assert cm.a_ref_csv_cat_file_string == os.path.abspath('ref_100.csv')
+        assert cm.a_cat_csv_file_path == os.path.abspath('file_100.csv')
+        assert cm.a_ref_cat_csv_file_path == os.path.abspath('ref_100.csv')
         assert_allclose(cm.a_correct_mag_array, np.array([14.07, 14.17, 14.27, 14.37, 14.47]))
         assert_allclose(cm.a_correct_mag_slice, np.array([0.05, 0.05, 0.05, 0.05, 0.05]))
         assert_allclose(cm.a_correct_sig_slice, np.array([0.1, 0.1, 0.1, 0.1, 0.1]))
@@ -1447,17 +1380,26 @@ class TestInputs:
         assert_allclose([marray[0], narray[0]], [2, 0], rtol=0.1, atol=0.01)
         # pylint: enable=no-member
 
-        assert np.all(np.load('wise_folder_100/in_chunk_overlap.npy') == 0)
+        assert np.all(cm.a_in_overlaps == 0)
 
         # Set up a completely valid test of cat_a_params and cat_b_params
         # for compute_snr_mag_relation.
         new_line = (r'compute_snr_mag_relation: True' + '\ncorrect_astro_save_folder: ac_folder\n'
-                    r'csv_cat_file_string: file_{}.csv''\npos_and_err_indices: [0, 1, 2]\n'
-                    'mag_indices: [3, 5, 7]\nmag_unc_indices: [4, 6, 8]')
+                    '\nmag_unc_indices: [4, 6, 8, 10]')
+
         ca_p_ = self.ca_p_text.replace('compute_snr_mag_relation: False', new_line)
+        ca_p_ = ca_p_.replace('chunk_overlap_col: 6', 'chunk_overlap_col: 12')
+        ca_p_ = ca_p_.replace('best_mag_index_col: 7', 'best_mag_index_col: 11')
+        ca_p_ = ca_p_.replace(r'cat_csv_file_path: gaia_folder_{}/gaia.csv',
+                              r'cat_csv_file_path: file_{}.csv')
+        ca_p_ = ca_p_.replace('mag_indices: [3, 4, 5]', 'mag_indices: [3, 5, 7]')
+        ca_p_ = ca_p_.replace('mag_unc_indices: [4, 6, 8, 10]', 'mag_unc_indices: [4, 6, 8]')
+
         cb_p_ = self.cb_p_text.replace('compute_snr_mag_relation: False', new_line)
-        cb_p_ = cb_p_.replace('[3, 5, 7]', '[3, 5, 7, 9]')
-        cb_p_ = cb_p_.replace('[4, 6, 8]', '[4, 6, 8, 10]')
+        cb_p_ = cb_p_.replace('mag_indices: [3, 4, 5, 6]', 'mag_indices: [3, 5, 7, 9]')
+        cb_p_ = cb_p_.replace(r'cat_csv_file_path: wise_folder_{}/wise.csv',
+                              r'cat_csv_file_path: file_{}.csv')
+        cb_p_ = cb_p_.replace('chunk_overlap_col: 7', 'chunk_overlap_col: 12')
         if os.path.isfile('ac_folder/npy/snr_mag_params.npy'):
             os.remove('ac_folder/npy/snr_mag_params.npy')
         cm = CrossMatch(mock_filename(cm_p_.encode("utf-8")),
@@ -1470,7 +1412,7 @@ class TestInputs:
         assert cm.b_compute_snr_mag_relation is True
         assert not hasattr(cm, 'b_correct_mag_slice')
         assert cm.b_correct_astro_save_folder == os.path.abspath('ac_folder')
-        assert cm.b_csv_cat_file_string == os.path.abspath('file_9.csv')
+        assert cm.b_cat_csv_file_path == os.path.abspath('file_9.csv')
         assert np.all(cm.b_pos_and_err_indices == np.array([[0, 1, 2], [0, 1, 2]]))
         assert np.all(cm.b_mag_indices == np.array([3, 5, 7, 9]))
         assert np.all(cm.b_mag_unc_indices == np.array([4, 6, 8, 10]))
@@ -1486,9 +1428,9 @@ class TestInputs:
         cm.chunk_id = self.chunk_id
         cm._initialise_chunk()
         assert cm.a_compute_snr_mag_relation is True
-        assert not hasattr(cm, 'a_best_mag_index')
+        assert not hasattr(cm, 'a_correct_astro_mag_indices_index')
         assert cm.a_correct_astro_save_folder == os.path.abspath('ac_folder')
-        assert cm.a_csv_cat_file_string == os.path.abspath('file_9.csv')
+        assert cm.a_cat_csv_file_path == os.path.abspath('file_9.csv')
         assert np.all(cm.a_pos_and_err_indices == np.array([[0, 1, 2], [0, 1, 2]]))
         assert np.all(cm.a_mag_indices == np.array([3, 5, 7]))
         assert np.all(cm.a_mag_unc_indices == np.array([4, 6, 8]))
@@ -1534,11 +1476,11 @@ class TestInputs:
         cm._load_metadata_config(self.chunk_id)
         cm.chunk_id = self.chunk_id
         cm._initialise_chunk()
-        assert cm.a_best_mag_index == 0
+        assert cm.a_correct_astro_mag_indices_index == 0
         assert_allclose(cm.a_nn_radius, 30)
         assert cm.a_correct_astro_save_folder == os.path.abspath('ac_folder')
-        assert cm.a_csv_cat_file_string == os.path.abspath('file_9.csv')
-        assert cm.a_ref_csv_cat_file_string == os.path.abspath('ref_9.csv')
+        assert cm.a_cat_csv_file_path == os.path.abspath('file_9.csv')
+        assert cm.a_ref_cat_csv_file_path == os.path.abspath('ref_9.csv')
         assert_allclose(cm.a_correct_mag_array, np.array([14.07, 14.17, 14.27, 14.37, 14.47]))
         assert_allclose(cm.a_correct_mag_slice, np.array([0.05, 0.05, 0.05, 0.05, 0.05]))
         assert_allclose(cm.a_correct_sig_slice, np.array([0.1, 0.1, 0.1, 0.1, 0.1]))
@@ -1555,28 +1497,30 @@ class TestInputs:
 
         lines_a, lines_b = ca_p_2.split('\n'), cb_p_2.split('\n')
         for old_line, new_line, x, match_text in zip(
-                ['best_mag_index: ', 'best_mag_index: ', 'best_mag_index: ', 'nn_radius: ', 'nn_radius: ',
+                ['correct_astro_mag_indices_index: ', 'correct_astro_mag_indices_index: ',
+                 'correct_astro_mag_indices_index: ', 'nn_radius: ', 'nn_radius: ',
                  'correct_mag_array: ', 'correct_mag_slice: ', 'correct_mag_slice: ', 'correct_sig_slice: ',
                  'correct_sig_slice: ', 'pos_and_err_indices: ', 'pos_and_err_indices: ',
                  'pos_and_err_indices: ', 'mag_indices:', 'mag_indices:', 'mag_indices:', 'mag_unc_indices:',
                  'mag_unc_indices:', 'mag_unc_indices:', 'chunk_overlap_col: ', 'chunk_overlap_col: ',
                  'chunk_overlap_col: ', 'best_mag_index_col: ', 'best_mag_index_col: ', 'dd_params_path: ',
                  'l_cut_path: '],
-                ['best_mag_index: A', 'best_mag_index: 2.5', 'best_mag_index: 7',
-                 'nn_radius: A', 'nn_radius: [1, 2]', 'correct_mag_array: [1, 2, A, 4, 5]',
-                 'correct_mag_slice: [0.1, 0.1, 0.1, A, 0.1]', 'correct_mag_slice: [0.1, 0.1, 0.1]',
-                 'correct_sig_slice: [0.1, 0.1, 0.1, A, 0.1]', 'correct_sig_slice: [0.1, 0.1, 0.1]',
-                 'pos_and_err_indices: [1 2 3 4 5 A]', 'pos_and_err_indices: [1, 2, 3, 4, 5.5, 6]',
-                 'pos_and_err_indices: [1, 2, 3, 4, 5]', 'mag_indices: [A, 1, 2]', 'mag_indices: [1, 2]',
-                 'mag_indices: [1.2, 2, 3, 4]', 'mag_unc_indices: [A, 1, 2]', 'mag_unc_indices: [1, 2]',
-                 'mag_unc_indices: [1.2, 2, 3]', 'chunk_overlap_col: Non', 'chunk_overlap_col: A',
-                 'chunk_overlap_col: 1.2', 'best_mag_index_col: A', 'best_mag_index_col: 1.2',
-                 'dd_params_path: ./some_folder', 'l_cut_path: ./l_cut_dummy_folder'],
+                ['correct_astro_mag_indices_index: A', 'correct_astro_mag_indices_index: 2.5',
+                 'correct_astro_mag_indices_index: 7', 'nn_radius: A', 'nn_radius: [1, 2]',
+                 'correct_mag_array: [1, 2, A, 4, 5]', 'correct_mag_slice: [0.1, 0.1, 0.1, A, 0.1]',
+                 'correct_mag_slice: [0.1, 0.1, 0.1]', 'correct_sig_slice: [0.1, 0.1, 0.1, A, 0.1]',
+                 'correct_sig_slice: [0.1, 0.1, 0.1]', 'pos_and_err_indices: [1 2 3 4 5 A]',
+                 'pos_and_err_indices: [1, 2, 3, 4, 5.5, 6]', 'pos_and_err_indices: [1, 2, 3, 4, 5]',
+                 'mag_indices: [A, 1, 2]', 'mag_indices: [1, 2]', 'mag_indices: [1.2, 2, 3, 4]',
+                 'mag_unc_indices: [A, 1, 2]', 'mag_unc_indices: [1, 2]', 'mag_unc_indices: [1.2, 2, 3]',
+                 'chunk_overlap_col: Non', 'chunk_overlap_col: A', 'chunk_overlap_col: 1.2',
+                 'best_mag_index_col: A', 'best_mag_index_col: 1.2', 'dd_params_path: ./some_folder',
+                 'l_cut_path: ./l_cut_dummy_folder'],
                 ['a', 'b', 'a', 'b', 'a', 'a', 'b', 'a', 'b', 'a', 'b', 'a', 'a', 'a', 'b', 'b',
                  'b', 'a', 'a', 'a', 'b', 'a', 'a', 'b', 'b', 'a'],
-                ['best_mag_index should be an integer in the catalogue "a"',
-                 'best_mag_index should be an integer in the catalogue "b"',
-                 'best_mag_index cannot be a larger index than the list of filters '
+                ['correct_astro_mag_indices_index should be an integer in the catalogue "a"',
+                 'correct_astro_mag_indices_index should be an integer in the catalogue "b"',
+                 'correct_astro_mag_indices_index cannot be a larger index than the list of filters '
                  'in the catalogue "a', 'nn_radius must be a float in the catalogue "b"',
                  'nn_radius must be a float in the catalogue "a"',
                  'correct_mag_array should be a list of floats in the catalogue "a"',
@@ -1632,12 +1576,12 @@ class TestInputs:
 class TestPostProcess:
     def setup_method(self):
         self.joint_folder_path = os.path.abspath('joint')
-        self.a_cat_folder_path = os.path.abspath('a_cat')
-        self.b_cat_folder_path = os.path.abspath('b_cat')
+        self.a_cat_csv_file_path = os.path.abspath('a_input_csv_folder/gaia_catalogue.csv')
+        self.b_cat_csv_file_path = os.path.abspath('b_input_csv_folder/wise_catalogue.csv')
 
         os.makedirs(f'{self.joint_folder_path}', exist_ok=True)
-        os.makedirs(self.a_cat_folder_path, exist_ok=True)
-        os.makedirs(self.b_cat_folder_path, exist_ok=True)
+        os.makedirs(os.path.splitext(self.a_cat_csv_file_path)[0], exist_ok=True)
+        os.makedirs(os.path.splitext(self.b_cat_csv_file_path)[0], exist_ok=True)
 
         na, nb, nmatch = 10000, 7000, 4000
         self.na, self.nb, self.nmatch = na, nb, nmatch
@@ -1667,8 +1611,8 @@ class TestPostProcess:
         self.bf = np.delete(np.arange(nb), self.bc)
         self.cm.bf = self.bf
 
-        np.save(f'{self.a_cat_folder_path}/in_chunk_overlap.npy', rng.choice(2, size=na).astype(bool))
-        np.save(f'{self.b_cat_folder_path}/in_chunk_overlap.npy', rng.choice(2, size=nb).astype(bool))
+        self.cm.a_in_overlaps = rng.choice(2, size=na).astype(bool)
+        self.cm.b_in_overlaps = rng.choice(2, size=nb).astype(bool)
 
         rng = np.random.default_rng(seed=13256)
         self.cm.pc = rng.uniform(0, 1, size=self.nmatch)
@@ -1690,12 +1634,6 @@ class TestPostProcess:
         self.cm.reject_a = None
         self.cm.reject_b = None
 
-    def mock_filename(self, content: bytes) -> int:
-        r, w = os.pipe()
-        with open(w, "wb") as wf:
-            wf.write(content)
-        return r
-
     def make_temp_catalogue(self, nrow, ncol, nnans, designation):
         # Fake a ID/ra/dec/err/[mags xN]/bestflag/inchunk csv file.
         rng = np.random.default_rng(seed=657234234)
@@ -1715,8 +1653,8 @@ class TestPostProcess:
     @pytest.mark.parametrize("include_phot_like", [True, False])
     def test_postprocess(self, include_phot_like):
         self.cm.joint_folder_path = self.joint_folder_path
-        self.cm.a_cat_folder_path = self.a_cat_folder_path
-        self.cm.b_cat_folder_path = self.b_cat_folder_path
+        self.cm.a_cat_csv_file_path = self.a_cat_csv_file_path
+        self.cm.b_cat_csv_file_path = self.b_cat_csv_file_path
 
         self.cm.include_phot_like = include_phot_like
         if include_phot_like:
@@ -1747,8 +1685,8 @@ class TestPostProcess:
             exts = ['']
 
         for ext in exts:
-            aino = np.load(f'{self.a_cat_folder_path}/in_chunk_overlap.npy')
-            bino = np.load(f'{self.b_cat_folder_path}/in_chunk_overlap.npy')
+            aino = self.cm.a_in_overlaps
+            bino = self.cm.b_in_overlaps
             ac = np.load(f'{self.joint_folder_path}/ac{ext}.npy')
             af = np.load(f'{self.joint_folder_path}/af{ext}.npy')
             bc = np.load(f'{self.joint_folder_path}/bc{ext}.npy')
@@ -1776,8 +1714,8 @@ class TestPostProcess:
     # pylint: disable-next=too-many-statements,too-many-locals
     def test_postprocess_with_csv(self, include_phot_like):
         self.cm.joint_folder_path = self.joint_folder_path
-        self.cm.a_cat_folder_path = self.a_cat_folder_path
-        self.cm.b_cat_folder_path = self.b_cat_folder_path
+        self.cm.a_cat_csv_file_path = self.a_cat_csv_file_path
+        self.cm.b_cat_csv_file_path = self.b_cat_csv_file_path
 
         self.cm.include_phot_like = include_phot_like
         if include_phot_like:
@@ -1787,16 +1725,12 @@ class TestPostProcess:
         # Set a whole load of fake inputs
         self.cm.output_csv_folder = 'output_csv_folder'
         os.makedirs(self.cm.output_csv_folder, exist_ok=True)
-        self.cm.a_input_csv_file_path = 'a_input_csv_folder/gaia_catalogue.csv'
-        os.makedirs(os.path.splitext(self.cm.a_input_csv_file_path)[0], exist_ok=True)
         self.cm.a_csv_has_header = False
         acat, acatstring = self.make_temp_catalogue(self.na, 8, 100, 'Gaia ')
-        np.savetxt(self.cm.a_input_csv_file_path, acatstring, delimiter=',', fmt='%s', header='')
-        self.cm.b_input_csv_file_path = 'b_input_csv_folder/wise_catalogue.csv'
-        os.makedirs(os.path.splitext(self.cm.b_input_csv_file_path)[0], exist_ok=True)
+        np.savetxt(self.cm.a_cat_csv_file_path, acatstring, delimiter=',', fmt='%s', header='')
         self.cm.b_csv_has_header = True
         bcat, bcatstring = self.make_temp_catalogue(self.nb, 10, 500, 'J')
-        np.savetxt(self.cm.b_input_csv_file_path, bcatstring, delimiter=',', fmt='%s',
+        np.savetxt(self.cm.b_cat_csv_file_path, bcatstring, delimiter=',', fmt='%s',
                    header='ID, RA, Dec, Err, W1, W2, W3, W4, bestflag, inchunk')
         self.cm.match_out_csv_name = 'match.csv'
         self.cm.a_nonmatch_out_csv_name = 'gaia_nonmatch.csv'
@@ -1841,8 +1775,8 @@ class TestPostProcess:
             exts = ['']
 
         for ext in exts:
-            aino = np.load(f'{self.a_cat_folder_path}/in_chunk_overlap.npy')
-            bino = np.load(f'{self.b_cat_folder_path}/in_chunk_overlap.npy')
+            aino = self.cm.a_in_overlaps
+            bino = self.cm.b_in_overlaps
             ac = np.load(f'{self.joint_folder_path}/ac{ext}.npy')
             af = np.load(f'{self.joint_folder_path}/af{ext}.npy')
             bc = np.load(f'{self.joint_folder_path}/bc{ext}.npy')

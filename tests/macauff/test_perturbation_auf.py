@@ -615,10 +615,11 @@ class TestMakePerturbAUFs():
         # Force the 0.1-0.9 square with extra objects for the convex hull to pick up.
         x = np.concatenate(([0.3, 0.3, 0.1] * 101, [0.1, 0.1, 0.1], [0.1, 0.9, 0.1],
                             [0.9, 0.1, 0.1], [0.9, 0.9, 0.1])).reshape(-1, 3)
-        np.save(f'{self.cat_folder}/con_cat_astro.npy', x)
-        np.save(f'{self.cat_folder}/con_cat_photo.npy',
-                np.array([np.concatenate(([14.99], [100]*100, [10], [10], [10], [10]))]).T)
-        np.save(f'{self.cat_folder}/magref.npy', np.array([0] * 105))
+        y = np.array([np.concatenate(([14.99], [100]*100, [10], [10], [10], [10]))]).T
+        z = np.array([0] * 105)
+        a = np.hstack((x, y, np.zeros((len(x), 1), bool), z.reshape(-1, 1)))
+        with open('cat_folder_9/cat.csv', "w", encoding='utf-8') as f:
+            np.savetxt(f, a, delimiter=",")
 
         # Fake up a TRILEGAL simulation data file.
         text = ('#area = 140.0 sq deg\n#Av at infinity = 1\n'
@@ -654,7 +655,7 @@ class TestMakePerturbAUFs():
         # Catalogue bins for the source, only keeping the single
         # source currently under consideration, and ignoring the two extra objects
         # used to force the local density to be calculated properly.
-        a_photo = np.load(f'{self.cat_folder}/con_cat_photo.npy')[0, :]
+        a_photo = y[0, :]
         dmag = 0.25
         mag_min = dmag * np.floor(np.amin(a_photo[0])/dmag)
         mag_max = dmag * np.ceil(np.amax(a_photo[0])/dmag)
@@ -682,19 +683,19 @@ class TestMakePerturbAUFs():
         ca_p_ = ca_p_text.replace('\nfilt_names: [G_BP, G, G_RP]', '\nfilt_names: [G]')
         cb_p_ = cb_p_text.replace('\nfilt_names: [W1, W2, W3, W4]', '\nfilt_names: [W1]')
 
-        for ol, nl in zip(['psf_fwhms: [0.12, 0.12, 0.12]', r'cat_folder_path: gaia_folder_{}',
-                           r'auf_folder_path: gaia_auf_folder_{}', 'tri_filt_names: [G_BP, G, G_RP]',
-                           'gal_al_avs: [1.002, 0.789, 0.589]'],
-                          ['psf_fwhms: [0.12]', r'cat_folder_path: cat_folder_{}',
-                           r'auf_folder_path: auf_folder_{}', 'tri_filt_names: [W1]',
-                           'gal_al_avs: [0]']):
+        for ol, nl in zip(['psf_fwhms: [0.12, 0.12, 0.12]', r'auf_folder_path: gaia_auf_folder_{}',
+                           'tri_filt_names: [G_BP, G, G_RP]', 'gal_al_avs: [1.002, 0.789, 0.589]',
+                           'mag_indices: [3, 4, 5]', 'chunk_overlap_col: 6', 'best_mag_index_col: 7'],
+                          ['psf_fwhms: [0.12]', r'auf_folder_path: auf_folder_{}', 'tri_filt_names: [W1]',
+                           'gal_al_avs: [0]', 'mag_indices: [3]', 'chunk_overlap_col: 4',
+                           'best_mag_index_col: 5']):
             ca_p_ = ca_p_.replace(ol, nl)
-        for ol, nl in zip(['psf_fwhms: [6.08, 6.84, 7.36, 11.99]', r'cat_folder_path: wise_folder_{}',
-                           r'auf_folder_path: wise_auf_folder_{}', 'tri_filt_names: [W1, W2, W3, W4]',
-                           'gal_al_avs: [0.039, 0.026, 0.015, 0.005]'],
-                          ['psf_fwhms: [6.08]', 'cat_folder_path: cat_folder_{}',
-                           'auf_folder_path: auf_folder_{}', 'tri_filt_names: [W1]',
-                           'gal_al_avs: [0]']):
+        for ol, nl in zip(['psf_fwhms: [6.08, 6.84, 7.36, 11.99]', r'auf_folder_path: wise_auf_folder_{}',
+                           'tri_filt_names: [W1, W2, W3, W4]', 'gal_al_avs: [0.039, 0.026, 0.015, 0.005]',
+                           'mag_indices: [3, 4, 5, 6]', 'chunk_overlap_col: 7', 'best_mag_index_col: 8'],
+                          ['psf_fwhms: [6.08]', 'auf_folder_path: auf_folder_{}', 'tri_filt_names: [W1]',
+                           'gal_al_avs: [0]', 'mag_indices: [3]', 'chunk_overlap_col: 4',
+                           'best_mag_index_col: 5']):
             cb_p_ = cb_p_.replace(ol, nl)
 
         os.makedirs('a_snr_mag_9', exist_ok=True)
@@ -711,6 +712,10 @@ class TestMakePerturbAUFs():
                     'tri_n_bright_sources_star_location: None')
         ca_p_ = ca_p_.replace(old_line, new_line)
         cb_p_ = cb_p_.replace(old_line, new_line)
+        ca_p_ = ca_p_.replace(r'cat_csv_file_path: gaia_folder_{}/gaia.csv',
+                              r'cat_csv_file_path: cat_folder_{}/cat.csv')
+        cb_p_ = cb_p_.replace(r'cat_csv_file_path: wise_folder_{}/wise.csv',
+                              r'cat_csv_file_path: cat_folder_{}/cat.csv')
 
         cm = CrossMatch(mock_filename(cm_p_.encode("utf-8")), mock_filename(ca_p_.encode("utf-8")),
                         mock_filename(cb_p_.encode("utf-8")))
@@ -719,7 +724,7 @@ class TestMakePerturbAUFs():
 
         if precompute_tri_hists:
             for flag in ['a_', 'b_']:
-                _a_photo = np.load(f'{self.cat_folder}/con_cat_photo.npy')
+                _a_photo = y
                 hist, bins = np.histogram(_a_photo[~np.isnan(_a_photo)], bins='auto')
                 dens_mag = (bins[:-1]+np.diff(bins)/2)[np.argmax(hist)] - 0.5
                 dens, tri_mags, tri_mags_mids, dtri_mags, _, num_bright_obj = make_tri_counts(
@@ -805,12 +810,13 @@ class TestMakePerturbAUFs():
         # Force the 0.1-0.9 square with extra objects for the convex hull to pick up.
         x = np.concatenate(([0.3, 0.3, 0.1] * 101, [0.1, 0.1, 0.1], [0.1, 0.9, 0.1],
                             [0.9, 0.1, 0.1], [0.9, 0.9, 0.1])).reshape(-1, 3)
-        np.save(f'{self.cat_folder}/con_cat_astro.npy', x)
         rng = np.random.default_rng(seed=83458923)
         main_mags = rng.uniform(24.95, 25.05, size=100)
-        np.save(f'{self.cat_folder}/con_cat_photo.npy',
-                np.array([np.concatenate(([14.99], main_mags, [10], [10], [10], [10]))]).T)
-        np.save(f'{self.cat_folder}/magref.npy', np.array([0] * 105))
+        y = np.array([np.concatenate(([14.99], main_mags, [10], [10], [10], [10]))]).T
+        z = np.array([0] * 105)
+        a = np.hstack((x, y, np.zeros((len(x), 1), bool), z.reshape(-1, 1)))
+        with open('cat_folder_9/cat.csv', "w", encoding='utf-8') as f:
+            np.savetxt(f, a, delimiter=",")
 
         # Fake up a TRILEGAL simulation data file.
         text = ('#area = 140.0 sq deg\n#Av at infinity = 1\n'
@@ -843,7 +849,7 @@ class TestMakePerturbAUFs():
         ax1, ax2 = self.auf_points[0]
 
         # Catalogue bins for the source:
-        a_photo = np.load(f'{self.cat_folder}/con_cat_photo.npy')[0, :]
+        a_photo = y[0, :]
         dmag = 0.25
         mag_min = dmag * np.floor(np.amin(a_photo[0])/dmag)
         mag_max = dmag * np.ceil(np.amax(a_photo[0])/dmag)
@@ -871,19 +877,19 @@ class TestMakePerturbAUFs():
         cm_p_ = cm_p_text.replace('include_perturb_auf: False', 'include_perturb_auf: True')
         ca_p_ = ca_p_text.replace('\nfilt_names: [G_BP, G, G_RP]', '\nfilt_names: [G]')
         cb_p_ = cb_p_text.replace('\nfilt_names: [W1, W2, W3, W4]', '\nfilt_names: [W1]')
-        for ol, nl in zip(['psf_fwhms: [0.12, 0.12, 0.12]', r'cat_folder_path: gaia_folder_{}',
-                           r'auf_folder_path: gaia_auf_folder_{}', 'tri_filt_names: [G_BP, G, G_RP]',
-                           'gal_al_avs: [1.002, 0.789, 0.589]'],
-                          ['psf_fwhms: [0.12]', r'cat_folder_path: cat_folder_{}',
-                           r'auf_folder_path: auf_folder_{}', 'tri_filt_names: [W1]',
-                           'gal_al_avs: [0]']):
+        for ol, nl in zip(['psf_fwhms: [0.12, 0.12, 0.12]', r'auf_folder_path: gaia_auf_folder_{}',
+                           'tri_filt_names: [G_BP, G, G_RP]', 'gal_al_avs: [1.002, 0.789, 0.589]',
+                           'mag_indices: [3, 4, 5]', 'chunk_overlap_col: 6', 'best_mag_index_col: 7'],
+                          ['psf_fwhms: [0.12]', r'auf_folder_path: auf_folder_{}', 'tri_filt_names: [W1]',
+                           'gal_al_avs: [0]', 'mag_indices: [3]', 'chunk_overlap_col: 4',
+                           'best_mag_index_col: 5']):
             ca_p_ = ca_p_.replace(ol, nl)
-        for ol, nl in zip(['psf_fwhms: [6.08, 6.84, 7.36, 11.99]', r'cat_folder_path: wise_folder_{}',
-                           r'auf_folder_path: wise_auf_folder_{}', 'tri_filt_names: [W1, W2, W3, W4]',
-                           'gal_al_avs: [0.039, 0.026, 0.015, 0.005]'],
-                          ['psf_fwhms: [6.08]', 'cat_folder_path: cat_folder_{}',
-                           'auf_folder_path: auf_folder_{}', 'tri_filt_names: [W1]',
-                           'gal_al_avs: [0]']):
+        for ol, nl in zip(['psf_fwhms: [6.08, 6.84, 7.36, 11.99]', r'auf_folder_path: wise_auf_folder_{}',
+                           'tri_filt_names: [W1, W2, W3, W4]', 'gal_al_avs: [0.039, 0.026, 0.015, 0.005]',
+                           'mag_indices: [3, 4, 5, 6]', 'chunk_overlap_col: 7', 'best_mag_index_col: 8'],
+                          ['psf_fwhms: [6.08]', 'auf_folder_path: auf_folder_{}', 'tri_filt_names: [W1]',
+                           'gal_al_avs: [0]', 'mag_indices: [3]', 'chunk_overlap_col: 4',
+                           'best_mag_index_col: 5']):
             cb_p_ = cb_p_.replace(ol, nl)
 
         os.makedirs('a_snr_mag_9', exist_ok=True)
@@ -898,6 +904,10 @@ class TestMakePerturbAUFs():
                     'tri_n_bright_sources_star_location: None')
         ca_p_ = ca_p_.replace(old_line, new_line)
         cb_p_ = cb_p_.replace(old_line, new_line)
+        ca_p_ = ca_p_.replace(r'cat_csv_file_path: gaia_folder_{}/gaia.csv',
+                              r'cat_csv_file_path: cat_folder_{}/cat.csv')
+        cb_p_ = cb_p_.replace(r'cat_csv_file_path: wise_folder_{}/wise.csv',
+                              r'cat_csv_file_path: cat_folder_{}/cat.csv')
 
         cm = CrossMatch(mock_filename(cm_p_.encode("utf-8")), mock_filename(ca_p_.encode("utf-8")),
                         mock_filename(cb_p_.encode("utf-8")))

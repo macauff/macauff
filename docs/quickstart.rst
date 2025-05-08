@@ -45,7 +45,7 @@ These files contain all of the inputs to `~macauff.CrossMatch`, the main class f
 
 Quick, self-consistent examples of the three files are:
 
-crossmatch_params.txt::
+crossmatch_params.yaml::
 
     # High level match type
     include_perturb_auf: False
@@ -87,11 +87,11 @@ crossmatch_params.txt::
     n_pool: 2
 
 
-cat_a_params.txt::
+cat_a_params.yaml::
 
     # Catalogue name -- used both for folder creation and output file names
     cat_name: Gaia
-    cat_folder_path: test_macauff_outputs/name_of_a_folder_{}
+    cat_csv_file_path: test_macauff_outputs/name_of_a_folder_{}/catalogue_a.csv
     # Folder for all AUF-related files to be created in. Should be an absolute path, or relative to folder script called in.
     auf_folder_path: test_macauff_outputs/cat_a_auf_folder_{}
 
@@ -127,13 +127,13 @@ cat_a_params.txt::
     compute_snr_mag_relation: False
 
 
-cat_b_params.txt::
+cat_b_params.yaml::
 
     # Catalogue name -- used both for folder creation and output file names
     cat_name: Gaia
-    cat_folder_path: test_macauff_outputs/name_of_b_folder_{}
+    cat_csv_file_path: test_macauff_outputs/name_of_b_folder_{}
     # Folder for all AUF-related files to be created in. Should be an absolute path, or relative to folder script called in.
-    auf_folder_path: test_macauff_outputs/cat_b_auf_folder_{}
+    auf_folder_path: test_macauff_outputs/cat_b_auf_folder_{}/catalogue_b.csv
 
     # Filter names are also used in any output file created
     filt_names: [W1, W2]

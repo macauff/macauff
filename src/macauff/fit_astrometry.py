@@ -59,11 +59,12 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
                  gal_wav_micron, gal_ab_offset, gal_filtname, gal_alav, dm, dd_params, l_cut,
                  ax1_mids, ax2_mids, ax_dimension, mag_array, mag_slice, sig_slice, n_pool,
                  npy_or_csv, coord_or_chunk, pos_and_err_indices, mag_indices, mag_unc_indices,
-                 mag_names, best_mag_index, coord_system, saturation_magnitudes, pregenerate_cutouts, n_r,
-                 n_rho, max_rho, mn_fit_type, trifolder=None, triname=None, maglim_f=None, magnum=None,
-                 tri_num_faint=None, trifilterset=None, trifiltname=None, tri_hist=None, tri_mags=None,
-                 dtri_mags=None, tri_uncert=None, use_photometric_uncertainties=False, cutout_area=None,
-                 cutout_height=None, single_sided_auf=True, chunks=None, return_nm=False):
+                 mag_names, correct_astro_mag_indices_index, coord_system, saturation_magnitudes,
+                 pregenerate_cutouts, n_r, n_rho, max_rho, mn_fit_type, trifolder=None, triname=None,
+                 maglim_f=None, magnum=None, tri_num_faint=None, trifilterset=None, trifiltname=None,
+                 tri_hist=None, tri_mags=None, dtri_mags=None, tri_uncert=None,
+                 use_photometric_uncertainties=False, cutout_area=None, cutout_height=None,
+                 single_sided_auf=True, chunks=None, return_nm=False):
         """
         Initialisation of AstrometricCorrections, accepting inputs required for
         the running of the optimisation and parameterisation of astrometry of
@@ -152,10 +153,11 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
             latitudinal (Dec or b), and *singular*, circular astrometric
             precision array. Coordinates should be in degrees while precision
             should be in the same units as ``sig_slice`` and those of the
-            nearest-neighbour distances, likely arcseconds. For example,
-            ``[[0, 1, 2], [6, 3, 0]]`` where catalogue "a" has its coordinates
-            in the first three columns in RA/Dec/Err order, while catalogue "b"
-            has its coordinates in a more random order.
+            nearest-neighbour distances, likely arcseconds. Note that coordinates
+            are reversed between calogues: for example, ``[[6, 3, 0], [0, 1, 2]]``
+            is the case where catalogue "a" has its coordinates in the first
+            three columns in RA/Dec/Err order, while catalogue "b" has its
+            coordinates in a more random order.
         mag_indices : list or numpy.ndarray
             In appropriate order, as expected by e.g. `~macauff.CrossMatch` inputs
             and `~macauff.make_perturb_aufs`, list the indexes of each magnitude
@@ -166,7 +168,7 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
             uncertainty index in the catalogue.
         mag_names : list or numpy.ndarray of strings
             Names of each ``mag_indices`` magnitude.
-        best_mag_index : integer
+        correct_astro_mag_indices_index : integer
             Index into ``mag_indices`` of the preferred magnitude to use to
             construct astrometric scaling relations from. Should generally
             be the one with the most coverage across all detections in a
@@ -366,7 +368,7 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
             self.mag_indices = mag_indices
             self.mag_unc_indices = mag_unc_indices
             self.mag_names = mag_names
-            self.best_mag_index = best_mag_index
+            self.correct_astro_mag_indices_index = correct_astro_mag_indices_index
         else:
             # np.genfromtxt will load in pos_and_err or pos_and_err, mag_ind,
             # mag_unc_ind order for the two catalogues. Each will effectively
@@ -374,17 +376,17 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
             # etc. for all options. These need saving for np.genfromtxt but
             # also for obtaining the correct column in the resulting sub-set of
             # the loaded csv file.
-            self.a_cols = np.array(pos_and_err_indices[0])
-            self.b_cols = np.concatenate((pos_and_err_indices[1], mag_indices, mag_unc_indices))
+            self.a_cols = np.array(pos_and_err_indices[1])
+            self.b_cols = np.concatenate((pos_and_err_indices[0], mag_indices, mag_unc_indices))
 
             self.pos_and_err_indices = [
-                [np.argmin(np.abs(q - self.a_cols)) for q in pos_and_err_indices[0]],
-                [np.argmin(np.abs(q - self.b_cols)) for q in pos_and_err_indices[1]]]
+                [np.argmin(np.abs(q - self.b_cols)) for q in pos_and_err_indices[0]],
+                [np.argmin(np.abs(q - self.a_cols)) for q in pos_and_err_indices[1]]]
             self.mag_indices = [np.argmin(np.abs(q - self.b_cols)) for q in mag_indices]
             self.mag_unc_indices = [np.argmin(np.abs(q - self.b_cols)) for q in mag_unc_indices]
 
             self.mag_names = mag_names
-            self.best_mag_index = best_mag_index
+            self.correct_astro_mag_indices_index = correct_astro_mag_indices_index
 
         self.n_pool = n_pool
 
@@ -1057,7 +1059,7 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
         else:
             ax1_mid, ax2_mid, _ = self.list_of_things
 
-        mag_ind = self.mag_indices[self.best_mag_index]
+        mag_ind = self.mag_indices[self.correct_astro_mag_indices_index]
         b_mag_data = self.b[~np.isnan(self.b[:, mag_ind]), mag_ind]
 
         hist_mag, bins = np.histogram(b_mag_data, bins='auto')
@@ -1108,7 +1110,7 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
             self.gal_wav_micron, self.gal_alpha0, self.gal_alpha1, self.gal_alphaweight,
             self.gal_ab_offset, self.gal_filtname, self.gal_alav*avs)
 
-        mag_ind = self.mag_indices[self.best_mag_index]
+        mag_ind = self.mag_indices[self.correct_astro_mag_indices_index]
         data_mags = self.b[~np.isnan(self.b[:, mag_ind]), mag_ind]
         data_hist, data_bins = np.histogram(data_mags, bins='auto')
         d_hc = np.where(data_hist > 3)[0]
@@ -1128,7 +1130,8 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
         data_loghist = np.log10(data_hist)
         data_dloghist = 1/np.log(10) * data_uncert / data_hist
 
-        q = (data_bins <= maxmag) & (data_bins >= self.saturation_magnitudes[self.best_mag_index])
+        q = (data_bins <= maxmag) & (
+            data_bins >= self.saturation_magnitudes[self.correct_astro_mag_indices_index])
         tri_corr, gal_corr = find_model_counts_corrections(data_loghist[q], data_dloghist[q],
                                                            data_bins[q]+data_dbins[q]/2, tri_hist, gal_dns,
                                                            tri_mags+dtri_mags/2)
@@ -1153,7 +1156,7 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
         print('Plotting data and model counts...')
         sys.stdout.flush()
 
-        mag_ind = self.mag_indices[self.best_mag_index]
+        mag_ind = self.mag_indices[self.correct_astro_mag_indices_index]
         data_mags = self.b[~np.isnan(self.b[:, mag_ind]), mag_ind]
 
         ax = plt.subplot(gs[0])
@@ -1211,8 +1214,8 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
 
         narray = create_densities(
             self.b, self.minmag, self.maxmag, self.hull_points, self.hull_x_shift, self.dens_search_radius,
-            self.n_pool, self.mag_indices[self.best_mag_index], self.pos_and_err_indices[1][0],
-            self.pos_and_err_indices[1][1], self.coord_system, self.file_name)
+            self.n_pool, self.mag_indices[self.correct_astro_mag_indices_index],
+            self.pos_and_err_indices[0][0], self.pos_and_err_indices[0][1], self.coord_system, self.file_name)
 
         if self.single_or_repeat == 'repeat':
             # Divide the counts through by the number of repeat visits.
@@ -1221,17 +1224,17 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
 
         if self.single_or_repeat == 'single':
             _, bmatch, dists = create_distances(
-                self.a, self.b, self.nn_radius, self.pos_and_err_indices[0][0],
-                self.pos_and_err_indices[0][1], self.pos_and_err_indices[1][0],
-                self.pos_and_err_indices[1][1], self.coord_system)
+                self.a, self.b, self.nn_radius, self.pos_and_err_indices[1][0],
+                self.pos_and_err_indices[1][1], self.pos_and_err_indices[0][0],
+                self.pos_and_err_indices[0][1], self.coord_system)
         else:
             bmatch, dists = [], []
             for v in np.unique(self.repeat_unique_visits):
                 q = self.repeat_unique_visits == v
                 _, _bm, _d = create_distances(
-                    self.a, self.b[q], self.nn_radius, self.pos_and_err_indices[0][0],
-                    self.pos_and_err_indices[0][1], self.pos_and_err_indices[1][0],
-                    self.pos_and_err_indices[1][1], self.coord_system)
+                    self.a, self.b[q], self.nn_radius, self.pos_and_err_indices[1][0],
+                    self.pos_and_err_indices[1][1], self.pos_and_err_indices[1][0],
+                    self.pos_and_err_indices[0][1], self.coord_system)
                 # The _bm array returned is [0, len(self.b[q])] indexed, so we
                 # need to convert to indices back into self.b.
                 b_match_large = np.arange(len(self.b))[q]
@@ -1262,9 +1265,9 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
         print('Creating AUF simulations...')
         sys.stdout.flush()
 
-        a = self.a_array[self.best_mag_index]
-        b = self.b_array[self.best_mag_index]
-        c = self.c_array[self.best_mag_index]
+        a = self.a_array[self.correct_astro_mag_indices_index]
+        b = self.b_array[self.correct_astro_mag_indices_index]
+        c = self.c_array[self.correct_astro_mag_indices_index]
         b_ratio = 0.05
         # Self-consistent, non-zeropointed "flux", based on the relation
         # given in make_snr_model.
@@ -1319,7 +1322,7 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
         avg_snr = np.empty((len(self.mag_array), 3), float)
         avg_mag = np.empty((len(self.mag_array), 3), float)
 
-        mag_ind = self.mag_indices[self.best_mag_index]
+        mag_ind = self.mag_indices[self.correct_astro_mag_indices_index]
         for i, mag in enumerate(self.mag_array):
             mag_cut = ((b_matches[:, mag_ind] <= mag+self.mag_slice[i]) &
                        (b_matches[:, mag_ind] >= mag-self.mag_slice[i]))
@@ -1332,15 +1335,15 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
                 nums.append([-1])
                 continue
             if not self.use_photometric_uncertainties:
-                sig = np.percentile(b_matches[mag_cut, self.pos_and_err_indices[1][2]], 50)
-                sig_cut = ((b_matches[:, self.pos_and_err_indices[1][2]] <= sig+self.sig_slice[i]) &
-                           (b_matches[:, self.pos_and_err_indices[1][2]] >= sig-self.sig_slice[i]))
+                sig = np.percentile(b_matches[mag_cut, self.pos_and_err_indices[0][2]], 50)
+                sig_cut = ((b_matches[:, self.pos_and_err_indices[0][2]] <= sig+self.sig_slice[i]) &
+                           (b_matches[:, self.pos_and_err_indices[0][2]] >= sig-self.sig_slice[i]))
             else:
-                sig = np.percentile(b_matches[mag_cut, self.mag_unc_indices[self.best_mag_index]],
-                                    50)
-                sig_cut = ((b_matches[:, self.mag_unc_indices[self.best_mag_index]] <=
+                sig = np.percentile(b_matches[mag_cut,
+                                    self.mag_unc_indices[self.correct_astro_mag_indices_index]], 50)
+                sig_cut = ((b_matches[:, self.mag_unc_indices[self.correct_astro_mag_indices_index]] <=
                             sig+self.sig_slice[i]) &
-                           (b_matches[:, self.mag_unc_indices[self.best_mag_index]] >=
+                           (b_matches[:, self.mag_unc_indices[self.correct_astro_mag_indices_index]] >=
                             sig-self.sig_slice[i]))
             n_cut = (self.narray[self.bmatch] >= self.moden-self.dn) & (
                 self.narray[self.bmatch] <= self.moden+self.dn)
@@ -1363,23 +1366,24 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
                 continue
 
             bm = b_matches[final_slice]
-            p = bm[:, self.mag_unc_indices[self.best_mag_index]] > 0
-            snr = 2.5 / np.log(10) / bm[p, self.mag_unc_indices[self.best_mag_index]]
+            p = bm[:, self.mag_unc_indices[self.correct_astro_mag_indices_index]] > 0
+            snr = 2.5 / np.log(10) / bm[p, self.mag_unc_indices[self.correct_astro_mag_indices_index]]
             avg_snr[i, 0] = np.median(snr)
             avg_snr[i, [1, 2]] = np.abs(np.percentile(snr, [16, 84]) - np.median(snr))
             avg_mag[i, 0] = np.median(bm[:, mag_ind])
             avg_mag[i, [1, 2]] = np.abs(np.percentile(bm[:, mag_ind], [16, 84]) -
                                         np.median(bm[:, mag_ind]))
             if not self.use_photometric_uncertainties:
-                avg_sig[i, 0] = np.median(bm[:, self.pos_and_err_indices[1][2]])
-                avg_sig[i, [1, 2]] = np.abs(np.percentile(bm[:, self.pos_and_err_indices[1][2]],
+                avg_sig[i, 0] = np.median(bm[:, self.pos_and_err_indices[0][2]])
+                avg_sig[i, [1, 2]] = np.abs(np.percentile(bm[:, self.pos_and_err_indices[0][2]],
                                                           [16, 84]) -
-                                            np.median(bm[:, self.pos_and_err_indices[1][2]]))
+                                            np.median(bm[:, self.pos_and_err_indices[0][2]]))
             else:
-                avg_sig[i, 0] = np.median(bm[:, self.mag_unc_indices[self.best_mag_index]])
+                avg_sig[i, 0] = np.median(bm[:, self.mag_unc_indices[self.correct_astro_mag_indices_index]])
                 avg_sig[i, [1, 2]] = np.abs(
-                    np.percentile(bm[:, self.mag_unc_indices[self.best_mag_index]], [16, 84]) -
-                    np.median(bm[:, self.mag_unc_indices[self.best_mag_index]]))
+                    np.percentile(bm[:, self.mag_unc_indices[self.correct_astro_mag_indices_index]],
+                                  [16, 84]) -
+                    np.median(bm[:, self.mag_unc_indices[self.correct_astro_mag_indices_index]]))
 
             h, bins = np.histogram(final_dists, bins='auto')
             num = np.sum(h)
@@ -1513,7 +1517,7 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
             The negative-log-likelihood of dataset of separations given the AUF
             model.
         """
-        h = 1 - np.sqrt(1 - min(1, self.a_array[self.best_mag_index]**2 * snr**2))
+        h = 1 - np.sqrt(1 - min(1, self.a_array[self.correct_astro_mag_indices_index]**2 * snr**2))
         four_combined = h * self.four_off_fw[:, i] + (1 - h) * self.four_off_ps[:, i]
 
         four_gauss = np.exp(-2 * np.pi**2 * (self.rho[:-1]+self.drho/2)**2 * o**2)
@@ -1628,8 +1632,8 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
                 ax.errorbar((pdf_bin[:-1]+np.diff(pdf_bin)/2)[q_pdf], pdf[q_pdf],
                             yerr=pdf_uncert[q_pdf], c='k', marker='.', zorder=1, ls='None')
 
-            mag_ind = self.mag_indices[self.best_mag_index]
-            pos_err_ind = self.pos_and_err_indices[1][2]
+            mag_ind = self.mag_indices[self.correct_astro_mag_indices_index]
+            pos_err_ind = self.pos_and_err_indices[0][2]
             mag_cut = ((b_matches[:, mag_ind] <= mag+self.mag_slice[i]) &
                        (b_matches[:, mag_ind] >= mag-self.mag_slice[i]))
             if not self.use_photometric_uncertainties:
@@ -1637,11 +1641,11 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
                 sig_cut = ((b_matches[:, pos_err_ind] <= bsig+self.sig_slice[i]) &
                            (b_matches[:, pos_err_ind] >= bsig-self.sig_slice[i]))
             else:
-                bsig = np.percentile(b_matches[mag_cut, self.mag_unc_indices[self.best_mag_index]],
-                                     50)
-                sig_cut = ((b_matches[:, self.mag_unc_indices[self.best_mag_index]] <=
+                bsig = np.percentile(b_matches[mag_cut,
+                                     self.mag_unc_indices[self.correct_astro_mag_indices_index]], 50)
+                sig_cut = ((b_matches[:, self.mag_unc_indices[self.correct_astro_mag_indices_index]] <=
                             bsig+self.sig_slice[i]) &
-                           (b_matches[:, self.mag_unc_indices[self.best_mag_index]] >=
+                           (b_matches[:, self.mag_unc_indices[self.correct_astro_mag_indices_index]] >=
                             bsig-self.sig_slice[i]))
             n_cut = (self.narray[self.bmatch] >= self.moden-self.dn) & (
                 self.narray[self.bmatch] <= self.moden+self.dn)
@@ -1657,8 +1661,8 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
                 -np.pi * (self.r[:-1]+self.dr/2)**2 * density)
 
             fit_sig = self.fit_sigs[i, 0]
-            h = 1 - np.sqrt(1 - min(1,
-                                    self.a_array[self.best_mag_index]**2 * self.avg_snr[i, 0]**2))
+            h = 1 - np.sqrt(
+                1 - min(1, self.a_array[self.correct_astro_mag_indices_index]**2 * self.avg_snr[i, 0]**2))
 
             ind_fit_sig = self.fit_sigs[i, 1]
             if self.make_plots:
@@ -1759,16 +1763,16 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
         """
         print("Plotting SNR-Magnitude-Uncertainty scaling relations...")
         sys.stdout.flush()
-        p = self.b[:, self.mag_unc_indices[self.best_mag_index]] > 0
-        _snr = 2.5 / np.log(10) / self.b[p, self.mag_unc_indices[self.best_mag_index]]
+        p = self.b[:, self.mag_unc_indices[self.correct_astro_mag_indices_index]] > 0
+        _snr = 2.5 / np.log(10) / self.b[p, self.mag_unc_indices[self.correct_astro_mag_indices_index]]
         if not self.use_photometric_uncertainties:
-            obj_err = self.b[p, self.pos_and_err_indices[1][2]]
+            obj_err = self.b[p, self.pos_and_err_indices[0][2]]
         else:
             # Since we expect the astrometric/inverse-photometric-snr scaling to
             # be roughly a factor FWHM/(2 * sqrt(2 * ln(2))), i.e. the sigma of
             # a Gaussian-ish PSF, scale accordingly:
             obj_err = self.psfsig / _snr
-        obj_mag = self.b[p, self.mag_indices[self.best_mag_index]]
+        obj_mag = self.b[p, self.mag_indices[self.correct_astro_mag_indices_index]]
 
         gs = self.make_gridspec('sig_vs_snr_vs_mag', 1, 3, 0.8, 6)
         ax = plt.subplot(gs[0])
@@ -2215,7 +2219,7 @@ class SNRMagnitudeRelationship(AstrometricCorrections):  # pylint: disable=too-m
         self.return_nm = return_nm
 
         if npy_or_csv == 'npy':
-            self.pos_and_err_indices = [None, pos_and_err_indices]
+            self.pos_and_err_indices = [pos_and_err_indices, None]
             self.mag_indices = mag_indices
             self.mag_unc_indices = mag_unc_indices
             self.mag_names = mag_names

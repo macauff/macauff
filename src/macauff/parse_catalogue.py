@@ -20,7 +20,7 @@ from macauff.misc_functions_fortran import misc_functions_fortran as mff
 __all__ = ['csv_to_npy', 'rect_slice_npy', 'npy_to_csv', 'rect_slice_csv']
 
 
-def csv_to_npy(input_folder, input_filename, output_folder, astro_cols, photo_cols, bestindex_col,
+def csv_to_npy(input_filename, astro_cols, photo_cols, bestindex_col,
                chunk_overlap_col, header=False, process_uncerts=False, astro_sig_fits_filepath=None,
                cat_in_radec=None, mn_in_radec=None):
     '''
@@ -29,12 +29,9 @@ def csv_to_npy(input_folder, input_filename, output_folder, astro_cols, photo_co
 
     Parameters
     ----------
-    input_folder : string
-        Folder on disk where the catalogue .csv file is stored.
     input_filename : string
-        Name of the CSV file, including extension, to convert to binary files.
-    output_folder : string
-        Folder on disk of where to save the .npy versions of the catalogue.
+        Location on disk, including extension, where the catalogue .csv file is
+        stored that is to be converted into numpy arrays.
     astro_cols : list or numpy.array of integers
         List of zero-indexed columns in the input catalogue representing the
         three required astrometric parameters, two orthogonal sky axis
@@ -80,6 +77,23 @@ def csv_to_npy(input_folder, input_filename, output_folder, astro_cols, photo_co
         compute m-n scaling relations are in RA/Dec or not. If ``mn_in_radec``
         disagrees with ``cat_in_radec`` then m-n coordinates will be converted
         to the coordinate system of the catalogue.
+
+    Returns
+    -------
+    astro : numpy.ndarray
+        Three-elements per source, shape ``(N, 3)``, longitude, latitude, and
+        (circular) astrometric uncertainty for every object in the catalogue.
+    photo : numpy.ndarray
+        Photometry of all objects in the catalogue, also length ``N`` in its
+        first axis and then ``M`` photometric bands per object.
+    best_index : numpy.ndarray
+        Indices, ``0``-``M-1``, indicating which of the ``M`` detections is the
+        preferred band for every object.
+    chunk_overlap : numpy.ndarray
+        Boolean flag, indicating whether an object is in the "chunk" or whether
+        it has been included in a halo around the primary chunk objects for
+        match purposes, but is a primary detection in a different chunk of this
+        catalogue.
     '''
     if not (process_uncerts is True or process_uncerts is False):
         raise ValueError("process_uncerts must either be True or False.")
@@ -97,19 +111,15 @@ def csv_to_npy(input_folder, input_filename, output_folder, astro_cols, photo_co
         raise ValueError("process_uncerts is True but astro_sig_fits_filepath does not exist. "
                          "Please ensure file path is correct.")
     astro_cols, photo_cols = np.array(astro_cols), np.array(photo_cols)
-    with open(f'{input_folder}/{input_filename}', encoding='utf-8') as fp:
+    with open(input_filename, encoding='utf-8') as fp:
         n_rows = 0 if not header else -1
         for _ in fp:
             n_rows += 1
 
-    astro = open_memmap(f'{output_folder}/con_cat_astro.npy', mode='w+', dtype=float,
-                        shape=(n_rows, 3))
-    photo = open_memmap(f'{output_folder}/con_cat_photo.npy', mode='w+', dtype=float,
-                        shape=(n_rows, len(photo_cols)))
-    best_index = open_memmap(f'{output_folder}/magref.npy', mode='w+', dtype=int,
-                             shape=(n_rows,))
-    chunk_overlap = open_memmap(f'{output_folder}/in_chunk_overlap.npy', mode='w+',
-                                dtype=bool, shape=(n_rows,))
+    astro = np.empty((n_rows, 3), float)
+    photo = np.empty((n_rows, len(photo_cols)), float)
+    best_index = np.empty(n_rows, int)
+    chunk_overlap = np.empty(n_rows, bool)
 
     if process_uncerts:
         m_sigs = np.load(f'{astro_sig_fits_filepath}/m_sigs_array.npy')
@@ -131,13 +141,14 @@ def csv_to_npy(input_folder, input_filename, output_folder, astro_cols, photo_co
     used_cols = np.concatenate((astro_cols, photo_cols, [bestindex_col]))
     if chunk_overlap_col is not None:
         used_cols = np.concatenate((used_cols, [chunk_overlap_col]))
+    used_cols = np.sort(used_cols)
     new_astro_cols = np.array([np.where(used_cols == a)[0][0] for a in astro_cols])
     new_photo_cols = np.array([np.where(used_cols == a)[0][0] for a in photo_cols])
     new_bestindex_col = np.where(used_cols == bestindex_col)[0][0]
     if chunk_overlap_col is not None:
         new_chunk_overlap_col = np.where(used_cols == chunk_overlap_col)[0][0]
     n = 0
-    for chunk in pd.read_csv(f'{input_folder}/{input_filename}', chunksize=100000,
+    for chunk in pd.read_csv(input_filename, chunksize=100000,
                              usecols=used_cols, header=None if not header else 0):
         if not process_uncerts:
             astro[n:n+chunk.shape[0]] = chunk.values[:, new_astro_cols]
@@ -159,6 +170,8 @@ def csv_to_npy(input_folder, input_filename, output_folder, astro_cols, photo_co
             chunk_overlap[n:n+chunk.shape[0]] = False
 
         n += chunk.shape[0]
+
+    return astro, photo, best_index, chunk_overlap
 
 
 # pylint: disable-next=dangerous-default-value,too-many-locals,too-many-statements

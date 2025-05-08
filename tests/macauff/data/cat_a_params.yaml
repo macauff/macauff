@@ -1,8 +1,14 @@
 # Catalogue name -- used both for folder creation and output file names
 cat_name: Gaia
-cat_folder_path: gaia_folder_{}
+cat_csv_file_path: gaia_folder_{}/gaia.csv
 # Folder for all AUF-related files to be created in. Should be an absolute path, or relative to folder script called in.
 auf_folder_path: gaia_auf_folder_{}
+
+pos_and_err_indices: [0, 1, 2]
+mag_indices: [3, 4, 5]
+chunk_overlap_col: 6
+best_mag_index_col: 7
+csv_has_header: False
 
 # Filter names are also used in any output file created
 filt_names: [G_BP, G, G_RP]
