@@ -33,22 +33,19 @@ from astropy.units import UnitsError
 __all__ = []
 
 
-def get_trilegal(filename, ra, dec, folder='.', galactic=False,
-                 filterset='kepler_2mass', area=1, magnum=1, maglim=27, binaries=False,
-                 trilegal_version='1.7', av=None, sigma_av=0.1):
+def get_trilegal(filename, ra, dec, galactic=False, filterset='kepler_2mass', area=1, magnum=1, maglim=27,
+                 binaries=False, trilegal_version='1.7', av=None, sigma_av=0.1):
     """
     Calls the TRILEGAL web form simulation and downloads the file.
 
     Parameters
     ----------
     filename : string
-        Output filename. If extension not provided, it will be added.
+        Output filename, including folder path.
     ra : float
         Coordinate for line-of-sight simulation.
     dec : float
         Coordinate for line-of-sight simulation.
-    folder : string, optional
-        Folder to which to save file.
     filterset : string, optional
         Filter set for which to call TRILEGAL.
     area : float, optional
@@ -84,27 +81,17 @@ def get_trilegal(filename, ra, dec, folder='.', galactic=False,
         c = SkyCoord(ra, dec, unit='deg', frame=frame)
     l, b = (c.galactic.l.value, c.galactic.b.value)
 
-    if os.path.isabs(filename):
-        folder = ''
-        outfolder = os.path.dirname(filename)
-    else:
-        outfolder = folder
-
-    if not re.search(r'\.dat$', filename):
-        outfile = f'{folder}/{filename}.dat'
-    else:
-        outfile = f'{folder}/{filename}'
     if av is None:
         av = get_av_infinity(l, b, frame='galactic')[0]
 
     result = trilegal_webcall(trilegal_version, l, b, area, binaries, av, sigma_av, filterset,
-                              magnum, maglim, outfile, outfolder)
+                              magnum, maglim, filename)
 
     return av, result
 
 
 def trilegal_webcall(trilegal_version, l, b, area, binaries, av, sigma_av, filterset, magnum,
-                     maglim, outfile, outfolder):
+                     maglim, save_filename):
     """
     Calls TRILEGAL webserver and downloads results file.
 
@@ -130,10 +117,8 @@ def trilegal_webcall(trilegal_version, l, b, area, binaries, av, sigma_av, filte
         Number of filter in given filterset to limit magnitudes to.
     maglim : float
         Limiting magnitude down to which to simulate sources.
-    outfile : string
+    save_filename : string
         Output filename.
-    outfolder : string
-        Output filename's containing folder.
 
     Returns
     -------
@@ -161,6 +146,7 @@ def trilegal_webcall(trilegal_version, l, b, area, binaries, av, sigma_av, filte
                   'object_av=1.504&object_avkind=1&object_cutoffmass=0.8&'
                   'object_file=tab_sfr%2Ffile_sfr_m4.dat&object_a=1&object_b=0&'
                   'output_kind=1')
+    outfolder = os.path.dirname(save_filename)
     cmd = (f"wget -o {outfolder}/lixo -O {outfolder}/tmpfile --post-data='submit_form=Submit&"
            f"trilegal_version={trilegal_version}&gal_coord=1&gc_l={l}&gc_b={b}&eq_alpha=0&eq_delta=0&"
            f"field={area}&photsys_file=tab_mag_odfnew%2Ftab_mag_{filterset}.dat&icm_lim={magnum}&"
@@ -221,8 +207,9 @@ def trilegal_webcall(trilegal_version, l, b, area, binaries, av, sigma_av, filte
                 # within trilegal_webcall any more, but the loops and if
                 # statements are left in for backwards compatibility.
                 return "timeout"
-    sp.Popen(f'mv {outfolder}/{filename} {outfile}', shell=True).wait()  # pylint: disable=consider-using-with
-    print(f'results copied to {outfile}')
+    # pylint: disable-next=consider-using-with
+    sp.Popen(f'mv {outfolder}/{filename} {save_filename}', shell=True).wait()
+    print(f'results copied to {save_filename}')
     sys.stdout.flush()
 
     return "good"

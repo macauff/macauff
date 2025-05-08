@@ -226,8 +226,8 @@ class TestMakeIslandGroupings():  # pylint: disable=too-many-instance-attributes
         self.a_auf_folder_path, self.b_auf_folder_path = r'gaia_auf_{}', r'wise_auf_{}'
         self.joint_folder_path = r'joint_{}'
         self.chunk_id = 9
-        for folder in [os.path.splitext(self.a_cat_csv_file_path)[0],
-                       os.path.splitext(self.b_cat_csv_file_path)[0], self.joint_folder_path,
+        for folder in [os.path.dirname(self.a_cat_csv_file_path),
+                       os.path.dirname(self.b_cat_csv_file_path), self.joint_folder_path,
                        self.a_auf_folder_path, self.b_auf_folder_path]:
             os.makedirs(folder.format(self.chunk_id), exist_ok=True)
         self.r = np.linspace(0, self.max_sep, 10000)

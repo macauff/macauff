@@ -101,7 +101,7 @@ class TestAstroCorrection:
 
         _kwargs = {
             'psf_fwhm': 6.1, 'numtrials': 10000, 'nn_radius': 30, 'dens_search_radius': 0.25,
-            'save_folder': 'ac_save_folder', 'trifolder': 'tri_folder', 'triname': 'trilegal_sim',
+            'save_folder': 'ac_save_folder', 'trifilepath': 'tri_folder/trilegal_sim.dat',
             'maglim_f': 25, 'magnum': 11, 'tri_num_faint': 1500000,
             'trifilterset': '2mass_spitzer_wise', 'trifiltname': 'W1', 'gal_wav_micron': 3.35,
             'gal_ab_offset': 2.699, 'gal_filtname': 'wise2010-W1', 'gal_alav': 0.039,
@@ -202,7 +202,7 @@ class TestAstroCorrection:
         ax_dimension = 1
         ac = AstrometricCorrections(
             psf_fwhm=6.1, numtrials=1000, nn_radius=30, dens_search_radius=0.25,
-            save_folder='ac_save_folder', trifolder='tri_folder', triname='trilegal_sim_{}_{}',
+            save_folder='ac_save_folder', trifilepath='tri_folder/trilegal_sim_{}_{}.dat',
             maglim_f=25, magnum=11, tri_num_faint=1500000, trifilterset='2mass_spitzer_wise',
             trifiltname='W1', gal_wav_micron=3.35, gal_ab_offset=2.699, gal_filtname='wise2010-W1',
             gal_alav=0.039, dm=0.1, dd_params=dd_params, l_cut=l_cut, ax1_mids=ax1_mids,
@@ -325,7 +325,7 @@ class TestAstroCorrection:
             ax_dimension = 2
         ac = AstrometricCorrections(
             psf_fwhm=6.1, numtrials=1000, nn_radius=30, dens_search_radius=1,
-            save_folder='ac_save_folder', trifolder='tri_folder', triname='trilegal_sim_{}_{}',
+            save_folder='ac_save_folder', trifilepath='tri_folder/trilegal_sim_{}_{}.dat',
             maglim_f=25, magnum=11, tri_num_faint=1500000, trifilterset='2mass_spitzer_wise',
             trifiltname='W1', gal_wav_micron=3.35, gal_ab_offset=2.699, gal_filtname='wise2010-W1',
             gal_alav=0.039, dm=0.1, dd_params=dd_params, l_cut=l_cut, ax1_mids=ax1_mids,

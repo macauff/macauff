@@ -37,8 +37,8 @@ class TestInputs:
         self.b_cat_csv_file_path = os.path.abspath(cat_b_config['cat_csv_file_path'].format(self.chunk_id))
 
         os.makedirs(joint_config['joint_folder_path'].format(self.chunk_id), exist_ok=True)
-        os.makedirs(os.path.splitext(self.a_cat_csv_file_path)[0], exist_ok=True)
-        os.makedirs(os.path.splitext(self.b_cat_csv_file_path)[0], exist_ok=True)
+        os.makedirs(os.path.dirname(self.a_cat_csv_file_path), exist_ok=True)
+        os.makedirs(os.path.dirname(self.b_cat_csv_file_path), exist_ok=True)
 
         self.a_cat = '0, 0, 0, 0, 0, 0, 0, 1\n0, 0, 0, 0, 0, 0, 0, 2'
         self.b_cat = '0, 0, 0, 0, 0, 0, 0, 0, 0\n0, 0, 0, 0, 0, 0, 0, 0, 3'
@@ -88,15 +88,15 @@ class TestInputs:
                                   [131, 1], [132, 1], [133, 1], [134, 1]]))
 
         cm_p_ = self.cm_p_text.replace('include_perturb_auf: False', 'include_perturb_auf: True')
-        ca_p_ = self.ca_p_text.replace(r'auf_folder_path: gaia_auf_folder_{}',
-                                       r'auf_folder_path: gaia_auf_folder_{}'
+        ca_p_ = self.ca_p_text.replace(r'auf_file_path: gaia_auf_folder/trilegal_download_{}.dat',
+                                       r'auf_file_path: gaia_auf_folder/trilegal_download_{}.dat'
                                        '\ndens_hist_tri_location: None\ntri_model_mags_location: None\n'
                                        'tri_model_mag_mids_location: None\n'
                                        'tri_model_mags_interval_location: None\n'
                                        'tri_dens_uncert_location: None\n'
                                        'tri_n_bright_sources_star_location: None')
-        cb_p_ = self.cb_p_text.replace(r'auf_folder_path: wise_auf_folder_{}',
-                                       r'auf_folder_path: wise_auf_folder_{}' + '\n'
+        cb_p_ = self.cb_p_text.replace(r'auf_file_path: wise_auf_folder/trilegal_download_{}.dat',
+                                       r'auf_file_path: wise_auf_folder/trilegal_download_{}.dat' + '\n'
                                        'dens_hist_tri_location: None\ntri_model_mags_location: None\n'
                                        'tri_model_mag_mids_location: None\n'
                                        'tri_model_mags_interval_location: None\n'
@@ -237,8 +237,8 @@ class TestInputs:
 
     def test_crossmatch_load_tri_hists(self):  # pylint: disable=too-many-statements
         cm_p_ = self.cm_p_text.replace('include_perturb_auf: False', 'include_perturb_auf: True')
-        ca_p_ = self.ca_p_text.replace(r'auf_folder_path: gaia_auf_folder_{}',
-                                       r'auf_folder_path: None'
+        ca_p_ = self.ca_p_text.replace(r'auf_file_path: gaia_auf_folder/trilegal_download_{}.dat',
+                                       r'auf_file_path: None'
                                        '\ndens_hist_tri_location: None\ntri_model_mags_location: None\n'
                                        'tri_model_mag_mids_location: None\n'
                                        'tri_model_mags_interval_location: None\n'
@@ -251,8 +251,8 @@ class TestInputs:
                             os.path.join(os.path.dirname(__file__), 'data/cat_b_params.yaml'))
             cm._load_metadata_config(self.chunk_id)
 
-        cb_p_ = self.cb_p_text.replace(r'auf_folder_path: wise_auf_folder_{}',
-                                       r'auf_folder_path: None'
+        cb_p_ = self.cb_p_text.replace(r'auf_file_path: wise_auf_folder/trilegal_download_{}.dat',
+                                       r'auf_file_path: None'
                                        '\ndens_hist_tri_location: None\ntri_model_mags_location: None\n'
                                        'tri_model_mag_mids_location: None\n'
                                        'tri_model_mags_interval_location: None\n'
@@ -325,7 +325,7 @@ class TestInputs:
                         mock_filename(ca_p_.encode("utf-8")),
                         mock_filename(cb_p_.encode("utf-8")))
         cm._load_metadata_config(self.chunk_id)
-        assert cm.b_auf_folder_path is None
+        assert cm.b_auf_file_path is None
         assert np.all([b is None for b in cm.a_tri_filt_names])
         assert np.all(cm.a_dens_hist_tri_list == np.ones((3, 10), float))  # pylint: disable=no-member
         assert np.all(cm.a_tri_dens_uncert_list == np.ones((3, 10), float))  # pylint: disable=no-member
@@ -339,18 +339,21 @@ class TestInputs:
         cm._load_metadata_config(self.chunk_id)
         assert cm.joint_folder_path == os.path.join(os.getcwd(), 'test_path_9')
         assert os.path.isdir(os.path.join(os.getcwd(), 'test_path_9'))
-        assert cm.a_auf_folder_path == os.path.join(os.getcwd(), 'gaia_auf_folder_9')
-        assert cm.b_auf_folder_path == os.path.join(os.getcwd(), 'wise_auf_folder_9')
+        assert cm.a_auf_file_path == os.path.join(os.getcwd(),
+                                                  r'gaia_auf_folder/trilegal_download_9_{}_{}.dat')
+        assert cm.b_auf_file_path == os.path.join(os.getcwd(),
+                                                  r'wise_auf_folder/trilegal_download_9_{}_{}.dat')
 
         # List of simple one line config file replacements for error message checking
         for old_line, new_line, match_text, error, fn in zip(
                 [r'joint_folder_path: test_path_{}', r'joint_folder_path: test_path_{}',
-                 r'auf_folder_path: gaia_auf_folder_{}', r'auf_folder_path: wise_auf_folder_{}'],
+                 r'auf_file_path: gaia_auf_folder/trilegal_download_{}.dat',
+                 r'auf_file_path: wise_auf_folder/trilegal_download_{}.dat'],
                 ['', 'joint_folder_path: /User/test/some/path/\n', '',
-                 'auf_folder_path: /User/test/some/path\n'],
+                 'auf_file_path: /User/test/some/path\n'],
                 ['Missing key', 'Error when trying to check temporary',
-                 'Missing key auf_folder_path from catalogue "a"',
-                 'folder for catalogue "b" AUF outputs. Please ensure that b_auf_folder_path'],
+                 'Missing key auf_file_path from catalogue "a"',
+                 'folder for catalogue "b" AUF outputs. Please ensure that b_auf_file_path'],
                 [ValueError, OSError, ValueError, OSError], ['c', 'c', 'a', 'b']):
             _cmp = self.cm_p_text.replace(old_line, new_line) if fn == 'c' else self.cm_p_text
             _cap = self.ca_p_text.replace(old_line, new_line) if fn == 'a' else self.ca_p_text
@@ -363,15 +366,15 @@ class TestInputs:
 
     def test_crossmatch_tri_inputs(self):
         cm_p_ = self.cm_p_text.replace('include_perturb_auf: False', 'include_perturb_auf: True')
-        ca_p_ = self.ca_p_text.replace(r'auf_folder_path: gaia_auf_folder_{}',
-                                       r'auf_folder_path: gaia_auf_folder_{}'
+        ca_p_ = self.ca_p_text.replace(r'auf_file_path: gaia_auf_folder/trilegal_download_{}.dat',
+                                       r'auf_file_path: gaia_auf_folder/trilegal_download_{}.dat'
                                        '\ndens_hist_tri_location: None\ntri_model_mags_location: None\n'
                                        'tri_model_mag_mids_location: None\n'
                                        'tri_model_mags_interval_location: None\n'
                                        'tri_dens_uncert_location: None\n'
                                        'tri_n_bright_sources_star_location: None')
-        cb_p_ = self.cb_p_text.replace(r'auf_folder_path: wise_auf_folder_{}',
-                                       r'auf_folder_path: wise_auf_folder_{}'
+        cb_p_ = self.cb_p_text.replace(r'auf_file_path: wise_auf_folder/trilegal_download_{}.dat',
+                                       r'auf_file_path: wise_auf_folder/trilegal_download_{}.dat'
                                        '\ndens_hist_tri_location: None\ntri_model_mags_location: None\n'
                                        'tri_model_mag_mids_location: None\n'
                                        'tri_model_mags_interval_location: None\n'
@@ -423,15 +426,15 @@ class TestInputs:
         assert np.all(cm.b_filt_names == np.array(['W1', 'W2', 'W3', 'W4']))
 
         cm_p_ = self.cm_p_text.replace('include_perturb_auf: False', 'include_perturb_auf: True')
-        ca_p_ = self.ca_p_text.replace(r'auf_folder_path: gaia_auf_folder_{}',
-                                       r'auf_folder_path: gaia_auf_folder_{}'
+        ca_p_ = self.ca_p_text.replace(r'auf_file_path: gaia_auf_folder/trilegal_download_{}.dat',
+                                       r'auf_file_path: gaia_auf_folder/trilegal_download_{}.dat'
                                        '\ndens_hist_tri_location: None\ntri_model_mags_location: None\n'
                                        'tri_model_mag_mids_location: None\n'
                                        'tri_model_mags_interval_location: None\n'
                                        'tri_dens_uncert_location: None\n'
                                        'tri_n_bright_sources_star_location: None')
-        cb_p_ = self.cb_p_text.replace(r'auf_folder_path: wise_auf_folder_{}',
-                                       r'auf_folder_path: wise_auf_folder_{}'
+        cb_p_ = self.cb_p_text.replace(r'auf_file_path: wise_auf_folder/trilegal_download_{}.dat',
+                                       r'auf_file_path: wise_auf_folder/trilegal_download_{}.dat'
                                        '\ndens_hist_tri_location: None\ntri_model_mags_location: None\n'
                                        'tri_model_mag_mids_location: None\n'
                                        'tri_model_mags_interval_location: None\n'
@@ -500,15 +503,15 @@ class TestInputs:
         assert cm.pos_corr_dist == 11
 
         cm_p_ = self.cm_p_text.replace('include_perturb_auf: False', 'include_perturb_auf: True')
-        ca_p_ = self.ca_p_text.replace(r'auf_folder_path: gaia_auf_folder_{}',
-                                       r'auf_folder_path: gaia_auf_folder_{}'
+        ca_p_ = self.ca_p_text.replace(r'auf_file_path: gaia_auf_folder/trilegal_download_{}.dat',
+                                       r'auf_file_path: gaia_auf_folder/trilegal_download_{}.dat'
                                        '\ndens_hist_tri_location: None\ntri_model_mags_location: None\n'
                                        'tri_model_mag_mids_location: None\n'
                                        'tri_model_mags_interval_location: None\n'
                                        'tri_dens_uncert_location: None\n'
                                        'tri_n_bright_sources_star_location: None')
-        cb_p_ = self.cb_p_text.replace(r'auf_folder_path: wise_auf_folder_{}',
-                                       r'auf_folder_path: wise_auf_folder_{}'
+        cb_p_ = self.cb_p_text.replace(r'auf_file_path: wise_auf_folder/trilegal_download_{}.dat',
+                                       r'auf_file_path: wise_auf_folder/trilegal_download_{}.dat'
                                        '\ndens_hist_tri_location: None\ntri_model_mags_location: None\n'
                                        'tri_model_mag_mids_location: None\n'
                                        'tri_model_mags_interval_location: None\n'
@@ -540,15 +543,15 @@ class TestInputs:
     # pylint: disable-next=too-many-statements
     def test_crossmatch_perturb_auf_inputs(self):
         cm_p_ = self.cm_p_text.replace('include_perturb_auf: False', 'include_perturb_auf: True')
-        ca_p_ = self.ca_p_text.replace(r'auf_folder_path: gaia_auf_folder_{}',
-                                       r'auf_folder_path: gaia_auf_folder_{}'
+        ca_p_ = self.ca_p_text.replace(r'auf_file_path: gaia_auf_folder/trilegal_download_{}.dat',
+                                       r'auf_file_path: gaia_auf_folder/trilegal_download_{}.dat'
                                        '\ndens_hist_tri_location: None\ntri_model_mags_location: None\n'
                                        'tri_model_mag_mids_location: None\n'
                                        'tri_model_mags_interval_location: None\n'
                                        'tri_dens_uncert_location: None\n'
                                        'tri_n_bright_sources_star_location: None')
-        cb_p_ = self.cb_p_text.replace(r'auf_folder_path: wise_auf_folder_{}',
-                                       r'auf_folder_path: wise_auf_folder_{}'
+        cb_p_ = self.cb_p_text.replace(r'auf_file_path: wise_auf_folder/trilegal_download_{}.dat',
+                                       r'auf_file_path: wise_auf_folder/trilegal_download_{}.dat'
                                        '\ndens_hist_tri_location: None\ntri_model_mags_location: None\n'
                                        'tri_model_mag_mids_location: None\n'
                                        'tri_model_mags_interval_location: None\n'
@@ -818,8 +821,8 @@ class TestInputs:
                         mock_filename(self.ca_p_text.encode("utf-8")),
                         mock_filename(self.cb_p_text.encode("utf-8")))
         cm._load_metadata_config(self.chunk_id)
-        assert os.path.exists(os.path.splitext(self.a_cat_csv_file_path)[0])
-        assert os.path.exists(os.path.splitext(self.b_cat_csv_file_path)[0])
+        assert os.path.exists(os.path.dirname(self.a_cat_csv_file_path))
+        assert os.path.exists(os.path.dirname(self.b_cat_csv_file_path))
         assert os.path.isfile(self.a_cat_csv_file_path)
         assert os.path.isfile(self.b_cat_csv_file_path)
         assert cm.a_cat_csv_file_path == self.a_cat_csv_file_path
@@ -1174,11 +1177,13 @@ class TestInputs:
             'gal_nzs: [33, 41, 11, 41]\ngal_aboffsets: [0.5, 0.5, 0.5, 0.5]\n'
             'gal_filternames: [wise2010-W1, wise2010-W2, wise2010-W3, wise2010-W4]\n'
             'saturation_magnitudes: [5, 5, 5, 5]\n')
-        ca_p_ = ca_p_.replace(r'auf_folder_path: gaia_auf_folder_{}', r'auf_folder_path: gaia_auf_folder_{}'
+        ca_p_ = ca_p_.replace(r'auf_file_path: gaia_auf_folder/trilegal_download_{}.dat',
+                              r'auf_file_path: gaia_auf_folder/trilegal_download_{}.dat'
                               '\ndens_hist_tri_location: None\ntri_model_mags_location: None\n'
                               'tri_model_mag_mids_location: None\ntri_model_mags_interval_location: None\n'
                               'tri_dens_uncert_location: None\ntri_n_bright_sources_star_location: None')
-        cb_p_ = cb_p_.replace(r'auf_folder_path: wise_auf_folder_{}', r'auf_folder_path: wise_auf_folder_{}'
+        cb_p_ = cb_p_.replace(r'auf_file_path: wise_auf_folder/trilegal_download_{}.dat',
+                              r'auf_file_path: wise_auf_folder/trilegal_download_{}.dat'
                               '\ndens_hist_tri_location: None\ntri_model_mags_location: None\n'
                               'tri_model_mag_mids_location: None\ntri_model_mags_interval_location: None\n'
                               'tri_dens_uncert_location: None\ntri_n_bright_sources_star_location: None')
@@ -1246,7 +1251,7 @@ class TestInputs:
         cb_p_2 = cb_p_2.replace('[3, 4, 5, 6]', '[3, 5, 7, 9]')
         cb_p_2 = cb_p_2.replace('chunk_overlap_col: 7', 'chunk_overlap_col: 12')
         # Fake some TRILEGAL downloads with random data.
-        os.makedirs('wise_auf_folder_9/131.0/-1.0', exist_ok=True)
+        os.makedirs('wise_auf_folder', exist_ok=True)
         text = ('#area = 4.0 sq deg\n#Av at infinity = 1\n' +
                 'Gc logAge [M/H] m_ini   logL   logTe logg  m-M0   Av    ' +
                 'm2/m1 mbol   J      H      Ks     IRAC_3.6 IRAC_4.5 IRAC_5.8 IRAC_8.0 MIPS_24 ' +
@@ -1258,7 +1263,7 @@ class TestInputs:
                 '1   6.65 -0.39  0.02415 -2.701 3.397  4.057 14.00  8.354 0.00 25.523 25.839 ' +
                 '24.409 23.524 22.583 22.387 22.292 22.015 21.144 19.380 20.878 '
                 f'{w1} 22.391 21.637 21.342  0.024\n ')
-        with open('wise_auf_folder_9/131.0/-1.0/trilegal_auf_simulation_faint.dat', "w",
+        with open('wise_auf_folder/trilegal_download_9_131.0_-1.0_faint.dat', "w",
                   encoding='utf-8') as f:
             f.write(text)
         # Fake some "real" csv data
@@ -1440,7 +1445,7 @@ class TestInputs:
 
         # New test of the AC run, just with pre-made histograms.
         dens, tri_mags, tri_mags_mids, dtri_mags, uncert, num_bright_obj = make_tri_counts(
-            'wise_auf_folder_9', '131.0/-1.0/trilegal_auf_simulation', 'W1', 0.1, 13.5, 16)
+            'wise_auf_folder/trilegal_download_9_131.0_-1.0.dat', 'W1', 0.1, 13.5, 16)
         dhtl = 'ac_folder/npy/dhtl.npy'
         np.save(dhtl, [dens, dens, dens, dens])
         tmml = 'ac_folder/npy/tmml.npy'
@@ -1454,7 +1459,8 @@ class TestInputs:
         tnbssl = 'ac_folder/npy/tnbssl.npy'
         np.save(tnbssl, [num_bright_obj, num_bright_obj, num_bright_obj, num_bright_obj])
 
-        cb_p_3 = cb_p_2.replace('auf_folder_path: wise_auf_folder_{}', 'auf_folder_path: None')
+        cb_p_3 = cb_p_2.replace('auf_file_path: wise_auf_folder/trilegal_download_{}.dat',
+                                'auf_file_path: None')
         lines = cb_p_3.split('\n')
         for ol, nl in zip(['tri_set_name: ', 'tri_filt_names: ', 'tri_filt_num: ', 'download_tri: ',
                            'tri_maglim_faint: ', 'tri_num_faint: ', 'dens_hist_tri_location: ',
@@ -1580,8 +1586,8 @@ class TestPostProcess:
         self.b_cat_csv_file_path = os.path.abspath('b_input_csv_folder/wise_catalogue.csv')
 
         os.makedirs(f'{self.joint_folder_path}', exist_ok=True)
-        os.makedirs(os.path.splitext(self.a_cat_csv_file_path)[0], exist_ok=True)
-        os.makedirs(os.path.splitext(self.b_cat_csv_file_path)[0], exist_ok=True)
+        os.makedirs(os.path.dirname(self.a_cat_csv_file_path), exist_ok=True)
+        os.makedirs(os.path.dirname(self.b_cat_csv_file_path), exist_ok=True)
 
         na, nb, nmatch = 10000, 7000, 4000
         self.na, self.nb, self.nmatch = na, nb, nmatch

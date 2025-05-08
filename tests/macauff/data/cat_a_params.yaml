@@ -2,7 +2,7 @@
 cat_name: Gaia
 cat_csv_file_path: gaia_folder_{}/gaia.csv
 # Folder for all AUF-related files to be created in. Should be an absolute path, or relative to folder script called in.
-auf_folder_path: gaia_auf_folder_{}
+auf_file_path: gaia_auf_folder/trilegal_download_{}.dat
 
 pos_and_err_indices: [0, 1, 2]
 mag_indices: [3, 4, 5]

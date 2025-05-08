@@ -60,11 +60,10 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
                  ax1_mids, ax2_mids, ax_dimension, mag_array, mag_slice, sig_slice, n_pool,
                  npy_or_csv, coord_or_chunk, pos_and_err_indices, mag_indices, mag_unc_indices,
                  mag_names, correct_astro_mag_indices_index, coord_system, saturation_magnitudes,
-                 pregenerate_cutouts, n_r, n_rho, max_rho, mn_fit_type, trifolder=None, triname=None,
-                 maglim_f=None, magnum=None, tri_num_faint=None, trifilterset=None, trifiltname=None,
-                 tri_hist=None, tri_mags=None, dtri_mags=None, tri_uncert=None,
-                 use_photometric_uncertainties=False, cutout_area=None, cutout_height=None,
-                 single_sided_auf=True, chunks=None, return_nm=False):
+                 pregenerate_cutouts, n_r, n_rho, max_rho, mn_fit_type, trifilepath=None, maglim_f=None,
+                 magnum=None, tri_num_faint=None, trifilterset=None, trifiltname=None, tri_hist=None,
+                 tri_mags=None, dtri_mags=None, tri_uncert=None, use_photometric_uncertainties=False,
+                 cutout_area=None, cutout_height=None, single_sided_auf=True, chunks=None, return_nm=False):
         """
         Initialisation of AstrometricCorrections, accepting inputs required for
         the running of the optimisation and parameterisation of astrometry of
@@ -199,18 +198,13 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
             Determines whether we perform quadratic or linear scaling for
             hyper-parameter fits to data-driven vs quoted astrometric
             uncertainties. Must either be "quadratic" or "linear."
-        trifolder : string, optional
+        trifilepath : string, optional
             Filepath of the location into which to save TRILEGAL simulations. If
             provided ``tri_hist``, ``tri_mags``, ``dtri_mags``, and ``tri_uncert``
             must be ``None``, and ``triname``, ``maglim_f``, ``magnum``,
             ``tri_num_faint``, ``trifilterset``, and ``trifiltname`` must be
-            given.
-        triname : string, optional
-            Name to give TRILEGAL simulations when downloaded. Is required to have
-            two format ``{}`` options in string, for unique ax1-ax2 sightline
-            combination downloads. Should not contain any file types, just the
-            name of the file up to, but not including, the final ".". Should be
-            ``None`` if ``tri_hist`` et al. are provided.
+            given. Must contain two format ``{}`` options in string, for unique
+            ax1-ax2 sightline combination downloads.
         maglim_f : float, optional
             Magnitude in the ``magnum`` filter down to which sources should be
             drawn for the "faint" sample. Should be ``None`` if ``tri_hist``
@@ -231,7 +225,7 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
         tri_hist : numpy.ndarray or None, optional
             If given, array of differential source densities, per square degree
             per magnitude, in the given filter, as computed by
-            `~macauff.make_tri_counts`. Must be provided if ``trifolder`` is
+            `~macauff.make_tri_counts`. Must be provided if ``trifilepath`` is
             ``None``, else must itself be ``None``.
         tri_mags : numpy.ndarray, optional
             Left-hand magnitude bin edges for each bin in ``tri_hist``. Must be
@@ -317,8 +311,7 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
 
         self.save_folder = save_folder
 
-        self.trifolder = trifolder
-        self.triname = triname
+        self.trifilepath = trifilepath
         self.maglim_f = maglim_f
         self.magnum = magnum
         self.tri_num_faint = tri_num_faint
@@ -493,8 +486,8 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
             raise ValueError("b_cat_func must be given if pregenerate_cutouts is 'False'.")
         if tri_download not in (None, True, False):
             raise ValueError("tri_download must either be True, False, or None.")
-        if self.trifolder is not None and tri_download not in (True, False):
-            raise ValueError("tri_download must either be True or False if trifolder given.")
+        if self.trifilepath is not None and tri_download not in (True, False):
+            raise ValueError("tri_download must either be True or False if trifilepath given.")
         if self.tri_hist is not None and tri_download is not None:
             raise ValueError("tri_download must be None if tri_hist is given.")
         if make_plots and seeing_ranges is None:
@@ -1071,36 +1064,28 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
         # directly into AstrometricCorrections.
         maxmag = bins[:-1][np.argmax(hist_mag)] - 0.5
 
-        if (self.trifolder is not None and (
-                self.tri_download or not
-                os.path.isfile(f'{self.trifolder}/{self.triname.format(ax1_mid, ax2_mid)}_faint.dat'))):
-            # Have to check for the existence of the folder as well as just
-            # the lack of file. However, we can't guarantee that self.triname
-            # doesn't contain folder sub-structure (e.g.
-            # trifolder/ax1/ax2/file_faint.dat) and hence check generically.
-            base_auf_folder = os.path.split(f'{self.trifolder}/'
-                                            f'{self.triname.format(ax1_mid, ax2_mid)}_faint.dat')[0]
-            if not os.path.exists(base_auf_folder):
-                os.makedirs(base_auf_folder, exist_ok=True)
-
+        if self.trifilepath is not None:
+            x, y = os.path.splitext(self.trifilepath.format(ax1_mid, ax2_mid))
+            full_file = x + '_faint' + y
+        if (self.trifilepath is not None and (self.tri_download or not os.path.isfile(full_file))):
             data_bright_dens = np.sum(~np.isnan(b_mag_data) & (b_mag_data <= maxmag)) / self.area
             # pylint: disable-next=fixme
             # TODO: un-hardcode min_bright_tri_number
             min_bright_tri_number = 1000
             min_area = min_bright_tri_number / data_bright_dens
 
-            download_trilegal_simulation(self.trifolder, self.trifilterset, ax1_mid, ax2_mid,
+            download_trilegal_simulation(full_file, self.trifilterset, ax1_mid, ax2_mid,
                                          self.magnum, self.coord_system, self.maglim_f, min_area,
                                          av=1, sigma_av=0, total_objs=self.tri_num_faint)
-            os.system(f'mv {self.trifolder}/trilegal_auf_simulation.dat '
-                      f'{self.trifolder}/{self.triname.format(ax1_mid, ax2_mid)}_faint.dat')
 
         avs = generate_avs_inside_hull(self.hull_points, self.hull_x_shift, self.coord_system)
 
-        if self.trifolder is not None:
+        if self.trifilepath is not None:
+            # Don't pass the _faint-appended filepath to make_tri_counts, since it
+            # handles that itself.
             tri_hist, tri_mags, _, dtri_mags, tri_uncert, _ = make_tri_counts(
-                self.trifolder, self.triname.format(ax1_mid, ax2_mid), self.trifiltname, self.dm,
-                np.amin(b_mag_data), maxmag, al_av=self.gal_alav, av_grid=avs)
+                self.trifilepath.format(ax1_mid, ax2_mid), self.trifiltname, self.dm, np.amin(b_mag_data),
+                maxmag, al_av=self.gal_alav, av_grid=avs)
         else:
             tri_hist, tri_mags = self.tri_hist, self.tri_mags
             dtri_mags, tri_uncert = self.dtri_mags, self.tri_uncert

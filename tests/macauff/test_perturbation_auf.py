@@ -339,7 +339,7 @@ gal_values = GalCountValues()
 
 class TestMakePerturbAUFs():
     def setup_class(self):
-        self.auf_folder = 'auf_folder_9'
+        self.auf_folder = 'auf_folder'
         self.cat_folder = 'cat_folder_9'
         os.system(f'rm -r {self.auf_folder}')
         os.system(f'rm -r {self.cat_folder}')
@@ -368,7 +368,7 @@ class TestMakePerturbAUFs():
 
         a = A()
         a.b_cat_folder_path = self.cat_folder
-        a.b_auf_folder_path = self.auf_folder
+        a.b_auf_file_path = f'{self.auf_folder}/trilegal_auf_simulation_{{}}_{{}}.dat'
         a.b_filt_names = self.filters
         a.b_auf_region_points = self.auf_points
         a.r = self.r
@@ -409,8 +409,8 @@ class TestMakePerturbAUFs():
                 '22.387 22.292 22.015 21.144 19.380 20.878 100.99 22.391 21.637 21.342  0.024\n')
 
         os.makedirs(f'{self.auf_folder}/{self.auf_points[0][0]}/{self.auf_points[0][1]}', exist_ok=True)
-        with open(f'{self.auf_folder}/{self.auf_points[0][0]}/{self.auf_points[0][1]}/'
-                  'trilegal_auf_simulation_faint.dat', "w", encoding='utf-8') as f:
+        with open(f'{self.auf_folder}/trilegal_auf_simulation_{self.auf_points[0][0]}_'
+                  f'{self.auf_points[0][1]}_faint.dat', "w", encoding='utf-8') as f:
             f.write(text)
         f.close()
 
@@ -446,7 +446,6 @@ class TestMakePerturbAUFs():
         self.fake_cm.b_tri_model_mags_interval_list = [None] * len(self.filters)
         self.fake_cm.b_tri_n_bright_sources_star_list = [None] * len(self.filters)
         self.fake_cm.n_pool = 1
-
         with pytest.raises(ValueError, match="The number of simulated objects in this sky patch "):
             make_perturb_aufs(self.fake_cm, 'b')
 
@@ -487,8 +486,8 @@ class TestMakePerturbAUFs():
                     '19.380 20.878 100.99 22.391 21.637 21.342  0.024\n')
             for new_auf_point in new_auf_points:
                 os.makedirs(f'{self.auf_folder}/{new_auf_point[0]}/{new_auf_point[1]}', exist_ok=True)
-                with open(f'{self.auf_folder}/{new_auf_point[0]}/{new_auf_point[1]}/'
-                          'trilegal_auf_simulation_faint.dat', "w", encoding='utf-8') as f:
+                with open(f'{self.auf_folder}/trilegal_auf_simulation_{self.auf_points[0][0]}_'
+                          f'{self.auf_points[0][1]}_faint.dat', "w", encoding='utf-8') as f:
                     f.write(text)
 
             prob_0_draw = psf_mean**0 * np.exp(-psf_mean) / math.factorial(0)
@@ -640,9 +639,8 @@ class TestMakePerturbAUFs():
                 ' 0.02415 -2.701 3.397  4.057 14.00  8.354 0.00 25.523 25.839 24.409 23.524 22.583 '
                 '22.387 22.292 22.015 21.144 19.380 20.878 100.99 22.391 21.637 21.342  0.024\n')
         for new_auf_point in new_auf_points:
-            os.makedirs(f'{self.auf_folder}/{new_auf_point[0]}/{new_auf_point[1]}', exist_ok=True)
-            with open(f'{self.auf_folder}/{new_auf_point[0]}/{new_auf_point[1]}/'
-                      'trilegal_auf_simulation_faint.dat', "w", encoding='utf-8') as f:
+            with open(f'{self.auf_folder}/trilegal_download_9_{self.auf_points[0][0]}_'
+                      f'{self.auf_points[0][1]}_faint.dat', "w", encoding='utf-8') as f:
                 f.write(text)
 
         prob_0_draw = psf_mean**0 * np.exp(-psf_mean) / math.factorial(0)
@@ -683,19 +681,21 @@ class TestMakePerturbAUFs():
         ca_p_ = ca_p_text.replace('\nfilt_names: [G_BP, G, G_RP]', '\nfilt_names: [G]')
         cb_p_ = cb_p_text.replace('\nfilt_names: [W1, W2, W3, W4]', '\nfilt_names: [W1]')
 
-        for ol, nl in zip(['psf_fwhms: [0.12, 0.12, 0.12]', r'auf_folder_path: gaia_auf_folder_{}',
+        for ol, nl in zip(['psf_fwhms: [0.12, 0.12, 0.12]',
+                           r'auf_file_path: gaia_auf_folder/trilegal_download_{}.dat',
                            'tri_filt_names: [G_BP, G, G_RP]', 'gal_al_avs: [1.002, 0.789, 0.589]',
                            'mag_indices: [3, 4, 5]', 'chunk_overlap_col: 6', 'best_mag_index_col: 7'],
-                          ['psf_fwhms: [0.12]', r'auf_folder_path: auf_folder_{}', 'tri_filt_names: [W1]',
-                           'gal_al_avs: [0]', 'mag_indices: [3]', 'chunk_overlap_col: 4',
-                           'best_mag_index_col: 5']):
+                          ['psf_fwhms: [0.12]', r'auf_file_path: auf_folder/trilegal_download_{}.dat',
+                           'tri_filt_names: [W1]', 'gal_al_avs: [0]', 'mag_indices: [3]',
+                           'chunk_overlap_col: 4', 'best_mag_index_col: 5']):
             ca_p_ = ca_p_.replace(ol, nl)
-        for ol, nl in zip(['psf_fwhms: [6.08, 6.84, 7.36, 11.99]', r'auf_folder_path: wise_auf_folder_{}',
+        for ol, nl in zip(['psf_fwhms: [6.08, 6.84, 7.36, 11.99]',
+                           r'auf_file_path: wise_auf_folder/trilegal_download_{}.dat',
                            'tri_filt_names: [W1, W2, W3, W4]', 'gal_al_avs: [0.039, 0.026, 0.015, 0.005]',
                            'mag_indices: [3, 4, 5, 6]', 'chunk_overlap_col: 7', 'best_mag_index_col: 8'],
-                          ['psf_fwhms: [6.08]', 'auf_folder_path: auf_folder_{}', 'tri_filt_names: [W1]',
-                           'gal_al_avs: [0]', 'mag_indices: [3]', 'chunk_overlap_col: 4',
-                           'best_mag_index_col: 5']):
+                          ['psf_fwhms: [6.08]', r'auf_file_path: auf_folder/trilegal_download_{}.dat',
+                           'tri_filt_names: [W1]', 'gal_al_avs: [0]', 'mag_indices: [3]',
+                           'chunk_overlap_col: 4', 'best_mag_index_col: 5']):
             cb_p_ = cb_p_.replace(ol, nl)
 
         os.makedirs('a_snr_mag_9', exist_ok=True)
@@ -705,8 +705,8 @@ class TestMakePerturbAUFs():
 
         # Fake this the easy way both times, then below correct the parameters
         # for the precompute_hist version of the test.
-        old_line = r'auf_folder_path: auf_folder_{}'
-        new_line = (r'auf_folder_path: auf_folder_{}' + '\ndens_hist_tri_location: None\n'
+        old_line = r'auf_file_path: auf_folder/trilegal_download_{}.dat'
+        new_line = (r'auf_file_path: auf_folder/trilegal_download_{}.dat' + '\ndens_hist_tri_location: None\n'
                     'tri_model_mags_location: None\ntri_model_mag_mids_location: None\n'
                     'tri_model_mags_interval_location: None\ntri_dens_uncert_location: None\n'
                     'tri_n_bright_sources_star_location: None')
@@ -728,8 +728,8 @@ class TestMakePerturbAUFs():
                 hist, bins = np.histogram(_a_photo[~np.isnan(_a_photo)], bins='auto')
                 dens_mag = (bins[:-1]+np.diff(bins)/2)[np.argmax(hist)] - 0.5
                 dens, tri_mags, tri_mags_mids, dtri_mags, _, num_bright_obj = make_tri_counts(
-                    f'{self.auf_folder}/{new_auf_points[0][0]}/{new_auf_points[0][1]}/',
-                    'trilegal_auf_simulation', getattr(cm, f'{flag}tri_filt_names')[0], cm.d_mag,
+                    f'{self.auf_folder}/trilegal_download_9_{self.auf_points[0][0]}_'
+                    f'{self.auf_points[0][1]}.dat', getattr(cm, f'{flag}tri_filt_names')[0], cm.d_mag,
                     np.amin(a_photo), dens_mag)
                 setattr(cm, f'{flag}dens_hist_tri_list', [dens])
                 setattr(cm, f'{flag}tri_model_mags_list', [tri_mags])
@@ -737,8 +737,8 @@ class TestMakePerturbAUFs():
                 setattr(cm, f'{flag}tri_model_mags_interval_list', [dtri_mags])
                 setattr(cm, f'{flag}tri_n_bright_sources_star_list', [num_bright_obj])
 
-            cm.a_auf_folder_path = None
-            cm.b_auf_folder_path = None
+            cm.a_auf_file_path = None
+            cm.b_auf_file_path = None
             cm.a_tri_set_name = None
             cm.b_tri_set_name = None
             cm.a_tri_maglim_faint = None
@@ -838,8 +838,8 @@ class TestMakePerturbAUFs():
                 '22.387 22.292 22.015 21.144 19.380 20.878 25.99 22.391 21.637 21.342  0.024\n')
         for new_auf_point in new_auf_points:
             os.makedirs(f'{self.auf_folder}/{new_auf_point[0]}/{new_auf_point[1]}', exist_ok=True)
-            with open(f'{self.auf_folder}/{new_auf_point[0]}/{new_auf_point[1]}/'
-                      'trilegal_auf_simulation_faint.dat', "w", encoding='utf-8') as f:
+            with open(f'{self.auf_folder}/trilegal_download_9_{self.auf_points[0][0]}_'
+                      f'{self.auf_points[0][1]}_faint.dat', "w", encoding='utf-8') as f:
                 f.write(text)
 
         prob_0_draw = psf_mean**0 * np.exp(-psf_mean) / math.factorial(0)
@@ -877,19 +877,21 @@ class TestMakePerturbAUFs():
         cm_p_ = cm_p_text.replace('include_perturb_auf: False', 'include_perturb_auf: True')
         ca_p_ = ca_p_text.replace('\nfilt_names: [G_BP, G, G_RP]', '\nfilt_names: [G]')
         cb_p_ = cb_p_text.replace('\nfilt_names: [W1, W2, W3, W4]', '\nfilt_names: [W1]')
-        for ol, nl in zip(['psf_fwhms: [0.12, 0.12, 0.12]', r'auf_folder_path: gaia_auf_folder_{}',
+        for ol, nl in zip(['psf_fwhms: [0.12, 0.12, 0.12]',
+                           r'auf_file_path: gaia_auf_folder/trilegal_download_{}.dat',
                            'tri_filt_names: [G_BP, G, G_RP]', 'gal_al_avs: [1.002, 0.789, 0.589]',
                            'mag_indices: [3, 4, 5]', 'chunk_overlap_col: 6', 'best_mag_index_col: 7'],
-                          ['psf_fwhms: [0.12]', r'auf_folder_path: auf_folder_{}', 'tri_filt_names: [W1]',
-                           'gal_al_avs: [0]', 'mag_indices: [3]', 'chunk_overlap_col: 4',
-                           'best_mag_index_col: 5']):
+                          ['psf_fwhms: [0.12]', r'auf_file_path: auf_folder/trilegal_download_{}.dat',
+                           'tri_filt_names: [W1]', 'gal_al_avs: [0]', 'mag_indices: [3]',
+                           'chunk_overlap_col: 4', 'best_mag_index_col: 5']):
             ca_p_ = ca_p_.replace(ol, nl)
-        for ol, nl in zip(['psf_fwhms: [6.08, 6.84, 7.36, 11.99]', r'auf_folder_path: wise_auf_folder_{}',
+        for ol, nl in zip(['psf_fwhms: [6.08, 6.84, 7.36, 11.99]',
+                           r'auf_file_path: wise_auf_folder/trilegal_download_{}.dat',
                            'tri_filt_names: [W1, W2, W3, W4]', 'gal_al_avs: [0.039, 0.026, 0.015, 0.005]',
                            'mag_indices: [3, 4, 5, 6]', 'chunk_overlap_col: 7', 'best_mag_index_col: 8'],
-                          ['psf_fwhms: [6.08]', 'auf_folder_path: auf_folder_{}', 'tri_filt_names: [W1]',
-                           'gal_al_avs: [0]', 'mag_indices: [3]', 'chunk_overlap_col: 4',
-                           'best_mag_index_col: 5']):
+                          ['psf_fwhms: [6.08]', 'auf_file_path: auf_folder/trilegal_download_{}.dat',
+                           'tri_filt_names: [W1]', 'gal_al_avs: [0]', 'mag_indices: [3]',
+                           'chunk_overlap_col: 4', 'best_mag_index_col: 5']):
             cb_p_ = cb_p_.replace(ol, nl)
 
         os.makedirs('a_snr_mag_9', exist_ok=True)
@@ -897,8 +899,8 @@ class TestMakePerturbAUFs():
         np.save('a_snr_mag_9/snr_mag_params.npy', np.array([[[0.0109, 46.08, 0.119, 130, 0]]]))
         np.save('b_snr_mag_9/snr_mag_params.npy', np.array([[[0.0109, 46.08, 0.119, 130, 0]]]))
 
-        old_line = r'auf_folder_path: auf_folder_{}'
-        new_line = (r'auf_folder_path: auf_folder_{}' + '\ndens_hist_tri_location: None\n'
+        old_line = r'auf_file_path: auf_folder/trilegal_download_{}.dat'
+        new_line = (r'auf_file_path: auf_folder/trilegal_download_{}.dat' + '\ndens_hist_tri_location: None\n'
                     'tri_model_mags_location: None\ntri_model_mag_mids_location: None\n'
                     'tri_model_mags_interval_location: None\ntri_dens_uncert_location: None\n'
                     'tri_n_bright_sources_star_location: None')
@@ -1011,7 +1013,7 @@ def test_make_tri_counts(run_type):  # pylint: disable=too-many-branches
             out.writelines(script)
     if run_type != "neither":
         dens, tri_mags, tri_mags_mids, _, uncert, n = make_tri_counts(
-            '.', 'trilegal_auf_simulation', 'W1', 0.1, 5 if run_type != "faint" else 10, 20,
+            'trilegal_auf_simulation.dat', 'W1', 0.1, 5 if run_type != "faint" else 10, 20,
             use_bright=run_type != "faint", use_faint=run_type != "bright")
         assert n
         if run_type == "both":
@@ -1047,17 +1049,17 @@ def test_make_tri_counts(run_type):  # pylint: disable=too-many-branches
     else:
         with pytest.raises(ValueError, match="use_bright and use_faint cannot both be "):
             dens, tri_mags, tri_mags_mids, _, uncert, n = make_tri_counts(
-                '.', 'trilegal_auf_simulation', 'W1', 0.1, 10, 20, use_bright=False,
+                'trilegal_auf_simulation.dat', 'W1', 0.1, 10, 20, use_bright=False,
                 use_faint=False)
 
     if run_type == "both":
         with pytest.raises(ValueError, match="If one of al_av or av_grid is provided "):
             dens, tri_mags, tri_mags_mids, _, uncert, n = make_tri_counts(
-                '.', 'trilegal_auf_simulation', 'W1', 0.1, 5, 20,
+                'trilegal_auf_simulation.dat', 'W1', 0.1, 5, 20,
                 use_bright=False, use_faint=True, al_av=0.9)
 
         dens, tri_mags, tri_mags_mids, _, uncert, n = make_tri_counts(
-            '.', 'trilegal_auf_simulation', 'W1', 0.1, 5, 20, use_bright=True, use_faint=True,
+            'trilegal_auf_simulation.dat', 'W1', 0.1, 5, 20, use_bright=True, use_faint=True,
             al_av=0.9, av_grid=np.array([2, 2, 2, 2, 2]))
         assert n
         assert_allclose(tri_mags[0], 5 + 0.9, atol=0.1)
@@ -1087,7 +1089,7 @@ def test_make_tri_counts(run_type):  # pylint: disable=too-many-branches
             out.writelines(lines)
         with pytest.raises(ValueError, match="tri_av_inf_faint cannot be smaller than 0.1 while"):
             dens, tri_mags, tri_mags_mids, _, uncert, n = make_tri_counts(
-                '.', 'trilegal_auf_simulation', 'W1', 0.1, 10, 20,
+                'trilegal_auf_simulation.dat', 'W1', 0.1, 10, 20,
                 use_bright=False, use_faint=True, al_av=0.9, av_grid=np.array([2, 2, 2, 2]))
     if run_type == "bright":
         ol = '#Av at infinity = 1'
@@ -1102,20 +1104,19 @@ def test_make_tri_counts(run_type):  # pylint: disable=too-many-branches
             out.writelines(lines)
         with pytest.raises(ValueError, match="tri_av_inf_bright cannot be smaller than 0.1 while"):
             dens, tri_mags, tri_mags_mids, _, uncert, n = make_tri_counts(
-                '.', 'trilegal_auf_simulation', 'W1', 0.1, 5, 20,
+                'trilegal_auf_simulation.dat', 'W1', 0.1, 5, 20,
                 use_bright=True, use_faint=False, al_av=0.9, av_grid=np.array([2, 2, 2, 2]))
 
 
 @pytest.mark.remote_data
 def test_trilegal_download():
-    tri_folder = '.'
-    download_trilegal_simulation(tri_folder, 'gaiaDR2', 15, 6, 1, 'galactic', 32, 0.01, total_objs=10000)
-    tri_name = 'trilegal_auf_simulation'
-    with open(f'{tri_folder}/{tri_name}.dat', "r", encoding='utf-8') as f:
+    download_trilegal_simulation(os.path.join(os.getcwd(), 'trilegal_auf_simulation.dat'), 'gaiaDR2',
+                                 15, 6, 1, 'galactic', 32, 0.01, total_objs=10000)
+    with open('trilegal_auf_simulation.dat', "r", encoding='utf-8') as f:
         line = f.readline()
     bits = line.split(' ')
     tri_area = float(bits[2])
-    tri = np.genfromtxt(f'{tri_folder}/{tri_name}.dat', delimiter=None, names=True,
+    tri = np.genfromtxt('trilegal_auf_simulation.dat', delimiter=None, names=True,
                         comments='#', skip_header=2)
     assert np.all(tri[:]['G'] <= 32)
     assert tri_area <= 10

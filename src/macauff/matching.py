@@ -161,7 +161,6 @@ class CrossMatch():
             a_coord_or_chunk = 'chunk'
         if self.a_correct_astrometry:
             acbi = self.a_correct_astro_mag_indices_index
-            a_correct_astro_tri_name = '{}/{}/trilegal_auf_simulation'
             t = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             print(f"{t} Rank {self.rank}, chunk {self.chunk_id}: Calculating catalogue 'a' "
                   "uncertainty corrections...")
@@ -173,11 +172,11 @@ class CrossMatch():
                 self.a_correct_mag_slice, self.a_correct_sig_slice, self.n_pool, a_npy_or_csv,
                 a_coord_or_chunk, self.a_pos_and_err_indices, self.a_mag_indices, self.a_mag_unc_indices,
                 self.a_filt_names, self.a_correct_astro_mag_indices_index, self.a_auf_region_frame,
-                self.a_saturation_magnitudes, trifolder=self.a_auf_folder_path,
-                triname=a_correct_astro_tri_name, maglim_f=self.a_tri_maglim_faint,
-                magnum=self.a_tri_filt_num, tri_num_faint=self.a_tri_num_faint,
-                trifilterset=self.a_tri_set_name, trifiltname=self.a_tri_filt_names[acbi],
-                tri_hist=self.a_dens_hist_tri_list[acbi], tri_mags=self.a_tri_model_mags_list[acbi],
+                self.a_saturation_magnitudes, trifilepath=self.a_auf_file_path,
+                maglim_f=self.a_tri_maglim_faint, magnum=self.a_tri_filt_num,
+                tri_num_faint=self.a_tri_num_faint, trifilterset=self.a_tri_set_name,
+                trifiltname=self.a_tri_filt_names[acbi], tri_hist=self.a_dens_hist_tri_list[acbi],
+                tri_mags=self.a_tri_model_mags_list[acbi],
                 dtri_mags=self.a_tri_model_mags_interval_list[acbi],
                 tri_uncert=self.a_tri_dens_uncert_list[acbi],
                 use_photometric_uncertainties=self.a_use_photometric_uncertainties, pregenerate_cutouts=True,
@@ -238,7 +237,6 @@ class CrossMatch():
             b_coord_or_chunk = 'chunk'
         if self.b_correct_astrometry:
             bcbi = self.b_correct_astro_mag_indices_index
-            b_correct_astro_tri_name = '{}/{}/trilegal_auf_simulation'
             t = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             print(f"{t} Rank {self.rank}, chunk {self.chunk_id}: Calculating catalogue 'b' "
                   "uncertainty corrections...")
@@ -250,11 +248,11 @@ class CrossMatch():
                 self.b_correct_mag_slice, self.b_correct_sig_slice, self.n_pool, b_npy_or_csv,
                 b_coord_or_chunk, self.b_pos_and_err_indices, self.b_mag_indices, self.b_mag_unc_indices,
                 self.b_filt_names, self.b_correct_astro_mag_indices_index, self.b_auf_region_frame,
-                self.b_saturation_magnitudes, trifolder=self.b_auf_folder_path,
-                triname=b_correct_astro_tri_name, maglim_f=self.b_tri_maglim_faint,
-                magnum=self.b_tri_filt_num, tri_num_faint=self.b_tri_num_faint,
-                trifilterset=self.b_tri_set_name, trifiltname=self.b_tri_filt_names[bcbi],
-                tri_hist=self.b_dens_hist_tri_list[bcbi], tri_mags=self.b_tri_model_mags_list[bcbi],
+                self.b_saturation_magnitudes, trifilepath=self.b_auf_file_path,
+                maglim_f=self.b_tri_maglim_faint, magnum=self.b_tri_filt_num,
+                tri_num_faint=self.b_tri_num_faint, trifilterset=self.b_tri_set_name,
+                trifiltname=self.b_tri_filt_names[bcbi], tri_hist=self.b_dens_hist_tri_list[bcbi],
+                tri_mags=self.b_tri_model_mags_list[bcbi],
                 dtri_mags=self.b_tri_model_mags_interval_list[bcbi],
                 tri_uncert=self.b_tri_dens_uncert_list[bcbi],
                 use_photometric_uncertainties=self.b_use_photometric_uncertainties,
@@ -634,12 +632,21 @@ class CrossMatch():
                     not os.path.isfile(getattr(self, f'{flag[0]}_cat_csv_file_path'))):
                 raise OSError(f'{flag}cat_csv_file_path does not exist. Please ensure that '
                               f'path for catalogue {catname} is correct.')
-            if getattr(self, f'{flag[0]}_auf_folder_path') is not None:
+            if getattr(self, f'{flag[0]}_auf_file_path') is not None:
                 try:
-                    os.makedirs(getattr(self, f'{flag[0]}_auf_folder_path'), exist_ok=True)
+                    os.makedirs(os.path.dirname(getattr(self, f'{flag[0]}_auf_file_path')), exist_ok=True)
                 except OSError as exc:
                     raise OSError(f"Error when trying to create temporary folder for catalogue {catname} AUF "
-                                  f"outputs. Please ensure that {flag}auf_folder_path is correct.") from exc
+                                  f"outputs. Please ensure that {flag}auf_file_path is correct.") from exc
+        # Force auf_file_path to have two ``_{}`` string formats in it, now
+        # that we have filled in the original one with the chunk ID; these are
+        # for inter-chunk AUF pointings, stored by coordinate in the filename.
+        if self.a_auf_file_path is not None:
+            x, y = os.path.splitext(self.a_auf_file_path)
+            self.a_auf_file_path = x + r"_{}_{}" + y
+        if self.b_auf_file_path is not None:
+            x, y = os.path.splitext(self.b_auf_file_path)
+            self.b_auf_file_path = x + r"_{}_{}" + y
 
         for config, catname in zip([self.cat_a_params_dict, self.cat_b_params_dict], ['a_', 'b_']):
             ind = np.where(chunk_id == np.array(config['chunk_id_list']))[0][0]
@@ -793,7 +800,7 @@ class CrossMatch():
 
         for config, catname in zip([cat_a_config, cat_b_config], ['"a"', '"b"']):
             for check_flag in ['auf_region_type', 'auf_region_frame', 'auf_region_points_per_chunk',
-                               'filt_names', 'cat_name', 'auf_folder_path', 'cat_csv_file_path',
+                               'filt_names', 'cat_name', 'auf_file_path', 'cat_csv_file_path',
                                'correct_astrometry', 'compute_snr_mag_relation', 'chunk_id_list',
                                'pos_and_err_indices', 'mag_indices', 'chunk_overlap_col',
                                'best_mag_index_col', 'csv_has_header']:
@@ -909,14 +916,14 @@ class CrossMatch():
 
         joint_config['joint_folder_path'] = os.path.abspath(joint_config['joint_folder_path'])
 
-        if cat_a_config['auf_folder_path'] == "None":
-            cat_a_config['auf_folder_path'] = None
+        if cat_a_config['auf_file_path'] == "None":
+            cat_a_config['auf_file_path'] = None
         else:
-            cat_a_config['auf_folder_path'] = os.path.abspath(cat_a_config['auf_folder_path'])
-        if cat_b_config['auf_folder_path'] == "None":
-            cat_b_config['auf_folder_path'] = None
+            cat_a_config['auf_file_path'] = os.path.abspath(cat_a_config['auf_file_path'])
+        if cat_b_config['auf_file_path'] == "None":
+            cat_b_config['auf_file_path'] = None
         else:
-            cat_b_config['auf_folder_path'] = os.path.abspath(cat_b_config['auf_folder_path'])
+            cat_b_config['auf_file_path'] = os.path.abspath(cat_b_config['auf_file_path'])
 
         cat_a_config['cat_csv_file_path'] = os.path.abspath(cat_a_config['cat_csv_file_path'])
         cat_b_config['cat_csv_file_path'] = os.path.abspath(cat_b_config['cat_csv_file_path'])
@@ -1146,7 +1153,7 @@ class CrossMatch():
                 # should be; and if any (all) options from A are None, zero
                 # options from B should be None, and vice versa.
                 run_internal_none_flag = [config[name] is None for name in
-                                          ['auf_folder_path', 'tri_set_name', 'tri_maglim_faint',
+                                          ['auf_file_path', 'tri_set_name', 'tri_maglim_faint',
                                           'tri_num_faint', 'download_tri', 'tri_filt_num']]
                 run_internal_none_flag.append(np.all([b is None for b in config['tri_filt_names']]))
                 if not (np.sum(run_internal_none_flag) == 0 or
