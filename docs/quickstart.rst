@@ -29,12 +29,20 @@ and called with
     extent = [0, 0.25, 50, 50.3]
     num_filters_a, num_filters_b = 3, 2
     a_uncert, b_uncert = 0.1, 0.3
-    a_cat_path = 'test_macauff_outputs/name_of_a_folder'
-    b_cat_path = 'test_macauff_outputs/name_of_b_folder'
-    generate_random_data(num_a_source, num_b_source, num_common, extent, num_filters_a,
-                         num_filters_b, a_uncert, b_uncert, a_cat_path, b_cat_path)
+    a_file_path = 'test_macauff_outputs/name_of_a_file.csv'
+    b_file_path = 'test_macauff_outputs/name_of_b_file.csv'
+    (a_astro, b_astro, a_photo, b_photo, a_mag_ind, b_mag_ind, a_true,
+     b_true) = generate_random_data(
+        num_a_source, num_b_source, num_common, extent, num_filters_a,
+        num_filters_b, a_uncert, b_uncert)
+    a_array = np.hstack((a_astro, a_photo, np.zeros((len(a_astro)), bool), a_mag_ind))
+    with open(a_file_path, "w", encoding='utf-8') as f:
+        np.savetxt(f, a_array, delimiter=',')
+    b_array = np.hstack((b_astro, b_photo, np.zeros((len(b_astro)), bool), b_mag_ind))
+    with open(b_file_path, "w", encoding='utf-8') as f:
+        np.savetxt(f, b_array, delimiter=',')
 
-This will save the appropriate three files -- ``con_cat_astro``, ``con_cat_photo``, and ``magref`` -- in the respective catalogue path folders. Additionally, it will save the (zero-indexed) indices in each catalogue that correspond to the counterpart sources in the two catalogues, for "ground truth" comparison.
+This will provide three fake-data arrays -- astrometry (right ascension, declination, uncertainty), photometry (``num_filters_*`` per source), and a "best magnitude" array -- per catalogue, which can then be saved as a comma-separated file. Additionally, it will return the (zero-indexed) indices in each catalogue that correspond to the counterpart sources in the two catalogues, for "ground truth" comparison.
 
 Input Parameters
 ================
@@ -95,6 +103,12 @@ cat_a_params.yaml::
     # Folder for all AUF-related files to be created in. Should be an absolute path, or relative to folder script called in.
     auf_folder_path: test_macauff_outputs/cat_a_auf_folder_{}
 
+    pos_and_err_indices: [0, 1, 2]
+    mag_indices: [3, 4, 5]
+    chunk_overlap_col: 6
+    best_mag_index_col: 7
+    csv_has_header: False
+
     # Filter names are also used in any output file created
     filt_names: [G_BP, G, G_RP]
 
@@ -134,6 +148,12 @@ cat_b_params.yaml::
     cat_csv_file_path: test_macauff_outputs/name_of_b_folder_{}
     # Folder for all AUF-related files to be created in. Should be an absolute path, or relative to folder script called in.
     auf_folder_path: test_macauff_outputs/cat_b_auf_folder_{}/catalogue_b.csv
+
+    pos_and_err_indices: [0, 1, 2]
+    mag_indices: [3, 4, 5, 6]
+    chunk_overlap_col: 7
+    best_mag_index_col: 8
+    csv_has_header: False
 
     # Filter names are also used in any output file created
     filt_names: [W1, W2]
@@ -190,12 +210,12 @@ which will save all intermediate match data to the ``joint_folder_path`` paramet
 
     import numpy as np
     joint_folder_path = 'test_macauff_outputs/test_path_9'
-    a = np.load('{}/con_cat_astro.npy'.format(a_cat_path))
-    b = np.load('{}/con_cat_astro.npy'.format(b_cat_path))
-    cat_a_match_inds = np.load('{}/ac.npy'.format(joint_folder_path))
-    cat_b_match_inds = np.load('{}/bc.npy'.format(joint_folder_path))
+    # Alternatively, load a saved file depending on e.g.
+    # make_output_csv being set to True.
+    cat_a_match_inds = cross_match.ac
+    cat_b_match_inds = cross_match.bc
 
-    a_matches, b_matches = a[cat_a_match_inds], b[cat_b_match_inds]
+    a_matches, b_matches = a_astro[cat_a_match_inds], b_astro[cat_b_match_inds]
 
 You can then, for example, calculate the on-sky separations between these sources
 
