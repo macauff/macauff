@@ -1067,6 +1067,7 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
         if self.trifilepath is not None:
             x, y = os.path.splitext(self.trifilepath.format(ax1_mid, ax2_mid))
             full_file = x + '_faint' + y
+        # pylint: disable-next=possibly-used-before-assignment
         if (self.trifilepath is not None and (self.tri_download or not os.path.isfile(full_file))):
             data_bright_dens = np.sum(~np.isnan(b_mag_data) & (b_mag_data <= maxmag)) / self.area
             # pylint: disable-next=fixme

@@ -564,8 +564,7 @@ class CrossMatch():
             cat_b_file_path = self.cat_b_params_dict['cat_csv_file_path'].format(chunk_id)
 
             for file_path in [cat_a_file_path, cat_b_file_path]:
-                for path, _, files in os.walk(file_path):
-                    chunk_sizes[i] += os.path.getsize(file_path)
+                chunk_sizes[i] += os.path.getsize(file_path)
 
         # Sort chunk list by size, largest to smallest
         chunk_queue_sorted = chunk_queue[np.argsort(chunk_sizes)[::-1]]
@@ -639,11 +638,11 @@ class CrossMatch():
         # Force auf_file_path to have two ``_{}`` string formats in it, now
         # that we have filled in the original one with the chunk ID; these are
         # for inter-chunk AUF pointings, stored by coordinate in the filename.
-        if self.a_auf_file_path is not None:
-            x, y = os.path.splitext(self.a_auf_file_path)
+        if self.a_auf_file_path is not None:  # pylint: disable=access-member-before-definition
+            x, y = os.path.splitext(self.a_auf_file_path)  # pylint: disable=access-member-before-definition
             self.a_auf_file_path = x + r"_{}_{}" + y
-        if self.b_auf_file_path is not None:
-            x, y = os.path.splitext(self.b_auf_file_path)
+        if self.b_auf_file_path is not None:  # pylint: disable=access-member-before-definition
+            x, y = os.path.splitext(self.b_auf_file_path)  # pylint: disable=access-member-before-definition
             self.b_auf_file_path = x + r"_{}_{}" + y
 
         for config, catname in zip([self.cat_a_params_dict, self.cat_b_params_dict], ['a_', 'b_']):

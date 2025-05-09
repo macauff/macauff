@@ -110,7 +110,7 @@ class TestParseCatalogue:
         np.save('test_sig_folder/n_sigs_array.npy', np.array([0.01]))
         np.save('test_sig_folder/snr_mag_params.npy', np.array([[[0, 0, 0, 10.0, 0.0]]]))
 
-        astro, photo, best_index, chunk_overlaps = csv_to_npy(
+        astro, photo, best_index, _ = csv_to_npy(
             'test_data.csv', [0, 1, 2], [4, 5], 6, None, header=header, process_uncerts=True,
             astro_sig_fits_filepath='test_sig_folder', cat_in_radec=False, mn_in_radec=False)
 
@@ -126,7 +126,7 @@ class TestParseCatalogue:
         np.save('test_sig_folder/snr_mag_params.npy',
                 np.array([[[0, 0, 0, a.galactic.l.degree[0], a.galactic.b.degree[0]]]]))
 
-        astro, photo, best_index, chunk_overlaps = csv_to_npy(
+        astro, photo, best_index, _ = csv_to_npy(
             'test_data.csv', [0, 1, 2], [4, 5], 6, None, header=header, process_uncerts=True,
             astro_sig_fits_filepath='test_sig_folder', cat_in_radec=False, mn_in_radec=False)
 

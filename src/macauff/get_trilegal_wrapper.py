@@ -20,7 +20,6 @@ Provides the code to query the online TRILEGAL API and download the results.
 
 
 import os
-import re
 import subprocess as sp
 import sys
 import time

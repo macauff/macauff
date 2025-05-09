@@ -485,9 +485,8 @@ class TestMakePerturbAUFs():
                     '8.354 0.00 25.523 25.839 24.409 23.524 22.583 22.387 22.292 22.015 21.144 '
                     '19.380 20.878 100.99 22.391 21.637 21.342  0.024\n')
             for new_auf_point in new_auf_points:
-                os.makedirs(f'{self.auf_folder}/{new_auf_point[0]}/{new_auf_point[1]}', exist_ok=True)
-                with open(f'{self.auf_folder}/trilegal_auf_simulation_{self.auf_points[0][0]}_'
-                          f'{self.auf_points[0][1]}_faint.dat', "w", encoding='utf-8') as f:
+                with open(f'{self.auf_folder}/trilegal_auf_simulation_{new_auf_point[0][0]}_'
+                          f'{new_auf_point[0][1]}_faint.dat', "w", encoding='utf-8') as f:
                     f.write(text)
 
             prob_0_draw = psf_mean**0 * np.exp(-psf_mean) / math.factorial(0)
@@ -639,8 +638,8 @@ class TestMakePerturbAUFs():
                 ' 0.02415 -2.701 3.397  4.057 14.00  8.354 0.00 25.523 25.839 24.409 23.524 22.583 '
                 '22.387 22.292 22.015 21.144 19.380 20.878 100.99 22.391 21.637 21.342  0.024\n')
         for new_auf_point in new_auf_points:
-            with open(f'{self.auf_folder}/trilegal_download_9_{self.auf_points[0][0]}_'
-                      f'{self.auf_points[0][1]}_faint.dat', "w", encoding='utf-8') as f:
+            with open(f'{self.auf_folder}/trilegal_download_9_{new_auf_point[0][0]}_'
+                      f'{new_auf_point[0][1]}_faint.dat', "w", encoding='utf-8') as f:
                 f.write(text)
 
         prob_0_draw = psf_mean**0 * np.exp(-psf_mean) / math.factorial(0)
@@ -837,9 +836,8 @@ class TestMakePerturbAUFs():
                 ' 0.02415 -2.701 3.397  4.057 14.00  8.354 0.00 25.523 25.839 24.409 23.524 22.583 '
                 '22.387 22.292 22.015 21.144 19.380 20.878 25.99 22.391 21.637 21.342  0.024\n')
         for new_auf_point in new_auf_points:
-            os.makedirs(f'{self.auf_folder}/{new_auf_point[0]}/{new_auf_point[1]}', exist_ok=True)
-            with open(f'{self.auf_folder}/trilegal_download_9_{self.auf_points[0][0]}_'
-                      f'{self.auf_points[0][1]}_faint.dat', "w", encoding='utf-8') as f:
+            with open(f'{self.auf_folder}/trilegal_download_9_{new_auf_point[0][0]}_'
+                      f'{new_auf_point[0][1]}_faint.dat', "w", encoding='utf-8') as f:
                 f.write(text)
 
         prob_0_draw = psf_mean**0 * np.exp(-psf_mean) / math.factorial(0)
