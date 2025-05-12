@@ -385,7 +385,7 @@ class CrossMatch():
                     # Assign chunks until no more work.
                     # Then count "no more work" signals until no more workers.
                     try:
-                        new_chunk = self.chunk_queue.pop(0)
+                        new_chunk, self.chunk_queue = self.chunk_queue[0], self.chunk_queue[1:]
                         signal = self.worker_signals['WORK_REQUEST']
                         t = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                         print(f'{t} Rank {self.rank}: sending rank {worker_id} chunk {new_chunk}')
@@ -555,19 +555,21 @@ class CrossMatch():
         '''
         chunk_queue = np.copy(self.crossmatch_params_dict['chunk_id_list'])
 
-        chunk_sizes = np.empty(len(chunk_queue), dtype=float)
+        chunk_sizes = np.zeros(len(chunk_queue), dtype=float)
+        chunk_id_not_in_completed_chunks = np.empty(len(chunk_queue), dtype=bool)
         for i, chunk_id in enumerate(chunk_queue):
             # Skip completed chunks
-            if chunk_id in completed_chunks:
-                continue
+            chunk_id_not_in_completed_chunks[i] = chunk_id not in completed_chunks
             cat_a_file_path = self.cat_a_params_dict['cat_csv_file_path'].format(chunk_id)
             cat_b_file_path = self.cat_b_params_dict['cat_csv_file_path'].format(chunk_id)
 
             for file_path in [cat_a_file_path, cat_b_file_path]:
                 chunk_sizes[i] += os.path.getsize(file_path)
 
-        # Sort chunk list by size, largest to smallest
-        chunk_queue_sorted = chunk_queue[np.argsort(chunk_sizes)[::-1]]
+        # Sort chunk list by size, largest to smallest, removing already
+        # completed chunks.
+        chunk_queue_sorted = chunk_queue[chunk_id_not_in_completed_chunks][
+            np.argsort(chunk_sizes[chunk_id_not_in_completed_chunks])[::-1]]
 
         return chunk_queue_sorted
 
@@ -640,10 +642,10 @@ class CrossMatch():
         # for inter-chunk AUF pointings, stored by coordinate in the filename.
         if self.a_auf_file_path is not None:  # pylint: disable=access-member-before-definition
             x, y = os.path.splitext(self.a_auf_file_path)  # pylint: disable=access-member-before-definition
-            self.a_auf_file_path = x + r"_{}_{}" + y
+            self.a_auf_file_path = x + r"_{:.2f}_{:.2f}" + y
         if self.b_auf_file_path is not None:  # pylint: disable=access-member-before-definition
             x, y = os.path.splitext(self.b_auf_file_path)  # pylint: disable=access-member-before-definition
-            self.b_auf_file_path = x + r"_{}_{}" + y
+            self.b_auf_file_path = x + r"_{:.2f}_{:.2f}" + y
 
         for config, catname in zip([self.cat_a_params_dict, self.cat_b_params_dict], ['a_', 'b_']):
             ind = np.where(chunk_id == np.array(config['chunk_id_list']))[0][0]
@@ -669,7 +671,8 @@ class CrossMatch():
                         config['snr_mag_params_file_path'].format(chunk_id)))):
                     raise OSError(f"{flag}snr_mag_params_file_path's folder does not exist. Please ensure "
                                   f"that path for catalogue {flag[0]} is correct.")
-                if self.crossmatch_params_dict['include_perturb_auf']:
+                if self.crossmatch_params_dict['include_perturb_auf'] and not (
+                        config['correct_astrometry'] or config['compute_snr_mag_relation']):
                     if not os.path.isfile(os.path.abspath(
                             config['snr_mag_params_file_path'].format(chunk_id))):
                         raise FileNotFoundError(f"The file in {flag}snr_mag_params_file_path does not exist."
