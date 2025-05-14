@@ -290,7 +290,7 @@ def test_circle_area(position, coord):
             # We have a random process in this calculation, will result in small
             # variations in the area.
             if coord != "0-360":
-                assert_allclose(calc_area, np.pi * r**2 / 4, rtol=0.02, atol=5e-5)
+                assert_allclose(calc_area, np.pi * r**2 / 4, rtol=0.04, atol=5e-5)
             else:
                 assert_allclose(calc_area, np.pi * r**2 / 2, rtol=0.02, atol=5e-5)
 
@@ -351,7 +351,7 @@ def test_circle_area(position, coord):
                     # pylint: disable-next=possibly-used-before-assignment
                     chord_area = r**2 * np.arccos(1 - h / r) - (r - h) * np.sqrt(r**2 - (r - h)**2)
                     remaining_area = np.pi * r**2 - chord_area
-                    assert_allclose(calc_area, remaining_area, rtol=0.02, atol=5e-5)
+                    assert_allclose(calc_area, remaining_area, rtol=0.05, atol=5e-5)
                 else:
                     assert_allclose(calc_area, np.pi * r**2, rtol=0.02, atol=5e-5)
 

@@ -95,9 +95,9 @@ subroutine get_circle_area_overlap(cat_ax1, cat_ax2, density_radius, hull_ax1, h
     ! Flags for forks in the logic of calculating circle area.
     logical :: circle_too_near_edge
     ! Area of circle inside rectangle, coordinates and variables of various calculations.
-    real(dp) :: area, x0, y0, x0s(25000), y0s(25000), x1, y1, x2, y2, cross_prod, dot_prod, fraction
+    real(dp) :: area, x0, y0, x0s(100), y0s(100), x1, y1, x2, y2, cross_prod, dot_prod, fraction
     ! Sampled radius and position angles of objects.
-    real(dp) :: r(25000), t(25000)
+    real(dp) :: r(100), t(100)
     ! Distance between circle and a particular rectangle edge; Haversine distance; minimum-vector coordinates;
     ! amount of circle outside a particular rectangle edge; and point-inside-hull parameters.
     real(dp) :: h, d, z, s, xn, yn, chord_area_overlap, sum_of_angles, theta
@@ -143,11 +143,14 @@ subroutine get_circle_area_overlap(cat_ax1, cat_ax2, density_radius, hull_ax1, h
 
         if (circle_too_near_edge) then
             ! Draw samples to determine fraction of circle inside polygon of odd shape.
-            call random_number(t(:))
-            call random_number(r(:))
-            t(:) = t(:) * 2.0_dp * pi
-            ! Note that these are angular offsets and hence convert from degrees to radians!
-            r(:) = sqrt(r(:)) * density_radius / 180.0_dp * pi
+            ! Use the "sunflower seed arrangement" pattern to get a uniform distribution.
+            do k = 1, size(t)
+                t(k) = 2.0_dp * pi * real(k, dp) / ((sqrt(5.0_dp)+1.0_dp)/2.0_dp)**2  ! golden ratio phi
+            end do
+            do k = 1, size(r)
+                ! Note that these are angular offsets and hence convert from degrees to radians!
+                r(k) = sqrt(real(k, dp) - 0.5_dp)/sqrt(real(size(r), dp) - 0.5_dp) * density_radius / 180.0_dp * pi
+            end do
 
             call distribute_objects_in_circle(cat_ax1(j), cat_ax2(j), r, t, x0s, y0s)
 
