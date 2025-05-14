@@ -1554,7 +1554,6 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
         nnf = -1
 
         k = y[_q] * np.diff(bins)[_q] * num
-        log_fac_k = np.log(factorial(k))
         # Ramanujan, The Lost Notebook and other Unpublished Papers, gives
         # an approximation for ln(n!) as n ln(n) - n + 1/6 ln(8 n^3 +
         # 4 n^2 + n + 1/30) + ln(pi)/2. We use this, to avoid overflowing
@@ -1725,7 +1724,9 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
                             lab = rf'sigma_{sig_type} = {sig_val:.4f}", F = {f_val:.2f}{h_str}'
                     else:
                         lab = ''
-                    ax.plot((pdf_bin[:-1]+np.diff(pdf_bin)/2)[q_pdf], modely[q_pdf], ls, label=lab)
+                    modely_norm = np.sum(modely * np.diff(pdf_bin))
+                    ax.plot((pdf_bin[:-1]+np.diff(pdf_bin)/2)[q_pdf], modely[q_pdf] / modely_norm,
+                            ls, label=lab)
 
             if self.make_plots:
                 ax.legend(fontsize=8)
