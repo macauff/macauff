@@ -639,9 +639,7 @@ def calculate_overlap_counts(a, b, minmag, maxmag, search_radius, n_pool, mag_in
 
     full_urepr = full_cat.data.represent_as(UnitSphericalRepresentation)
     full_ucoords = full_cat.realize_frame(full_urepr)
-    # Load the cartesian representation array into shared memory.
-    shared_full_ucoords_xyz = SharedNumpyArray(full_ucoords.cartesian.xyz, f'ucoords_{unique_shared_id}')
-    del full_urepr, full_ucoords
+    del full_urepr
 
     mag_cut_urepr = mag_cut_cat.data.represent_as(UnitSphericalRepresentation)
     mag_cut_ucoords = mag_cut_cat.realize_frame(mag_cut_urepr)
@@ -655,7 +653,7 @@ def calculate_overlap_counts(a, b, minmag, maxmag, search_radius, n_pool, mag_in
         overlap_inds = [0] * len(a)
 
     counter = np.arange(0, len(a))
-    iter_group = zip(counter, itertools.repeat([shared_full_ucoords_xyz, mag_cut_kdt, r, len_or_inds]))
+    iter_group = zip(counter, full_ucoords, itertools.repeat([mag_cut_kdt, r, len_or_inds]))
     with multiprocessing.Pool(n_pool) as pool:
         for stuff in pool.imap_unordered(ball_point_query, iter_group, chunksize=len(a)//n_pool):
             i, result = stuff
@@ -665,8 +663,6 @@ def calculate_overlap_counts(a, b, minmag, maxmag, search_radius, n_pool, mag_in
                 overlap_inds[i] = result
 
     pool.join()
-
-    shared_full_ucoords_xyz.unlink()
 
     if len_or_inds == 'len':
         return overlap_number
@@ -697,10 +693,10 @@ def ball_point_query(iterable):
         ``full_ucoords[i]``, or the indices into ``mag_cut_kdt`` that are
         within the specified range.
     """
-    i, (shared_full_ucoords_xyz, mag_cut_kdt, r, len_or_inds) = iterable
+    i, full_ucoord, (mag_cut_kdt, r, len_or_inds) = iterable
     # query_ball_point returns the neighbours of x (full_ucoords) around self
     # (mag_cut_kdt) within r.
-    kdt_query = mag_cut_kdt.query_ball_point(shared_full_ucoords_xyz.read()[:, i], r, return_sorted=True)
+    kdt_query = mag_cut_kdt.query_ball_point(full_ucoord.cartesian.xyz, r, return_sorted=True)
     if len_or_inds == 'len':
         return i, len(kdt_query)
     return i, kdt_query
