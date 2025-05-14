@@ -34,7 +34,10 @@ def source_pairing(cm, force_no_phot_like=False):
         an astrometry-only match from a with-photometry match.
     '''
     t = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    print(f"{t} Rank {cm.rank}, chunk {cm.chunk_id}: Pairing sources...")
+    if force_no_phot_like:
+        print(f"{t} Rank {cm.rank}, chunk {cm.chunk_id}: Pairing sources, forcing no photometry...")
+    else:
+        print(f"{t} Rank {cm.rank}, chunk {cm.chunk_id}: Pairing sources...")
     sys.stdout.flush()
 
     len_a, len_b = np.sum(cm.agrplen), np.sum(cm.bgrplen)

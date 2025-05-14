@@ -37,9 +37,6 @@ def make_island_groupings(cm):
 
     # Convert from arcseconds to degrees internally.
     max_sep = np.copy(cm.pos_corr_dist) / 3600
-    t = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    print(f"{t} Rank {cm.rank}, chunk {cm.chunk_id}: Creating catalogue islands and overlaps...")
-    sys.stdout.flush()
 
     t = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     print(f"{t} Rank {cm.rank}, chunk {cm.chunk_id}: Calculating maximum overlap...")
@@ -93,6 +90,8 @@ def make_island_groupings(cm):
     # as well get rid of the extraneous column.
     ainds = np.asfortranarray(ainds[:np.amax(asize), :])
     binds = np.asfortranarray(binds[:np.amax(bsize), :])
+    amaxsize = int(np.amax(asize))
+    bmaxsize = int(np.amax(bsize))
 
     t = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     print(f"{t} Rank {cm.rank}, chunk {cm.chunk_id}: Calculating integral lengths...")
