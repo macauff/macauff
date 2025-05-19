@@ -472,7 +472,7 @@ def rect_slice_csv(input_folder, output_folder, input_filename, output_filename,
         n_rows = 0 if not header else -1
         for _ in fp:
             n_rows += 1
-    small_astro = open_memmap(f'{input_folder}/temp_astro.npy', mode='w+', dtype=float, shape=(n_rows, 2))
+    small_astro = np.empty((n_rows, 2), float)
 
     n = 0
     for chunk in pd.read_csv(f'{input_folder}/{input_filename}', chunksize=100000, usecols=astro_cols,
@@ -504,8 +504,6 @@ def rect_slice_csv(input_folder, output_folder, input_filename, output_filename,
 
     df.to_csv(f'{output_folder}/{output_filename}', encoding='utf-8', index=False,
               header=False)
-
-    os.remove(f'{input_folder}/temp_astro.npy')
 
 
 def rect_slice_npy(input_folder, output_folder, rect_coords, padding, mem_chunk_num):
