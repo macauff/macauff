@@ -353,6 +353,15 @@ def convex_hull_area(x, y, return_hull=False):
     # either side of the 0/360 degree boundary but doesn't fully wrap around
     # the entire longitudinal ring.
     x_shift = 180 - np.sum(min_max_lon(x))/2
+    # A quirk of min_max_lon is that if data straddle the 0/360 boundary, but
+    # are mostly on the 360-side, then we get a negative min_max_lon result and
+    # an x_shift larger than 180, instead of an x_shift in the desired range
+    # [-180, 180]. To fix this we can check for x_shift > 180 and subtract 360.
+    # If we don't, then we risk moving objects at e.g. an RA of 359 degrees
+    # (min_max_lon would say this is -1 degrees) aronud by +181 degrees to 540
+    # degrees, rather than backwards to 180 degrees.
+    if x_shift > 180:
+        x_shift -= 360
     new_x = x + x_shift
     new_x[new_x > 360] = new_x[new_x > 360] - 360
     new_x[new_x < 0] = new_x[new_x < 0] + 360

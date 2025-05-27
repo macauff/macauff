@@ -147,3 +147,8 @@ def source_pairing(cm, force_no_phot_like=False):
                       f"{'indices' if tot - big_len_b > 1 else 'index'} recorded, check results "
                       "for duplications carefully")
     sys.stdout.flush()
+
+    print(f"{t} Rank {cm.rank}, chunk {cm.chunk_id}: Catalogue a/b match fraction: "
+          f"{len(getattr(cm, 'ac' + file_extension)) / len(a_astro):.3f}/"
+          f"{len(getattr(cm, 'bc' + file_extension)) / len(b_astro):.3f}")
+    sys.stdout.flush()
