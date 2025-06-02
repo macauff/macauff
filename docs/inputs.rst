@@ -150,7 +150,7 @@ These parameters are required in two separate files, one per catalogue to be cro
 
 These can be divided into those inputs that are always required:
 
-``cat_csv_file_path``, ``cat_name``, ``pos_and_err_indices``, ``mag_indices``, ``chunk_overlap_col``, ``best_mag_index_col``, ``csv_has_header``, ``filt_names``, ``auf_folder_path``, ``auf_region_type``, ``auf_region_frame``, ``auf_region_points_per_chunk``, ``chunk_id_list``, ``correct_astrometry``, and ``compute_snr_mag_relation``;
+``cat_csv_file_path``, ``cat_name``, ``pos_and_err_indices``, ``mag_indices``, ``chunk_overlap_col``, ``best_mag_index_col``, ``csv_has_header``, ``filt_names``, ``auf_file_path``, ``auf_region_type``, ``auf_region_frame``, ``auf_region_points_per_chunk``, ``chunk_id_list``, ``correct_astrometry``, and ``compute_snr_mag_relation``;
 
 those that are only required if the `Joint Parameters`_ option ``include_perturb_auf`` is ``True``:
 
@@ -218,9 +218,9 @@ A boolean, yes/no, for whether there is a header in the first line of the ``.csv
 
 The filter names of the photometric bandpasses used in this catalogue, in the order in which they are saved in ``con_cat_photo``. These will be used to describe any output data files generated after the matching process. Should be a list.
 
-``auf_folder_path``
+``auf_file_path``
 
-The folder into which the Astrometric Uncertainty Function (AUF) related files will be, or have been, saved. Can also either be an absolute or relative path, like ``cat_csv_file_path``. Alternatively, this can (and must) be ``None`` if all parameters related to loading pre-computed TRILEGAL histograms (``dens_hist_tri_location`` et al.) are provided. Requires ``_{}`` in the string for chunking purposes.
+The folder and file name into which the Astrometric Uncertainty Function (AUF) related files will be, or have been, saved. Can also either be an absolute or relative path, like ``cat_csv_file_path``. Alternatively, this can (and must) be ``None`` if all parameters related to loading pre-computed TRILEGAL histograms (``dens_hist_tri_location`` et al.) are provided. Requires ``_{}`` in the string for chunking purposes.
 
 ``auf_region_type``
 
@@ -298,23 +298,23 @@ Integer number of objects to draw from the TRILEGAL simulation -- affecting the 
 
 ``dens_hist_tri_location``
 
-The location on disk of a numpy array, shape ``(len(filt_names), M)`` where ``M`` is a consistent number of magnitude bins, of differential source counts for a given TRILEGAL simulation, in each filter for a specific catalogue. Alternatively, should be ``None`` if ``auf_folder_path`` and associated parameters for the running of TRILEGAL histogram generation within the cross-match run are given. If not ``None``, must have a consistent formatting string which contains ``_{}`` for per-chunk loading with a single string input.
+The location on disk of a numpy array, shape ``(len(filt_names), M)`` where ``M`` is a consistent number of magnitude bins, of differential source counts for a given TRILEGAL simulation, in each filter for a specific catalogue. Alternatively, should be ``None`` if ``auf_file_path`` and associated parameters for the running of TRILEGAL histogram generation within the cross-match run are given. If not ``None``, must have a consistent formatting string which contains ``_{}`` for per-chunk loading with a single string input.
 
 ``tri_model_mags_location``
 
-The location on disk of a numpy array, shape ``(len(filt_names), M)`` where ``M`` is a consistent number of magnitude bins, of the left-hand magnitude bin edges of differential source counts for a given TRILEGAL simulation, in each filter for a specific catalogue. Alternatively, should be ``None`` if ``auf_folder_path`` and associated parameters for the running of TRILEGAL histogram generation within the cross-match run are given. If not ``None``, must have a consistent formatting string which contains ``_{}`` for per-chunk loading with a single string input.
+The location on disk of a numpy array, shape ``(len(filt_names), M)`` where ``M`` is a consistent number of magnitude bins, of the left-hand magnitude bin edges of differential source counts for a given TRILEGAL simulation, in each filter for a specific catalogue. Alternatively, should be ``None`` if ``auf_file_path`` and associated parameters for the running of TRILEGAL histogram generation within the cross-match run are given. If not ``None``, must have a consistent formatting string which contains ``_{}`` for per-chunk loading with a single string input.
 
 ``tri_model_mag_mids_location``
 
-The location on disk of a numpy array, shape ``(len(filt_names), M)`` where ``M`` is a consistent number of magnitude bins, of magnitude bin-middles of differential source counts for a given TRILEGAL simulation, in each filter for a specific catalogue. Alternatively, should be ``None`` if ``auf_folder_path`` and associated parameters for the running of TRILEGAL histogram generation within the cross-match run are given. If not ``None``, must have a consistent formatting string which contains ``_{}`` for per-chunk loading with a single string input.
+The location on disk of a numpy array, shape ``(len(filt_names), M)`` where ``M`` is a consistent number of magnitude bins, of magnitude bin-middles of differential source counts for a given TRILEGAL simulation, in each filter for a specific catalogue. Alternatively, should be ``None`` if ``auf_file_path`` and associated parameters for the running of TRILEGAL histogram generation within the cross-match run are given. If not ``None``, must have a consistent formatting string which contains ``_{}`` for per-chunk loading with a single string input.
 
 ``tri_model_mags_interval_location``
 
-The location on disk of a numpy array, shape ``(len(filt_names), M)`` where ``M`` is a consistent number of magnitude bins, of magnitude bin widths of differential source counts for a given TRILEGAL simulation, in each filter for a specific catalogue. Alternatively, should be ``None`` if ``auf_folder_path`` and associated parameters for the running of TRILEGAL histogram generation within the cross-match run are given. If not ``None``, must have a consistent formatting string which contains ``_{}`` for per-chunk loading with a single string input.
+The location on disk of a numpy array, shape ``(len(filt_names), M)`` where ``M`` is a consistent number of magnitude bins, of magnitude bin widths of differential source counts for a given TRILEGAL simulation, in each filter for a specific catalogue. Alternatively, should be ``None`` if ``auf_file_path`` and associated parameters for the running of TRILEGAL histogram generation within the cross-match run are given. If not ``None``, must have a consistent formatting string which contains ``_{}`` for per-chunk loading with a single string input.
 
 ``tri_n_bright_sources_star_location``
 
-The location on disk of a ``.npy`` file containing the number of simulated bright TRILEGAL objects in the input simulation, one per filter. Should be a 1-D numpy array of shape ``(len(filt_names),)``. Alternatively, should be ``None`` if ``auf_folder_path`` and associated parameters for the running of TRILEGAL histogram generation within the cross-match run are given. If not ``None``, must have a consistent formatting string which contains ``_{}`` for per-chunk loading with a single string input.
+The location on disk of a ``.npy`` file containing the number of simulated bright TRILEGAL objects in the input simulation, one per filter. Should be a 1-D numpy array of shape ``(len(filt_names),)``. Alternatively, should be ``None`` if ``auf_file_path`` and associated parameters for the running of TRILEGAL histogram generation within the cross-match run are given. If not ``None``, must have a consistent formatting string which contains ``_{}`` for per-chunk loading with a single string input.
 
 ``dd_params_path``
 
@@ -476,7 +476,7 @@ The inter-dependency of input parameters on one another, and the output ``CrossM
     ├─* chunk_id_list[5]
     ├─* filt_names
     ├─* cat_name
-    ├─* auf_folder_path[3a, 4]
+    ├─* auf_file_path[3a, 4]
     ├─* cat_csv_file_path[4]
     ├─* pos_and_err_indices
     ├─* mag_indices
