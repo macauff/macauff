@@ -36,11 +36,11 @@ These parameters are only provided in the single, common-parameter input file, a
 
 There are some parameters that must be given in all runs:
 
-``joint_folder_path``, ``include_perturb_auf``, ``include_phot_like``, ``use_phot_priors``, ``pos_corr_dist``, ``cf_region_type``, ``cf_region_frame``, ``cf_region_points_per_chunk``, ``chunk_id_list``, ``real_hankel_points``, ``four_hankel_points``, ``four_max_rho``, ``int_fracs``, ``make_output_csv``, and ``n_pool``;
+``output_save_folder``, ``include_perturb_auf``, ``include_phot_like``, ``use_phot_priors``, ``pos_corr_dist``, ``cf_region_type``, ``cf_region_frame``, ``cf_region_points_per_chunk``, ``chunk_id_list``, ``real_hankel_points``, ``four_hankel_points``, ``four_max_rho``, ``int_fracs``, ``make_output_csv``, and ``n_pool``;
 
 options which need to be supplied if ``make_output_csv`` is ``True``:
 
-``output_csv_folder``, ``match_out_csv_name``, and ``nonmatch_out_csv_name``;
+``match_out_csv_name``, and ``nonmatch_out_csv_name``;
 
 options that must be supplied if ``include_phot_like`` is ``True``:
 
@@ -56,9 +56,9 @@ and those options which only need to be supplied if ``include_perturb_auf`` is `
 Common Parameter Description
 ----------------------------
 
-``joint_folder_path``
+``output_save_folder``
 
-The top-level folder location, into which all intermediate files and folders are placed, when created during the cross-match process. This can either be an absolute file path, or relative to the folder from which your script that called `CrossMatch()` is based. Must contain ``_{}`` for chunk ID-based variations.
+The folder path into which to save the stored ``.csv`` files that are created if ``make_output_csv`` is ``True``, or ``.npy`` files are saved otherwise.
 
 ``include_perturb_auf``
 
@@ -117,10 +117,6 @@ Determines how many CPUs are used when parallelising within ``Python`` using ``m
 ``int_fracs``
 
 The integral fractions of the various so-called "error circles" used in the cross-match process. Should be list of floats, in the order of: bright error circle fraction, "field" error circle fraction, and potential counterpart cutoff limit. Note that bright and "field" fractions should be reasonably separated in value (more than maybe 0.1) to avoid biasing results that use both to measure photometry-based priors, when applicable.
-
-``output_csv_folder``
-
-The folder path into which to save the stored ``.csv`` files that are created if ``make_output_csv`` is ``True``.
 
 ``match_out_csv_name``
 
@@ -455,14 +451,13 @@ The inter-dependency of input parameters on one another, and the output ``CrossM
     ├─> cf_region_frame[2]
     ├─> cf_region_points_per_chunk[5]
     ├─> chunk_id_list[5]
-    ├─> joint_folder_path[4]
+    ├─> output_save_folder
     ├─> pos_corr_dist
     ├─> real_hankel_points
     ├─> four_hankel_points
     ├─> four_max_rho
     ├─> int_fracs
     ├─> make_output_csv
-    │                 ├─> output_csv_folder
     │                 ├─> match_out_csv_name[4]
     │                 ├─> nonmatch_out_csv_name[4]
     │                 ├─* cat_col_names

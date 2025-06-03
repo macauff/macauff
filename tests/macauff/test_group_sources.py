@@ -223,11 +223,11 @@ class TestMakeIslandGroupings():  # pylint: disable=too-many-instance-attributes
         self.a_title, self.b_title = 'gaia', 'wise'
         self.a_cat_csv_file_path = r'gaia_folder/gaia_{}.csv'
         self.b_cat_csv_file_path = r'wise_folder/wise_{}.csv'
-        self.a_auf_folder_path, self.b_auf_folder_path = r'gaia_auf_{}', r'wise_auf_{}'
-        self.joint_folder_path = r'joint_{}'
+        self.a_auf_folder_path, self.b_auf_folder_path = r'gaia_auf', r'wise_auf'
+        self.output_save_folder = r'joint'
         self.chunk_id = 9
         for folder in [os.path.dirname(self.a_cat_csv_file_path),
-                       os.path.dirname(self.b_cat_csv_file_path), self.joint_folder_path,
+                       os.path.dirname(self.b_cat_csv_file_path), self.output_save_folder,
                        self.a_auf_folder_path, self.b_auf_folder_path]:
             os.makedirs(folder.format(self.chunk_id), exist_ok=True)
         self.r = np.linspace(0, self.max_sep, 10000)
@@ -292,7 +292,7 @@ class TestMakeIslandGroupings():  # pylint: disable=too-many-instance-attributes
         with open(os.path.join(os.path.dirname(__file__), 'data/cat_b_params.yaml'),
                   encoding='utf-8') as cb_p:
             self.cb_p_text = cb_p.read()
-        cm_p_ = self.cm_p_text.replace(r'joint_folder_path: test_path_{}', r'joint_folder_path: joint_{}')
+        cm_p_ = self.cm_p_text.replace(r'output_save_folder: test_path', r'output_save_folder: joint')
 
         # Save dummy files into each catalogue folder as well.
         for file, n in zip([self.a_cat_csv_file_path, self.b_cat_csv_file_path], [3, 4]):
@@ -317,7 +317,7 @@ class TestMakeIslandGroupings():  # pylint: disable=too-many-instance-attributes
         self.cm.b_auf_region_points = self.b_auf_pointings
         self.cm.a_cat_csv_file_path = self.a_cat_csv_file_path
         self.cm.b_cat_csv_file_path = self.b_cat_csv_file_path
-        self.cm.joint_folder_path = self.joint_folder_path
+        self.cm.output_save_folder = self.output_save_folder
         self.cm.include_phot_like = self.include_phot_like
         self.cm.use_phot_prior = self.use_phot_prior
         self.cm.j1s = self.j1s
@@ -379,7 +379,7 @@ class TestMakeIslandGroupings():  # pylint: disable=too-many-instance-attributes
                                                    *np.arange(n_c, n_b), 0]))).reshape(1, -1)
 
     def test_make_island_groupings(self):
-        os.system(f'rm -rf {self.joint_folder_path.format(self.chunk_id)}/*')
+        os.system(f'rm -rf {self.output_save_folder.format(self.chunk_id)}/*')
         self._fake_fourier_grid(self.n_a, self.n_b)
         n_a, n_b, n_c = self.n_a, self.n_b, self.n_com
         # For the first, full runthrough call the CrossMatch function instead of
@@ -408,7 +408,7 @@ class TestMakeIslandGroupings():  # pylint: disable=too-many-instance-attributes
 
     @pytest.mark.filterwarnings("ignore:.*island, containing.*")
     def test_mig_extra_reject(self):  # pylint: disable=too-many-statements
-        os.system(f'rm -rf {self.joint_folder_path.format(self.chunk_id)}/*')
+        os.system(f'rm -rf {self.output_save_folder.format(self.chunk_id)}/*')
         self._fake_fourier_grid(self.n_a+10, self.n_b+11)
         n_a, n_b, n_c = self.n_a, self.n_b, self.n_com
         ax_lims = self.ax_lims
@@ -483,7 +483,7 @@ class TestMakeIslandGroupings():  # pylint: disable=too-many-instance-attributes
     @pytest.mark.filterwarnings("ignore:.*island, containing.*")
     # pylint: disable-next=too-many-statements
     def test_mig_no_reject_ax_lims(self):
-        os.system(f'rm -rf {self.joint_folder_path.format(self.chunk_id)}/*')
+        os.system(f'rm -rf {self.output_save_folder.format(self.chunk_id)}/*')
         # _fake_fourier_grid pads for an assumed 4 pointing sources, but we
         # have six here to account for projection effects at the poles.
         self._fake_fourier_grid(self.n_a + 2, self.n_b + 2)
@@ -564,7 +564,7 @@ class TestMakeIslandGroupings():  # pylint: disable=too-many-instance-attributes
         assert self.cm.reject_b is None
 
     def test_make_island_groupings_include_phot_like(self):  # pylint: disable=too-many-statements
-        os.system(f'rm -rf {self.joint_folder_path.format(self.chunk_id)}/*')
+        os.system(f'rm -rf {self.output_save_folder.format(self.chunk_id)}/*')
         self._fake_fourier_grid(self.n_a, self.n_b)
         self.cm.include_phot_like = True
         self.cm.chunk_id = 1

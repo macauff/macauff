@@ -490,7 +490,7 @@ class CrossMatch():
         for lae in loop_array_extensions:
             if self.make_output_csv:
                 npy_to_csv(
-                    [self.a_cat_csv_file_path, self.b_cat_csv_file_path], self, self.output_csv_folder,
+                    [self.a_cat_csv_file_path, self.b_cat_csv_file_path], self, self.output_save_folder,
                     [self.match_out_csv_name, self.a_nonmatch_out_csv_name, self.b_nonmatch_out_csv_name],
                     [self.a_cat_col_names, self.b_cat_col_names], [self.a_cat_col_nums, self.b_cat_col_nums],
                     [self.a_cat_name, self.b_cat_name],
@@ -503,37 +503,37 @@ class CrossMatch():
                 # want a set of .csv tables.
                 ac, bc = getattr(self, f'ac{lae}'), getattr(self, f'bc{lae}')
                 core_matches = ~a_in_overlaps[ac] | ~b_in_overlaps[bc]
-                np.save(f'{self.joint_folder_path}/ac{lae}.npy', ac[core_matches])
-                np.save(f'{self.joint_folder_path}/bc{lae}.npy', bc[core_matches])
+                np.save(f'{self.output_save_folder}/ac_{self.chunk_id}{lae}.npy', ac[core_matches])
+                np.save(f'{self.output_save_folder}/bc_{self.chunk_id}{lae}.npy', bc[core_matches])
                 for fname in ['pc', 'eta', 'xi', 'crptseps', 'acontamflux', 'bcontamflux']:
-                    np.save(f'{self.joint_folder_path}/{fname}{lae}.npy',
+                    np.save(f'{self.output_save_folder}/{fname}_{self.chunk_id}{lae}.npy',
                             getattr(self, f'{fname}{lae}')[core_matches])
                 for fname in ['pacontam', 'pbcontam']:
-                    np.save(f'{self.joint_folder_path}/{fname}{lae}.npy',
+                    np.save(f'{self.output_save_folder}/{fname}_{self.chunk_id}{lae}.npy',
                             getattr(self, f'{fname}{lae}')[:, core_matches])
 
                 af, bf = getattr(self, f'af{lae}'), getattr(self, f'bf{lae}')
                 a_core_nonmatches = ~a_in_overlaps[af]
                 b_core_nonmatches = ~b_in_overlaps[bf]
-                np.save(f'{self.joint_folder_path}/af{lae}.npy', af[a_core_nonmatches])
-                np.save(f'{self.joint_folder_path}/bf{lae}.npy', bf[b_core_nonmatches])
+                np.save(f'{self.output_save_folder}/af_{self.chunk_id}{lae}.npy', af[a_core_nonmatches])
+                np.save(f'{self.output_save_folder}/bf_{self.chunk_id}{lae}.npy', bf[b_core_nonmatches])
                 for fnametype, cnm in zip(['a', 'b'], [a_core_nonmatches, b_core_nonmatches]):
                     for fname_ in ['{}fieldflux', 'pf{}', '{}fieldeta', '{}fieldxi', '{}fieldseps']:
                         fname = fname_.format(fnametype)
-                        np.save(f'{self.joint_folder_path}/{fname}{lae}.npy',
+                        np.save(f'{self.output_save_folder}/{fname}_{self.chunk_id}{lae}.npy',
                                 getattr(self, f'{fname}{lae}')[cnm])
 
                 if self.reject_a is not None:
-                    np.save(f'{self.joint_folder_path}/reject_a{lae}.npy',
+                    np.save(f'{self.output_save_folder}/reject_a_{self.chunk_id}{lae}.npy',
                             np.append(np.append(self.reject_a, ac[~core_matches]), af[~a_core_nonmatches]))
                 else:
-                    np.save(f'{self.joint_folder_path}/reject_a{lae}.npy',
+                    np.save(f'{self.output_save_folder}/reject_a_{self.chunk_id}{lae}.npy',
                             np.append(ac[~core_matches], af[~a_core_nonmatches]))
                 if self.reject_b is not None:
-                    np.save(f'{self.joint_folder_path}/reject_b{lae}.npy',
+                    np.save(f'{self.output_save_folder}/reject_b_{self.chunk_id}{lae}.npy',
                             np.append(np.append(self.reject_b, bc[~core_matches]), bf[~b_core_nonmatches]))
                 else:
-                    np.save(f'{self.joint_folder_path}/reject_b{lae}.npy',
+                    np.save(f'{self.output_save_folder}/reject_b_{self.chunk_id}{lae}.npy',
                             np.append(bc[~core_matches], bf[~b_core_nonmatches]))
 
     def _make_chunk_queue(self, completed_chunks):
@@ -562,6 +562,11 @@ class CrossMatch():
             chunk_id_not_in_completed_chunks[i] = chunk_id not in completed_chunks
             cat_a_file_path = self.cat_a_params_dict['cat_csv_file_path'].format(chunk_id)
             cat_b_file_path = self.cat_b_params_dict['cat_csv_file_path'].format(chunk_id)
+
+            for catname, flag, cfp in zip(['"a"', '"b"'], ['a_', 'b_'], [cat_a_file_path, cat_b_file_path]):
+                if (not os.path.exists(cfp) or not os.path.isfile(cfp)):
+                    raise OSError(f'{flag}cat_csv_file_path does not exist. Please ensure that '
+                                  f'path for catalogue {catname} is correct.')
 
             for file_path in [cat_a_file_path, cat_b_file_path]:
                 chunk_sizes[i] += os.path.getsize(file_path)
@@ -622,9 +627,11 @@ class CrossMatch():
                     setattr(self, f'{cat_prefix}{key}', _item)
 
         # Ensure that we can save to the folders for outputs.
-        if not os.path.exists(self.joint_folder_path):
-            raise OSError("Error when trying to check temporary folder for joint outputs. "
-                          "Please ensure that joint_folder_path is correct.")
+        try:
+            os.makedirs(self.output_save_folder, exist_ok=True)
+        except OSError as exc:
+            raise OSError("Error when trying to create folder to store output csv files in. Please "
+                          "ensure that output_save_folder is correct in joint config file.") from exc
 
         for catname, flag in zip(['"a"', '"b"'], ['a_', 'b_']):
             if (not os.path.exists(getattr(self, f'{flag[0]}_cat_csv_file_path')) or
@@ -793,7 +800,7 @@ class CrossMatch():
 
         for check_flag in ['include_perturb_auf', 'include_phot_like', 'use_phot_priors',
                            'cf_region_type', 'cf_region_frame', 'cf_region_points_per_chunk',
-                           'joint_folder_path', 'pos_corr_dist', 'real_hankel_points', 'chunk_id_list',
+                           'output_save_folder', 'pos_corr_dist', 'real_hankel_points', 'chunk_id_list',
                            'four_hankel_points', 'four_max_rho', 'int_fracs', 'make_output_csv', 'n_pool']:
             if check_flag not in joint_config:
                 raise ValueError(f"Missing key {check_flag} from joint metadata file.")
@@ -914,7 +921,7 @@ class CrossMatch():
                 cat_a_config['auf_region_frame'] != joint_config['cf_region_frame']):
             raise ValueError("Region frames for c/f and AUF creation must all be the same.")
 
-        joint_config['joint_folder_path'] = os.path.abspath(joint_config['joint_folder_path'])
+        joint_config['output_save_folder'] = os.path.abspath(joint_config['output_save_folder'])
 
         if cat_a_config['auf_file_path'] == "None":
             cat_a_config['auf_file_path'] = None
@@ -1395,7 +1402,7 @@ class CrossMatch():
             Dictionary with all of catalogue b's metadata parameters.
         """
 
-        for check_flag in ['output_csv_folder', 'match_out_csv_name', 'nonmatch_out_csv_name']:
+        for check_flag in ['match_out_csv_name', 'nonmatch_out_csv_name']:
             if check_flag not in joint_config:
                 raise ValueError(f"Missing key {check_flag} from joint metadata file.")
 
@@ -1403,13 +1410,6 @@ class CrossMatch():
             for check_flag in ['cat_col_names', 'cat_col_nums', 'extra_col_names', 'extra_col_nums']:
                 if check_flag not in config:
                     raise ValueError(f"Missing key {check_flag} from catalogue {catname} metadata file.")
-
-        joint_config['output_csv_folder'] = os.path.abspath(joint_config['output_csv_folder'])
-        try:
-            os.makedirs(joint_config['output_csv_folder'], exist_ok=True)
-        except OSError as exc:
-            raise OSError("Error when trying to create folder to store output csv files in. Please "
-                          "ensure that output_csv_folder is correct in joint config file.") from exc
 
         for config, catname in zip([cat_a_config, cat_b_config], ['a_', 'b_']):
             # Non-match csv name should be of the format

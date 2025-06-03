@@ -62,7 +62,7 @@ crossmatch_params.yaml::
 
     # File paths
     # Top-level folder for all temporary cross-match files to be created in. Should be absolute path, or relative to folder script called in
-    joint_folder_path: test_macauff_outputs/test_path_{}
+    output_save_folder: test_macauff_outputs/test_path
 
     make_output_csv: False
 
@@ -204,12 +204,12 @@ With both your data and input files, you are now ready to perform your first cro
                                  use_mpi=False)
         cross_match()
 
-which will save all intermediate match data to the ``joint_folder_path`` parameter in ``joint_file_path`` (``test_macauff_outputs/test_path_9`` if you used the files as given above), and eventually produce a list of indices of matches for the two catalogues. Within Python these can be loaded by calling the original binary files
+which will save all intermediate match data to the ``output_save_folder`` parameter in ``joint_file_path`` (``test_macauff_outputs/test_path`` if you used the files as given above), and eventually produce a list of indices of matches for the two catalogues. Within Python these can be loaded by calling the original binary files
 
 .. code-block:: python
 
     import numpy as np
-    joint_folder_path = 'test_macauff_outputs/test_path_9'
+    output_save_folder = 'test_macauff_outputs/test_path'
     # Alternatively, load a saved file depending on e.g.
     # make_output_csv being set to True.
     cat_a_match_inds = cross_match.ac

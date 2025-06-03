@@ -36,7 +36,7 @@ class TestInputs:
         self.a_cat_csv_file_path = os.path.abspath(cat_a_config['cat_csv_file_path'].format(self.chunk_id))
         self.b_cat_csv_file_path = os.path.abspath(cat_b_config['cat_csv_file_path'].format(self.chunk_id))
 
-        os.makedirs(joint_config['joint_folder_path'].format(self.chunk_id), exist_ok=True)
+        os.makedirs(joint_config['output_save_folder'].format(self.chunk_id), exist_ok=True)
         os.makedirs(os.path.dirname(self.a_cat_csv_file_path), exist_ok=True)
         os.makedirs(os.path.dirname(self.b_cat_csv_file_path), exist_ok=True)
 
@@ -337,21 +337,21 @@ class TestInputs:
                         os.path.join(os.path.dirname(__file__), 'data/cat_a_params.yaml'),
                         os.path.join(os.path.dirname(__file__), 'data/cat_b_params.yaml'))
         cm._load_metadata_config(self.chunk_id)
-        assert cm.joint_folder_path == os.path.join(os.getcwd(), 'test_path_9')
-        assert os.path.isdir(os.path.join(os.getcwd(), 'test_path_9'))
+        assert cm.output_save_folder == os.path.join(os.getcwd(), 'test_path')
+        assert os.path.isdir(os.path.join(os.getcwd(), 'test_path'))
         assert cm.a_auf_file_path == os.path.join(os.getcwd(),
-                                                  r'gaia_auf_folder/trilegal_download_9_{}_{}.dat')
+                                                  r'gaia_auf_folder/trilegal_download_9_{:.2f}_{:.2f}.dat')
         assert cm.b_auf_file_path == os.path.join(os.getcwd(),
-                                                  r'wise_auf_folder/trilegal_download_9_{}_{}.dat')
+                                                  r'wise_auf_folder/trilegal_download_9_{:.2f}_{:.2f}.dat')
 
         # List of simple one line config file replacements for error message checking
         for old_line, new_line, match_text, error, fn in zip(
-                [r'joint_folder_path: test_path_{}', r'joint_folder_path: test_path_{}',
+                ['output_save_folder: test_path', 'output_save_folder: test_path',
                  r'auf_file_path: gaia_auf_folder/trilegal_download_{}.dat',
                  r'auf_file_path: wise_auf_folder/trilegal_download_{}.dat'],
-                ['', 'joint_folder_path: /User/test/some/path/\n', '',
+                ['', 'output_save_folder: /User/test/some/path/\n', '',
                  'auf_file_path: /User/test/some/path\n'],
-                ['Missing key', 'Error when trying to check temporary',
+                ['Missing key', 'Error when trying to create folder',
                  'Missing key auf_file_path from catalogue "a"',
                  'folder for catalogue "b" AUF outputs. Please ensure that b_auf_file_path'],
                 [ValueError, OSError, ValueError, OSError], ['c', 'c', 'a', 'b']):
@@ -1012,10 +1012,8 @@ class TestInputs:
                             mock_filename(self.cb_p_text.encode("utf-8")))
             cm._load_metadata_config(self.chunk_id)
 
-        lines = ['make_output_csv: True', '\noutput_csv_folder: output_csv_folder',
-                 '\nmatch_out_csv_name: match.csv']
-        for i, key in enumerate(['output_csv_folder', 'match_out_csv_name',
-                                 'nonmatch_out_csv_name']):
+        lines = ['make_output_csv: True', '\nmatch_out_csv_name: match.csv']
+        for i, key in enumerate(['match_out_csv_name', 'nonmatch_out_csv_name']):
             new_line = ''
             for j in range(i+1):
                 new_line = new_line + lines[j]
@@ -1058,7 +1056,7 @@ class TestInputs:
                         mock_filename(ca_p_.encode("utf-8")),
                         mock_filename(cb_p_.encode("utf-8")))
         cm._load_metadata_config(self.chunk_id)
-        assert cm.output_csv_folder == os.path.abspath('output_csv_folder')
+        assert cm.output_save_folder == os.path.abspath('test_path')
         assert cm.match_out_csv_name == 'match.csv'
         assert cm.b_nonmatch_out_csv_name == 'WISE_nonmatch.csv'
 
@@ -1070,15 +1068,15 @@ class TestInputs:
 
         # Check for various input points of failure:
         for old_line, new_line, error_msg, err_type, cfg_type in zip(
-                ['output_csv_folder: output_csv_folder', 'cat_col_nums: [1, 2, 3]', 'cat_col_nums: [1, 2, 3]',
-                 'cat_col_nums: [1, 2, 3]', 'extra_col_names: None'],
-                ['output_csv_folder: /Volume/test/path/that/fails', 'cat_col_nums: [1, 2, A]',
-                 'cat_col_nums: [1, 2, 3, 4]', 'cat_col_nums: [1, 2, 3.4]', 'extra_col_names: [D, F, G]'],
-                ['Error when trying to create ', 'cat_col_nums should be a list of integers in catalogue "b"',
+                ['cat_col_nums: [1, 2, 3]', 'cat_col_nums: [1, 2, 3]', 'cat_col_nums: [1, 2, 3]',
+                 'extra_col_names: None'],
+                ['cat_col_nums: [1, 2, A]', 'cat_col_nums: [1, 2, 3, 4]', 'cat_col_nums: [1, 2, 3.4]',
+                 'extra_col_names: [D, F, G]'],
+                ['cat_col_nums should be a list of integers in catalogue "b"',
                  'a_cat_col_names and a_cat_col_nums should contain the same',
                  'All elements of a_cat_col_nums', 'Both extra_col_names and extra_col_nums must '
                  'be None if either is None in catalogue "a"'],
-                [OSError, ValueError, ValueError, ValueError, ValueError], ['j', 'b', 'a', 'a', 'a']):
+                [ValueError, ValueError, ValueError, ValueError], ['b', 'a', 'a', 'a']):
             j = cm_p_.replace(old_line, new_line) if cfg_type == 'j' else cm_p_
             a = ca_p_.replace(old_line, new_line) if cfg_type == 'a' else ca_p_
             b = cb_p_.replace(old_line, new_line) if cfg_type == 'b' else cb_p_
@@ -1354,17 +1352,18 @@ class TestInputs:
         ca_p_3 = ca_p_3.replace(r'cat_csv_file_path: gaia_folder/gaia_{}.csv',
                                 r'cat_csv_file_path: file_{}.csv')
         cb_p_3 = cb_p_2.replace('  - 9', '  - 100')
-        os.system('cp -r test_path_9 test_path_100')
+        cb_p_3 = cb_p_3.replace(r'cat_csv_file_path: wise_folder/wise_{}.csv',
+                                r'cat_csv_file_path: file_{}.csv')
         os.system('cp -r gaia_folder_9 gaia_folder_100')
         os.system('cp -r wise_folder_9 wise_folder_100')
         os.system('cp -r a_snr_mag_9 a_snr_mag_100')
         os.system('cp -r b_snr_mag_9 b_snr_mag_100')
         os.system('cp -r wise_auf_folder_9 wise_auf_folder_100')
+        os.system('cp ref_9.csv ref_100.csv')
+        os.system('cp file_9.csv file_100.csv')
         cm = CrossMatch(mock_filename(cm_p_2.encode("utf-8")),
                         mock_filename(cb_p_3.encode("utf-8")),
                         mock_filename(ca_p_3.encode("utf-8")))
-        os.system('cp ref_9.csv ref_100.csv')
-        os.system('cp file_9.csv file_100.csv')
         cm._load_metadata_config(100)
         cm.chunk_id = 100
         cm._initialise_chunk()
@@ -1581,11 +1580,11 @@ class TestInputs:
 
 class TestPostProcess:
     def setup_method(self):
-        self.joint_folder_path = os.path.abspath('joint')
+        self.output_save_folder = os.path.abspath('joint')
         self.a_cat_csv_file_path = os.path.abspath('a_input_csv_folder/gaia_catalogue.csv')
         self.b_cat_csv_file_path = os.path.abspath('b_input_csv_folder/wise_catalogue.csv')
 
-        os.makedirs(f'{self.joint_folder_path}', exist_ok=True)
+        os.makedirs(f'{self.output_save_folder}', exist_ok=True)
         os.makedirs(os.path.dirname(self.a_cat_csv_file_path), exist_ok=True)
         os.makedirs(os.path.dirname(self.b_cat_csv_file_path), exist_ok=True)
 
@@ -1658,7 +1657,7 @@ class TestPostProcess:
 
     @pytest.mark.parametrize("include_phot_like", [True, False])
     def test_postprocess(self, include_phot_like):
-        self.cm.joint_folder_path = self.joint_folder_path
+        self.cm.output_save_folder = self.output_save_folder
         self.cm.a_cat_csv_file_path = self.a_cat_csv_file_path
         self.cm.b_cat_csv_file_path = self.b_cat_csv_file_path
 
@@ -1693,10 +1692,10 @@ class TestPostProcess:
         for ext in exts:
             aino = self.cm.a_in_overlaps
             bino = self.cm.b_in_overlaps
-            ac = np.load(f'{self.joint_folder_path}/ac{ext}.npy')
-            af = np.load(f'{self.joint_folder_path}/af{ext}.npy')
-            bc = np.load(f'{self.joint_folder_path}/bc{ext}.npy')
-            bf = np.load(f'{self.joint_folder_path}/bf{ext}.npy')
+            ac = np.load(f'{self.output_save_folder}/ac_{self.cm.chunk_id}{ext}.npy')
+            af = np.load(f'{self.output_save_folder}/af_{self.cm.chunk_id}{ext}.npy')
+            bc = np.load(f'{self.output_save_folder}/bc_{self.cm.chunk_id}{ext}.npy')
+            bf = np.load(f'{self.output_save_folder}/bf_{self.cm.chunk_id}{ext}.npy')
 
             assert np.all(~aino[ac] | ~bino[bc])
             assert np.all(~aino[af])
@@ -1719,7 +1718,7 @@ class TestPostProcess:
     @pytest.mark.parametrize("include_phot_like", [True, False])
     # pylint: disable-next=too-many-statements,too-many-locals
     def test_postprocess_with_csv(self, include_phot_like):
-        self.cm.joint_folder_path = self.joint_folder_path
+        self.cm.output_save_folder = self.output_save_folder
         self.cm.a_cat_csv_file_path = self.a_cat_csv_file_path
         self.cm.b_cat_csv_file_path = self.b_cat_csv_file_path
 
@@ -1729,8 +1728,8 @@ class TestPostProcess:
         self.cm.make_output_csv = True
 
         # Set a whole load of fake inputs
-        self.cm.output_csv_folder = 'output_csv_folder'
-        os.makedirs(self.cm.output_csv_folder, exist_ok=True)
+        self.cm.output_save_folder = 'output_save_folder'
+        os.makedirs(self.cm.output_save_folder, exist_ok=True)
         self.cm.a_csv_has_header = False
         acat, acatstring = self.make_temp_catalogue(self.na, 8, 100, 'Gaia ')
         np.savetxt(self.cm.a_cat_csv_file_path, acatstring, delimiter=',', fmt='%s', header='')
@@ -1805,9 +1804,9 @@ class TestPostProcess:
             # Check that the outputs make sense, treating this more like a
             # parse_catalogue test than anything else, but importantly
             # checking for correct lengths of produced outputs like pc.
-            assert os.path.isfile(f'{self.cm.output_csv_folder}/{self.cm.match_out_csv_name}')
-            assert os.path.isfile(f'{self.cm.output_csv_folder}/{self.cm.a_nonmatch_out_csv_name}')
-            assert os.path.isfile(f'{self.cm.output_csv_folder}/{self.cm.b_nonmatch_out_csv_name}')
+            assert os.path.isfile(f'{self.cm.output_save_folder}/{self.cm.match_out_csv_name}')
+            assert os.path.isfile(f'{self.cm.output_save_folder}/{self.cm.a_nonmatch_out_csv_name}')
+            assert os.path.isfile(f'{self.cm.output_save_folder}/{self.cm.b_nonmatch_out_csv_name}')
 
             pc = getattr(self.cm, f'pc{ext}')
             eta = getattr(self.cm, f'eta{ext}')
@@ -1834,7 +1833,7 @@ class TestPostProcess:
                               np.append(extra_cols, self.cm.b_extra_col_names))
 
             _name = self.cm.match_out_csv_name[:-4] + ext + self.cm.match_out_csv_name[-4:]
-            df = pd.read_csv(f'{self.cm.output_csv_folder}/{_name}', header=None, names=names)
+            df = pd.read_csv(f'{self.cm.output_save_folder}/{_name}', header=None, names=names)
             for i, col in zip([1, 2, 4, 5], self.cm.a_cat_col_names[1:]):
                 assert_allclose(df[col], acat[ac, i])
 
@@ -1853,7 +1852,7 @@ class TestPostProcess:
             names = np.append(self.cm.a_cat_col_names,
                               ['MATCH_P', 'NNM_SEPARATION', 'NNM_ETA', 'NNM_XI', 'A_AVG_CONT'])
             _name = self.cm.a_nonmatch_out_csv_name[:-4] + ext + self.cm.a_nonmatch_out_csv_name[-4:]
-            df = pd.read_csv(f'{self.cm.output_csv_folder}/{_name}', header=None, names=names)
+            df = pd.read_csv(f'{self.cm.output_save_folder}/{_name}', header=None, names=names)
             for i, col in zip([1, 2, 4, 5], self.cm.a_cat_col_names[1:]):
                 assert_allclose(df[col], acat[af, i])
             assert np.all([df[self.cm.a_cat_col_names[0]].iloc[i] == acatstring[af[i], 0] for i in
@@ -1867,7 +1866,7 @@ class TestPostProcess:
                               ['MATCH_P', 'NNM_SEPARATION', 'NNM_ETA', 'NNM_XI', 'B_AVG_CONT']),
                               self.cm.b_extra_col_names)
             _name = self.cm.b_nonmatch_out_csv_name[:-4] + ext + self.cm.b_nonmatch_out_csv_name[-4:]
-            df = pd.read_csv(f'{self.cm.output_csv_folder}/{_name}', header=None, names=names)
+            df = pd.read_csv(f'{self.cm.output_save_folder}/{_name}', header=None, names=names)
             for i, col in zip([1, 2, 4, 5, 6], self.cm.b_cat_col_names[1:]):
                 assert_allclose(df[col], bcat[bf, i])
             assert np.all([df[self.cm.b_cat_col_names[0]].iloc[i] == bcatstring[bf[i], 0] for i in

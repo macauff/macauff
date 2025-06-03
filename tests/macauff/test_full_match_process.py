@@ -110,8 +110,8 @@ def test_naive_bayes_match(shape, x, y):
     else:
         new_region_points = f'[{x-radius/2:.2f}, {x+radius/2:.2f}, 2, {y}, {y}, 1]'
 
-    for ol, nl in zip([r'joint_folder_path: test_path_{}', '  - [131, 134, 4, -1, 1, 3]'],
-                      [r'joint_folder_path: new_test_path_{}', f'  - {new_region_points}']):
+    for ol, nl in zip([r'output_save_folder: test_path', '  - [131, 134, 4, -1, 1, 3]'],
+                      [r'output_save_folder: new_test_path', f'  - {new_region_points}']):
         cm_p_ = cm_p_.replace(ol, nl)
     if shape == 'circle':
         wowp = "True" if x == 131 else "False"
@@ -125,13 +125,13 @@ def test_naive_bayes_match(shape, x, y):
     cb_p_ = cb_p_text.replace('auf_region_points: [131, 134, 4, -1, 1, 4]',
                               f'auf_region_points: {new_region_points}')
 
-    os.makedirs('new_test_path_9', exist_ok=True)
+    os.makedirs('new_test_path', exist_ok=True)
     cm = CrossMatch(mock_filename(cm_p_.encode("utf-8")), mock_filename(ca_p_.encode("utf-8")),
                     mock_filename(cb_p_.encode("utf-8")))
     cm()
 
-    ac = np.load(f'{cm.joint_folder_path}/ac.npy')
-    bc = np.load(f'{cm.joint_folder_path}/bc.npy')
+    ac = np.load(f'{cm.output_save_folder}/ac_9.npy')
+    bc = np.load(f'{cm.output_save_folder}/bc_9.npy')
     assert len(ac) == n_c
     assert len(bc) == n_c
 
@@ -142,8 +142,8 @@ def test_naive_bayes_match(shape, x, y):
         assert np.all([a_mp[i], b_mp[i]] == [ac[q], bc[q]])
 
     if shape == 'circle' and x == 131:
-        ac = np.load(f'{cm.joint_folder_path}/ac_without_photometry.npy')
-        bc = np.load(f'{cm.joint_folder_path}/bc_without_photometry.npy')
+        ac = np.load(f'{cm.output_save_folder}/ac_9_without_photometry.npy')
+        bc = np.load(f'{cm.output_save_folder}/bc_9_without_photometry.npy')
         assert len(ac) == n_c
         assert len(bc) == n_c
         for i in range(0, n_c):
@@ -152,6 +152,6 @@ def test_naive_bayes_match(shape, x, y):
             q = np.where(a_mp[i] == ac)[0][0]
             assert np.all([a_mp[i], b_mp[i]] == [ac[q], bc[q]])
 
-    os.system('rm -r new_test_path_9')
+    os.system('rm -r new_test_path')
     os.system('rm -r gaia_folder')
     os.system('rm -r wise_folder')

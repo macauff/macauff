@@ -5,7 +5,7 @@ use_phot_priors: False
 
 # File paths
 # Top-level folder for all temporary cross-match files to be created in. Should be absolute path, or relative to folder script called in
-joint_folder_path: test_path_{}
+output_save_folder: test_path
 
 make_output_csv: False
 

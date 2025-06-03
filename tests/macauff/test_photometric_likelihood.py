@@ -25,7 +25,7 @@ class TestOneSidedPhotometricLikelihood:
     def setup_class(self):
         self.cf_points = np.array([[a, b] for a in [131.5, 132.5, 133.5] for b in [-0.5, 0.5]])
         self.cf_areas = np.ones((6), float)
-        self.joint_folder_path = 'test_path_9'
+        self.output_save_folder = 'test_path'
         self.a_cat_folder_path = 'gaia_folder'
         self.b_cat_folder_path = 'wise_folder'
 
@@ -35,7 +35,7 @@ class TestOneSidedPhotometricLikelihood:
 
         self.include_phot_like, self.use_phot_priors = False, False
 
-        os.makedirs(self.joint_folder_path, exist_ok=True)
+        os.makedirs(self.output_save_folder, exist_ok=True)
         os.makedirs(self.a_cat_folder_path, exist_ok=True)
         os.makedirs(self.b_cat_folder_path, exist_ok=True)
 
@@ -348,7 +348,7 @@ class TestFullPhotometricLikelihood:  # pylint: disable=too-many-instance-attrib
     def setup_class(self):  # pylint: disable=too-many-statements
         self.cf_points = np.array([[131.5, -0.5], [131.5, 0]])
         self.cf_areas = 0.25 * np.ones((2), float)
-        self.joint_folder_path = 'test_path'
+        self.output_save_folder = 'test_path'
         self.a_cat_folder_path = 'gaia_folder'
         self.b_cat_folder_path = 'wise_folder'
 

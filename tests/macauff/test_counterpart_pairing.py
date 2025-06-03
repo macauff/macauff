@@ -119,14 +119,14 @@ class TestCounterpartPairing:  # pylint: disable=too-many-instance-attributes
 
         # We have to save various files for the source_pairing function to
         # pick up again.
-        self.joint_folder_path = 'test_path_9'
+        self.output_save_folder = 'test_path'
         self.a_cat_folder_path = 'gaia_folder'
         self.b_cat_folder_path = 'wise_folder'
         self.a_auf_folder_path = 'gaia_auf_folder'
         self.b_auf_folder_path = 'wise_auf_folder'
 
-        os.system(f'rm -r {self.joint_folder_path}')
-        os.makedirs(f'{self.joint_folder_path}', exist_ok=True)
+        os.system(f'rm -r {self.output_save_folder}')
+        os.makedirs(f'{self.output_save_folder}', exist_ok=True)
         for f in [self.a_cat_folder_path, self.b_cat_folder_path,
                   self.a_auf_folder_path, self.b_auf_folder_path]:
             os.makedirs(f, exist_ok=True)
@@ -169,7 +169,7 @@ class TestCounterpartPairing:  # pylint: disable=too-many-instance-attributes
         a.b_modelrefinds = self.bmodelrefinds
         a.a_perturb_auf_outputs = self.a_perturb_auf_outputs
         a.b_perturb_auf_outputs = self.b_perturb_auf_outputs
-        a.joint_folder_path = self.joint_folder_path
+        a.output_save_folder = self.output_save_folder
         a.a_cat_folder_path = self.a_cat_folder_path
         a.b_cat_folder_path = self.b_cat_folder_path
         a.rho = self.rho
@@ -217,8 +217,8 @@ class TestCounterpartPairing:  # pylint: disable=too-many-instance-attributes
         self.nfa, self.nfb = self.fa_priors[0, 0, 0], self.fb_priors[0, 0, 0]
 
     def test_individual_island_probability(self):
-        os.system(f'rm -r {self.joint_folder_path}')
-        os.makedirs(f'{self.joint_folder_path}', exist_ok=True)
+        os.system(f'rm -r {self.output_save_folder}')
+        os.makedirs(f'{self.output_save_folder}', exist_ok=True)
         i = 0
         wrapper = [
             self.a_cat[:, :3], self.a_cat[:, 3:6], self.b_cat[:, :3], self.b_cat[:, 3:7], self.c_array,
@@ -261,8 +261,8 @@ class TestCounterpartPairing:  # pylint: disable=too-many-instance-attributes
         assert_allclose(prob, _prob, rtol=1e-5)
 
     def test_individual_island_zero_probabilities(self):
-        os.system(f'rm -r {self.joint_folder_path}')
-        os.makedirs(f'{self.joint_folder_path}', exist_ok=True)
+        os.system(f'rm -r {self.output_save_folder}')
+        os.makedirs(f'{self.output_save_folder}', exist_ok=True)
         # Fake the extra fire extinguisher likelihood/prior used in the main code.
         fa_array = np.zeros_like(self.fa_array) + 1e-10
         fb_array = np.zeros_like(self.fb_array) + 1e-10
@@ -386,8 +386,8 @@ class TestCounterpartPairing:  # pylint: disable=too-many-instance-attributes
 
     def test_including_b_reject(self):
         # pylint: disable=no-member
-        os.system(f'rm -r {self.joint_folder_path}')
-        os.makedirs(f'{self.joint_folder_path}', exist_ok=True)
+        os.system(f'rm -r {self.output_save_folder}')
+        os.makedirs(f'{self.output_save_folder}', exist_ok=True)
         # Remove the third group, pretending it's rejected in the group stage.
         alist = self.alist[:, [0, 1, 3, 4]]
         blist = self.blist[:, [0, 1, 3, 4]]
@@ -449,8 +449,8 @@ class TestCounterpartPairing:  # pylint: disable=too-many-instance-attributes
 
     def test_small_length_warnings(self):
         # pylint: disable=no-member
-        os.system(f'rm -r {self.joint_folder_path}')
-        os.makedirs(f'{self.joint_folder_path}', exist_ok=True)
+        os.system(f'rm -r {self.output_save_folder}')
+        os.makedirs(f'{self.output_save_folder}', exist_ok=True)
         # Here want to test that the number of recorded matches -- either
         # counterpart, field, or rejected -- is lower than the total length.
         # To achieve this we fake reject length arrays smaller than their
@@ -498,8 +498,8 @@ class TestCounterpartPairing:  # pylint: disable=too-many-instance-attributes
 
     def test_large_length_warnings(self):
         # pylint: disable=no-member
-        os.system(f'rm -r {self.joint_folder_path}')
-        os.makedirs(f'{self.joint_folder_path}', exist_ok=True)
+        os.system(f'rm -r {self.output_save_folder}')
+        os.makedirs(f'{self.output_save_folder}', exist_ok=True)
         # Here want to test that the number of recorded matches -- either
         # counterpart, field, or rejected -- is higher than the total length.
         # To achieve this we fake reject length arrays larger than their
@@ -547,7 +547,7 @@ class TestCounterpartPairing:  # pylint: disable=too-many-instance-attributes
     @pytest.mark.parametrize("with_and_without_photometry", [True, False])
     def test_pair_sources(self, with_and_without_photometry):  # pylint: disable=too-many-statements
         # pylint: disable=no-member
-        os.system(f'rm -r {self.joint_folder_path}/*')
+        os.system(f'rm -r {self.output_save_folder}/*')
         # Same run as test_source_pairing, but called from CrossMatch rather than
         # directly this time.
         cm_p_ = self.cm_p_text.replace('  - [131, 134, 4, -1, 1, 3]', '  - [131, 131, 1, 0, 0, 1]')

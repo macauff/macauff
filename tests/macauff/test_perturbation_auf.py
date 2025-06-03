@@ -36,7 +36,7 @@ class TestCreatePerturbAUF:
         os.makedirs('wise_auf_folder', exist_ok=True)
         os.makedirs('gaia_folder', exist_ok=True)
         os.makedirs('wise_folder', exist_ok=True)
-        os.makedirs('test_path_9', exist_ok=True)
+        os.makedirs('test_path', exist_ok=True)
         self.cm = CrossMatch(os.path.join(os.path.dirname(__file__), 'data/crossmatch_params.yaml'),
                              os.path.join(os.path.dirname(__file__), 'data/cat_a_params.yaml'),
                              os.path.join(os.path.dirname(__file__), 'data/cat_b_params.yaml'))
@@ -368,7 +368,7 @@ class TestMakePerturbAUFs():
 
         a = A()
         a.b_cat_folder_path = self.cat_folder
-        a.b_auf_file_path = f'{self.auf_folder}/trilegal_auf_simulation_{{}}_{{}}.dat'
+        a.b_auf_file_path = f'{self.auf_folder}/trilegal_auf_simulation_{{:.2f}}_{{:.2f}}.dat'
         a.b_filt_names = self.filters
         a.b_auf_region_points = self.auf_points
         a.r = self.r
@@ -408,9 +408,8 @@ class TestMakePerturbAUFs():
                 ' 0.02415 -2.701 3.397  4.057 14.00  8.354 0.00 25.523 25.839 24.409 23.524 22.583 '
                 '22.387 22.292 22.015 21.144 19.380 20.878 100.99 22.391 21.637 21.342  0.024\n')
 
-        os.makedirs(f'{self.auf_folder}/{self.auf_points[0][0]}/{self.auf_points[0][1]}', exist_ok=True)
-        with open(f'{self.auf_folder}/trilegal_auf_simulation_{self.auf_points[0][0]}_'
-                  f'{self.auf_points[0][1]}_faint.dat', "w", encoding='utf-8') as f:
+        with open(f'{self.auf_folder}/trilegal_auf_simulation_{self.auf_points[0][0]:.2f}_'
+                  f'{self.auf_points[0][1]:.2f}_faint.dat', "w", encoding='utf-8') as f:
             f.write(text)
         f.close()
 
@@ -485,8 +484,8 @@ class TestMakePerturbAUFs():
                     '8.354 0.00 25.523 25.839 24.409 23.524 22.583 22.387 22.292 22.015 21.144 '
                     '19.380 20.878 100.99 22.391 21.637 21.342  0.024\n')
             for new_auf_point in new_auf_points:
-                with open(f'{self.auf_folder}/trilegal_auf_simulation_{new_auf_point[0][0]}_'
-                          f'{new_auf_point[0][1]}_faint.dat', "w", encoding='utf-8') as f:
+                with open(f'{self.auf_folder}/trilegal_auf_simulation_{new_auf_point[0]:.2f}_'
+                          f'{new_auf_point[1]:.2f}_faint.dat', "w", encoding='utf-8') as f:
                     f.write(text)
 
             prob_0_draw = psf_mean**0 * np.exp(-psf_mean) / math.factorial(0)
@@ -562,8 +561,8 @@ class TestMakePerturbAUFs():
             perturb_auf_combo = f'{ax1}-{ax2}-{self.filters[0]}'
             for name, size in zip(
                     ['frac', 'flux', 'offset', 'cumulative', 'fourier', 'Narray', 'magarray'],
-                    [(len(self.delta_mag_cuts), 3), (3,), (len(self.r)-1, 3),
-                     (len(self.r)-1, 3), (len(self.rho)-1, 3), (3,), (3,)]):
+                    [(len(self.delta_mag_cuts), 4), (4,), (len(self.r)-1, 4),
+                     (len(self.r)-1, 4), (len(self.rho)-1, 4), (4,), (4,)]):
                 var = p_a_o[perturb_auf_combo][name]
                 assert np.all(var.shape == size)
 
@@ -638,8 +637,8 @@ class TestMakePerturbAUFs():
                 ' 0.02415 -2.701 3.397  4.057 14.00  8.354 0.00 25.523 25.839 24.409 23.524 22.583 '
                 '22.387 22.292 22.015 21.144 19.380 20.878 100.99 22.391 21.637 21.342  0.024\n')
         for new_auf_point in new_auf_points:
-            with open(f'{self.auf_folder}/trilegal_download_9_{new_auf_point[0][0]}_'
-                      f'{new_auf_point[0][1]}_faint.dat', "w", encoding='utf-8') as f:
+            with open(f'{self.auf_folder}/trilegal_download_9_{new_auf_point[0]:.2f}_'
+                      f'{new_auf_point[1]:.2f}_faint.dat', "w", encoding='utf-8') as f:
                 f.write(text)
 
         prob_0_draw = psf_mean**0 * np.exp(-psf_mean) / math.factorial(0)
@@ -727,8 +726,8 @@ class TestMakePerturbAUFs():
                 hist, bins = np.histogram(_a_photo[~np.isnan(_a_photo)], bins='auto')
                 dens_mag = (bins[:-1]+np.diff(bins)/2)[np.argmax(hist)] - 0.5
                 dens, tri_mags, tri_mags_mids, dtri_mags, _, num_bright_obj = make_tri_counts(
-                    f'{self.auf_folder}/trilegal_download_9_{self.auf_points[0][0]}_'
-                    f'{self.auf_points[0][1]}.dat', getattr(cm, f'{flag}tri_filt_names')[0], cm.d_mag,
+                    f'{self.auf_folder}/trilegal_download_9_{self.auf_points[0][0]:.2f}_'
+                    f'{self.auf_points[0][1]:.2f}.dat', getattr(cm, f'{flag}tri_filt_names')[0], cm.d_mag,
                     np.amin(a_photo), dens_mag)
                 setattr(cm, f'{flag}dens_hist_tri_list', [dens])
                 setattr(cm, f'{flag}tri_model_mags_list', [tri_mags])
@@ -836,8 +835,8 @@ class TestMakePerturbAUFs():
                 ' 0.02415 -2.701 3.397  4.057 14.00  8.354 0.00 25.523 25.839 24.409 23.524 22.583 '
                 '22.387 22.292 22.015 21.144 19.380 20.878 25.99 22.391 21.637 21.342  0.024\n')
         for new_auf_point in new_auf_points:
-            with open(f'{self.auf_folder}/trilegal_download_9_{new_auf_point[0][0]}_'
-                      f'{new_auf_point[0][1]}_faint.dat', "w", encoding='utf-8') as f:
+            with open(f'{self.auf_folder}/trilegal_download_9_{new_auf_point[0]:.2f}_'
+                      f'{new_auf_point[1]:.2f}_faint.dat', "w", encoding='utf-8') as f:
                 f.write(text)
 
         prob_0_draw = psf_mean**0 * np.exp(-psf_mean) / math.factorial(0)
