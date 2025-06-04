@@ -4,6 +4,12 @@
 General
 ^^^^^^^
 
+- Refactored folder structure and input parameter file workflow, removing the
+  parameter file, AUF files, and saved output sub-folders. [#90]
+
+- Removed secondary file conversion requirements, loading directly from plain-text
+  input and saving directly to plain-text output as necessary. [#90]
+
 - Relaxed the assumption of rectlinearity in shape of match regions, no longer
   assuming rectangles aligned with a particular coordinate system. [#88]
 
@@ -25,6 +31,9 @@ New Features
 Bug Fixes
 ^^^^^^^^^
 
+- Issue resolved with ``convex_hull_area`` negative longitude resulting in
+  coordinates higher than 360 degrees. [#90]
+
 - Fixed issue with rounding of coordinates when calling ``AstrometricCorrections``
   from within ``macauff``, resulting in two separately saved sets of Galaxy
   source counts in two different files.  [#88]
@@ -36,6 +45,44 @@ Bug Fixes
 
 API Changes
 ^^^^^^^^^^^
+
+- ``joint_folder_path`` and ``output_csv_folder`` merged into
+  ``output_save_folder``. [#90]
+
+- ``cf_regions_points`` and ``auf_region_points`` changed to be a list of
+  inputs, one per chunk, with ``chunk_id_list`` added to map the inputs to
+  each parallelisation. [#90]
+
+- Parameter file extension changed to YAML syntax, with ``chunks_folder_path``
+  changed to separate input file paths in ``crossmatch_params_file_path``,
+  ``cat_a_params_file_path``, and ``cat_b_params_file_path``. [#90]
+
+- ``match_out_csv_name``, ``nonmatch_out_csv_name``, ``cat_csv_file_path``
+  (previously ``cat_folder_path``), ``auf_file_path`` (previously
+  ``auf_folder_path``), ``snr_mag_params_file_path`` (previously
+  ``snr_mag_params_path``), ``input_csv_file_path`` (previously
+  ``input_csv_folder``),  ``correct_astro_save_folder``, ``ref_cat_csv_file_path``
+  (previously ``ref_csv_cat_file_string``), and  ``dens_hist_tri_location`` et
+  al., when not None, must contain string formatting to insert chunk IDs
+  into. [#90]
+
+- Removed ``csv_cat_file_string``, ``cat_csv_name``, and ``input_csv_folder`` as
+  input parameters. [#90]
+
+- ``best_mag_index`` was renamed ``correct_astro_mag_indices_index``. [#90]
+
+- ``pos_and_err_indices`` had its list of integers reversed, always passing
+  the current-catalogue triplet first in both the case of ``correct_astrometry``
+  and ``compute_snr_mag_relation``. [#90]
+
+- CSV-related input parameters made required entry instead of only being asked for
+  when ``correct_astrometry`` was ``True``. [#90]
+
+- ``csv_to_npy`` now returns the arrays created rather than saving to disk. [#90]
+
+- ``npy_to_csv`` requires the ``CrossMatch`` class be passed to it, and no longer
+  reads necessary arrays from disk. It also requires the ``correct_astrometry``
+  flags rather than the now-defunct ``input_npy_folder`` keyword. [#90]
 
 - ``generate_random_data`` generalised to allow for circular test regions to be
   generated, as well as rectangular ones. [#88]
