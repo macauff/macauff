@@ -5,7 +5,6 @@ running an already-established catalogue-catalogue association determination.
 '''
 
 import datetime
-import os
 import sys
 
 import numpy as np
