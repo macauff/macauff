@@ -41,8 +41,14 @@ class CrossMatch():
 
     Parameters
     ----------
-    parameter_file_folder_path : string
-        A path to the location of the folder containing input parameter files.
+    crossmatch_params_file_path : string
+        A path to the location of the joint-match parameter file.
+    cat_a_params_file_path : string
+        A path to the location of the file containing the left-hand catalogue
+        parameters.
+    cat_b_params_file_path : string
+        A path to the location of the input parameter file containing the
+        relevant information for the right-hand catalogue "b".
     resume_file_path : string, optional
         A path to the location of the file containing resume information for the
         cross match.
