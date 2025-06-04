@@ -353,6 +353,15 @@ def convex_hull_area(x, y, return_hull=False):
     # either side of the 0/360 degree boundary but doesn't fully wrap around
     # the entire longitudinal ring.
     x_shift = 180 - np.sum(min_max_lon(x))/2
+    # A quirk of min_max_lon is that if data straddle the 0/360 boundary, but
+    # are mostly on the 360-side, then we get a negative min_max_lon result and
+    # an x_shift larger than 180, instead of an x_shift in the desired range
+    # [-180, 180]. To fix this we can check for x_shift > 180 and subtract 360.
+    # If we don't, then we risk moving objects at e.g. an RA of 359 degrees
+    # (min_max_lon would say this is -1 degrees) aronud by +181 degrees to 540
+    # degrees, rather than backwards to 180 degrees.
+    if x_shift > 180:
+        x_shift -= 360
     new_x = x + x_shift
     new_x[new_x > 360] = new_x[new_x > 360] - 360
     new_x[new_x < 0] = new_x[new_x < 0] + 360
@@ -639,23 +648,21 @@ def calculate_overlap_counts(a, b, minmag, maxmag, search_radius, n_pool, mag_in
 
     full_urepr = full_cat.data.represent_as(UnitSphericalRepresentation)
     full_ucoords = full_cat.realize_frame(full_urepr)
-    # Load the cartesian representation array into shared memory.
-    shared_full_ucoords_xyz = SharedNumpyArray(full_ucoords.cartesian.xyz, f'ucoords_{unique_shared_id}')
-    del full_urepr, full_ucoords
+    del full_urepr
 
     mag_cut_urepr = mag_cut_cat.data.represent_as(UnitSphericalRepresentation)
     mag_cut_ucoords = mag_cut_cat.realize_frame(mag_cut_urepr)
     mag_cut_kdt = _get_cart_kdt(mag_cut_ucoords)
     del mag_cut_urepr, mag_cut_ucoords
 
-    r = (2 * np.sin(Angle(search_radius * u.degree) / 2.0)).value  # pylint: disable=no-member
+    r = (2 * np.sin(Angle(search_radius * u.degree) / 2.0)).value
     if len_or_inds == 'len':
         overlap_number = np.empty(len(a), int)
     else:
         overlap_inds = [0] * len(a)
 
     counter = np.arange(0, len(a))
-    iter_group = zip(counter, itertools.repeat([shared_full_ucoords_xyz, mag_cut_kdt, r, len_or_inds]))
+    iter_group = zip(counter, full_ucoords, itertools.repeat([mag_cut_kdt, r, len_or_inds]))
     with multiprocessing.Pool(n_pool) as pool:
         for stuff in pool.imap_unordered(ball_point_query, iter_group, chunksize=len(a)//n_pool):
             i, result = stuff
@@ -665,8 +672,6 @@ def calculate_overlap_counts(a, b, minmag, maxmag, search_radius, n_pool, mag_in
                 overlap_inds[i] = result
 
     pool.join()
-
-    shared_full_ucoords_xyz.unlink()
 
     if len_or_inds == 'len':
         return overlap_number
@@ -697,10 +702,10 @@ def ball_point_query(iterable):
         ``full_ucoords[i]``, or the indices into ``mag_cut_kdt`` that are
         within the specified range.
     """
-    i, (shared_full_ucoords_xyz, mag_cut_kdt, r, len_or_inds) = iterable
+    i, full_ucoord, (mag_cut_kdt, r, len_or_inds) = iterable
     # query_ball_point returns the neighbours of x (full_ucoords) around self
     # (mag_cut_kdt) within r.
-    kdt_query = mag_cut_kdt.query_ball_point(shared_full_ucoords_xyz.read()[:, i], r, return_sorted=True)
+    kdt_query = mag_cut_kdt.query_ball_point(full_ucoord.cartesian.xyz, r, return_sorted=True)
     if len_or_inds == 'len':
         return i, len(kdt_query)
     return i, kdt_query

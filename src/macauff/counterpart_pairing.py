@@ -34,7 +34,10 @@ def source_pairing(cm, force_no_phot_like=False):
         an astrometry-only match from a with-photometry match.
     '''
     t = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    print(f"{t} Rank {cm.rank}, chunk {cm.chunk_id}: Pairing sources...")
+    if force_no_phot_like:
+        print(f"{t} Rank {cm.rank}, chunk {cm.chunk_id}: Pairing sources, forcing no photometry...")
+    else:
+        print(f"{t} Rank {cm.rank}, chunk {cm.chunk_id}: Pairing sources...")
     sys.stdout.flush()
 
     len_a, len_b = np.sum(cm.agrplen), np.sum(cm.bgrplen)
@@ -143,4 +146,9 @@ def source_pairing(cm, force_no_phot_like=False):
         warnings.warn(f"{tot - big_len_b} additional catalogue b "
                       f"{'indices' if tot - big_len_b > 1 else 'index'} recorded, check results "
                       "for duplications carefully")
+    sys.stdout.flush()
+
+    print(f"{t} Rank {cm.rank}, chunk {cm.chunk_id}: Catalogue a/b match fraction: "
+          f"{len(getattr(cm, 'ac' + file_extension)) / len(a_astro):.3f}/"
+          f"{len(getattr(cm, 'bc' + file_extension)) / len(b_astro):.3f}")
     sys.stdout.flush()

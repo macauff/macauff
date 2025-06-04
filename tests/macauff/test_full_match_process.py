@@ -7,13 +7,11 @@ import os
 
 import numpy as np
 import pytest
-from test_matching import _replace_line
+from test_utils import mock_filename
 
-# pylint: disable=import-error,no-name-in-module
 from macauff.matching import CrossMatch
 from macauff.utils import generate_random_data
 
-# pylint: enable=import-error,no-name-in-module
 # pylint: disable=duplicate-code
 
 
@@ -42,12 +40,9 @@ def test_naive_bayes_match(shape, x, y):
         mid_lon, mid_lat = 0.5 * (extent[0] + extent[1]), 0.5 * (extent[2] + extent[3])
         forced_extent = np.array([radius * np.cos(t) + mid_lon, radius * np.sin(t) + mid_lat]).T
 
-    a_cat, b_cat = 'a_cat', 'b_cat'
-
-    generate_random_data(n_a, n_b, n_c, extent + np.array([1.1*r/3600, -1.1*r/3600, 1.1*r/3600, -1.1*r/3600]),
-                         n_a_filts, n_b_filts, a_astro_sig, b_astro_sig, a_cat, b_cat, shape=shape, seed=9999)
-    a_astro = np.load(f"{a_cat}/con_cat_astro.npy")
-    a_mp = np.load(f"{a_cat}/test_match_indices.npy")
+    a_astro, b_astro, a_photo, b_photo, amagref, bmagref, a_mp, b_mp = generate_random_data(
+        n_a, n_b, n_c, extent + np.array([1.1*r/3600, -1.1*r/3600, 1.1*r/3600, -1.1*r/3600]),
+        n_a_filts, n_b_filts, a_astro_sig, b_astro_sig, shape=shape, seed=9999)
     lonely_counter = 0
     for i in range(len(a_astro)):
         if i not in a_mp:
@@ -67,8 +62,6 @@ def test_naive_bayes_match(shape, x, y):
                 if lonely_counter == len(t)-1:
                     break
             lonely_counter += 1
-    b_astro = np.load(f"{b_cat}/con_cat_astro.npy")
-    b_mp = np.load(f"{b_cat}/test_match_indices.npy")
     lonely_counter = 0
     for i in range(len(b_astro)):
         if i not in b_mp:
@@ -88,95 +81,77 @@ def test_naive_bayes_match(shape, x, y):
                 if lonely_counter == len(t)-1:
                     break
             lonely_counter += 1
-    np.save(f"{a_cat}/con_cat_astro.npy", a_astro)
-    np.save(f"{b_cat}/con_cat_astro.npy", b_astro)
+
+    a_cat = np.hstack((a_astro, a_photo, np.zeros((len(a_astro), 1), bool), amagref.reshape(-1, 1)))
+    b_cat = np.hstack((b_astro, b_photo, np.zeros((len(b_astro), 1), bool), bmagref.reshape(-1, 1)))
+    os.makedirs('gaia_folder', exist_ok=True)
+    with open('gaia_folder/gaia_9.csv', "w", encoding='utf-8') as f:
+        np.savetxt(f, a_cat, delimiter=",")
+    os.makedirs('wise_folder', exist_ok=True)
+    with open('wise_folder/wise_9.csv', "w", encoding='utf-8') as f:
+        np.savetxt(f, b_cat, delimiter=",")
 
     if shape == 'circle':
         n_a, n_b, n_c = len(a_astro), len(b_astro), len(a_mp)
 
-    # Ensure output chunk directory exists
-    os.makedirs(os.path.join(os.path.dirname(__file__), "data/chunk0"), exist_ok=True)
-
-    ol, nl = 'pos_corr_dist = 11', f'pos_corr_dist = {r:.2f}\n'
-    with open(os.path.join(os.path.dirname(__file__), 'data/crossmatch_params.txt'),
-              encoding='utf-8') as file:
-        f = file.readlines()
-    idx = np.where([ol in line for line in f])[0][0]
-    _replace_line(os.path.join(os.path.dirname(__file__), 'data/crossmatch_params.txt'),
-                  idx, nl, out_file=os.path.join(os.path.dirname(__file__),
-                  'data/chunk0/crossmatch_params_.txt'))
+    with open(os.path.join(os.path.dirname(__file__), 'data/crossmatch_params.yaml'),
+              encoding='utf-8') as cm_p:
+        cm_p_text = cm_p.read()
+    with open(os.path.join(os.path.dirname(__file__), 'data/cat_a_params.yaml'),
+              encoding='utf-8') as ca_p:
+        ca_p_text = ca_p.read()
+    with open(os.path.join(os.path.dirname(__file__), 'data/cat_b_params.yaml'),
+              encoding='utf-8') as cb_p:
+        cb_p_text = cb_p.read()
+    cm_p_ = cm_p_text.replace('pos_corr_dist: 11', f'pos_corr_dist: {r:.2f}')
 
     if shape == 'rectangle':
-        new_region_points = f'{x} {x} 1 {y} {y} 1'
+        new_region_points = f'[{x}, {x}, 1, {y}, {y}, 1]'
     else:
-        new_region_points = f'{x-radius/2:.2f} {x+radius/2:.2f} 2 {y} {y} 1'
+        new_region_points = f'[{x-radius/2:.2f}, {x+radius/2:.2f}, 2, {y}, {y}, 1]'
 
-    for ol, nl in zip(['joint_folder_path = test_path', 'cf_region_points = 131 134 4 -1 1 3'],
-                      ['joint_folder_path = new_test_path\n', f'cf_region_points = {new_region_points}\n']):
-        with open(os.path.join(os.path.dirname(__file__), 'data/crossmatch_params.txt'),
-                  encoding='utf-8') as file:
-            f = file.readlines()
-        idx = np.where([ol in line for line in f])[0][0]
-        _replace_line(os.path.join(os.path.dirname(__file__), 'data/chunk0/crossmatch_params_.txt'),
-                      idx, nl)
+    for ol, nl in zip([r'output_save_folder: test_path', '  - [131, 134, 4, -1, 1, 3]'],
+                      [r'output_save_folder: new_test_path', f'  - {new_region_points}']):
+        cm_p_ = cm_p_.replace(ol, nl)
     if shape == 'circle':
-        wowp = "yes" if x == 131 else "no"
-        for ol, nl in zip(['include_phot_like = no', 'use_phot_priors = no'],
-                          [f'include_phot_like = yes\nwith_and_without_photometry = {wowp}\n',
-                           'use_phot_priors = yes\n']):
-            with open(os.path.join(os.path.dirname(__file__), 'data/chunk0/crossmatch_params_.txt'),
-                      encoding='utf-8') as file:
-                f = file.readlines()
-            idx = np.where([ol in line for line in f])[0][0]
-            _replace_line(os.path.join(os.path.dirname(__file__), 'data/chunk0/crossmatch_params_.txt'),
-                          idx, nl)
+        wowp = "True" if x == 131 else "False"
+        for ol, nl in zip(['include_phot_like: False', 'use_phot_priors: False'],
+                          [f'include_phot_like: True\nwith_and_without_photometry: {wowp}',
+                           'use_phot_priors: True']):
+            cm_p_ = cm_p_.replace(ol, nl)
 
-    ol = 'auf_region_points = 131 134 4 -1 1 {}'
-    nl = f'auf_region_points = {new_region_points}\n'
-    for file_name in ['cat_a_params', 'cat_b_params']:
-        _ol = ol.format('3' if '_a_' in file_name else '4')
-        with open(os.path.join(os.path.dirname(__file__), f'data/{file_name}.txt'), encoding='utf-8') as file:
-            f = file.readlines()
-        idx = np.where([_ol in line for line in f])[0][0]
-        _replace_line(os.path.join(os.path.dirname(__file__), f'data/{file_name}.txt'),
-                      idx, nl, out_file=os.path.join(os.path.dirname(__file__),
-                      f'data/chunk0/{file_name}_.txt'))
-
-    for cat, ol, nl in zip(['cat_a_params', 'cat_b_params'], ['cat_folder_path = gaia_folder',
-                           'cat_folder_path = wise_folder'], ['cat_folder_path = a_cat\n',
-                           'cat_folder_path = b_cat\n']):
-        with open(os.path.join(os.path.dirname(__file__), f'data/{cat}.txt'), encoding='utf-8') as file:
-            f = file.readlines()
-        idx = np.where([ol in line for line in f])[0][0]
-        _replace_line(os.path.join(os.path.dirname(__file__), f'data/chunk0/{cat}_.txt'), idx, nl)
+    ca_p_ = ca_p_text.replace('auf_region_points: [131, 134, 4, -1, 1, 3]',
+                              f'auf_region_points: {new_region_points}')
+    cb_p_ = cb_p_text.replace('auf_region_points: [131, 134, 4, -1, 1, 4]',
+                              f'auf_region_points: {new_region_points}')
 
     os.makedirs('new_test_path', exist_ok=True)
-    cm = CrossMatch(os.path.join(os.path.dirname(__file__), 'data'))
+    cm = CrossMatch(mock_filename(cm_p_.encode("utf-8")), mock_filename(ca_p_.encode("utf-8")),
+                    mock_filename(cb_p_.encode("utf-8")))
     cm()
 
-    ac = np.load(f'{cm.joint_folder_path}/ac.npy')
-    bc = np.load(f'{cm.joint_folder_path}/bc.npy')
+    ac = np.load(f'{cm.output_save_folder}/ac_9.npy')
+    bc = np.load(f'{cm.output_save_folder}/bc_9.npy')
     assert len(ac) == n_c
     assert len(bc) == n_c
 
-    a_right_inds = np.load(f'{a_cat}/test_match_indices.npy')
-    b_right_inds = np.load(f'{b_cat}/test_match_indices.npy')
-
     for i in range(0, n_c):
-        assert a_right_inds[i] in ac
-        assert b_right_inds[i] in bc
-        q = np.where(a_right_inds[i] == ac)[0][0]
-        assert np.all([a_right_inds[i], b_right_inds[i]] == [ac[q], bc[q]])
+        assert a_mp[i] in ac
+        assert b_mp[i] in bc
+        q = np.where(a_mp[i] == ac)[0][0]
+        assert np.all([a_mp[i], b_mp[i]] == [ac[q], bc[q]])
 
     if shape == 'circle' and x == 131:
-        ac = np.load(f'{cm.joint_folder_path}/ac_without_photometry.npy')
-        bc = np.load(f'{cm.joint_folder_path}/bc_without_photometry.npy')
+        ac = np.load(f'{cm.output_save_folder}/ac_9_without_photometry.npy')
+        bc = np.load(f'{cm.output_save_folder}/bc_9_without_photometry.npy')
         assert len(ac) == n_c
         assert len(bc) == n_c
         for i in range(0, n_c):
-            assert a_right_inds[i] in ac
-            assert b_right_inds[i] in bc
-            q = np.where(a_right_inds[i] == ac)[0][0]
-            assert np.all([a_right_inds[i], b_right_inds[i]] == [ac[q], bc[q]])
+            assert a_mp[i] in ac
+            assert b_mp[i] in bc
+            q = np.where(a_mp[i] == ac)[0][0]
+            assert np.all([a_mp[i], b_mp[i]] == [ac[q], bc[q]])
 
     os.system('rm -r new_test_path')
+    os.system('rm -r gaia_folder')
+    os.system('rm -r wise_folder')

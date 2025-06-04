@@ -5,7 +5,6 @@ running an already-established catalogue-catalogue association determination.
 '''
 
 import datetime
-import os
 import sys
 
 import numpy as np
@@ -38,7 +37,6 @@ class Macauff():
         Call each step in a cross-match in turn.
         '''
 
-        os.system(f'rm -r {self.cm.joint_folder_path}/*')
         # The first step is to create the perturbation AUF components, if needed.
         self.create_perturb_auf()
 

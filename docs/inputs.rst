@@ -4,24 +4,9 @@ Input Parameters
 
 This page details the various inputs expected by `~macauff.CrossMatch` via its input parameter files. These are split into two main sections: inputs that both catalogues need separately (contained in their respective catalogue parameters file) and inputs that are defined with respect to the catalogue-catalogue cross-match.
 
-These input parameters are required to be in ``crossmatch_params*.txt`` for the `Joint Parameters`_ options, and ``cat_a_params*.txt``, ``cat_b_params*.txt`` for the `Catalogue-specific Parameters`_ options, where the asterisk indicates a wildcard -- i.e., the text files must end ``.txt`` and begin e.g. ``crossmatch_params``,  but can contain text between those two parts of the file.
+These input parameters are required to be in a file for the `Joint Parameters`_ options, and two further, separate files for the `Catalogue-specific Parameters`_ options.
 
-Depending on the size of the match being performed, it is likely that you may want to use the MPI parallelisation option to save runtime or memory overhead, splitting your matches into "chunks." Even if your cross-match area is small enough that you only have a single file per catalogue, this is treated as a single chunk. Each individual chunk -- or your only chunk -- is required to have its own set of three input text parameter files, within folders inside ``chunks_folder_path`` as passed to `~macauff.CrossMatch`. Most of the parameters within these files will be the same across all chunks -- you'll likely always want to include the perturbation component of the AUF or include photometric likelihoods, or use the same filters across all sub-catalogue cross-matches -- but some will vary on a per-chunk basis, most notably anything that involves astrometric coordinates.
-
-The sub-folder structure should look something like::
-
-    /path/to/your/chunks_folder_path
-                                   ├─── 2017
-                                   │       ├── crossmatch_params_2017.txt
-                                   │       ├── cat_a_params_2017.txt
-                                   │       └── cat_b_params_2017.txt
-                                   │
-                                   ├─── 2018
-                                   │       ├── crossmatch_params_2018.txt
-                                   │       ├── cat_a_params_2018.txt
-                                   │       └── cat_b_params_2018.txt
-
-where e.g. ``crossmatch_params_2017.txt`` and ``crossmatch_params_2018.txt`` would both contain all of the "Joint Parameters" parameters necessary to run the matches in their respective chunks; again, significant numbers of these would be the same, but e.g. ``cf_region_points`` would differ.
+Depending on the size of the match being performed, it is likely that you may want to use the MPI parallelisation option to save runtime or memory overhead, splitting your matches into "chunks." Even if your cross-match area is small enough that you only have a single file per catalogue, this is treated as a single chunk. Most cross-match parameters are common across all chunks -- such as the input photometric magnitude columns, or whether certain match algorithm components are turned on or not -- but some are unique to each chunk. Certain parameters will be constant but vary with the chunk ID, and will require a ``_{}`` within their input parameter, such that Python's ``.format`` functionality will insert the designation. Others will be totally static, while any input keywords ending in ``_per_chunk``, as well as specifically the ``chunk_id_list`` will be a multi-line YAML entry, one line per chunk (such that the first line of ``chunk_id_list`` matches the first line of each per-chunk entry, and so on).
 
 For a simple example of how this works for a one-chunk cross-match, see :doc:`quickstart`, and for more details on the inputs and outputs from individual functions within the cross-match process check the :doc:`documentation<macauff>`.
 
@@ -30,7 +15,7 @@ CrossMatch Inputs
 
 As well as the parameters required that are ingested through the input parameters files, `~macauff.CrossMatch` itself requires some input arguments.
 
-- ``chunks_folder_path``: the directory in which the folders containing parameters files are stored
+- ``crossmatch_params_file_path``, ``cat_a_params_file_path``, and ``cat_b_params_file_path``: the file paths to the three input metadata files containing parameters files
 
 - ``use_mpi``: boolean flag for whether to parallelise distribution of chunks using MPI. If ``False`` chunks will be run in serial; defaults to ``True``, but with a fallback for if the appropriate module is not available.
 
@@ -51,11 +36,11 @@ These parameters are only provided in the single, common-parameter input file, a
 
 There are some parameters that must be given in all runs:
 
-``joint_folder_path``, ``include_perturb_auf``, ``include_phot_like``, ``use_phot_priors``, ``pos_corr_dist``, ``cf_region_type``, ``cf_region_frame``, ``cf_region_points``, ``real_hankel_points``, ``four_hankel_points``, ``four_max_rho``, ``int_fracs``, ``make_output_csv``, and ``n_pool``;
+``output_save_folder``, ``include_perturb_auf``, ``include_phot_like``, ``use_phot_priors``, ``pos_corr_dist``, ``cf_region_type``, ``cf_region_frame``, ``cf_region_points_per_chunk``, ``chunk_id_list``, ``real_hankel_points``, ``four_hankel_points``, ``four_max_rho``, ``int_fracs``, ``make_output_csv``, and ``n_pool``;
 
 options which need to be supplied if ``make_output_csv`` is ``True``:
 
-``output_csv_folder``, ``match_out_csv_name``, and ``nonmatch_out_csv_name``;
+``match_out_csv_name``, and ``nonmatch_out_csv_name``;
 
 options that must be supplied if ``include_phot_like`` is ``True``:
 
@@ -71,9 +56,9 @@ and those options which only need to be supplied if ``include_perturb_auf`` is `
 Common Parameter Description
 ----------------------------
 
-``joint_folder_path``
+``output_save_folder``
 
-The top-level folder location, into which all intermediate files and folders are placed, when created during the cross-match process. This can either be an absolute file path, or relative to the folder from which your script that called `CrossMatch()` is based.
+The folder path into which to save the stored ``.csv`` files that are created if ``make_output_csv`` is ``True``, or ``.npy`` files are saved otherwise.
 
 ``include_perturb_auf``
 
@@ -102,12 +87,16 @@ This flag controls whether the areas in which photometry-related variables (like
 
 This allows either ``equatorial`` or ``galactic`` frame coordinates to be used in the match process.
 
-``cf_region_points``
+``cf_region_points_per_chunk``
 
-The list of pointings for which to run simulations of perturbations due to blended sources, if applicable. If ``cf_region_type`` is ``rectangle``, then ``cf_region_points`` accepts six numbers: ``start longitude, end longitude, number of longitude points, start latitude, end latitude, number of latitude points``; if ``points`` then tuples must be of the syntax ``(a, b), (c, d)`` where ``a`` and ``c`` are RA or Galactic Longitude, and ``b`` and ``d`` are Declination or Galactic Latitude.
+The list of pointings for which to run simulations of perturbations due to blended sources, if applicable. If ``cf_region_type`` is ``rectangle``, then ``cf_region_points`` accepts six numbers: ``start longitude, end longitude, number of longitude points, start latitude, end latitude, number of latitude points``; if ``points`` then tuples must be of the syntax ``[[a, b], [c, d]]`` where ``a`` and ``c`` are RA or Galactic Longitude, and ``b`` and ``d`` are Declination or Galactic Latitude. Each chunk must have an element of these pointing lists; these can be produced on a single line, or make use of YAML multi-line formatting to more easily visualise the list-of-point-values, which will produce a list of length ``N``, of which each element will either be a length-six list or an ``Mx2`` nested list.
 
 .. note::
     ``cf_region_points`` longitudes may be given with negative coordinates for cases where the match area is both above and below zero degrees, but they can also be given within the [0, 360] phase space, as 350 degrees and -10 degrees are handled the same where needed by ``cf_region_points``.
+
+``chunk_id_list``
+
+A single entry per chunk, to have the same length as ``cf_region_points_per_chunk``, of unique IDs for each chunk. This is the list of chunks to run cross-matches for, and must be contained within the lists of chunks given in the ``chunk_id_list`` entries of each input catalogue. However -- for example, when an all-sky catalogue matches with a non-all-sky dataset -- the joint-parameter list of chunk IDs can be smaller in number, and a subset of those given in the catalogue-specific parameter files.
 
 ``real_hankel_points``
 
@@ -127,19 +116,15 @@ Determines how many CPUs are used when parallelising within ``Python`` using ``m
 
 ``int_fracs``
 
-The integral fractions of the various so-called "error circles" used in the cross-match process. Should be space-separated floats, in the order of: bright error circle fraction, "field" error circle fraction, and potential counterpart cutoff limit. Note that bright and "field" fractions should be reasonably separated in value (more than maybe 0.1) to avoid biasing results that use both to measure photometry-based priors, when applicable.
-
-``output_csv_folder``
-
-The folder path into which to save the stored ``.csv`` files that are created if ``make_output_csv`` is ``True``.
+The integral fractions of the various so-called "error circles" used in the cross-match process. Should be list of floats, in the order of: bright error circle fraction, "field" error circle fraction, and potential counterpart cutoff limit. Note that bright and "field" fractions should be reasonably separated in value (more than maybe 0.1) to avoid biasing results that use both to measure photometry-based priors, when applicable.
 
 ``match_out_csv_name``
 
-Name of the band-merged, cross-matched dataset of counterpart associations and accompanying metadata, including the appropriate file extension (currently ``.csv``).
+Name of the band-merged, cross-matched dataset of counterpart associations and accompanying metadata, including the appropriate file extension. Must be a single string containing ``_{}``, into which the chunk ID is inserted.
 
 ``nonmatch_out_csv_name``
 
-Filename to save out the respective non-match catalogue objects and metadata to. Will have appended to the front ``cat_name`` to distinguish the two non-match files. ``nonmatch_out_csv_name`` should contain the appropriate file extension.
+Filename to save out the respective non-match catalogue objects and metadata to. Will have appended to the front ``cat_name`` to distinguish the two non-match files. ``nonmatch_out_csv_name`` should contain the appropriate file extension. Must be a single string containing ``_{}``, into which the chunk ID is inserted.
 
 ``with_and_without_photometry``
 
@@ -161,11 +146,11 @@ These parameters are required in two separate files, one per catalogue to be cro
 
 These can be divided into those inputs that are always required:
 
-``cat_folder_path``, ``cat_name``, ``filt_names``, ``auf_folder_path``, ``auf_region_type``, ``auf_region_frame``, ``auf_region_points``, ``correct_astrometry``, and ``compute_snr_mag_relation``;
+``cat_csv_file_path``, ``cat_name``, ``pos_and_err_indices``, ``mag_indices``, ``chunk_overlap_col``, ``best_mag_index_col``, ``csv_has_header``, ``filt_names``, ``auf_file_path``, ``auf_region_type``, ``auf_region_frame``, ``auf_region_points_per_chunk``, ``chunk_id_list``, ``correct_astrometry``, and ``compute_snr_mag_relation``;
 
 those that are only required if the `Joint Parameters`_ option ``include_perturb_auf`` is ``True``:
 
-``fit_gal_flag``, ``run_fw_auf``, ``run_psf_auf``, ``psf_fwhms``, ``snr_mag_params_path``, ``download_tri``, ``tri_set_name``, ``tri_filt_names``, ``tri_filt_num``, ``tri_maglim_faint``, ``tri_num_faint``, ``gal_al_avs``, ``dens_dist``, ``dens_hist_tri_location``, ``tri_model_mags_location``, ``tri_model_mag_mids_location``, ``tri_model_mags_interval_location``, and ``tri_n_bright_sources_star_location``;
+``fit_gal_flag``, ``run_fw_auf``, ``run_psf_auf``, ``psf_fwhms``, ``snr_mag_params_file_path``, ``download_tri``, ``tri_set_name``, ``tri_filt_names``, ``tri_filt_num``, ``tri_maglim_faint``, ``tri_num_faint``, ``gal_al_avs``, ``dens_dist``, ``dens_hist_tri_location``, ``tri_model_mags_location``, ``tri_model_mag_mids_location``, ``tri_model_mags_interval_location``, and ``tri_n_bright_sources_star_location``;
 
 parameters required if ``run_psf_auf`` is ``True``:
 
@@ -177,41 +162,61 @@ the inputs required in each catalogue parameters file if ``fit_gal_flag`` is ``T
 
 inputs required if ``make_output_csv`` is ``True``:
 
-``input_csv_folder``, ``cat_csv_name``, ``cat_col_names``, ``cat_col_nums``, ``input_npy_folder``, ``csv_has_header``, ``extra_col_names``, and ``extra_col_nums``;
+``input_csv_file_path``, ``cat_col_names``, ``cat_col_nums``, ``extra_col_names``, and ``extra_col_nums``;
 
 the inputs required if either ``correct_astrometry`` or ``compute_snr_mag_relation`` are ``True``:
 
-``correct_astro_save_folder``, ``csv_cat_file_string``, ``mag_indices``, ``mag_unc_indices``, and ``pos_and_err_indices``;
+``correct_astro_save_folder``, ``mag_unc_indices``;
 
 and the inputs required if ``correct_astrometry`` is ``True``:
 
-``best_mag_index``, ``nn_radius``, ``ref_csv_cat_file_string``, ``correct_mag_array``, ``correct_mag_slice``, ``correct_sig_slice``, ``chunk_overlap_col``, ``best_mag_index_col``, and ``saturation_magnitudes``.
+``correct_astro_mag_indices_index``, ``nn_radius``, ``ref_cat_csv_file_path``, ``correct_mag_array``, ``correct_mag_slice``, ``correct_sig_slice``, and ``saturation_magnitudes``.
 
 .. note::
-    ``run_fw_auf``, ``run_psf_auf``, ``psf_fwhms``, ``snr_mag_params_path``, ``download_tri``, ``tri_set_name``, ``tri_filt_names``, ``tri_filt_num``, ``tri_maglim_faint``, ``tri_num_faint``, ``dens_dist``, ``dd_params_path``, ``l_cut_path``, ``gal_wavs``, ``gal_zmax``, ``gal_nzs``, ``gal_aboffsets``, ``gal_filternames``, and ``gal_al_avs`` are all currently required if ``correct_astrometry`` is ``True``, bypassing the nested flags above. For example, ``dens_dist`` is required as an input if ``include_perturb_auf`` is ``True``, or if ``correct_astrometry`` is set. This means that ``AstrometricCorrections`` implicitly always runs and fits for a full Astrometric Uncertainty Function.
+    ``run_fw_auf``, ``run_psf_auf``, ``psf_fwhms``, ``snr_mag_params_file_path``, ``download_tri``, ``tri_set_name``, ``tri_filt_names``, ``tri_filt_num``, ``tri_maglim_faint``, ``tri_num_faint``, ``dens_dist``, ``dd_params_path``, ``l_cut_path``, ``gal_wavs``, ``gal_zmax``, ``gal_nzs``, ``gal_aboffsets``, ``gal_filternames``, and ``gal_al_avs`` are all currently required if ``correct_astrometry`` is ``True``, bypassing the nested flags above. For example, ``dens_dist`` is required as an input if ``include_perturb_auf`` is ``True``, or if ``correct_astrometry`` is set. This means that ``AstrometricCorrections`` implicitly always runs and fits for a full Astrometric Uncertainty Function.
 
 .. note::
-    ``snr_mag_params_path`` is currently also required if ``compute_snr_mag_relation`` is ``True``, bypassing the above flags. It is therefore currently a required input if any one of ``include_perturb_auf``, ``correct_astrometry``, or ``compute_snr_mag_relation`` are set to ``True``.
+    ``snr_mag_params_file_path`` is currently also required if ``compute_snr_mag_relation`` is ``True``, bypassing the above flags. It is therefore currently a required input if any one of ``include_perturb_auf``, ``correct_astrometry``, or ``compute_snr_mag_relation`` are set to ``True``.
 
 
 Catalogue Parameter Description
 -------------------------------
 
-``cat_folder_path``
+``cat_csv_file_path``
 
-The folder containing the three files (see :doc:`quickstart` for more details) describing the given input catalogue. Can either be an absolute path, or relative to the folder from which the script was called.
+The filepath to the ``.csv`` file of the input catalogue (see :doc:`quickstart` for more details). Can either be an absolute path, or relative to the folder from which the script was called, including the ``_{}`` chunk ID flag requirement.
 
 ``cat_name``
 
 The name of the catalogue. This is used to generate intermediate folder structure within the cross-matching process, and during any output file creation process.
 
+``pos_and_err_indices``
+
+A list of either three or six integers. If ``correct_astrometry`` is ``True``, a list of six integers, the first three elements of which are the zero-indexed indices into the *input* catalogue .csv file (``cat_csv_file_path``) for the longitudinal coordinate, latitudinal coordinate, and circular astrometric precision respectively, followed by the lon/lat/uncert of the *reference* catalogue (``ref_cat_csv_file_path``). For example, ``[10, 9, 8, 0, 1, 2]`` suggests that the reference catalogue begins with the position and uncertainty of its objects while the catalogue "a" or "b" sources have, in their original .csv file, a backwards list of coordinates and precisions towards the final columns of the filing system. Otherwise (including if ``compute_snr_mag_relation`` is ``True``), then only three integers should be passed, the respective coordinates for its own catalogue (dropping the indices of the reference catalogue); in the above example we would therefore only pass ``[10, 9, 8]``.
+
+``mag_indices``
+
+Just for the input catalogue, a list of ``len(filt_names)`` integers detailing the zero-indexed column number of the magnitudes in the dataset.
+
+``chunk_overlap_col``
+
+Column number in the original csv file for the column containing the boolean flag indicating whether sources are in the "halo" or "core" of the chunk. Used within ``CrossMatch`` after calling ``AstrometricCorrections`` to create final npy arrays via ``csv_to_npy``. Should be a single integer number.
+
+``best_mag_index_col``
+
+The zero-indexed integer column number in the original input csv file used in ``AstrometricCorrections`` that corresponds to the column containing the highest quality detection for each source in the catalogue, used in ``csv_to_npy``.
+
+``csv_has_header``
+
+A boolean, yes/no, for whether there is a header in the first line of the ``.csv`` input catalogue files (``True``), or if the first line is a line of data (``False``).
+
 ``filt_names``
 
-The filter names of the photometric bandpasses used in this catalogue, in the order in which they are saved in ``con_cat_photo``. These will be used to describe any output data files generated after the matching process. Should be a space-separated list.
+The filter names of the photometric bandpasses used in this catalogue, in the order in which they are saved in ``con_cat_photo``. These will be used to describe any output data files generated after the matching process. Should be a list.
 
-``auf_folder_path``
+``auf_file_path``
 
-The folder into which the Astrometric Uncertainty Function (AUF) related files will be, or have been, saved. Can also either be an absolute or relative path, like ``cat_folder_path``. Alternatively, this can (and must) be ``None`` if all parameters related to loading pre-computed TRILEGAL histograms (``dens_hist_tri_location`` et al.) are provided.
+The folder and file name into which the Astrometric Uncertainty Function (AUF) related files will be, or have been, saved. Can also either be an absolute or relative path, like ``cat_csv_file_path``. Alternatively, this can (and must) be ``None`` if all parameters related to loading pre-computed TRILEGAL histograms (``dens_hist_tri_location`` et al.) are provided. Requires ``_{}`` in the string for chunking purposes.
 
 ``auf_region_type``
 
@@ -221,12 +226,16 @@ Similar to ``cf_region_type``, flag indicating which definition to use for deter
 
 As with ``auf_region_frame``, this flag indicates which frame the data, and thus AUF simulations, are in. Can either be ``equatorial`` or ``galactic``, allowing for data to be input either in Right Ascension and Declination, or Galactic Longitude and Galactic Latitude.
 
-``auf_region_points``
+``auf_region_points_per_chunk``
 
-Based on ``auf_region_type``, this must either by six space-separated floats, controlling the start and end, and number of, longitude and latitude points in ``start lon end lon # steps start lat end lat #steps`` order (see ``cf_region_points``), or a series of comma-separated tuples cf. ``(a, b), (c, d)``.
+Based on ``auf_region_type``, this must either by list of six floats, controlling the start and end, and number of, longitude and latitude points in ``start lon end lon # steps start lat end lat #steps`` order (see ``cf_region_points``), or a nested list of lists cf. ``[[a, b], [c, d]]``. Similar to ``cf_region_points_per_chunk``, must be a value per chunk ID of ``chunk_id_list`` in the specific catalogue parameter file, to be bundled into a list wrapper of length the number of chunks.
 
 .. note::
     ``auf_region_points`` longitudes may be given with negative coordinates for cases where the match area is both above and below zero degrees, but they can also be given within the [0, 360] phase space, as 350 degrees and -10 degrees are handled the same where needed by ``auf_region_points``.
+
+``chunk_id_list``
+
+A single entry per chunk, to have the same length as ``auf_region_points_per_chunk``, of unique IDs for each chunk. Must agree with the list in ``chunk_id_list`` in the joint-catalogue parameter file, and be a super-set of those chunks to be matched (i.e., no chunks can be in the joint catalogue match file without being in both catalogue-only input files).
 
 ``correct_astrometry``
 
@@ -253,11 +262,11 @@ Complementary flag to ``run_fw_auf``, indicates whether to run background-domina
 
 ``psf_fwhms``
 
-The Full-Width-At-Half-Maximum of each filter's Point Spread Function (PSF), in the same order as in ``filt_names``. These are used to simulate the PSF if ``include_perturb_auf`` is set to ``True``, and are unnecessary otherwise. Should be a space-separated list of floats.
+The Full-Width-At-Half-Maximum of each filter's Point Spread Function (PSF), in the same order as in ``filt_names``. These are used to simulate the PSF if ``include_perturb_auf`` is set to ``True``, and are unnecessary otherwise. Should be a list of floats.
 
-``snr_mag_params_path``
+``snr_mag_params_file_path``
 
-File path, either absolute or relative to the location of the script the cross-matches are run from, of a binary ``.npy`` file containing the parameterisation of the signal-to-noise ratio of sources as a function of magnitude, in a series of given sightlines. Must be of shape ``(N, M, 5)`` where ``N`` is the number of filters in ``filt_names`` order, ``M`` is the number of sightlines for which SNR vs mag has been derived, and the 5 entries for each filter-sightline combination must be in order ``a``, ``b``, ``c``, ``coord1`` (e.g. RA), and ``coord2`` (e.g. Dec). See pre-processing for more information on the meaning of those terms and how ``snr_mag_params`` is used.
+File path, either absolute or relative to the location of the script the cross-matches are run from, of a binary ``.npy`` file containing the parameterisation of the signal-to-noise ratio of sources as a function of magnitude, in a series of given sightlines. Must contain the necessary ``_{}`` formatting for per-chunk parameters. Must be of shape ``(N, M, 5)`` where ``N`` is the number of filters in ``filt_names`` order, ``M`` is the number of sightlines for which SNR vs mag has been derived, and the 5 entries for each filter-sightline combination must be in order ``a``, ``b``, ``c``, ``coord1`` (e.g. RA), and ``coord2`` (e.g. Dec). See pre-processing for more information on the meaning of those terms and how ``snr_mag_params`` is used.
 
 ``download_tri``
 
@@ -285,23 +294,23 @@ Integer number of objects to draw from the TRILEGAL simulation -- affecting the 
 
 ``dens_hist_tri_location``
 
-The location on disk of a numpy array, shape ``(len(filt_names), M)`` where ``M`` is a consistent number of magnitude bins, of differential source counts for a given TRILEGAL simulation, in each filter for a specific catalogue. Alternatively, should be ``None`` if ``auf_folder_path`` and associated parameters for the running of TRILEGAL histogram generation within the cross-match run are given.
+The location on disk of a numpy array, shape ``(len(filt_names), M)`` where ``M`` is a consistent number of magnitude bins, of differential source counts for a given TRILEGAL simulation, in each filter for a specific catalogue. Alternatively, should be ``None`` if ``auf_file_path`` and associated parameters for the running of TRILEGAL histogram generation within the cross-match run are given. If not ``None``, must have a consistent formatting string which contains ``_{}`` for per-chunk loading with a single string input.
 
 ``tri_model_mags_location``
 
-The location on disk of a numpy array, shape ``(len(filt_names), M)`` where ``M`` is a consistent number of magnitude bins, of the left-hand magnitude bin edges of differential source counts for a given TRILEGAL simulation, in each filter for a specific catalogue. Alternatively, should be ``None`` if ``auf_folder_path`` and associated parameters for the running of TRILEGAL histogram generation within the cross-match run are given.
+The location on disk of a numpy array, shape ``(len(filt_names), M)`` where ``M`` is a consistent number of magnitude bins, of the left-hand magnitude bin edges of differential source counts for a given TRILEGAL simulation, in each filter for a specific catalogue. Alternatively, should be ``None`` if ``auf_file_path`` and associated parameters for the running of TRILEGAL histogram generation within the cross-match run are given. If not ``None``, must have a consistent formatting string which contains ``_{}`` for per-chunk loading with a single string input.
 
 ``tri_model_mag_mids_location``
 
-The location on disk of a numpy array, shape ``(len(filt_names), M)`` where ``M`` is a consistent number of magnitude bins, of magnitude bin-middles of differential source counts for a given TRILEGAL simulation, in each filter for a specific catalogue. Alternatively, should be ``None`` if ``auf_folder_path`` and associated parameters for the running of TRILEGAL histogram generation within the cross-match run are given.
+The location on disk of a numpy array, shape ``(len(filt_names), M)`` where ``M`` is a consistent number of magnitude bins, of magnitude bin-middles of differential source counts for a given TRILEGAL simulation, in each filter for a specific catalogue. Alternatively, should be ``None`` if ``auf_file_path`` and associated parameters for the running of TRILEGAL histogram generation within the cross-match run are given. If not ``None``, must have a consistent formatting string which contains ``_{}`` for per-chunk loading with a single string input.
 
 ``tri_model_mags_interval_location``
 
-The location on disk of a numpy array, shape ``(len(filt_names), M)`` where ``M`` is a consistent number of magnitude bins, of magnitude bin widths of differential source counts for a given TRILEGAL simulation, in each filter for a specific catalogue. Alternatively, should be ``None`` if ``auf_folder_path`` and associated parameters for the running of TRILEGAL histogram generation within the cross-match run are given.
+The location on disk of a numpy array, shape ``(len(filt_names), M)`` where ``M`` is a consistent number of magnitude bins, of magnitude bin widths of differential source counts for a given TRILEGAL simulation, in each filter for a specific catalogue. Alternatively, should be ``None`` if ``auf_file_path`` and associated parameters for the running of TRILEGAL histogram generation within the cross-match run are given. If not ``None``, must have a consistent formatting string which contains ``_{}`` for per-chunk loading with a single string input.
 
 ``tri_n_bright_sources_star_location``
 
-The location on disk of a ``.npy`` file containing the number of simulated bright TRILEGAL objects in the input simulation, one per filter. Should be a 1-D numpy array of shape ``(len(filt_names),)``. Alternatively, should be ``None`` if ``auf_folder_path`` and associated parameters for the running of TRILEGAL histogram generation within the cross-match run are given.
+The location on disk of a ``.npy`` file containing the number of simulated bright TRILEGAL objects in the input simulation, one per filter. Should be a 1-D numpy array of shape ``(len(filt_names),)``. Alternatively, should be ``None`` if ``auf_file_path`` and associated parameters for the running of TRILEGAL histogram generation within the cross-match run are given. If not ``None``, must have a consistent formatting string which contains ``_{}`` for per-chunk loading with a single string input.
 
 ``dd_params_path``
 
@@ -337,15 +346,11 @@ Name of each filter as appropriate for providing to ``speclite`` for each filter
 
 ``gal_al_avs``
 
-Differential extinction relative to the V-band for each filter, a set of space-separated floats. Must be provided if ``include_perturb_auf`` is ``True``.
+Differential extinction relative to the V-band for each filter, a list of floats. Must be provided if ``include_perturb_auf`` is ``True``.
 
-``input_csv_folder``
+``input_csv_file_path``
 
-Location of the catalogue's original input ``.csv`` file, generally converted to a binary file for use within the main code via ``csv_to_npy``.
-
-``cat_csv_name``
-
-Name, including extension, of the ``.csv`` file located in ``input_csv_folder``.
+Full filepath of the catalogue's original input ``.csv`` file, generally converted to a binary file for use within the main code via ``csv_to_npy``, including filename and extension. Should have ``_{}`` formatting within the string for chunk-identification purposes.
 
 ``cat_col_names``
 
@@ -355,14 +360,6 @@ The names of the mandatory columns from each respctive catalogue. Should contain
 
 For each column name in ``cat_col_names``, ``cat_col_nums`` is the zero-indexed position of the column. For example, if we had ``['ID', 'RA', 'Dec', 'V']`` as our ``cat_col_names``, we might have ``[0, 1, 2, 5]`` as our ``cat_col_nums``, in which our designation and coordinates are the first three columns, but our V-band magnitude is a few columns down.
 
-``input_npy_folder``
-
-The location on disk of the folder that contains the converted binary ``.npy`` files used as inputs to the software. Likely the same as ``cat_folder_path``, or ``None`` can be given if we do not need to load a converted astrometric uncertainty from the binary files and instead can rely solely on the original quoted astrometric uncertainty from the ``.csv`` files.
-
-``csv_has_header``
-
-A boolean, yes/no, for whether there is a header in the first line of the ``.csv`` input catalogue files (``yes``), or if the first line is a line of data (``no``).
-
 ``extra_col_names``
 
 Analogous to ``cat_col_names``, a list of the additional columns from the original csv catalogue file that we wish to add to the match and non-match output files.
@@ -371,9 +368,9 @@ Analogous to ``cat_col_names``, a list of the additional columns from the origin
 
 The zero-indexed positions of each corresponding column in ``extra_col_names``, much the same as in ``cat_col_nums``, but for additional, optional columns we may wish to transfer from input to output dataset.
 
-``best_mag_index``
+``correct_astro_mag_indices_index``
 
-For the purposes of correcting systematic biases in a given catalogue, a single photometric band is used. ``best_mag_index`` indicates which filter to use -- e.g., ``best_mag_index = 0`` says to use the first filter as given in ``filt_names`` or ``mag_indices``. Must be a single integer value no larger than ``len(filt_names)-1``.
+For the purposes of correcting systematic biases in a given catalogue, a single photometric band is used. ``correct_astro_mag_indices_index`` indicates which filter to use -- e.g., ``correct_astro_mag_indices_index = 0`` says to use the first filter as given in ``filt_names`` or ``mag_indices``. Must be a single integer value no larger than ``len(filt_names)-1``.
 
 ``nn_radius``
 
@@ -381,19 +378,15 @@ Nearest neighbour radius out to which to search for potential counterparts for t
 
 ``correct_astro_save_folder``
 
-File path, relative or absolute, into which to save files as generated by the astrometric correction process.
+File path, relative or absolute, into which to save files as generated by the astrometric correction process. Must include ``_{}`` to allow for formatting for each chunk separately.
 
-``csv_cat_file_string``
+``ref_cat_csv_file_path``
 
-Path and filename, including extension, all in a single string, containing the location of each correction sightline's dataset to test. Must contain the appropriate number of string format ``{}`` identifiers depending on ``coord_or_chunk`` -- in this case, a single "chunk" identifier for corrections done through ``CrossMatch``. For example, ``/your/path/to/file/data_{}.csv`` where each "chunk" is saved into a csv file called ``data_1``, ``data_2``, ``data_104`` etc.
-
-``ref_csv_cat_file_string``
-
-Similar to ``csv_cat_file_string``, but the path and filename, including extension, of the *reference* dataset used in the matching process. These chunks should correspond one-to-one with those used in ``csv_cat_file_string`` -- i.e., ``data_1.csv`` in ``/your/path/to/file`` should be the same region of the sky as the reference catalogue in ``/another/path/to/elsewhere/reference_data_1.csv``, potentially with some buffer overlap to avoid false matches at the edges.
+Similar to ``cat_csv_file_path``, but the path and filename, including extension, of the *reference* dataset used in the matching process. These chunks should correspond one-to-one with those used in ``cat_csv_file_path`` -- i.e., ``data_1.csv`` in ``/your/path/to/file`` should be the same region of the sky as the reference catalogue in ``/another/path/to/elsewhere/reference_data_1.csv``, potentially with some buffer overlap to avoid false matches at the edges. Must include ``_{}`` to allow for formatting for each chunk separately.
 
 ``correct_mag_array``
 
-List of magnitudes at which to evaluate the distribution of matches to the higher-astrometric-precision dataset in the chosen ``best_mag_index`` filter. Accepts a list of floats.
+List of magnitudes at which to evaluate the distribution of matches to the higher-astrometric-precision dataset in the chosen ``correct_astro_mag_indices_index`` filter. Accepts a list of floats.
 
 ``correct_mag_slice``
 
@@ -403,25 +396,9 @@ Corresponding to each magnitude in ``correct_mag_array``, each element of this l
 
 Elementwise with ``correct_mag_array`` and ``correct_mag_slice``, a list of floats of widths of astrometric precision to select a robust sub-sample of objects in each magnitude bin for, ensuring a self-similar AUF.
 
-``pos_and_err_indices``
-
-A list of either three or six whitespace-separated integers. If ``correct_astrometry`` is ``True``, a list of six integers, the first three elements of which are the zero-indexed indices into the *reference* catalogue .csv file (``ref_csv_cat_file_string``) for the longitudinal coordinate, latitudinal coordinate, and circular astrometric precision respectively, followed by the lon/lat/uncert of the *input* catalogue. For example, ``0 1 2 10 9 8`` suggests that the reference catalogue begins with the position and uncertainty of its objects while the catalogue "a" or "b" sources have, in their original .csv file, a backwards list of coordinates and precisions towards the final columns of the filing system. If ``compute_snr_mag_relation`` is ``True``, then only three integers should be passed, the respective coordinates for its own catalogue (dropping the indices of the reference catalogue); in the above example we would therefore only pass ``10 9 8``.
-
-``mag_indices``
-
-Just for the input catalogue, a list of ``len(filt_names)`` space-separated integers detailing the zero-indexed column number of the magnitudes in the dataset.
-
 ``mag_unc_indices``
 
-Similar to ``mag_indices``, a list of ``len(mag_indices)`` space-separated integers, one for each column in ``mag_indices`` for where the corresponding uncertainty column is held for each magnitude in the input .csv file.
-
-``chunk_overlap_col``
-
-Column number in the original csv file for the column containing the boolean flag indicating whether sources are in the "halo" or "core" of the chunk. Used within ``CrossMatch`` after calling ``AstrometricCorrections`` to create final npy files via ``csv_to_npy``. Should be a single integer number.
-
-``best_mag_index_col``
-
-The zero-indexed integer column number in the original input csv file used in ``AstrometricCorrections`` that corresponds to the column containing the highest quality detection for each source in the catalogue, used when calling ``csv_to_npy``.
+Similar to ``mag_indices``, a list of ``len(mag_indices)`` integers, one for each column in ``mag_indices`` for where the corresponding uncertainty column is held for each magnitude in the input .csv file.
 
 ``use_photometric_uncertainties``
 
@@ -448,7 +425,7 @@ The inter-dependency of input parameters on one another, and the output ``CrossM
     │                     │             ├─* gal_aboffsets
     │                     │             ├─* gal_filternames
     │                     │             └─* saturation_magnitudes
-    │                     ├─* snr_mag_params_path -> snr_mag_params
+    │                     ├─* snr_mag_params_file_path[4] -> snr_mag_params
     │                     ├─* tri_set_name[3a]
     │                     ├─* tri_filt_names[3a]
     │                     ├─* tri_filt_num[3a]
@@ -461,65 +438,59 @@ The inter-dependency of input parameters on one another, and the output ``CrossM
     │                     ├─* tri_maglim_faint[3a]
     │                     ├─* tri_num_faint[3a]
     │                     ├─* gal_al_avs
-    │                     ├─* dens_hist_tri_location[3b] -> dens_hist_tri_list
-    │                     ├─* tri_model_mags_location[3b] -> tri_model_mags_list
-    │                     ├─* tri_model_mag_mids_location[3b] -> tri_model_mag_mids_list
-    │                     ├─* tri_model_mags_interval_location[3b] -> tri_model_mags_interval_list
-    │                     ├─* tri_model_mags_uncert_location[3b] -> tri_model_mags_uncert_list
-    │                     └─* tri_n_bright_sources_star_location[3b] -> tri_n_bright_sources_star_list
+    │                     ├─* dens_hist_tri_location[3b, 4] -> dens_hist_tri_list
+    │                     ├─* tri_model_mags_location[3b, 4] -> tri_model_mags_list
+    │                     ├─* tri_model_mag_mids_location[3b, 4] -> tri_model_mag_mids_list
+    │                     ├─* tri_model_mags_interval_location[3b, 4] -> tri_model_mags_interval_list
+    │                     ├─* tri_model_mags_uncert_location[3b, 4] -> tri_model_mags_uncert_list
+    │                     └─* tri_n_bright_sources_star_location[3b, 4] -> tri_n_bright_sources_star_list
     ├─> include_phot_like
     │                   └─> with_and_without_photometry
     ├─> use_phot_priors
     ├─> cf_region_type
     ├─> cf_region_frame[2]
-    ├─> cf_region_points
-    ├─> joint_folder_path
+    ├─> cf_region_points_per_chunk[5]
+    ├─> chunk_id_list[5]
+    ├─> output_save_folder
     ├─> pos_corr_dist
     ├─> real_hankel_points
     ├─> four_hankel_points
     ├─> four_max_rho
     ├─> int_fracs
     ├─> make_output_csv
-    │                 ├─> output_csv_folder
-    │                 ├─> match_out_csv_name
-    │                 ├─> nonmatch_out_csv_name
-    │                 ├─* input_csv_folder
-    │                 ├─* cat_csv_name
+    │                 ├─> match_out_csv_name[4]
+    │                 ├─> nonmatch_out_csv_name[4]
     │                 ├─* cat_col_names
     │                 ├─* cat_col_nums
-    │                 ├─* input_npy_folder
-    │                 ├─* csv_has_header
     │                 ├─* extra_col_names
     │                 └─* extra_col_nums
     ├─> n_pool
     ├─* auf_region_type
     ├─* auf_region_frame[2]
-    ├─* auf_region_points
+    ├─* auf_region_points_per_chunk[5]
+    ├─* chunk_id_list[5]
     ├─* filt_names
     ├─* cat_name
-    ├─* auf_folder_path[3a]
-    ├─* cat_folder_path
+    ├─* auf_file_path[3a, 4]
+    ├─* cat_csv_file_path[4]
+    ├─* pos_and_err_indices
+    ├─* mag_indices
+    ├─* chunk_overlap_col
+    ├─* best_mag_index_col
+    ├─* csv_has_header
     ├─* correct_astrometry[1]
-    │                    ├─* correct_astro_save_folder
-    │                    ├─* csv_cat_file_string
-    │                    ├─* pos_and_err_indices
-    │                    ├─* mag_indices
+    │                    ├─* correct_astro_save_folder[4]
     │                    ├─* mag_unc_indices
-    │                    ├─* best_mag_index
+    │                    ├─* correct_astro_mag_indices_index
     │                    ├─* nn_radius
-    │                    ├─* ref_csv_cat_file_string
+    │                    ├─* ref_cat_csv_file_path[4]
     │                    ├─* correct_mag_array
     │                    ├─* correct_mag_slice
     │                    ├─* correct_sig_slice
-    │                    ├─* chunk_overlap_col
-    │                    ├─* best_mag_index_col
     │                    ├-* use_photometric_uncertainties
     │                    └─* saturation_magnitudes
     ├─* compute_snr_mag_relation[1]
-    │                          ├─* correct_astro_save_folder
-    │                          ├─* csv_cat_file_string
-    │                          ├─* pos_and_err_indices
-    │                          ├─* mag_indices
+    │                          ├─* correct_astro_save_folder[4]
                                └─* mag_unc_indices
 
 List directories end in ``->`` for ``joint`` parameters, ``-*`` for ``catalogue`` parameters. ``catalogue`` level items will have ``a_`` or ``b_`` prepended, depending on which "side" of the cross-match they are from. Items with a second keyword after an arrow ``->`` are the names of the attributes that are saved to ``CrossMatch``, usually when the input parameter is a location on disk.
@@ -527,6 +498,8 @@ List directories end in ``->`` for ``joint`` parameters, ``-*`` for ``catalogue`
 | [1] - cannot both be ``True``
 | [2] - must be the same
 | [3] - only one set of [3a] and [3b] should be given, the others should be passed as ``None``
+| [4] - must have ``_{}`` in its string, into which the chunk ID will be inserted
+| [5] - must have relevant input entry per chunk, e.g. in a YAML multi-line format, aligned with the chunk ID of ``chunk_id_list`` of the relevant input parameter file
 
 .. rubric:: Footnotes
 

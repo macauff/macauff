@@ -13,7 +13,7 @@ import pytest
 from numpy.testing import assert_allclose
 from scipy.special import j0, j1  # pylint: disable=no-name-in-module
 from scipy.stats import skewnorm
-from test_matching import _replace_line
+from test_utils import mock_filename
 
 # pylint: disable=import-error,no-name-in-module
 from macauff.macauff import Macauff
@@ -37,10 +37,11 @@ class TestCreatePerturbAUF:
         os.makedirs('gaia_folder', exist_ok=True)
         os.makedirs('wise_folder', exist_ok=True)
         os.makedirs('test_path', exist_ok=True)
-        self.cm = CrossMatch(os.path.join(os.path.dirname(__file__), 'data'))
-        self.cm._initialise_chunk(os.path.join(os.path.dirname(__file__), 'data/crossmatch_params.txt'),
-                                  os.path.join(os.path.dirname(__file__), 'data/cat_a_params.txt'),
-                                  os.path.join(os.path.dirname(__file__), 'data/cat_b_params.txt'))
+        self.cm = CrossMatch(os.path.join(os.path.dirname(__file__), 'data/crossmatch_params.yaml'),
+                             os.path.join(os.path.dirname(__file__), 'data/cat_a_params.yaml'),
+                             os.path.join(os.path.dirname(__file__), 'data/cat_b_params.yaml'))
+        self.cm._load_metadata_config(9)
+        self.cm.make_shared_data()
         self.cm.a_auf_region_points = np.array([[0, 0], [50, 50]], dtype=float)
         self.cm.b_auf_region_points = np.array([[0, 0], [50, 50]], dtype=float)
         self.cm.perturb_auf_func = make_perturb_aufs
@@ -65,7 +66,7 @@ class TestCreatePerturbAUF:
             setattr(self.cm, f"{'a' if size == 25 else 'b'}_magref", cat)
 
         self.cm.include_perturb_auf = False
-        self.cm.chunk_id = 1
+        self.cm.chunk_id = 9
         mcff = Macauff(self.cm)
         mcff.create_perturb_auf()
         p_a_o = self.cm.b_perturb_auf_outputs
@@ -367,7 +368,7 @@ class TestMakePerturbAUFs():
 
         a = A()
         a.b_cat_folder_path = self.cat_folder
-        a.b_auf_folder_path = self.auf_folder
+        a.b_auf_file_path = f'{self.auf_folder}/trilegal_auf_simulation_{{:.2f}}_{{:.2f}}.dat'
         a.b_filt_names = self.filters
         a.b_auf_region_points = self.auf_points
         a.r = self.r
@@ -407,9 +408,8 @@ class TestMakePerturbAUFs():
                 ' 0.02415 -2.701 3.397  4.057 14.00  8.354 0.00 25.523 25.839 24.409 23.524 22.583 '
                 '22.387 22.292 22.015 21.144 19.380 20.878 100.99 22.391 21.637 21.342  0.024\n')
 
-        os.makedirs(f'{self.auf_folder}/{self.auf_points[0][0]}/{self.auf_points[0][1]}', exist_ok=True)
-        with open(f'{self.auf_folder}/{self.auf_points[0][0]}/{self.auf_points[0][1]}/'
-                  'trilegal_auf_simulation_faint.dat', "w", encoding='utf-8') as f:
+        with open(f'{self.auf_folder}/trilegal_auf_simulation_{self.auf_points[0][0]:.2f}_'
+                  f'{self.auf_points[0][1]:.2f}_faint.dat', "w", encoding='utf-8') as f:
             f.write(text)
         f.close()
 
@@ -445,7 +445,6 @@ class TestMakePerturbAUFs():
         self.fake_cm.b_tri_model_mags_interval_list = [None] * len(self.filters)
         self.fake_cm.b_tri_n_bright_sources_star_list = [None] * len(self.filters)
         self.fake_cm.n_pool = 1
-
         with pytest.raises(ValueError, match="The number of simulated objects in this sky patch "):
             make_perturb_aufs(self.fake_cm, 'b')
 
@@ -485,9 +484,8 @@ class TestMakePerturbAUFs():
                     '8.354 0.00 25.523 25.839 24.409 23.524 22.583 22.387 22.292 22.015 21.144 '
                     '19.380 20.878 100.99 22.391 21.637 21.342  0.024\n')
             for new_auf_point in new_auf_points:
-                os.makedirs(f'{self.auf_folder}/{new_auf_point[0]}/{new_auf_point[1]}', exist_ok=True)
-                with open(f'{self.auf_folder}/{new_auf_point[0]}/{new_auf_point[1]}/'
-                          'trilegal_auf_simulation_faint.dat', "w", encoding='utf-8') as f:
+                with open(f'{self.auf_folder}/trilegal_auf_simulation_{new_auf_point[0]:.2f}_'
+                          f'{new_auf_point[1]:.2f}_faint.dat', "w", encoding='utf-8') as f:
                     f.write(text)
 
             prob_0_draw = psf_mean**0 * np.exp(-psf_mean) / math.factorial(0)
@@ -563,8 +561,8 @@ class TestMakePerturbAUFs():
             perturb_auf_combo = f'{ax1}-{ax2}-{self.filters[0]}'
             for name, size in zip(
                     ['frac', 'flux', 'offset', 'cumulative', 'fourier', 'Narray', 'magarray'],
-                    [(len(self.delta_mag_cuts), 3), (3,), (len(self.r)-1, 3),
-                     (len(self.r)-1, 3), (len(self.rho)-1, 3), (3,), (3,)]):
+                    [(len(self.delta_mag_cuts), 4), (4,), (len(self.r)-1, 4),
+                     (len(self.r)-1, 4), (len(self.rho)-1, 4), (4,), (4,)]):
                 var = p_a_o[perturb_auf_combo][name]
                 assert np.all(var.shape == size)
 
@@ -614,10 +612,11 @@ class TestMakePerturbAUFs():
         # Force the 0.1-0.9 square with extra objects for the convex hull to pick up.
         x = np.concatenate(([0.3, 0.3, 0.1] * 101, [0.1, 0.1, 0.1], [0.1, 0.9, 0.1],
                             [0.9, 0.1, 0.1], [0.9, 0.9, 0.1])).reshape(-1, 3)
-        np.save(f'{self.cat_folder}/con_cat_astro.npy', x)
-        np.save(f'{self.cat_folder}/con_cat_photo.npy',
-                np.array([np.concatenate(([14.99], [100]*100, [10], [10], [10], [10]))]).T)
-        np.save(f'{self.cat_folder}/magref.npy', np.array([0] * 105))
+        y = np.array([np.concatenate(([14.99], [100]*100, [10], [10], [10], [10]))]).T
+        z = np.array([0] * 105)
+        a = np.hstack((x, y, np.zeros((len(x), 1), bool), z.reshape(-1, 1)))
+        with open('cat_folder/cat_9.csv', "w", encoding='utf-8') as f:
+            np.savetxt(f, a, delimiter=",")
 
         # Fake up a TRILEGAL simulation data file.
         text = ('#area = 140.0 sq deg\n#Av at infinity = 1\n'
@@ -638,9 +637,8 @@ class TestMakePerturbAUFs():
                 ' 0.02415 -2.701 3.397  4.057 14.00  8.354 0.00 25.523 25.839 24.409 23.524 22.583 '
                 '22.387 22.292 22.015 21.144 19.380 20.878 100.99 22.391 21.637 21.342  0.024\n')
         for new_auf_point in new_auf_points:
-            os.makedirs(f'{self.auf_folder}/{new_auf_point[0]}/{new_auf_point[1]}', exist_ok=True)
-            with open(f'{self.auf_folder}/{new_auf_point[0]}/{new_auf_point[1]}/'
-                      'trilegal_auf_simulation_faint.dat', "w", encoding='utf-8') as f:
+            with open(f'{self.auf_folder}/trilegal_download_9_{new_auf_point[0]:.2f}_'
+                      f'{new_auf_point[1]:.2f}_faint.dat', "w", encoding='utf-8') as f:
                 f.write(text)
 
         prob_0_draw = psf_mean**0 * np.exp(-psf_mean) / math.factorial(0)
@@ -653,7 +651,7 @@ class TestMakePerturbAUFs():
         # Catalogue bins for the source, only keeping the single
         # source currently under consideration, and ignoring the two extra objects
         # used to force the local density to be calculated properly.
-        a_photo = np.load(f'{self.cat_folder}/con_cat_photo.npy')[0, :]
+        a_photo = y[0, :]
         dmag = 0.25
         mag_min = dmag * np.floor(np.amin(a_photo[0])/dmag)
         mag_max = dmag * np.ceil(np.amax(a_photo[0])/dmag)
@@ -668,99 +666,68 @@ class TestMakePerturbAUFs():
         mag_offset = mod_bin - mag_bin
         rel_flux = 10**(-1/2.5 * mag_offset)
 
-        ol, nl = 'include_perturb_auf = no', 'include_perturb_auf = yes\n'
-        with open(os.path.join(os.path.dirname(__file__), 'data/crossmatch_params.txt'),
-                  encoding='utf-8') as file:
-            f = file.readlines()
-        idx = np.where([ol in line for line in f])[0][0]
-        _replace_line(os.path.join(os.path.dirname(__file__), 'data/crossmatch_params.txt'),
-                      idx, nl, out_file=os.path.join(os.path.dirname(__file__),
-                      'data/crossmatch_params_.txt'))
+        with open(os.path.join(os.path.dirname(__file__), 'data/crossmatch_params.yaml'),
+                  encoding='utf-8') as cm_p:
+            cm_p_text = cm_p.read()
+        with open(os.path.join(os.path.dirname(__file__), 'data/cat_a_params.yaml'),
+                  encoding='utf-8') as ca_p:
+            ca_p_text = ca_p.read()
+        with open(os.path.join(os.path.dirname(__file__), 'data/cat_b_params.yaml'),
+                  encoding='utf-8') as cb_p:
+            cb_p_text = cb_p.read()
+        cm_p_ = cm_p_text.replace('include_perturb_auf: False', 'include_perturb_auf: True')
+        ca_p_ = ca_p_text.replace('\nfilt_names: [G_BP, G, G_RP]', '\nfilt_names: [G]')
+        cb_p_ = cb_p_text.replace('\nfilt_names: [W1, W2, W3, W4]', '\nfilt_names: [W1]')
 
-        ol, nl = 'filt_names = G_BP G G_RP', 'filt_names = G\n'
-        with open(os.path.join(os.path.dirname(__file__), 'data/cat_a_params.txt'),
-                  encoding='utf-8') as file:
-            f = file.readlines()
-        idx = np.where([ol in line for line in f])[0][0]
-        _replace_line(os.path.join(os.path.dirname(__file__), 'data/cat_a_params.txt'),
-                      idx, nl, out_file=os.path.join(os.path.dirname(__file__),
-                      'data/cat_a_params_.txt'))
-        for ol, nl in zip(['psf_fwhms = 0.12 0.12 0.12', 'cat_folder_path = gaia_folder',
-                           'auf_folder_path = gaia_auf_folder', 'tri_filt_names = G_BP G G_RP',
-                           'gal_al_avs = '],
-                          ['psf_fwhms = 0.12\n', 'cat_folder_path = cat_folder\n',
-                           'auf_folder_path = auf_folder\n', 'tri_filt_names = W1\n',
-                           'gal_al_avs = 0\n']):
-            with open(os.path.join(os.path.dirname(__file__), 'data/cat_a_params.txt'),
-                      encoding='utf-8') as file:
-                f = file.readlines()
-            idx = np.where([ol in line for line in f])[0][0]
-            _replace_line(os.path.join(os.path.dirname(__file__), 'data/cat_a_params_.txt'),
-                          idx, nl)
+        for ol, nl in zip(['psf_fwhms: [0.12, 0.12, 0.12]',
+                           r'auf_file_path: gaia_auf_folder/trilegal_download_{}.dat',
+                           'tri_filt_names: [G_BP, G, G_RP]', 'gal_al_avs: [1.002, 0.789, 0.589]',
+                           'mag_indices: [3, 4, 5]', 'chunk_overlap_col: 6', 'best_mag_index_col: 7'],
+                          ['psf_fwhms: [0.12]', r'auf_file_path: auf_folder/trilegal_download_{}.dat',
+                           'tri_filt_names: [W1]', 'gal_al_avs: [0]', 'mag_indices: [3]',
+                           'chunk_overlap_col: 4', 'best_mag_index_col: 5']):
+            ca_p_ = ca_p_.replace(ol, nl)
+        for ol, nl in zip(['psf_fwhms: [6.08, 6.84, 7.36, 11.99]',
+                           r'auf_file_path: wise_auf_folder/trilegal_download_{}.dat',
+                           'tri_filt_names: [W1, W2, W3, W4]', 'gal_al_avs: [0.039, 0.026, 0.015, 0.005]',
+                           'mag_indices: [3, 4, 5, 6]', 'chunk_overlap_col: 7', 'best_mag_index_col: 8'],
+                          ['psf_fwhms: [6.08]', r'auf_file_path: auf_folder/trilegal_download_{}.dat',
+                           'tri_filt_names: [W1]', 'gal_al_avs: [0]', 'mag_indices: [3]',
+                           'chunk_overlap_col: 4', 'best_mag_index_col: 5']):
+            cb_p_ = cb_p_.replace(ol, nl)
 
-        ol, nl = 'filt_names = W1 W2 W3 W4', 'filt_names = W1\n'
-        with open(os.path.join(os.path.dirname(__file__), 'data/cat_b_params.txt'),
-                  encoding='utf-8') as file:
-            f = file.readlines()
-        idx = np.where([ol in line for line in f])[0][0]
-        _replace_line(os.path.join(os.path.dirname(__file__), 'data/cat_b_params.txt'),
-                      idx, nl, out_file=os.path.join(os.path.dirname(__file__),
-                      'data/cat_b_params_.txt'))
-        for ol, nl in zip(['psf_fwhms = 6.08 6.84 7.36 11.99', 'cat_folder_path = wise_folder',
-                           'auf_folder_path = wise_auf_folder', 'tri_filt_names = W1 W2 W3 W4',
-                           'gal_al_avs = '],
-                          ['psf_fwhms = 6.08\n', 'cat_folder_path = cat_folder\n',
-                           'auf_folder_path = auf_folder\n', 'tri_filt_names = W1\n',
-                           'gal_al_avs = 0\n']):
-            with open(os.path.join(os.path.dirname(__file__), 'data/cat_b_params.txt'),
-                      encoding='utf-8') as file:
-                f = file.readlines()
-            idx = np.where([ol in line for line in f])[0][0]
-            _replace_line(os.path.join(os.path.dirname(__file__), 'data/cat_b_params_.txt'),
-                          idx, nl)
-
-        os.makedirs('a_snr_mag', exist_ok=True)
-        os.makedirs('b_snr_mag', exist_ok=True)
-        np.save('a_snr_mag/snr_mag_params.npy', np.array([[[0.0109, 46.08, 0.119, 130, 0]]]))
-        np.save('b_snr_mag/snr_mag_params.npy', np.array([[[0.0109, 46.08, 0.119, 130, 0]]]))
+        os.makedirs('a_snr_mag_9', exist_ok=True)
+        os.makedirs('b_snr_mag_9', exist_ok=True)
+        np.save('a_snr_mag_9/snr_mag_params.npy', np.array([[[0.0109, 46.08, 0.119, 130, 0]]]))
+        np.save('b_snr_mag_9/snr_mag_params.npy', np.array([[[0.0109, 46.08, 0.119, 130, 0]]]))
 
         # Fake this the easy way both times, then below correct the parameters
         # for the precompute_hist version of the test.
-        with open(os.path.join(os.path.dirname(__file__), 'data/cat_a_params_.txt'),
-                  encoding='utf-8') as file:
-            f = file.readlines()
-        old_line = 'auf_folder_path = auf_folder'
-        new_line = ('auf_folder_path = auf_folder\ndens_hist_tri_location = None\n'
-                    'tri_model_mags_location = None\ntri_model_mag_mids_location = None\n'
-                    'tri_model_mags_interval_location = None\ntri_dens_uncert_location = None\n'
-                    'tri_n_bright_sources_star_location = None\n')
-        idx = np.where([old_line in line for line in f])[0][0]
-        _replace_line(os.path.join(os.path.dirname(__file__), 'data/cat_a_params_.txt'), idx, new_line)
-        with open(os.path.join(os.path.dirname(__file__), 'data/cat_b_params_.txt'),
-                  encoding='utf-8') as file:
-            f = file.readlines()
-        old_line = 'auf_folder_path = auf_folder'
-        new_line = ('auf_folder_path = auf_folder\ndens_hist_tri_location = None\n'
-                    'tri_model_mags_location = None\ntri_model_mag_mids_location = None\n'
-                    'tri_model_mags_interval_location = None\ntri_dens_uncert_location = None\n'
-                    'tri_n_bright_sources_star_location = None\n')
-        idx = np.where([old_line in line for line in f])[0][0]
-        _replace_line(os.path.join(os.path.dirname(__file__), 'data/cat_b_params_.txt'), idx, new_line)
+        old_line = r'auf_file_path: auf_folder/trilegal_download_{}.dat'
+        new_line = (r'auf_file_path: auf_folder/trilegal_download_{}.dat' + '\ndens_hist_tri_location: None\n'
+                    'tri_model_mags_location: None\ntri_model_mag_mids_location: None\n'
+                    'tri_model_mags_interval_location: None\ntri_dens_uncert_location: None\n'
+                    'tri_n_bright_sources_star_location: None')
+        ca_p_ = ca_p_.replace(old_line, new_line)
+        cb_p_ = cb_p_.replace(old_line, new_line)
+        ca_p_ = ca_p_.replace(r'cat_csv_file_path: gaia_folder/gaia_{}.csv',
+                              r'cat_csv_file_path: cat_folder/cat_{}.csv')
+        cb_p_ = cb_p_.replace(r'cat_csv_file_path: wise_folder/wise_{}.csv',
+                              r'cat_csv_file_path: cat_folder/cat_{}.csv')
 
-        cm = CrossMatch(os.path.join(os.path.dirname(__file__), 'data'))
-        cm._initialise_chunk(os.path.join(os.path.dirname(__file__),
-                                          'data/crossmatch_params_.txt'),
-                             os.path.join(os.path.dirname(__file__), 'data/cat_a_params_.txt'),
-                             os.path.join(os.path.dirname(__file__), 'data/cat_b_params_.txt'))
+        cm = CrossMatch(mock_filename(cm_p_.encode("utf-8")), mock_filename(ca_p_.encode("utf-8")),
+                        mock_filename(cb_p_.encode("utf-8")))
+        cm._load_metadata_config(9)
+        cm._initialise_chunk()
 
         if precompute_tri_hists:
             for flag in ['a_', 'b_']:
-                _a_photo = np.load(f'{self.cat_folder}/con_cat_photo.npy')
+                _a_photo = y
                 hist, bins = np.histogram(_a_photo[~np.isnan(_a_photo)], bins='auto')
                 dens_mag = (bins[:-1]+np.diff(bins)/2)[np.argmax(hist)] - 0.5
                 dens, tri_mags, tri_mags_mids, dtri_mags, _, num_bright_obj = make_tri_counts(
-                    f'{self.auf_folder}/{new_auf_points[0][0]}/{new_auf_points[0][1]}/',
-                    'trilegal_auf_simulation', getattr(cm, f'{flag}tri_filt_names')[0], cm.d_mag,
+                    f'{self.auf_folder}/trilegal_download_9_{self.auf_points[0][0]:.2f}_'
+                    f'{self.auf_points[0][1]:.2f}.dat', getattr(cm, f'{flag}tri_filt_names')[0], cm.d_mag,
                     np.amin(a_photo), dens_mag)
                 setattr(cm, f'{flag}dens_hist_tri_list', [dens])
                 setattr(cm, f'{flag}tri_model_mags_list', [tri_mags])
@@ -768,8 +735,8 @@ class TestMakePerturbAUFs():
                 setattr(cm, f'{flag}tri_model_mags_interval_list', [dtri_mags])
                 setattr(cm, f'{flag}tri_n_bright_sources_star_list', [num_bright_obj])
 
-            cm.a_auf_folder_path = None
-            cm.b_auf_folder_path = None
+            cm.a_auf_file_path = None
+            cm.b_auf_file_path = None
             cm.a_tri_set_name = None
             cm.b_tri_set_name = None
             cm.a_tri_maglim_faint = None
@@ -841,12 +808,13 @@ class TestMakePerturbAUFs():
         # Force the 0.1-0.9 square with extra objects for the convex hull to pick up.
         x = np.concatenate(([0.3, 0.3, 0.1] * 101, [0.1, 0.1, 0.1], [0.1, 0.9, 0.1],
                             [0.9, 0.1, 0.1], [0.9, 0.9, 0.1])).reshape(-1, 3)
-        np.save(f'{self.cat_folder}/con_cat_astro.npy', x)
         rng = np.random.default_rng(seed=83458923)
         main_mags = rng.uniform(24.95, 25.05, size=100)
-        np.save(f'{self.cat_folder}/con_cat_photo.npy',
-                np.array([np.concatenate(([14.99], main_mags, [10], [10], [10], [10]))]).T)
-        np.save(f'{self.cat_folder}/magref.npy', np.array([0] * 105))
+        y = np.array([np.concatenate(([14.99], main_mags, [10], [10], [10], [10]))]).T
+        z = np.array([0] * 105)
+        a = np.hstack((x, y, np.zeros((len(x), 1), bool), z.reshape(-1, 1)))
+        with open('cat_folder/cat_9.csv', "w", encoding='utf-8') as f:
+            np.savetxt(f, a, delimiter=",")
 
         # Fake up a TRILEGAL simulation data file.
         text = ('#area = 140.0 sq deg\n#Av at infinity = 1\n'
@@ -867,9 +835,8 @@ class TestMakePerturbAUFs():
                 ' 0.02415 -2.701 3.397  4.057 14.00  8.354 0.00 25.523 25.839 24.409 23.524 22.583 '
                 '22.387 22.292 22.015 21.144 19.380 20.878 25.99 22.391 21.637 21.342  0.024\n')
         for new_auf_point in new_auf_points:
-            os.makedirs(f'{self.auf_folder}/{new_auf_point[0]}/{new_auf_point[1]}', exist_ok=True)
-            with open(f'{self.auf_folder}/{new_auf_point[0]}/{new_auf_point[1]}/'
-                      'trilegal_auf_simulation_faint.dat', "w", encoding='utf-8') as f:
+            with open(f'{self.auf_folder}/trilegal_download_9_{new_auf_point[0]:.2f}_'
+                      f'{new_auf_point[1]:.2f}_faint.dat', "w", encoding='utf-8') as f:
                 f.write(text)
 
         prob_0_draw = psf_mean**0 * np.exp(-psf_mean) / math.factorial(0)
@@ -879,7 +846,7 @@ class TestMakePerturbAUFs():
         ax1, ax2 = self.auf_points[0]
 
         # Catalogue bins for the source:
-        a_photo = np.load(f'{self.cat_folder}/con_cat_photo.npy')[0, :]
+        a_photo = y[0, :]
         dmag = 0.25
         mag_min = dmag * np.floor(np.amin(a_photo[0])/dmag)
         mag_max = dmag * np.ceil(np.amax(a_photo[0])/dmag)
@@ -895,88 +862,56 @@ class TestMakePerturbAUFs():
         mag_offset = mod_bin - mag_bin
         rel_flux = 10**(-1/2.5 * mag_offset)
 
-        ol, nl = 'include_perturb_auf = no', 'include_perturb_auf = yes\n'
-        with open(os.path.join(os.path.dirname(__file__), 'data/crossmatch_params.txt'),
-                  encoding='utf-8') as file:
-            f = file.readlines()
-        idx = np.where([ol in line for line in f])[0][0]
-        _replace_line(os.path.join(os.path.dirname(__file__), 'data/crossmatch_params.txt'),
-                      idx, nl, out_file=os.path.join(os.path.dirname(__file__),
-                      'data/crossmatch_params_.txt'))
+        with open(os.path.join(os.path.dirname(__file__), 'data/crossmatch_params.yaml'),
+                  encoding='utf-8') as cm_p:
+            cm_p_text = cm_p.read()
+        with open(os.path.join(os.path.dirname(__file__), 'data/cat_a_params.yaml'),
+                  encoding='utf-8') as ca_p:
+            ca_p_text = ca_p.read()
+        with open(os.path.join(os.path.dirname(__file__), 'data/cat_b_params.yaml'),
+                  encoding='utf-8') as cb_p:
+            cb_p_text = cb_p.read()
+        cm_p_ = cm_p_text.replace('include_perturb_auf: False', 'include_perturb_auf: True')
+        ca_p_ = ca_p_text.replace('\nfilt_names: [G_BP, G, G_RP]', '\nfilt_names: [G]')
+        cb_p_ = cb_p_text.replace('\nfilt_names: [W1, W2, W3, W4]', '\nfilt_names: [W1]')
+        for ol, nl in zip(['psf_fwhms: [0.12, 0.12, 0.12]',
+                           r'auf_file_path: gaia_auf_folder/trilegal_download_{}.dat',
+                           'tri_filt_names: [G_BP, G, G_RP]', 'gal_al_avs: [1.002, 0.789, 0.589]',
+                           'mag_indices: [3, 4, 5]', 'chunk_overlap_col: 6', 'best_mag_index_col: 7'],
+                          ['psf_fwhms: [0.12]', r'auf_file_path: auf_folder/trilegal_download_{}.dat',
+                           'tri_filt_names: [W1]', 'gal_al_avs: [0]', 'mag_indices: [3]',
+                           'chunk_overlap_col: 4', 'best_mag_index_col: 5']):
+            ca_p_ = ca_p_.replace(ol, nl)
+        for ol, nl in zip(['psf_fwhms: [6.08, 6.84, 7.36, 11.99]',
+                           r'auf_file_path: wise_auf_folder/trilegal_download_{}.dat',
+                           'tri_filt_names: [W1, W2, W3, W4]', 'gal_al_avs: [0.039, 0.026, 0.015, 0.005]',
+                           'mag_indices: [3, 4, 5, 6]', 'chunk_overlap_col: 7', 'best_mag_index_col: 8'],
+                          ['psf_fwhms: [6.08]', 'auf_file_path: auf_folder/trilegal_download_{}.dat',
+                           'tri_filt_names: [W1]', 'gal_al_avs: [0]', 'mag_indices: [3]',
+                           'chunk_overlap_col: 4', 'best_mag_index_col: 5']):
+            cb_p_ = cb_p_.replace(ol, nl)
 
-        ol, nl = 'filt_names = G_BP G G_RP', 'filt_names = G\n'
-        with open(os.path.join(os.path.dirname(__file__), 'data/cat_a_params.txt'),
-                  encoding='utf-8') as file:
-            f = file.readlines()
-        idx = np.where([ol in line for line in f])[0][0]
-        _replace_line(os.path.join(os.path.dirname(__file__), 'data/cat_a_params.txt'),
-                      idx, nl, out_file=os.path.join(os.path.dirname(__file__),
-                      'data/cat_a_params_.txt'))
-        for ol, nl in zip(['psf_fwhms = 0.12 0.12 0.12', 'cat_folder_path = gaia_folder',
-                           'auf_folder_path = gaia_auf_folder', 'tri_filt_names = G_BP G G_RP',
-                           'gal_al_avs = '],
-                          ['psf_fwhms = 0.12\n', 'cat_folder_path = cat_folder\n',
-                           'auf_folder_path = auf_folder\n', 'tri_filt_names = W1\n',
-                           'gal_al_avs = 0\n']):
-            with open(os.path.join(os.path.dirname(__file__), 'data/cat_a_params.txt'),
-                      encoding='utf-8') as file:
-                f = file.readlines()
-            idx = np.where([ol in line for line in f])[0][0]
-            _replace_line(os.path.join(os.path.dirname(__file__), 'data/cat_a_params_.txt'),
-                          idx, nl)
+        os.makedirs('a_snr_mag_9', exist_ok=True)
+        os.makedirs('b_snr_mag_9', exist_ok=True)
+        np.save('a_snr_mag_9/snr_mag_params.npy', np.array([[[0.0109, 46.08, 0.119, 130, 0]]]))
+        np.save('b_snr_mag_9/snr_mag_params.npy', np.array([[[0.0109, 46.08, 0.119, 130, 0]]]))
 
-        ol, nl = 'filt_names = W1 W2 W3 W4', 'filt_names = W1\n'
-        with open(os.path.join(os.path.dirname(__file__), 'data/cat_b_params.txt'),
-                  encoding='utf-8') as file:
-            f = file.readlines()
-        idx = np.where([ol in line for line in f])[0][0]
-        _replace_line(os.path.join(os.path.dirname(__file__), 'data/cat_b_params.txt'),
-                      idx, nl, out_file=os.path.join(os.path.dirname(__file__),
-                      'data/cat_b_params_.txt'))
-        for ol, nl in zip(['psf_fwhms = 6.08 6.84 7.36 11.99', 'cat_folder_path = wise_folder',
-                           'auf_folder_path = wise_auf_folder', 'tri_filt_names = W1 W2 W3 W4',
-                           'gal_al_avs = '],
-                          ['psf_fwhms = 6.08\n', 'cat_folder_path = cat_folder\n',
-                           'auf_folder_path = auf_folder\n', 'tri_filt_names = W1\n',
-                           'gal_al_avs = 0\n']):
-            with open(os.path.join(os.path.dirname(__file__), 'data/cat_b_params.txt'),
-                      encoding='utf-8') as file:
-                f = file.readlines()
-            idx = np.where([ol in line for line in f])[0][0]
-            _replace_line(os.path.join(os.path.dirname(__file__), 'data/cat_b_params_.txt'),
-                          idx, nl)
+        old_line = r'auf_file_path: auf_folder/trilegal_download_{}.dat'
+        new_line = (r'auf_file_path: auf_folder/trilegal_download_{}.dat' + '\ndens_hist_tri_location: None\n'
+                    'tri_model_mags_location: None\ntri_model_mag_mids_location: None\n'
+                    'tri_model_mags_interval_location: None\ntri_dens_uncert_location: None\n'
+                    'tri_n_bright_sources_star_location: None')
+        ca_p_ = ca_p_.replace(old_line, new_line)
+        cb_p_ = cb_p_.replace(old_line, new_line)
+        ca_p_ = ca_p_.replace(r'cat_csv_file_path: gaia_folder/gaia_{}.csv',
+                              r'cat_csv_file_path: cat_folder/cat_{}.csv')
+        cb_p_ = cb_p_.replace(r'cat_csv_file_path: wise_folder/wise_{}.csv',
+                              r'cat_csv_file_path: cat_folder/cat_{}.csv')
 
-        os.makedirs('a_snr_mag', exist_ok=True)
-        os.makedirs('b_snr_mag', exist_ok=True)
-        np.save('a_snr_mag/snr_mag_params.npy', np.array([[[0.0109, 46.08, 0.119, 130, 0]]]))
-        np.save('b_snr_mag/snr_mag_params.npy', np.array([[[0.0109, 46.08, 0.119, 130, 0]]]))
-
-        with open(os.path.join(os.path.dirname(__file__), 'data/cat_a_params_.txt'),
-                  encoding='utf-8') as file:
-            f = file.readlines()
-        old_line = 'auf_folder_path = auf_folder'
-        new_line = ('auf_folder_path = auf_folder\ndens_hist_tri_location = None\n'
-                    'tri_model_mags_location = None\ntri_model_mag_mids_location = None\n'
-                    'tri_model_mags_interval_location = None\ntri_dens_uncert_location = None\n'
-                    'tri_n_bright_sources_star_location = None\n')
-        idx = np.where([old_line in line for line in f])[0][0]
-        _replace_line(os.path.join(os.path.dirname(__file__), 'data/cat_a_params_.txt'), idx, new_line)
-        with open(os.path.join(os.path.dirname(__file__), 'data/cat_b_params_.txt'),
-                  encoding='utf-8') as file:
-            f = file.readlines()
-        old_line = 'auf_folder_path = auf_folder'
-        new_line = ('auf_folder_path = auf_folder\ndens_hist_tri_location = None\n'
-                    'tri_model_mags_location = None\ntri_model_mag_mids_location = None\n'
-                    'tri_model_mags_interval_location = None\ntri_dens_uncert_location = None\n'
-                    'tri_n_bright_sources_star_location = None\n')
-        idx = np.where([old_line in line for line in f])[0][0]
-        _replace_line(os.path.join(os.path.dirname(__file__), 'data/cat_b_params_.txt'), idx, new_line)
-
-        cm = CrossMatch(os.path.join(os.path.dirname(__file__), 'data'))
-        cm._initialise_chunk(os.path.join(os.path.dirname(__file__),
-                                          'data/crossmatch_params_.txt'),
-                             os.path.join(os.path.dirname(__file__), 'data/cat_a_params_.txt'),
-                             os.path.join(os.path.dirname(__file__), 'data/cat_b_params_.txt'))
+        cm = CrossMatch(mock_filename(cm_p_.encode("utf-8")), mock_filename(ca_p_.encode("utf-8")),
+                        mock_filename(cb_p_.encode("utf-8")))
+        cm._load_metadata_config(9)
+        cm._initialise_chunk()
 
         cm.a_auf_region_points = new_auf_points
         cm.b_auf_region_points = new_auf_points
@@ -1010,7 +945,7 @@ class TestMakePerturbAUFs():
         cm.b_run_fw = True
         cm.b_run_psf = False
 
-        cm.chunk_id = 1
+        cm.chunk_id = 9
 
         cm.a_dens_dist = density_radius
         cm.b_dens_dist = density_radius
@@ -1075,7 +1010,7 @@ def test_make_tri_counts(run_type):  # pylint: disable=too-many-branches
             out.writelines(script)
     if run_type != "neither":
         dens, tri_mags, tri_mags_mids, _, uncert, n = make_tri_counts(
-            '.', 'trilegal_auf_simulation', 'W1', 0.1, 5 if run_type != "faint" else 10, 20,
+            'trilegal_auf_simulation.dat', 'W1', 0.1, 5 if run_type != "faint" else 10, 20,
             use_bright=run_type != "faint", use_faint=run_type != "bright")
         assert n
         if run_type == "both":
@@ -1111,17 +1046,17 @@ def test_make_tri_counts(run_type):  # pylint: disable=too-many-branches
     else:
         with pytest.raises(ValueError, match="use_bright and use_faint cannot both be "):
             dens, tri_mags, tri_mags_mids, _, uncert, n = make_tri_counts(
-                '.', 'trilegal_auf_simulation', 'W1', 0.1, 10, 20, use_bright=False,
+                'trilegal_auf_simulation.dat', 'W1', 0.1, 10, 20, use_bright=False,
                 use_faint=False)
 
     if run_type == "both":
         with pytest.raises(ValueError, match="If one of al_av or av_grid is provided "):
             dens, tri_mags, tri_mags_mids, _, uncert, n = make_tri_counts(
-                '.', 'trilegal_auf_simulation', 'W1', 0.1, 5, 20,
+                'trilegal_auf_simulation.dat', 'W1', 0.1, 5, 20,
                 use_bright=False, use_faint=True, al_av=0.9)
 
         dens, tri_mags, tri_mags_mids, _, uncert, n = make_tri_counts(
-            '.', 'trilegal_auf_simulation', 'W1', 0.1, 5, 20, use_bright=True, use_faint=True,
+            'trilegal_auf_simulation.dat', 'W1', 0.1, 5, 20, use_bright=True, use_faint=True,
             al_av=0.9, av_grid=np.array([2, 2, 2, 2, 2]))
         assert n
         assert_allclose(tri_mags[0], 5 + 0.9, atol=0.1)
@@ -1144,10 +1079,14 @@ def test_make_tri_counts(run_type):  # pylint: disable=too-many-branches
         with open('trilegal_auf_simulation_faint.dat', encoding='utf-8') as file:
             f = file.readlines()
         idx = np.where([ol in line for line in f])[0][0]
-        _replace_line('trilegal_auf_simulation_faint.dat', idx, nl)
+        with open('trilegal_auf_simulation_faint.dat', 'r', encoding='utf-8') as file:
+            lines = file.readlines()
+        lines[idx] = nl
+        with open('trilegal_auf_simulation_faint.dat', 'w', encoding='utf-8') as out:
+            out.writelines(lines)
         with pytest.raises(ValueError, match="tri_av_inf_faint cannot be smaller than 0.1 while"):
             dens, tri_mags, tri_mags_mids, _, uncert, n = make_tri_counts(
-                '.', 'trilegal_auf_simulation', 'W1', 0.1, 10, 20,
+                'trilegal_auf_simulation.dat', 'W1', 0.1, 10, 20,
                 use_bright=False, use_faint=True, al_av=0.9, av_grid=np.array([2, 2, 2, 2]))
     if run_type == "bright":
         ol = '#Av at infinity = 1'
@@ -1155,23 +1094,26 @@ def test_make_tri_counts(run_type):  # pylint: disable=too-many-branches
         with open('trilegal_auf_simulation_bright.dat', encoding='utf-8') as file:
             f = file.readlines()
         idx = np.where([ol in line for line in f])[0][0]
-        _replace_line('trilegal_auf_simulation_bright.dat', idx, nl)
+        with open('trilegal_auf_simulation_bright.dat', 'r', encoding='utf-8') as file:
+            lines = file.readlines()
+        lines[idx] = nl
+        with open('trilegal_auf_simulation_bright.dat', 'w', encoding='utf-8') as out:
+            out.writelines(lines)
         with pytest.raises(ValueError, match="tri_av_inf_bright cannot be smaller than 0.1 while"):
             dens, tri_mags, tri_mags_mids, _, uncert, n = make_tri_counts(
-                '.', 'trilegal_auf_simulation', 'W1', 0.1, 5, 20,
+                'trilegal_auf_simulation.dat', 'W1', 0.1, 5, 20,
                 use_bright=True, use_faint=False, al_av=0.9, av_grid=np.array([2, 2, 2, 2]))
 
 
 @pytest.mark.remote_data
 def test_trilegal_download():
-    tri_folder = '.'
-    download_trilegal_simulation(tri_folder, 'gaiaDR2', 15, 6, 1, 'galactic', 32, 0.01, total_objs=10000)
-    tri_name = 'trilegal_auf_simulation'
-    with open(f'{tri_folder}/{tri_name}.dat', "r", encoding='utf-8') as f:
+    download_trilegal_simulation(os.path.join(os.getcwd(), 'trilegal_auf_simulation.dat'), 'gaiaDR2',
+                                 15, 6, 1, 'galactic', 32, 0.01, total_objs=10000)
+    with open('trilegal_auf_simulation.dat', "r", encoding='utf-8') as f:
         line = f.readline()
     bits = line.split(' ')
     tri_area = float(bits[2])
-    tri = np.genfromtxt(f'{tri_folder}/{tri_name}.dat', delimiter=None, names=True,
+    tri = np.genfromtxt('trilegal_auf_simulation.dat', delimiter=None, names=True,
                         comments='#', skip_header=2)
     assert np.all(tri[:]['G'] <= 32)
     assert tri_area <= 10

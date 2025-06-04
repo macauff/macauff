@@ -9,7 +9,6 @@ import warnings
 import numpy as np
 import pytest
 
-# pylint: disable-next=import-error,no-name-in-module
 from macauff.make_set_list import _initial_group_numbering, set_list
 
 

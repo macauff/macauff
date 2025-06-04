@@ -6,7 +6,6 @@ Tests for the "get_trilegal_wrapper" module.
 import pytest
 from numpy.testing import assert_allclose
 
-# pylint: disable-next=no-name-in-module,import-error
 from macauff.get_trilegal_wrapper import get_av_infinity
 
 

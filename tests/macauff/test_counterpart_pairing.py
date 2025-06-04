@@ -10,7 +10,7 @@ import os
 import numpy as np
 import pytest
 from numpy.testing import assert_allclose
-from test_matching import _replace_line
+from test_utils import mock_filename
 
 # pylint: disable=no-name-in-module,import-error
 from macauff.counterpart_pairing import source_pairing
@@ -47,35 +47,35 @@ class TestCounterpartPairing:  # pylint: disable=too-many-instance-attributes
         # Test will have three overlap islands: two with 2 a sources and 1 b
         # source, with 1 unmatched a source, and one with 2 a + 1 b all unmatched
         # sources. Also two islands each with just one "field" object.
-        self.a_astro = np.empty((7, 3), float)
-        self.b_astro = np.empty((4, 3), float)
+        self.a_cat = np.empty((7, 8), float)
+        self.b_cat = np.empty((4, 9), float)
         self.a_sig, self.b_sig = 0.1, 0.08
 
-        self.a_astro[:3, :2] = np.array([[0, 0], [0.1, 0.1], [0.1, 0]])
-        self.a_astro[3:6, :2] = self.a_astro[:3, :2] + rng.choice([-1, 1], size=(3, 2)) * \
+        self.a_cat[:3, :2] = np.array([[0, 0], [0.1, 0.1], [0.1, 0]])
+        self.a_cat[3:6, :2] = self.a_cat[:3, :2] + rng.choice([-1, 1], size=(3, 2)) * \
             rng.uniform(2.1*self.a_sig/3600, 3*self.a_sig/3600, size=(3, 2))
-        self.a_astro[6, :2] = np.array([0.1, 0.1])
+        self.a_cat[6, :2] = np.array([0.1, 0.1])
         # Force the second source in the island with the counterpart a/b pair
         # in "a" to be 2-3 sigma away, while the counterpart is <=1 sigma distant.
-        self.b_astro[:3, :2] = self.a_astro[:3, :2] + \
+        self.b_cat[:3, :2] = self.a_cat[:3, :2] + \
             rng.uniform(-1*self.b_sig/3600, self.b_sig/3600, size=(3, 2))
         # Swap the first and second indexes around
-        self.b_astro[:2, 0] = self.b_astro[[1, 0], 0]
-        self.b_astro[:2, 1] = self.b_astro[[1, 0], 1]
-        self.b_astro[-1, :2] = np.array([0.05, 0.05])
+        self.b_cat[:2, 0] = self.b_cat[[1, 0], 0]
+        self.b_cat[:2, 1] = self.b_cat[[1, 0], 1]
+        self.b_cat[-1, :2] = np.array([0.05, 0.05])
         # Swap the last two indexes as well
-        self.b_astro[-2:, 0] = self.b_astro[[-1, -2], 0]
-        self.b_astro[-2:, 1] = self.b_astro[[-1, -2], 1]
+        self.b_cat[-2:, 0] = self.b_cat[[-1, -2], 0]
+        self.b_cat[-2:, 1] = self.b_cat[[-1, -2], 1]
         # Force no match between the third island by adding distance between
         # a[2] and b[3]. Unphysical but effective.
-        self.b_astro[3, 1] += 7*self.b_sig/3600
+        self.b_cat[3, 1] += 7*self.b_sig/3600
 
-        self.a_astro[:, 2] = self.a_sig
-        self.b_astro[:, 2] = self.b_sig
+        self.a_cat[:, 2] = self.a_sig
+        self.b_cat[:, 2] = self.b_sig
         # Currently we don't care about the photometry, setting both
         # include_phot_like and use_phot_priors to False, so just fake:
-        self.a_photo = np.ones((7, 3), float)
-        self.b_photo = np.ones((4, 4), float)
+        self.a_cat[:, 3:6] = np.ones((7, 3), float)
+        self.b_cat[:, 3:7] = np.ones((4, 4), float)
 
         self.alist = np.array([[0, 3], [1, 4], [2, 5], [6, -1], [-1, -1]]).T
         self.blist = np.array([[1], [0], [3], [-1], [2]]).T
@@ -99,8 +99,11 @@ class TestCounterpartPairing:  # pylint: disable=too-many-instance-attributes
                                            np.ones((4, 3, 1), float))
         self.fb_priors = np.asfortranarray((3/0.001**2 * 0.5) * np.ones((4, 3, 1), float))
 
-        self.amagref = np.zeros((self.a_astro.shape[0]), int)
-        self.bmagref = np.zeros((self.b_astro.shape[0]), int)
+        # best_mag_index and chunk_overlap respectively.
+        self.a_cat[:, 7] = np.zeros((self.a_cat.shape[0]), int)
+        self.b_cat[:, 8] = np.zeros((self.b_cat.shape[0]), int)
+        self.a_cat[:, 6] = np.ones((self.a_cat.shape[0]), bool)
+        self.b_cat[:, 7] = np.ones((self.b_cat.shape[0]), bool)
 
         self.amodelrefinds = np.zeros((3, 7), int, order='F')
         self.bmodelrefinds = np.zeros((3, 4), int, order='F')
@@ -116,23 +119,21 @@ class TestCounterpartPairing:  # pylint: disable=too-many-instance-attributes
 
         # We have to save various files for the source_pairing function to
         # pick up again.
-        self.joint_folder_path = 'test_path'
+        self.output_save_folder = 'test_path'
         self.a_cat_folder_path = 'gaia_folder'
         self.b_cat_folder_path = 'wise_folder'
         self.a_auf_folder_path = 'gaia_auf_folder'
         self.b_auf_folder_path = 'wise_auf_folder'
 
-        os.system(f'rm -r {self.joint_folder_path}')
-        os.makedirs(f'{self.joint_folder_path}', exist_ok=True)
+        os.system(f'rm -r {self.output_save_folder}')
+        os.makedirs(f'{self.output_save_folder}', exist_ok=True)
         for f in [self.a_cat_folder_path, self.b_cat_folder_path,
                   self.a_auf_folder_path, self.b_auf_folder_path]:
             os.makedirs(f, exist_ok=True)
-        np.save(f'{self.a_cat_folder_path}/con_cat_astro.npy', self.a_astro)
-        np.save(f'{self.b_cat_folder_path}/con_cat_astro.npy', self.b_astro)
-        np.save(f'{self.a_cat_folder_path}/con_cat_photo.npy', self.a_photo)
-        np.save(f'{self.b_cat_folder_path}/con_cat_photo.npy', self.b_photo)
-        np.save(f'{self.a_cat_folder_path}/magref.npy', self.amagref)
-        np.save(f'{self.b_cat_folder_path}/magref.npy', self.bmagref)
+        with open(f'{self.a_cat_folder_path}/gaia_9.csv', "w", encoding='utf-8') as f:
+            np.savetxt(f, self.a_cat, delimiter=",")
+        with open(f'{self.b_cat_folder_path}/wise_9.csv', "w", encoding='utf-8') as f:
+            np.savetxt(f, self.b_cat, delimiter=",")
 
         # We should have already made fourier_grid, frac_grid, and flux_grid
         # for each catalogue.
@@ -145,7 +146,17 @@ class TestCounterpartPairing:  # pylint: disable=too-many-instance-attributes
         self.a_perturb_auf_outputs['flux_grid'] = self.aflux_grids
         self.b_perturb_auf_outputs['flux_grid'] = self.bflux_grids
 
-        self.large_len = max(len(self.a_astro), len(self.b_astro))
+        self.large_len = max(len(self.a_cat), len(self.b_cat))
+
+        with open(os.path.join(os.path.dirname(__file__), 'data/crossmatch_params.yaml'),
+                  encoding='utf-8') as cm_p:
+            self.cm_p_text = cm_p.read()
+        with open(os.path.join(os.path.dirname(__file__), 'data/cat_a_params.yaml'),
+                  encoding='utf-8') as ca_p:
+            self.ca_p_text = ca_p.read()
+        with open(os.path.join(os.path.dirname(__file__), 'data/cat_b_params.yaml'),
+                  encoding='utf-8') as cb_p:
+            self.cb_p_text = cb_p.read()
 
     def make_class(self):
         class A():  # pylint: disable=too-few-public-methods
@@ -158,7 +169,7 @@ class TestCounterpartPairing:  # pylint: disable=too-many-instance-attributes
         a.b_modelrefinds = self.bmodelrefinds
         a.a_perturb_auf_outputs = self.a_perturb_auf_outputs
         a.b_perturb_auf_outputs = self.b_perturb_auf_outputs
-        a.joint_folder_path = self.joint_folder_path
+        a.output_save_folder = self.output_save_folder
         a.a_cat_folder_path = self.a_cat_folder_path
         a.b_cat_folder_path = self.b_cat_folder_path
         a.rho = self.rho
@@ -183,42 +194,42 @@ class TestCounterpartPairing:  # pylint: disable=too-many-instance-attributes
         a.bgrplen = self.bgrplen
         a.lenrejecta = 0
         a.lenrejectb = 0
-        a.a_astro = self.a_astro
-        a.a_photo = self.a_photo
-        a.b_astro = self.b_astro
-        a.b_photo = self.b_photo
-        a.a_magref = self.amagref
-        a.b_magref = self.bmagref
+        a.a_astro = self.a_cat[:, :3]
+        a.a_photo = self.a_cat[:, 3:6]
+        a.b_astro = self.b_cat[:, :3]
+        a.b_photo = self.b_cat[:, 3:7]
+        a.a_magref = self.a_cat[:, 7]
+        a.b_magref = self.b_cat[:, 8]
 
         return a
 
     def _calculate_prob_integral(self):
         self.o = np.sqrt(self.a_sig**2 + self.b_sig**2) / 3600
-        self.sep = np.sqrt(((self.a_astro[0, 0] -
-                             self.b_astro[1, 0])*np.cos(np.radians(self.b_astro[1, 1])))**2 +
-                           (self.a_astro[0, 1] - self.b_astro[1, 1])**2)
+        self.sep = np.sqrt(((self.a_cat[0, 0] -
+                             self.b_cat[1, 0])*np.cos(np.radians(self.b_cat[1, 1])))**2 +
+                           (self.a_cat[0, 1] - self.b_cat[1, 1])**2)
         self.g = 1/(2 * np.pi * self.o**2) * np.exp(-0.5 * self.sep**2 / self.o**2)
-        self.sep_wrong = np.sqrt(((self.a_astro[3, 0] -
-                                   self.b_astro[1, 0])*np.cos(np.radians(self.a_astro[3, 1])))**2 +
-                                 (self.a_astro[3, 1] - self.b_astro[1, 1])**2)
+        self.sep_wrong = np.sqrt(((self.a_cat[3, 0] -
+                                   self.b_cat[1, 0])*np.cos(np.radians(self.a_cat[3, 1])))**2 +
+                                 (self.a_cat[3, 1] - self.b_cat[1, 1])**2)
         self.g_wrong = 1/(2 * np.pi * self.o**2) * np.exp(-0.5 * self.sep_wrong**2 / self.o**2)
         self.nc = self.c_priors[0, 0, 0]
         self.nfa, self.nfb = self.fa_priors[0, 0, 0], self.fb_priors[0, 0, 0]
 
     def test_individual_island_probability(self):
-        os.system(f'rm -r {self.joint_folder_path}')
-        os.makedirs(f'{self.joint_folder_path}', exist_ok=True)
+        os.system(f'rm -r {self.output_save_folder}')
+        os.makedirs(f'{self.output_save_folder}', exist_ok=True)
         i = 0
         wrapper = [
-            self.a_astro, self.a_photo, self.b_astro, self.b_photo, self.c_array, self.fa_array,
-            self.fb_array, self.c_priors, self.fa_priors, self.fb_priors, self.abinsarray,
+            self.a_cat[:, :3], self.a_cat[:, 3:6], self.b_cat[:, :3], self.b_cat[:, 3:7], self.c_array,
+            self.fa_array, self.fb_array, self.c_priors, self.fa_priors, self.fb_priors, self.abinsarray,
             self.bbinsarray, self.abinlengths, self.bbinlengths, self.afrac_grids,
             self.aflux_grids, self.afourier_grids, self.bfrac_grids, self.bflux_grids,
             self.bfourier_grids, self.rho, self.drho, self.n_fracs, self.large_len,
             self.alist[:self.agrplen[i], i]+1, self.blist[:self.bgrplen[i], i]+1,
-            self.amagref[self.alist[:self.agrplen[i], i]]+1,
+            self.a_cat[self.alist[:self.agrplen[i], i], 7]+1,
             self.a_sky_inds[self.alist[:self.agrplen[i], i]]+1,
-            self.bmagref[self.blist[:self.bgrplen[i], i]]+1,
+            self.b_cat[self.blist[:self.bgrplen[i], i], 8]+1,
             self.b_sky_inds[self.blist[:self.bgrplen[i], i]]+1,
             self.amodelrefinds[:, self.alist[:self.agrplen[i], i]]+1,
             self.bmodelrefinds[:, self.blist[:self.bgrplen[i], i]]+1]
@@ -250,8 +261,8 @@ class TestCounterpartPairing:  # pylint: disable=too-many-instance-attributes
         assert_allclose(prob, _prob, rtol=1e-5)
 
     def test_individual_island_zero_probabilities(self):
-        os.system(f'rm -r {self.joint_folder_path}')
-        os.makedirs(f'{self.joint_folder_path}', exist_ok=True)
+        os.system(f'rm -r {self.output_save_folder}')
+        os.makedirs(f'{self.output_save_folder}', exist_ok=True)
         # Fake the extra fire extinguisher likelihood/prior used in the main code.
         fa_array = np.zeros_like(self.fa_array) + 1e-10
         fb_array = np.zeros_like(self.fb_array) + 1e-10
@@ -259,15 +270,15 @@ class TestCounterpartPairing:  # pylint: disable=too-many-instance-attributes
         fb_priors = np.zeros_like(self.fb_priors) + 1e-10
         i = 0
         wrapper = [
-            self.a_astro, self.a_photo, self.b_astro, self.b_photo, self.c_array, fa_array,
-            fb_array, self.c_priors, fa_priors, fb_priors, self.abinsarray,
+            self.a_cat[:, :3], self.a_cat[:, 3:6], self.b_cat[:, :3], self.b_cat[:, 3:7], self.c_array,
+            fa_array, fb_array, self.c_priors, fa_priors, fb_priors, self.abinsarray,
             self.bbinsarray, self.abinlengths, self.bbinlengths, self.afrac_grids,
             self.aflux_grids, self.afourier_grids, self.bfrac_grids, self.bflux_grids,
             self.bfourier_grids, self.rho, self.drho, self.n_fracs, self.large_len,
             self.alist[:self.agrplen[i], i]+1, self.blist[:self.bgrplen[i], i]+1,
-            self.amagref[self.alist[:self.agrplen[i], i]]+1,
+            self.a_cat[self.alist[:self.agrplen[i], i], 7]+1,
             self.a_sky_inds[self.alist[:self.agrplen[i], i]]+1,
-            self.bmagref[self.blist[:self.bgrplen[i], i]]+1,
+            self.b_cat[self.blist[:self.bgrplen[i], i], 8]+1,
             self.b_sky_inds[self.blist[:self.bgrplen[i], i]]+1,
             self.amodelrefinds[:, self.alist[:self.agrplen[i], i]]+1,
             self.bmodelrefinds[:, self.blist[:self.bgrplen[i], i]]+1]
@@ -281,15 +292,15 @@ class TestCounterpartPairing:  # pylint: disable=too-many-instance-attributes
         c_array = np.zeros_like(self.c_array) + 1e-10
         c_priors = np.zeros_like(self.c_priors) + 1e-10
         wrapper = [
-            self.a_astro, self.a_photo, self.b_astro, self.b_photo, c_array, fa_array,
-            fb_array, c_priors, fa_priors, fb_priors, self.abinsarray,
+            self.a_cat[:, :3], self.a_cat[:, 3:6], self.b_cat[:, :3], self.b_cat[:, 3:7], c_array,
+            self.fa_array, self.fb_array, c_priors, self.fa_priors, self.fb_priors, self.abinsarray,
             self.bbinsarray, self.abinlengths, self.bbinlengths, self.afrac_grids,
             self.aflux_grids, self.afourier_grids, self.bfrac_grids, self.bflux_grids,
             self.bfourier_grids, self.rho, self.drho, self.n_fracs, self.large_len,
             self.alist[:self.agrplen[i], i]+1, self.blist[:self.bgrplen[i], i]+1,
-            self.amagref[self.alist[:self.agrplen[i], i]]+1,
+            self.a_cat[self.alist[:self.agrplen[i], i], 7]+1,
             self.a_sky_inds[self.alist[:self.agrplen[i], i]]+1,
-            self.bmagref[self.blist[:self.bgrplen[i], i]]+1,
+            self.b_cat[self.blist[:self.bgrplen[i], i], 8]+1,
             self.b_sky_inds[self.blist[:self.bgrplen[i], i]]+1,
             self.amodelrefinds[:, self.alist[:self.agrplen[i], i]]+1,
             self.bmodelrefinds[:, self.blist[:self.bgrplen[i], i]]+1]
@@ -303,7 +314,7 @@ class TestCounterpartPairing:  # pylint: disable=too-many-instance-attributes
         assert np.all(bcrpts == np.array([self.large_len+1]))
         assert_allclose(prob/integral, 1)
 
-    def test_source_pairing(self):  # pylint: disable=too-many-statements
+    def test_source_pairing(self):
         # pylint: disable=no-member
         fake_cm = self.make_class()
         source_pairing(fake_cm)
@@ -361,9 +372,9 @@ class TestCounterpartPairing:  # pylint: disable=too-many-instance-attributes
         afeta = fake_cm.afieldeta
         afxi = fake_cm.afieldxi
         q = np.where(a_field == 2)[0][0]
-        fake_field_sep = np.sqrt(((self.a_astro[2, 0] -
-                                   self.b_astro[3, 0])*np.cos(np.radians(self.b_astro[3, 1])))**2 +
-                                 (self.a_astro[2, 1] - self.b_astro[3, 1])**2)
+        fake_field_sep = np.sqrt(((self.a_cat[2, 0] -
+                                   self.b_cat[3, 0])*np.cos(np.radians(self.b_cat[3, 1])))**2 +
+                                 (self.a_cat[2, 1] - self.b_cat[3, 1])**2)
         assert_allclose(afs[q], fake_field_sep * 3600, rtol=1e-6)
 
         fake_field_g = 1/(2 * np.pi * self.o**2) * np.exp(-0.5 * fake_field_sep**2 / self.o**2)
@@ -375,8 +386,8 @@ class TestCounterpartPairing:  # pylint: disable=too-many-instance-attributes
 
     def test_including_b_reject(self):
         # pylint: disable=no-member
-        os.system(f'rm -r {self.joint_folder_path}')
-        os.makedirs(f'{self.joint_folder_path}', exist_ok=True)
+        os.system(f'rm -r {self.output_save_folder}')
+        os.makedirs(f'{self.output_save_folder}', exist_ok=True)
         # Remove the third group, pretending it's rejected in the group stage.
         alist = self.alist[:, [0, 1, 3, 4]]
         blist = self.blist[:, [0, 1, 3, 4]]
@@ -438,8 +449,8 @@ class TestCounterpartPairing:  # pylint: disable=too-many-instance-attributes
 
     def test_small_length_warnings(self):
         # pylint: disable=no-member
-        os.system(f'rm -r {self.joint_folder_path}')
-        os.makedirs(f'{self.joint_folder_path}', exist_ok=True)
+        os.system(f'rm -r {self.output_save_folder}')
+        os.makedirs(f'{self.output_save_folder}', exist_ok=True)
         # Here want to test that the number of recorded matches -- either
         # counterpart, field, or rejected -- is lower than the total length.
         # To achieve this we fake reject length arrays smaller than their
@@ -487,8 +498,8 @@ class TestCounterpartPairing:  # pylint: disable=too-many-instance-attributes
 
     def test_large_length_warnings(self):
         # pylint: disable=no-member
-        os.system(f'rm -r {self.joint_folder_path}')
-        os.makedirs(f'{self.joint_folder_path}', exist_ok=True)
+        os.system(f'rm -r {self.output_save_folder}')
+        os.makedirs(f'{self.output_save_folder}', exist_ok=True)
         # Here want to test that the number of recorded matches -- either
         # counterpart, field, or rejected -- is higher than the total length.
         # To achieve this we fake reject length arrays larger than their
@@ -533,52 +544,26 @@ class TestCounterpartPairing:  # pylint: disable=too-many-instance-attributes
         assert np.all([q in b_field for q in [2]])
         assert np.all([q not in b_field for q in [0, 1, 3]])
 
-    def _setup_cross_match_parameters(self):
-        # Ensure output chunk directory exists
-        os.makedirs(os.path.join(os.path.dirname(__file__), "data/chunk0"), exist_ok=True)
-
-        for ol, nl in zip(['cf_region_points = 131 134 4 -1 1 3'],
-                          ['cf_region_points = 131 131 1 0 0 1\n']):
-
-            with open(os.path.join(os.path.dirname(__file__), 'data/crossmatch_params.txt'),
-                      encoding='utf-8') as file:
-                f = file.readlines()
-            idx = np.where([ol in line for line in f])[0][0]
-            _replace_line(os.path.join(os.path.dirname(__file__), 'data/crossmatch_params.txt'),
-                          idx, nl, out_file=os.path.join(os.path.dirname(__file__),
-                          'data/chunk0/crossmatch_params_.txt'))
-
-        ol, nl = 'auf_region_points = 131 134 4 -1 1 {}', 'auf_region_points = 0 0 1 0 0 1\n'
-        for file_name in ['cat_a_params', 'cat_b_params']:
-            _ol = ol.format('3' if '_a_' in file_name else '4')
-            with open(os.path.join(os.path.dirname(__file__), f'data/{file_name}.txt'),
-                      encoding='utf-8') as file:
-                f = file.readlines()
-            idx = np.where([_ol in line for line in f])[0][0]
-            _replace_line(os.path.join(os.path.dirname(__file__), f'data/{file_name}.txt'),
-                          idx, nl, out_file=os.path.join(os.path.dirname(__file__),
-                          f'data/chunk0/{file_name}_.txt'))
-
     @pytest.mark.parametrize("with_and_without_photometry", [True, False])
     def test_pair_sources(self, with_and_without_photometry):  # pylint: disable=too-many-statements
         # pylint: disable=no-member
-        os.system(f'rm -r {self.joint_folder_path}/*')
+        os.system(f'rm -r {self.output_save_folder}/*')
         # Same run as test_source_pairing, but called from CrossMatch rather than
         # directly this time.
-        self._setup_cross_match_parameters()
-        self.cm = CrossMatch(os.path.join(os.path.dirname(__file__), 'data'))
+        cm_p_ = self.cm_p_text.replace('  - [131, 134, 4, -1, 1, 3]', '  - [131, 131, 1, 0, 0, 1]')
+        ca_p_ = self.ca_p_text.replace('  - [131, 134, 4, -1, 1, 3]', '  - [0, 0, 1, 0, 0, 1]')
+        cb_p_ = self.cb_p_text.replace('  - [131, 134, 4, -1, 1, 4]', '  - [0, 0, 1, 0, 0, 1]')
+        self.cm = CrossMatch(mock_filename(cm_p_.encode("utf-8")), mock_filename(ca_p_.encode("utf-8")),
+                             mock_filename(cb_p_.encode("utf-8")))
+        self.cm._load_metadata_config(9)
+        self.cm._initialise_chunk()
         self.cm.delta_mag_cuts = np.array([2.5, 5])
         self.cm.a_modelrefinds = self.amodelrefinds
         self.cm.b_modelrefinds = self.bmodelrefinds
         self.cm.chunk_id = 1
         self.cm.a_perturb_auf_outputs = self.a_perturb_auf_outputs
         self.cm.b_perturb_auf_outputs = self.b_perturb_auf_outputs
-        self.cm._initialise_chunk(os.path.join(os.path.dirname(__file__),
-                                               'data/chunk0/crossmatch_params_.txt'),
-                                  os.path.join(os.path.dirname(__file__),
-                                               'data/chunk0/cat_a_params_.txt'),
-                                  os.path.join(os.path.dirname(__file__),
-                                               'data/chunk0/cat_b_params_.txt'))
+
         self.cm.count_pair_func = source_pairing
 
         self.cm.abinsarray = self.abinsarray
@@ -703,9 +688,9 @@ class TestCounterpartPairing:  # pylint: disable=too-many-instance-attributes
         afeta = self.cm.afieldeta
         afxi = self.cm.afieldxi
         q = np.where(a_field == 2)[0][0]
-        fake_field_sep = np.sqrt(((self.a_astro[2, 0] -
-                                   self.b_astro[3, 0])*np.cos(np.radians(self.b_astro[3, 1])))**2 +
-                                 (self.a_astro[2, 1] - self.b_astro[3, 1])**2)
+        fake_field_sep = np.sqrt(((self.a_cat[2, 0] -
+                                   self.b_cat[3, 0])*np.cos(np.radians(self.b_cat[3, 1])))**2 +
+                                 (self.a_cat[2, 1] - self.b_cat[3, 1])**2)
         assert_allclose(afs[q], fake_field_sep * 3600, rtol=1e-6)
 
         fake_field_g = 1/(2 * np.pi * self.o**2) * np.exp(-0.5 * fake_field_sep**2 / self.o**2)
@@ -730,9 +715,9 @@ class TestCounterpartPairing:  # pylint: disable=too-many-instance-attributes
             afeta = self.cm.afieldeta_without_photometry
             afxi = self.cm.afieldxi_without_photometry
             q = np.where(a_field == 2)[0][0]
-            fake_field_sep = np.sqrt(((self.a_astro[2, 0] -
-                                       self.b_astro[3, 0])*np.cos(np.radians(self.b_astro[3, 1])))**2 +
-                                     (self.a_astro[2, 1] - self.b_astro[3, 1])**2)
+            fake_field_sep = np.sqrt(((self.a_cat[2, 0] -
+                                       self.b_cat[3, 0])*np.cos(np.radians(self.b_cat[3, 1])))**2 +
+                                     (self.a_cat[2, 1] - self.b_cat[3, 1])**2)
             assert_allclose(afs[q], fake_field_sep * 3600, rtol=1e-6)
 
             fake_field_g = 1/(2 * np.pi * self.o**2) * np.exp(-0.5 * fake_field_sep**2 / self.o**2)

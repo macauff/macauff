@@ -8,7 +8,7 @@ import os
 import numpy as np
 import pytest
 from numpy.testing import assert_allclose
-from test_matching import _replace_line
+from test_utils import mock_filename
 
 # pylint: disable=import-error,no-name-in-module
 from macauff.macauff import Macauff
@@ -25,7 +25,7 @@ class TestOneSidedPhotometricLikelihood:
     def setup_class(self):
         self.cf_points = np.array([[a, b] for a in [131.5, 132.5, 133.5] for b in [-0.5, 0.5]])
         self.cf_areas = np.ones((6), float)
-        self.joint_folder_path = 'test_path'
+        self.output_save_folder = 'test_path'
         self.a_cat_folder_path = 'gaia_folder'
         self.b_cat_folder_path = 'wise_folder'
 
@@ -35,6 +35,7 @@ class TestOneSidedPhotometricLikelihood:
 
         self.include_phot_like, self.use_phot_priors = False, False
 
+        os.makedirs(self.output_save_folder, exist_ok=True)
         os.makedirs(self.a_cat_folder_path, exist_ok=True)
         os.makedirs(self.b_cat_folder_path, exist_ok=True)
 
@@ -59,15 +60,17 @@ class TestOneSidedPhotometricLikelihood:
 
             setattr(self, f'{name}_photo', a)
 
-        old_line = 'cf_region_points = 131 134 4 -1 1 3'
-        new_line = 'cf_region_points = 131.5 133.5 3 -0.5 0.5 2\n'
-        with open(os.path.join(os.path.dirname(__file__), 'data/crossmatch_params.txt'),
-                  encoding='utf-8') as file:
-            f = file.readlines()
-        idx = np.where([old_line in line for line in f])[0][0]
-        _replace_line(os.path.join(os.path.dirname(__file__), 'data/crossmatch_params.txt'),
-                      idx, new_line, out_file=os.path.join(os.path.dirname(__file__),
-                      'data/crossmatch_params_.txt'))
+        with open(os.path.join(os.path.dirname(__file__), 'data/crossmatch_params.yaml'),
+                  encoding='utf-8') as cm_p:
+            self.cm_p_text = cm_p.read()
+        self.cm_p_ = self.cm_p_text.replace('  - [131, 134, 4, -1, 1, 3]',
+                                            '  - [131.5, 133.5, 3, -0.5, 0.5, 2]')
+        with open(os.path.join(os.path.dirname(__file__), 'data/cat_a_params.yaml'),
+                  encoding='utf-8') as ca_p:
+            self.ca_p_text = ca_p.read()
+        with open(os.path.join(os.path.dirname(__file__), 'data/cat_b_params.yaml'),
+                  encoding='utf-8') as cb_p:
+            self.cb_p_text = cb_p.read()
 
     def make_class(self):
         class A():  # pylint: disable=too-few-public-methods
@@ -128,8 +131,8 @@ class TestOneSidedPhotometricLikelihood:
         abins = fake_cm.abinsarray
         bbins = fake_cm.bbinsarray
         for which_cat, filts, _bins in zip(['a', 'b'], [self.afilts, self.bfilts], [abins, bbins]):
-            a = getattr(fake_cm, f'{which_cat}_astro')  # np.load(f'{folder}/con_cat_astro.npy')
-            b = getattr(fake_cm, f'{which_cat}_photo')  # np.load(f'{folder}/con_cat_photo.npy')
+            a = getattr(fake_cm, f'{which_cat}_astro')
+            b = getattr(fake_cm, f'{which_cat}_photo')
             for i, (ax1, ax2) in enumerate(self.cf_points):
                 q = ((a[:, 0] >= ax1-0.5) & (a[:, 0] <= ax1+0.5) &
                      (a[:, 1] >= ax2-0.5) & (a[:, 1] <= ax2+0.5))
@@ -197,16 +200,18 @@ class TestOneSidedPhotometricLikelihood:
         # Here we also have to dump a random "magref" file to placate the
         # checks on CrossMatch.
         for folder, name in zip([self.a_cat_folder_path, self.b_cat_folder_path], ['a', 'b']):
-            np.save(f'{folder}/con_cat_astro.npy', getattr(self, f'{name}_astro'))
-            np.save(f'{folder}/con_cat_photo.npy', getattr(self, f'{name}_photo'))
-            np.save(f'{folder}/magref.npy', np.zeros((len(getattr(self, f'{name}_astro')))))
+            x, y = getattr(self, f'{name}_astro'), getattr(self, f'{name}_photo')
+            z = np.zeros((len(getattr(self, f'{name}_astro'))))
+            a = np.hstack((x, y, np.zeros((len(x), 1), bool), z.reshape(-1, 1)))
+            with open(f'{folder}/{folder[:4]}_9.csv', "w", encoding='utf-8') as f:
+                np.savetxt(f, a, delimiter=",")
 
-        self.cm = CrossMatch(os.path.join(os.path.dirname(__file__), 'data'))
-        self.cm._initialise_chunk(os.path.join(os.path.dirname(__file__),
-                                               'data/crossmatch_params_.txt'),
-                                  os.path.join(os.path.dirname(__file__), 'data/cat_a_params.txt'),
-                                  os.path.join(os.path.dirname(__file__), 'data/cat_b_params.txt'))
-        self.cm.chunk_id = 1
+        self.cm = CrossMatch(mock_filename(self.cm_p_.encode("utf-8")),
+                             mock_filename(self.ca_p_text.encode("utf-8")),
+                             mock_filename(self.cb_p_text.encode("utf-8")))
+        self.cm._load_metadata_config(9)
+        self.cm._initialise_chunk()
+        self.cm.chunk_id = 9
         self.cm.phot_like_func = compute_photometric_likelihoods
         self.cm.cf_areas = self.cf_areas
         self.cm.auf_cdf_a = None
@@ -232,10 +237,9 @@ class TestOneSidedPhotometricLikelihood:
 
         abins = self.cm.abinsarray
         bbins = self.cm.bbinsarray
-        for folder, filts, _bins in zip([self.a_cat_folder_path, self.b_cat_folder_path],
-                                        [self.afilts, self.bfilts], [abins, bbins]):
-            a = np.load(f'{folder}/con_cat_astro.npy')
-            b = np.load(f'{folder}/con_cat_photo.npy')
+        for name, filts, _bins in zip(['a', 'b'], [self.afilts, self.bfilts], [abins, bbins]):
+            a = getattr(self, f'{name}_astro')
+            b = getattr(self, f'{name}_photo')
             for i, (ax1, ax2) in enumerate(self.cf_points):
                 q = ((a[:, 0] >= ax1-0.5) & (a[:, 0] <= ax1+0.5) &
                      (a[:, 1] >= ax2-0.5) & (a[:, 1] <= ax2+0.5))
@@ -344,7 +348,7 @@ class TestFullPhotometricLikelihood:  # pylint: disable=too-many-instance-attrib
     def setup_class(self):  # pylint: disable=too-many-statements
         self.cf_points = np.array([[131.5, -0.5], [131.5, 0]])
         self.cf_areas = 0.25 * np.ones((2), float)
-        self.joint_folder_path = 'test_path'
+        self.output_save_folder = 'test_path'
         self.a_cat_folder_path = 'gaia_folder'
         self.b_cat_folder_path = 'wise_folder'
 

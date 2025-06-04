@@ -34,7 +34,7 @@ from macauff.perturbation_auf_fortran import perturbation_auf_fortran as paf
 __all__ = ['make_perturb_aufs', 'create_single_perturb_auf']
 
 
-# pylint: disable-next=too-many-locals,too-many-arguments,too-many-branches,too-many-statements
+# pylint: disable-next=too-many-locals,too-many-statements
 def make_perturb_aufs(cm, which_cat):
     r"""
     cm : Class
@@ -52,7 +52,7 @@ def make_perturb_aufs(cm, which_cat):
 
     # Extract the single-catalogue values for determining the perturbation
     # component of the AUF.
-    auf_folder = getattr(cm, f'{which_cat}_auf_folder_path')
+    auf_file_path = getattr(cm, f'{which_cat}_auf_file_path')
     auf_points = getattr(cm, f'{which_cat}_auf_region_points')
     filters = getattr(cm, f'{which_cat}_filt_names')
     if cm.include_perturb_auf:
@@ -131,12 +131,12 @@ def make_perturb_aufs(cm, which_cat):
 
     for i, auf_point in enumerate(auf_points):
         ax1, ax2 = auf_point
-        if auf_folder is not None:
-            ax_folder = f'{auf_folder}/{ax1}/{ax2}'
-            if not os.path.exists(ax_folder):
-                os.makedirs(ax_folder, exist_ok=True)
+        if auf_file_path is not None:
+            new_auf_file_path = auf_file_path.format(ax1, ax2)
+            if not os.path.exists(os.path.dirname(new_auf_file_path)):
+                os.makedirs(os.path.dirname(new_auf_file_path), exist_ok=True)
         else:
-            ax_folder = None
+            new_auf_file_path = None
 
         if cm.include_perturb_auf:
             sky_cut = modelrefinds[2, :] == i
@@ -166,9 +166,12 @@ def make_perturb_aufs(cm, which_cat):
         # If there are no sources in this entire section of sky, we don't need
         # to bother downloading any TRILEGAL simulations since we'll auto-fill
         # dummy data (and never use it) in the filter loop.
-        if auf_folder is not None and cm.include_perturb_auf and len(a_astro_cut) > 0 and (
+        if auf_file_path is not None:
+            x, y = os.path.splitext(new_auf_file_path)
+            full_file = x + '_faint' + y
+        if auf_file_path is not None and cm.include_perturb_auf and len(a_astro_cut) > 0 and (
                 # pylint: disable-next=possibly-used-before-assignment
-                tri_download_flag or not os.path.isfile(f'{ax_folder}/trilegal_auf_simulation_faint.dat')):
+                tri_download_flag or not os.path.isfile(full_file)):
 
             data_bright_dens = np.array([np.sum(~np.isnan(a_photo_cut[:, q]) &
                                          (a_photo_cut[:, q] <= dens_mags[q])) / sky_area
@@ -178,14 +181,12 @@ def make_perturb_aufs(cm, which_cat):
             min_area = max(min_bright_tri_number / data_bright_dens)
             # Hard-coding the AV=1 trick to allow for using av_grid later.
             # pylint: disable-next=possibly-used-before-assignment
-            download_trilegal_simulation(ax_folder, tri_set_name, ax1, ax2, tri_filt_num,
+            download_trilegal_simulation(full_file, tri_set_name, ax1, ax2, tri_filt_num,
                                          # pylint: disable-next=possibly-used-before-assignment
                                          auf_region_frame, tri_maglim_faint, min_area,
                                          # pylint: disable-next=possibly-used-before-assignment
                                          av=1, sigma_av=0, total_objs=tri_num_faint,
                                          rank=cm.rank, chunk_id=cm.chunk_id)
-            os.system(f'mv {ax_folder}/trilegal_auf_simulation.dat '
-                      f'{ax_folder}/trilegal_auf_simulation_faint.dat')
         for j, filt in enumerate(filters):
             perturb_auf_combo = f'{ax1}-{ax2}-{filt}'
 
@@ -231,18 +232,17 @@ def make_perturb_aufs(cm, which_cat):
                     single_perturb_auf_output = create_single_perturb_auf(
                         auf_points[i], cm.r, cm.dr, cm.j0s, num_trials, psf_fwhms[j], dens_mags[j], a_photo,
                         localn, d_mag, delta_mag_cuts, dd_params, l_cut, run_fw, run_psf, snr_mag_params[j],
-                        al_avs[j], avs, fit_gal_flag, sky_area,
-                        saturation_magnitudes[j], cmau_array, wavs[j], z_maxs[j], nzs[j], alpha0, alpha1,
-                        alpha_weight, ab_offsets[j], filter_names[j], tri_folder=ax_folder,
-                        filt_header=tri_filt_names[j], dens_hist_tri=dens_hist_tri[j],
-                        model_mags=tri_model_mags[j], model_mag_mids=tri_model_mag_mids[j],
-                        model_mags_interval=tri_model_mags_interval[j],
+                        al_avs[j], avs, fit_gal_flag, sky_area, saturation_magnitudes[j], cmau_array, wavs[j],
+                        z_maxs[j], nzs[j], alpha0, alpha1, alpha_weight, ab_offsets[j], filter_names[j],
+                        tri_file_path=new_auf_file_path, filt_header=tri_filt_names[j],
+                        dens_hist_tri=dens_hist_tri[j], model_mags=tri_model_mags[j],
+                        model_mag_mids=tri_model_mag_mids[j], model_mags_interval=tri_model_mags_interval[j],
                         n_bright_sources_star=tri_n_bright_sources_star[j])
                 else:
                     single_perturb_auf_output = create_single_perturb_auf(
                         auf_points[i], cm.r, cm.dr, cm.j0s, num_trials, psf_fwhms[j], dens_mags[j], a_photo,
                         localn, d_mag, delta_mag_cuts, dd_params, l_cut, run_fw, run_psf, snr_mag_params[j],
-                        al_avs[j], avs, fit_gal_flag, tri_folder=ax_folder,
+                        al_avs[j], avs, fit_gal_flag, tri_file_path=new_auf_file_path,
                         filt_header=tri_filt_names[j], dens_hist_tri=dens_hist_tri[j],
                         model_mags=tri_model_mags[j], model_mag_mids=tri_model_mag_mids[j],
                         model_mags_interval=tri_model_mags_interval[j],
@@ -361,7 +361,7 @@ def make_perturb_aufs(cm, which_cat):
     return modelrefinds, perturb_auf_outputs
 
 
-def download_trilegal_simulation(tri_folder, tri_filter_set, ax1, ax2, mag_num, region_frame,
+def download_trilegal_simulation(tri_file_path, tri_filter_set, ax1, ax2, mag_num, region_frame,
                                  mag_lim, min_area, total_objs=1.5e6, av=None, sigma_av=0.1,
                                  rank=None, chunk_id=None):
     '''
@@ -370,8 +370,8 @@ def download_trilegal_simulation(tri_folder, tri_filter_set, ax1, ax2, mag_num, 
 
     Parameters
     ----------
-    tri_folder : string
-        The location of the folder into which to save the TRILEGAL file.
+    tri_file_path : string
+        The location on disk into which to save the TRILEGAL file.
     tri_filter_set : string
         The name of the filterset, as given by the TRILEGAL input form.
     ax1 : float
@@ -419,7 +419,6 @@ def download_trilegal_simulation(tri_folder, tri_filter_set, ax1, ax2, mag_num, 
 
     areaflag = 0
     triarea = min(10, min_area)
-    tri_name = 'trilegal_auf_simulation'
     galactic_flag = region_frame == 'galactic'
     # To avoid a loop where we start at some area, halve repeatedly until
     # the API call limit is satisfied, but then get nobjs < total_objs and
@@ -440,9 +439,8 @@ def download_trilegal_simulation(tri_folder, tri_filter_set, ax1, ax2, mag_num, 
                 # get a "good" result from the function call.
                 signal.alarm(11*60)
                 av_inf, result = get_trilegal(
-                    tri_name, ax1, ax2, folder=tri_folder, galactic=galactic_flag,
-                    filterset=tri_filter_set, area=triarea, maglim=mag_lim, magnum=mag_num, av=av,
-                    sigma_av=sigma_av)
+                    tri_file_path, ax1, ax2, galactic=galactic_flag, filterset=tri_filter_set, area=triarea,
+                    maglim=mag_lim, magnum=mag_num, av=av, sigma_av=sigma_av)
                 if result == "nocomm":
                     nocomm_count += 1
                 # 11 minute timer allows for 5 loops of two-minute waits for
@@ -464,7 +462,7 @@ def download_trilegal_simulation(tri_folder, tri_filter_set, ax1, ax2, mag_num, 
             t = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             print(f'{t} Rank {rank}, chunk {chunk_id}: TRILEGAL call time: {end-start:.2f}')
             signal.alarm(0)
-        with open(f'{tri_folder}/{tri_name}.dat', "r", encoding='utf-8') as f:
+        with open(tri_file_path, "r", encoding='utf-8') as f:
             contents = f.readlines()
         # Two comment lines; one at the top and one at the bottom - we add a
         # third in a moment, however
@@ -498,28 +496,27 @@ def download_trilegal_simulation(tri_folder, tri_filter_set, ax1, ax2, mag_num, 
             areaflag = 1
             accept_results = True
         if not accept_results:
-            os.system(f'rm {tri_folder}/{tri_name}.dat')
+            os.system(f'rm {tri_file_path}')
     if not accept_results:
         result = "timeout"
         while result == "timeout":
             av_inf, result = get_trilegal(
-                tri_name, ax1, ax2, folder=tri_folder, galactic=galactic_flag,
-                filterset=tri_filter_set, area=triarea, maglim=mag_lim, magnum=mag_num, av=av,
-                sigma_av=sigma_av)
-    with open(f'{tri_folder}/{tri_name}.dat', "r", encoding='utf-8') as f:
+                tri_file_path, ax1, ax2, galactic=galactic_flag, filterset=tri_filter_set, area=triarea,
+                maglim=mag_lim, magnum=mag_num, av=av, sigma_av=sigma_av)
+    with open(tri_file_path, "r", encoding='utf-8') as f:
         contents = f.readlines()
     contents.insert(0, f'#area = {triarea} sq deg\n#Av at infinity = {av_inf}\n')
-    with open(f'{tri_folder}/{tri_name}.dat', "w", encoding='utf-8') as f:
+    with open(tri_file_path, "w", encoding='utf-8') as f:
         contents = "".join(contents)
         f.write(contents)
 
 
-# pylint: disable=too-many-locals,too-many-arguments,too-many-statements,too-many-positional-arguments
+# pylint: disable=too-many-locals,too-many-arguments,too-many-positional-arguments
 def create_single_perturb_auf(auf_point, r, dr, j0s, num_trials, psf_fwhm, density_mag, a_photo, localn,
                               d_mag, mag_cut, dd_params, l_cut, run_fw, run_psf, snr_mag_params, al_av,
                               avs, fit_gal_flag, sky_area=None, saturation_magnitude=None, cmau_array=None,
                               wav=None, z_max=None, nz=None, alpha0=None, alpha1=None, alpha_weight=None,
-                              ab_offset=None, filter_name=None, tri_folder=None, filt_header=None,
+                              ab_offset=None, filter_name=None, tri_file_path=None, filt_header=None,
                               dens_hist_tri=None, model_mags=None, model_mag_mids=None,
                               model_mags_interval=None, n_bright_sources_star=None):
     r'''
@@ -616,10 +613,10 @@ def create_single_perturb_auf(auf_point, r, dr, j0s, num_trials, psf_fwhm, densi
     filter_name : string, optional
         The ``speclite`` style ``group_name-band_name`` name for the filter,
         for use in the creation of simulated galaxy counts.
-    tri_folder : string or None, optional
-        Folder where the TRILEGAL datafile is stored, and where the individual
-        filter-specific perturbation AUF simulations should be saved. Must be
-        provided if not providing pre-computed TRILEGAL magnitude counts.
+    tri_file_path : string or None, optional
+        Location on disk where the TRILEGAL datafile is stored, and where the
+        individual filter-specific perturbation AUF simulations should be saved.
+        Must be provided if not providing pre-computed TRILEGAL magnitude counts.
     filt_header : float or None, optional
         The filter name, as given by the TRILEGAL datafile, for this simulation.
         Must be provided along with ``tri_folder``, or must be ``None`` if
@@ -657,12 +654,10 @@ def create_single_perturb_auf(auf_point, r, dr, j0s, num_trials, psf_fwhm, densi
 
     '''
     # TODO: extend to allow a Galactic source model that doesn't depend on TRILEGAL  pylint: disable=fixme
-    if tri_folder is not None:
-        tri_name = 'trilegal_auf_simulation'
+    if tri_file_path is not None:
         (dens_hist_tri, model_mags, model_mag_mids, model_mags_interval, _,
          n_bright_sources_star) = make_tri_counts(
-            tri_folder, tri_name, filt_header, d_mag, np.amin(a_photo), density_mag, al_av=al_av,
-            av_grid=avs)
+            tri_file_path, filt_header, d_mag, np.amin(a_photo), density_mag, al_av=al_av, av_grid=avs)
 
     log10y_tri = -np.inf * np.ones_like(dens_hist_tri)
     log10y_tri[dens_hist_tri > 0] = np.log10(dens_hist_tri[dens_hist_tri > 0])
@@ -823,7 +818,7 @@ def create_single_perturb_auf(auf_point, r, dr, j0s, num_trials, psf_fwhm, densi
 
 
 # pylint: disable=too-many-locals,too-many-statements
-def make_tri_counts(trifolder, trifilename, trifiltname, dm, brightest_source_mag,
+def make_tri_counts(trifilepath, trifiltname, dm, brightest_source_mag,
                     density_mag, use_bright=False, use_faint=True, al_av=None, av_grid=None):
     """
     Combine TRILEGAL simulations for a given line of sight in the Galaxy, using
@@ -834,11 +829,10 @@ def make_tri_counts(trifolder, trifilename, trifiltname, dm, brightest_source_ma
 
     Parameters
     ----------
-    trifolder : string
-        Location on disk into which to save TRILEGAL simulations.
-    trifilename : string
-        Name to save TRILEGAL simulation files to, to which "_bright" and
-        "_faint" will be appended for the two runs respectively.
+    trifilepath : string
+        Location on disk into which the TRILEGAL simulations are saved, to
+        which "_bright" and "_faint" will be added for the two runs
+        respectively, as needed.
     trifiltname : string
         The individual filter within ``trifilterset`` being used for generating
         differential source counts.
@@ -890,7 +884,9 @@ def make_tri_counts(trifolder, trifilename, trifiltname, dm, brightest_source_ma
     if (al_av is None and av_grid is not None) or (al_av is not None and av_grid is None):
         raise ValueError("If one of al_av or av_grid is provided the other must be given as well.")
     if use_faint:
-        with open(f'{trifolder}/{trifilename}_faint.dat', "r", encoding='utf-8') as f:
+        x, y = os.path.splitext(trifilepath)
+        full_file = x + "_faint" + y
+        with open(full_file, "r", encoding='utf-8') as f:
             area_line = f.readline()
             av_line = f.readline()
         # #area = {} sq deg, #Av at infinity = {} should be the first two lines, so
@@ -901,12 +897,13 @@ def make_tri_counts(trifolder, trifilename, trifiltname, dm, brightest_source_ma
         tri_av_inf_faint = float(bits[4])
         if tri_av_inf_faint < 0.1 and av_grid is not None:
             raise ValueError("tri_av_inf_faint cannot be smaller than 0.1 while using av_grid.")
-        tri_faint = np.genfromtxt(f'{trifolder}/{trifilename}_faint.dat', delimiter=None,
-                                  names=True, comments='#', skip_header=2,
+        tri_faint = np.genfromtxt(full_file, delimiter=None, names=True, comments='#', skip_header=2,
                                   usecols=[trifiltname, 'Av'])
 
     if use_bright:
-        with open(f'{trifolder}/{trifilename}_bright.dat', "r", encoding='utf-8') as f:
+        x, y = os.path.splitext(trifilepath)
+        full_file = x + "_bright" + y
+        with open(full_file, "r", encoding='utf-8') as f:
             area_line = f.readline()
             av_line = f.readline()
         bits = area_line.split(' ')
@@ -915,8 +912,7 @@ def make_tri_counts(trifolder, trifilename, trifiltname, dm, brightest_source_ma
         tri_av_inf_bright = float(bits[4])
         if tri_av_inf_bright < 0.1 and av_grid is not None:
             raise ValueError("tri_av_inf_bright cannot be smaller than 0.1 while using av_grid.")
-        tri_bright = np.genfromtxt(f'{trifolder}/{trifilename}_bright.dat',
-                                   delimiter=None, names=True, comments='#', skip_header=2,
+        tri_bright = np.genfromtxt(full_file, delimiter=None, names=True, comments='#', skip_header=2,
                                    usecols=[trifiltname, 'Av'])
 
     if use_faint:

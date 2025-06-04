@@ -9,7 +9,7 @@ import numpy as np
 import pytest
 from numpy.testing import assert_allclose
 from scipy.special import j1  # pylint: disable=no-name-in-module
-from test_matching import _replace_line
+from test_utils import mock_filename
 
 # pylint: disable=no-name-in-module,import-error
 from macauff.group_sources import make_island_groupings
@@ -221,12 +221,15 @@ class TestMakeIslandGroupings():  # pylint: disable=too-many-instance-attributes
         self.max_sep, self.int_fracs = 11, [0.63, 0.9, 0.99]  # max_sep in arcseconds
         self.a_filt_names, self.b_filt_names = ['G', 'RP'], ['W1', 'W2', 'W3']
         self.a_title, self.b_title = 'gaia', 'wise'
-        self.a_cat_folder_path, self.b_cat_folder_path = 'gaia_cat', 'wise_cat'
-        self.a_auf_folder_path, self.b_auf_folder_path = 'gaia_auf', 'wise_auf'
-        self.joint_folder_path = 'joint'
-        for folder in [self.a_cat_folder_path, self.b_cat_folder_path, self.joint_folder_path,
+        self.a_cat_csv_file_path = r'gaia_folder/gaia_{}.csv'
+        self.b_cat_csv_file_path = r'wise_folder/wise_{}.csv'
+        self.a_auf_folder_path, self.b_auf_folder_path = r'gaia_auf', r'wise_auf'
+        self.output_save_folder = r'joint'
+        self.chunk_id = 9
+        for folder in [os.path.dirname(self.a_cat_csv_file_path),
+                       os.path.dirname(self.b_cat_csv_file_path), self.output_save_folder,
                        self.a_auf_folder_path, self.b_auf_folder_path]:
-            os.makedirs(folder, exist_ok=True)
+            os.makedirs(folder.format(self.chunk_id), exist_ok=True)
         self.r = np.linspace(0, self.max_sep, 10000)
         self.dr = np.diff(self.r)
         self.rho = np.linspace(0, 100, 9900)
@@ -280,34 +283,28 @@ class TestMakeIslandGroupings():  # pylint: disable=too-many-instance-attributes
 
         # Set the catalogue folders now to avoid an error message in
         # CrossMatch's __init__ call.
-        old_line = 'cat_folder_path = gaia_folder'
-        new_line = f'cat_folder_path = {self.a_cat_folder_path}\n'
-        with open(os.path.join(os.path.dirname(__file__), 'data/cat_a_params.txt'), encoding='utf-8') as file:
-            f = file.readlines()
-        idx = np.where([old_line in line for line in f])[0][0]
-        _replace_line(os.path.join(os.path.dirname(__file__), 'data/cat_a_params.txt'),
-                      idx, new_line, out_file=os.path.join(os.path.dirname(__file__),
-                      'data/cat_a_params_.txt'))
-        old_line = 'cat_folder_path = wise_folder'
-        new_line = f'cat_folder_path = {self.b_cat_folder_path}\n'
-        with open(os.path.join(os.path.dirname(__file__), 'data/cat_b_params.txt'), encoding='utf-8') as file:
-            f = file.readlines()
-        idx = np.where([old_line in line for line in f])[0][0]
-        _replace_line(os.path.join(os.path.dirname(__file__), 'data/cat_b_params.txt'),
-                      idx, new_line, out_file=os.path.join(os.path.dirname(__file__),
-                      'data/cat_b_params_.txt'))
+        with open(os.path.join(os.path.dirname(__file__), 'data/crossmatch_params.yaml'),
+                  encoding='utf-8') as cm_p:
+            self.cm_p_text = cm_p.read()
+        with open(os.path.join(os.path.dirname(__file__), 'data/cat_a_params.yaml'),
+                  encoding='utf-8') as ca_p:
+            self.ca_p_text = ca_p.read()
+        with open(os.path.join(os.path.dirname(__file__), 'data/cat_b_params.yaml'),
+                  encoding='utf-8') as cb_p:
+            self.cb_p_text = cb_p.read()
+        cm_p_ = self.cm_p_text.replace(r'output_save_folder: test_path', r'output_save_folder: joint')
 
         # Save dummy files into each catalogue folder as well.
-        for folder, n in zip([self.a_cat_folder_path, self.b_cat_folder_path], [3, 4]):
-            np.save(f'{folder}/con_cat_astro.npy', np.zeros((10, 3), float))
-            np.save(f'{folder}/con_cat_photo.npy', np.zeros((10, n), float))
-            np.save(f'{folder}/magref.npy', np.zeros((10,), int))
+        for file, n in zip([self.a_cat_csv_file_path, self.b_cat_csv_file_path], [3, 4]):
+            x = np.zeros((10, 5+n), float)
+            with open(file.format(self.chunk_id), "w", encoding='utf-8') as f:
+                np.savetxt(f, x, delimiter=',')
 
         # Also set up an instance of CrossMatch at the same time.
-        self.cm = CrossMatch(os.path.join(os.path.dirname(__file__), 'data'))
-        self.cm._initialise_chunk(os.path.join(os.path.dirname(__file__), 'data/crossmatch_params.txt'),
-                                  os.path.join(os.path.dirname(__file__), 'data/cat_a_params_.txt'),
-                                  os.path.join(os.path.dirname(__file__), 'data/cat_b_params_.txt'))
+        self.cm = CrossMatch(mock_filename(cm_p_.encode("utf-8")),
+                             mock_filename(self.ca_p_text.encode("utf-8")),
+                             mock_filename(self.cb_p_text.encode("utf-8")))
+        self.cm._load_metadata_config(self.chunk_id)
         self.cm.pos_corr_dist = self.max_sep
         self.cm.a_filt_names = self.a_filt_names
         self.cm.b_filt_names = self.b_filt_names
@@ -318,9 +315,9 @@ class TestMakeIslandGroupings():  # pylint: disable=too-many-instance-attributes
         self.cm.b_auf_folder_path = self.b_auf_folder_path
         self.cm.a_auf_region_points = self.a_auf_pointings
         self.cm.b_auf_region_points = self.b_auf_pointings
-        self.cm.a_cat_folder_path = self.a_cat_folder_path
-        self.cm.b_cat_folder_path = self.b_cat_folder_path
-        self.cm.joint_folder_path = self.joint_folder_path
+        self.cm.a_cat_csv_file_path = self.a_cat_csv_file_path
+        self.cm.b_cat_csv_file_path = self.b_cat_csv_file_path
+        self.cm.output_save_folder = self.output_save_folder
         self.cm.include_phot_like = self.include_phot_like
         self.cm.use_phot_prior = self.use_phot_prior
         self.cm.j1s = self.j1s
@@ -336,7 +333,7 @@ class TestMakeIslandGroupings():  # pylint: disable=too-many-instance-attributes
                 [self.a_auf_folder_path, self.b_auf_folder_path],
                 [self.a_auf_pointings, self.b_auf_pointings],
                 [self.a_filt_names, self.b_filt_names], [n_a + 4, n_b + 4]):
-            np.save(f'{auf_folder}/modelrefinds.npy', np.zeros((3, n), int))
+            np.save(f'{auf_folder.format(self.chunk_id)}/modelrefinds.npy', np.zeros((3, n), int))
             if 'gaia' in auf_folder:
                 self.a_modelrefinds = np.zeros((3, n), int)
             else:
@@ -382,11 +379,9 @@ class TestMakeIslandGroupings():  # pylint: disable=too-many-instance-attributes
                                                    *np.arange(n_c, n_b), 0]))).reshape(1, -1)
 
     def test_make_island_groupings(self):
-        os.system(f'rm -rf {self.joint_folder_path}/*')
+        os.system(f'rm -rf {self.output_save_folder.format(self.chunk_id)}/*')
         self._fake_fourier_grid(self.n_a, self.n_b)
         n_a, n_b, n_c = self.n_a, self.n_b, self.n_com
-        np.save(f'{self.a_cat_folder_path}/con_cat_astro.npy', self.a_coords)
-        np.save(f'{self.b_cat_folder_path}/con_cat_astro.npy', self.b_coords)
         # For the first, full runthrough call the CrossMatch function instead of
         # directly calling make_island_groupings to test group_sources as well.
         self.cm.chunk_id = 1
@@ -413,7 +408,7 @@ class TestMakeIslandGroupings():  # pylint: disable=too-many-instance-attributes
 
     @pytest.mark.filterwarnings("ignore:.*island, containing.*")
     def test_mig_extra_reject(self):  # pylint: disable=too-many-statements
-        os.system(f'rm -rf {self.joint_folder_path}/*')
+        os.system(f'rm -rf {self.output_save_folder.format(self.chunk_id)}/*')
         self._fake_fourier_grid(self.n_a+10, self.n_b+11)
         n_a, n_b, n_c = self.n_a, self.n_b, self.n_com
         ax_lims = self.ax_lims
@@ -445,8 +440,6 @@ class TestMakeIslandGroupings():  # pylint: disable=too-many-instance-attributes
         b_coords[self.n_b:-4, 1] = 0.5*(ax_lims[2]+ax_lims[3])
         a_coords[self.n_a:-4, 2] = 0.5
         b_coords[self.n_b:-4, 2] = 0.5
-        np.save(f'{self.a_cat_folder_path}/con_cat_astro.npy', a_coords)
-        np.save(f'{self.b_cat_folder_path}/con_cat_astro.npy', b_coords)
 
         self.cm.chunk_id = 1
         self.cm.a_perturb_auf_outputs = self.a_perturb_auf_outputs
@@ -458,8 +451,8 @@ class TestMakeIslandGroupings():  # pylint: disable=too-many-instance-attributes
 
         make_island_groupings(self.cm)
 
-        alist, blist = self.cm.alist, self.cm.blist  # pylint: disable=no-member
-        agrplen, bgrplen = self.cm.agrplen, self.cm.bgrplen  # pylint: disable=no-member
+        alist, blist = self.cm.alist, self.cm.blist
+        agrplen, bgrplen = self.cm.agrplen, self.cm.bgrplen
         # We removed 3 extra sources this time around, which should all be 1:1 islands.
         assert np.all(alist.shape == (2, n_a - 4 + n_b - n_c))
         assert np.all(blist.shape == (1, n_a - 4 + n_b - n_c))
@@ -490,7 +483,7 @@ class TestMakeIslandGroupings():  # pylint: disable=too-many-instance-attributes
     @pytest.mark.filterwarnings("ignore:.*island, containing.*")
     # pylint: disable-next=too-many-statements
     def test_mig_no_reject_ax_lims(self):
-        os.system(f'rm -rf {self.joint_folder_path}/*')
+        os.system(f'rm -rf {self.output_save_folder.format(self.chunk_id)}/*')
         # _fake_fourier_grid pads for an assumed 4 pointing sources, but we
         # have six here to account for projection effects at the poles.
         self._fake_fourier_grid(self.n_a + 2, self.n_b + 2)
@@ -530,9 +523,6 @@ class TestMakeIslandGroupings():  # pylint: disable=too-many-instance-attributes
         a_coords[7, :2] = [180, -90+(self.max_sep-3)/3600]
         b_coords[7, :2] = a_coords[7, :2] + [0.2*self.sigma/3600, -0.15*self.sigma/3600]
 
-        np.save(f'{self.a_cat_folder_path}/con_cat_astro.npy', a_coords)
-        np.save(f'{self.b_cat_folder_path}/con_cat_astro.npy', b_coords)
-
         self.cm.chunk_id = 1
         self.cm.a_perturb_auf_outputs = self.a_perturb_auf_outputs
         self.cm.b_perturb_auf_outputs = self.b_perturb_auf_outputs
@@ -543,8 +533,8 @@ class TestMakeIslandGroupings():  # pylint: disable=too-many-instance-attributes
 
         make_island_groupings(self.cm)
 
-        alist, blist = self.cm.alist, self.cm.blist  # pylint: disable=no-member
-        agrplen, bgrplen = self.cm.agrplen, self.cm.bgrplen  # pylint: disable=no-member
+        alist, blist = self.cm.alist, self.cm.blist
+        agrplen, bgrplen = self.cm.agrplen, self.cm.bgrplen
         # The same tests that were ran in make_island_groupings should pass here, once
         # we remove the six additional points that survive at (0, -90), (360, -90),
         # (0, 0), or (360, 0) that we used to force the box size.
@@ -574,10 +564,8 @@ class TestMakeIslandGroupings():  # pylint: disable=too-many-instance-attributes
         assert self.cm.reject_b is None
 
     def test_make_island_groupings_include_phot_like(self):  # pylint: disable=too-many-statements
-        os.system(f'rm -rf {self.joint_folder_path}/*')
+        os.system(f'rm -rf {self.output_save_folder.format(self.chunk_id)}/*')
         self._fake_fourier_grid(self.n_a, self.n_b)
-        np.save(f'{self.a_cat_folder_path}/con_cat_astro.npy', self.a_coords)
-        np.save(f'{self.b_cat_folder_path}/con_cat_astro.npy', self.b_coords)
         self.cm.include_phot_like = True
         self.cm.chunk_id = 1
         self.cm.a_perturb_auf_outputs = self.a_perturb_auf_outputs
@@ -590,8 +578,8 @@ class TestMakeIslandGroupings():  # pylint: disable=too-many-instance-attributes
 
         # Verify that make_island_groupings doesn't change when the extra arrays
         # are calculated, as an initial test.
-        alist, blist = self.cm.alist, self.cm.blist  # pylint: disable=no-member
-        agrplen, bgrplen = self.cm.agrplen, self.cm.bgrplen  # pylint: disable=no-member
+        alist, blist = self.cm.alist, self.cm.blist
+        agrplen, bgrplen = self.cm.agrplen, self.cm.bgrplen
         self._comparisons_in_islands(alist, blist, agrplen, bgrplen, self.n_a, self.n_b,
                                      self.n_com)
 
@@ -601,8 +589,8 @@ class TestMakeIslandGroupings():  # pylint: disable=too-many-instance-attributes
         assert np.all(self.cm.reject_a == np.arange(self.n_a, self.n_a+4))
         assert np.all(self.cm.reject_b == np.arange(self.n_b, self.n_b+4))
 
-        aerr = np.load(f'{self.a_cat_folder_path}/con_cat_astro.npy')[:, 2]
-        berr = np.load(f'{self.b_cat_folder_path}/con_cat_astro.npy')[:, 2]
+        aerr = self.a_coords[:, 2]
+        berr = self.b_coords[:, 2]
 
         # pylint: disable=no-member
         ab_area = self.cm.ab_area
