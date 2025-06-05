@@ -21,8 +21,8 @@ __all__ = ['csv_to_npy', 'rect_slice_npy', 'npy_to_csv', 'rect_slice_csv']
 
 
 def csv_to_npy(input_filename, astro_cols, photo_cols, bestindex_col,
-               chunk_overlap_col, header=False, process_uncerts=False, astro_sig_fits_filepath=None,
-               cat_in_radec=None, mn_in_radec=None):
+               chunk_overlap_col, snr_cols=None, header=False, process_uncerts=False,
+               astro_sig_fits_filepath=None, cat_in_radec=None, mn_in_radec=None):
     '''
     Convert a .csv file representation of a photometric catalogue into the
     appropriate .npy binary files used in the cross-matching process.
@@ -39,7 +39,7 @@ def csv_to_npy(input_filename, astro_cols, photo_cols, bestindex_col,
         must be the last column, with the first two columns of ``astro_cols``
         matching in order to the first two columns of the output astrometry
         binary file, if ``process_uncerts`` is ``True``.
-    photo_cols : list or numpy.array of integers
+    photo_cols : list or numpy.ndarray of integers
         List of zero-indexed columns in the input catalogue representing the
         magnitudes of each photometric source to be used in the cross-matching.
     bestindex_col : integer
@@ -52,6 +52,10 @@ def csv_to_npy(input_filename, astro_cols, photo_cols, bestindex_col,
         of the boolean representation of whether sources are in the "halo"
         (``1`` in the .csv) or "core" (``0``) of the region. If ``None`` then all
         objects are assumed to be in the core.
+    snr_cols : list or numpy.ndarray of integers
+        List of zero-indexed columns in the input catalogue representing the
+        signal-to-noise ratios of each detection corresponding to those same
+        magnitudes in ``photo_cols``.
     header : boolean, optional
         Flag indicating whether the .csv file has a first line with the names
         of the columns in it, or whether the first line of the file is the first
@@ -94,6 +98,9 @@ def csv_to_npy(input_filename, astro_cols, photo_cols, bestindex_col,
         it has been included in a halo around the primary chunk objects for
         match purposes, but is a primary detection in a different chunk of this
         catalogue.
+    snrs : numpy.ndarray, optional
+        If ``snr_cols`` are provided, also returns the signal-to-noise ratios for
+        each ``photo`` detection for each source.
     '''
     if not (process_uncerts is True or process_uncerts is False):
         raise ValueError("process_uncerts must either be True or False.")
@@ -120,6 +127,8 @@ def csv_to_npy(input_filename, astro_cols, photo_cols, bestindex_col,
     photo = np.empty((n_rows, len(photo_cols)), float)
     best_index = np.empty(n_rows, int)
     chunk_overlap = np.empty(n_rows, bool)
+    if snr_cols is not None:
+        snrs = np.empty((n_rows, len(photo_cols)), float)
 
     if process_uncerts:
         m_sigs = np.load(f'{astro_sig_fits_filepath}/m_sigs_array.npy')
@@ -141,12 +150,16 @@ def csv_to_npy(input_filename, astro_cols, photo_cols, bestindex_col,
     used_cols = np.concatenate((astro_cols, photo_cols, [bestindex_col]))
     if chunk_overlap_col is not None:
         used_cols = np.concatenate((used_cols, [chunk_overlap_col]))
+    if snr_cols is not None:
+        used_cols = np.concatenate((used_cols, snr_cols))
     used_cols = np.sort(used_cols)
     new_astro_cols = np.array([np.where(used_cols == a)[0][0] for a in astro_cols])
     new_photo_cols = np.array([np.where(used_cols == a)[0][0] for a in photo_cols])
     new_bestindex_col = np.where(used_cols == bestindex_col)[0][0]
     if chunk_overlap_col is not None:
         new_chunk_overlap_col = np.where(used_cols == chunk_overlap_col)[0][0]
+    if snr_cols is not None:
+        new_snr_cols = np.array([np.where(used_cols == a)[0][0] for a in snr_cols])
     n = 0
     for chunk in pd.read_csv(input_filename, chunksize=100000,
                              usecols=used_cols, header=None if not header else 0):
@@ -168,9 +181,13 @@ def csv_to_npy(input_filename, astro_cols, photo_cols, bestindex_col,
             chunk_overlap[n:n+chunk.shape[0]] = chunk.values[:, new_chunk_overlap_col].astype(bool)
         else:
             chunk_overlap[n:n+chunk.shape[0]] = False
+        if snr_cols is not None:
+            snrs[n:n+chunk.shape[0]] = chunk.values[:, new_snr_cols]
 
         n += chunk.shape[0]
 
+    if snr_cols is not None:
+        return astro, photo, best_index, chunk_overlap, snrs
     return astro, photo, best_index, chunk_overlap
 
 

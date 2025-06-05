@@ -425,7 +425,7 @@ The inter-dependency of input parameters on one another, and the output ``CrossM
     │                     │             ├─* gal_aboffsets
     │                     │             ├─* gal_filternames
     │                     │             └─* saturation_magnitudes
-    │                     ├─* snr_mag_params_file_path[4] -> snr_mag_params
+    │                     ├─* snr_indices
     │                     ├─* tri_set_name[3a]
     │                     ├─* tri_filt_names[3a]
     │                     ├─* tri_filt_num[3a]

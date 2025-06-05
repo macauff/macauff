@@ -611,7 +611,8 @@ class TestMakePerturbAUFs():
                             [0.9, 0.1, 0.1], [0.9, 0.9, 0.1])).reshape(-1, 3)
         y = np.array([np.concatenate(([14.99], [100]*100, [10], [10], [10], [10]))]).T
         z = np.array([0] * 105)
-        a = np.hstack((x, y, np.zeros((len(x), 1), bool), z.reshape(-1, 1)))
+        s = np.array([[100] * 105])
+        a = np.hstack((x, y, np.zeros((len(x), 1), bool), z.reshape(-1, 1), s.reshape(-1, 1)))
         with open('cat_folder/cat_9.csv', "w", encoding='utf-8') as f:
             np.savetxt(f, a, delimiter=",")
 
@@ -679,18 +680,20 @@ class TestMakePerturbAUFs():
         for ol, nl in zip(['psf_fwhms: [0.12, 0.12, 0.12]',
                            r'auf_file_path: gaia_auf_folder/trilegal_download_{}.dat',
                            'tri_filt_names: [G_BP, G, G_RP]', 'gal_al_avs: [1.002, 0.789, 0.589]',
-                           'mag_indices: [3, 4, 5]', 'chunk_overlap_col: 6', 'best_mag_index_col: 7'],
+                           'mag_indices: [3, 4, 5]', 'chunk_overlap_col: 6', 'best_mag_index_col: 7',
+                           'snr_indices: [8, 9, 10]'],
                           ['psf_fwhms: [0.12]', r'auf_file_path: auf_folder/trilegal_download_{}.dat',
                            'tri_filt_names: [W1]', 'gal_al_avs: [0]', 'mag_indices: [3]',
-                           'chunk_overlap_col: 4', 'best_mag_index_col: 5']):
+                           'chunk_overlap_col: 4', 'best_mag_index_col: 5', 'snr_indices: [6]']):
             ca_p_ = ca_p_.replace(ol, nl)
         for ol, nl in zip(['psf_fwhms: [6.08, 6.84, 7.36, 11.99]',
                            r'auf_file_path: wise_auf_folder/trilegal_download_{}.dat',
                            'tri_filt_names: [W1, W2, W3, W4]', 'gal_al_avs: [0.039, 0.026, 0.015, 0.005]',
-                           'mag_indices: [3, 4, 5, 6]', 'chunk_overlap_col: 7', 'best_mag_index_col: 8'],
+                           'mag_indices: [3, 4, 5, 6]', 'chunk_overlap_col: 7', 'best_mag_index_col: 8',
+                           'snr_indices: [9, 10, 11, 12]'],
                           ['psf_fwhms: [6.08]', r'auf_file_path: auf_folder/trilegal_download_{}.dat',
                            'tri_filt_names: [W1]', 'gal_al_avs: [0]', 'mag_indices: [3]',
-                           'chunk_overlap_col: 4', 'best_mag_index_col: 5']):
+                           'chunk_overlap_col: 4', 'best_mag_index_col: 5', 'snr_indices: [6]']):
             cb_p_ = cb_p_.replace(ol, nl)
 
         # Fake this the easy way both times, then below correct the parameters
@@ -804,7 +807,8 @@ class TestMakePerturbAUFs():
         main_mags = rng.uniform(24.95, 25.05, size=100)
         y = np.array([np.concatenate(([14.99], main_mags, [10], [10], [10], [10]))]).T
         z = np.array([0] * 105)
-        a = np.hstack((x, y, np.zeros((len(x), 1), bool), z.reshape(-1, 1)))
+        s = np.array([[100] * 105])
+        a = np.hstack((x, y, np.zeros((len(x), 1), bool), z.reshape(-1, 1), s.reshape(-1, 1)))
         with open('cat_folder/cat_9.csv', "w", encoding='utf-8') as f:
             np.savetxt(f, a, delimiter=",")
 
@@ -869,18 +873,20 @@ class TestMakePerturbAUFs():
         for ol, nl in zip(['psf_fwhms: [0.12, 0.12, 0.12]',
                            r'auf_file_path: gaia_auf_folder/trilegal_download_{}.dat',
                            'tri_filt_names: [G_BP, G, G_RP]', 'gal_al_avs: [1.002, 0.789, 0.589]',
-                           'mag_indices: [3, 4, 5]', 'chunk_overlap_col: 6', 'best_mag_index_col: 7'],
+                           'mag_indices: [3, 4, 5]', 'chunk_overlap_col: 6', 'best_mag_index_col: 7',
+                           'snr_indices: [8, 9, 10]'],
                           ['psf_fwhms: [0.12]', r'auf_file_path: auf_folder/trilegal_download_{}.dat',
                            'tri_filt_names: [W1]', 'gal_al_avs: [0]', 'mag_indices: [3]',
-                           'chunk_overlap_col: 4', 'best_mag_index_col: 5']):
+                           'chunk_overlap_col: 4', 'best_mag_index_col: 5', 'snr_indices: [6]']):
             ca_p_ = ca_p_.replace(ol, nl)
         for ol, nl in zip(['psf_fwhms: [6.08, 6.84, 7.36, 11.99]',
                            r'auf_file_path: wise_auf_folder/trilegal_download_{}.dat',
                            'tri_filt_names: [W1, W2, W3, W4]', 'gal_al_avs: [0.039, 0.026, 0.015, 0.005]',
-                           'mag_indices: [3, 4, 5, 6]', 'chunk_overlap_col: 7', 'best_mag_index_col: 8'],
-                          ['psf_fwhms: [6.08]', 'auf_file_path: auf_folder/trilegal_download_{}.dat',
+                           'mag_indices: [3, 4, 5, 6]', 'chunk_overlap_col: 7', 'best_mag_index_col: 8',
+                           'snr_indices: [9, 10, 11, 12]'],
+                          ['psf_fwhms: [6.08]', r'auf_file_path: auf_folder/trilegal_download_{}.dat',
                            'tri_filt_names: [W1]', 'gal_al_avs: [0]', 'mag_indices: [3]',
-                           'chunk_overlap_col: 4', 'best_mag_index_col: 5']):
+                           'chunk_overlap_col: 4', 'best_mag_index_col: 5', 'snr_indices: [6]']):
             cb_p_ = cb_p_.replace(ol, nl)
 
         old_line = r'auf_file_path: auf_folder/trilegal_download_{}.dat'
