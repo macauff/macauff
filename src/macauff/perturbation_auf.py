@@ -16,6 +16,8 @@ import timeit
 import numpy as np
 import requests
 
+from scipy.stats import binned_statistic
+
 # pylint: disable=import-error,no-name-in-module
 from macauff.galaxy_counts import create_galaxy_counts
 from macauff.get_trilegal_wrapper import get_trilegal
@@ -71,7 +73,6 @@ def make_perturb_aufs(cm, which_cat):
         delta_mag_cuts = cm.delta_mag_cuts
         run_fw = getattr(cm, f'{which_cat}_run_fw_auf')
         run_psf = getattr(cm, f'{which_cat}_run_psf_auf')
-        snr_mag_params = getattr(cm, f'{which_cat}_snr_mag_params')
         al_avs = getattr(cm, f'{which_cat}_gal_al_avs')
         if run_psf:
             dd_params = getattr(cm, f'{which_cat}_dd_params')
@@ -104,6 +105,7 @@ def make_perturb_aufs(cm, which_cat):
     a_tot_astro = getattr(cm, f'{which_cat}_astro')
     if cm.include_perturb_auf:
         a_tot_photo = getattr(cm, f'{which_cat}_photo')
+        a_tot_snr = getattr(cm, f'{which_cat}_snr')
 
     n_sources = len(a_tot_astro)
 
@@ -143,6 +145,7 @@ def make_perturb_aufs(cm, which_cat):
             med_index_slice = np.arange(0, len(local_n))[sky_cut]
             a_photo_cut = a_tot_photo[sky_cut]
             a_astro_cut = a_tot_astro[sky_cut]
+            a_snr_cut = a_tot_snr[sky_cut]
 
             if len(a_astro_cut) > 0:
                 dens_mags = np.empty(len(filters), float)
@@ -150,7 +153,8 @@ def make_perturb_aufs(cm, which_cat):
                     # Take the "density" magnitude (i.e., the faint limit down to
                     # which to integrate counts per square degree per magnitude) from
                     # the data, with a small allowance for completeness limit turnover.
-                    hist, bins = np.histogram(a_photo_cut[~np.isnan(a_photo_cut)], bins='auto')
+                    hist, bins = np.histogram(a_photo_cut[~np.isnan(a_photo_cut[:, j]) &
+                                                          ~np.isnan(a_snr_cut[:, j]), j], bins='auto')
                     # TODO: relax half-mag cut, make input parameter  pylint: disable=fixme
                     dens_mags[j] = (bins[:-1]+np.diff(bins)/2)[np.argmax(hist)] - 0.5
 
@@ -173,7 +177,7 @@ def make_perturb_aufs(cm, which_cat):
                 # pylint: disable-next=possibly-used-before-assignment
                 tri_download_flag or not os.path.isfile(full_file)):
 
-            data_bright_dens = np.array([np.sum(~np.isnan(a_photo_cut[:, q]) &
+            data_bright_dens = np.array([np.sum(~np.isnan(a_photo_cut[:, q]) & ~np.isnan(a_snr_cut[:, q]) &
                                          (a_photo_cut[:, q] <= dens_mags[q])) / sky_area
                                         for q in range(len(dens_mags))])
             # TODO: un-hardcode min_bright_tri_number  pylint: disable=fixme
@@ -191,9 +195,10 @@ def make_perturb_aufs(cm, which_cat):
             perturb_auf_combo = f'{ax1}-{ax2}-{filt}'
 
             if cm.include_perturb_auf:
-                good_mag_slice = ~np.isnan(a_photo_cut[:, j])
-                a_astro = a_astro_cut[good_mag_slice]
-                a_photo = a_photo_cut[good_mag_slice, j]
+                good_mag_snr_slice = ~np.isnan(a_photo_cut[:, j]) & ~np.isnan(a_snr_cut[:, j])
+                a_astro = a_astro_cut[good_mag_snr_slice]
+                a_photo = a_photo_cut[good_mag_snr_slice, j]
+                a_snr = a_snr_cut[good_mag_snr_slice, j]
                 if len(a_photo) == 0:
                     arraylengths[j, i] = 0
                     # If no sources in this AUF-filter combination, we need to
@@ -227,11 +232,11 @@ def make_perturb_aufs(cm, which_cat):
                 # catalogue, using just the astrometry, we should be able
                 # to just over-write this N times if there happen to be N
                 # good detections of a source.
-                local_n[med_index_slice[good_mag_slice], j] = localn
+                local_n[med_index_slice[good_mag_snr_slice], j] = localn
                 if fit_gal_flag:
                     single_perturb_auf_output = create_single_perturb_auf(
                         auf_points[i], cm.r, cm.dr, cm.j0s, num_trials, psf_fwhms[j], dens_mags[j], a_photo,
-                        localn, d_mag, delta_mag_cuts, dd_params, l_cut, run_fw, run_psf, snr_mag_params[j],
+                        a_snr, localn, d_mag, delta_mag_cuts, dd_params, l_cut, run_fw, run_psf,
                         al_avs[j], avs, fit_gal_flag, sky_area, saturation_magnitudes[j], cmau_array, wavs[j],
                         z_maxs[j], nzs[j], alpha0, alpha1, alpha_weight, ab_offsets[j], filter_names[j],
                         tri_file_path=new_auf_file_path, filt_header=tri_filt_names[j],
@@ -241,7 +246,7 @@ def make_perturb_aufs(cm, which_cat):
                 else:
                     single_perturb_auf_output = create_single_perturb_auf(
                         auf_points[i], cm.r, cm.dr, cm.j0s, num_trials, psf_fwhms[j], dens_mags[j], a_photo,
-                        localn, d_mag, delta_mag_cuts, dd_params, l_cut, run_fw, run_psf, snr_mag_params[j],
+                        a_snr, localn, d_mag, delta_mag_cuts, dd_params, l_cut, run_fw, run_psf,
                         al_avs[j], avs, fit_gal_flag, tri_file_path=new_auf_file_path,
                         filt_header=tri_filt_names[j], dens_hist_tri=dens_hist_tri[j],
                         model_mags=tri_model_mags[j], model_mag_mids=tri_model_mag_mids[j],
@@ -512,8 +517,8 @@ def download_trilegal_simulation(tri_file_path, tri_filter_set, ax1, ax2, mag_nu
 
 
 # pylint: disable=too-many-locals,too-many-arguments,too-many-positional-arguments
-def create_single_perturb_auf(auf_point, r, dr, j0s, num_trials, psf_fwhm, density_mag, a_photo, localn,
-                              d_mag, mag_cut, dd_params, l_cut, run_fw, run_psf, snr_mag_params, al_av,
+def create_single_perturb_auf(auf_point, r, dr, j0s, num_trials, psf_fwhm, density_mag, a_photo, a_snr,
+                              localn, d_mag, mag_cut, dd_params, l_cut, run_fw, run_psf, al_av,
                               avs, fit_gal_flag, sky_area=None, saturation_magnitude=None, cmau_array=None,
                               wav=None, z_max=None, nz=None, alpha0=None, alpha1=None, alpha_weight=None,
                               ab_offset=None, filter_name=None, tri_file_path=None, filt_header=None,
@@ -545,6 +550,8 @@ def create_single_perturb_auf(auf_point, r, dr, j0s, num_trials, psf_fwhm, densi
     a_photo : numpy.ndarray
         The photometry of each source for which simulated perturbations should be
         made.
+    a_snr : numpy.ndarray
+        The signal-to-noise ratios of each source in ``a_photo``.
     localn : numpy.ndarray
         The local normalising densities for each source.
     d_mag : float
@@ -566,10 +573,6 @@ def create_single_perturb_auf(auf_point, r, dr, j0s, num_trials, psf_fwhm, densi
     run_psf : bool
         Flag indicating whether to run the "background-dominated PSF" version
         of the perturbation algorithm.
-    snr_mag_params : numpy.ndarray
-        Array, of shape ``(Y, 5)``, containing the pre-determined values of the
-        magnitude-perturbation weighting relationship for a series of Galactic
-        sightlines for this particular filter.
     al_av : float
         Reddening vector for the filter, :math:`\frac{A_\lambda}{A_V}`.
     avs : list or numpy.ndarray of floats
@@ -755,13 +758,10 @@ def create_single_perturb_auf(auf_point, r, dr, j0s, num_trials, psf_fwhm, densi
 
     psf_r = 1.185 * psf_fwhm
 
-    s_flux = 10**(-1/2.5 * mag_array)
-    lb_ind = mff.find_nearest_point(auf_point[0], auf_point[1],
-                                    snr_mag_params[:, 3], snr_mag_params[:, 4])
-    a_snr = snr_mag_params[lb_ind, 0]
-    b_snr = snr_mag_params[lb_ind, 1]
-    c_snr = snr_mag_params[lb_ind, 2]
-    snr = s_flux / np.sqrt(c_snr * s_flux + b_snr + (a_snr * s_flux)**2)
+    n_sources_inv_max_snr = 1000
+    inv_max_snr = 1 / np.percentile(a_snr[np.argsort(a_snr)][:n_sources_inv_max_snr], 50)
+    snr, _, _ = binned_statistic(a_photo, a_snr, statistic='median', bins=magbins)
+    snr = snr[magi]
 
     b = 0.05
     dm_max = _calculate_magnitude_offsets(count_array, mag_array, b, snr, model_mag_mids, log10y,
@@ -786,7 +786,7 @@ def create_single_perturb_auf(auf_point, r, dr, j0s, num_trials, psf_fwhm, densi
             l_cut, 'psf')
 
     if run_fw and run_psf:
-        h = 1 - np.sqrt(1 - np.minimum(np.ones_like(snr), a_snr**2 * snr**2))
+        h = 1 - np.sqrt(1 - np.minimum(np.ones_like(snr), inv_max_snr**2 * snr**2))
         flux = h * flux_fw + (1 - h) * flux_psf  # pylint: disable=possibly-used-before-assignment
         h = h.reshape(1, -1)
         frac = h * frac_fw + (1 - h) * frac_psf  # pylint: disable=possibly-used-before-assignment
