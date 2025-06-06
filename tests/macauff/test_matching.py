@@ -998,7 +998,7 @@ class TestInputs:
             new_line = new_line + line
         new_line = new_line + '\nextra_col_nums: None'
         ca_p_ = self.ca_p_text.replace(old_line, new_line)
-        cb_p_ = self.cb_p_text.replace(old_line.replace('a_snr_mag', 'b_snr_mag'), new_line)
+        cb_p_ = self.cb_p_text.replace(old_line, new_line)
 
         # At this point we should successfully load the csv-related parameters.
         cm = CrossMatch(mock_filename(cm_p_.encode("utf-8")),
@@ -1071,19 +1071,6 @@ class TestInputs:
         assert cm.n_pool == 2  # pylint: disable=no-member
         assert cm.a_correct_astrometry is False  # pylint: disable=no-member
         assert cm.b_correct_astrometry is False  # pylint: disable=no-member
-        assert cm.a_compute_snr_mag_relation is False  # pylint: disable=no-member
-
-        for cat_n in ['a', 'b']:
-            x = self.ca_p_text if cat_n == 'a' else self.cb_p_text
-            x = x.replace('correct_astrometry: False', 'correct_astrometry: True')
-            x = x.replace('compute_snr_mag_relation: False', 'compute_snr_mag_relation: True')
-            x = x.replace('pos_and_err_indices: [0, 1, 2]', 'pos_and_err_indices: [0, 1, 2, 0, 1, 2]')
-            b, c = (x, self.cb_p_text) if cat_n == 'a' else (self.ca_p_text, x)
-            with pytest.raises(ValueError, match=f"Ambiguity in catalogue '{cat_n}' hav"):
-                cm = CrossMatch(mock_filename(self.cm_p_text.encode("utf-8")),
-                                mock_filename(b.encode("utf-8")),
-                                mock_filename(c.encode("utf-8")))
-                cm._load_metadata_config(self.chunk_id)
 
         cm_p_ = self.cm_p_text.replace('n_pool: 2', '')
         with pytest.raises(ValueError, match="Missing key n_pool from joint"):
@@ -1326,57 +1313,7 @@ class TestInputs:
         mnarray = np.load('ac_folder/npy/mn_sigs_array.npy')
         assert_allclose([mnarray[0, 0], mnarray[0, 1]], [2, 0], rtol=0.1, atol=0.01)
         # pylint: enable=no-member
-
         assert np.all(cm.a_in_overlaps == 0)
-
-        # Set up a completely valid test of cat_a_params and cat_b_params
-        # for compute_snr_mag_relation.
-        new_line = (r'compute_snr_mag_relation: True' + '\ncorrect_astro_save_folder: ac_folder\n')
-
-        ca_p_ = self.ca_p_text.replace('compute_snr_mag_relation: False', new_line)
-        ca_p_ = ca_p_.replace('chunk_overlap_col: 6', 'chunk_overlap_col: 12')
-        ca_p_ = ca_p_.replace('best_mag_index_col: 7', 'best_mag_index_col: 11')
-        ca_p_ = ca_p_.replace(r'cat_csv_file_path: gaia_folder/gaia_{}.csv',
-                              r'cat_csv_file_path: file_{}.csv')
-        ca_p_ = ca_p_.replace('mag_indices: [3, 4, 5]', 'mag_indices: [3, 5, 7]')
-        ca_p_ = ca_p_.replace('snr_indices: [8, 9, 10]', 'snr_indices: [4, 6, 8]')
-
-        cb_p_ = self.cb_p_text.replace('compute_snr_mag_relation: False', new_line)
-        cb_p_ = cb_p_.replace('mag_indices: [3, 4, 5, 6]', 'mag_indices: [3, 5, 7, 9]')
-        cb_p_ = cb_p_.replace(r'cat_csv_file_path: wise_folder/wise_{}.csv',
-                              r'cat_csv_file_path: file_{}.csv')
-        cb_p_ = cb_p_.replace('chunk_overlap_col: 7', 'chunk_overlap_col: 12')
-        cm = CrossMatch(mock_filename(cm_p_.encode("utf-8")),
-                        mock_filename(self.ca_p_text.encode("utf-8")),
-                        mock_filename(cb_p_.encode("utf-8")))
-        cm._load_metadata_config(self.chunk_id)
-        cm.chunk_id = self.chunk_id
-        cm._initialise_chunk()
-        # pylint: disable=no-member
-        assert cm.b_compute_snr_mag_relation is True
-        assert not hasattr(cm, 'b_correct_mag_slice')
-        assert cm.b_correct_astro_save_folder == os.path.abspath('ac_folder')
-        assert cm.b_cat_csv_file_path == os.path.abspath('file_9.csv')
-        assert np.all(cm.b_pos_and_err_indices == np.array([[0, 1, 2], [0, 1, 2]]))
-        assert np.all(cm.b_mag_indices == np.array([3, 5, 7, 9]))
-        assert np.all(cm.b_snr_indices == np.array([4, 6, 8, 10]))
-        mnarray = np.load('ac_folder/npy/mn_sigs_array.npy')
-        assert_allclose([mnarray[0, 0], mnarray[0, 1]], [2, 0], rtol=0.1, atol=0.01)
-        cm = CrossMatch(mock_filename(cm_p_.encode("utf-8")),
-                        mock_filename(ca_p_.encode("utf-8")),
-                        mock_filename(self.cb_p_text.encode("utf-8")))
-        cm._load_metadata_config(self.chunk_id)
-        cm.chunk_id = self.chunk_id
-        cm._initialise_chunk()
-        assert cm.a_compute_snr_mag_relation is True
-        assert not hasattr(cm, 'a_correct_astro_mag_indices_index')
-        assert cm.a_correct_astro_save_folder == os.path.abspath('ac_folder')
-        assert cm.a_cat_csv_file_path == os.path.abspath('file_9.csv')
-        assert np.all(cm.a_pos_and_err_indices == np.array([[0, 1, 2], [0, 1, 2]]))
-        assert np.all(cm.a_mag_indices == np.array([3, 5, 7]))
-        assert np.all(cm.a_snr_indices == np.array([4, 6, 8]))
-        mnarray = np.load('ac_folder/npy/mn_sigs_array.npy')
-        assert_allclose([mnarray[0, 0], mnarray[0, 1]], [2, 0], rtol=0.1, atol=0.01)
 
         # New test of the AC run, just with pre-made histograms.
         dens, tri_mags, tri_mags_mids, dtri_mags, uncert, num_bright_obj = make_tri_counts(
@@ -1472,7 +1409,7 @@ class TestInputs:
                  'mag_indices should be a list of integers in the catalogue "a" ',
                  'b_filt_names and b_mag_indices should contain the',
                  'All elements of b_mag_indices should be integers.',
-                 'snr_indices should be a list of integers in the catalogue "b" ',
+                 'snr_indices should be a list of integers in catalogue "b" ',
                  'a_snr_indices and a_mag_indices should contain the',
                  'All elements of a_snr_indices should be integers.',
                  'chunk_overlap_col should be an integer in the catalogue "a"',
@@ -1500,10 +1437,9 @@ class TestInputs:
                 cm._load_metadata_config(self.chunk_id)
 
         cb_p_3 = cb_p_2.replace('correct_astrometry: True', 'correct_astrometry: False')
-        cb_p_3 = cb_p_3.replace('compute_snr_mag_relation: False', 'compute_snr_mag_relation: True')
         cb_p_3 = cb_p_3.replace('pos_and_err_indices: [0, 1, 2, 0, 1, 2]',
                                 'pos_and_err_indices: [1, 2, 3, 4, 5]')
-        match_text = 'b_pos_and_err_indices should contain three elements when compute_snr_mag_relation '
+        match_text = 'b_pos_and_err_indices should contain three elements when correct_astrometry is F'
         with pytest.raises(ValueError, match=match_text):
             cm = CrossMatch(mock_filename(self.cm_p_text.encode("utf-8")),
                             mock_filename(ca_p_2.encode("utf-8")),

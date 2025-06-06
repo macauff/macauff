@@ -426,31 +426,31 @@ The inter-dependency of input parameters on one another, and the output ``CrossM
     │                     │             ├─* gal_filternames
     │                     │             └─* saturation_magnitudes
     │                     ├─* snr_indices
-    │                     ├─* tri_set_name[3a]
-    │                     ├─* tri_filt_names[3a]
-    │                     ├─* tri_filt_num[3a]
-    │                     ├─* download_tri[3a]
+    │                     ├─* tri_set_name[2a]
+    │                     ├─* tri_filt_names[2a]
+    │                     ├─* tri_filt_num[2a]
+    │                     ├─* download_tri[2a]
     │                     ├─* psf_fwhms
     │                     ├─* run_fw_auf
     │                     ├─* run_psf_auf
     │                     │             ├─* dd_params_path -> dd_params
     │                     │             └─* l_cut_path -> l_cut
-    │                     ├─* tri_maglim_faint[3a]
-    │                     ├─* tri_num_faint[3a]
+    │                     ├─* tri_maglim_faint[2a]
+    │                     ├─* tri_num_faint[2a]
     │                     ├─* gal_al_avs
-    │                     ├─* dens_hist_tri_location[3b, 4] -> dens_hist_tri_list
-    │                     ├─* tri_model_mags_location[3b, 4] -> tri_model_mags_list
-    │                     ├─* tri_model_mag_mids_location[3b, 4] -> tri_model_mag_mids_list
-    │                     ├─* tri_model_mags_interval_location[3b, 4] -> tri_model_mags_interval_list
-    │                     ├─* tri_model_mags_uncert_location[3b, 4] -> tri_model_mags_uncert_list
-    │                     └─* tri_n_bright_sources_star_location[3b, 4] -> tri_n_bright_sources_star_list
+    │                     ├─* dens_hist_tri_location[2b, 3] -> dens_hist_tri_list
+    │                     ├─* tri_model_mags_location[2b, 3] -> tri_model_mags_list
+    │                     ├─* tri_model_mag_mids_location[2b, 3] -> tri_model_mag_mids_list
+    │                     ├─* tri_model_mags_interval_location[2b, 3] -> tri_model_mags_interval_list
+    │                     ├─* tri_model_mags_uncert_location[2b, 3] -> tri_model_mags_uncert_list
+    │                     └─* tri_n_bright_sources_star_location[2b, 3] -> tri_n_bright_sources_star_list
     ├─> include_phot_like
     │                   └─> with_and_without_photometry
     ├─> use_phot_priors
     ├─> cf_region_type
-    ├─> cf_region_frame[2]
-    ├─> cf_region_points_per_chunk[5]
-    ├─> chunk_id_list[5]
+    ├─> cf_region_frame[1]
+    ├─> cf_region_points_per_chunk[4]
+    ├─> chunk_id_list[4]
     ├─> output_save_folder
     ├─> pos_corr_dist
     ├─> real_hankel_points
@@ -458,48 +458,44 @@ The inter-dependency of input parameters on one another, and the output ``CrossM
     ├─> four_max_rho
     ├─> int_fracs
     ├─> make_output_csv
-    │                 ├─> match_out_csv_name[4]
-    │                 ├─> nonmatch_out_csv_name[4]
+    │                 ├─> match_out_csv_name[3]
+    │                 ├─> nonmatch_out_csv_name[3]
     │                 ├─* cat_col_names
     │                 ├─* cat_col_nums
     │                 ├─* extra_col_names
     │                 └─* extra_col_nums
     ├─> n_pool
     ├─* auf_region_type
-    ├─* auf_region_frame[2]
-    ├─* auf_region_points_per_chunk[5]
-    ├─* chunk_id_list[5]
+    ├─* auf_region_frame[1]
+    ├─* auf_region_points_per_chunk[4]
+    ├─* chunk_id_list[4]
     ├─* filt_names
     ├─* cat_name
-    ├─* auf_file_path[3a, 4]
-    ├─* cat_csv_file_path[4]
+    ├─* auf_file_path[2a, 3]
+    ├─* cat_csv_file_path[3]
     ├─* pos_and_err_indices
     ├─* mag_indices
     ├─* chunk_overlap_col
     ├─* best_mag_index_col
     ├─* csv_has_header
-    ├─* correct_astrometry[1]
-    │                    ├─* correct_astro_save_folder[4]
-    │                    ├─* mag_unc_indices
-    │                    ├─* correct_astro_mag_indices_index
-    │                    ├─* nn_radius
-    │                    ├─* ref_cat_csv_file_path[4]
-    │                    ├─* correct_mag_array
-    │                    ├─* correct_mag_slice
-    │                    ├─* correct_sig_slice
-    │                    ├-* use_photometric_uncertainties
-    │                    └─* saturation_magnitudes
-    ├─* compute_snr_mag_relation[1]
-    │                          ├─* correct_astro_save_folder[4]
-                               └─* mag_unc_indices
+    └─* correct_astrometry
+                         ├─* correct_astro_save_folder[3]
+                         ├─* snr_indices
+                         ├─* correct_astro_mag_indices_index
+                         ├─* nn_radius
+                         ├─* ref_cat_csv_file_path[3]
+                         ├─* correct_mag_array
+                         ├─* correct_mag_slice
+                         ├─* correct_sig_slice
+                         ├-* use_photometric_uncertainties
+                         └─* saturation_magnitudes
 
 List directories end in ``->`` for ``joint`` parameters, ``-*`` for ``catalogue`` parameters. ``catalogue`` level items will have ``a_`` or ``b_`` prepended, depending on which "side" of the cross-match they are from. Items with a second keyword after an arrow ``->`` are the names of the attributes that are saved to ``CrossMatch``, usually when the input parameter is a location on disk.
 
-| [1] - cannot both be ``True``
-| [2] - must be the same
-| [3] - only one set of [3a] and [3b] should be given, the others should be passed as ``None``
-| [4] - must have ``_{}`` in its string, into which the chunk ID will be inserted
-| [5] - must have relevant input entry per chunk, e.g. in a YAML multi-line format, aligned with the chunk ID of ``chunk_id_list`` of the relevant input parameter file
+| [1] - must be the same
+| [2] - only one set of [3a] and [3b] should be given, the others should be passed as ``None``
+| [3] - must have ``_{}`` in its string, into which the chunk ID will be inserted
+| [4] - must have relevant input entry per chunk, e.g. in a YAML multi-line format, aligned with the chunk ID of ``chunk_id_list`` of the relevant input parameter file
 
 .. rubric:: Footnotes
 

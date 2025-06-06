@@ -54,4 +54,3 @@ dens_dist: 0.25
 
 # Test for whether we need to correct astrometry of catalogue for systematic biases before performing matches
 correct_astrometry: False
-compute_snr_mag_relation: False

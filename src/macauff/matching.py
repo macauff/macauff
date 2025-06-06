@@ -20,7 +20,7 @@ except ModuleNotFoundError:
     MPI = None
 
 from macauff.counterpart_pairing import source_pairing
-from macauff.fit_astrometry import AstrometricCorrections, SNRMagnitudeRelationship
+from macauff.fit_astrometry import AstrometricCorrections
 from macauff.group_sources import make_island_groupings
 from macauff.macauff import Macauff
 from macauff.parse_catalogue import csv_to_npy, npy_to_csv
@@ -153,13 +153,12 @@ class CrossMatch():
         '''
 
         # If astrometry of either catalogue needs fixing, do that now.
-        if self.a_correct_astrometry or self.a_compute_snr_mag_relation:
+        if self.a_correct_astrometry:
             # Generate from current data: just need the singular chunk mid-points
             # and to leave all other parameters as they are.
             if len(self.a_auf_region_points) > 1:
-                warnings.warn("a_auf_region_points contains more than one AUF sampling point, but either "
-                              "a_correct_astrometry or a_compute_snr_mag_relation is True. Check results "
-                              "carefully.")
+                warnings.warn("a_auf_region_points contains more than one AUF sampling point, but "
+                              "a_correct_astrometry is True. Check results carefully.")
             ax1_mids = np.array([self.a_auf_region_points[0, 0]])
             ax2_mids = np.array([self.a_auf_region_points[0, 1]])
             ax_dimension = 2
@@ -229,24 +228,13 @@ class CrossMatch():
                 self.a_astro, self.a_photo, self.a_magref, self.a_in_overlaps, self.a_snr = x
             else:
                 self.a_astro, self.a_photo, self.a_magref, self.a_in_overlaps = x
-        if self.a_compute_snr_mag_relation:
-            t = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            print(f"{t} Rank {self.rank}, chunk {self.chunk_id}: Calculating catalogue 'a' "
-                  "SNR-mag relations...")
-            smr = SNRMagnitudeRelationship(
-                self.a_correct_astro_save_folder, ax1_mids, ax2_mids, ax_dimension, a_npy_or_csv,
-                a_coord_or_chunk, self.a_pos_and_err_indices, self.a_mag_indices,
-                self.a_mag_unc_indices, self.a_filt_names, self.a_auf_region_frame,
-                chunks=[self.chunk_id])
-            smr(b_cat_name=self.a_cat_csv_file_path, make_plots=True, overwrite_all_sightlines=True)
 
-        if self.b_correct_astrometry or self.b_compute_snr_mag_relation:
+        if self.b_correct_astrometry:
             # Generate from current data: just need the singular chunk mid-points
             # and to leave all other parameters as they are.
             if len(self.b_auf_region_points) > 1:
-                warnings.warn("b_auf_region_points contains more than one AUF sampling point, but either "
-                              "b_correct_astrometry or b_compute_snr_mag_relation is True. Check results "
-                              "carefully.")
+                warnings.warn("b_auf_region_points contains more than one AUF sampling point, but "
+                              "b_correct_astrometry is True. Check results carefully.")
             ax1_mids = np.array([self.b_auf_region_points[0, 0]])
             ax2_mids = np.array([self.b_auf_region_points[0, 1]])
             ax_dimension = 2
@@ -303,7 +291,7 @@ class CrossMatch():
                 raise FileNotFoundError('Catalogue file not found in catalogue "b" path. '
                                         'Please ensure photometric catalogue is correctly saved.')
 
-            if self.include_perturb_auf or self.a_correct_astrometry:
+            if self.include_perturb_auf or self.b_correct_astrometry:
                 snr_cols = self.b_snr_indices
             else:
                 snr_cols = None
@@ -314,16 +302,6 @@ class CrossMatch():
                 self.b_astro, self.b_photo, self.b_magref, self.b_in_overlaps, self.b_snr = x
             else:
                 self.b_astro, self.b_photo, self.b_magref, self.b_in_overlaps = x
-        if self.b_compute_snr_mag_relation:
-            t = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            print(f"{t} Rank {self.rank}, chunk {self.chunk_id}: Calculating catalogue 'b' "
-                  "SNR-mag relations...")
-            smr = SNRMagnitudeRelationship(
-                self.b_correct_astro_save_folder, ax1_mids, ax2_mids, ax_dimension, b_npy_or_csv,
-                b_coord_or_chunk, self.b_pos_and_err_indices, self.b_mag_indices,
-                self.b_mag_unc_indices, self.b_filt_names, self.b_auf_region_frame,
-                chunks=[self.chunk_id])
-            smr(b_cat_name=self.b_cat_csv_file_path, make_plots=True, overwrite_all_sightlines=True)
 
         self.make_shared_data()
 
@@ -801,9 +779,8 @@ class CrossMatch():
         for config, catname in zip([cat_a_config, cat_b_config], ['"a"', '"b"']):
             for check_flag in ['auf_region_type', 'auf_region_frame', 'auf_region_points_per_chunk',
                                'filt_names', 'cat_name', 'auf_file_path', 'cat_csv_file_path',
-                               'correct_astrometry', 'compute_snr_mag_relation', 'chunk_id_list',
-                               'pos_and_err_indices', 'mag_indices', 'chunk_overlap_col',
-                               'best_mag_index_col', 'csv_has_header']:
+                               'correct_astrometry', 'chunk_id_list', 'pos_and_err_indices', 'mag_indices',
+                               'chunk_overlap_col', 'best_mag_index_col', 'csv_has_header']:
                 if check_flag not in config:
                     raise ValueError(f"Missing key {check_flag} from catalogue {catname} metadata file.")
 
@@ -825,9 +802,8 @@ class CrossMatch():
 
             # pos_and_err_indices should be a three- or six-integer list that
             # we then transform into [reference_cat_inds, this_cat_inds]
-            # where each *_cat_inds is a three-element list [x, y, z],
-            # or just this_cat_inds in the case of
-            # compute_snr_mag_relation=True.
+            # where each *_cat_inds is a three-element list [x, y, z], or just
+            # this_cat_inds, depending on whether correct_astrometry is set.
             a = config['pos_and_err_indices']
             try:
                 b = np.array([float(f) for f in a])
@@ -839,7 +815,7 @@ class CrossMatch():
                                  'when correct_astrometry is True.')
             if len(b) != 3 and not correct_astro:
                 raise ValueError(f'{flag}pos_and_err_indices should contain three elements '
-                                 'when compute_snr_mag_relation is True.')
+                                 'when correct_astrometry is False.')
             if not np.all([c.is_integer() for c in b]):
                 raise ValueError(f'All elements of {flag}pos_and_err_indices should be integers.')
 
@@ -936,19 +912,10 @@ class CrossMatch():
         # first, if there are any.
 
         for n, config in zip(['a', 'b'], [cat_a_config, cat_b_config]):
-            for p in ['correct_astrometry', 'compute_snr_mag_relation']:
+            for p in ['correct_astrometry']:
                 if config[p] not in (True, False):
                     raise ValueError(f"Boolean key {p} not set to allowed value in catalogue {n} "
                                      "metadata file.")
-
-        if cat_a_config['correct_astrometry'] and cat_a_config['compute_snr_mag_relation']:
-            raise ValueError("Ambiguity in catalogue 'a' having both correct_astrometry and "
-                             "compute_snr_mag_relation both being True. Only set at most one "
-                             "flag as 'True'.")
-        if cat_b_config['correct_astrometry'] and cat_b_config['compute_snr_mag_relation']:
-            raise ValueError("Ambiguity in catalogue 'b' having both correct_astrometry and "
-                             "compute_snr_mag_relation both being True. Only set at most one "
-                             "flag as 'True'.")
 
         if (joint_config['include_perturb_auf'] or cat_a_config['correct_astrometry'] or
                 cat_b_config['correct_astrometry']):
@@ -976,9 +943,8 @@ class CrossMatch():
         # if self.a_correct_astrometry or self.b_correct_astrometry respectively
         # have been set.
         # pylint: disable-next=too-many-nested-blocks
-        for correct_astro, compute_snr_mag_relation, config, catname, flag in zip(
+        for correct_astro, config, catname, flag in zip(
                 [cat_a_config['correct_astrometry'], cat_b_config['correct_astrometry']],
-                [cat_a_config['compute_snr_mag_relation'], cat_b_config['compute_snr_mag_relation']],
                 [cat_a_config, cat_b_config], ['"a"', '"b"'], ['a_', 'b_']):
             if joint_config['include_perturb_auf'] or correct_astro:
                 for check_flag in ['dens_dist']:
@@ -1012,8 +978,8 @@ class CrossMatch():
                 except ValueError as exc:
                     raise ValueError('snr_indices should be a list of integers '
                                      f'in catalogue {catname} metadata file') from exc
-                if len(b) != len(config['filt_names']):
-                    raise ValueError(f'{flag}snr_indices and {flag}filt_names should contain the same '
+                if len(b) != len(config['mag_indices']):
+                    raise ValueError(f'{flag}snr_indices and {flag}mag_indices should contain the same '
                                      'number of entries.')
                 if not np.all([c.is_integer() for c in b]):
                     raise ValueError(f'All elements of {flag}snr_indices should be integers.')
@@ -1259,35 +1225,26 @@ class CrossMatch():
         except (ValueError, TypeError) as exc:
             raise ValueError("n_pool should be a single integer number.") from exc
 
-        for correct_astro, compute_snr_mag_relation, config, catname, flag in zip(
+        for correct_astro, config, catname, flag in zip(
                 [cat_a_config['correct_astrometry'], cat_b_config['correct_astrometry']],
-                [cat_a_config['compute_snr_mag_relation'], cat_b_config['compute_snr_mag_relation']],
                 [cat_a_config, cat_b_config], ['"a"', '"b"'], ['a_', 'b_']):
-            # Have to split these parameters into two, as four of them are
-            # required for the simpler case of just doing SNR-mag relation
-            # calculations, instead of the full astrometry correction.
-            if correct_astro or compute_snr_mag_relation:
-                for check_flag in ['correct_astro_save_folder']:
-                    if check_flag not in config:
-                        raise ValueError(f"Missing key {check_flag} from catalogue {catname} metadata file.")
-
-                config['correct_astro_save_folder'] = os.path.abspath(config['correct_astro_save_folder'])
-
             if correct_astro:
                 # If this particular catalogue requires a systematic correction
                 # for astrometric biases from ensemble match distributions before
                 # we can do a probability-based cross-match, then load some extra
-                # pieces of information, over and above those already loaded
-                # for just the SNR-mag case.
-                for check_flag in ['correct_astro_mag_indices_index', 'nn_radius', 'ref_cat_csv_file_path',
-                                   'correct_mag_array', 'correct_mag_slice', 'correct_sig_slice',
-                                   'use_photometric_uncertainties', 'mn_fit_type', 'seeing_ranges']:
+                # pieces of information.
+                for check_flag in ['correct_astro_save_folder', 'correct_astro_mag_indices_index',
+                                   'nn_radius', 'ref_cat_csv_file_path', 'correct_mag_array',
+                                   'correct_mag_slice', 'correct_sig_slice', 'use_photometric_uncertainties',
+                                   'mn_fit_type', 'seeing_ranges']:
                     if check_flag not in config:
                         raise ValueError(f"Missing key {check_flag} from catalogue {catname} metadata file.")
 
                 if config['use_photometric_uncertainties'] not in (True, False):
                     raise ValueError('Boolean flag key use_photometric_uncertainties not set to allowed '
                                      f'value in catalogue {catname} metadata file.')
+
+                config['correct_astro_save_folder'] = os.path.abspath(config['correct_astro_save_folder'])
 
                 mn_fit_type = config['mn_fit_type']
                 if mn_fit_type not in ['quadratic', 'linear']:
