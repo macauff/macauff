@@ -176,7 +176,7 @@ class CrossMatch():
                 self.a_gal_filternames[acbi], self.a_gal_al_avs[acbi], self.d_mag, self.a_dd_params,
                 self.a_l_cut, ax1_mids, ax2_mids, ax_dimension, self.a_correct_mag_array,
                 self.a_correct_mag_slice, self.a_correct_sig_slice, self.n_pool, a_npy_or_csv,
-                a_coord_or_chunk, self.a_pos_and_err_indices, self.a_mag_indices, self.a_mag_unc_indices,
+                a_coord_or_chunk, self.a_pos_and_err_indices, self.a_mag_indices, self.a_snr_indices,
                 self.a_filt_names, self.a_correct_astro_mag_indices_index, self.a_auf_region_frame,
                 self.a_saturation_magnitudes, trifilepath=self.a_auf_file_path,
                 maglim_f=self.a_tri_maglim_faint, magnum=self.a_tri_filt_num,
@@ -196,10 +196,10 @@ class CrossMatch():
                 raise FileNotFoundError('Catalogue file not found in catalogue "a" path. '
                                         'Please ensure photometric catalogue is correctly saved.')
 
-            if not getattr(self, 'a_snr_indices'):
-                snr_cols = None
-            else:
+            if self.include_perturb_auf or self.a_correct_astrometry:
                 snr_cols = self.a_snr_indices
+            else:
+                snr_cols = None
             # Having corrected the astrometry, we have to call csv_to_npy
             # now, rather than pre-generating our binary input catalogues.
             x = csv_to_npy(
@@ -217,10 +217,10 @@ class CrossMatch():
                 raise FileNotFoundError('Catalogue file not found in catalogue "a" path. '
                                         'Please ensure photometric catalogue is correctly saved.')
 
-            if not getattr(self, 'a_snr_indices'):
-                snr_cols = None
-            else:
+            if self.include_perturb_auf or self.a_correct_astrometry:
                 snr_cols = self.a_snr_indices
+            else:
+                snr_cols = None
             # Otherwise, just load the files without correcting anything.
             x = csv_to_npy(
                 self.a_cat_csv_file_path, self.a_pos_and_err_indices, self.a_mag_indices,
@@ -239,19 +239,6 @@ class CrossMatch():
                 self.a_mag_unc_indices, self.a_filt_names, self.a_auf_region_frame,
                 chunks=[self.chunk_id])
             smr(b_cat_name=self.a_cat_csv_file_path, make_plots=True, overwrite_all_sightlines=True)
-        if self.a_correct_astrometry or self.a_compute_snr_mag_relation:
-            # If we re-made either side's astrometry then we need to load its
-            # SNR-mag relation now.
-            os.system(f'cp {self.a_correct_astro_save_folder}/npy/snr_mag_params.npy '
-                      f'{self.a_snr_mag_params_file_path}')
-            if not os.path.isfile(self.a_snr_mag_params_file_path):
-                raise FileNotFoundError(f'{self.a_snr_mag_params_file_path} file not found in catalogue '
-                                        '"a" path. Please ensure astrometry corrections are pre-generated.')
-            a = np.load(self.a_snr_mag_params_file_path)
-            if not (len(a.shape) == 3 and a.shape[2] == 5 and
-                    a.shape[0] == len(self.a_filt_names)):
-                raise ValueError('a_snr_mag_params should be of shape (X, Y, 5)')
-            self.a_snr_mag_params = a
 
         if self.b_correct_astrometry or self.b_compute_snr_mag_relation:
             # Generate from current data: just need the singular chunk mid-points
@@ -276,7 +263,7 @@ class CrossMatch():
                 self.b_gal_filternames[bcbi], self.b_gal_al_avs[bcbi], self.d_mag, self.b_dd_params,
                 self.b_l_cut, ax1_mids, ax2_mids, ax_dimension, self.b_correct_mag_array,
                 self.b_correct_mag_slice, self.b_correct_sig_slice, self.n_pool, b_npy_or_csv,
-                b_coord_or_chunk, self.b_pos_and_err_indices, self.b_mag_indices, self.b_mag_unc_indices,
+                b_coord_or_chunk, self.b_pos_and_err_indices, self.b_mag_indices, self.b_snr_indices,
                 self.b_filt_names, self.b_correct_astro_mag_indices_index, self.b_auf_region_frame,
                 self.b_saturation_magnitudes, trifilepath=self.b_auf_file_path,
                 maglim_f=self.b_tri_maglim_faint, magnum=self.b_tri_filt_num,
@@ -297,10 +284,10 @@ class CrossMatch():
                 raise FileNotFoundError('Catalogue file not found in catalogue "b" path. '
                                         'Please ensure photometric catalogue is correctly saved.')
 
-            if not getattr(self, 'b_snr_indices'):
-                snr_cols = None
-            else:
+            if self.include_perturb_auf or self.a_correct_astrometry:
                 snr_cols = self.b_snr_indices
+            else:
+                snr_cols = None
             x = csv_to_npy(
                 self.b_cat_csv_file_path, self.b_pos_and_err_indices[0], self.b_mag_indices,
                 self.b_best_mag_index_col, self.b_chunk_overlap_col, snr_cols=snr_cols, header=False,
@@ -316,10 +303,10 @@ class CrossMatch():
                 raise FileNotFoundError('Catalogue file not found in catalogue "b" path. '
                                         'Please ensure photometric catalogue is correctly saved.')
 
-            if not getattr(self, 'b_snr_indices'):
-                snr_cols = None
-            else:
+            if self.include_perturb_auf or self.a_correct_astrometry:
                 snr_cols = self.b_snr_indices
+            else:
+                snr_cols = None
             x = csv_to_npy(
                 self.b_cat_csv_file_path, self.b_pos_and_err_indices, self.b_mag_indices,
                 self.b_best_mag_index_col, self.b_chunk_overlap_col, snr_cols=snr_cols, header=False)
@@ -337,18 +324,6 @@ class CrossMatch():
                 self.b_mag_unc_indices, self.b_filt_names, self.b_auf_region_frame,
                 chunks=[self.chunk_id])
             smr(b_cat_name=self.b_cat_csv_file_path, make_plots=True, overwrite_all_sightlines=True)
-        if self.b_correct_astrometry or self.b_compute_snr_mag_relation:
-            os.system(f'cp {self.b_correct_astro_save_folder}/npy/snr_mag_params.npy '
-                      f'{self.b_snr_mag_params_file_path}')
-            f = 'snr_mag_params'
-            if not os.path.isfile(self.b_snr_mag_params_file_path):
-                raise FileNotFoundError(f'{f} file not found in catalogue "b" path. '
-                                        'Please ensure astrometry corrections are pre-generated.')
-            a = np.load(self.b_snr_mag_params_file_path)
-            if not (len(a.shape) == 3 and a.shape[2] == 5 and
-                    a.shape[0] == len(self.b_filt_names)):
-                raise ValueError('b_snr_mag_params should be of shape (X, Y, 5)')
-            self.b_snr_mag_params = a
 
         self.make_shared_data()
 
@@ -1292,23 +1267,11 @@ class CrossMatch():
             # required for the simpler case of just doing SNR-mag relation
             # calculations, instead of the full astrometry correction.
             if correct_astro or compute_snr_mag_relation:
-                for check_flag in ['correct_astro_save_folder', 'mag_unc_indices']:
+                for check_flag in ['correct_astro_save_folder']:
                     if check_flag not in config:
                         raise ValueError(f"Missing key {check_flag} from catalogue {catname} metadata file.")
 
                 config['correct_astro_save_folder'] = os.path.abspath(config['correct_astro_save_folder'])
-
-                a = config['mag_unc_indices']
-                try:
-                    b = np.array([float(f) for f in a])
-                except ValueError as exc:
-                    raise ValueError('mag_unc_indices should be a list of integers '
-                                     f'in the catalogue {catname} metadata file') from exc
-                if len(b) != len(config['mag_indices']):
-                    raise ValueError(f'{flag}mag_unc_indices and {flag}mag_indices should contain the '
-                                     'same number of entries.')
-                if not np.all([c.is_integer() for c in b]):
-                    raise ValueError(f'All elements of {flag}mag_unc_indices should be integers.')
 
             if correct_astro:
                 # If this particular catalogue requires a systematic correction

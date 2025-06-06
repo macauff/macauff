@@ -44,8 +44,8 @@ class TestAstroCorrection:
     def fake_cata_cutout(self, lmin, lmax, bmin, bmax, *cat_args):  # pylint: disable=unused-argument
         astro_uncert = self.rng.uniform(0.001, 0.002, size=self.n)
         mag = self.rng.uniform(12, 12.1, size=self.n)
-        mag_uncert = self.rng.uniform(0.01, 0.02, size=self.n)
-        a = np.array([self.true_ra, self.true_dec, astro_uncert, mag, mag_uncert]).T
+        snr = self.rng.uniform(10, 100, size=self.n)
+        a = np.array([self.true_ra, self.true_dec, astro_uncert, mag, snr]).T
         if self.npy_or_csv == 'npy':
             np.save(self.a_cat_name.format(*cat_args), a)
         else:
@@ -58,9 +58,9 @@ class TestAstroCorrection:
         mag[50:100] = mag[:50] + self.rng.uniform(-0.0001, 0.0001, size=50)
         s = 10**(-1/2.5 * mag[:50])
         snr = s / np.sqrt(3.5e-16 * s + 8e-17 + (1.2e-2 * s)**2)
-        mag_uncert = np.empty(self.n, float)
-        mag_uncert[:50] = 2.5 * np.log10(1 + 1/snr)
-        mag_uncert[50:100] = mag_uncert[:50] + self.rng.uniform(-0.001, 0.001, size=50)
+        snrs = np.empty(self.n, float)
+        snrs[:50] = snr
+        snrs[50:100] = snrs[:50] + self.rng.uniform(-0.5, 0.5, size=50)
         astro_uncert = np.empty(self.n, float)
         astro_uncert[:100] = 0.01
         # Divide the N-100 objects at the 0/16/33/52/75/100 interval, for a
@@ -74,8 +74,7 @@ class TestAstroCorrection:
                                           [0.01, 0.02, 0.06, 0.12, 0.4]):
             mag[i:j] = self.rng.uniform(mag_mid-0.05, mag_mid+0.05, size=j-i)
             snr_mag = mag_mid / np.sqrt(3.5e-16 * mag_mid + 8e-17 + (1.2e-2 * mag_mid)**2)
-            dm_mag = 2.5 * np.log10(1 + 1/snr_mag)
-            mag_uncert[i:j] = self.rng.uniform(dm_mag-0.005, dm_mag+0.005, size=j-i)
+            snrs[i:j] = self.rng.uniform(snr_mag-0.5, snr_mag+0.5, size=j-i)
             astro_uncert[i:j] = self.rng.uniform(sig_mid, sig_mid+0.01, size=j-i)
         angle = self.rng.uniform(0, 2*np.pi, size=self.n)
         ra_angle, dec_angle = np.cos(angle), np.sin(angle)
@@ -85,7 +84,7 @@ class TestAstroCorrection:
         dist = self.rng.rayleigh(scale=2*astro_uncert / 3600, size=self.n)
         rand_ra = self.true_ra + dist * ra_angle
         rand_dec = self.true_dec + dist * dec_angle
-        b = np.array([rand_ra, rand_dec, astro_uncert, mag, mag_uncert]).T
+        b = np.array([rand_ra, rand_dec, astro_uncert, mag, snrs]).T
         if self.npy_or_csv == 'npy':
             np.save(self.b_cat_name.format(*cat_args), b)
         else:
@@ -109,7 +108,7 @@ class TestAstroCorrection:
             'ax2_mids': ax2_mids, 'cutout_area': 60, 'cutout_height': 6, 'mag_array': magarray,
             'mag_slice': magslice, 'sig_slice': sigslice, 'n_pool': 1,
             'pos_and_err_indices': [[0, 1, 2], [0, 1, 2]], 'mag_indices': [3],
-            'mag_unc_indices': [4], 'mag_names': ['W1'], 'correct_astro_mag_indices_index': 0,
+            'snr_indices': [4], 'mag_names': ['W1'], 'correct_astro_mag_indices_index': 0,
             'n_r': 5000, 'n_rho': 5000, 'max_rho': 100, 'saturation_magnitudes': [15],
             'mn_fit_type': 'quadratic'}
 
@@ -209,7 +208,7 @@ class TestAstroCorrection:
             ax2_mids=ax2_mids, ax_dimension=ax_dimension, cutout_area=60, cutout_height=6,
             mag_array=magarray, mag_slice=magslice, sig_slice=sigslice, n_pool=1, npy_or_csv='npy',
             coord_or_chunk='coord', pos_and_err_indices=[[0, 1, 2], [0, 1, 2]], mag_indices=[3],
-            mag_unc_indices=[4], mag_names=['W1'], correct_astro_mag_indices_index=0,
+            snr_indices=[4], mag_names=['W1'], correct_astro_mag_indices_index=0,
             coord_system='equatorial', chunks=chunks, pregenerate_cutouts=True, n_r=2000, n_rho=2000,
             max_rho=40, saturation_magnitudes=[15], mn_fit_type='quadratic')
         with pytest.raises(ValueError, match="a_cat and b_cat must either both be None or "):
@@ -331,7 +330,7 @@ class TestAstroCorrection:
             gal_alav=0.039, dm=0.1, dd_params=dd_params, l_cut=l_cut, ax1_mids=ax1_mids,
             ax2_mids=ax2_mids, ax_dimension=ax_dimension, mag_array=magarray, mag_slice=magslice,
             sig_slice=sigslice, n_pool=1, npy_or_csv=npy_or_csv, coord_or_chunk=coord_or_chunk,
-            pos_and_err_indices=[[0, 1, 2], [0, 1, 2]], mag_indices=[3], mag_unc_indices=[4],
+            pos_and_err_indices=[[0, 1, 2], [0, 1, 2]], mag_indices=[3], snr_indices=[4],
             mag_names=['W1'], correct_astro_mag_indices_index=0, coord_system=coord_system, chunks=chunks,
             pregenerate_cutouts=pregenerate_cutouts,
             cutout_area=60 if pregenerate_cutouts is False else None,
@@ -356,18 +355,12 @@ class TestAstroCorrection:
         else:
             a_cat_func = self.fake_cata_cutout
             b_cat_func = self.fake_catb_cutout
-        if os.path.isfile('ac_save_folder/npy/snr_mag_params.npy'):
-            os.remove('ac_save_folder/npy/snr_mag_params.npy')
-        if os.path.isfile('ac_save_folder/npy/m_sigs_array.npy'):
-            os.remove('ac_save_folder/npy/m_sigs_array.npy')
-        if os.path.isfile('ac_save_folder/npy/n_sigs_array.npy'):
-            os.remove('ac_save_folder/npy/n_sigs_array.npy')
+        if os.path.isfile('ac_save_folder/npy/mn_sigs_array.npy'):
+            os.remove('ac_save_folder/npy/mn_sigs_array.npy')
 
         if half_run_flag:
-            np.save('ac_save_folder/npy/snr_mag_params.npy',
-                    np.array([[[-1, -1, -1, -1, -1], [-1, -2, -3, -4, -5]]], dtype=float))
-            np.save('ac_save_folder/npy/m_sigs_array.npy', np.array([-1, 12], dtype=float))
-            np.save('ac_save_folder/npy/n_sigs_array.npy', np.array([-1, 15], dtype=float))
+            np.save('ac_save_folder/npy/mn_sigs_array.npy',
+                    np.array([[-1, -1, -1, -1], [12, 15, 18, 21]], dtype=float))
         if in_memory:
             cat_args = (105.0, 0.0)
             ax1_min, ax1_max, ax2_min, ax2_max = 100, 110, -3, 3
@@ -377,12 +370,12 @@ class TestAstroCorrection:
             b_cat = np.load(self.b_cat_name.format(*cat_args))
         if return_nm:
             if in_memory:
-                marray, narray, abc_array = ac(
+                mnarray = ac(
                     a_cat=a_cat, b_cat=b_cat, a_cat_name=None, b_cat_name=None, a_cat_func=None,
                     b_cat_func=None, tri_download=False, make_plots=True, make_summary_plot=True,
                     seeing_ranges=np.array([0.5, 1, 1.5]))
             else:
-                marray, narray, abc_array = ac(
+                mnarray = ac(
                     a_cat=None, b_cat=None, a_cat_name=self.a_cat_name, b_cat_name=self.b_cat_name,
                     a_cat_func=a_cat_func, b_cat_func=b_cat_func, tri_download=False, make_plots=True,
                     make_summary_plot=True, seeing_ranges=np.array([0.5, 1, 1.5]))
@@ -400,12 +393,10 @@ class TestAstroCorrection:
         if coord_or_chunk == 'coord':
             assert os.path.isfile('ac_save_folder/pdf/auf_fits_105.0_0.0.pdf')
             assert os.path.isfile('ac_save_folder/pdf/counts_comparison_105.0_0.0.pdf')
-            assert os.path.isfile('ac_save_folder/pdf/s_vs_snr_105.0_0.0.pdf')
             assert os.path.isfile('ac_save_folder/pdf/histogram_mag_vs_sig_vs_snr_105.0_0.0.pdf')
         else:
             assert os.path.isfile('ac_save_folder/pdf/auf_fits_2017.pdf')
             assert os.path.isfile('ac_save_folder/pdf/counts_comparison_2017.pdf')
-            assert os.path.isfile('ac_save_folder/pdf/s_vs_snr_2017.pdf')
             assert os.path.isfile('ac_save_folder/pdf/histogram_mag_vs_sig_vs_snr_2017.pdf')
 
         assert os.path.isfile('ac_save_folder/pdf/summary_mn_ind_cdfs.pdf')
@@ -413,18 +404,12 @@ class TestAstroCorrection:
         assert os.path.isfile('ac_save_folder/pdf/summary_individual_sig_vs_sig.pdf')
 
         if not return_nm:
-            marray = np.load('ac_save_folder/npy/m_sigs_array.npy')
-            narray = np.load('ac_save_folder/npy/n_sigs_array.npy')
+            mnarray = np.load('ac_save_folder/npy/mn_sigs_array.npy')
         # pylint: disable-next=possibly-used-before-assignment
-        assert_allclose([marray[0], narray[0]], [2, 0], rtol=0.1, atol=0.01)
+        assert_allclose([mnarray[0, 0], mnarray[0, 1]], [2, 0], rtol=0.1, atol=0.01)
 
-        if not return_nm:
-            abc_array = np.load('ac_save_folder/npy/snr_mag_params.npy')
         # pylint: disable-next=possibly-used-before-assignment
-        assert_allclose([abc_array[0, 0, 3], abc_array[0, 0, 4]], [105, 0], atol=0.001)
-
-        assert_allclose(abc_array[0, 0, 0], 1.2e-2, rtol=0.05, atol=0.001)
-        assert_allclose(abc_array[0, 0, 1], 8e-17, rtol=0.05, atol=5e-19)
+        assert_allclose([mnarray[0, 2], mnarray[0, 3]], [105, 0], atol=0.001)
 
         if pregenerate_cutouts is False:
             assert_allclose(ac.ax1_mins[0], 100, rtol=0.01)
@@ -436,10 +421,9 @@ class TestAstroCorrection:
             # For the pre-determined set of parameters we should have skipped
             # one of the sightlines and want to check if its parameters are
             # unchanged.
-            assert_allclose([marray[1], narray[1]], [12, 15], atol=0.001)
-            assert_allclose(abc_array[0, 1, 0], -1, atol=0.001)
-            assert_allclose(abc_array[0, 1, 1], -2, atol=0.001)
-            assert_allclose(abc_array[0, 1, 3], -4, atol=0.001)
+            assert_allclose([mnarray[1, 0], mnarray[1, 1]], [12, 15], atol=0.001)
+            assert_allclose(mnarray[1, 2], 18, atol=0.001)
+            assert_allclose(mnarray[1, 3], 21, atol=0.001)
 
         os.system('rm -r store_data')
 
@@ -458,7 +442,7 @@ class TestSNRMagRelation:
         ax1_mids, ax2_mids = np.array([105], dtype=float), np.array([0], dtype=float)
         _kwargs = {
             'save_folder': 'ac_save_folder', 'ax1_mids': ax1_mids, 'ax2_mids': ax2_mids,
-            'pos_and_err_indices': [0, 1, 2], 'mag_indices': [3], 'mag_unc_indices': [4],
+            'pos_and_err_indices': [0, 1, 2], 'mag_indices': [3], 'snr_indices': [4],
             'mag_names': ['W1']}
 
         for ax_dim in [3, 'A']:
@@ -529,7 +513,7 @@ class TestSNRMagRelation:
         smr = SNRMagnitudeRelationship(
             save_folder='ac_save_folder', ax1_mids=ax1_mids, ax2_mids=ax2_mids,
             ax_dimension=ax_dimension, npy_or_csv=npy_or_csv, coord_or_chunk=coord_or_chunk,
-            pos_and_err_indices=[0, 1, 2], mag_indices=[3], mag_unc_indices=[4], mag_names=['W1'],
+            pos_and_err_indices=[0, 1, 2], mag_indices=[3], snr_indices=[4], mag_names=['W1'],
             coord_system=coord_system, chunks=chunks, return_nm=return_nm)
 
         if coord_or_chunk == 'coord':

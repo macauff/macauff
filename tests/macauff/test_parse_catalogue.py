@@ -106,9 +106,7 @@ class TestParseCatalogue:
                        cat_in_radec=False, mn_in_radec=False)
 
         os.makedirs('test_sig_folder')
-        np.save('test_sig_folder/m_sigs_array.npy', np.array([2]))
-        np.save('test_sig_folder/n_sigs_array.npy', np.array([0.01]))
-        np.save('test_sig_folder/snr_mag_params.npy', np.array([[[0, 0, 0, 10.0, 0.0]]]))
+        np.save('test_sig_folder/mn_sigs_array.npy', np.array([[2, 0.01, 10.0, 0.0]]))
 
         astro, photo, best_index, _ = csv_to_npy(
             'test_data.csv', [0, 1, 2], [4, 5], 6, None, header=header, process_uncerts=True,
@@ -123,8 +121,8 @@ class TestParseCatalogue:
         assert_allclose(best_index, self.data[:, 6])
 
         a = SkyCoord(ra=[10.0], dec=[0.0], unit='deg', frame='icrs')
-        np.save('test_sig_folder/snr_mag_params.npy',
-                np.array([[[0, 0, 0, a.galactic.l.degree[0], a.galactic.b.degree[0]]]]))
+        np.save('test_sig_folder/mn_sigs_array.npy', np.array([[
+            2, 0.01, a.galactic.l.degree[0], a.galactic.b.degree[0]]]))
 
         astro, photo, best_index, _ = csv_to_npy(
             'test_data.csv', [0, 1, 2], [4, 5], 6, None, header=header, process_uncerts=True,

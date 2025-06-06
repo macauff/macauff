@@ -131,11 +131,10 @@ def csv_to_npy(input_filename, astro_cols, photo_cols, bestindex_col,
         snrs = np.empty((n_rows, len(photo_cols)), float)
 
     if process_uncerts:
-        m_sigs = np.load(f'{astro_sig_fits_filepath}/m_sigs_array.npy')
-        n_sigs = np.load(f'{astro_sig_fits_filepath}/n_sigs_array.npy')
-        mn_coords = np.empty((len(m_sigs), 2), float)
-        mn_coords[:, 0] = np.load(f'{astro_sig_fits_filepath}/snr_mag_params.npy')[0, :, 3]
-        mn_coords[:, 1] = np.load(f'{astro_sig_fits_filepath}/snr_mag_params.npy')[0, :, 4]
+        mn_sigs = np.load(f'{astro_sig_fits_filepath}/mn_sigs_array.npy')
+        mn_coords = np.empty((len(mn_sigs), 2), float)
+        mn_coords[:, 0] = np.copy(mn_sigs[:, 2])
+        mn_coords[:, 1] = np.copy(mn_sigs[:, 3])
         if cat_in_radec and not mn_in_radec:
             # Convert mn_coords to RA/Dec if catalogue is in Equatorial coords.
             a = SkyCoord(l=mn_coords[:, 0], b=mn_coords[:, 1], unit='deg', frame='galactic')
@@ -173,7 +172,7 @@ def csv_to_npy(input_filename, astro_cols, photo_cols, bestindex_col,
                                                  chunk.values[:, new_astro_cols[1]],
                                                  mn_coords[:, 0], mn_coords[:, 1])
             # pylint: disable-next=possibly-used-before-assignment
-            new_sigs = np.sqrt((m_sigs[sig_mn_inds]*old_sigs)**2 + n_sigs[sig_mn_inds]**2)
+            new_sigs = np.sqrt((mn_sigs[sig_mn_inds, 0]*old_sigs)**2 + mn_sigs[sig_mn_inds, 1]**2)
             astro[n:n+chunk.shape[0], 2] = new_sigs
         photo[n:n+chunk.shape[0]] = chunk.values[:, new_photo_cols]
         best_index[n:n+chunk.shape[0]] = chunk.values[:, new_bestindex_col]
