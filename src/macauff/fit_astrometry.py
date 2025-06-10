@@ -360,7 +360,7 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
         self.mn_fit_type = mn_fit_type
 
         if npy_or_csv == 'npy':
-            self.pos_and_err_indices = pos_and_err_indices
+            self.pos_and_err_indices_full = pos_and_err_indices
             self.mag_indices = mag_indices
             self.snr_indices = snr_indices
             self.mag_names = mag_names
@@ -374,8 +374,7 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
             # the loaded csv file.
             self.a_cols = np.array(pos_and_err_indices[1])
             self.b_cols = np.concatenate((pos_and_err_indices[0], mag_indices, snr_indices))
-
-            self.pos_and_err_indices = [
+            self.pos_and_err_indices_full = [
                 [np.argmin(np.abs(q - self.b_cols)) for q in pos_and_err_indices[0]],
                 [np.argmin(np.abs(q - self.a_cols)) for q in pos_and_err_indices[1]]]
             self.mag_indices = [np.argmin(np.abs(q - self.b_cols)) for q in mag_indices]
@@ -550,21 +549,34 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
         else:
             zip_list = (self.ax1_mids, self.ax2_mids, self.chunks)
 
+        if self.use_photometric_uncertainties:
+            shape = (len(self.ax1_mids), len(self.mag_names), 4)
+        else:
+            shape = (len(self.ax1_mids), 4)
+
         if (self.return_nm or overwrite_all_sightlines or
                 not os.path.isfile(f'{self.save_folder}/npy/mn_sigs_array.npy')):
             if not self.return_nm:
                 mn_sigs = open_memmap(f'{self.save_folder}/npy/mn_sigs_array.npy', mode='w+',
-                                      dtype=float, shape=(len(self.ax1_mids), 4))
+                                      dtype=float, shape=shape)
             else:
-                mn_sigs = np.empty(dtype=float, shape=(len(self.ax1_mids), 4))
+                mn_sigs = np.empty(dtype=float, shape=shape)
             mn_sigs[:] = -1
         else:
             mn_sigs = open_memmap(f'{self.save_folder}/npy/mn_sigs_array.npy', mode='r+')
 
         if self.make_summary_plot:
-            self.gs_single_sigsig = self.make_gridspec('single_sigsig', 1, 2, 0.8, 5)
-            self.ax_b_sing = plt.subplot(self.gs_single_sigsig[0])
-            self.ax_b_log_sing = plt.subplot(self.gs_single_sigsig[1])
+            if self.use_photometric_uncertainties:
+                self.gs_single_sigsig = self.make_gridspec('single_sigsig', len(self.mag_names), 2, 0.8, 5)
+                self.ax_b_sing = [plt.subplot(self.gs_single_sigsig[q, 0]) for q in
+                                  range(len(self.mag_names))]
+                sys.stdout.flush()
+                self.ax_b_log_sing = [plt.subplot(self.gs_single_sigsig[q, 1]) for q in
+                                      range(len(self.mag_names))]
+            else:
+                self.gs_single_sigsig = self.make_gridspec('single_sigsig', 1, 2, 0.8, 5)
+                self.ax_b_sing = [plt.subplot(self.gs_single_sigsig[0])]
+                self.ax_b_log_sing = [plt.subplot(self.gs_single_sigsig[1])]
 
             self.ylims_sing = [999, 0]
 
@@ -573,10 +585,14 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
                          'chocolate', 'darksalmon', 'steelblue', 'slateblue', 'tan', 'yellowgreen',
                          'silver']
 
-            self.avg_b_dens = np.empty(len(self.ax1_mids), float)
+            if self.use_photometric_uncertainties:
+                shape = (len(self.ax1_mids), len(self.mag_names))
+            else:
+                shape = len(self.ax1_mids)
+            self.avg_b_dens = np.empty(shape, float)
 
-            self.mn_poisson_cdfs = np.empty(len(self.ax1_mids), object)
-            self.ind_poisson_cdfs = np.empty(len(self.ax1_mids), object)
+            self.mn_poisson_cdfs = np.empty(shape, object)
+            self.ind_poisson_cdfs = np.empty(shape, object)
 
         for index_, list_of_things in enumerate(zip(*zip_list)):
             if not np.all(mn_sigs[index_, :] == -1):
@@ -608,57 +624,93 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
             self.area, self.hull_points, self.hull_x_shift = convex_hull_area(
                 self.b[:, 0], self.b[:, 1], return_hull=True)
 
-            if self.single_or_repeat == 'repeat':
-                # Divide the density through by the number of repeat visits,
-                # since we want the average density of the visits, not the
-                # sum of all repeated visits.
-                n_visits = len(np.unique(self.repeat_unique_visits))
-                self.avg_b_dens[index_] = len(self.b) / self.area / n_visits
-            else:
-                self.avg_b_dens[index_] = len(self.b) / self.area
+            # At this point we need to loop to accommodate the possibility
+            # that we're generating a per-band parameterisation. If
+            # use_photometric_uncertainties is False this will be a single loop,
+            # boringly doing nothing.
+            for unc_index in range(len(self.pos_and_err_indices_full[0])-2):
+                self.unc_index = unc_index
+                self.pos_and_err_indices = [
+                    [self.pos_and_err_indices_full[0][0], self.pos_and_err_indices_full[0][1],
+                     self.pos_and_err_indices_full[0][unc_index+2]], self.pos_and_err_indices_full[1]]
+                if self.use_photometric_uncertainties:
+                    self.magnitude_append = f'{self.mag_names[unc_index]}_'
+                else:
+                    self.magnitude_append = ''
 
-            self.make_star_galaxy_counts()
-            if self.make_plots:
-                self.plot_star_galaxy_counts()
-            self.calculate_local_densities_and_nearest_neighbours()
+                if self.use_photometric_uncertainties:
+                    n_sources = np.sum(~np.isnan(self.b[:, self.pos_and_err_indices[0][2]]))
+                else:
+                    n_sources = len(self.b)
+                if self.single_or_repeat == 'repeat':
+                    # Divide the density through by the number of repeat visits,
+                    # since we want the average density of the visits, not the
+                    # sum of all repeated visits.
+                    n_visits = len(np.unique(self.repeat_unique_visits))
+                    if self.use_photometric_uncertainties:
+                        self.avg_b_dens[index_, unc_index] = n_sources / self.area / n_visits
+                    else:
+                        self.avg_b_dens[index_] = n_sources / self.area / n_visits
+                else:
+                    if self.use_photometric_uncertainties:
+                        self.avg_b_dens[index_, unc_index] = n_sources / self.area
+                    else:
+                        self.avg_b_dens[index_] = n_sources / self.area
 
-            self.simulate_aufs()
-            self.create_auf_pdfs()
-            # If we don't have at least 5 unique magnitude slices to calculate,
-            # reduce the number of data points per histogram to increase
-            # number statistics.
-            if np.sum([q[0] == -1 for q in self.pdfs]) > len(self.pdfs)-5:
-                warnings.warn("Reduced PDF histogram counts to 75.")
-                self.create_auf_pdfs(min_hist_cut=75)
-            if np.sum([q[0] == -1 for q in self.pdfs]) > len(self.pdfs)-5:
-                warnings.warn("Reduced PDF histogram counts to 50.")
-                self.create_auf_pdfs(min_hist_cut=50)
-            if np.sum([q[0] == -1 for q in self.pdfs]) <= len(self.pdfs)-5:
-                m_sig, n_sig = self.fit_uncertainty()
-            else:
-                # Fall back to not correcting anything if data still too poor
-                # to draw any meaningful conclusions from.
-                m_sig, n_sig = 1, 0
-            mn_sigs[index_, 0] = m_sig
-            mn_sigs[index_, 1] = n_sig
-            mn_sigs[index_, 2] = ax1_mid
-            mn_sigs[index_, 3] = ax2_mid
-            mn_poisson_cdfs, ind_poisson_cdfs = self.plot_fits_calculate_cdfs()
-            if self.make_summary_plot:
-                self.mn_poisson_cdfs[index_] = mn_poisson_cdfs
-                self.ind_poisson_cdfs[index_] = ind_poisson_cdfs
-                if np.sum(~self.skip_flags) > 0:
-                    c = self.cols[index_ % len(self.cols)]
-                    plt.figure('single_sigsig')
-                    self.ax_b_sing.errorbar(self.avg_sig[~self.skip_flags, 0],
-                                            self.fit_sigs[~self.skip_flags, 1],
-                                            linestyle='None', c=c, marker='x', label=file_name)
-                    self.ax_b_log_sing.errorbar(self.avg_sig[~self.skip_flags, 0],
-                                                self.fit_sigs[~self.skip_flags, 1],
-                                                linestyle='None', c=c, marker='x')
-                    self.ylims_sing[0] = min(self.ylims_sing[0], np.amin(self.fit_sigs[~self.skip_flags, 1]))
-                    self.ylims_sing[1] = max(self.ylims_sing[1], np.amax(self.fit_sigs[~self.skip_flags, 1]))
-                self.plot_snr_mag_sig()
+                self.make_star_galaxy_counts()
+                if self.make_plots:
+                    self.plot_star_galaxy_counts()
+                self.calculate_local_densities_and_nearest_neighbours()
+
+                self.simulate_aufs()
+                self.create_auf_pdfs()
+                # If we don't have at least 5 unique magnitude slices to calculate,
+                # reduce the number of data points per histogram to increase
+                # number statistics.
+                if np.sum([q[0] == -1 for q in self.pdfs]) > len(self.pdfs)-5:
+                    warnings.warn("Reduced PDF histogram counts to 75.")
+                    self.create_auf_pdfs(min_hist_cut=75)
+                if np.sum([q[0] == -1 for q in self.pdfs]) > len(self.pdfs)-5:
+                    warnings.warn("Reduced PDF histogram counts to 50.")
+                    self.create_auf_pdfs(min_hist_cut=50)
+                if np.sum([q[0] == -1 for q in self.pdfs]) <= len(self.pdfs)-5:
+                    m_sig, n_sig = self.fit_uncertainty()
+                else:
+                    # Fall back to not correcting anything if data still too poor
+                    # to draw any meaningful conclusions from.
+                    m_sig, n_sig = 1, 0
+                if self.use_photometric_uncertainties:
+                    mn_sigs[index_, unc_index, 0] = m_sig
+                    mn_sigs[index_, unc_index, 1] = n_sig
+                    mn_sigs[index_, unc_index, 2] = ax1_mid
+                    mn_sigs[index_, unc_index, 3] = ax2_mid
+                else:
+                    mn_sigs[index_, 0] = m_sig
+                    mn_sigs[index_, 1] = n_sig
+                    mn_sigs[index_, 2] = ax1_mid
+                    mn_sigs[index_, 3] = ax2_mid
+                mn_poisson_cdfs, ind_poisson_cdfs = self.plot_fits_calculate_cdfs()
+                if self.make_summary_plot:
+                    if self.use_photometric_uncertainties:
+                        self.mn_poisson_cdfs[index_, unc_index] = mn_poisson_cdfs
+                        self.ind_poisson_cdfs[index_, unc_index] = ind_poisson_cdfs
+                    else:
+                        self.mn_poisson_cdfs[index_] = mn_poisson_cdfs
+                        self.ind_poisson_cdfs[index_] = ind_poisson_cdfs
+                    if np.sum(~self.skip_flags) > 0:
+                        c = self.cols[index_ % len(self.cols)]
+                        plt.figure('single_sigsig')
+                        self.ax_b_sing[unc_index].errorbar(self.avg_sig[~self.skip_flags, 0],
+                                                           self.fit_sigs[~self.skip_flags, 1],
+                                                           linestyle='None', c=c, marker='x', label=file_name)
+                        self.ax_b_log_sing[unc_index].errorbar(self.avg_sig[~self.skip_flags, 0],
+                                                               self.fit_sigs[~self.skip_flags, 1],
+                                                               linestyle='None', c=c, marker='x')
+                        self.ylims_sing[0] = min(self.ylims_sing[0],
+                                                 np.amin(self.fit_sigs[~self.skip_flags, 1]))
+                        self.ylims_sing[1] = max(self.ylims_sing[1],
+                                                 np.amax(self.fit_sigs[~self.skip_flags, 1]))
+                    self.plot_snr_mag_sig()
 
         self.mn_sigs = mn_sigs
         if self.make_summary_plot:
@@ -849,7 +901,8 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
         else:
             ax1_mid, ax2_mid, _ = self.list_of_things
 
-        mag_ind = self.mag_indices[self.correct_astro_mag_indices_index]
+        p_ind = self.unc_index if self.use_photometric_uncertainties else self.correct_astro_mag_indices_index
+        mag_ind = self.mag_indices[p_ind]
         b_mag_data = self.b[~np.isnan(self.b[:, mag_ind]), mag_ind]
 
         hist_mag, bins = np.histogram(b_mag_data, bins='auto')
@@ -893,13 +946,10 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
             self.gal_wav_micron, self.gal_alpha0, self.gal_alpha1, self.gal_alphaweight,
             self.gal_ab_offset, self.gal_filtname, self.gal_alav*avs)
 
-        mag_ind = self.mag_indices[self.correct_astro_mag_indices_index]
-        data_mags = self.b[~np.isnan(self.b[:, mag_ind]), mag_ind]
-        data_hist, data_bins = np.histogram(data_mags, bins='auto')
-        d_hc = np.where(data_hist > 3)[0]
-        data_hist = data_hist[d_hc]
-        data_dbins = np.diff(data_bins)[d_hc]
-        data_bins = data_bins[d_hc]
+        d_hc = np.where(hist_mag > 3)[0]
+        data_hist = hist_mag[d_hc]
+        data_dbins = np.diff(bins)[d_hc]
+        data_bins = bins[d_hc]
 
         data_uncert = np.sqrt(data_hist) / data_dbins / self.area
         data_hist = data_hist / data_dbins / self.area
@@ -913,8 +963,7 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
         data_loghist = np.log10(data_hist)
         data_dloghist = 1/np.log(10) * data_uncert / data_hist
 
-        q = (data_bins <= maxmag) & (
-            data_bins >= self.saturation_magnitudes[self.correct_astro_mag_indices_index])
+        q = (data_bins <= maxmag) & (data_bins >= self.saturation_magnitudes[p_ind])
         tri_corr, gal_corr = find_model_counts_corrections(data_loghist[q], data_dloghist[q],
                                                            data_bins[q]+data_dbins[q]/2, tri_hist, gal_dns,
                                                            tri_mags+dtri_mags/2)
@@ -939,7 +988,8 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
         print('Plotting data and model counts...')
         sys.stdout.flush()
 
-        mag_ind = self.mag_indices[self.correct_astro_mag_indices_index]
+        p_ind = self.unc_index if self.use_photometric_uncertainties else self.correct_astro_mag_indices_index
+        mag_ind = self.mag_indices[p_ind]
         data_mags = self.b[~np.isnan(self.b[:, mag_ind]), mag_ind]
 
         ax = plt.subplot(gs[0])
@@ -975,7 +1025,7 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
                 np.log10(self.gal_corr), 'k:')
         ax.set_ylim(*lims)
 
-        ax.set_xlabel('Magnitude')
+        ax.set_xlabel(f'{self.mag_names[self.unc_index]} / mag')
         if usetex:
             ax.set_ylabel(r'log$_{10}\left(\mathrm{D}\ /\ \mathrm{mag}^{-1}\,'
                           r'\mathrm{deg}^{-2}\right)$')
@@ -984,7 +1034,7 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
 
         plt.figure('123123')
         plt.tight_layout()
-        plt.savefig(f'{self.save_folder}/pdf/counts_comparison_{self.file_name}.pdf')
+        plt.savefig(f'{self.save_folder}/pdf/{self.magnitude_append}counts_comparison_{self.file_name}.pdf')
         plt.close()
 
     def calculate_local_densities_and_nearest_neighbours(self):
@@ -995,10 +1045,11 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
         print('Creating local densities and nearest neighbour matches...')
         sys.stdout.flush()
 
+        p_ind = self.unc_index if self.use_photometric_uncertainties else self.correct_astro_mag_indices_index
         narray = create_densities(
             self.b, self.minmag, self.maxmag, self.hull_points, self.hull_x_shift, self.dens_search_radius,
-            self.n_pool, self.mag_indices[self.correct_astro_mag_indices_index],
-            self.pos_and_err_indices[0][0], self.pos_and_err_indices[0][1], self.coord_system, self.file_name)
+            self.n_pool, self.mag_indices[p_ind], self.pos_and_err_indices[0][0],
+            self.pos_and_err_indices[0][1], self.coord_system, self.file_name)
 
         if self.single_or_repeat == 'repeat':
             # Divide the counts through by the number of repeat visits.
@@ -1050,8 +1101,9 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
 
         b_ratio = 0.05
 
-        _snr = self.b[:, self.snr_indices[self.correct_astro_mag_indices_index]]
-        _mag = self.b[:, self.mag_indices[self.correct_astro_mag_indices_index]]
+        p_ind = self.unc_index if self.use_photometric_uncertainties else self.correct_astro_mag_indices_index
+        _snr = self.b[:, self.snr_indices[p_ind]]
+        _mag = self.b[:, self.mag_indices[p_ind]]
         p = ((_snr > 0) & ~np.isnan(_snr) & np.isfinite(_snr) &
              (_mag > 0) & ~np.isnan(_mag) & np.isfinite(_mag))
         snr, _, _ = binned_statistic(_mag[p], _snr[p], statistic='median',
@@ -1106,7 +1158,8 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
         avg_snr = np.empty((len(self.mag_array), 3), float)
         avg_mag = np.empty((len(self.mag_array), 3), float)
 
-        mag_ind = self.mag_indices[self.correct_astro_mag_indices_index]
+        p_ind = self.unc_index if self.use_photometric_uncertainties else self.correct_astro_mag_indices_index
+        mag_ind = self.mag_indices[p_ind]
         for i, mag in enumerate(self.mag_array):
             mag_cut = ((b_matches[:, mag_ind] <= mag+self.mag_slice[i]) &
                        (b_matches[:, mag_ind] >= mag-self.mag_slice[i]))
@@ -1118,14 +1171,9 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
                 pdf_bins.append([-1])
                 nums.append([-1])
                 continue
-            if not self.use_photometric_uncertainties:
-                sig = np.percentile(b_matches[mag_cut, self.pos_and_err_indices[0][2]], 50)
-                sig_cut = ((b_matches[:, self.pos_and_err_indices[0][2]] <= sig+self.sig_slice[i]) &
-                           (b_matches[:, self.pos_and_err_indices[0][2]] >= sig-self.sig_slice[i]))
-            else:
-                sig = np.percentile(b_matches[mag_cut, self.pos_and_err_indices[0][2]], 50)
-                sig_cut = ((b_matches[:, self.pos_and_err_indices[0][2]] <= sig+self.sig_slice[i]) &
-                           (b_matches[:, self.pos_and_err_indices[0][2]] >= sig-self.sig_slice[i]))
+            sig = np.percentile(b_matches[mag_cut, self.pos_and_err_indices[0][2]], 50)
+            sig_cut = ((b_matches[:, self.pos_and_err_indices[0][2]] <= sig+self.sig_slice[i]) &
+                       (b_matches[:, self.pos_and_err_indices[0][2]] >= sig-self.sig_slice[i]))
             n_cut = (self.narray[self.bmatch] >= self.moden-self.dn) & (
                 self.narray[self.bmatch] <= self.moden+self.dn)
 
@@ -1147,23 +1195,17 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
                 continue
 
             bm = b_matches[final_slice]
-            p = ((bm[:, self.snr_indices[self.correct_astro_mag_indices_index]] > 0) &
-                 ~np.isnan(bm[:, self.snr_indices[self.correct_astro_mag_indices_index]]) &
-                 np.isfinite(bm[:, self.snr_indices[self.correct_astro_mag_indices_index]]))
-            snr = bm[p, self.snr_indices[self.correct_astro_mag_indices_index]]
+            p = ((bm[:, self.snr_indices[p_ind]] > 0) & ~np.isnan(bm[:, self.snr_indices[p_ind]]) &
+                 np.isfinite(bm[:, self.snr_indices[p_ind]]))
+            snr = bm[p, self.snr_indices[p_ind]]
             avg_snr[i, 0] = np.median(snr)
             avg_snr[i, [1, 2]] = np.abs(np.percentile(snr, [16, 84]) - np.median(snr))
             avg_mag[i, 0] = np.median(bm[:, mag_ind])
             avg_mag[i, [1, 2]] = np.abs(np.percentile(bm[:, mag_ind], [16, 84]) -
                                         np.median(bm[:, mag_ind]))
-            if not self.use_photometric_uncertainties:
-                avg_sig[i, 0] = np.median(bm[:, self.pos_and_err_indices[0][2]])
-                avg_sig[i, [1, 2]] = np.abs(np.percentile(bm[:, self.pos_and_err_indices[0][2]], [16, 84]) -
-                                            np.median(bm[:, self.pos_and_err_indices[0][2]]))
-            else:
-                avg_sig[i, 0] = np.median(bm[:, self.pos_and_err_indices[0][2]])
-                avg_sig[i, [1, 2]] = np.abs(np.percentile(bm[:, self.pos_and_err_indices[0][2]], [16, 84]) -
-                                            np.median(bm[:, self.pos_and_err_indices[0][2]]))
+            avg_sig[i, 0] = np.median(bm[:, self.pos_and_err_indices[0][2]])
+            avg_sig[i, [1, 2]] = np.abs(np.percentile(bm[:, self.pos_and_err_indices[0][2]], [16, 84]) -
+                                        np.median(bm[:, self.pos_and_err_indices[0][2]]))
 
             h, bins = np.histogram(final_dists, bins='auto')
             num = np.sum(h)
@@ -1298,7 +1340,8 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
             model.
         """
 
-        _snr = self.b[:, self.snr_indices[self.correct_astro_mag_indices_index]]
+        p_ind = self.unc_index if self.use_photometric_uncertainties else self.correct_astro_mag_indices_index
+        _snr = self.b[:, self.snr_indices[p_ind]]
         p = ((_snr > 0) & ~np.isnan(_snr) & np.isfinite(_snr))
         n_sources_inv_max_snr = 1000
         inv_max_snr = 1 / np.percentile(_snr[p][np.argsort(_snr[p])][:n_sources_inv_max_snr], 50)
@@ -1405,6 +1448,7 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
 
         b_matches = self.b[self.bmatch]
 
+        p_ind = self.unc_index if self.use_photometric_uncertainties else self.correct_astro_mag_indices_index
         for i, mag in enumerate(self.mag_array):
             if self.skip_flags[i]:
                 continue
@@ -1416,18 +1460,13 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
                 ax.errorbar((pdf_bin[:-1]+np.diff(pdf_bin)/2)[q_pdf], pdf[q_pdf],
                             yerr=pdf_uncert[q_pdf], c='k', marker='.', zorder=1, ls='None')
 
-            mag_ind = self.mag_indices[self.correct_astro_mag_indices_index]
+            mag_ind = self.mag_indices[p_ind]
             pos_err_ind = self.pos_and_err_indices[0][2]
             mag_cut = ((b_matches[:, mag_ind] <= mag+self.mag_slice[i]) &
                        (b_matches[:, mag_ind] >= mag-self.mag_slice[i]))
-            if not self.use_photometric_uncertainties:
-                bsig = np.percentile(b_matches[mag_cut, pos_err_ind], 50)
-                sig_cut = ((b_matches[:, pos_err_ind] <= bsig+self.sig_slice[i]) &
-                           (b_matches[:, pos_err_ind] >= bsig-self.sig_slice[i]))
-            else:
-                bsig = np.percentile(b_matches[mag_cut, pos_err_ind], 50)
-                sig_cut = ((b_matches[:, pos_err_ind] <= bsig+self.sig_slice[i]) &
-                           (b_matches[:, pos_err_ind] >= bsig-self.sig_slice[i]))
+            bsig = np.percentile(b_matches[mag_cut, pos_err_ind], 50)
+            sig_cut = ((b_matches[:, pos_err_ind] <= bsig+self.sig_slice[i]) &
+                       (b_matches[:, pos_err_ind] >= bsig-self.sig_slice[i]))
             n_cut = (self.narray[self.bmatch] >= self.moden-self.dn) & (
                 self.narray[self.bmatch] <= self.moden+self.dn)
             if not self.use_photometric_uncertainties:
@@ -1442,7 +1481,7 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
                 -np.pi * (self.r[:-1]+self.dr/2)**2 * density)
 
             fit_sig = self.fit_sigs[i, 0]
-            _snr = self.b[:, self.snr_indices[self.correct_astro_mag_indices_index]]
+            _snr = self.b[:, self.snr_indices[p_ind]]
             p = ((_snr > 0) & ~np.isnan(_snr) & np.isfinite(_snr))
             n_sources_inv_max_snr = 1000
             inv_max_snr = 1 / np.percentile(_snr[p][np.argsort(_snr[p])][:n_sources_inv_max_snr], 50)
@@ -1537,7 +1576,7 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
 
         if self.make_plots:
             plt.tight_layout()
-            plt.savefig(f'{self.save_folder}/pdf/auf_fits_{self.file_name}.pdf')
+            plt.savefig(f'{self.save_folder}/pdf/{self.magnitude_append}auf_fits_{self.file_name}.pdf')
             plt.close()
 
         return mn_poisson_cdfs, ind_poisson_cdfs
@@ -1549,20 +1588,15 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
         """
         print("Plotting SNR-Magnitude-Uncertainty scaling relations...")
         sys.stdout.flush()
-        p = ((self.b[:, self.snr_indices[self.correct_astro_mag_indices_index]] > 0) &
-             ~np.isnan(self.b[:, self.snr_indices[self.correct_astro_mag_indices_index]]) &
-             np.isfinite(self.b[:, self.snr_indices[self.correct_astro_mag_indices_index]]))
-        _snr = self.b[p, self.snr_indices[self.correct_astro_mag_indices_index]]
-        if not self.use_photometric_uncertainties:
-            obj_err = self.b[p, self.pos_and_err_indices[0][2]]
-        else:
-            # Since we expect the astrometric/inverse-photometric-snr scaling to
-            # be roughly a factor FWHM/(2 * sqrt(2 * ln(2))), i.e. the sigma of
-            # a Gaussian-ish PSF, scale accordingly:
-            obj_err = self.psfsig / _snr
-        obj_mag = self.b[p, self.mag_indices[self.correct_astro_mag_indices_index]]
+        p_ind = self.unc_index if self.use_photometric_uncertainties else self.correct_astro_mag_indices_index
+        p = ((self.b[:, self.snr_indices[p_ind]] > 0) & ~np.isnan(self.b[:, self.snr_indices[p_ind]]) &
+             np.isfinite(self.b[:, self.snr_indices[p_ind]]))
+        _snr = self.b[p, self.snr_indices[p_ind]]
+        obj_err = self.b[p, self.pos_and_err_indices[0][2]]
+        obj_mag = self.b[p, self.mag_indices[p_ind]]
 
         gs = self.make_gridspec('sig_vs_snr_vs_mag', 1, 3, 0.8, 6)
+        mag_label = f' ({self.mag_names[self.unc_index]})' if self.use_photometric_uncertainties else ''
         ax = plt.subplot(gs[0])
         q = (obj_err < 1) & (_snr > 1) & (obj_err > 0)
         log_inv_snr = np.log10(1 / _snr[q])
@@ -1577,9 +1611,13 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
             ls_list = ['r--', 'k-']
         elif len(self.seeing_ranges) == 3:
             ls_list = ['r--', 'k-', 'r-']
-        for seeing, ls in zip(self.seeing_ranges, ls_list):  # pylint: disable=possibly-used-before-assignment
-            log_ks = np.log10(seeing / (2 * np.sqrt(2 * np.log(2))))
-            ax.plot(x, log_ks + x, ls, label=rf'seeing = {seeing:.1f} arcsec')
+        if not self.use_photometric_uncertainties:
+            # pylint: disable-next=possibly-used-before-assignment
+            for seeing, ls in zip(self.seeing_ranges, ls_list):
+                log_ks = np.log10(seeing / (2 * np.sqrt(2 * np.log(2))))
+                ax.plot(x, log_ks + x, ls, label=rf'seeing = {seeing:.1f} arcsec')
+        else:
+            ax.plot(x, x, 'k-')
 
         q = ~self.skip_flags
         if np.sum(q) > 0:
@@ -1598,15 +1636,16 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
 
         ax.set_xlim(*xlims)
         ax.set_ylim(*ylims)
-        ax.legend(fontsize=10)
+        if not self.use_photometric_uncertainties:
+            ax.legend(fontsize=10)
         if usetex:
             ax.set_xlabel(r'$\log_{10}$(1 / SNR)')
         else:
             ax.set_xlabel(r'log10(1 / SNR)')
         if usetex:
-            ax.set_ylabel(r'$\log_{10}$(Quoted uncertainty / arcsecond)')
+            ax.set_ylabel(rf'$\log_{10}$(Quoted{mag_label} uncertainty / arcsecond)')
         else:
-            ax.set_ylabel(r'log10(Quoted uncertainty / arcsecond)')
+            ax.set_ylabel(rf'log10(Quoted{mag_label} uncertainty / arcsecond)')
 
         ax = plt.subplot(gs[1])
         q = (obj_err < 1) & (_snr > 1) & (obj_err > 0) & ~np.isnan(obj_mag)
@@ -1646,7 +1685,7 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
             ax.set_xlabel(r'$\log_{10}$(1 / SNR)')
         else:
             ax.set_xlabel(r'log10(1 / SNR)')
-        ax.set_ylabel('Magnitude')
+        ax.set_xlabel(f'{self.mag_names[self.unc_index]} / mag')
 
         ax = plt.subplot(gs[2])
         q = (obj_err < 1) & (_snr > 1) & (obj_err > 0) & ~np.isnan(obj_mag)
@@ -1671,13 +1710,14 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
 
         ax.set_xlim(*xlims)
         ax.set_ylim(*ylims)
-        ax.set_xlabel('Magnitude')
+        ax.set_xlabel(f'{self.mag_names[self.unc_index]} / mag')
         if usetex:
-            ax.set_ylabel(r'$\log_{10}$(Quoted uncertainty / arcsecond)')
+            ax.set_ylabel(rf'$\log_{10}$(Quoted{mag_label} uncertainty / arcsecond)')
         else:
-            ax.set_ylabel(r'log10(Quoted uncertainty / arcsecond)')
+            ax.set_ylabel(rf'log10(Quoted{mag_label} uncertainty / arcsecond)')
         plt.tight_layout()
-        plt.savefig(f'{self.save_folder}/pdf/histogram_mag_vs_sig_vs_snr_{self.file_name}.pdf')
+        plt.savefig(f'{self.save_folder}/pdf/{self.magnitude_append}'
+                    f'histogram_mag_vs_sig_vs_snr_{self.file_name}.pdf')
         plt.close()
 
     def finalise_summary_plots(self):
@@ -1687,107 +1727,130 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
         resulting "m" and "n" scaling parameters.
         """
 
-        x_array = np.linspace(0, self.ax_b_sing.get_xlim()[1], 1000)
+        loop_len = len(self.mag_names) if self.use_photometric_uncertainties else 1
         plt.figure('single_sigsig')
-        self.ax_b_sing.plot(x_array, x_array, 'g:')
-        self.ax_b_sing.set_ylim(0.95 * self.ylims_sing[0], 1.05 * self.ylims_sing[1])
-        self.ax_b_log_sing.plot(x_array, x_array, 'g:')
-        self.ax_b_log_sing.set_xscale('log')
-        self.ax_b_log_sing.set_yscale('log')
+        for unc_index in range(loop_len):
+            x_array = np.linspace(0, self.ax_b_sing[unc_index].get_xlim()[1], 1000)
+            self.ax_b_sing[unc_index].plot(x_array, x_array, 'g:')
+            self.ax_b_sing[unc_index].set_ylim(0.95 * self.ylims_sing[0], 1.05 * self.ylims_sing[1])
+            self.ax_b_log_sing[unc_index].plot(x_array, x_array, 'g:')
+            self.ax_b_log_sing[unc_index].set_xscale('log')
+            self.ax_b_log_sing[unc_index].set_yscale('log')
 
-        if usetex:
-            if not self.use_photometric_uncertainties:
-                self.ax_b_sing.set_xlabel(r'Quoted astrometric $\sigma$ / arcsecond')
-                self.ax_b_log_sing.set_xlabel(r'Quoted astrometric $\sigma$ / arcsecond')
+            if usetex:
+                if not self.use_photometric_uncertainties:
+                    self.ax_b_sing[unc_index].set_xlabel(r'Quoted astrometric $\sigma$ / arcsecond')
+                    self.ax_b_log_sing[unc_index].set_xlabel(r'Quoted astrometric $\sigma$ / arcsecond')
+                else:
+                    self.ax_b_sing[unc_index].set_xlabel(
+                        rf'Quoted photometric {self.mag_names[unc_index]} $\sigma$ / arcsecond')
+                    self.ax_b_log_sing[unc_index].set_xlabel(
+                        rf'Quoted photometric {self.mag_names[unc_index]} $\sigma$ / arcsecond')
+                self.ax_b_sing[unc_index].set_ylabel(r'Individually-fit astrometric $\sigma$ / arcsecond')
+                self.ax_b_log_sing[unc_index].set_ylabel(r'Individually-fit astrometric $\sigma$ / arcsecond')
             else:
-                self.ax_b_sing.set_xlabel(r'Quoted photometric $\sigma$ / arcsecond')
-                self.ax_b_log_sing.set_xlabel(r'Quoted photometric $\sigma$ / arcsecond')
-            self.ax_b_sing.set_ylabel(r'Individually-fit astrometric $\sigma$ / arcsecond')
-            self.ax_b_log_sing.set_ylabel(r'Individually-fit astrometric $\sigma$ / arcsecond')
-        else:
-            if not self.use_photometric_uncertainties:
-                self.ax_b_sing.set_xlabel(r'Quoted astrometric sigma / arcsecond')
-                self.ax_b_log_sing.set_xlabel(r'Quoted astrometric sigma / arcsecond')
-            else:
-                self.ax_b_sing.set_xlabel(r'Quoted photometric sigma / arcsecond')
-                self.ax_b_log_sing.set_xlabel(r'Quoted photometric sigma / arcsecond')
-            self.ax_b_sing.set_ylabel(r'Individually-fit astrometric sigma / arcsecond')
-            self.ax_b_log_sing.set_ylabel(r'Individually-fit astrometric sigma / arcsecond')
+                if not self.use_photometric_uncertainties:
+                    self.ax_b_sing[unc_index].set_xlabel(r'Quoted astrometric sigma / arcsecond')
+                    self.ax_b_log_sing[unc_index].set_xlabel(r'Quoted astrometric sigma / arcsecond')
+                else:
+                    self.ax_b_sing[unc_index].set_xlabel(
+                        rf'Quoted photometric {self.mag_names[unc_index]} sigma / arcsecond')
+                    self.ax_b_log_sing[unc_index].set_xlabel(
+                        rf'Quoted photometric {self.mag_names[unc_index]} sigma / arcsecond')
+                self.ax_b_sing[unc_index].set_ylabel(r'Individually-fit astrometric sigma / arcsecond')
+                self.ax_b_log_sing[unc_index].set_ylabel(r'Individually-fit astrometric sigma / arcsecond')
         plt.savefig(f'{self.save_folder}/pdf/summary_individual_sig_vs_sig.pdf')
         plt.close()
 
-        gs = self.make_gridspec('fits_cdf', 1, 2, 0.8, 6)
-        for i, (f, label) in enumerate(zip([self.mn_poisson_cdfs, self.ind_poisson_cdfs],
-                                           ['HyperParameter', 'Individual'])):
-            ax_d = plt.subplot(gs[i])
-            for j, g in enumerate(f):
-                if g is None:
-                    continue
-                sys.stdout.flush()
-                q = ~np.isnan(g)
-                p_cdf = g[q]
-                # Under the hypothesis all CDFs are "true" we should expect
-                # the distribution of CDFs to be linear with fraction of the way
-                # through the sorted list of CDFs -- that is, the CDF ranked 30%
-                # in order should be ~0.3.
-                q_sort = np.argsort(p_cdf)
-                filter_log_nans = p_cdf[q_sort] < 1
-                true_hypothesis_cdf_dist = (np.arange(1, len(p_cdf)+1, 1) - 0.5) / len(p_cdf)
-                c = self.cols[j % len(self.cols)]
-                ax_d.plot(np.log10(1 - p_cdf[q_sort][filter_log_nans]),
-                          true_hypothesis_cdf_dist[filter_log_nans], ls='None', c=c, marker='.')
-                ax_d.plot(np.log10(1 - true_hypothesis_cdf_dist), true_hypothesis_cdf_dist, 'r--')
-            if usetex:
-                ax_d.set_xlabel(rf'$\log_{{10}}(1 - \mathrm{{{label} CDF}})$')
+        gs = self.make_gridspec('fits_cdf', loop_len, 2, 0.8, 6)
+        for unc_index in range(loop_len):
+            if self.use_photometric_uncertainties:
+                _m, _i = self.mn_poisson_cdfs[:, unc_index], self.ind_poisson_cdfs[:, unc_index]
             else:
-                ax_d.set_xlabel(rf'log10(1 - {label} CDF)')
-            ax_d.set_ylabel('Fraction')
+                _m, _i = self.mn_poisson_cdfs, self.ind_poisson_cdfs
+            for i, (f, label) in enumerate(zip([_m, _i], ['HyperParameter', 'Individual'])):
+                ax_d = plt.subplot(gs[unc_index, i])
+                for j, g in enumerate(f):
+                    if g is None:
+                        continue
+                    sys.stdout.flush()
+                    q = ~np.isnan(g)
+                    p_cdf = g[q]
+                    # Under the hypothesis all CDFs are "true" we should expect
+                    # the distribution of CDFs to be linear with fraction of the way
+                    # through the sorted list of CDFs -- that is, the CDF ranked 30%
+                    # in order should be ~0.3.
+                    q_sort = np.argsort(p_cdf)
+                    filter_log_nans = p_cdf[q_sort] < 1
+                    true_hypothesis_cdf_dist = (np.arange(1, len(p_cdf)+1, 1) - 0.5) / len(p_cdf)
+                    c = self.cols[j % len(self.cols)]
+                    ax_d.plot(np.log10(1 - p_cdf[q_sort][filter_log_nans]),
+                              true_hypothesis_cdf_dist[filter_log_nans], ls='None', c=c, marker='.')
+                    ax_d.plot(np.log10(1 - true_hypothesis_cdf_dist), true_hypothesis_cdf_dist, 'r--')
+                if usetex:
+                    if not self.use_photometric_uncertainties:
+                        ax_d.set_xlabel(rf'$\log_{{10}}(1 - \mathrm{{{label} CDF}})$')
+                    else:
+                        ax_d.set_xlabel(rf'$\log_{{10}}(1 - \mathrm{{{label} CDF}}) '
+                                        rf'({self.mag_names[unc_index]})$')
+                else:
+                    if not self.use_photometric_uncertainties:
+                        ax_d.set_xlabel(rf'log10(1 - {label} CDF)')
+                    else:
+                        ax_d.set_xlabel(rf'log10(1 - {label} CDF) ({self.mag_names[unc_index]})')
+                ax_d.set_ylabel('Fraction')
         plt.savefig(f'{self.save_folder}/pdf/summary_mn_ind_cdfs.pdf')
         plt.close()
 
-        self.gs_mn_sky = self.make_gridspec('mn_sky', 2, 2, 0.8, 5)
-        for i, (f, label) in enumerate(zip([self.mn_sigs[:, 0], self.mn_sigs[:, 1]],
-                                           ['m', 'n / arcsecond'])):
-            ax = plt.subplot(self.gs_mn_sky[i])
-            img = ax.scatter(self.ax1_mids, self.ax2_mids, c=f, cmap='viridis')
-            c = plt.colorbar(img, ax=ax, use_gridspec=True)
-            c.ax.set_ylabel(label)
-            ax1_name = 'l' if self.coord_system == 'galactic' else 'RA'
-            ax2_name = 'b' if self.coord_system == 'galactic' else 'Dec'
-            ax.set_xlabel(f'{ax1_name} / deg')
-            ax.set_ylabel(f'{ax2_name} / deg')
-
-            xlims = ax.get_xlim()
-            ylims = ax.get_ylim()
-
-            # Plot the Galactic and Ecliptic planes.
-            for _b in [-20, 0, 20]:
-                l = np.linspace(0, 360, 10000)
-                b = np.zeros_like(l) + _b
-                c = SkyCoord(l=l, b=b, unit='deg', frame='galactic')
-                ra, dec = c.icrs.ra.degree, c.icrs.dec.degree
-                q = np.argsort(ra)
-                ra, dec = ra[q], dec[q]
-                ax.plot(ra, dec, ls='-', c='k' if _b == 0 else 'grey', alpha=0.7, zorder=-1)
-            for _lat in [-20, 0, 20]:
-                lon = np.linspace(0, 360, 10000)
-                lat = np.zeros_like(lon) + _lat
-                c = SkyCoord(lon=lon, lat=lat, unit='deg', frame='barycentricmeanecliptic')
-                ra, dec = c.icrs.ra.degree, c.icrs.dec.degree
-                q = np.argsort(ra)
-                ra, dec = ra[q], dec[q]
-                ax.plot(ra, dec, ls='--', c='k' if _lat == 0 else 'grey', alpha=0.7, zorder=-1)
-
-            ax.set_xlim(*xlims)
-            ax.set_ylim(*ylims)
-
-            ax = plt.subplot(self.gs_mn_sky[i+2])
-            ax.plot(self.avg_b_dens, f, 'k.')
-            if usetex:
-                ax.set_xlabel(r'Average density / deg$^{-2}$')
+        self.gs_mn_sky = self.make_gridspec('mn_sky', 2*loop_len, 2, 0.8, 5)
+        for unc_index in range(loop_len):
+            if self.use_photometric_uncertainties:
+                _m, _n = self.mn_sigs[:, unc_index, 0], self.mn_sigs[:, unc_index, 1]
             else:
-                ax.set_xlabel('Average density / deg^-2')
-            ax.set_ylabel(label)
+                _m, _n = self.mn_sigs[:, 0], self.mn_sigs[:, 1]
+            mag_label = f' ({self.mag_names[unc_index]})' if self.use_photometric_uncertainties else ''
+            for i, (f, label) in enumerate(zip([_m, _n], [f'm{mag_label}', f'n / arcsecond{mag_label}'])):
+                ax = plt.subplot(self.gs_mn_sky[2*unc_index, i])
+                img = ax.scatter(self.ax1_mids, self.ax2_mids, c=f, cmap='viridis')
+                c = plt.colorbar(img, ax=ax, use_gridspec=True)
+                c.ax.set_ylabel(label)
+                ax1_name = 'l' if self.coord_system == 'galactic' else 'RA'
+                ax2_name = 'b' if self.coord_system == 'galactic' else 'Dec'
+                ax.set_xlabel(f'{ax1_name} / deg')
+                ax.set_ylabel(f'{ax2_name} / deg')
+
+                xlims = ax.get_xlim()
+                ylims = ax.get_ylim()
+
+                # Plot the Galactic and Ecliptic planes.
+                for _b in [-20, 0, 20]:
+                    l = np.linspace(0, 360, 10000)
+                    b = np.zeros_like(l) + _b
+                    c = SkyCoord(l=l, b=b, unit='deg', frame='galactic')
+                    ra, dec = c.icrs.ra.degree, c.icrs.dec.degree
+                    q = np.argsort(ra)
+                    ra, dec = ra[q], dec[q]
+                    ax.plot(ra, dec, ls='-', c='k' if _b == 0 else 'grey', alpha=0.7, zorder=-1)
+                for _lat in [-20, 0, 20]:
+                    lon = np.linspace(0, 360, 10000)
+                    lat = np.zeros_like(lon) + _lat
+                    c = SkyCoord(lon=lon, lat=lat, unit='deg', frame='barycentricmeanecliptic')
+                    ra, dec = c.icrs.ra.degree, c.icrs.dec.degree
+                    q = np.argsort(ra)
+                    ra, dec = ra[q], dec[q]
+                    ax.plot(ra, dec, ls='--', c='k' if _lat == 0 else 'grey', alpha=0.7, zorder=-1)
+
+                ax.set_xlim(*xlims)
+                ax.set_ylim(*ylims)
+
+                ax = plt.subplot(self.gs_mn_sky[2*unc_index+1, i])
+                ax.plot(self.avg_b_dens[:, unc_index] if self.use_photometric_uncertainties else
+                        self.avg_b_dens, f, 'k.')
+                if usetex:
+                    ax.set_xlabel(rf'Average density / deg$^{-2}${mag_label}')
+                else:
+                    ax.set_xlabel(f'Average density / deg^-2{mag_label}')
+                ax.set_ylabel(label)
 
         plt.tight_layout()
         plt.savefig(f'{self.save_folder}/pdf/summary_mn_sky.pdf')

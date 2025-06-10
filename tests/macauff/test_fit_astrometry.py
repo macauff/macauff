@@ -292,13 +292,15 @@ class TestAstroCorrection:
         os.system('rm -r store_data')
 
     @pytest.mark.remote_data
-    @pytest.mark.parametrize("npy_or_csv,coord_or_chunk,coord_system,pregenerate_cutouts,return_nm,in_memory",
-                             [("csv", "chunk", "equatorial", True, False, False),
-                              ("npy", "coord", "galactic", None, True, True),
-                              ("npy", "chunk", "equatorial", False, False, False)])
+    @pytest.mark.parametrize("npy_or_csv,coord_or_chunk,coord_system,pregenerate_cutouts,return_nm,in_memory,"
+                             "use_photometric_uncertainties",
+                             [("csv", "chunk", "equatorial", True, False, False, False),
+                              ("npy", "coord", "galactic", None, True, True, False),
+                              ("npy", "chunk", "equatorial", False, False, False, False),
+                              ("npy", "chunk", "equatorial", True, False, False, True)])
     # pylint: disable-next=too-many-statements,too-many-branches
     def test_fit_astrometry(self, npy_or_csv, coord_or_chunk, coord_system, pregenerate_cutouts, return_nm,
-                            in_memory):
+                            in_memory, use_photometric_uncertainties):
         self.npy_or_csv = npy_or_csv
         dd_params = np.load(os.path.join(os.path.dirname(__file__), 'data/dd_params.npy'))
         l_cut = np.load(os.path.join(os.path.dirname(__file__), 'data/l_cut.npy'))
@@ -322,6 +324,18 @@ class TestAstroCorrection:
             else:
                 chunks = [2017]
             ax_dimension = 2
+        if use_photometric_uncertainties:
+            pos_and_err_indices = [[0, 1, 6, 7], [0, 1, 2]]
+            mag_indices = [2, 3]
+            snr_indices = [4, 5]
+            saturation_magnitudes = [5, 5]
+            mag_names = ['W1', 'W2']
+        else:
+            pos_and_err_indices = [[0, 1, 2], [0, 1, 2]]
+            mag_indices = [3]
+            snr_indices = [4]
+            saturation_magnitudes = [5]
+            mag_names = ['W1']
         ac = AstrometricCorrections(
             psf_fwhm=6.1, numtrials=1000, nn_radius=30, dens_search_radius=1,
             save_folder='ac_save_folder', trifilepath='tri_folder/trilegal_sim_{}_{}.dat',
@@ -330,12 +344,13 @@ class TestAstroCorrection:
             gal_alav=0.039, dm=0.1, dd_params=dd_params, l_cut=l_cut, ax1_mids=ax1_mids,
             ax2_mids=ax2_mids, ax_dimension=ax_dimension, mag_array=magarray, mag_slice=magslice,
             sig_slice=sigslice, n_pool=1, npy_or_csv=npy_or_csv, coord_or_chunk=coord_or_chunk,
-            pos_and_err_indices=[[0, 1, 2], [0, 1, 2]], mag_indices=[3], snr_indices=[4],
-            mag_names=['W1'], correct_astro_mag_indices_index=0, coord_system=coord_system, chunks=chunks,
+            pos_and_err_indices=pos_and_err_indices, mag_indices=mag_indices, snr_indices=snr_indices,
+            mag_names=mag_names, correct_astro_mag_indices_index=0, coord_system=coord_system, chunks=chunks,
             pregenerate_cutouts=pregenerate_cutouts,
+            use_photometric_uncertainties=use_photometric_uncertainties,
             cutout_area=60 if pregenerate_cutouts is False else None,
             cutout_height=6 if pregenerate_cutouts is False else None, n_r=2000, n_rho=2000, max_rho=40,
-            return_nm=return_nm, saturation_magnitudes=[5],
+            return_nm=return_nm, saturation_magnitudes=saturation_magnitudes,
             mn_fit_type='quadratic' if pregenerate_cutouts is False else 'linear')
 
         if coord_or_chunk == 'coord':
@@ -352,6 +367,12 @@ class TestAstroCorrection:
             self.fake_catb_cutout(ax1_min, ax1_max, ax2_min, ax2_max, *cat_args)
             a_cat_func = None
             b_cat_func = None
+            if use_photometric_uncertainties:
+                # Fake a different columns for this test.
+                temp_cat = np.load(self.b_cat_name.format(*cat_args))
+                new_cat = np.array([temp_cat[:, 0], temp_cat[:, 1], temp_cat[:, 3], temp_cat[:, 3],
+                                    temp_cat[:, 4], temp_cat[:, 4], temp_cat[:, 2], temp_cat[:, 2]*2]).T
+                np.save(self.b_cat_name.format(*cat_args), new_cat)
         else:
             a_cat_func = self.fake_cata_cutout
             b_cat_func = self.fake_catb_cutout
@@ -390,14 +411,27 @@ class TestAstroCorrection:
                    a_cat_func=a_cat_func, b_cat_func=b_cat_func, tri_download=False, make_plots=True,
                    make_summary_plot=True, seeing_ranges=np.array([0.5, 1, 1.5]))
 
-        if coord_or_chunk == 'coord':
-            assert os.path.isfile('ac_save_folder/pdf/auf_fits_105.0_0.0.pdf')
-            assert os.path.isfile('ac_save_folder/pdf/counts_comparison_105.0_0.0.pdf')
-            assert os.path.isfile('ac_save_folder/pdf/histogram_mag_vs_sig_vs_snr_105.0_0.0.pdf')
+        if not use_photometric_uncertainties:
+            if coord_or_chunk == 'coord':
+                assert os.path.isfile('ac_save_folder/pdf/auf_fits_105.0_0.0.pdf')
+                assert os.path.isfile('ac_save_folder/pdf/counts_comparison_105.0_0.0.pdf')
+                assert os.path.isfile('ac_save_folder/pdf/histogram_mag_vs_sig_vs_snr_105.0_0.0.pdf')
+            else:
+                assert os.path.isfile('ac_save_folder/pdf/auf_fits_2017.pdf')
+                assert os.path.isfile('ac_save_folder/pdf/counts_comparison_2017.pdf')
+                assert os.path.isfile('ac_save_folder/pdf/histogram_mag_vs_sig_vs_snr_2017.pdf')
+            assert np.all(ac.gs_mn_sky.get_geometry() == (2, 2))
         else:
-            assert os.path.isfile('ac_save_folder/pdf/auf_fits_2017.pdf')
-            assert os.path.isfile('ac_save_folder/pdf/counts_comparison_2017.pdf')
-            assert os.path.isfile('ac_save_folder/pdf/histogram_mag_vs_sig_vs_snr_2017.pdf')
+            for n in ['W1', 'W2']:
+                if coord_or_chunk == 'coord':
+                    assert os.path.isfile(f'ac_save_folder/pdf/{n}_auf_fits_105.0_0.0.pdf')
+                    assert os.path.isfile(f'ac_save_folder/pdf/{n}_counts_comparison_105.0_0.0.pdf')
+                    assert os.path.isfile(f'ac_save_folder/pdf/{n}_histogram_mag_vs_sig_vs_snr_105.0_0.0.pdf')
+                else:
+                    assert os.path.isfile(f'ac_save_folder/pdf/{n}_auf_fits_2017.pdf')
+                    assert os.path.isfile(f'ac_save_folder/pdf/{n}_counts_comparison_2017.pdf')
+                    assert os.path.isfile(f'ac_save_folder/pdf/{n}_histogram_mag_vs_sig_vs_snr_2017.pdf')
+            assert np.all(ac.gs_mn_sky.get_geometry() == (4, 2))
 
         assert os.path.isfile('ac_save_folder/pdf/summary_mn_ind_cdfs.pdf')
         assert os.path.isfile('ac_save_folder/pdf/summary_mn_sky.pdf')
@@ -405,11 +439,29 @@ class TestAstroCorrection:
 
         if not return_nm:
             mnarray = np.load('ac_save_folder/npy/mn_sigs_array.npy')
-        # pylint: disable-next=possibly-used-before-assignment
-        assert_allclose([mnarray[0, 0], mnarray[0, 1]], [2, 0], rtol=0.1, atol=0.01)
+        if not use_photometric_uncertainties:
+            # pylint: disable-next=possibly-used-before-assignment
+            if half_run_flag:
+                assert np.all(mnarray.shape == (2, 4))
+            else:
+                assert np.all(mnarray.shape == (1, 4))
+            assert_allclose([mnarray[0, 0], mnarray[0, 1]], [2, 0], rtol=0.1, atol=0.01)
+        else:
+            # pylint: disable-next=possibly-used-before-assignment
+            if half_run_flag:
+                assert np.all(mnarray.shape == (2, 2, 4))
+            else:
+                assert np.all(mnarray.shape == (1, 2, 4))
+            assert_allclose([mnarray[0, 0, 0], mnarray[0, 0, 1]], [2, 0], rtol=0.1, atol=0.01)
+            assert_allclose([mnarray[0, 1, 0], mnarray[0, 1, 1]], [1, 0], rtol=0.1, atol=0.01)
 
-        # pylint: disable-next=possibly-used-before-assignment
-        assert_allclose([mnarray[0, 2], mnarray[0, 3]], [105, 0], atol=0.001)
+        if not use_photometric_uncertainties:
+            # pylint: disable-next=possibly-used-before-assignment
+            assert_allclose([mnarray[0, 2], mnarray[0, 3]], [105, 0], atol=0.001)
+        else:
+            # pylint: disable-next=possibly-used-before-assignment
+            assert_allclose([mnarray[0, 0, 2], mnarray[0, 0, 3]], [105, 0], atol=0.001)
+            assert_allclose([mnarray[0, 1, 2], mnarray[0, 1, 3]], [105, 0], atol=0.001)
 
         if pregenerate_cutouts is False:
             assert_allclose(ac.ax1_mins[0], 100, rtol=0.01)
@@ -426,3 +478,5 @@ class TestAstroCorrection:
             assert_allclose(mnarray[1, 3], 21, atol=0.001)
 
         os.system('rm -r store_data')
+        os.system('rm ac_save_folder/npy/*')
+        os.system('rm ac_save_folder/pdf/*')

@@ -687,10 +687,18 @@ class CrossMatch():
                         setattr(self, f'{flag}{name}_list', np.load(config[f'{name}_location']))
         for config, flag in zip([self.cat_a_params_dict, self.cat_b_params_dict], ['a_', 'b_']):
             if config['correct_astrometry']:
-                # The reshape puts the first three elements in a[0], and hence
-                # those are this_cat_inds, with a[1] ref_cat_inds.
-                setattr(self, f'{flag}pos_and_err_indices',
-                        np.array(config['pos_and_err_indices']).reshape(2, 3))
+                if not config['use_photometric_uncertainties']:
+                    # The reshape puts the first three elements in a[0], and hence
+                    # those are this_cat_inds, with a[1] ref_cat_inds.
+                    setattr(self, f'{flag}pos_and_err_indices',
+                            np.array(config['pos_and_err_indices']).reshape(2, 3))
+                else:
+                    # If use_photometric_uncertainties then we need to make a
+                    # more generic two-list nested list. This is every index
+                    # except the last three in the first list, the final three
+                    # indices in a second nested list.
+                    setattr(self, f'{flag}pos_and_err_indices',
+                            [config['pos_and_err_indices'][:-3], config['pos_and_err_indices'][-3:]])
             else:
                 # Otherwise we only need three elements, so we just store them
                 # in a (3,) shape array.
