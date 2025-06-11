@@ -1279,7 +1279,8 @@ class TestInputs:
         cb_p_2 = cb_p_2.replace('chunk_overlap_col: 12', 'chunk_overlap_col: None')
         cb_p_2 = cb_p_2.replace('best_mag_index_col: 8', 'best_mag_index_col: 11')
 
-        # Swapped a+b to test a_* versions of things
+        # Swapped a+b to test a_* versions of things, but also test using the
+        # photometric information.
         cm_p_2 = cm_p_.replace('  - 9', '  - 100')
         ca_p_3 = self.ca_p_text.replace('  - 9', '  - 100')
         ca_p_3 = ca_p_3.replace(r'cat_csv_file_path: gaia_folder/gaia_{}.csv',
@@ -1287,11 +1288,20 @@ class TestInputs:
         cb_p_3 = cb_p_2.replace('  - 9', '  - 100')
         cb_p_3 = cb_p_3.replace(r'cat_csv_file_path: wise_folder/wise_{}.csv',
                                 r'cat_csv_file_path: file_{}.csv')
+        cb_p_3 = cb_p_3.replace('use_photometric_uncertainties: False', 'use_photometric_uncertainties: True')
+        cb_p_3 = cb_p_3.replace('pos_and_err_indices: [0, 1, 2, 0, 1, 2]',
+                                'pos_and_err_indices: [0, 1, 2, 13, 14, 15, 0, 1, 2]')
+
         os.system('cp -r gaia_folder_9 gaia_folder_100')
         os.system('cp -r wise_folder_9 wise_folder_100')
         os.system('cp -r wise_auf_folder_9 wise_auf_folder_100')
         os.system('cp ref_9.csv ref_100.csv')
         os.system('cp file_9.csv file_100.csv')
+        x = np.loadtxt('file_100.csv', delimiter=',')
+        y = np.empty((len(x), 16), float)
+        y[:, :13] = x
+        y[:, [13, 14, 15]] = x[:, [2, 2, 2]]
+        np.savetxt('file_100.csv', y, delimiter=',')
         cm = CrossMatch(mock_filename(cm_p_2.encode("utf-8")),
                         mock_filename(cb_p_3.encode("utf-8")),
                         mock_filename(ca_p_3.encode("utf-8")))
@@ -1307,11 +1317,14 @@ class TestInputs:
         assert_allclose(cm.a_correct_mag_array, np.array([14.07, 14.17, 14.27, 14.37, 14.47]))
         assert_allclose(cm.a_correct_mag_slice, np.array([0.05, 0.05, 0.05, 0.05, 0.05]))
         assert_allclose(cm.a_correct_sig_slice, np.array([0.1, 0.1, 0.1, 0.1, 0.1]))
-        assert np.all(cm.a_pos_and_err_indices == np.array([[0, 1, 2], [0, 1, 2]]))
+        assert np.all(cm.a_pos_and_err_indices[0] == np.array([0, 1, 2, 13, 14, 15]))
+        assert np.all(cm.a_pos_and_err_indices[1] == np.array([0, 1, 2]))
         assert np.all(cm.a_mag_indices == np.array([3, 5, 7, 9]))
         assert np.all(cm.a_snr_indices == np.array([4, 6, 8, 10]))
         mnarray = np.load('ac_folder/npy/mn_sigs_array.npy')
-        assert_allclose([mnarray[0, 0], mnarray[0, 1]], [2, 0], rtol=0.1, atol=0.01)
+        assert np.all(mnarray.shape == (1, 4, 4))
+        assert_allclose([mnarray[0, 0, 0], mnarray[0, 0, 1]], [2, 0], rtol=0.1, atol=0.01)
+        assert_allclose([mnarray[0, 3, 0], mnarray[0, 3, 1]], [2, 0], rtol=0.1, atol=0.01)
         # pylint: enable=no-member
         assert np.all(cm.a_in_overlaps == 0)
 
@@ -1376,22 +1389,22 @@ class TestInputs:
                  'correct_astro_mag_indices_index: ', 'nn_radius: ', 'nn_radius: ',
                  'correct_mag_array: ', 'correct_mag_slice: ', 'correct_mag_slice: ', 'correct_sig_slice: ',
                  'correct_sig_slice: ', 'pos_and_err_indices: ', 'pos_and_err_indices: ',
-                 'pos_and_err_indices: ', 'mag_indices:', 'mag_indices:', 'mag_indices:', 'snr_indices:',
-                 'snr_indices:', 'snr_indices:', 'chunk_overlap_col: ', 'chunk_overlap_col: ',
-                 'chunk_overlap_col: ', 'best_mag_index_col: ', 'best_mag_index_col: ', 'dd_params_path: ',
-                 'l_cut_path: '],
+                 'pos_and_err_indices: ', 'pos_and_err_indices: ', 'mag_indices:', 'mag_indices:',
+                 'mag_indices:', 'snr_indices:', 'snr_indices:', 'snr_indices:', 'chunk_overlap_col: ',
+                 'chunk_overlap_col: ', 'chunk_overlap_col: ', 'best_mag_index_col: ', 'best_mag_index_col: ',
+                 'dd_params_path: ', 'l_cut_path: '],
                 ['correct_astro_mag_indices_index: A', 'correct_astro_mag_indices_index: 2.5',
                  'correct_astro_mag_indices_index: 7', 'nn_radius: A', 'nn_radius: [1, 2]',
                  'correct_mag_array: [1, 2, A, 4, 5]', 'correct_mag_slice: [0.1, 0.1, 0.1, A, 0.1]',
                  'correct_mag_slice: [0.1, 0.1, 0.1]', 'correct_sig_slice: [0.1, 0.1, 0.1, A, 0.1]',
                  'correct_sig_slice: [0.1, 0.1, 0.1]', 'pos_and_err_indices: [1 2 3 4 5 A]',
                  'pos_and_err_indices: [1, 2, 3, 4, 5.5, 6]', 'pos_and_err_indices: [1, 2, 3, 4, 5]',
-                 'mag_indices: [A, 1, 2]', 'mag_indices: [1, 2]', 'mag_indices: [1.2, 2, 3, 4]',
-                 'snr_indices: [A, 1, 2]', 'snr_indices: [1, 2]', 'snr_indices: [1.2, 2, 3]',
-                 'chunk_overlap_col: Non', 'chunk_overlap_col: A', 'chunk_overlap_col: 1.2',
-                 'best_mag_index_col: A', 'best_mag_index_col: 1.2', 'dd_params_path: ./some_folder',
-                 'l_cut_path: ./l_cut_dummy_folder'],
-                ['a', 'b', 'a', 'b', 'a', 'a', 'b', 'a', 'b', 'a', 'b', 'a', 'a', 'a', 'b', 'b',
+                 'pos_and_err_indices: [1, 2, 3, 4, 5]', 'mag_indices: [A, 1, 2]', 'mag_indices: [1, 2]',
+                 'mag_indices: [1.2, 2, 3, 4]', 'snr_indices: [A, 1, 2]', 'snr_indices: [1, 2]',
+                 'snr_indices: [1.2, 2, 3]', 'chunk_overlap_col: Non', 'chunk_overlap_col: A',
+                 'chunk_overlap_col: 1.2', 'best_mag_index_col: A', 'best_mag_index_col: 1.2',
+                 'dd_params_path: ./some_folder', 'l_cut_path: ./l_cut_dummy_folder'],
+                ['a', 'b', 'a', 'b', 'a', 'a', 'b', 'a', 'b', 'a', 'b', 'a', 'a', 'b', 'a', 'b', 'b',
                  'b', 'a', 'a', 'a', 'b', 'a', 'a', 'b', 'b', 'a'],
                 ['correct_astro_mag_indices_index should be an integer in the catalogue "a"',
                  'correct_astro_mag_indices_index should be an integer in the catalogue "b"',
@@ -1406,6 +1419,7 @@ class TestInputs:
                  'pos_and_err_indices should be a list of integers in the catalogue "b"',
                  'All elements of a_pos_and_err_indices should be integers',
                  'a_pos_and_err_indices should contain six elements when correct_astrometry',
+                 'b_pos_and_err_indices should contain at least six elements when correct_astrometry',
                  'mag_indices should be a list of integers in the catalogue "a" ',
                  'b_filt_names and b_mag_indices should contain the',
                  'All elements of b_mag_indices should be integers.',
@@ -1430,6 +1444,8 @@ class TestInputs:
                 type_of_error = OSError
             else:
                 type_of_error = FileNotFoundError
+            if "contain at least six" in match_text:
+                c = c.replace('use_photometric_uncertainties: False', 'use_photometric_uncertainties: True')
             with pytest.raises(type_of_error, match=match_text):
                 cm = CrossMatch(mock_filename(self.cm_p_text.encode("utf-8")),
                                 mock_filename(b.encode("utf-8")),

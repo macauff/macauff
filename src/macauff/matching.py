@@ -808,19 +808,26 @@ class CrossMatch():
                 raise ValueError(f'All elements of {flag}mag_indices should be '
                                  'integers.')
 
-            # pos_and_err_indices should be a three- or six-integer list that
-            # we then transform into [reference_cat_inds, this_cat_inds]
-            # where each *_cat_inds is a three-element list [x, y, z], or just
-            # this_cat_inds, depending on whether correct_astrometry is set.
+            # pos_and_err_indices should be a three-, six- or N-integer list
+            # that we then transform into [this_cat_inds, reference_cat_inds]
+            # where reference_cat_inds is a three-element list [x, y, z],
+            # necessary when correct_astrometry is set, and this_cat_inds,
+            # depending on whether use_photometric_uncertainties is set, is
+            # either a three- or N-element (N>=3) list.
             a = config['pos_and_err_indices']
             try:
                 b = np.array([float(f) for f in a])
             except ValueError as exc:
                 raise ValueError('pos_and_err_indices should be a list of integers '
                                  f'in the catalogue "{flag[0]}"" metadata file') from exc
-            if len(b) != 6 and correct_astro:
+            if len(b) != 6 and correct_astro and not config['use_photometric_uncertainties']:
                 raise ValueError(f'{flag}pos_and_err_indices should contain six elements '
-                                 'when correct_astrometry is True.')
+                                 'when correct_astrometry is True and use_photometric_uncertainties is '
+                                 'False.')
+            if len(b) < 6 and correct_astro and config['use_photometric_uncertainties']:
+                raise ValueError(f'{flag}pos_and_err_indices should contain at least six elements '
+                                 'when correct_astrometry is True and use_photometric_uncertainties is '
+                                 'True.')
             if len(b) != 3 and not correct_astro:
                 raise ValueError(f'{flag}pos_and_err_indices should contain three elements '
                                  'when correct_astrometry is False.')
