@@ -1344,7 +1344,7 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
         _snr = self.b[:, self.snr_indices[p_ind]]
         p = ((_snr > 0) & ~np.isnan(_snr) & np.isfinite(_snr))
         n_sources_inv_max_snr = 1000
-        inv_max_snr = 1 / np.percentile(_snr[p][np.argsort(_snr[p])][:n_sources_inv_max_snr], 50)
+        inv_max_snr = 1 / np.percentile(_snr[p][np.argsort(_snr[p])][n_sources_inv_max_snr:], 50)
         h = 1 - np.sqrt(1 - min(1, inv_max_snr**2 * snr**2))
         four_combined = h * self.four_off_fw[:, i] + (1 - h) * self.four_off_ps[:, i]
 
@@ -1484,7 +1484,7 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
             _snr = self.b[:, self.snr_indices[p_ind]]
             p = ((_snr > 0) & ~np.isnan(_snr) & np.isfinite(_snr))
             n_sources_inv_max_snr = 1000
-            inv_max_snr = 1 / np.percentile(_snr[p][np.argsort(_snr[p])][:n_sources_inv_max_snr], 50)
+            inv_max_snr = 1 / np.percentile(_snr[p][np.argsort(_snr[p])][n_sources_inv_max_snr:], 50)
             h = 1 - np.sqrt(1 - min(1, inv_max_snr**2 * self.avg_snr[i, 0]**2))
 
             ind_fit_sig = self.fit_sigs[i, 1]
