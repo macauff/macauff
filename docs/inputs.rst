@@ -487,7 +487,7 @@ The inter-dependency of input parameters on one another, and the output ``CrossM
                          ├─* correct_mag_array
                          ├─* correct_mag_slice
                          ├─* correct_sig_slice
-                         ├-* use_photometric_uncertainties
+                         ├─* use_photometric_uncertainties
                          └─* saturation_magnitudes
 
 List directories end in ``->`` for ``joint`` parameters, ``-*`` for ``catalogue`` parameters. ``catalogue`` level items will have ``a_`` or ``b_`` prepended, depending on which "side" of the cross-match they are from. Items with a second keyword after an arrow ``->`` are the names of the attributes that are saved to ``CrossMatch``, usually when the input parameter is a location on disk.
