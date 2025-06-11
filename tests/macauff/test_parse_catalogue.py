@@ -20,7 +20,7 @@ class TestParseCatalogue:
 
         self.n = 100000
         data = rng.standard_normal(size=(self.n, 8))
-        data[:, 6] = np.round(data[:, 6]).astype(int)
+        data[:, 6] = rng.choice(2, size=(self.n,))
         nan_cols = [rng.choice(self.n, size=(100,), replace=False),
                     rng.choice(self.n, size=(100,), replace=False)]
         data[nan_cols[0], 4] = np.nan
@@ -135,6 +135,43 @@ class TestParseCatalogue:
         assert_allclose(astro[:, 2], np.sqrt((2*self.data[:, 2])**2 + 0.01**2))
         assert_allclose(photo, self.data[:, [4, 5]])
         assert_allclose(best_index, self.data[:, 6])
+
+        rng = np.random.default_rng(seed=890124789123)
+        self.n = 100000
+        data = rng.standard_normal(size=(self.n, 10))
+        data[:, 8] = rng.choice(2, size=(self.n,))
+        nan_cols = [rng.choice(self.n, size=(100,), replace=False)]
+        nan_cols.append(rng.choice(np.delete(np.arange(self.n), nan_cols[0]), size=(100,), replace=False))
+        nan_cols.append(rng.choice(np.delete(np.arange(self.n), np.concatenate((nan_cols[0], nan_cols[1]))),
+                        size=(100,), replace=False))
+        nan_cols.append(rng.choice(np.delete(np.arange(self.n),
+                        np.concatenate((nan_cols[0], nan_cols[1], nan_cols[2]))), size=(100,), replace=False))
+        data[nan_cols[0], 4] = np.nan
+        data[nan_cols[1], 5] = np.nan
+        data[nan_cols[2], 6] = np.nan
+        data[nan_cols[3], 7] = np.nan
+        data[:, 9] = rng.choice(2, size=(self.n,))
+        data1 = data.astype(str)
+        data1[data1 == 'nan'] = ''
+        np.savetxt('test_data.csv', data1, delimiter=',', fmt='%s', header=header_text + ', i, j')
+
+        np.save('test_sig_folder/mn_sigs_array.npy',
+                np.array([[[2, 0.01, 10.0, 0.0], [1.1, 0.001, 10.0, 0.0]]]))
+
+        astro, photo, best_index, _ = csv_to_npy(
+            'test_data.csv', [0, 1, 5, 7], [4, 6], 8, None, header=header, process_uncerts=True,
+            astro_sig_fits_filepath='test_sig_folder', cat_in_radec=False, mn_in_radec=False)
+
+        assert np.all(astro.shape == (self.n, 3))
+        assert np.all(photo.shape == (self.n, 2))
+        assert np.all(best_index.shape == (self.n,))
+        assert_allclose(astro[:, [0, 1]], data[:, [0, 1]])
+        q = best_index == 0
+        assert_allclose(astro[q, 2], np.sqrt((2*data[q, 5])**2 + 0.01**2))
+        q = best_index == 1
+        assert_allclose(astro[q, 2], np.sqrt((1.1*data[q, 7])**2 + 0.001**2))
+        assert_allclose(photo, data[:, [4, 6]])
+        assert_allclose(best_index, data[:, 8])
 
     def test_rect_slice_npy(self):
         np.save('con_cat_astro.npy', self.data[:, [1, 2, 3]])

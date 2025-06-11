@@ -35,10 +35,16 @@ def csv_to_npy(input_filename, astro_cols, photo_cols, bestindex_col,
     astro_cols : list or numpy.array of integers
         List of zero-indexed columns in the input catalogue representing the
         three required astrometric parameters, two orthogonal sky axis
-        coordinates and a single, circular astrometric precision. The precision
-        must be the last column, with the first two columns of ``astro_cols``
-        matching in order to the first two columns of the output astrometry
-        binary file, if ``process_uncerts`` is ``True``.
+        coordinates and a single, circular astrometric precision. The first two
+        columns of ``astro_cols`` must match in order the first two columns of
+        the output astrometry binary file. For cases where ``process_uncerts``
+        is ``True``, the last ``N`` columns must either be a single astrometric
+        uncertainty, for when catalogue-given astrometric uncertainties are
+        available and were used to parameterise the position-residuals in the
+        catalogue, or a list of ``N`` photometric uncertainty bands, in which
+        case there will be ``N`` band-based parameterisations of the astrometry
+        and the ``bestindex_col`` flags will be used to determine which
+        parameterisation to use for each source individually.
     photo_cols : list or numpy.ndarray of integers
         List of zero-indexed columns in the input catalogue representing the
         magnitudes of each photometric source to be used in the cross-matching.
@@ -133,8 +139,16 @@ def csv_to_npy(input_filename, astro_cols, photo_cols, bestindex_col,
     if process_uncerts:
         mn_sigs = np.load(f'{astro_sig_fits_filepath}/mn_sigs_array.npy')
         mn_coords = np.empty((len(mn_sigs), 2), float)
-        mn_coords[:, 0] = np.copy(mn_sigs[:, 2])
-        mn_coords[:, 1] = np.copy(mn_sigs[:, 3])
+        # Check the shape of mn_sigs for a third dimension which signals that
+        # we need to perform per-band parameterisation.
+        if len(mn_sigs.shape) == 3:
+            per_band_param = True
+            mn_coords[:, 0] = np.copy(mn_sigs[:, 0, 2])
+            mn_coords[:, 1] = np.copy(mn_sigs[:, 0, 3])
+        else:
+            per_band_param = False
+            mn_coords[:, 0] = np.copy(mn_sigs[:, 2])
+            mn_coords[:, 1] = np.copy(mn_sigs[:, 3])
         if cat_in_radec and not mn_in_radec:
             # Convert mn_coords to RA/Dec if catalogue is in Equatorial coords.
             a = SkyCoord(l=mn_coords[:, 0], b=mn_coords[:, 1], unit='deg', frame='galactic')
@@ -162,20 +176,28 @@ def csv_to_npy(input_filename, astro_cols, photo_cols, bestindex_col,
     n = 0
     for chunk in pd.read_csv(input_filename, chunksize=100000,
                              usecols=used_cols, header=None if not header else 0):
+        best_index[n:n+chunk.shape[0]] = chunk.values[:, new_bestindex_col]
         if not process_uncerts:
             astro[n:n+chunk.shape[0]] = chunk.values[:, new_astro_cols]
         else:
             astro[n:n+chunk.shape[0], 0] = chunk.values[:, new_astro_cols[0]]
             astro[n:n+chunk.shape[0], 1] = chunk.values[:, new_astro_cols[1]]
-            old_sigs = chunk.values[:, new_astro_cols[2]]
             sig_mn_inds = mff.find_nearest_point(chunk.values[:, new_astro_cols[0]],
                                                  chunk.values[:, new_astro_cols[1]],
                                                  mn_coords[:, 0], mn_coords[:, 1])
-            # pylint: disable-next=possibly-used-before-assignment
-            new_sigs = np.sqrt((mn_sigs[sig_mn_inds, 0]*old_sigs)**2 + mn_sigs[sig_mn_inds, 1]**2)
+            if not per_band_param:
+                old_sigs = chunk.values[:, new_astro_cols[2]]
+                # pylint: disable-next=possibly-used-before-assignment
+                new_sigs = np.sqrt((mn_sigs[sig_mn_inds, 0]*old_sigs)**2 + mn_sigs[sig_mn_inds, 1]**2)
+            else:
+                new_sigs = np.empty(chunk.shape[0], float)
+                for i in range(chunk.shape[0]):
+                    old_sig = chunk.values[i, new_astro_cols[2+best_index[i]]]
+                    new_sig = np.sqrt((mn_sigs[sig_mn_inds[i], best_index[i], 0]*old_sig)**2 +
+                                      mn_sigs[sig_mn_inds[i], best_index[i], 1]**2)
+                    new_sigs[i] = new_sig
             astro[n:n+chunk.shape[0], 2] = new_sigs
         photo[n:n+chunk.shape[0]] = chunk.values[:, new_photo_cols]
-        best_index[n:n+chunk.shape[0]] = chunk.values[:, new_bestindex_col]
         if chunk_overlap_col is not None:
             chunk_overlap[n:n+chunk.shape[0]] = chunk.values[:, new_chunk_overlap_col].astype(bool)
         else:
