@@ -820,14 +820,6 @@ class CrossMatch():
             except ValueError as exc:
                 raise ValueError('pos_and_err_indices should be a list of integers '
                                  f'in the catalogue "{flag[0]}"" metadata file') from exc
-            if len(b) != 6 and correct_astro and not config['use_photometric_uncertainties']:
-                raise ValueError(f'{flag}pos_and_err_indices should contain six elements '
-                                 'when correct_astrometry is True and use_photometric_uncertainties is '
-                                 'False.')
-            if len(b) < 6 and correct_astro and config['use_photometric_uncertainties']:
-                raise ValueError(f'{flag}pos_and_err_indices should contain at least six elements '
-                                 'when correct_astrometry is True and use_photometric_uncertainties is '
-                                 'True.')
             if len(b) != 3 and not correct_astro:
                 raise ValueError(f'{flag}pos_and_err_indices should contain three elements '
                                  'when correct_astrometry is False.')
@@ -1331,6 +1323,28 @@ class CrossMatch():
                 if len(b) != len(config['correct_mag_array']):
                     raise ValueError(f'{flag}correct_mag_array and {flag}correct_sig_slice should contain '
                                      'the same number of entries.')
+
+                # Check for the remaining permutations of pos_and_err_indices
+                # within the inner correct_astrometry check.
+                a = config['pos_and_err_indices']
+                b = np.array([float(f) for f in a])
+                if len(b) != 6 and not config['use_photometric_uncertainties']:
+                    raise ValueError(f'{flag}pos_and_err_indices should contain six elements '
+                                     'when correct_astrometry is True and use_photometric_uncertainties is '
+                                     'False.')
+                if len(b) < 6 and config['use_photometric_uncertainties']:
+                    raise ValueError(f'{flag}pos_and_err_indices should contain at least six elements '
+                                     'when correct_astrometry is True and use_photometric_uncertainties is '
+                                     'True.')
+                # Three elements of pos_and_err_indices are taken up by the reference
+                # catalogue's indices, and two are for the to-be-fit catalogue's
+                # positions, but the remaining indices must match the lists of
+                # magnitude-related elements.
+                if len(b) - 5 != len(config['filt_names']) and config['use_photometric_uncertainties']:
+                    raise ValueError(f'{flag}pos_and_err_indices should contain the same number of '
+                                     'non-reference, non-position, magnitude-uncertainty columns as there '
+                                     f'are elements in {flag}filt_names when correct_astrometry is True and '
+                                     'use_photometric_uncertainties is True.')
 
         return joint_config, cat_a_config, cat_b_config
 
