@@ -1130,9 +1130,9 @@ class TestInputs:
                  '\nsnr_indices: [4, 6, 8]', '\ncorrect_astro_save_folder: ac_folder',
                  '\ncorrect_astro_mag_indices_index: 0', '\nnn_radius: 30',
                  '\nref_cat_csv_file_path: ref_{}.csv',
-                 '\ncorrect_mag_array: [14.07, 14.17, 14.27, 14.37, 14.47]',
-                 '\ncorrect_mag_slice: [0.05, 0.05, 0.05, 0.05, 0.05]',
-                 '\ncorrect_sig_slice: [0.1, 0.1, 0.1, 0.1, 0.1]', '\nuse_photometric_uncertainties: False',
+                 '\ncorrect_mag_array: [[14.07, 14.17, 14.27, 14.37, 14.47]]',
+                 '\ncorrect_mag_slice: [[0.05, 0.05, 0.05, 0.05, 0.05]]',
+                 '\ncorrect_sig_slice: [[0.1, 0.1, 0.1, 0.1, 0.1]]', '\nuse_photometric_uncertainties: False',
                  '\nmn_fit_type: quadratic', '\nseeing_ranges: [0.9, 1.1]']
         for i, key in enumerate(['snr_indices', 'correct_astro_save_folder',
                                  'correct_astro_mag_indices_index', 'nn_radius', 'ref_cat_csv_file_path',
@@ -1265,9 +1265,9 @@ class TestInputs:
         assert cm.b_correct_astro_save_folder == os.path.abspath('ac_folder')
         assert cm.b_cat_csv_file_path == os.path.abspath('file_9.csv')
         assert cm.b_ref_cat_csv_file_path == os.path.abspath('ref_9.csv')
-        assert_allclose(cm.b_correct_mag_array, np.array([14.07, 14.17, 14.27, 14.37, 14.47]))
-        assert_allclose(cm.b_correct_mag_slice, np.array([0.05, 0.05, 0.05, 0.05, 0.05]))
-        assert_allclose(cm.b_correct_sig_slice, np.array([0.1, 0.1, 0.1, 0.1, 0.1]))
+        assert_allclose(cm.b_correct_mag_array, np.array([[14.07, 14.17, 14.27, 14.37, 14.47]]))
+        assert_allclose(cm.b_correct_mag_slice, np.array([[0.05, 0.05, 0.05, 0.05, 0.05]]))
+        assert_allclose(cm.b_correct_sig_slice, np.array([[0.1, 0.1, 0.1, 0.1, 0.1]]))
         assert np.all(cm.b_pos_and_err_indices == np.array([[0, 1, 2], [0, 1, 2]]))
         assert np.all(cm.b_mag_indices == np.array([3, 5, 7, 9]))
         assert np.all(cm.b_snr_indices == np.array([4, 6, 8, 10]))
@@ -1291,6 +1291,17 @@ class TestInputs:
         cb_p_3 = cb_p_3.replace('use_photometric_uncertainties: False', 'use_photometric_uncertainties: True')
         cb_p_3 = cb_p_3.replace('pos_and_err_indices: [0, 1, 2, 0, 1, 2]',
                                 'pos_and_err_indices: [0, 1, 2, 13, 14, 15, 0, 1, 2]')
+        cb_p_3 = cb_p_3.replace('correct_mag_array: [[14.07, 14.17, 14.27, 14.37, 14.47]]',
+                                'correct_mag_array: [[14.07, 14.17, 14.27, 14.37, 14.47], [14.07, 14.17, '
+                                '14.27, 14.37, 14.47], [14.07, 14.17, 14.27, 14.37, 14.47], [14.07, 14.17, '
+                                '14.27, 14.37, 14.47]]')
+        cb_p_3 = cb_p_3.replace('correct_mag_slice: [[0.05, 0.05, 0.05, 0.05, 0.05]]',
+                                'correct_mag_slice: [[0.05, 0.05, 0.05, 0.05, 0.05], [0.05, 0.05, 0.05, '
+                                '0.05, 0.05], [0.05, 0.05, 0.05, 0.05, 0.05], [0.05, 0.05, 0.05, 0.05, '
+                                '0.05]]')
+        cb_p_3 = cb_p_3.replace('correct_sig_slice: [[0.1, 0.1, 0.1, 0.1, 0.1]]',
+                                'correct_sig_slice: [[0.1, 0.1, 0.1, 0.1, 0.1], [0.1, 0.1, 0.1, 0.1, 0.1], '
+                                '[0.1, 0.1, 0.1, 0.1, 0.1], [0.1, 0.1, 0.1, 0.1, 0.1]]')
 
         os.system('cp -r gaia_folder_9 gaia_folder_100')
         os.system('cp -r wise_folder_9 wise_folder_100')
@@ -1314,9 +1325,9 @@ class TestInputs:
         assert cm.a_correct_astro_save_folder == os.path.abspath('ac_folder')
         assert cm.a_cat_csv_file_path == os.path.abspath('file_100.csv')
         assert cm.a_ref_cat_csv_file_path == os.path.abspath('ref_100.csv')
-        assert_allclose(cm.a_correct_mag_array, np.array([14.07, 14.17, 14.27, 14.37, 14.47]))
-        assert_allclose(cm.a_correct_mag_slice, np.array([0.05, 0.05, 0.05, 0.05, 0.05]))
-        assert_allclose(cm.a_correct_sig_slice, np.array([0.1, 0.1, 0.1, 0.1, 0.1]))
+        assert_allclose(cm.a_correct_mag_array, np.array([[14.07, 14.17, 14.27, 14.37, 14.47]] * 4))
+        assert_allclose(cm.a_correct_mag_slice, np.array([[0.05, 0.05, 0.05, 0.05, 0.05]] * 4))
+        assert_allclose(cm.a_correct_sig_slice, np.array([[0.1, 0.1, 0.1, 0.1, 0.1]] * 4))
         assert np.all(cm.a_pos_and_err_indices[0] == np.array([0, 1, 2, 13, 14, 15]))
         assert np.all(cm.a_pos_and_err_indices[1] == np.array([0, 1, 2]))
         assert np.all(cm.a_mag_indices == np.array([3, 5, 7, 9]))
@@ -1370,9 +1381,9 @@ class TestInputs:
         assert cm.a_correct_astro_save_folder == os.path.abspath('ac_folder')
         assert cm.a_cat_csv_file_path == os.path.abspath('file_9.csv')
         assert cm.a_ref_cat_csv_file_path == os.path.abspath('ref_9.csv')
-        assert_allclose(cm.a_correct_mag_array, np.array([14.07, 14.17, 14.27, 14.37, 14.47]))
-        assert_allclose(cm.a_correct_mag_slice, np.array([0.05, 0.05, 0.05, 0.05, 0.05]))
-        assert_allclose(cm.a_correct_sig_slice, np.array([0.1, 0.1, 0.1, 0.1, 0.1]))
+        assert_allclose(cm.a_correct_mag_array, np.array([[14.07, 14.17, 14.27, 14.37, 14.47]]))
+        assert_allclose(cm.a_correct_mag_slice, np.array([[0.05, 0.05, 0.05, 0.05, 0.05]]))
+        assert_allclose(cm.a_correct_sig_slice, np.array([[0.1, 0.1, 0.1, 0.1, 0.1]]))
         assert np.all(cm.a_pos_and_err_indices == np.array([[0, 1, 2], [0, 1, 2]]))
         assert np.all(cm.a_mag_indices == np.array([3, 5, 7, 9]))
         assert np.all(cm.a_snr_indices == np.array([4, 6, 8, 10]))
@@ -1388,16 +1399,18 @@ class TestInputs:
                 ['correct_astro_mag_indices_index: ', 'correct_astro_mag_indices_index: ',
                  'correct_astro_mag_indices_index: ', 'nn_radius: ', 'nn_radius: ',
                  'correct_mag_array: ', 'correct_mag_slice: ', 'correct_mag_slice: ', 'correct_sig_slice: ',
-                 'correct_sig_slice: ', 'pos_and_err_indices: ', 'pos_and_err_indices: ',
-                 'pos_and_err_indices: ', 'pos_and_err_indices: ', 'pos_and_err_indices: ', 'mag_indices:',
-                 'mag_indices:', 'mag_indices:', 'snr_indices:', 'snr_indices:', 'snr_indices:',
-                 'chunk_overlap_col: ', 'chunk_overlap_col: ', 'chunk_overlap_col: ', 'best_mag_index_col: ',
-                 'best_mag_index_col: ', 'dd_params_path: ', 'l_cut_path: '],
+                 'correct_sig_slice: ', 'correct_sig_slice: ', 'pos_and_err_indices: ',
+                 'pos_and_err_indices: ', 'pos_and_err_indices: ', 'pos_and_err_indices: ',
+                 'pos_and_err_indices: ', 'mag_indices:', 'mag_indices:', 'mag_indices:', 'snr_indices:',
+                 'snr_indices:', 'snr_indices:', 'chunk_overlap_col: ', 'chunk_overlap_col: ',
+                 'chunk_overlap_col: ', 'best_mag_index_col: ', 'best_mag_index_col: ', 'dd_params_path: ',
+                 'l_cut_path: '],
                 ['correct_astro_mag_indices_index: A', 'correct_astro_mag_indices_index: 2.5',
                  'correct_astro_mag_indices_index: 7', 'nn_radius: A', 'nn_radius: [1, 2]',
-                 'correct_mag_array: [1, 2, A, 4, 5]', 'correct_mag_slice: [0.1, 0.1, 0.1, A, 0.1]',
-                 'correct_mag_slice: [0.1, 0.1, 0.1]', 'correct_sig_slice: [0.1, 0.1, 0.1, A, 0.1]',
-                 'correct_sig_slice: [0.1, 0.1, 0.1]', 'pos_and_err_indices: [1 2 3 4 5 A]',
+                 'correct_mag_array: [[1, 2, A, 4, 5]]', 'correct_mag_slice: [[0.1, 0.1, 0.1, A, 0.1]]',
+                 'correct_mag_slice: [[0.1, 0.1, 0.1]]', 'correct_sig_slice: [[0.1, 0.1, 0.1, A, 0.1]]',
+                 'correct_sig_slice: [[0.1, 0.1, 0.1, 0.1, 0.1], [0.1]]',
+                 'correct_sig_slice: [[0.1, 0.1, 0.1]]', 'pos_and_err_indices: [1 2 3 4 5 A]',
                  'pos_and_err_indices: [1, 2, 3, 4, 5.5, 6]', 'pos_and_err_indices: [1, 2, 3, 4, 5]',
                  'pos_and_err_indices: [1, 2, 3, 4, 5]', 'pos_and_err_indices: [1, 2, 3, 4, 5, 6, 7]',
                  'mag_indices: [A, 1, 2]', 'mag_indices: [1, 2]', 'mag_indices: [1.2, 2, 3, 4]',
@@ -1405,17 +1418,18 @@ class TestInputs:
                  'chunk_overlap_col: Non', 'chunk_overlap_col: A', 'chunk_overlap_col: 1.2',
                  'best_mag_index_col: A', 'best_mag_index_col: 1.2', 'dd_params_path: ./some_folder',
                  'l_cut_path: ./l_cut_dummy_folder'],
-                ['a', 'b', 'a', 'b', 'a', 'a', 'b', 'a', 'b', 'a', 'b', 'a', 'a', 'b', 'a', 'a', 'b', 'b',
-                 'b', 'a', 'a', 'a', 'b', 'a', 'a', 'b', 'b', 'a'],
+                ['a', 'b', 'a', 'b', 'a', 'a', 'b', 'a', 'b', 'a', 'a', 'b', 'a', 'a', 'b', 'a', 'a', 'b',
+                 'b', 'b', 'a', 'a', 'a', 'b', 'a', 'a', 'b', 'b', 'a'],
                 ['correct_astro_mag_indices_index should be an integer in the catalogue "a"',
                  'correct_astro_mag_indices_index should be an integer in the catalogue "b"',
                  'correct_astro_mag_indices_index cannot be a larger index than the list of filters '
                  'in the catalogue "a', 'nn_radius must be a float in the catalogue "b"',
                  'nn_radius must be a float in the catalogue "a"',
-                 'correct_mag_array should be a list of floats in the catalogue "a"',
-                 'correct_mag_slice should be a list of floats in the catalogue "b"',
+                 'correct_mag_array should be a list of list of floats in the catalogue "a"',
+                 'correct_mag_slice should be a list of list of floats in the catalogue "b"',
                  'a_correct_mag_array and a_correct_mag_slice should contain the same',
-                 'correct_sig_slice should be a list of floats in the catalogue "b"',
+                 'correct_sig_slice should be a list of list of floats in the catalogue "b"',
+                 'a_correct_mag_array and a_correct_sig_slice should contain the same',
                  'a_correct_mag_array and a_correct_sig_slice should contain the same',
                  'pos_and_err_indices should be a list of integers in the catalogue "b"',
                  'All elements of a_pos_and_err_indices should be integers',

@@ -55,14 +55,14 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
     to a well-understood second dataset.
     """
     # pylint: disable-next=too-many-locals,too-many-arguments,too-many-positional-arguments
-    def __init__(self, psf_fwhm, numtrials, nn_radius, dens_search_radius, save_folder,
-                 gal_wav_micron, gal_ab_offset, gal_filtname, gal_alav, dm, dd_params, l_cut,
-                 ax1_mids, ax2_mids, ax_dimension, mag_array, mag_slice, sig_slice, n_pool,
+    def __init__(self, psf_fwhms, numtrials, nn_radius, dens_search_radius, save_folder,
+                 gal_wavs_micron, gal_ab_offsets, gal_filtnames, gal_alavs, dm, dd_params, l_cut,
+                 ax1_mids, ax2_mids, ax_dimension, mag_arrays, mag_slices, sig_slices, n_pool,
                  npy_or_csv, coord_or_chunk, pos_and_err_indices, mag_indices, snr_indices,
                  mag_names, correct_astro_mag_indices_index, coord_system, saturation_magnitudes,
                  pregenerate_cutouts, n_r, n_rho, max_rho, mn_fit_type, trifilepath=None, maglim_f=None,
-                 magnum=None, tri_num_faint=None, trifilterset=None, trifiltname=None, tri_hist=None,
-                 tri_mags=None, dtri_mags=None, tri_uncert=None, use_photometric_uncertainties=False,
+                 magnum=None, tri_num_faint=None, trifilterset=None, trifiltnames=None, tri_hists=None,
+                 tri_magses=None, dtri_magses=None, tri_uncerts=None, use_photometric_uncertainties=False,
                  cutout_area=None, cutout_height=None, single_sided_auf=True, chunks=None, return_nm=False):
         """
         Initialisation of AstrometricCorrections, accepting inputs required for
@@ -73,9 +73,9 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
 
         Parameters
         ----------
-        psf_fwhm : float
-            The full-width at half-maximum of the Point Spread Function, used to
-            determine the size of the PSF for perturber placement purposes.
+        psf_fwhms : list or numpy.ndarray of floats
+            The full-widths at half-maximum of the Point Spread Functions, used to
+            determine the sizes of the PSF for perturber placement purposes.
         numtrials : integer
             Number of simulations to run when deriving pertubation statistics.
         nn_radius : float
@@ -88,16 +88,16 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
         save_folder : string
             Absolute or relative filepath of folder into which to store
             temporary and generated outputs from the fitting process.
-        gal_wav_micron : float
-            Wavelength, in microns, of the chosen filter, for use in
+        gal_wavs_micron : list or numpy.ndarray of floats
+            Wavelength, in microns, of the chosen filters, for use in
             simulating galaxy counts.
-        gal_ab_offset : float
-            The offset between the filter zero point and the AB magnitude
+        gal_ab_offsets : list or numpy.ndarray of floats
+            The offsets between the filter zero points and the AB magnitude
             offset.
-        gal_filtname : string
-            Name of the filter in the ``speclite`` compound naming convention.
-        gal_alav : float
-            Differential reddening vector of the given filter.
+        gal_filtnames : list or numpy.ndarray of strings
+            Names of the filter in the ``speclite`` compound naming convention.
+        gal_alavs : list or numpy.ndarray of floats
+            Differential reddening vector of the given filters.
         dm : float
             Bin spacing for magnitude histograms of TRILEGAL simulations.
         dd_params : numpy.ndarray
@@ -123,16 +123,22 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
             rectangle when combined in a grid, or if ``2`` each
             ``ax1_mids``-``ax2_mids`` combination is a unique ax-ax pairing used
             as given.
-        mag_array : numpy.ndarray
-            List of magnitudes in the filter to derive astrometry for.
-        mag_slice : numpy.ndarray
+        mag_arrays : list of numpy.ndarrays or numpy.ndarray
+            List of lists of magnitudes in the filter to derive astrometry for,
+            with each element of ``mag_arrays[i]`` a list or array of magnitudes
+            at which to take cuts in the corresponding ``mag_names[i]`` filter.
+        mag_slices : list of numpy.ndarrays or numpy.ndarray
             Widths of interval at which to take slices of magnitudes for deriving
-            astrometric properties. Each ``mag_slice`` maps elementwise to each
-            ``mag_array``, and hence they should be the same shape.
-        sig_slice : numpy.ndarray
+            astrometric properties. Each ``mag_slices[i]`` maps elementwise to each
+            ``mag_array[i]``, and hence they should be the same shape, with the two
+            lists or arrays meeting ``len(mag_arrays) == len(mag_slices)``.
+        sig_slices : list of numpy.ndarrays or numpy.ndarray
             Interval widths of quoted astrometric uncertainty to use when
             isolating individual sets of objects for AUF derivation. Length
-            should match ``mag_array``.
+            should match ``mag_array``. List must have the same number of elements
+            as ``mag_arrays``, with each list-element agreeing in length as well;
+            if a numpy array, then
+            ``np.all(mag_arrays.shape == sig_slices.shape)`` must be true.
         n_pool : integer
             The maximum number of threads to use when calling
             ``multiprocessing``.
@@ -203,42 +209,42 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
             uncertainties. Must either be "quadratic" or "linear."
         trifilepath : string, optional
             Filepath of the location into which to save TRILEGAL simulations. If
-            provided ``tri_hist``, ``tri_mags``, ``dtri_mags``, and ``tri_uncert``
-            must be ``None``, and ``triname``, ``maglim_f``, ``magnum``,
-            ``tri_num_faint``, ``trifilterset``, and ``trifiltname`` must be
+            provided ``tri_hists``, ``tri_magses``, ``dtri_magses``, and
+            ``tri_uncerts`` must be ``None``, and ``maglim_fs``, ``magnums``,
+            ``tri_num_faints``, ``trifilterset``, and ``trifiltnames`` must be
             given. Must contain two format ``{}`` options in string, for unique
             ax1-ax2 sightline combination downloads.
         maglim_f : float, optional
             Magnitude in the ``magnum`` filter down to which sources should be
-            drawn for the "faint" sample. Should be ``None`` if ``tri_hist``
+            drawn for the "faint" sample. Should be ``None`` if ``tri_hists``
             et al. are provided.
         magnum : float, optional
-            Zero-indexed column number of the chosen filter limiting magnitude.
-            Should be ``None`` if ``tri_hist`` et al. are provided.
+            Zero-indexed column number of the chosen filter's limiting magnitude.
+            Should be ``None`` if ``tri_hists`` et al. are provided.
         tri_num_faint : integer, optional
             Approximate number of objects to simulate in the chosen filter for
-            TRILEGAL simulations. Should be ``None`` if ``tri_hist`` et al.
+            TRILEGAL simulations. Should be ``None`` if ``tri_hists`` et al.
             are provided.
         trifilterset : string, optional
             Name of the TRILEGAL filter set for which to generate simulations.
             Should be ``None`` if ``tri_hist`` et al. are provided.
-        trifiltname : string, optional
-            Name of the specific filter to generate perturbation AUF component in.
-            Should be ``None`` if ``tri_hist`` et al. are provided.
-        tri_hist : numpy.ndarray or None, optional
+        trifiltnames : list of string, optional
+            Name of the specific filters to generate perturbation AUF component in.
+            Should be ``None`` if ``tri_hists`` et al. are provided.
+        tri_hists : list of numpy.ndarray or None, optional
             If given, array of differential source densities, per square degree
-            per magnitude, in the given filter, as computed by
+            per magnitude, in the given filters, as computed by
             `~macauff.make_tri_counts`. Must be provided if ``trifilepath`` is
             ``None``, else must itself be ``None``.
-        tri_mags : numpy.ndarray, optional
-            Left-hand magnitude bin edges for each bin in ``tri_hist``. Must be
-            given if ``tri_hist`` is provided, else ``None``.
-        dtri_mags : numpy.ndarray, optional
-            Magnitude bin widths for each ``tri_mags`` bin.  Must be given if
-            ``tri_hist`` is provided, else ``None``.
-        tri_uncert : numpy.ndarray, optional
+        tri_magses : list of numpy.ndarray, optional
+            Left-hand magnitude bin edges for each bin in ``tri_hist`` for each
+            filter. Must be given if ``tri_hists`` is provided, else ``None``.
+        dtri_magses : list of numpy.ndarray, optional
+            Magnitude bin widths for each ``tri_mags`` bin in all filters.
+            Must be given if ``tri_hists`` is provided, else ``None``.
+        tri_uncerts : list of numpy.ndarray, optional
             Differential source count uncertainties, as derived by
-            `~macauff.make_tri_counts`.  Must be given if ``tri_hist`` is
+            `~macauff.make_tri_counts`.  Must be given if ``tri_hists`` is
             provided, else ``None``.
         use_photometric_uncertainties : boolean, optional
             Flag for whether or not to use the photometric uncertainties instead
@@ -299,7 +305,7 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
         if mn_fit_type not in ("quadratic", "linear"):
             raise ValueError("mn_fit_type must either be 'quadratic' or 'linear'.")
         self.return_nm = return_nm
-        self.psf_fwhm = psf_fwhm
+        self.psf_fwhms = psf_fwhms
         self.numtrials = numtrials
         self.nn_radius = nn_radius
         self.dens_search_radius = dens_search_radius
@@ -307,10 +313,7 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
         # for calling the perturbation AUF algorithms.
         self.dmcut = [2.5]
 
-        self.psf_radius = 1.185 * self.psf_fwhm
-        self.psfsig = self.psf_fwhm / (2 * np.sqrt(2 * np.log(2)))
-        self.r, self.rho = np.linspace(0, self.psf_radius, n_r), np.linspace(0, max_rho, n_rho)
-        self.dr, self.drho = np.diff(self.r), np.diff(self.rho)
+        self.n_r, self.max_rho, self.n_rho = n_r, max_rho, n_rho
 
         self.save_folder = save_folder
 
@@ -319,16 +322,16 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
         self.magnum = magnum
         self.tri_num_faint = tri_num_faint
         self.trifilterset = trifilterset
-        self.trifiltname = trifiltname
-        self.gal_wav_micron = gal_wav_micron
-        self.gal_ab_offset = gal_ab_offset
-        self.gal_filtname = gal_filtname
-        self.gal_alav = gal_alav
+        self.trifiltnames = trifiltnames
+        self.gal_wavs_micron = gal_wavs_micron
+        self.gal_ab_offsets = gal_ab_offsets
+        self.gal_filtnames = gal_filtnames
+        self.gal_alavs = gal_alavs
 
-        self.tri_hist = tri_hist
-        self.tri_mags = tri_mags
-        self.dtri_mags = dtri_mags
-        self.tri_uncert = tri_uncert
+        self.tri_hists = tri_hists
+        self.tri_magses = tri_magses
+        self.dtri_magses = dtri_magses
+        self.tri_uncerts = tri_uncerts
 
         self.dm = dm
 
@@ -345,9 +348,9 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
                 self.cutout_area = cutout_area
                 self.cutout_height = cutout_height
 
-        self.mag_array = np.array(mag_array)
-        self.mag_slice = np.array(mag_slice)
-        self.sig_slice = np.array(sig_slice)
+        self.mag_arrays = [np.array(x) for x in mag_arrays]
+        self.mag_slices = [np.array(x) for x in mag_slices]
+        self.sig_slices = [np.array(x) for x in sig_slices]
 
         self.saturation_magnitudes = np.array(saturation_magnitudes)
 
@@ -386,11 +389,6 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
         self.n_pool = n_pool
 
         self.use_photometric_uncertainties = use_photometric_uncertainties
-
-        self.j0s = mff.calc_j0(self.rho[:-1]+self.drho/2, self.r[:-1]+self.dr/2)
-
-        self.n_mag_cols = np.ceil(np.sqrt(len(self.mag_array))).astype(int)
-        self.n_mag_rows = np.ceil(len(self.mag_array) / self.n_mag_cols).astype(int)
 
         self.n_filt_cols = np.ceil(np.sqrt(len(self.mag_indices))).astype(int)
         self.n_filt_rows = np.ceil(len(self.mag_indices) / self.n_filt_cols).astype(int)
@@ -490,8 +488,8 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
             raise ValueError("tri_download must either be True, False, or None.")
         if self.trifilepath is not None and tri_download not in (True, False):
             raise ValueError("tri_download must either be True or False if trifilepath given.")
-        if self.tri_hist is not None and tri_download is not None:
-            raise ValueError("tri_download must be None if tri_hist is given.")
+        if None not in self.tri_hists and tri_download is not None:
+            raise ValueError("tri_download must be None if tri_hists is given.")
         if make_plots and seeing_ranges is None:
             raise ValueError("seeing_ranges must be provided if make_plots is True.")
         if make_plots:
@@ -629,6 +627,42 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
             # use_photometric_uncertainties is False this will be a single loop,
             # boringly doing nothing.
             for unc_index in range(len(self.pos_and_err_indices_full[0])-2):
+                # If we aren't using photometric uncertainties then we only do
+                # do a single loop through unc_index, but need to use the
+                # correct_astro_mag_indices_index element of all of our
+                # magnitude-related terms; however, if we are using photometry,
+                # then unc_index loops as intended.
+                p = unc_index if self.use_photometric_uncertainties else self.correct_astro_mag_indices_index
+                self.psf_fwhm = self.psf_fwhms[p]
+                self.gal_wav_micron = self.gal_wavs_micron[p]
+                self.gal_ab_offset = self.gal_ab_offsets[p]
+                self.gal_filtname = self.gal_filtnames[p]
+                self.gal_alav = self.gal_alavs[p]
+                self.mag_array = self.mag_arrays[p]
+                self.mag_slice = self.mag_slices[p]
+                self.sig_slice = self.sig_slices[p]
+                if self.trifilepath is not None:
+                    # For record keeping, trifilepath and trifilterset, magnum,
+                    # maglim_f, and tri_num_faint aren't per-band, so don't get
+                    # selected out of a list.
+                    self.trifiltname = self.trifiltnames[p]
+                else:
+                    self.tri_hist = self.tri_hists[p]
+                    self.tri_mags = self.tri_magses[p]
+                    self.dtri_mags = self.dtri_magses[p]
+                    self.tri_uncert = self.tri_uncerts[p]
+
+                self.psf_radius = 1.185 * self.psf_fwhm
+                self.psfsig = self.psf_fwhm / (2 * np.sqrt(2 * np.log(2)))
+                self.r = np.linspace(0, self.psf_radius, self.n_r)
+                self.rho = np.linspace(0, self.max_rho, self.n_rho)
+                self.dr, self.drho = np.diff(self.r), np.diff(self.rho)
+
+                self.j0s = mff.calc_j0(self.rho[:-1]+self.drho/2, self.r[:-1]+self.dr/2)
+
+                self.n_mag_cols = np.ceil(np.sqrt(len(self.mag_array))).astype(int)
+                self.n_mag_rows = np.ceil(len(self.mag_array) / self.n_mag_cols).astype(int)
+
                 self.unc_index = unc_index
                 self.pos_and_err_indices = [
                     [self.pos_and_err_indices_full[0][0], self.pos_and_err_indices_full[0][1],

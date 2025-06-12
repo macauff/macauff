@@ -165,14 +165,13 @@ class CrossMatch():
             a_npy_or_csv = 'csv'
             a_coord_or_chunk = 'chunk'
         if self.a_correct_astrometry:
-            acbi = self.a_correct_astro_mag_indices_index
             t = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             print(f"{t} Rank {self.rank}, chunk {self.chunk_id}: Calculating catalogue 'a' "
                   "uncertainty corrections...")
             ac = AstrometricCorrections(
-                self.a_psf_fwhms[acbi], self.num_trials, self.a_nn_radius, self.a_dens_dist,
-                self.a_correct_astro_save_folder, self.a_gal_wavs[acbi], self.a_gal_aboffsets[acbi],
-                self.a_gal_filternames[acbi], self.a_gal_al_avs[acbi], self.d_mag, self.a_dd_params,
+                self.a_psf_fwhms, self.num_trials, self.a_nn_radius, self.a_dens_dist,
+                self.a_correct_astro_save_folder, self.a_gal_wavs, self.a_gal_aboffsets,
+                self.a_gal_filternames, self.a_gal_al_avs, self.d_mag, self.a_dd_params,
                 self.a_l_cut, ax1_mids, ax2_mids, ax_dimension, self.a_correct_mag_array,
                 self.a_correct_mag_slice, self.a_correct_sig_slice, self.n_pool, a_npy_or_csv,
                 a_coord_or_chunk, self.a_pos_and_err_indices, self.a_mag_indices, self.a_snr_indices,
@@ -180,10 +179,9 @@ class CrossMatch():
                 self.a_saturation_magnitudes, trifilepath=self.a_auf_file_path,
                 maglim_f=self.a_tri_maglim_faint, magnum=self.a_tri_filt_num,
                 tri_num_faint=self.a_tri_num_faint, trifilterset=self.a_tri_set_name,
-                trifiltname=self.a_tri_filt_names[acbi], tri_hist=self.a_dens_hist_tri_list[acbi],
-                tri_mags=self.a_tri_model_mags_list[acbi],
-                dtri_mags=self.a_tri_model_mags_interval_list[acbi],
-                tri_uncert=self.a_tri_dens_uncert_list[acbi],
+                trifiltnames=self.a_tri_filt_names, tri_hists=self.a_dens_hist_tri_list,
+                tri_magses=self.a_tri_model_mags_list, dtri_magses=self.a_tri_model_mags_interval_list,
+                tri_uncerts=self.a_tri_dens_uncert_list,
                 use_photometric_uncertainties=self.a_use_photometric_uncertainties, pregenerate_cutouts=True,
                 chunks=[self.chunk_id], n_r=self.real_hankel_points, n_rho=self.four_hankel_points,
                 max_rho=self.four_max_rho, mn_fit_type=self.a_mn_fit_type)
@@ -241,14 +239,13 @@ class CrossMatch():
             b_npy_or_csv = 'csv'
             b_coord_or_chunk = 'chunk'
         if self.b_correct_astrometry:
-            bcbi = self.b_correct_astro_mag_indices_index
             t = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             print(f"{t} Rank {self.rank}, chunk {self.chunk_id}: Calculating catalogue 'b' "
                   "uncertainty corrections...")
             ac = AstrometricCorrections(
-                self.b_psf_fwhms[bcbi], self.num_trials, self.b_nn_radius, self.b_dens_dist,
-                self.b_correct_astro_save_folder, self.b_gal_wavs[bcbi], self.b_gal_aboffsets[bcbi],
-                self.b_gal_filternames[bcbi], self.b_gal_al_avs[bcbi], self.d_mag, self.b_dd_params,
+                self.b_psf_fwhms, self.num_trials, self.b_nn_radius, self.b_dens_dist,
+                self.b_correct_astro_save_folder, self.b_gal_wavs, self.b_gal_aboffsets,
+                self.b_gal_filternames, self.b_gal_al_avs, self.d_mag, self.b_dd_params,
                 self.b_l_cut, ax1_mids, ax2_mids, ax_dimension, self.b_correct_mag_array,
                 self.b_correct_mag_slice, self.b_correct_sig_slice, self.n_pool, b_npy_or_csv,
                 b_coord_or_chunk, self.b_pos_and_err_indices, self.b_mag_indices, self.b_snr_indices,
@@ -256,10 +253,9 @@ class CrossMatch():
                 self.b_saturation_magnitudes, trifilepath=self.b_auf_file_path,
                 maglim_f=self.b_tri_maglim_faint, magnum=self.b_tri_filt_num,
                 tri_num_faint=self.b_tri_num_faint, trifilterset=self.b_tri_set_name,
-                trifiltname=self.b_tri_filt_names[bcbi], tri_hist=self.b_dens_hist_tri_list[bcbi],
-                tri_mags=self.b_tri_model_mags_list[bcbi],
-                dtri_mags=self.b_tri_model_mags_interval_list[bcbi],
-                tri_uncert=self.b_tri_dens_uncert_list[bcbi],
+                trifiltnames=self.b_tri_filt_names, tri_hists=self.b_dens_hist_tri_list,
+                tri_magses=self.b_tri_model_mags_list, dtri_magses=self.b_tri_model_mags_interval_list,
+                tri_uncerts=self.b_tri_dens_uncert_list,
                 use_photometric_uncertainties=self.b_use_photometric_uncertainties,
                 pregenerate_cutouts=True, chunks=[self.chunk_id],
                 n_r=self.real_hankel_points, n_rho=self.four_hankel_points, max_rho=self.four_max_rho,
@@ -1299,28 +1295,30 @@ class CrossMatch():
 
                 a = config['correct_mag_array']
                 try:
-                    b = np.array([float(f) for f in a])
-                except ValueError as exc:
-                    raise ValueError('correct_mag_array should be a list of floats in the '
+                    b = np.array([float(f) for mid_list in a for f in mid_list])
+                except (ValueError, TypeError) as exc:
+                    raise ValueError('correct_mag_array should be a list of list of floats in the '
                                      f'catalogue {catname} metadata file.') from exc
 
                 a = config['correct_mag_slice']
                 try:
-                    b = np.array([float(f) for f in a])
+                    b = np.array([float(f) for mid_list in a for f in mid_list])
                 except ValueError as exc:
-                    raise ValueError('correct_mag_slice should be a list of floats in the '
+                    raise ValueError('correct_mag_slice should be a list of list of floats in the '
                                      f'catalogue {catname} metadata file.') from exc
-                if len(b) != len(config['correct_mag_array']):
+                if (len(a) != len(config['correct_mag_array']) or
+                        np.any([len(a[i]) != len(config['correct_mag_array'][i]) for i in range(len(a))])):
                     raise ValueError(f'{flag}correct_mag_array and {flag}correct_mag_slice should contain '
                                      'the same number of entries.')
 
                 a = config['correct_sig_slice']
                 try:
-                    b = np.array([float(f) for f in a])
+                    b = np.array([float(f) for mid_list in a for f in mid_list])
                 except ValueError as exc:
-                    raise ValueError('correct_sig_slice should be a list of floats in the '
+                    raise ValueError('correct_sig_slice should be a list of list of floats in the '
                                      f'catalogue {catname} metadata file.') from exc
-                if len(b) != len(config['correct_mag_array']):
+                if (len(a) != len(config['correct_mag_array']) or
+                        np.any([len(a[i]) != len(config['correct_mag_array'][i]) for i in range(len(a))])):
                     raise ValueError(f'{flag}correct_mag_array and {flag}correct_sig_slice should contain '
                                      'the same number of entries.')
 

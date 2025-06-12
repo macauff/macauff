@@ -99,14 +99,14 @@ class TestAstroCorrection:
         sigslice = np.array([0.01, 0.01, 0.01, 0.01, 0.01])
 
         _kwargs = {
-            'psf_fwhm': 6.1, 'numtrials': 10000, 'nn_radius': 30, 'dens_search_radius': 0.25,
+            'psf_fwhms': [6.1], 'numtrials': 10000, 'nn_radius': 30, 'dens_search_radius': 0.25,
             'save_folder': 'ac_save_folder', 'trifilepath': 'tri_folder/trilegal_sim.dat',
             'maglim_f': 25, 'magnum': 11, 'tri_num_faint': 1500000,
-            'trifilterset': '2mass_spitzer_wise', 'trifiltname': 'W1', 'gal_wav_micron': 3.35,
-            'gal_ab_offset': 2.699, 'gal_filtname': 'wise2010-W1', 'gal_alav': 0.039,
+            'trifilterset': '2mass_spitzer_wise', 'trifiltnames': ['W1'], 'gal_wavs_micron': [3.35],
+            'gal_ab_offsets': [2.699], 'gal_filtnames': ['wise2010-W1'], 'gal_alavs': [0.039],
             'dm': 0.1, 'dd_params': dd_params, 'l_cut': l_cut, 'ax1_mids': ax1_mids,
-            'ax2_mids': ax2_mids, 'cutout_area': 60, 'cutout_height': 6, 'mag_array': magarray,
-            'mag_slice': magslice, 'sig_slice': sigslice, 'n_pool': 1,
+            'ax2_mids': ax2_mids, 'cutout_area': 60, 'cutout_height': 6, 'mag_arrays': [magarray],
+            'mag_slices': [magslice], 'sig_slices': [sigslice], 'n_pool': 1,
             'pos_and_err_indices': [[0, 1, 2], [0, 1, 2]], 'mag_indices': [3],
             'snr_indices': [4], 'mag_names': ['W1'], 'correct_astro_mag_indices_index': 0,
             'n_r': 5000, 'n_rho': 5000, 'max_rho': 100, 'saturation_magnitudes': [15],
@@ -200,13 +200,13 @@ class TestAstroCorrection:
         chunks = None
         ax_dimension = 1
         ac = AstrometricCorrections(
-            psf_fwhm=6.1, numtrials=1000, nn_radius=30, dens_search_radius=0.25,
+            psf_fwhms=[6.1], numtrials=1000, nn_radius=30, dens_search_radius=0.25,
             save_folder='ac_save_folder', trifilepath='tri_folder/trilegal_sim_{}_{}.dat',
             maglim_f=25, magnum=11, tri_num_faint=1500000, trifilterset='2mass_spitzer_wise',
-            trifiltname='W1', gal_wav_micron=3.35, gal_ab_offset=2.699, gal_filtname='wise2010-W1',
-            gal_alav=0.039, dm=0.1, dd_params=dd_params, l_cut=l_cut, ax1_mids=ax1_mids,
-            ax2_mids=ax2_mids, ax_dimension=ax_dimension, cutout_area=60, cutout_height=6,
-            mag_array=magarray, mag_slice=magslice, sig_slice=sigslice, n_pool=1, npy_or_csv='npy',
+            trifiltnames=['W1'], gal_wavs_micron=[3.35], gal_ab_offsets=[2.699],
+            gal_filtnames=['wise2010-W1'], gal_alavs=[0.039], dm=0.1, dd_params=dd_params, l_cut=l_cut,
+            ax1_mids=ax1_mids, ax2_mids=ax2_mids, ax_dimension=ax_dimension, cutout_area=60, cutout_height=6,
+            mag_arrays=[magarray], mag_slices=[magslice], sig_slices=[sigslice], n_pool=1, npy_or_csv='npy',
             coord_or_chunk='coord', pos_and_err_indices=[[0, 1, 2], [0, 1, 2]], mag_indices=[3],
             snr_indices=[4], mag_names=['W1'], correct_astro_mag_indices_index=0,
             coord_system='equatorial', chunks=chunks, pregenerate_cutouts=True, n_r=2000, n_rho=2000,
@@ -330,23 +330,41 @@ class TestAstroCorrection:
             snr_indices = [4, 5]
             saturation_magnitudes = [5, 5]
             mag_names = ['W1', 'W2']
+            psf_fwhms = [6.1, 6.4]
+            trifiltnames = ['W1', 'W2']
+            gal_wavs_micron = [3.35, 4.62]
+            gal_ab_offsets = [2.699, 3.339]
+            gal_filtnames = ['wise2010-W1', 'wise2010-W2']
+            gal_alavs = [0.039, 0.026]
+            mag_arrays = [magarray, magarray]
+            mag_slices = [magslice, magslice]
+            sig_slices = [sigslice, sigslice]
         else:
             pos_and_err_indices = [[0, 1, 2], [0, 1, 2]]
             mag_indices = [3]
             snr_indices = [4]
             saturation_magnitudes = [5]
             mag_names = ['W1']
+            psf_fwhms = [6.1]
+            trifiltnames = ['W1']
+            gal_wavs_micron = [3.35]
+            gal_ab_offsets = [2.699]
+            gal_filtnames = ['wise2010-W1']
+            gal_alavs = [0.039]
+            mag_arrays = [magarray]
+            mag_slices = [magslice]
+            sig_slices = [sigslice]
         ac = AstrometricCorrections(
-            psf_fwhm=6.1, numtrials=1000, nn_radius=30, dens_search_radius=1,
+            psf_fwhms=psf_fwhms, numtrials=1000, nn_radius=30, dens_search_radius=1,
             save_folder='ac_save_folder', trifilepath='tri_folder/trilegal_sim_{}_{}.dat',
             maglim_f=25, magnum=11, tri_num_faint=1500000, trifilterset='2mass_spitzer_wise',
-            trifiltname='W1', gal_wav_micron=3.35, gal_ab_offset=2.699, gal_filtname='wise2010-W1',
-            gal_alav=0.039, dm=0.1, dd_params=dd_params, l_cut=l_cut, ax1_mids=ax1_mids,
-            ax2_mids=ax2_mids, ax_dimension=ax_dimension, mag_array=magarray, mag_slice=magslice,
-            sig_slice=sigslice, n_pool=1, npy_or_csv=npy_or_csv, coord_or_chunk=coord_or_chunk,
-            pos_and_err_indices=pos_and_err_indices, mag_indices=mag_indices, snr_indices=snr_indices,
-            mag_names=mag_names, correct_astro_mag_indices_index=0, coord_system=coord_system, chunks=chunks,
-            pregenerate_cutouts=pregenerate_cutouts,
+            trifiltnames=trifiltnames, gal_wavs_micron=gal_wavs_micron, gal_ab_offsets=gal_ab_offsets,
+            gal_filtnames=gal_filtnames, gal_alavs=gal_alavs, dm=0.1, dd_params=dd_params, l_cut=l_cut,
+            ax1_mids=ax1_mids, ax2_mids=ax2_mids, ax_dimension=ax_dimension, mag_arrays=mag_arrays,
+            mag_slices=mag_slices, sig_slices=sig_slices, n_pool=1, npy_or_csv=npy_or_csv,
+            coord_or_chunk=coord_or_chunk, pos_and_err_indices=pos_and_err_indices, mag_indices=mag_indices,
+            snr_indices=snr_indices, mag_names=mag_names, correct_astro_mag_indices_index=0,
+            coord_system=coord_system, chunks=chunks, pregenerate_cutouts=pregenerate_cutouts,
             use_photometric_uncertainties=use_photometric_uncertainties,
             cutout_area=60 if pregenerate_cutouts is False else None,
             cutout_height=6 if pregenerate_cutouts is False else None, n_r=2000, n_rho=2000, max_rho=40,
