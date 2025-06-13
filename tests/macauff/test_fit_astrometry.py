@@ -194,9 +194,9 @@ class TestAstroCorrection:
         dd_params = np.load(os.path.join(os.path.dirname(__file__), 'data/dd_params.npy'))
         l_cut = np.load(os.path.join(os.path.dirname(__file__), 'data/l_cut.npy'))
         ax1_mids, ax2_mids = np.array([105], dtype=float), np.array([0], dtype=float)
-        magarray = np.array([14.07, 14.17, 14.27, 14.37, 14.47])
-        magslice = np.array([0.05, 0.05, 0.05, 0.05, 0.05])
-        sigslice = np.array([0.01, 0.01, 0.01, 0.01, 0.01])
+        magarray = [np.array([14.07, 14.17, 14.27, 14.37, 14.47])]
+        magslice = [np.array([0.05, 0.05, 0.05, 0.05, 0.05])]
+        sigslice = [np.array([0.01, 0.01, 0.01, 0.01, 0.01])]
         chunks = None
         ax_dimension = 1
         ac = AstrometricCorrections(
@@ -399,7 +399,7 @@ class TestAstroCorrection:
 
         if half_run_flag:
             np.save('ac_save_folder/npy/mn_sigs_array.npy',
-                    np.array([[-1, -1, -1, -1], [12, 15, 18, 21]], dtype=float))
+                    np.array([[-9999, -9999, -9999, -9999], [12, 15, 18, 21]], dtype=float))
         if in_memory:
             cat_args = (105.0, 0.0)
             ax1_min, ax1_max, ax2_min, ax2_max = 100, 110, -3, 3

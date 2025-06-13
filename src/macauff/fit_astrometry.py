@@ -61,9 +61,10 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
                  npy_or_csv, coord_or_chunk, pos_and_err_indices, mag_indices, snr_indices,
                  mag_names, correct_astro_mag_indices_index, coord_system, saturation_magnitudes,
                  pregenerate_cutouts, n_r, n_rho, max_rho, mn_fit_type, trifilepath=None, maglim_f=None,
-                 magnum=None, tri_num_faint=None, trifilterset=None, trifiltnames=None, tri_hists=None,
-                 tri_magses=None, dtri_magses=None, tri_uncerts=None, use_photometric_uncertainties=False,
-                 cutout_area=None, cutout_height=None, single_sided_auf=True, chunks=None, return_nm=False):
+                 magnum=None, tri_num_faint=None, trifilterset=None, trifiltnames=[None], tri_hists=[None],
+                 tri_magses=[None], dtri_magses=[None], tri_uncerts=[None],
+                 use_photometric_uncertainties=False, cutout_area=None, cutout_height=None,
+                 single_sided_auf=True, chunks=None, return_nm=False):
         """
         Initialisation of AstrometricCorrections, accepting inputs required for
         the running of the optimisation and parameterisation of astrometry of
@@ -559,7 +560,7 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
                                       dtype=float, shape=shape)
             else:
                 mn_sigs = np.empty(dtype=float, shape=shape)
-            mn_sigs[:] = -1
+            mn_sigs[:] = -9999
         else:
             mn_sigs = open_memmap(f'{self.save_folder}/npy/mn_sigs_array.npy', mode='r+')
 
@@ -593,7 +594,7 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
             self.ind_poisson_cdfs = np.empty(shape, object)
 
         for index_, list_of_things in enumerate(zip(*zip_list)):
-            if not np.all(mn_sigs[index_, :] == -1):
+            if np.all(mn_sigs[index_, :] != -9999):
                 continue
             print(f'Running astrometry fits for sightline {index_+1}/{len(self.ax1_mids)}...')
             sys.stdout.flush()
