@@ -16,6 +16,10 @@ General
 New Features
 ^^^^^^^^^^^^
 
+- ``AstrometricCorrections`` runs per-band parameterisation when using photometry
+  to calibrate astrometric precisions, with an "astrometric scatter"-based relation
+  for each filter. [#91]
+
 - Added ``with_and_without_photometry`` input keyword, to allow for cases where
   ``include_phot_like`` is ``True`` but an astrometry-only cross-match is also
   desired, saving two sets of counterparts and corresponding data in one
@@ -45,6 +49,31 @@ Bug Fixes
 
 API Changes
 ^^^^^^^^^^^
+
+- ``CrossMatch`` replaced ``mag_unc_indices`` with ``snr_indices``, requiring
+  pre-computed signal-to-noise ratios rather than photometric uncertainties where
+  required. [#91]
+
+- Removed ``compute_snr_mag_relation`` and ``snr_mag_params_file_path`` now that
+  SNRs are required as inputs and hence it is no longer necessary to compute the
+  the scaling with magnitude. [#91]
+
+- ``correct_mag_array``, ``correct_mag_slice``, and ``correct_sig_slice`` require,
+  both as inputs to ``CrossMatch`` but generally through to
+  ``AstrometricCorrections``, per-band lists of such parameters if photometric
+  calibration is required. [#91]
+
+- ``pos_and_err_indices`` now has a third permutation of accepted input, where
+  photometry-based calibration through ``AstrometricCorrections`` will require
+  three reference-catalogue indices, two position indices in the catatlogue to
+  be calibrated, and a number of photometric-uncertainty column indices as
+  appropriate. [#91]
+
+- ``AstrometricCorrections`` takes full lists of photometric band-related inputs
+  than a single, best parameter, mirroring the format in ``CrossMatch``. [#91]
+
+- ``csv_to_npy`` requires SNR column indices where relevant, and handles the
+  per-band astrometric parameterisation accordingly. [#91]
 
 - ``joint_folder_path`` and ``output_csv_folder`` merged into
   ``output_save_folder``. [#90]
