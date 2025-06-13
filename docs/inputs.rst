@@ -146,11 +146,11 @@ These parameters are required in two separate files, one per catalogue to be cro
 
 These can be divided into those inputs that are always required:
 
-``cat_csv_file_path``, ``cat_name``, ``pos_and_err_indices``, ``mag_indices``, ``chunk_overlap_col``, ``best_mag_index_col``, ``csv_has_header``, ``filt_names``, ``auf_file_path``, ``auf_region_type``, ``auf_region_frame``, ``auf_region_points_per_chunk``, ``chunk_id_list``, ``correct_astrometry``, and ``compute_snr_mag_relation``;
+``cat_csv_file_path``, ``cat_name``, ``pos_and_err_indices``, ``mag_indices``, ``chunk_overlap_col``, ``best_mag_index_col``, ``csv_has_header``, ``filt_names``, ``auf_file_path``, ``auf_region_type``, ``auf_region_frame``, ``auf_region_points_per_chunk``, ``chunk_id_list``, and ``correct_astrometry``;
 
 those that are only required if the `Joint Parameters`_ option ``include_perturb_auf`` is ``True``:
 
-``fit_gal_flag``, ``run_fw_auf``, ``run_psf_auf``, ``psf_fwhms``, ``snr_mag_params_file_path``, ``download_tri``, ``tri_set_name``, ``tri_filt_names``, ``tri_filt_num``, ``tri_maglim_faint``, ``tri_num_faint``, ``gal_al_avs``, ``dens_dist``, ``dens_hist_tri_location``, ``tri_model_mags_location``, ``tri_model_mag_mids_location``, ``tri_model_mags_interval_location``, and ``tri_n_bright_sources_star_location``;
+``fit_gal_flag``, ``run_fw_auf``, ``run_psf_auf``, ``psf_fwhms``, ``download_tri``, ``tri_set_name``, ``tri_filt_names``, ``tri_filt_num``, ``tri_maglim_faint``, ``tri_num_faint``, ``gal_al_avs``, ``dens_dist``, ``snr_indices``, ``dens_hist_tri_location``, ``tri_model_mags_location``, ``tri_model_mag_mids_location``, ``tri_model_mags_interval_location``, and ``tri_n_bright_sources_star_location``;
 
 parameters required if ``run_psf_auf`` is ``True``:
 
@@ -164,19 +164,12 @@ inputs required if ``make_output_csv`` is ``True``:
 
 ``input_csv_file_path``, ``cat_col_names``, ``cat_col_nums``, ``extra_col_names``, and ``extra_col_nums``;
 
-the inputs required if either ``correct_astrometry`` or ``compute_snr_mag_relation`` are ``True``:
+the inputs required if either ``correct_astrometry`` is ``True``:
 
-``correct_astro_save_folder``, ``mag_unc_indices``;
-
-and the inputs required if ``correct_astrometry`` is ``True``:
-
-``correct_astro_mag_indices_index``, ``nn_radius``, ``ref_cat_csv_file_path``, ``correct_mag_array``, ``correct_mag_slice``, ``correct_sig_slice``, and ``saturation_magnitudes``.
+``correct_astro_save_folder``, ``correct_astro_mag_indices_index``, ``nn_radius``, ``ref_cat_csv_file_path``, ``correct_mag_array``, ``correct_mag_slice``, ``correct_sig_slice``, ``use_photometric_uncertainties``, and ``saturation_magnitudes``.
 
 .. note::
-    ``run_fw_auf``, ``run_psf_auf``, ``psf_fwhms``, ``snr_mag_params_file_path``, ``download_tri``, ``tri_set_name``, ``tri_filt_names``, ``tri_filt_num``, ``tri_maglim_faint``, ``tri_num_faint``, ``dens_dist``, ``dd_params_path``, ``l_cut_path``, ``gal_wavs``, ``gal_zmax``, ``gal_nzs``, ``gal_aboffsets``, ``gal_filternames``, and ``gal_al_avs`` are all currently required if ``correct_astrometry`` is ``True``, bypassing the nested flags above. For example, ``dens_dist`` is required as an input if ``include_perturb_auf`` is ``True``, or if ``correct_astrometry`` is set. This means that ``AstrometricCorrections`` implicitly always runs and fits for a full Astrometric Uncertainty Function.
-
-.. note::
-    ``snr_mag_params_file_path`` is currently also required if ``compute_snr_mag_relation`` is ``True``, bypassing the above flags. It is therefore currently a required input if any one of ``include_perturb_auf``, ``correct_astrometry``, or ``compute_snr_mag_relation`` are set to ``True``.
+    ``run_fw_auf``, ``run_psf_auf``, ``psf_fwhms``, ``download_tri``, ``tri_set_name``, ``tri_filt_names``, ``tri_filt_num``, ``tri_maglim_faint``, ``tri_num_faint``, ``dens_dist``, ``dd_params_path``, ``l_cut_path``, ``gal_wavs``, ``gal_zmax``, ``gal_nzs``, ``gal_aboffsets``, ``gal_filternames``, ``gal_al_avs``, and ``snr_indices`` are all currently required if ``correct_astrometry`` is ``True``, bypassing the nested flags above. For example, ``dens_dist`` is required as an input if ``include_perturb_auf`` is ``True``, or if ``correct_astrometry`` is set. This means that ``AstrometricCorrections`` implicitly always runs and fits for a full Astrometric Uncertainty Function.
 
 
 Catalogue Parameter Description
@@ -192,7 +185,7 @@ The name of the catalogue. This is used to generate intermediate folder structur
 
 ``pos_and_err_indices``
 
-A list of either three or six integers. If ``correct_astrometry`` is ``True``, a list of six integers, the first three elements of which are the zero-indexed indices into the *input* catalogue .csv file (``cat_csv_file_path``) for the longitudinal coordinate, latitudinal coordinate, and circular astrometric precision respectively, followed by the lon/lat/uncert of the *reference* catalogue (``ref_cat_csv_file_path``). For example, ``[10, 9, 8, 0, 1, 2]`` suggests that the reference catalogue begins with the position and uncertainty of its objects while the catalogue "a" or "b" sources have, in their original .csv file, a backwards list of coordinates and precisions towards the final columns of the filing system. Otherwise (including if ``compute_snr_mag_relation`` is ``True``), then only three integers should be passed, the respective coordinates for its own catalogue (dropping the indices of the reference catalogue); in the above example we would therefore only pass ``[10, 9, 8]``.
+A list of either three, six, or N integers. If ``correct_astrometry`` is ``True``, a list of either six or N integers. If ``use_photometric_uncertainties`` is ``False`` then the first three elements are the zero-indexed indices into the *input* catalogue .csv file (``cat_csv_file_path``) for the longitudinal coordinate, latitudinal coordinate, and circular astrometric precision respectively, followed by the lon/lat/uncert of the *reference* catalogue (``ref_cat_csv_file_path``). For example, ``[10, 9, 8, 0, 1, 2]`` suggests that the reference catalogue begins with the position and uncertainty of its objects while the catalogue "a" or "b" sources have, in their original .csv file, a backwards list of coordinates and precisions towards the final columns of the filing system. If photometric uncertainties are to be used to correct astrometric uncertainties, then the first two elements should be input longitude and latitude, followed by all indices for the input catalogue's photometric uncertainty columns, with the three reference catalogue longitude, latitude, and circular astrometric precision columns. Otherwise for ``correct_astrometry`` being ``False`` then only three integers should be passed, the respective coordinates for its own catalogue (dropping the indices of the reference catalogue and requiring that astrometric uncertainty be the third index); in the above example we would therefore only pass ``[10, 9, 8]``.
 
 ``mag_indices``
 
@@ -244,10 +237,6 @@ In cases where catalogues have unreliable *centroid* uncertainties, before catal
 .. note::
     If ``correct_astrometry`` is ``True`` then ``dustmaps`` will be called to obtain line-of-sight extinction values. You will need the SFD dustmaps to be pre-downloaded; to do so before you call the cross-match procedure you must run ``dustmaps.sfd.fetch()``; see the ``dustmaps`` documentation for more details on how to specific a particular download location.
 
-``compute_snr_mag_relation``
-
-This flag can be ``False`` if the relationship between signal-to-noise ratio and magnitude is pre-computed; otherwise it indicates that the functional form of SNR vs brightness should be derived for the particular catalogue in question.
-
 ``fit_gal_flag``
 
 Optional flag for whether to include simulated external galaxy counts, or just include Galactic sources when deriving the perturbation component of the AUF. Only needed if ``include_perturb_auf`` is ``True``.
@@ -263,10 +252,6 @@ Complementary flag to ``run_fw_auf``, indicates whether to run background-domina
 ``psf_fwhms``
 
 The Full-Width-At-Half-Maximum of each filter's Point Spread Function (PSF), in the same order as in ``filt_names``. These are used to simulate the PSF if ``include_perturb_auf`` is set to ``True``, and are unnecessary otherwise. Should be a list of floats.
-
-``snr_mag_params_file_path``
-
-File path, either absolute or relative to the location of the script the cross-matches are run from, of a binary ``.npy`` file containing the parameterisation of the signal-to-noise ratio of sources as a function of magnitude, in a series of given sightlines. Must contain the necessary ``_{}`` formatting for per-chunk parameters. Must be of shape ``(N, M, 5)`` where ``N`` is the number of filters in ``filt_names`` order, ``M`` is the number of sightlines for which SNR vs mag has been derived, and the 5 entries for each filter-sightline combination must be in order ``a``, ``b``, ``c``, ``coord1`` (e.g. RA), and ``coord2`` (e.g. Dec). See pre-processing for more information on the meaning of those terms and how ``snr_mag_params`` is used.
 
 ``download_tri``
 
@@ -323,6 +308,10 @@ Alongside ``dd_params_path``, path to the ``.npy`` file containing the limiting 
 ``dens_dist``
 
 The radius, in arcseconds, within which to count internal catalogue sources for each object, to calculate the local source density. Used to scale TRILEGAL simulated source counts to match smaller scale density fluctuations. Only required if ``include_perturb_auf`` is ``True``.
+
+``snr_indices``
+
+Similar to ``mag_indices``, a list of ``len(mag_indices)`` integers, one for each column in ``mag_indices`` for where the corresponding signal-to-noise ratio column is held for each magnitude in the input .csv file.
 
 ``gal_wavs``
 
@@ -386,19 +375,15 @@ Similar to ``cat_csv_file_path``, but the path and filename, including extension
 
 ``correct_mag_array``
 
-List of magnitudes at which to evaluate the distribution of matches to the higher-astrometric-precision dataset in the chosen ``correct_astro_mag_indices_index`` filter. Accepts a list of floats.
+List of magnitude arrays at which to evaluate the distribution of matches to the higher-astrometric-precision dataset in each input-catalogue photometric filter. Accepts a list of lists of floats, or two-dimensional array, with the first axis the same length as ``mag_indices``.
 
 ``correct_mag_slice``
 
-Corresponding to each magnitude in ``correct_mag_array``, each element of this list of floats should be a width around each ``correct_mag_array`` element to select sources, ensuring a small sub-set of similar brightness objects are used to determine the Astrometric Uncertainty Function of.
+Corresponding to each magnitude in ``correct_mag_array``, each element of this list of lists of floats should be a width around each ``correct_mag_array`` element to select sources, ensuring a small sub-set of similar brightness objects are used to determine the Astrometric Uncertainty Function of.
 
 ``correct_sig_slice``
 
-Elementwise with ``correct_mag_array`` and ``correct_mag_slice``, a list of floats of widths of astrometric precision to select a robust sub-sample of objects in each magnitude bin for, ensuring a self-similar AUF.
-
-``mag_unc_indices``
-
-Similar to ``mag_indices``, a list of ``len(mag_indices)`` integers, one for each column in ``mag_indices`` for where the corresponding uncertainty column is held for each magnitude in the input .csv file.
+Elementwise with ``correct_mag_array`` and ``correct_mag_slice``, a list of lists of floats of widths of astrometric precision to select a robust sub-sample of objects in each magnitude bin for, ensuring a self-similar AUF.
 
 ``use_photometric_uncertainties``
 
