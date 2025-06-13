@@ -15,7 +15,6 @@ import timeit
 
 import numpy as np
 import requests
-
 from scipy.stats import binned_statistic
 
 # pylint: disable=import-error,no-name-in-module
