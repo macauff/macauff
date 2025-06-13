@@ -206,8 +206,10 @@ class CrossMatch():
                 cat_in_radec=self.a_auf_region_frame == 'equatorial',
                 mn_in_radec=self.a_auf_region_frame == 'equatorial')
             if snr_cols is not None:
+                # pylint: disable-next=unbalanced-tuple-unpacking
                 self.a_astro, self.a_photo, self.a_magref, self.a_in_overlaps, self.a_snr = x
             else:
+                # pylint: disable-next=unbalanced-tuple-unpacking
                 self.a_astro, self.a_photo, self.a_magref, self.a_in_overlaps = x
         else:
             if not os.path.isfile(self.a_cat_csv_file_path):
@@ -223,8 +225,10 @@ class CrossMatch():
                 self.a_cat_csv_file_path, self.a_pos_and_err_indices, self.a_mag_indices,
                 self.a_best_mag_index_col, self.a_chunk_overlap_col, snr_cols=snr_cols, header=False)
             if snr_cols is not None:
+                # pylint: disable-next=unbalanced-tuple-unpacking
                 self.a_astro, self.a_photo, self.a_magref, self.a_in_overlaps, self.a_snr = x
             else:
+                # pylint: disable-next=unbalanced-tuple-unpacking
                 self.a_astro, self.a_photo, self.a_magref, self.a_in_overlaps = x
 
         if self.b_correct_astrometry:
@@ -279,8 +283,10 @@ class CrossMatch():
                 cat_in_radec=self.b_auf_region_frame == 'equatorial',
                 mn_in_radec=self.b_auf_region_frame == 'equatorial')
             if snr_cols is not None:
+                # pylint: disable-next=unbalanced-tuple-unpacking
                 self.b_astro, self.b_photo, self.b_magref, self.b_in_overlaps, self.b_snr = x
             else:
+                # pylint: disable-next=unbalanced-tuple-unpacking
                 self.b_astro, self.b_photo, self.b_magref, self.b_in_overlaps = x
         else:
             if not os.path.isfile(self.b_cat_csv_file_path):
@@ -295,8 +301,10 @@ class CrossMatch():
                 self.b_cat_csv_file_path, self.b_pos_and_err_indices, self.b_mag_indices,
                 self.b_best_mag_index_col, self.b_chunk_overlap_col, snr_cols=snr_cols, header=False)
             if snr_cols is not None:
+                # pylint: disable-next=unbalanced-tuple-unpacking
                 self.b_astro, self.b_photo, self.b_magref, self.b_in_overlaps, self.b_snr = x
             else:
+                # pylint: disable-next=unbalanced-tuple-unpacking
                 self.b_astro, self.b_photo, self.b_magref, self.b_in_overlaps = x
 
         self.make_shared_data()

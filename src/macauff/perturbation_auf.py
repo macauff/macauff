@@ -234,22 +234,21 @@ def make_perturb_aufs(cm, which_cat):
                 local_n[med_index_slice[good_mag_snr_slice], j] = localn
                 if fit_gal_flag:
                     single_perturb_auf_output = create_single_perturb_auf(
-                        auf_points[i], cm.r, cm.dr, cm.j0s, num_trials, psf_fwhms[j], dens_mags[j], a_photo,
-                        a_snr, localn, d_mag, delta_mag_cuts, dd_params, l_cut, run_fw, run_psf,
-                        al_avs[j], avs, fit_gal_flag, sky_area, saturation_magnitudes[j], cmau_array, wavs[j],
-                        z_maxs[j], nzs[j], alpha0, alpha1, alpha_weight, ab_offsets[j], filter_names[j],
+                        cm.r, cm.dr, cm.j0s, num_trials, psf_fwhms[j], dens_mags[j], a_photo, a_snr, localn,
+                        d_mag, delta_mag_cuts, dd_params, l_cut, run_fw, run_psf, al_avs[j], avs,
+                        fit_gal_flag, sky_area, saturation_magnitudes[j], cmau_array, wavs[j], z_maxs[j],
+                        nzs[j], alpha0, alpha1, alpha_weight, ab_offsets[j], filter_names[j],
                         tri_file_path=new_auf_file_path, filt_header=tri_filt_names[j],
                         dens_hist_tri=dens_hist_tri[j], model_mags=tri_model_mags[j],
                         model_mag_mids=tri_model_mag_mids[j], model_mags_interval=tri_model_mags_interval[j],
                         n_bright_sources_star=tri_n_bright_sources_star[j])
                 else:
                     single_perturb_auf_output = create_single_perturb_auf(
-                        auf_points[i], cm.r, cm.dr, cm.j0s, num_trials, psf_fwhms[j], dens_mags[j], a_photo,
-                        a_snr, localn, d_mag, delta_mag_cuts, dd_params, l_cut, run_fw, run_psf,
-                        al_avs[j], avs, fit_gal_flag, tri_file_path=new_auf_file_path,
-                        filt_header=tri_filt_names[j], dens_hist_tri=dens_hist_tri[j],
-                        model_mags=tri_model_mags[j], model_mag_mids=tri_model_mag_mids[j],
-                        model_mags_interval=tri_model_mags_interval[j],
+                        cm.r, cm.dr, cm.j0s, num_trials, psf_fwhms[j], dens_mags[j], a_photo, a_snr, localn,
+                        d_mag, delta_mag_cuts, dd_params, l_cut, run_fw, run_psf, al_avs[j], avs,
+                        fit_gal_flag, tri_file_path=new_auf_file_path, filt_header=tri_filt_names[j],
+                        dens_hist_tri=dens_hist_tri[j], model_mags=tri_model_mags[j],
+                        model_mag_mids=tri_model_mag_mids[j], model_mags_interval=tri_model_mags_interval[j],
                         n_bright_sources_star=tri_n_bright_sources_star[j])
                 perturb_auf_outputs[perturb_auf_combo] = single_perturb_auf_output
             else:
@@ -516,7 +515,7 @@ def download_trilegal_simulation(tri_file_path, tri_filter_set, ax1, ax2, mag_nu
 
 
 # pylint: disable=too-many-locals,too-many-arguments,too-many-positional-arguments
-def create_single_perturb_auf(auf_point, r, dr, j0s, num_trials, psf_fwhm, density_mag, a_photo, a_snr,
+def create_single_perturb_auf(r, dr, j0s, num_trials, psf_fwhm, density_mag, a_photo, a_snr,
                               localn, d_mag, mag_cut, dd_params, l_cut, run_fw, run_psf, al_av,
                               avs, fit_gal_flag, sky_area=None, saturation_magnitude=None, cmau_array=None,
                               wav=None, z_max=None, nz=None, alpha0=None, alpha1=None, alpha_weight=None,
@@ -529,8 +528,6 @@ def create_single_perturb_auf(auf_point, r, dr, j0s, num_trials, psf_fwhm, densi
 
     Parameters
     ----------
-    auf_point : numpy.ndarray
-        The orthogonal sky coordinates of the simulated AUF component.
     r : numpy.ndarray
         Array of real-space positions.
     dr : numpy.ndarray

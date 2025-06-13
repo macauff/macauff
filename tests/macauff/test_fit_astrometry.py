@@ -298,7 +298,7 @@ class TestAstroCorrection:
                               ("npy", "coord", "galactic", None, True, True, False),
                               ("npy", "chunk", "equatorial", False, False, False, False),
                               ("npy", "chunk", "equatorial", True, False, False, True)])
-    # pylint: disable-next=too-many-statements,too-many-branches
+    # pylint: disable-next=too-many-statements,too-many-branches,too-many-locals
     def test_fit_astrometry(self, npy_or_csv, coord_or_chunk, coord_system, pregenerate_cutouts, return_nm,
                             in_memory, use_photometric_uncertainties):
         self.npy_or_csv = npy_or_csv
@@ -460,8 +460,10 @@ class TestAstroCorrection:
         if not use_photometric_uncertainties:
             # pylint: disable-next=possibly-used-before-assignment
             if half_run_flag:
+                # pylint: disable-next=possibly-used-before-assignment
                 assert np.all(mnarray.shape == (2, 4))
             else:
+                # pylint: disable-next=possibly-used-before-assignment
                 assert np.all(mnarray.shape == (1, 4))
             assert_allclose([mnarray[0, 0], mnarray[0, 1]], [2, 0], rtol=0.1, atol=0.01)
         else:

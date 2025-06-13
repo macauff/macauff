@@ -37,6 +37,7 @@ class TestParseCatalogue:
         for header_text, header in zip(['', '# a, b, c, d, e, f, g, h'], [False, True]):
             np.savetxt('test_data.csv', data1, delimiter=',', fmt='%s', header=header_text)
 
+            # pylint: disable-next=unbalanced-tuple-unpacking
             astro, photo, best_index, chunk_overlaps = csv_to_npy(
                 'test_data.csv', [0, 1, 2], [4, 5], 6, None, header=header)
 
@@ -57,6 +58,7 @@ class TestParseCatalogue:
         for header_text, header in zip(['', '# a, b, c, d, e, f, g, h'], [False, True]):
             np.savetxt('test_data.csv', data1, delimiter=',', fmt='%s', header=header_text)
 
+            # pylint: disable-next=unbalanced-tuple-unpacking
             astro, photo, best_index, chunk_overlaps = csv_to_npy(
                 'test_data.csv', [0, 1, 2], [4, 5], 6, 7, header=header)
 
@@ -68,7 +70,7 @@ class TestParseCatalogue:
             assert_allclose(best_index, self.data[:, 6])
             assert np.all(chunk_overlaps == self.data[:, 7])
 
-    def test_csv_to_npy_process_uncert(self):
+    def test_csv_to_npy_process_uncert(self):  # pylint: disable=too-many-statements
         # Convert data to string to get expected Pandas-esque .csv formatting where
         # NaN values are empty strings.
         data1 = self.data.astype(str)
@@ -108,7 +110,7 @@ class TestParseCatalogue:
         os.makedirs('test_sig_folder')
         np.save('test_sig_folder/mn_sigs_array.npy', np.array([[2, 0.01, 10.0, 0.0]]))
 
-        astro, photo, best_index, _ = csv_to_npy(
+        astro, photo, best_index, _ = csv_to_npy(  # pylint: disable=unbalanced-tuple-unpacking
             'test_data.csv', [0, 1, 2], [4, 5], 6, None, header=header, process_uncerts=True,
             astro_sig_fits_filepath='test_sig_folder', cat_in_radec=False, mn_in_radec=False)
 
@@ -124,7 +126,7 @@ class TestParseCatalogue:
         np.save('test_sig_folder/mn_sigs_array.npy', np.array([[
             2, 0.01, a.galactic.l.degree[0], a.galactic.b.degree[0]]]))
 
-        astro, photo, best_index, _ = csv_to_npy(
+        astro, photo, best_index, _ = csv_to_npy(  # pylint: disable=unbalanced-tuple-unpacking
             'test_data.csv', [0, 1, 2], [4, 5], 6, None, header=header, process_uncerts=True,
             astro_sig_fits_filepath='test_sig_folder', cat_in_radec=False, mn_in_radec=False)
 
@@ -158,7 +160,7 @@ class TestParseCatalogue:
         np.save('test_sig_folder/mn_sigs_array.npy',
                 np.array([[[2, 0.01, 10.0, 0.0], [1.1, 0.001, 10.0, 0.0]]]))
 
-        astro, photo, best_index, _ = csv_to_npy(
+        astro, photo, best_index, _ = csv_to_npy(  # pylint: disable=unbalanced-tuple-unpacking
             'test_data.csv', [0, 1, 5, 7], [4, 6], 8, None, header=header, process_uncerts=True,
             astro_sig_fits_filepath='test_sig_folder', cat_in_radec=False, mn_in_radec=False)
 

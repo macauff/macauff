@@ -185,7 +185,7 @@ def csv_to_npy(input_filename, astro_cols, photo_cols, bestindex_col,
             sig_mn_inds = mff.find_nearest_point(chunk.values[:, new_astro_cols[0]],
                                                  chunk.values[:, new_astro_cols[1]],
                                                  mn_coords[:, 0], mn_coords[:, 1])
-            if not per_band_param:
+            if not per_band_param:  # pylint: disable=possibly-used-before-assignment
                 old_sigs = chunk.values[:, new_astro_cols[2]]
                 # pylint: disable-next=possibly-used-before-assignment
                 new_sigs = np.sqrt((mn_sigs[sig_mn_inds, 0]*old_sigs)**2 + mn_sigs[sig_mn_inds, 1]**2)

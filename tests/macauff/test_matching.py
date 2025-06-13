@@ -1376,6 +1376,7 @@ class TestInputs:
         cm._load_metadata_config(self.chunk_id)
         cm.chunk_id = self.chunk_id
         cm._initialise_chunk()
+        # pylint: disable=no-member
         assert cm.a_correct_astro_mag_indices_index == 0
         assert_allclose(cm.a_nn_radius, 30)
         assert cm.a_correct_astro_save_folder == os.path.abspath('ac_folder')

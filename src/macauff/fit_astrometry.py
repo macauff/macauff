@@ -61,10 +61,9 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
                  npy_or_csv, coord_or_chunk, pos_and_err_indices, mag_indices, snr_indices,
                  mag_names, correct_astro_mag_indices_index, coord_system, saturation_magnitudes,
                  pregenerate_cutouts, n_r, n_rho, max_rho, mn_fit_type, trifilepath=None, maglim_f=None,
-                 magnum=None, tri_num_faint=None, trifilterset=None, trifiltnames=[None], tri_hists=[None],
-                 tri_magses=[None], dtri_magses=[None], tri_uncerts=[None],
-                 use_photometric_uncertainties=False, cutout_area=None, cutout_height=None,
-                 single_sided_auf=True, chunks=None, return_nm=False):
+                 magnum=None, tri_num_faint=None, trifilterset=None, trifiltnames=None, tri_hists=None,
+                 tri_magses=None, dtri_magses=None, tri_uncerts=None, use_photometric_uncertainties=False,
+                 cutout_area=None, cutout_height=None, single_sided_auf=True, chunks=None, return_nm=False):
         """
         Initialisation of AstrometricCorrections, accepting inputs required for
         the running of the optimisation and parameterisation of astrometry of
@@ -489,7 +488,7 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
             raise ValueError("tri_download must either be True, False, or None.")
         if self.trifilepath is not None and tri_download not in (True, False):
             raise ValueError("tri_download must either be True or False if trifilepath given.")
-        if None not in self.tri_hists and tri_download is not None:
+        if self.tri_hists is None or None not in self.tri_hists and tri_download is not None:
             raise ValueError("tri_download must be None if tri_hists is given.")
         if make_plots and seeing_ranges is None:
             raise ValueError("seeing_ranges must be provided if make_plots is True.")
@@ -1616,7 +1615,7 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
 
         return mn_poisson_cdfs, ind_poisson_cdfs
 
-    def plot_snr_mag_sig(self):
+    def plot_snr_mag_sig(self):  # pylint: disable=too-many-statements
         """
         Generate 2-D histograms of SNR, quoted/fit astrometric uncertainty, and
         photometric magnitude.
