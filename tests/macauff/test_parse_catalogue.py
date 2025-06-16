@@ -11,7 +11,8 @@ import pytest
 from astropy.coordinates import SkyCoord
 from numpy.testing import assert_allclose
 
-from macauff.parse_catalogue import csv_to_npy, npy_to_csv, rect_slice_csv, rect_slice_npy
+from macauff.parse_catalogue import (csv_to_npy, npy_to_csv, rect_slice_csv, rect_slice_npy,
+                                     apply_proper_motion)
 
 
 class TestParseCatalogue:
@@ -645,3 +646,22 @@ class TestParseCatalogueNpyToCsv:  # pylint: disable=too-many-instance-attribute
         assert_allclose(df['NNM_SEPARATION'], self.bfieldseps)
         assert_allclose(df['NNM_ETA'], self.bfieldeta)
         assert_allclose(df['NNM_XI'], self.bfieldxi)
+
+
+@pytest.mark.filterwarnings("ignore:.*ERFA function.*")
+@pytest.mark.parametrize("time_format", ["J", "Y"])
+@pytest.mark.parametrize("coord_system", ["galactic", "equatorial"])
+def test_apply_proper_motion(time_format, coord_system):
+    ra, dec = [180, 0], [85, 0]
+    pm_ra, pm_dec = [0, 30], [5*3600, 0]
+    if time_format == 'J':
+        ref_epoch = ['J2048.000', 'J2000.000']
+        move_to_epoch = 'J2050.000'
+    else:
+        ref_epoch = ['2048-01-01', '2000-01-01']
+        move_to_epoch = '2050-01-01'
+
+    x, y = apply_proper_motion(ra, dec, pm_ra, pm_dec, ref_epoch, move_to_epoch, coord_system)
+
+    assert_allclose(x, [0, 0+50*30/3600], rtol=1e-4, atol=1e-10)
+    assert_allclose(y, [85, 0], rtol=0.015, atol=1e-10)

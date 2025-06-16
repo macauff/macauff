@@ -7,12 +7,14 @@ This module provides the high-level framework for performing catalogue-catalogue
 
 import datetime
 import os
+import re
 import sys
 import warnings
 from time import sleep
 
 import numpy as np
 import yaml
+from astropy.time import Time
 
 try:
     from mpi4py import MPI
@@ -792,9 +794,55 @@ class CrossMatch():
             for check_flag in ['auf_region_type', 'auf_region_frame', 'auf_region_points_per_chunk',
                                'filt_names', 'cat_name', 'auf_file_path', 'cat_csv_file_path',
                                'correct_astrometry', 'chunk_id_list', 'pos_and_err_indices', 'mag_indices',
-                               'chunk_overlap_col', 'best_mag_index_col', 'csv_has_header']:
+                               'chunk_overlap_col', 'best_mag_index_col', 'csv_has_header',
+                               'apply_proper_motion']:
                 if check_flag not in config:
                     raise ValueError(f"Missing key {check_flag} from catalogue {catname} metadata file.")
+
+        for config, flag, apply_pm in zip(
+                [cat_a_config, cat_b_config], ['a_', 'b_'], [cat_a_config['apply_proper_motion'],
+                                                             cat_b_config['apply_proper_motion']]):
+            if apply_pm:
+                for check_flag in ['pm_indices', 'ref_epoch_or_index', 'move_to_epoch']:
+                    if check_flag not in config:
+                        raise ValueError(f'Missing key {check_flag} from catalogue "{flag[0]}"" '
+                                         'metadata file.')
+
+                a = config['pm_indices']
+                try:
+                    b = np.array([float(f) for f in a])
+                except (ValueError, TypeError) as exc:
+                    raise ValueError('pm_indices should be a list of integers '
+                                     f'in the catalogue "{flag[0]}" metadata file') from exc
+                if len(b) != 2:
+                    raise ValueError(f'{flag}pm_indices should contain two entries.')
+                if not np.all([c.is_integer() for c in b]):
+                    raise ValueError(f'All elements of {flag}pm_indices should be integers.')
+
+                a = config['ref_epoch_or_index']
+                if isinstance(config['ref_epoch_or_index'], str):
+                    try:
+                        Time(a)
+                    except ValueError as exc:
+                        raise ValueError(f"{flag}ref_epoch_or_index, if given as a constant string input, "
+                                         "must be a string that astropy's Time function accepts, such as "
+                                         "JYYYY or YYYY-MM-DD.") from exc
+                else:
+                    try:
+                        a = float(a)
+                    except (ValueError, TypeError) as exc:
+                        raise ValueError('ref_epoch_or_index, if indicating a column index, should be an '
+                                         f'integer in the catalogue "{flag[0]}" metadata file.') from exc
+                    if not a.is_integer():
+                        raise ValueError('ref_epoch_or_index, if indicating a column index, should be an '
+                                         f'integer in the catalogue "{flag[0]}" metadata file.')
+
+                a = config['move_to_epoch']
+                try:
+                    Time(a)
+                except ValueError as exc:
+                    raise ValueError(f"{flag}move_to_epoch must be a string that astropy's Time "
+                                     "function accepts, such as JYYYY or YYYY-MM-DD.") from exc
 
         for config, flag, correct_astro in zip(
                 [cat_a_config, cat_b_config], ['a_', 'b_'], [cat_a_config['correct_astrometry'],

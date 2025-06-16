@@ -1061,6 +1061,67 @@ class TestInputs:
                 cm._load_metadata_config(self.chunk_id)
 
     @pytest.mark.remote_data
+    # pylint: disable-next=too-many-statements,too-many-locals
+    def test_crossmatch_apply_proper_motion(self):
+        cm = CrossMatch(mock_filename(self.cm_p_text.encode("utf-8")),
+                        mock_filename(self.ca_p_text.encode("utf-8")),
+                        mock_filename(self.cb_p_text.encode("utf-8")))
+        cm._load_metadata_config(self.chunk_id)
+        assert cm.a_apply_proper_motion is False  # pylint: disable=no-member
+        assert cm.b_apply_proper_motion is False  # pylint: disable=no-member
+
+        old_line = 'apply_proper_motion: False'
+        lines = ['apply_proper_motion: True\n', '\npm_indices: [1, 2]', '\nref_epoch_or_index: 3',
+                 '\nmove_to_epoch: J2000.000']
+        for i, key in enumerate(['pm_indices', 'ref_epoch_or_index', 'move_to_epoch']):
+            new_line = ''
+            for j in range(i+1):
+                new_line = new_line + lines[j]
+            ca_p_ = self.ca_p_text.replace(old_line, new_line)
+            with pytest.raises(ValueError, match=f'Missing key {key} from catalogue "a"'):
+                cm = CrossMatch(mock_filename(self.cm_p_text.encode("utf-8")),
+                                mock_filename(ca_p_.encode("utf-8")),
+                                mock_filename(self.cb_p_text.encode("utf-8")))
+                cm._load_metadata_config(self.chunk_id)
+
+        new_line = ''
+        for line in lines:
+            new_line = new_line + line
+        new_line = new_line
+        ca_p_ = self.ca_p_text.replace(old_line, new_line)
+
+        for old_line, new_line, error_msg in zip(
+                ['pm_indices: [1, 2]', 'pm_indices: [1, 2]', 'pm_indices: [1, 2]', 'pm_indices: [1, 2]',
+                 'ref_epoch_or_index: 3', 'ref_epoch_or_index: 3', 'ref_epoch_or_index: 3',
+                 'ref_epoch_or_index: 3', 'ref_epoch_or_index: 3', 'ref_epoch_or_index: 3',
+                 'ref_epoch_or_index: 3', 'move_to_epoch: J2000.000', 'move_to_epoch: J2000.000',
+                 'move_to_epoch: J2000.000'],
+                ['pm_indices: A', 'pm_indices: [A, 1]', 'pm_indices: [1, 2, 3]', 'pm_indices: 1',
+                 'ref_epoch_or_index: J198.a', 'ref_epoch_or_index: F1989.0',
+                 'ref_epoch_or_index: 12-12-1989', 'ref_epoch_or_index: 1.5', 'ref_epoch_or_index: A',
+                 'ref_epoch_or_index: [A]', 'ref_epoch_or_index: [1]', 'move_to_epoch: JYYYY',
+                 'move_to_epoch: Y2000', 'move_to_epoch: A', 'move_to_epoch: [1]'],
+                ['pm_indices should be a list of integers', 'pm_indices should be a list of integers',
+                 'pm_indices should contain two entries', 'pm_indices should be a list of integers',
+                 'ref_epoch_or_index, if given as a constant string input, ',
+                 'ref_epoch_or_index, if given as a constant string input, ',
+                 'ref_epoch_or_index, if given as a constant string input, ',
+                 'ref_epoch_or_index, if indicating a column index, ',
+                 'ref_epoch_or_index, if given as a constant string input, ',
+                 'ref_epoch_or_index, if indicating a column index, ',
+                 'ref_epoch_or_index, if indicating a column index, ',
+                 "move_to_epoch must be a string that astropy's Time",
+                 "move_to_epoch must be a string that astropy's Time",
+                 "move_to_epoch must be a string that astropy's Time",
+                 "move_to_epoch must be a string that astropy's Time"]):
+            ca_p_2 = ca_p_.replace(old_line, new_line)
+            with pytest.raises(ValueError, match=error_msg):
+                cm = CrossMatch(mock_filename(self.cm_p_text.encode("utf-8")),
+                                mock_filename(ca_p_2.encode("utf-8")),
+                                mock_filename(self.cb_p_text.encode("utf-8")))
+                cm._load_metadata_config(self.chunk_id)
+
+    @pytest.mark.remote_data
     @pytest.mark.filterwarnings("ignore:.*contains more than one AUF sampling point, .*")
     # pylint: disable-next=too-many-statements,too-many-locals
     def test_crossmatch_correct_astrometry_inputs(self):

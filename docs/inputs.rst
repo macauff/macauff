@@ -463,6 +463,10 @@ The inter-dependency of input parameters on one another, and the output ``CrossM
     ├─* chunk_overlap_col
     ├─* best_mag_index_col
     ├─* csv_has_header
+    ├─* apply_proper_motion
+    │                     ├─* pm_indices
+    │                     ├─* ref_epoch_or_index
+    │                     └─* move_to_epoch
     └─* correct_astrometry
                          ├─* correct_astro_save_folder[3]
                          ├─* snr_indices

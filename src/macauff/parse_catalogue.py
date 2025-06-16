@@ -9,6 +9,9 @@ import os
 import numpy as np
 import pandas as pd
 from astropy.coordinates import SkyCoord
+from astropy.time import Time
+from astropy import units as u
+
 from numpy.lib.format import open_memmap
 
 # pylint: disable=import-error,no-name-in-module
@@ -609,3 +612,64 @@ def rect_slice_npy(input_folder, output_folder, rect_coords, padding, mem_chunk_
         # Always assume that a cutout is a single "visit" with no chunk "halo".
         small_chunk_overlap[counter:counter:inside_n] = False
         counter += inside_n
+
+
+def apply_proper_motion(lon, lat, pm_lon, pm_lat, ref_epoch, move_to_epoch, coord_system):
+    '''
+    Functionality to apply proper motions to a dataset with measured on-sky
+    stellar drift.
+
+    Parameters
+    ----------
+    lon : numpy.ndarray of floats
+        Longitude coordinate of each object. Should either be Right Ascension
+        or galactic longitude, depending on ``coord_system``.
+    lat: numpy.ndarray of floats
+        Declination or galactic latitude (depending on ``coord_system``) of
+        each object to be moved to a new epoch.
+    pm_lon : numpy.ndarray of floats
+        Longitudinal drift of each object, corresponding element by element
+        to ``lon`` and ``lat``. Must be in units of arcseconds per year, and
+        account for the latitudinal projection effect (e.g., the "cos dec"
+        effect) already.
+    pm_lat : numpy.ndarray of floats
+        The latitudinal drift of the objects, in arcseconds per year.
+    ref_epoch : numpy.ndarray of strings or string
+        The date, or dates, of all observations. Can either be a single value
+        or an array/list of epochs, element-wise with ``lon`` et al. Must be
+        accepted by ``SkyCoord`` as a valid format, such as ``JXXXX.YYY` or
+        ``YYYY-MM-DD``.
+    move_to_epoch : string
+        The new date to which all sources should have their positions moved to.
+        Must be a valid astropy ``Time`` format, expecting either ``JXXXX.YYY``
+        or ``YYYY-MM-DD`.
+    coord_system : string
+        String to determine which coordinate system the data are in, either
+        ``equatorial``, in which case the ICRS frame is used internally, or
+        ``galactic``, where the galactic coordinate system will be applied.
+
+    Returns
+    -------
+    new_lon : numpy.ndarray of floats
+        The new longitudinal coordinates of each object in ``move_to_epoch``
+        dates.
+    new_lat : numpy.ndarray of floats
+        Latitude (Dec or b) of objects at the new epoch.
+    '''
+    if coord_system == 'galactic':
+        c = SkyCoord(l=lon * u.degree, b=lat * u.degree, frame='galactic', distance=1e9*u.kpc,
+                     pm_l_cosb=pm_lon * u.arcsecond / u.year, pm_b=pm_lat * u.arcsecond / u.year,
+                     obstime=ref_epoch)
+    else:
+        c = SkyCoord(ra=lon * u.degree, dec=lat * u.degree, frame='icrs', distance=1e9*u.kpc,
+                     pm_ra_cosdec=pm_lon * u.arcsecond / u.year, pm_dec=pm_lat * u.arcsecond / u.year,
+                     obstime=ref_epoch)
+
+    d = c.apply_space_motion(new_obstime=Time(move_to_epoch))
+
+    if coord_system == 'galactic':
+        new_lon, new_lat = d.l.degree, d.b.degree
+    else:
+        new_lon, new_lat = d.ra.degree, d.dec.degree
+
+    return new_lon, new_lat
