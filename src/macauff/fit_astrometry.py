@@ -488,7 +488,8 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
             raise ValueError("tri_download must either be True, False, or None.")
         if self.trifilepath is not None and tri_download not in (True, False):
             raise ValueError("tri_download must either be True or False if trifilepath given.")
-        if self.tri_hists is None or None not in self.tri_hists and tri_download is not None:
+        if tri_download is not None and (self.tri_hists is not None or (isinstance(
+                self.tri_hists, (list, np.ndarray)) and None not in self.tri_hists)):
             raise ValueError("tri_download must be None if tri_hists is given.")
         if make_plots and seeing_ranges is None:
             raise ValueError("seeing_ranges must be provided if make_plots is True.")
