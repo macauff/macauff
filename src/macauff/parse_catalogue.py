@@ -25,7 +25,8 @@ __all__ = ['csv_to_npy', 'rect_slice_npy', 'npy_to_csv', 'rect_slice_csv']
 
 def csv_to_npy(input_filename, astro_cols, photo_cols, bestindex_col,
                chunk_overlap_col, snr_cols=None, header=False, process_uncerts=False,
-               astro_sig_fits_filepath=None, cat_in_radec=None, mn_in_radec=None):
+               astro_sig_fits_filepath=None, cat_in_radec=None, mn_in_radec=None,
+               pm_cols=None, pm_ref_epoch=None, pm_move_to_epoch=None):
     '''
     Convert a .csv file representation of a photometric catalogue into the
     appropriate .npy binary files used in the cross-matching process.
@@ -126,6 +127,15 @@ def csv_to_npy(input_filename, astro_cols, photo_cols, bestindex_col,
     if process_uncerts and not os.path.exists(astro_sig_fits_filepath):
         raise ValueError("process_uncerts is True but astro_sig_fits_filepath does not exist. "
                          "Please ensure file path is correct.")
+    if pm_cols is not None and pm_move_to_epoch is None:
+        raise ValueError("pm_move_to_epoch cannot be None if pm_cols is given.")
+    if pm_cols is not None and (len(pm_cols) < 2 or len(pm_cols) > 3):
+        raise ValueError("pm_cols must either be of length two or three if supplied.")
+    if pm_cols is not None and len(pm_cols) == 2 and pm_ref_epoch is None:
+        raise ValueError("pm_ref_epoch cannot be None if pm_cols is supplied and of length 2.")
+    if pm_cols is not None and len(pm_cols) == 3 and pm_ref_epoch is not None:
+        raise ValueError("If proper motions are to be applied and pm_cols has three elements then "
+                         "pm_ref_epoch cannot be given as well.")
     astro_cols, photo_cols = np.array(astro_cols), np.array(photo_cols)
     with open(input_filename, encoding='utf-8') as fp:
         n_rows = 0 if not header else -1
@@ -138,6 +148,12 @@ def csv_to_npy(input_filename, astro_cols, photo_cols, bestindex_col,
     chunk_overlap = np.empty(n_rows, bool)
     if snr_cols is not None:
         snrs = np.empty((n_rows, len(photo_cols)), float)
+    if pm_cols is not None:
+        if len(pm_cols) == 2:
+            pms = np.empty((n_rows, len(pm_cols)), float)
+        else:
+            pms = np.empty((n_rows, len(pm_cols)-1), float)
+            pm_epochs = np.empty(n_rows, object)
 
     if process_uncerts:
         mn_sigs = np.load(f'{astro_sig_fits_filepath}/mn_sigs_array.npy')
@@ -168,6 +184,8 @@ def csv_to_npy(input_filename, astro_cols, photo_cols, bestindex_col,
         used_cols = np.concatenate((used_cols, [chunk_overlap_col]))
     if snr_cols is not None:
         used_cols = np.concatenate((used_cols, snr_cols))
+    if pm_cols is not None:
+        used_cols = np.concatenate((used_cols, pm_cols))
     used_cols = np.sort(used_cols)
     new_astro_cols = np.array([np.where(used_cols == a)[0][0] for a in astro_cols])
     new_photo_cols = np.array([np.where(used_cols == a)[0][0] for a in photo_cols])
@@ -176,6 +194,8 @@ def csv_to_npy(input_filename, astro_cols, photo_cols, bestindex_col,
         new_chunk_overlap_col = np.where(used_cols == chunk_overlap_col)[0][0]
     if snr_cols is not None:
         new_snr_cols = np.array([np.where(used_cols == a)[0][0] for a in snr_cols])
+    if pm_cols is not None:
+        new_pm_cols = np.array([np.where(used_cols == a)[0][0] for a in pm_cols])
     n = 0
     for chunk in pd.read_csv(input_filename, chunksize=100000,
                              usecols=used_cols, header=None if not header else 0):
@@ -207,8 +227,23 @@ def csv_to_npy(input_filename, astro_cols, photo_cols, bestindex_col,
             chunk_overlap[n:n+chunk.shape[0]] = False
         if snr_cols is not None:
             snrs[n:n+chunk.shape[0]] = chunk.values[:, new_snr_cols]
+        if pm_cols is not None:
+            if len(pm_cols) == 2:
+                pms[n:n+chunk.shape[0]] = chunk.values[:, new_pm_cols]
+            else:
+                pms[n:n+chunk.shape[0]] = chunk.values[:, new_pm_cols[:-1]]
+                pm_epochs[n:n+chunk.shape[0]] = chunk.values[:, new_pm_cols[-1]]
 
         n += chunk.shape[0]
+
+    if pm_cols is not None:
+        # Since we made the temporary holding place for the individal array
+        # epochs an object dtype, just extract values into a list quickly to
+        # make astropy.time.Time happy later.
+        pm_r_e = pm_ref_epoch if pm_ref_epoch is not None else [q for q in pm_epochs]
+        lon, lat = apply_proper_motion(astro[:, 0], astro[:, 1], pms[:, 0], pms[:, 1], pm_r_e,
+                                       pm_move_to_epoch, 'equatorial' if cat_in_radec else 'galactic')
+        astro[:, 0], astro[:, 1] = lon, lat
 
     if snr_cols is not None:
         return astro, photo, best_index, chunk_overlap, snrs

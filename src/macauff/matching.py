@@ -199,6 +199,16 @@ class CrossMatch():
                 snr_cols = self.a_snr_indices
             else:
                 snr_cols = None
+            if self.a_apply_proper_motion:
+                if isinstance(self.a_ref_epoch_or_index, str):
+                    pm_cols = self.a_pm_indices
+                    pm_ref_epoch = self.a_ref_epoch_or_index
+                else:
+                    pm_cols = np.append(self.a_pm_indices, self.a_ref_epoch_or_index)
+                    pm_ref_epoch = None
+                pm_move_to_epoch = self.a_move_to_epoch
+            else:
+                pm_cols, pm_ref_epoch, pm_move_to_epoch = None, None, None
             # Having corrected the astrometry, we have to call csv_to_npy
             # now, rather than pre-generating our binary input catalogues.
             x = csv_to_npy(
@@ -206,7 +216,8 @@ class CrossMatch():
                 self.a_best_mag_index_col, self.a_chunk_overlap_col, snr_cols=snr_cols, header=False,
                 process_uncerts=True, astro_sig_fits_filepath=f'{self.a_correct_astro_save_folder}/npy',
                 cat_in_radec=self.a_auf_region_frame == 'equatorial',
-                mn_in_radec=self.a_auf_region_frame == 'equatorial')
+                mn_in_radec=self.a_auf_region_frame == 'equatorial', pm_cols=pm_cols,
+                pm_ref_epoch=pm_ref_epoch, pm_move_to_epoch=pm_move_to_epoch)
             if snr_cols is not None:
                 # pylint: disable-next=unbalanced-tuple-unpacking
                 self.a_astro, self.a_photo, self.a_magref, self.a_in_overlaps, self.a_snr = x
@@ -222,10 +233,21 @@ class CrossMatch():
                 snr_cols = self.a_snr_indices
             else:
                 snr_cols = None
+            if self.a_apply_proper_motion:
+                if isinstance(self.a_ref_epoch_or_index, str):
+                    pm_cols = self.a_pm_indices
+                    pm_ref_epoch = self.a_ref_epoch_or_index
+                else:
+                    pm_cols = np.append(self.a_pm_indices, self.a_ref_epoch_or_index)
+                    pm_ref_epoch = None
+                pm_move_to_epoch = self.a_move_to_epoch
+            else:
+                pm_cols, pm_ref_epoch, pm_move_to_epoch = None, None, None
             # Otherwise, just load the files without correcting anything.
             x = csv_to_npy(
                 self.a_cat_csv_file_path, self.a_pos_and_err_indices, self.a_mag_indices,
-                self.a_best_mag_index_col, self.a_chunk_overlap_col, snr_cols=snr_cols, header=False)
+                self.a_best_mag_index_col, self.a_chunk_overlap_col, snr_cols=snr_cols, header=False,
+                pm_cols=pm_cols, pm_ref_epoch=pm_ref_epoch, pm_move_to_epoch=pm_move_to_epoch)
             if snr_cols is not None:
                 # pylint: disable-next=unbalanced-tuple-unpacking
                 self.a_astro, self.a_photo, self.a_magref, self.a_in_overlaps, self.a_snr = x
@@ -278,12 +300,23 @@ class CrossMatch():
                 snr_cols = self.b_snr_indices
             else:
                 snr_cols = None
+            if self.b_apply_proper_motion:
+                if isinstance(self.b_ref_epoch_or_index, str):
+                    pm_cols = self.b_pm_indices
+                    pm_ref_epoch = self.b_ref_epoch_or_index
+                else:
+                    pm_cols = np.append(self.b_pm_indices, self.b_ref_epoch_or_index)
+                    pm_ref_epoch = None
+                pm_move_to_epoch = self.b_move_to_epoch
+            else:
+                pm_cols, pm_ref_epoch, pm_move_to_epoch = None, None, None
             x = csv_to_npy(
                 self.b_cat_csv_file_path, self.b_pos_and_err_indices[0], self.b_mag_indices,
                 self.b_best_mag_index_col, self.b_chunk_overlap_col, snr_cols=snr_cols, header=False,
                 process_uncerts=True, astro_sig_fits_filepath=f'{self.b_correct_astro_save_folder}/npy',
                 cat_in_radec=self.b_auf_region_frame == 'equatorial',
-                mn_in_radec=self.b_auf_region_frame == 'equatorial')
+                mn_in_radec=self.b_auf_region_frame == 'equatorial', pm_cols=pm_cols,
+                pm_ref_epoch=pm_ref_epoch, pm_move_to_epoch=pm_move_to_epoch)
             if snr_cols is not None:
                 # pylint: disable-next=unbalanced-tuple-unpacking
                 self.b_astro, self.b_photo, self.b_magref, self.b_in_overlaps, self.b_snr = x
@@ -299,9 +332,20 @@ class CrossMatch():
                 snr_cols = self.b_snr_indices
             else:
                 snr_cols = None
+            if self.b_apply_proper_motion:
+                if isinstance(self.b_ref_epoch_or_index, str):
+                    pm_cols = self.b_pm_indices
+                    pm_ref_epoch = self.b_ref_epoch_or_index
+                else:
+                    pm_cols = np.append(self.b_pm_indices, self.b_ref_epoch_or_index)
+                    pm_ref_epoch = None
+                pm_move_to_epoch = self.b_move_to_epoch
+            else:
+                pm_cols, pm_ref_epoch, pm_move_to_epoch = None, None, None
             x = csv_to_npy(
                 self.b_cat_csv_file_path, self.b_pos_and_err_indices, self.b_mag_indices,
-                self.b_best_mag_index_col, self.b_chunk_overlap_col, snr_cols=snr_cols, header=False)
+                self.b_best_mag_index_col, self.b_chunk_overlap_col, snr_cols=snr_cols, header=False,
+                pm_cols=pm_cols, pm_ref_epoch=pm_ref_epoch, pm_move_to_epoch=pm_move_to_epoch)
             if snr_cols is not None:
                 # pylint: disable-next=unbalanced-tuple-unpacking
                 self.b_astro, self.b_photo, self.b_magref, self.b_in_overlaps, self.b_snr = x

@@ -1061,6 +1061,7 @@ class TestInputs:
                 cm._load_metadata_config(self.chunk_id)
 
     @pytest.mark.remote_data
+    @pytest.mark.filterwarnings("ignore:.*ERFA function.*")
     # pylint: disable-next=too-many-statements,too-many-locals
     def test_crossmatch_apply_proper_motion(self):
         cm = CrossMatch(mock_filename(self.cm_p_text.encode("utf-8")),
@@ -1087,7 +1088,6 @@ class TestInputs:
         new_line = ''
         for line in lines:
             new_line = new_line + line
-        new_line = new_line
         ca_p_ = self.ca_p_text.replace(old_line, new_line)
 
         for old_line, new_line, error_msg in zip(
@@ -1120,6 +1120,87 @@ class TestInputs:
                                 mock_filename(ca_p_2.encode("utf-8")),
                                 mock_filename(self.cb_p_text.encode("utf-8")))
                 cm._load_metadata_config(self.chunk_id)
+
+        # Fake some "real" csv data
+        self.rng = np.random.default_rng(seed=924782365)
+        ax1_min, ax1_max, ax2_min, ax2_max = 100, 110, 13, 23
+        cat_args = (self.chunk_id,)
+        t_a_c = TAC()
+        t_a_c.npy_or_csv = 'csv'
+        t_a_c.n = 5000
+        t_a_c.rng = self.rng
+        # Fake sources for fake_catb_cutout. We need all N-25 objects
+        # to be within 0.25 degrees of each of the first 25 data points,
+        # except the 26-100th objects, which can be wherever.
+        x_25 = self.rng.uniform(100, 110, size=25)
+        y_25 = self.rng.uniform(13, 23, size=25)
+        x_25_100 = self.rng.uniform(100, 110, size=75)
+        y_25_100 = self.rng.uniform(13, 23, size=75)
+        spawn_choice = self.rng.choice(25, size=t_a_c.n-100, replace=True)
+        spawn_radius = np.sqrt(self.rng.uniform(0, 1, size=t_a_c.n-100)) * 0.25
+        spawn_angle = self.rng.uniform(0, 2*np.pi, size=t_a_c.n-100)
+        spawn_x = x_25[spawn_choice] + spawn_radius * np.cos(spawn_angle)
+        spawn_y = y_25[spawn_choice] + spawn_radius * np.sin(spawn_angle)
+        t_a_c.true_ra = np.append(np.append(x_25, x_25_100), spawn_x)
+        t_a_c.true_dec = np.append(np.append(y_25, y_25_100), spawn_y)
+        t_a_c.a_cat_name = 'ref_{}.csv'
+        t_a_c.fake_cata_cutout(ax1_min, ax1_max, ax2_min, ax2_max, *cat_args)
+        # Re-fake data with multiple magnitude columns.
+        x = np.loadtxt('ref_9.csv', delimiter=',')
+        y = np.empty((len(x), 14), object)
+        y[:, [0, 1, 2]] = x[:, [0, 1, 2]]
+        y[:, [3, 4]] = x[:, [3, 4]]
+        y[:, [5, 6]] = x[:, [3, 4]]
+        y[:, [7, 8]] = x[:, [3, 4]]
+        # Pad with both a best index and chunk overlap column
+        y[:, 9] = 2
+        y[:, 10] = 1
+        # Now add proper motions: some sideways at dec=0, some up/down.
+        y[:1000, 1] = 0
+        y[:1000, 11] = self.rng.uniform(-500, 500, size=1000)
+        y[:1000, 12] = 0
+        y[1000:, 11] = 0
+        y[1000:, 12] = self.rng.uniform(-2, 2, size=4000) * 3600
+        epoch_diff = self.rng.uniform(-1, 4, size=5000)
+        y[:, 13] = [f'J{2000 + q:.3f}' for q in epoch_diff]
+        y[0, 13] = y[0, 13][:-1]
+        fmt = ['%.18e'] * 13
+        fmt.append('%5s')
+        np.savetxt('ref_9.csv', y, delimiter=',', fmt=fmt)
+
+        new_line = ''
+        for line in lines:
+            new_line = new_line + line
+        ca_p_ = self.ca_p_text.replace('apply_proper_motion: False', new_line)
+        ca_p_ = ca_p_.replace(r'cat_csv_file_path: gaia_folder/gaia_{}.csv',
+                              r'cat_csv_file_path: ref_{}.csv')
+        ca_p_ = ca_p_.replace('pm_indices: [1, 2]', 'pm_indices: [11, 12]')
+        ca_p_ = ca_p_.replace('ref_epoch_or_index: 3', 'ref_epoch_or_index: J2005.0')
+
+        cm = CrossMatch(mock_filename(self.cm_p_text.encode("utf-8")),
+                        mock_filename(ca_p_.encode("utf-8")),
+                        mock_filename(self.cb_p_text.encode("utf-8")))
+        cm._load_metadata_config(self.chunk_id)
+        cm.chunk_id = self.chunk_id
+        cm._initialise_chunk()
+
+        assert_allclose(cm.a_astro[:, 0], np.array(y[:, 0] + y[:, 11] * -5 / 3600, dtype=float), rtol=1e-4)
+        assert_allclose(cm.a_astro[:, 1], np.array(y[:, 1] + y[:, 12] * -5 / 3600, dtype=float),
+                        rtol=0.03, atol=1e-10)
+
+        ca_p_ = ca_p_.replace('ref_epoch_or_index: J2005.0', 'ref_epoch_or_index: 13')
+
+        cm = CrossMatch(mock_filename(self.cm_p_text.encode("utf-8")),
+                        mock_filename(ca_p_.encode("utf-8")),
+                        mock_filename(self.cb_p_text.encode("utf-8")))
+        cm._load_metadata_config(self.chunk_id)
+        cm.chunk_id = self.chunk_id
+        cm._initialise_chunk()
+
+        assert_allclose(cm.a_astro[:, 0], np.array(y[:, 0] + y[:, 11] * -1*epoch_diff / 3600, dtype=float),
+                        rtol=1e-4)
+        assert_allclose(cm.a_astro[:, 1], np.array(y[:, 1] + y[:, 12] * -1*epoch_diff / 3600, dtype=float),
+                        rtol=0.03, atol=1e-10)
 
     @pytest.mark.remote_data
     @pytest.mark.filterwarnings("ignore:.*contains more than one AUF sampling point, .*")
