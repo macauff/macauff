@@ -45,7 +45,14 @@ class TestAstroCorrection:
         astro_uncert = self.rng.uniform(0.001, 0.002, size=self.n)
         mag = self.rng.uniform(12, 12.1, size=self.n)
         snr = self.rng.uniform(10, 100, size=self.n)
-        a = np.array([self.true_ra, self.true_dec, astro_uncert, mag, snr]).T
+        if self.apply_proper_motion:
+            pm_ra = np.array([-1] * self.n)
+            pm_dec = np.zeros(self.n, float)
+        if self.apply_proper_motion:
+            a = np.array([self.true_ra + 1 * 18 / 3600, self.true_dec, astro_uncert, mag,
+                          snr, pm_ra, pm_dec]).T
+        else:
+            a = np.array([self.true_ra, self.true_dec, astro_uncert, mag, snr]).T
         if self.npy_or_csv == 'npy':
             np.save(self.a_cat_name.format(*cat_args), a)
         else:
@@ -91,6 +98,7 @@ class TestAstroCorrection:
             np.savetxt(self.b_cat_name.format(*cat_args), b, delimiter=',')
 
     def test_fit_astrometry_load_errors(self):  # pylint: disable=too-many-statements
+        self.apply_proper_motion = False
         dd_params = np.load(os.path.join(os.path.dirname(__file__), 'data/dd_params.npy'))
         l_cut = np.load(os.path.join(os.path.dirname(__file__), 'data/l_cut.npy'))
         ax1_mids, ax2_mids = np.array([105], dtype=float), np.array([0], dtype=float)
@@ -179,6 +187,12 @@ class TestAstroCorrection:
                 **_kwargs, ax_dimension=1, npy_or_csv='csv', pregenerate_cutouts=False,
                 coord_or_chunk='coord', coord_system='equatorial', cutout_area=60, cutout_height=6,
                 use_photometric_uncertainties=True, return_nm=False, mn_fit_type='something else')
+        with pytest.raises(ValueError, match="motion_flag cannot be True without supplying pm_indices, "):
+            ac = AstrometricCorrections(
+                **_kwargs, ax_dimension=1, npy_or_csv='csv', pregenerate_cutouts=False,
+                coord_or_chunk='coord', coord_system='equatorial', cutout_area=60, cutout_height=6,
+                use_photometric_uncertainties=True, return_nm=False, mn_fit_type='quadratic',
+                apply_proper_motion_flag=True)
         ac = AstrometricCorrections(
             **_kwargs, ax_dimension=1, npy_or_csv='csv', pregenerate_cutouts=False,
             coord_or_chunk='coord', coord_system='equatorial', cutout_area=60, cutout_height=6,
@@ -291,23 +305,27 @@ class TestAstroCorrection:
 
         os.system('rm -r store_data')
 
+    @pytest.mark.filterwarnings("ignore:.*ERFA function.*")
     @pytest.mark.remote_data
     @pytest.mark.parametrize("npy_or_csv,coord_or_chunk,coord_system,pregenerate_cutouts,return_nm,in_memory,"
-                             "use_photometric_uncertainties",
-                             [("csv", "chunk", "equatorial", True, False, False, False),
-                              ("npy", "coord", "galactic", None, True, True, False),
-                              ("npy", "chunk", "equatorial", False, False, False, False),
-                              ("npy", "chunk", "equatorial", True, False, False, True)])
+                             "use_photometric_uncertainties,apply_proper_motion",
+                             [("csv", "chunk", "equatorial", True, False, False, False, False),
+                              ("npy", "coord", "galactic", None, True, True, False, False),
+                              ("npy", "chunk", "equatorial", False, False, False, False, False),
+                              ("npy", "chunk", "equatorial", False, False, False, False, True),
+                              ("npy", "chunk", "equatorial", True, False, False, True, False)])
     # pylint: disable-next=too-many-statements,too-many-branches,too-many-locals
     def test_fit_astrometry(self, npy_or_csv, coord_or_chunk, coord_system, pregenerate_cutouts, return_nm,
-                            in_memory, use_photometric_uncertainties):
+                            in_memory, use_photometric_uncertainties, apply_proper_motion):
         self.npy_or_csv = npy_or_csv
+        self.apply_proper_motion = apply_proper_motion
         dd_params = np.load(os.path.join(os.path.dirname(__file__), 'data/dd_params.npy'))
         l_cut = np.load(os.path.join(os.path.dirname(__file__), 'data/l_cut.npy'))
         # Flag telling us to test for the non-running of all sightlines,
         # but to leave pre-generated ones alone
         half_run_flag = (npy_or_csv == "npy" and coord_or_chunk == "chunk" and
-                         coord_system == "equatorial" and pregenerate_cutouts is False)
+                         coord_system == "equatorial" and pregenerate_cutouts is False and
+                         apply_proper_motion is False)
         if half_run_flag:
             ax1_mids, ax2_mids = np.array([105, 120], dtype=float), np.array([0, 10], dtype=float)
         else:
@@ -354,6 +372,14 @@ class TestAstroCorrection:
             mag_arrays = [magarray]
             mag_slices = [magslice]
             sig_slices = [sigslice]
+        if apply_proper_motion:
+            pm_indices = [None, [5, 6]]
+            pm_ref_epoch_or_index = [None, 'J2000']
+            pm_move_to_epoch = [None, 'J2018']
+        else:
+            pm_indices = None
+            pm_ref_epoch_or_index = None
+            pm_move_to_epoch = None
         ac = AstrometricCorrections(
             psf_fwhms=psf_fwhms, numtrials=1000, nn_radius=30, dens_search_radius=1,
             save_folder='ac_save_folder', trifilepath='tri_folder/trilegal_sim_{}_{}.dat',
@@ -369,7 +395,9 @@ class TestAstroCorrection:
             cutout_area=60 if pregenerate_cutouts is False else None,
             cutout_height=6 if pregenerate_cutouts is False else None, n_r=2000, n_rho=2000, max_rho=40,
             return_nm=return_nm, saturation_magnitudes=saturation_magnitudes,
-            mn_fit_type='quadratic' if pregenerate_cutouts is False else 'linear')
+            mn_fit_type='quadratic' if pregenerate_cutouts is False else 'linear',
+            apply_proper_motion_flag=apply_proper_motion, pm_indices=pm_indices,
+            pm_ref_epoch_or_index=pm_ref_epoch_or_index, pm_move_to_epoch=pm_move_to_epoch)
 
         if coord_or_chunk == 'coord':
             self.a_cat_name = 'store_data/a_cat{}{}' + ('.csv' if npy_or_csv == 'csv' else '.npy')

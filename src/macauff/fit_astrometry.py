@@ -36,6 +36,7 @@ from macauff.misc_functions import (
     generate_avs_inside_hull,
 )
 from macauff.misc_functions_fortran import misc_functions_fortran as mff
+from macauff.parse_catalogue import apply_proper_motion
 from macauff.perturbation_auf import (
     _calculate_magnitude_offsets,
     download_trilegal_simulation,
@@ -63,7 +64,9 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
                  pregenerate_cutouts, n_r, n_rho, max_rho, mn_fit_type, trifilepath=None, maglim_f=None,
                  magnum=None, tri_num_faint=None, trifilterset=None, trifiltnames=None, tri_hists=None,
                  tri_magses=None, dtri_magses=None, tri_uncerts=None, use_photometric_uncertainties=False,
-                 cutout_area=None, cutout_height=None, single_sided_auf=True, chunks=None, return_nm=False):
+                 cutout_area=None, cutout_height=None, single_sided_auf=True, chunks=None, return_nm=False,
+                 apply_proper_motion_flag=False, pm_indices=None, pm_ref_epoch_or_index=None,
+                 pm_move_to_epoch=None):
         """
         Initialisation of AstrometricCorrections, accepting inputs required for
         the running of the optimisation and parameterisation of astrometry of
@@ -304,6 +307,10 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
             raise ValueError("return_nm must either be True or False.")
         if mn_fit_type not in ("quadratic", "linear"):
             raise ValueError("mn_fit_type must either be 'quadratic' or 'linear'.")
+        if apply_proper_motion_flag and np.any([q is None for q in
+                                               [pm_indices, pm_ref_epoch_or_index, pm_move_to_epoch]]):
+            raise ValueError("apply_proper_motion_flag cannot be True without supplying pm_indices, "
+                             "pm_ref_epoch_or_index, and pm_move_to_epoch.")
         self.return_nm = return_nm
         self.psf_fwhms = psf_fwhms
         self.numtrials = numtrials
@@ -362,12 +369,18 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
 
         self.mn_fit_type = mn_fit_type
 
+        self.apply_proper_motion_flag = apply_proper_motion_flag
+        self.pm_move_to_epoch = pm_move_to_epoch
+
         if npy_or_csv == 'npy':
             self.pos_and_err_indices_full = pos_and_err_indices
             self.mag_indices = mag_indices
             self.snr_indices = snr_indices
             self.mag_names = mag_names
             self.correct_astro_mag_indices_index = correct_astro_mag_indices_index
+            if apply_proper_motion_flag:
+                self.pm_indices = pm_indices
+                self.pm_ref_epoch_or_index = pm_ref_epoch_or_index
         else:
             # np.genfromtxt will load in pos_and_err or pos_and_err, mag_ind,
             # snr_ind order for the two catalogues. Each will effectively
@@ -377,6 +390,15 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
             # the loaded csv file.
             self.a_cols = np.array(pos_and_err_indices[1])
             self.b_cols = np.concatenate((pos_and_err_indices[0], mag_indices, snr_indices))
+            if apply_proper_motion_flag:
+                if pm_indices[0] is not None:
+                    self.b_cols = np.concatenate((self.b_cols, pm_indices[0]))
+                    if isinstance(pm_ref_epoch_or_index[0], int):
+                        self.b_cols = np.concatenate((self.b_cols, pm_ref_epoch_or_index[0]))
+                if pm_indices[1] is not None:
+                    self.a_cols = np.concatenate((self.a_cols, pm_indices[1]))
+                    if isinstance(pm_ref_epoch_or_index[1], int):
+                        self.a_cols = np.concatenate((self.a_cols, pm_ref_epoch_or_index[1]))
             self.pos_and_err_indices_full = [
                 [np.argmin(np.abs(q - self.b_cols)) for q in pos_and_err_indices[0]],
                 [np.argmin(np.abs(q - self.a_cols)) for q in pos_and_err_indices[1]]]
@@ -385,6 +407,24 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
 
             self.mag_names = mag_names
             self.correct_astro_mag_indices_index = correct_astro_mag_indices_index
+
+            if apply_proper_motion_flag:
+                self.pm_indices = [None, None]
+                self.pm_ref_epoch_or_index = [None, None]
+                if pm_indices[0] is not None:
+                    self.pm_indices[0] = [np.argmin(np.abs(q - self.b_cols)) for q in pm_indices[0]]
+                    if isinstance(pm_ref_epoch_or_index[0], int):
+                        self.pm_ref_epoch_or_index[0] = np.argmin(np.abs(pm_ref_epoch_or_index[0] -
+                                                                         self.b_cols))
+                    else:
+                        self.pm_ref_epoch_or_index[0] = pm_ref_epoch_or_index[0]
+                if pm_indices[1] is not None:
+                    self.pm_indices[1] = [np.argmin(np.abs(q - self.a_cols)) for q in pm_indices[1]]
+                    if isinstance(pm_ref_epoch_or_index[1], int):
+                        self.pm_ref_epoch_or_index[1] = np.argmin(np.abs(pm_ref_epoch_or_index[1] -
+                                                                         self.a_cols))
+                    else:
+                        self.pm_ref_epoch_or_index[1] = pm_ref_epoch_or_index[1]
 
         self.n_pool = n_pool
 
@@ -618,7 +658,25 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
                     self.repeat_unique_visits = self.repeat_unique_visits_list[index_]
             else:
                 self.a = self.load_catalogue('a', self.cat_args)
+                if self.apply_proper_motion_flag and self.pm_indices[1] is not None:
+                    pm_r_e = self.pm_ref_epoch_or_index[1] if not isinstance(
+                        self.pm_ref_epoch_or_index[1], int) else self.a[:, self.pm_ref_epoch_or_index[1]]
+                    x, y = apply_proper_motion(
+                        self.a[:, self.pos_and_err_indices_full[1][0]],
+                        self.a[:, self.pos_and_err_indices_full[1][1]], self.a[:, self.pm_indices[1][0]],
+                        self.a[:, self.pm_indices[1][1]], pm_r_e, self.pm_move_to_epoch[1], self.coord_system)
+                    self.a[:, self.pos_and_err_indices_full[1][0]] = x
+                    self.a[:, self.pos_and_err_indices_full[1][1]] = y
                 self.b = self.load_catalogue('b', self.cat_args)
+                if self.apply_proper_motion_flag and self.pm_indices[0] is not None:
+                    pm_r_e = self.pm_ref_epoch_or_index[0] if not isinstance(
+                        self.pm_ref_epoch_or_index[0], int) else self.b[:, self.pm_ref_epoch_or_index[0]]
+                    x, y = apply_proper_motion(
+                        self.b[:, self.pos_and_err_indices_full[0][0]],
+                        self.b[:, self.pos_and_err_indices_full[0][1]], self.b[:, self.pm_indices[0][0]],
+                        self.b[:, self.pm_indices[0][1]], pm_r_e, self.pm_move_to_epoch[0], self.coord_system)
+                    self.b[:, self.pos_and_err_indices[0][0]] = x
+                    self.b[:, self.pos_and_err_indices[0][1]] = y
 
             self.area, self.hull_points, self.hull_x_shift = convex_hull_area(
                 self.b[:, 0], self.b[:, 1], return_hull=True)

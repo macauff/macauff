@@ -1141,6 +1141,7 @@ class TestInputs:
         spawn_angle = self.rng.uniform(0, 2*np.pi, size=t_a_c.n-100)
         spawn_x = x_25[spawn_choice] + spawn_radius * np.cos(spawn_angle)
         spawn_y = y_25[spawn_choice] + spawn_radius * np.sin(spawn_angle)
+        t_a_c.apply_proper_motion = False
         t_a_c.true_ra = np.append(np.append(x_25, x_25_100), spawn_x)
         t_a_c.true_dec = np.append(np.append(y_25, y_25_100), spawn_y)
         t_a_c.a_cat_name = 'ref_{}.csv'
