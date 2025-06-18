@@ -692,13 +692,11 @@ def apply_proper_motion(lon, lat, pm_lon, pm_lat, ref_epoch, move_to_epoch, coor
         Latitude (Dec or b) of objects at the new epoch.
     '''
     if coord_system == 'galactic':
-        c = SkyCoord(l=lon * u.degree, b=lat * u.degree, frame='galactic', distance=1e9*u.kpc,
-                     pm_l_cosb=pm_lon * u.arcsecond / u.year, pm_b=pm_lat * u.arcsecond / u.year,
-                     obstime=ref_epoch)
+        c = SkyCoord(l=lon * u.degree, b=lat * u.degree, frame='galactic', obstime=ref_epoch,
+                     pm_l_cosb=pm_lon * u.arcsecond / u.year, pm_b=pm_lat * u.arcsecond / u.year)
     else:
-        c = SkyCoord(ra=lon * u.degree, dec=lat * u.degree, frame='icrs', distance=1e9*u.kpc,
-                     pm_ra_cosdec=pm_lon * u.arcsecond / u.year, pm_dec=pm_lat * u.arcsecond / u.year,
-                     obstime=ref_epoch)
+        c = SkyCoord(ra=lon * u.degree, dec=lat * u.degree, frame='icrs', obstime=ref_epoch,
+                     pm_ra_cosdec=pm_lon * u.arcsecond / u.year, pm_dec=pm_lat * u.arcsecond / u.year)
 
     d = c.apply_space_motion(new_obstime=Time(move_to_epoch))
 
