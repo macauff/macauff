@@ -375,7 +375,7 @@ class TestAstroCorrection:
         if apply_proper_motion:
             pm_indices = [None, [5, 6]]
             pm_ref_epoch_or_index = [None, 'J2000']
-            pm_move_to_epoch = [None, 'J2018']
+            pm_move_to_epoch = 'J2018'
         else:
             pm_indices = None
             pm_ref_epoch_or_index = None

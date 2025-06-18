@@ -664,7 +664,7 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
                     x, y = apply_proper_motion(
                         self.a[:, self.pos_and_err_indices_full[1][0]],
                         self.a[:, self.pos_and_err_indices_full[1][1]], self.a[:, self.pm_indices[1][0]],
-                        self.a[:, self.pm_indices[1][1]], pm_r_e, self.pm_move_to_epoch[1], self.coord_system)
+                        self.a[:, self.pm_indices[1][1]], pm_r_e, self.pm_move_to_epoch, self.coord_system)
                     self.a[:, self.pos_and_err_indices_full[1][0]] = x
                     self.a[:, self.pos_and_err_indices_full[1][1]] = y
                 self.b = self.load_catalogue('b', self.cat_args)
@@ -674,7 +674,7 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
                     x, y = apply_proper_motion(
                         self.b[:, self.pos_and_err_indices_full[0][0]],
                         self.b[:, self.pos_and_err_indices_full[0][1]], self.b[:, self.pm_indices[0][0]],
-                        self.b[:, self.pm_indices[0][1]], pm_r_e, self.pm_move_to_epoch[0], self.coord_system)
+                        self.b[:, self.pm_indices[0][1]], pm_r_e, self.pm_move_to_epoch, self.coord_system)
                     self.b[:, self.pos_and_err_indices[0][0]] = x
                     self.b[:, self.pos_and_err_indices[0][1]] = y
 

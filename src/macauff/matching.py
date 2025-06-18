@@ -206,7 +206,7 @@ class CrossMatch():
                 else:
                     pm_cols = np.append(self.a_pm_indices, self.a_ref_epoch_or_index)
                     pm_ref_epoch = None
-                pm_move_to_epoch = self.a_move_to_epoch
+                pm_move_to_epoch = self.move_to_epoch
             else:
                 pm_cols, pm_ref_epoch, pm_move_to_epoch = None, None, None
             # Having corrected the astrometry, we have to call csv_to_npy
@@ -240,7 +240,7 @@ class CrossMatch():
                 else:
                     pm_cols = np.append(self.a_pm_indices, self.a_ref_epoch_or_index)
                     pm_ref_epoch = None
-                pm_move_to_epoch = self.a_move_to_epoch
+                pm_move_to_epoch = self.move_to_epoch
             else:
                 pm_cols, pm_ref_epoch, pm_move_to_epoch = None, None, None
             # Otherwise, just load the files without correcting anything.
@@ -307,7 +307,7 @@ class CrossMatch():
                 else:
                     pm_cols = np.append(self.b_pm_indices, self.b_ref_epoch_or_index)
                     pm_ref_epoch = None
-                pm_move_to_epoch = self.b_move_to_epoch
+                pm_move_to_epoch = self.move_to_epoch
             else:
                 pm_cols, pm_ref_epoch, pm_move_to_epoch = None, None, None
             x = csv_to_npy(
@@ -339,7 +339,7 @@ class CrossMatch():
                 else:
                     pm_cols = np.append(self.b_pm_indices, self.b_ref_epoch_or_index)
                     pm_ref_epoch = None
-                pm_move_to_epoch = self.b_move_to_epoch
+                pm_move_to_epoch = self.move_to_epoch
             else:
                 pm_cols, pm_ref_epoch, pm_move_to_epoch = None, None, None
             x = csv_to_npy(
@@ -847,7 +847,7 @@ class CrossMatch():
                 [cat_a_config, cat_b_config], ['a_', 'b_'], [cat_a_config['apply_proper_motion'],
                                                              cat_b_config['apply_proper_motion']]):
             if apply_pm:
-                for check_flag in ['pm_indices', 'ref_epoch_or_index', 'move_to_epoch']:
+                for check_flag in ['pm_indices', 'ref_epoch_or_index']:
                     if check_flag not in config:
                         raise ValueError(f'Missing key {check_flag} from catalogue "{flag[0]}"" '
                                          'metadata file.')
@@ -881,12 +881,16 @@ class CrossMatch():
                         raise ValueError('ref_epoch_or_index, if indicating a column index, should be an '
                                          f'integer in the catalogue "{flag[0]}" metadata file.')
 
-                a = config['move_to_epoch']
-                try:
-                    Time(a)
-                except ValueError as exc:
-                    raise ValueError(f"{flag}move_to_epoch must be a string that astropy's Time "
-                                     "function accepts, such as JYYYY or YYYY-MM-DD.") from exc
+        if cat_a_config['apply_proper_motion'] or cat_b_config['apply_proper_motion']:
+            if 'move_to_epoch' not in joint_config:
+                raise ValueError("Missing key move_to_epoch from joint metadata file.")
+
+            a = joint_config['move_to_epoch']
+            try:
+                Time(a)
+            except ValueError as exc:
+                raise ValueError("move_to_epoch must be a string that astropy's Time "
+                                 "function accepts, such as JYYYY or YYYY-MM-DD.") from exc
 
         for config, flag, correct_astro in zip(
                 [cat_a_config, cat_b_config], ['a_', 'b_'], [cat_a_config['correct_astrometry'],

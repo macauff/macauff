@@ -1072,9 +1072,8 @@ class TestInputs:
         assert cm.b_apply_proper_motion is False  # pylint: disable=no-member
 
         old_line = 'apply_proper_motion: False'
-        lines = ['apply_proper_motion: True\n', '\npm_indices: [1, 2]', '\nref_epoch_or_index: 3',
-                 '\nmove_to_epoch: J2000.000']
-        for i, key in enumerate(['pm_indices', 'ref_epoch_or_index', 'move_to_epoch']):
+        lines = ['apply_proper_motion: True\n', '\npm_indices: [1, 2]', '\nref_epoch_or_index: 3']
+        for i, key in enumerate(['pm_indices', 'ref_epoch_or_index']):
             new_line = ''
             for j in range(i+1):
                 new_line = new_line + lines[j]
@@ -1089,6 +1088,14 @@ class TestInputs:
         for line in lines:
             new_line = new_line + line
         ca_p_ = self.ca_p_text.replace(old_line, new_line)
+
+        with pytest.raises(ValueError, match='Missing key move_to_epoch from joint metadata'):
+            cm = CrossMatch(mock_filename(self.cm_p_text.encode("utf-8")),
+                            mock_filename(ca_p_.encode("utf-8")),
+                            mock_filename(self.cb_p_text.encode("utf-8")))
+            cm._load_metadata_config(self.chunk_id)
+
+        cm_p_ = self.cm_p_text.replace('n_pool: 2', 'n_pool: 2\n\nmove_to_epoch: J2000.000')
 
         for old_line, new_line, error_msg in zip(
                 ['pm_indices: [1, 2]', 'pm_indices: [1, 2]', 'pm_indices: [1, 2]', 'pm_indices: [1, 2]',
@@ -1114,9 +1121,14 @@ class TestInputs:
                  "move_to_epoch must be a string that astropy's Time",
                  "move_to_epoch must be a string that astropy's Time",
                  "move_to_epoch must be a string that astropy's Time"]):
-            ca_p_2 = ca_p_.replace(old_line, new_line)
+            if 'move_to' in error_msg:
+                cm_p_2 = cm_p_.replace(old_line, new_line)
+                ca_p_2 = ca_p_
+            else:
+                cm_p_2 = cm_p_
+                ca_p_2 = ca_p_.replace(old_line, new_line)
             with pytest.raises(ValueError, match=error_msg):
-                cm = CrossMatch(mock_filename(self.cm_p_text.encode("utf-8")),
+                cm = CrossMatch(mock_filename(cm_p_2.encode("utf-8")),
                                 mock_filename(ca_p_2.encode("utf-8")),
                                 mock_filename(self.cb_p_text.encode("utf-8")))
                 cm._load_metadata_config(self.chunk_id)
@@ -1178,7 +1190,7 @@ class TestInputs:
         ca_p_ = ca_p_.replace('pm_indices: [1, 2]', 'pm_indices: [11, 12]')
         ca_p_ = ca_p_.replace('ref_epoch_or_index: 3', 'ref_epoch_or_index: J2005.0')
 
-        cm = CrossMatch(mock_filename(self.cm_p_text.encode("utf-8")),
+        cm = CrossMatch(mock_filename(cm_p_.encode("utf-8")),
                         mock_filename(ca_p_.encode("utf-8")),
                         mock_filename(self.cb_p_text.encode("utf-8")))
         cm._load_metadata_config(self.chunk_id)
@@ -1191,7 +1203,7 @@ class TestInputs:
 
         ca_p_ = ca_p_.replace('ref_epoch_or_index: J2005.0', 'ref_epoch_or_index: 13')
 
-        cm = CrossMatch(mock_filename(self.cm_p_text.encode("utf-8")),
+        cm = CrossMatch(mock_filename(cm_p_.encode("utf-8")),
                         mock_filename(ca_p_.encode("utf-8")),
                         mock_filename(self.cb_p_text.encode("utf-8")))
         cm._load_metadata_config(self.chunk_id)

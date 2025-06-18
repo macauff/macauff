@@ -464,9 +464,9 @@ The inter-dependency of input parameters on one another, and the output ``CrossM
     ├─* best_mag_index_col
     ├─* csv_has_header
     ├─* apply_proper_motion
+    │                     ├─> move_to_epoch
     │                     ├─* pm_indices
-    │                     ├─* ref_epoch_or_index
-    │                     └─* move_to_epoch
+    │                     └─* ref_epoch_or_index
     └─* correct_astrometry
                          ├─* correct_astro_save_folder[3]
                          ├─* snr_indices
