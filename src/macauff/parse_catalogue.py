@@ -91,6 +91,23 @@ def csv_to_npy(input_filename, astro_cols, photo_cols, bestindex_col,
         compute m-n scaling relations are in RA/Dec or not. If ``mn_in_radec``
         disagrees with ``cat_in_radec`` then m-n coordinates will be converted
         to the coordinate system of the catalogue.
+    pm_cols : list or numpy.ndarray of integers, optional
+        If given, must contain the two orthogonal sky-axis proper motions'
+        indices for the given dataset, to be loaded along with positions,
+        SNRs, photometry, etc. Depending on whether ``pm_ref_epoch`` is also
+        given, must additionally contain the index into the column in the data
+        holding the individial sources' date of observation as the final of
+        three elements. Must be ``None``, as per the default value, to force
+        skipping of element loading.
+    pm_ref_epoch : string, optional
+        If ``pm_cols`` is of length two then this must be given, but if ``pm_cols``
+        is three elements must not be given. If provided, must be a single
+        string, valid for loading into astropy's Time function. Otherwise,
+        ``pm_cols`` index must contain astropy Time-valid strings in its
+        dataset column.
+    pm_move_to_epoch : string, optional
+        If ``pm_cols`` is provided, regardless of its length, this must be
+        given, and must always contain a single, astropy Time valid, string.
 
     Returns
     -------

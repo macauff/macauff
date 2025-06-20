@@ -274,6 +274,41 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
         return_nm : boolean, optional
             Flag for whether the output correction arrays ``m`` and ``n`` should
             be saved to disk (``False``) or returned by the function (``True``).
+        apply_proper_motion_flag : boolean, optional
+            Flag to indicate if either dataset has proper motions that must be
+            applied to its positions before determining astrometric corrections.
+            Defaults to False, in which case neither dataset will check for, or
+            load, proper motion-based data.
+        pm_indices : list of list or numpy.ndarray of integers, optional
+            If given, must contain a list of two elements, each of which contains
+            the two orthogonal sky-axis proper motions' indices for the given
+            dataset, in the same reference frame as the positions to be loaded
+            along with positions, SNRs, photometry, as necessary. As this is
+            on a per-catalogue basis, if either (or both) dataset has no motion
+            information, ``None`` must be given, with the first element of the
+            list being, to be consistent with ``pos_and_err_indices``, the "b",
+            to-be-fit, catalogue, with the second element the "a", "truth" dataset.
+            We could have e.g. ``[None, [4, 5]]`` for the case where we apply
+            motion information to our truth catalogue, with proper motion
+            information being stored in the 5th and 6th columns.
+        pm_ref_epoch_or_index : list of strings or integers, optional
+            If provided, necessary when ``pm_indices`` is passed, each element,
+            consistent with ``pm_indices`` catalogue ordering, must either be
+            a single string, valid for loading into astropy's Time function,
+            representing a common date of observation for all sources in the file
+            or a single integer, loading from the dataset the astropy Time-valid
+            strings for each object individually as a column of the input file.
+            Again, if no motions are to be applied for an individual catalogue
+            but ``apply_proper_motion_flag`` is ``True``, then ``None`` must be
+            given for that list element; for the above example we could either
+            supply ``[None, 6]`` or ``[None, 'J2000']`` to load per-source
+            epochs from our file or supply a fixed observation date respectively.
+        pm_move_to_epoch : string, optional
+            If ``pm_indices`` is provided this must be given, containing a
+            single, astropy Time valid, string, the final epoch to apply proper
+            motions of all objects to. This must be a single string, rather than
+            a per-catalogue list, to ensure that a common epoch is used when
+            proper motions are to be applied to both datasets.
         """
         if single_sided_auf is not True:
             raise ValueError("single_sided_auf must be True.")
