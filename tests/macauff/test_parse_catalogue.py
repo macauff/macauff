@@ -11,8 +11,13 @@ import pytest
 from astropy.coordinates import SkyCoord
 from numpy.testing import assert_allclose
 
-from macauff.parse_catalogue import (csv_to_npy, npy_to_csv, rect_slice_csv, rect_slice_npy,
-                                     apply_proper_motion)
+from macauff.parse_catalogue import (
+    apply_proper_motion,
+    csv_to_npy,
+    npy_to_csv,
+    rect_slice_csv,
+    rect_slice_npy,
+)
 
 
 class TestParseCatalogue:

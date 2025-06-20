@@ -8,10 +8,9 @@ import os
 
 import numpy as np
 import pandas as pd
+from astropy import units as u
 from astropy.coordinates import SkyCoord
 from astropy.time import Time
-from astropy import units as u
-
 from numpy.lib.format import open_memmap
 
 # pylint: disable=import-error,no-name-in-module
