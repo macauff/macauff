@@ -16,6 +16,10 @@ General
 New Features
 ^^^^^^^^^^^^
 
+- New function ``apply_proper_motion``, allowing for catalogues with motion data
+  to be moved forwards or backwards in time, to align with a dataset with
+  differing observation dates. [#91]
+
 - ``AstrometricCorrections`` runs per-band parameterisation when using photometry
   to calibrate astrometric precisions, with an "astrometric scatter"-based relation
   for each filter. [#91]
@@ -49,6 +53,11 @@ Bug Fixes
 
 API Changes
 ^^^^^^^^^^^
+
+- Added catalogue-specific parameters ``apply_proper_motion``, ``pm_indices``,
+  and ``ref_epoch_or_index``, along with joint-parameter
+  ``move_to_epoch``. Parameters are propagated through ``CrossMatch`` to
+  ``csv_to_npy`` and ``AstrometricCorrections`` were necessary. [#91]
 
 - ``CrossMatch`` replaced ``mag_unc_indices`` with ``snr_indices``, requiring
   pre-computed signal-to-noise ratios rather than photometric uncertainties where
