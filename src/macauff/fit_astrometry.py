@@ -49,13 +49,14 @@ from macauff.perturbation_auf_fortran import perturbation_auf_fortran as paf
 __all__ = ['AstrometricCorrections']
 
 
-class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
+# pylint: disable=too-many-instance-attributes,too-many-statements,too-many-locals
+# pylint: disable=too-many-arguments,too-many-positional-arguments
+class AstrometricCorrections:
     """
     Class to calculate any potential corrections to quoted astrometric
     precisions in photometric catalogues, based on reliable cross-matching
     to a well-understood second dataset.
     """
-    # pylint: disable-next=too-many-locals,too-many-arguments,too-many-positional-arguments
     def __init__(self, psf_fwhms, numtrials, nn_radius, dens_search_radius, save_folder,
                  gal_wavs_micron, gal_ab_offsets, gal_filtnames, gal_alavs, dm, dd_params, l_cut,
                  ax1_mids, ax2_mids, ax_dimension, mag_arrays, mag_slices, sig_slices, n_pool,
@@ -710,8 +711,8 @@ class AstrometricCorrections:  # pylint: disable=too-many-instance-attributes
                         self.b[:, self.pos_and_err_indices_full[0][0]],
                         self.b[:, self.pos_and_err_indices_full[0][1]], self.b[:, self.pm_indices[0][0]],
                         self.b[:, self.pm_indices[0][1]], pm_r_e, self.pm_move_to_epoch, self.coord_system)
-                    self.b[:, self.pos_and_err_indices[0][0]] = x
-                    self.b[:, self.pos_and_err_indices[0][1]] = y
+                    self.b[:, self.pos_and_err_indices_full[0][0]] = x
+                    self.b[:, self.pos_and_err_indices_full[0][1]] = y
 
             self.area, self.hull_points, self.hull_x_shift = convex_hull_area(
                 self.b[:, 0], self.b[:, 1], return_hull=True)

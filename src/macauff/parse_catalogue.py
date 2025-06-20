@@ -22,6 +22,7 @@ from macauff.misc_functions_fortran import misc_functions_fortran as mff
 __all__ = ['csv_to_npy', 'rect_slice_npy', 'npy_to_csv', 'rect_slice_csv']
 
 
+# pylint: disable-next=too-many-branches,too-many-statements,too-many-locals
 def csv_to_npy(input_filename, astro_cols, photo_cols, bestindex_col,
                chunk_overlap_col, snr_cols=None, header=False, process_uncerts=False,
                astro_sig_fits_filepath=None, cat_in_radec=None, mn_in_radec=None,
@@ -256,7 +257,7 @@ def csv_to_npy(input_filename, astro_cols, photo_cols, bestindex_col,
         # Since we made the temporary holding place for the individal array
         # epochs an object dtype, just extract values into a list quickly to
         # make astropy.time.Time happy later.
-        pm_r_e = pm_ref_epoch if pm_ref_epoch is not None else [q for q in pm_epochs]
+        pm_r_e = pm_ref_epoch if pm_ref_epoch is not None else list(pm_epochs)
         lon, lat = apply_proper_motion(astro[:, 0], astro[:, 1], pms[:, 0], pms[:, 1], pm_r_e,
                                        pm_move_to_epoch, 'equatorial' if cat_in_radec else 'galactic')
         astro[:, 0], astro[:, 1] = lon, lat
@@ -266,7 +267,7 @@ def csv_to_npy(input_filename, astro_cols, photo_cols, bestindex_col,
     return astro, photo, best_index, chunk_overlap
 
 
-# pylint: disable-next=dangerous-default-value,too-many-locals,too-many-statements
+# pylint: disable-next=dangerous-default-value,too-many-locals,too-many-statements,dangerous-default-value
 def npy_to_csv(input_csv_file_paths, cm, output_folder, output_filenames, column_name_lists,
                column_num_lists, extra_col_cat_names, correct_astro_flags, headers=[False, False],
                extra_col_name_lists=[None, None], extra_col_num_lists=[None, None], file_extension=''):

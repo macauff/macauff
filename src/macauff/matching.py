@@ -7,7 +7,6 @@ This module provides the high-level framework for performing catalogue-catalogue
 
 import datetime
 import os
-import re
 import sys
 import warnings
 from time import sleep
@@ -144,7 +143,7 @@ class CrossMatch():
                 self.end_time = None
                 self.end_within = None
 
-    def _initialise_chunk(self):
+    def _initialise_chunk(self):  # pylint: disable=too-many-branches,too-many-statements
         '''
         Initialisation function for a single chunk of sky.
 
