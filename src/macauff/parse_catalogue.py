@@ -673,18 +673,18 @@ def apply_proper_motion(lon, lat, pm_lon, pm_lat, ref_epoch, move_to_epoch, coor
 
     Parameters
     ----------
-    lon : numpy.ndarray of floats
+    lon : numpy.ndarray or list of floats
         Longitude coordinate of each object. Should either be Right Ascension
         or galactic longitude, depending on ``coord_system``.
-    lat: numpy.ndarray of floats
+    lat: numpy.ndarray or list of floats
         Declination or galactic latitude (depending on ``coord_system``) of
         each object to be moved to a new epoch.
-    pm_lon : numpy.ndarray of floats
+    pm_lon : numpy.ndarray or list of floats
         Longitudinal drift of each object, corresponding element by element
         to ``lon`` and ``lat``. Must be in units of arcseconds per year, and
         account for the latitudinal projection effect (e.g., the "cos dec"
         effect) already.
-    pm_lat : numpy.ndarray of floats
+    pm_lat : numpy.ndarray or list of floats
         The latitudinal drift of the objects, in arcseconds per year.
     ref_epoch : numpy.ndarray of strings or string
         The date, or dates, of all observations. Can either be a single value
@@ -708,18 +708,29 @@ def apply_proper_motion(lon, lat, pm_lon, pm_lat, ref_epoch, move_to_epoch, coor
     new_lat : numpy.ndarray of floats
         Latitude (Dec or b) of objects at the new epoch.
     '''
+
+    lon, lat = np.array(lon), np.array(lat)
+    pm_lon, pm_lat = np.array(pm_lon), np.array(pm_lat)
+
+    q = ~np.isnan(pm_lon) & ~np.isnan(pm_lat)
+
+    if not isinstance(ref_epoch, str):
+        ref_epoch = np.array(ref_epoch)[q]
+
     if coord_system == 'galactic':
-        c = SkyCoord(l=lon * u.degree, b=lat * u.degree, frame='galactic', obstime=ref_epoch,
-                     pm_l_cosb=pm_lon * u.arcsecond / u.year, pm_b=pm_lat * u.arcsecond / u.year)
+        c = SkyCoord(l=lon[q] * u.degree, b=lat[q] * u.degree, frame='galactic', obstime=ref_epoch,
+                     pm_l_cosb=pm_lon[q] * u.arcsecond / u.year, pm_b=pm_lat[q] * u.arcsecond / u.year)
     else:
-        c = SkyCoord(ra=lon * u.degree, dec=lat * u.degree, frame='icrs', obstime=ref_epoch,
-                     pm_ra_cosdec=pm_lon * u.arcsecond / u.year, pm_dec=pm_lat * u.arcsecond / u.year)
+        c = SkyCoord(ra=lon[q] * u.degree, dec=lat[q] * u.degree, frame='icrs', obstime=ref_epoch,
+                     pm_ra_cosdec=pm_lon[q] * u.arcsecond / u.year, pm_dec=pm_lat[q] * u.arcsecond / u.year)
 
     d = c.apply_space_motion(new_obstime=Time(move_to_epoch))
 
+    new_lon, new_lat = np.empty(len(lon), float), np.empty(len(lat), float)
     if coord_system == 'galactic':
-        new_lon, new_lat = d.l.degree, d.b.degree
+        new_lon[q], new_lat[q] = d.l.degree, d.b.degree
     else:
-        new_lon, new_lat = d.ra.degree, d.dec.degree
+        new_lon[q], new_lat[q] = d.ra.degree, d.dec.degree
+    new_lon[~q], new_lat[~q] = lon[~q], lat[~q]
 
     return new_lon, new_lat
