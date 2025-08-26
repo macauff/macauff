@@ -482,7 +482,7 @@ The inter-dependency of input parameters on one another, and the output ``CrossM
 List directories end in ``->`` for ``joint`` parameters, ``-*`` for ``catalogue`` parameters. ``catalogue`` level items will have ``a_`` or ``b_`` prepended, depending on which "side" of the cross-match they are from. Items with a second keyword after an arrow ``->`` are the names of the attributes that are saved to ``CrossMatch``, usually when the input parameter is a location on disk.
 
 | [1] - must be the same
-| [2] - only one set of [3a] and [3b] should be given, the others should be passed as ``None``
+| [2] - only one set of [2a] and [2b] should be given, the others should be passed as ``None``
 | [3] - must have ``_{}`` in its string, into which the chunk ID will be inserted
 | [4] - must have relevant input entry per chunk, e.g. in a YAML multi-line format, aligned with the chunk ID of ``chunk_id_list`` of the relevant input parameter file
 

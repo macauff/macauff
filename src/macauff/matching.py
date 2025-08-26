@@ -295,7 +295,7 @@ class CrossMatch():
                 raise FileNotFoundError('Catalogue file not found in catalogue "b" path. '
                                         'Please ensure photometric catalogue is correctly saved.')
 
-            if self.include_perturb_auf or self.a_correct_astrometry:
+            if self.include_perturb_auf or self.b_correct_astrometry:
                 snr_cols = self.b_snr_indices
             else:
                 snr_cols = None
