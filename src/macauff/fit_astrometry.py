@@ -715,7 +715,8 @@ class AstrometricCorrections:
                     self.b[:, self.pos_and_err_indices_full[0][1]] = y
 
             self.area, self.hull_points, self.hull_x_shift = convex_hull_area(
-                self.b[:, 0], self.b[:, 1], return_hull=True)
+                self.b[:, self.pos_and_err_indices_full[0][0]],
+                self.b[:, self.pos_and_err_indices_full[0][1]], return_hull=True)
 
             # At this point we need to loop to accommodate the possibility
             # that we're generating a per-band parameterisation. If
