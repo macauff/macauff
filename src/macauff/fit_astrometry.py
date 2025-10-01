@@ -809,6 +809,9 @@ class AstrometricCorrections:
                     # Fall back to not correcting anything if data still too poor
                     # to draw any meaningful conclusions from.
                     m_sig, n_sig = 1, 0
+                    self.fit_sigs = np.zeros((len(self.mag_array), 2), float)
+                    self.fit_sigs[:, 0] = self.avg_sig[:, 0]
+                    self.fit_sigs[:, 1] = self.avg_sig[:, 0]
                 if self.use_photometric_uncertainties:
                     mn_sigs[index_, unc_index, 0] = m_sig
                     mn_sigs[index_, unc_index, 1] = n_sig
