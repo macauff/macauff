@@ -1282,14 +1282,14 @@ class TestInputs:
         # Test all of the inputs being needed one by one loading into cat_a_params:
         dd_l_path = os.path.join(os.path.dirname(__file__), 'data')
         lines = [f'correct_astrometry: True\n\ndd_params_path: {dd_l_path}\nl_cut_path: {dd_l_path}',
-                 '\nsnr_indices: [4, 6, 8]', '\ncorrect_astro_save_folder: ac_folder',
-                 '\ncorrect_astro_mag_indices_index: 0', '\nnn_radius: 30',
-                 '\nref_cat_csv_file_path: ref_{}.csv',
+                 '\nref_apply_proper_motion: False', '\nsnr_indices: [4, 6, 8]',
+                 '\ncorrect_astro_save_folder: ac_folder', '\ncorrect_astro_mag_indices_index: 0',
+                 '\nnn_radius: 30', '\nref_cat_csv_file_path: ref_{}.csv',
                  '\ncorrect_mag_array: [[14.07, 14.17, 14.27, 14.37, 14.47]]',
                  '\ncorrect_mag_slice: [[0.05, 0.05, 0.05, 0.05, 0.05]]',
                  '\ncorrect_sig_slice: [[0.1, 0.1, 0.1, 0.1, 0.1]]', '\nuse_photometric_uncertainties: False',
                  '\nmn_fit_type: quadratic', '\nseeing_ranges: [0.9, 1.1]']
-        for i, key in enumerate(['snr_indices', 'correct_astro_save_folder',
+        for i, key in enumerate(['ref_apply_proper_motion', 'snr_indices', 'correct_astro_save_folder',
                                  'correct_astro_mag_indices_index', 'nn_radius', 'ref_cat_csv_file_path',
                                  'correct_mag_array', 'correct_mag_slice', 'correct_sig_slice',
                                  'use_photometric_uncertainties', 'mn_fit_type', 'seeing_ranges']):
@@ -1340,6 +1340,7 @@ class TestInputs:
         cb_p_2 = cb_p_2.replace(r'cat_csv_file_path: wise_folder/wise_{}.csv',
                                 r'cat_csv_file_path: file_{}.csv')
         cb_p_2 = cb_p_2.replace('[3, 4, 5, 6]', '[3, 5, 7, 9]')
+        cb_p_2 = cb_p_2.replace('best_mag_index_col: 8', 'best_mag_index_col: 11')
         cb_p_2 = cb_p_2.replace('chunk_overlap_col: 7', 'chunk_overlap_col: 12')
         # Fake some TRILEGAL downloads with random data.
         os.makedirs('wise_auf_folder', exist_ok=True)
@@ -1354,7 +1355,7 @@ class TestInputs:
                 '1   6.65 -0.39  0.02415 -2.701 3.397  4.057 14.00  8.354 0.00 25.523 25.839 ' +
                 '24.409 23.524 22.583 22.387 22.292 22.015 21.144 19.380 20.878 '
                 f'{w1} 22.391 21.637 21.342  0.024\n ')
-        with open('wise_auf_folder/trilegal_download_9_131.0_-1.0_faint.dat', "w",
+        with open('wise_auf_folder/trilegal_download_9_131.00_-1.00_faint.dat', "w",
                   encoding='utf-8') as f:
             f.write(text)
         # Fake some "real" csv data
@@ -1433,7 +1434,6 @@ class TestInputs:
         assert np.all(cm.b_in_overlaps == y[:, 12].astype(int))
 
         cb_p_2 = cb_p_2.replace('chunk_overlap_col: 12', 'chunk_overlap_col: None')
-        cb_p_2 = cb_p_2.replace('best_mag_index_col: 8', 'best_mag_index_col: 11')
 
         # Swapped a+b to test a_* versions of things, but also test using the
         # photometric information.
@@ -1459,9 +1459,8 @@ class TestInputs:
                                 'correct_sig_slice: [[0.1, 0.1, 0.1, 0.1, 0.1], [0.1, 0.1, 0.1, 0.1, 0.1], '
                                 '[0.1, 0.1, 0.1, 0.1, 0.1], [0.1, 0.1, 0.1, 0.1, 0.1]]')
 
-        os.system('cp -r gaia_folder_9 gaia_folder_100')
-        os.system('cp -r wise_folder_9 wise_folder_100')
-        os.system('cp -r wise_auf_folder_9 wise_auf_folder_100')
+        os.system('cp -r wise_auf_folder/trilegal_download_9_131.00_-1.00_faint.dat '
+                  'wise_auf_folder/trilegal_download_100_131.00_-1.00_faint.dat')
         os.system('cp ref_9.csv ref_100.csv')
         os.system('cp file_9.csv file_100.csv')
         x = np.loadtxt('file_100.csv', delimiter=',')
@@ -1497,7 +1496,7 @@ class TestInputs:
 
         # New test of the AC run, just with pre-made histograms.
         dens, tri_mags, tri_mags_mids, dtri_mags, uncert, num_bright_obj = make_tri_counts(
-            'wise_auf_folder/trilegal_download_9_131.0_-1.0.dat', 'W1', 0.1, 13.5, 16)
+            'wise_auf_folder/trilegal_download_9_131.00_-1.00.dat', 'W1', 0.1, 13.5, 16)
         dhtl = 'ac_folder/npy/dhtl.npy'
         np.save(dhtl, [dens, dens, dens, dens])
         tmml = 'ac_folder/npy/tmml.npy'
@@ -1547,6 +1546,32 @@ class TestInputs:
         mnarray = np.load('ac_folder/npy/mn_sigs_array.npy')
         assert_allclose([mnarray[0, 0], mnarray[0, 1]], [2, 0], rtol=0.1, atol=0.01)
         # pylint: enable=no-member
+
+        # Include test that runs the proper-motion rewind with astrometric corrections.
+        # This begins with faking ref_9 again to include proper motion columns.
+        x = np.loadtxt('ref_9.csv', delimiter=',')
+        y = np.empty((len(x), 13), float)
+        y[:, [0, 1, 2]] = x[:, [0, 1, 2]]
+        y[:, [3, 4]] = x[:, [3, 4]]
+        y[:, [5, 6]] = x[:, [3, 4]]
+        y[:, [7, 8]] = x[:, [3, 4]]
+        y[:, [9, 10]] = 0.01
+        # Pad with both a best index and chunk overlap column
+        y[:, 11] = 2
+        y[:, 12] = 1
+        np.savetxt('ref_9.csv', y, delimiter=',')
+
+        cm_p_2b = cm_p_.replace('n_pool: 2', 'n_pool: 2\nmove_to_epoch: J2000.000')
+        cb_p_2b = cb_p_2.replace('chunk_overlap_col: None', 'chunk_overlap_col: 12')
+        cb_p_2b = cb_p_2b.replace('ref_apply_proper_motion: False', 'ref_apply_proper_motion: True\n'
+                                  'ref_pm_indices: [9, 10]\nref_ref_epoch_or_index: J2000.5')
+
+        cm = CrossMatch(mock_filename(cm_p_2b.encode("utf-8")),
+                        mock_filename(self.ca_p_text.encode("utf-8")),
+                        mock_filename(cb_p_2b.encode("utf-8")))
+        cm._load_metadata_config(self.chunk_id)
+        cm.chunk_id = self.chunk_id
+        cm._initialise_chunk()
 
         # Dummy folder that won't contain l_cut.npy
         os.makedirs('./l_cut_dummy_folder', exist_ok=True)

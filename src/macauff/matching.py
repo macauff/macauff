@@ -169,6 +169,18 @@ class CrossMatch():
             t = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             print(f"{t} Rank {self.rank}, chunk {self.chunk_id}: Calculating catalogue 'a' "
                   "uncertainty corrections...")
+            apply_proper_motion = self.a_apply_proper_motion or self.a_ref_apply_proper_motion
+            if apply_proper_motion:
+                pm_cols, pm_ref_epoch_or_index = [None, None], [None, None]
+                pm_move_to_epoch = self.move_to_epoch
+                if self.a_apply_proper_motion:
+                    pm_cols[0] = self.a_pm_indices
+                    pm_ref_epoch_or_index[0] = self.a_ref_epoch_or_index
+                if self.a_ref_apply_proper_motion:
+                    pm_cols[1] = self.a_ref_pm_indices
+                    pm_ref_epoch_or_index[1] = self.a_ref_ref_epoch_or_index
+            else:
+                pm_cols, pm_ref_epoch_or_index, pm_move_to_epoch = None, None, None
             ac = AstrometricCorrections(
                 self.a_psf_fwhms, self.num_trials, self.a_nn_radius, self.a_dens_dist,
                 self.a_correct_astro_save_folder, self.a_gal_wavs, self.a_gal_aboffsets,
@@ -185,7 +197,9 @@ class CrossMatch():
                 tri_uncerts=self.a_tri_dens_uncert_list,
                 use_photometric_uncertainties=self.a_use_photometric_uncertainties, pregenerate_cutouts=True,
                 chunks=[self.chunk_id], n_r=self.real_hankel_points, n_rho=self.four_hankel_points,
-                max_rho=self.four_max_rho, mn_fit_type=self.a_mn_fit_type)
+                max_rho=self.four_max_rho, mn_fit_type=self.a_mn_fit_type,
+                apply_proper_motion_flag=apply_proper_motion, pm_indices=pm_cols,
+                pm_ref_epoch_or_index=pm_ref_epoch_or_index, pm_move_to_epoch=pm_move_to_epoch)
             ac(a_cat_name=self.a_ref_cat_csv_file_path, b_cat_name=self.a_cat_csv_file_path,
                tri_download=self.a_download_tri, make_plots=True, overwrite_all_sightlines=True,
                seeing_ranges=self.a_seeing_ranges)
@@ -269,6 +283,18 @@ class CrossMatch():
             t = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             print(f"{t} Rank {self.rank}, chunk {self.chunk_id}: Calculating catalogue 'b' "
                   "uncertainty corrections...")
+            apply_proper_motion = self.b_apply_proper_motion or self.b_ref_apply_proper_motion
+            if apply_proper_motion:
+                pm_cols, pm_ref_epoch_or_index = [None, None], [None, None]
+                pm_move_to_epoch = self.move_to_epoch
+                if self.b_apply_proper_motion:
+                    pm_cols[0] = self.b_pm_indices
+                    pm_ref_epoch_or_index[0] = self.b_ref_epoch_or_index
+                if self.b_ref_apply_proper_motion:
+                    pm_cols[1] = self.b_ref_pm_indices
+                    pm_ref_epoch_or_index[1] = self.b_ref_ref_epoch_or_index
+            else:
+                pm_cols, pm_ref_epoch_or_index, pm_move_to_epoch = None, None, None
             ac = AstrometricCorrections(
                 self.b_psf_fwhms, self.num_trials, self.b_nn_radius, self.b_dens_dist,
                 self.b_correct_astro_save_folder, self.b_gal_wavs, self.b_gal_aboffsets,
@@ -286,7 +312,9 @@ class CrossMatch():
                 use_photometric_uncertainties=self.b_use_photometric_uncertainties,
                 pregenerate_cutouts=True, chunks=[self.chunk_id],
                 n_r=self.real_hankel_points, n_rho=self.four_hankel_points, max_rho=self.four_max_rho,
-                mn_fit_type=self.b_mn_fit_type)
+                mn_fit_type=self.b_mn_fit_type, apply_proper_motion_flag=apply_proper_motion,
+                pm_indices=pm_cols, pm_ref_epoch_or_index=pm_ref_epoch_or_index,
+                pm_move_to_epoch=pm_move_to_epoch)
             ac(a_cat_name=self.b_ref_cat_csv_file_path, b_cat_name=self.b_cat_csv_file_path,
                tri_download=self.b_download_tri, make_plots=True, overwrite_all_sightlines=True,
                seeing_ranges=self.b_seeing_ranges)
@@ -879,8 +907,54 @@ class CrossMatch():
                     if not a.is_integer():
                         raise ValueError('ref_epoch_or_index, if indicating a column index, should be an '
                                          f'integer in the catalogue "{flag[0]}" metadata file.')
+        for config, flag, correct_astro in zip(
+                [cat_a_config, cat_b_config], ['a_', 'b_'],
+                [cat_a_config['correct_astrometry'], cat_b_config['correct_astrometry']]):
+            if correct_astro:
+                if 'ref_apply_proper_motion' not in config:
+                    raise ValueError(f'Missing key ref_apply_proper_motion from catalogue "{flag[0]}"" '
+                                     'metadata file.')
+            if correct_astro and config['ref_apply_proper_motion']:
+                for check_flag in ['ref_pm_indices', 'ref_ref_epoch_or_index']:
+                    if check_flag not in config:
+                        raise ValueError(f'Missing key {check_flag} from catalogue "{flag[0]}"" '
+                                         'metadata file.')
 
-        if cat_a_config['apply_proper_motion'] or cat_b_config['apply_proper_motion']:
+                a = config['ref_pm_indices']
+                try:
+                    b = np.array([float(f) for f in a])
+                except (ValueError, TypeError) as exc:
+                    raise ValueError('ref_pm_indices should be a list of integers '
+                                     f'in the catalogue "{flag[0]}" metadata file') from exc
+                if len(b) != 2:
+                    raise ValueError(f'{flag}ref_pm_indices should contain two entries.')
+                if not np.all([c.is_integer() for c in b]):
+                    raise ValueError(f'All elements of {flag}ref_pm_indices should be integers.')
+
+                a = config['ref_ref_epoch_or_index']
+                if isinstance(config['ref_ref_epoch_or_index'], str):
+                    try:
+                        Time(a)
+                    except ValueError as exc:
+                        raise ValueError(f"{flag}ref_ref_epoch_or_index, if given as a constant string "
+                                         "input, must be a string that astropy's Time function accepts, "
+                                         "such as JYYYY or YYYY-MM-DD.") from exc
+                else:
+                    try:
+                        a = float(a)
+                    except (ValueError, TypeError) as exc:
+                        raise ValueError('ref_ref_epoch_or_index, if indicating a column index, should be an '
+                                         f'integer in the catalogue "{flag[0]}" metadata file.') from exc
+                    if not a.is_integer():
+                        raise ValueError('ref_ref_epoch_or_index, if indicating a column index, should be an '
+                                         f'integer in the catalogue "{flag[0]}" metadata file.')
+
+        # Always need to check for a/b catalogue PM application, but only check
+        # for their respective reference catalogues' PM application if they
+        # get a correct_astrometry call at all.
+        if (cat_a_config['apply_proper_motion'] or cat_b_config['apply_proper_motion'] or
+                (cat_a_config['correct_astrometry'] and cat_a_config['ref_apply_proper_motion']) or
+                (cat_b_config['correct_astrometry'] and cat_b_config['ref_apply_proper_motion'])):
             if 'move_to_epoch' not in joint_config:
                 raise ValueError("Missing key move_to_epoch from joint metadata file.")
 

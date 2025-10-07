@@ -46,12 +46,16 @@ options that must be supplied if ``include_phot_like`` is ``True``:
 
 ``with_and_without_photometry``;
 
-and those options which only need to be supplied if ``include_perturb_auf`` is ``True``:
+those options which only need to be supplied if ``include_perturb_auf`` is ``True``:
 
-``num_trials``, and ``d_mag``.
+``num_trials``, and ``d_mag``;
 
 .. note::
     ``num_trials`` and ``d_mag`` currently need to be supplied if either ``correct_astrometry`` option in the two `Catalogue-specific Parameters`_ config files is ``True`` as well.
+
+and those options which need to be supplied if either of ``apply_proper_motion`` or ``ref_apply_proper_motion`` is ``True``, in either catalogue:
+
+``move_to_epoch``.
 
 Common Parameter Description
 ----------------------------
@@ -138,6 +142,10 @@ The number of PSF realisations to draw when simulating the perturbation componen
 
 Bin sizes for magnitudes used to represent the source number density used in the random drawing of perturbation AUF component PSFs. Should be a single float. Only required if ``include_perturb_auf`` is ``True``.
 
+``move_to_epoch``
+
+The epoch to which proper motions should be fast-forwarded or re-wound, in either catalogue (and astrometric correction reference catalogues, as appropriate). Should be a single string formatted in such a way that it can be read by ``astropy``'s ``Time`` function, such as ``J2000`` or ``2000-01-01``.
+
 
 Catalogue-specific Parameters
 =============================
@@ -146,7 +154,7 @@ These parameters are required in two separate files, one per catalogue to be cro
 
 These can be divided into those inputs that are always required:
 
-``cat_csv_file_path``, ``cat_name``, ``pos_and_err_indices``, ``mag_indices``, ``chunk_overlap_col``, ``best_mag_index_col``, ``csv_has_header``, ``filt_names``, ``auf_file_path``, ``auf_region_type``, ``auf_region_frame``, ``auf_region_points_per_chunk``, ``chunk_id_list``, and ``correct_astrometry``;
+``cat_csv_file_path``, ``cat_name``, ``pos_and_err_indices``, ``mag_indices``, ``chunk_overlap_col``, ``best_mag_index_col``, ``csv_has_header``, ``filt_names``, ``auf_file_path``, ``auf_region_type``, ``auf_region_frame``, ``auf_region_points_per_chunk``, ``chunk_id_list``, ``apply_proper_motion``, and ``correct_astrometry``;
 
 those that are only required if the `Joint Parameters`_ option ``include_perturb_auf`` is ``True``:
 
@@ -164,12 +172,20 @@ inputs required if ``make_output_csv`` is ``True``:
 
 ``input_csv_file_path``, ``cat_col_names``, ``cat_col_nums``, ``extra_col_names``, and ``extra_col_nums``;
 
-the inputs required if either ``correct_astrometry`` is ``True``:
+the inputs required if ``correct_astrometry`` is ``True``:
 
-``correct_astro_save_folder``, ``correct_astro_mag_indices_index``, ``nn_radius``, ``ref_cat_csv_file_path``, ``correct_mag_array``, ``correct_mag_slice``, ``correct_sig_slice``, ``use_photometric_uncertainties``, and ``saturation_magnitudes``.
+``correct_astro_save_folder``, ``correct_astro_mag_indices_index``, ``nn_radius``, ``ref_cat_csv_file_path``, ``correct_mag_array``, ``correct_mag_slice``, ``correct_sig_slice``, ``use_photometric_uncertainties``, ``saturation_magnitudes``, and ``ref_apply_proper_motion``;
 
 .. note::
     ``run_fw_auf``, ``run_psf_auf``, ``psf_fwhms``, ``download_tri``, ``tri_set_name``, ``tri_filt_names``, ``tri_filt_num``, ``tri_maglim_faint``, ``tri_num_faint``, ``dens_dist``, ``dd_params_path``, ``l_cut_path``, ``gal_wavs``, ``gal_zmax``, ``gal_nzs``, ``gal_aboffsets``, ``gal_filternames``, ``gal_al_avs``, and ``snr_indices`` are all currently required if ``correct_astrometry`` is ``True``, bypassing the nested flags above. For example, ``dens_dist`` is required as an input if ``include_perturb_auf`` is ``True``, or if ``correct_astrometry`` is set. This means that ``AstrometricCorrections`` implicitly always runs and fits for a full Astrometric Uncertainty Function.
+
+the inputs required if ``apply_proper_motion`` is ``True``:
+
+``pm_indices``, and ``ref_epoch_or_index``;
+
+and the inputs required if ``ref_apply_proper_motion`` is ``True`` (and hence ``correct_astrometry`` is also ``True``):
+
+``ref_pm_indices``, and ``ref_ref_epoch_or_index``.
 
 
 Catalogue Parameter Description
@@ -229,6 +245,10 @@ Based on ``auf_region_type``, this must either by list of six floats, controllin
 ``chunk_id_list``
 
 A single entry per chunk, to have the same length as ``auf_region_points_per_chunk``, of unique IDs for each chunk. Must agree with the list in ``chunk_id_list`` in the joint-catalogue parameter file, and be a super-set of those chunks to be matched (i.e., no chunks can be in the joint catalogue match file without being in both catalogue-only input files).
+
+``apply_proper_motion``
+
+Boolean flag indicating whether, for this catalogue, we should apply known proper motion information to project the particular epoch (see ``ref_epoch_or_index``) to another time (see ``move_to_epoch``).
 
 ``correct_astrometry``
 
@@ -393,6 +413,25 @@ Boolean flag indicating whether the astrometric or photometric uncertainties of 
 
 A list, one float per filter, of the magnitudes in the given filter at which the telescope or survey saturates, used in the filtering of source counts for model-fitting purposes in ``AstrometricCorrections``.
 
+``pm_indices``
+
+List of integers for the two orthogonal sky indices that contain the proper motion information in the catalogue being cross-matched, used to propagate its given epoch to that declared in the joint-match configuration, ``move_to_epoch``.
+
+``ref_epoch_or_index``
+
+Either a single epoch that all observations are provided at, in which case -- similar to ``move_to_epoch`` -- the string should be formatted such that ``astropy``'s ``Time`` function can parse it (e.g. ``J2000`` or ``2000-01-01``); or an index into the file that contains the epochs of each observation, one per row, to be moved to ``move_to_epoch`` on a case-by-case basis.
+
+``ref_apply_proper_motion``
+
+Boolean flag for whether to apply proper motions to this catalogue's *reference* catalogue during astrometric precision parameterisation and characterisation.
+
+``ref_pm_indices``
+
+A list of integers, the index for the two ortogonal sky proper motion columns in the *reference* catalogue being loaded during astrometric corrections, similar to ``pm_indices``, if supplied, for the catalogue being parameterised and/or cross-matched.
+
+``ref_ref_epoch_or_index``
+
+The *reference* catalogue's "reference" epoch, used to propagate the reference cataloue to ``move_to_epoch`` before this catalogue has its uncertainties parameterised, as necessary. Formats expected are the same as ``ref_epoch_or_index``: single, ``Time``-compatible string, or index into reference catalogue from which an epoch per row can be extracted.
 
 Parameter Dependency Graph
 ==========================
@@ -464,12 +503,16 @@ The inter-dependency of input parameters on one another, and the output ``CrossM
     ├─* best_mag_index_col
     ├─* csv_has_header
     ├─* apply_proper_motion
-    │                     ├─> move_to_epoch
+    │                     ├─> move_to_epoch[5]
     │                     ├─* pm_indices
     │                     └─* ref_epoch_or_index
     └─* correct_astrometry
                          ├─* correct_astro_save_folder[3]
                          ├─* snr_indices
+                         ├─* ref_apply_proper_motion
+                         │                         ├─> move_to_epoch[5]
+                         │                         ├─* ref_pm_indices
+                         │                         └─* ref_ref_epoch_or_index
                          ├─* correct_astro_mag_indices_index
                          ├─* nn_radius
                          ├─* ref_cat_csv_file_path[3]
@@ -485,6 +528,7 @@ List directories end in ``->`` for ``joint`` parameters, ``-*`` for ``catalogue`
 | [2] - only one set of [2a] and [2b] should be given, the others should be passed as ``None``
 | [3] - must have ``_{}`` in its string, into which the chunk ID will be inserted
 | [4] - must have relevant input entry per chunk, e.g. in a YAML multi-line format, aligned with the chunk ID of ``chunk_id_list`` of the relevant input parameter file
+| [5] - must be provided in either ``apply_proper_motion`` or ``ref_apply_proper_motion`` are ``True`` in either input catalogue
 
 .. rubric:: Footnotes
 
