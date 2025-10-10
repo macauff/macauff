@@ -716,12 +716,15 @@ def apply_proper_motion(lon, lat, pm_lon, pm_lat, ref_epoch, move_to_epoch, coor
 
     if not isinstance(ref_epoch, str):
         ref_epoch = np.array(ref_epoch)[q]
+        time_ref_epoch = [Time(x) for x in ref_epoch]
+    else:
+        time_ref_epoch = Time(ref_epoch)
 
     if coord_system == 'galactic':
-        c = SkyCoord(l=lon[q] * u.degree, b=lat[q] * u.degree, frame='galactic', obstime=ref_epoch,
+        c = SkyCoord(l=lon[q] * u.degree, b=lat[q] * u.degree, frame='galactic', obstime=time_ref_epoch,
                      pm_l_cosb=pm_lon[q] * u.arcsecond / u.year, pm_b=pm_lat[q] * u.arcsecond / u.year)
     else:
-        c = SkyCoord(ra=lon[q] * u.degree, dec=lat[q] * u.degree, frame='icrs', obstime=ref_epoch,
+        c = SkyCoord(ra=lon[q] * u.degree, dec=lat[q] * u.degree, frame='icrs', obstime=time_ref_epoch,
                      pm_ra_cosdec=pm_lon[q] * u.arcsecond / u.year, pm_dec=pm_lat[q] * u.arcsecond / u.year)
 
     d = c.apply_space_motion(new_obstime=Time(move_to_epoch))
