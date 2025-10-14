@@ -25,25 +25,26 @@ jobs:
             python-version: "3.11"
             toxenv: py311-test
             gfortran-version: 12
+            gfortran-compiler: gcc
           - name: macOS, Python 3.10
             os: macOS-15
             python-version: "3.10"
             gfortran-version: 12
+            gfortran-compiler: gcc
     steps:
     - uses: actions/checkout@v3
     - name: Set up Python
       uses: actions/setup-python@v4
       with:
         python-version: ${{ matrix.python-version }}
-    - if: runner.os == 'macOS'
-      name: macOS gfortran
-      run: |
-        sudo ln -s /usr/local/bin/gfortran-${{ matrix.gfortran-version }} /usr/local/bin/gfortran
-        sudo mkdir /usr/local/gfortran
-        sudo ln -s /usr/local/Cellar/gcc@${{ matrix.gfortran-version }}/*/lib/gcc/${{ matrix.gfortran-version }} /usr/local/gfortran/lib
-    - if: runner.os == 'Linux'
-      name: ubuntu gfortran
-      run: sudo ln -sf /usr/bin/gfortran-${{ matrix.gfortran-version }} /usr/bin/gfortran
+    - name: Set up gfortran ${{ matrix.gfortran-compiler}}-${{ matrix.gfortran-version }}
+      uses: fortran-lang/setup-fortran@v1
+      id: setup-fortran
+      with:
+        compiler: ${{ matrix.gfortran-compiler }}
+        version: ${{ matrix.gfortran-version }}
+    - run: |
+        ${{ env.FC }} --version
     - name: Install dependencies
       run: |
         # sudo apt-get update
