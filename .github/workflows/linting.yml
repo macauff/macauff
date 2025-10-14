@@ -26,7 +26,7 @@ jobs:
             toxenv: py311-test
             gfortran-version: 12
           - name: macOS, Python 3.10
-            os: macOS-13
+            os: macOS-15
             python-version: "3.10"
             gfortran-version: 12
     steps:
