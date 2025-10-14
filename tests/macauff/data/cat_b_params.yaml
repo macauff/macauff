@@ -8,6 +8,7 @@ pos_and_err_indices: [0, 1, 2]
 mag_indices: [3, 4, 5, 6]
 chunk_overlap_col: 7
 best_mag_index_col: 8
+snr_indices: [9, 10, 11, 12]
 csv_has_header: False
 
 # Filter names are also used in any output file created
@@ -16,8 +17,6 @@ filt_names: [W1, W2, W3, W4]
 # Flags for which of the two AUF simulation algorithms to run
 run_fw_auf: True
 run_psf_auf: False
-# Path to array containing pre-computed astrometry corrections.
-snr_mag_params_file_path: b_snr_mag_{}/snr_mag_params.npy
 
 # Catalogue PSF parameters
 # Full-width at half maximums for each filter, in order, in arcseconds
@@ -55,4 +54,4 @@ dens_dist: 0.25
 
 # Test for whether we need to correct astrometry of catalogue for systematic biases before performing matches
 correct_astrometry: False
-compute_snr_mag_relation: False
+apply_proper_motion: False

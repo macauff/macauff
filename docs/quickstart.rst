@@ -115,8 +115,6 @@ cat_a_params.yaml::
     # Flags for which of the two AUF simulation algorithms to run
     run_fw_auf: True
     run_psf_auf: False
-    # Path to array containing pre-computed astrometry corrections.
-    snr_mag_params_file_path: a_snr_mag_{}/snr_mag_params.npy
 
     # Catalogue PSF parameters
     # Full-width at half maximums for each filter, in order, in arcseconds
@@ -138,7 +136,6 @@ cat_a_params.yaml::
 
     # Test for whether we need to correct astrometry of catalogue for systematic biases before performing matches
     correct_astrometry: False
-    compute_snr_mag_relation: False
 
 
 cat_b_params.yaml::
@@ -161,8 +158,6 @@ cat_b_params.yaml::
     # Flags for which of the two AUF simulation algorithms to run
     run_fw_auf: True
     run_psf_auf: False
-    # Path to array containing pre-computed astrometry corrections.
-    snr_mag_params_file_path: a_snr_mag_{}/snr_mag_params.npy
 
     # Catalogue PSF parameters
     # Full-width at half maximums for each filter, in order, in arcseconds
@@ -184,7 +179,6 @@ cat_b_params.yaml::
 
     # Test for whether we need to correct astrometry of catalogue for systematic biases before performing matches
     correct_astrometry: False
-    compute_snr_mag_relation: False
 
 .. note::
     Discussion of the input parameters available in the catalogue-specific and joint match-specific input files is provided in more detail :doc:`here<inputs>`.

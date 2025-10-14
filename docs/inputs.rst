@@ -46,12 +46,16 @@ options that must be supplied if ``include_phot_like`` is ``True``:
 
 ``with_and_without_photometry``;
 
-and those options which only need to be supplied if ``include_perturb_auf`` is ``True``:
+those options which only need to be supplied if ``include_perturb_auf`` is ``True``:
 
-``num_trials``, and ``d_mag``.
+``num_trials``, and ``d_mag``;
 
 .. note::
     ``num_trials`` and ``d_mag`` currently need to be supplied if either ``correct_astrometry`` option in the two `Catalogue-specific Parameters`_ config files is ``True`` as well.
+
+and those options which need to be supplied if either of ``apply_proper_motion`` or ``ref_apply_proper_motion`` is ``True``, in either catalogue:
+
+``move_to_epoch``.
 
 Common Parameter Description
 ----------------------------
@@ -138,6 +142,10 @@ The number of PSF realisations to draw when simulating the perturbation componen
 
 Bin sizes for magnitudes used to represent the source number density used in the random drawing of perturbation AUF component PSFs. Should be a single float. Only required if ``include_perturb_auf`` is ``True``.
 
+``move_to_epoch``
+
+The epoch to which proper motions should be fast-forwarded or re-wound, in either catalogue (and astrometric correction reference catalogues, as appropriate). Should be a single string formatted in such a way that it can be read by ``astropy``'s ``Time`` function, such as ``J2000`` or ``2000-01-01``.
+
 
 Catalogue-specific Parameters
 =============================
@@ -146,11 +154,11 @@ These parameters are required in two separate files, one per catalogue to be cro
 
 These can be divided into those inputs that are always required:
 
-``cat_csv_file_path``, ``cat_name``, ``pos_and_err_indices``, ``mag_indices``, ``chunk_overlap_col``, ``best_mag_index_col``, ``csv_has_header``, ``filt_names``, ``auf_file_path``, ``auf_region_type``, ``auf_region_frame``, ``auf_region_points_per_chunk``, ``chunk_id_list``, ``correct_astrometry``, and ``compute_snr_mag_relation``;
+``cat_csv_file_path``, ``cat_name``, ``pos_and_err_indices``, ``mag_indices``, ``chunk_overlap_col``, ``best_mag_index_col``, ``csv_has_header``, ``filt_names``, ``auf_file_path``, ``auf_region_type``, ``auf_region_frame``, ``auf_region_points_per_chunk``, ``chunk_id_list``, ``apply_proper_motion``, and ``correct_astrometry``;
 
 those that are only required if the `Joint Parameters`_ option ``include_perturb_auf`` is ``True``:
 
-``fit_gal_flag``, ``run_fw_auf``, ``run_psf_auf``, ``psf_fwhms``, ``snr_mag_params_file_path``, ``download_tri``, ``tri_set_name``, ``tri_filt_names``, ``tri_filt_num``, ``tri_maglim_faint``, ``tri_num_faint``, ``gal_al_avs``, ``dens_dist``, ``dens_hist_tri_location``, ``tri_model_mags_location``, ``tri_model_mag_mids_location``, ``tri_model_mags_interval_location``, and ``tri_n_bright_sources_star_location``;
+``fit_gal_flag``, ``run_fw_auf``, ``run_psf_auf``, ``psf_fwhms``, ``download_tri``, ``tri_set_name``, ``tri_filt_names``, ``tri_filt_num``, ``tri_maglim_faint``, ``tri_num_faint``, ``gal_al_avs``, ``dens_dist``, ``snr_indices``, ``dens_hist_tri_location``, ``tri_model_mags_location``, ``tri_model_mag_mids_location``, ``tri_model_mags_interval_location``, and ``tri_n_bright_sources_star_location``;
 
 parameters required if ``run_psf_auf`` is ``True``:
 
@@ -164,19 +172,20 @@ inputs required if ``make_output_csv`` is ``True``:
 
 ``input_csv_file_path``, ``cat_col_names``, ``cat_col_nums``, ``extra_col_names``, and ``extra_col_nums``;
 
-the inputs required if either ``correct_astrometry`` or ``compute_snr_mag_relation`` are ``True``:
+the inputs required if ``correct_astrometry`` is ``True``:
 
-``correct_astro_save_folder``, ``mag_unc_indices``;
-
-and the inputs required if ``correct_astrometry`` is ``True``:
-
-``correct_astro_mag_indices_index``, ``nn_radius``, ``ref_cat_csv_file_path``, ``correct_mag_array``, ``correct_mag_slice``, ``correct_sig_slice``, and ``saturation_magnitudes``.
+``correct_astro_save_folder``, ``correct_astro_mag_indices_index``, ``nn_radius``, ``ref_cat_csv_file_path``, ``correct_mag_array``, ``correct_mag_slice``, ``correct_sig_slice``, ``use_photometric_uncertainties``, ``saturation_magnitudes``, and ``ref_apply_proper_motion``;
 
 .. note::
-    ``run_fw_auf``, ``run_psf_auf``, ``psf_fwhms``, ``snr_mag_params_file_path``, ``download_tri``, ``tri_set_name``, ``tri_filt_names``, ``tri_filt_num``, ``tri_maglim_faint``, ``tri_num_faint``, ``dens_dist``, ``dd_params_path``, ``l_cut_path``, ``gal_wavs``, ``gal_zmax``, ``gal_nzs``, ``gal_aboffsets``, ``gal_filternames``, and ``gal_al_avs`` are all currently required if ``correct_astrometry`` is ``True``, bypassing the nested flags above. For example, ``dens_dist`` is required as an input if ``include_perturb_auf`` is ``True``, or if ``correct_astrometry`` is set. This means that ``AstrometricCorrections`` implicitly always runs and fits for a full Astrometric Uncertainty Function.
+    ``run_fw_auf``, ``run_psf_auf``, ``psf_fwhms``, ``download_tri``, ``tri_set_name``, ``tri_filt_names``, ``tri_filt_num``, ``tri_maglim_faint``, ``tri_num_faint``, ``dens_dist``, ``dd_params_path``, ``l_cut_path``, ``gal_wavs``, ``gal_zmax``, ``gal_nzs``, ``gal_aboffsets``, ``gal_filternames``, ``gal_al_avs``, and ``snr_indices`` are all currently required if ``correct_astrometry`` is ``True``, bypassing the nested flags above. For example, ``dens_dist`` is required as an input if ``include_perturb_auf`` is ``True``, or if ``correct_astrometry`` is set. This means that ``AstrometricCorrections`` implicitly always runs and fits for a full Astrometric Uncertainty Function.
 
-.. note::
-    ``snr_mag_params_file_path`` is currently also required if ``compute_snr_mag_relation`` is ``True``, bypassing the above flags. It is therefore currently a required input if any one of ``include_perturb_auf``, ``correct_astrometry``, or ``compute_snr_mag_relation`` are set to ``True``.
+the inputs required if ``apply_proper_motion`` is ``True``:
+
+``pm_indices``, and ``ref_epoch_or_index``;
+
+and the inputs required if ``ref_apply_proper_motion`` is ``True`` (and hence ``correct_astrometry`` is also ``True``):
+
+``ref_pm_indices``, and ``ref_ref_epoch_or_index``.
 
 
 Catalogue Parameter Description
@@ -192,7 +201,7 @@ The name of the catalogue. This is used to generate intermediate folder structur
 
 ``pos_and_err_indices``
 
-A list of either three or six integers. If ``correct_astrometry`` is ``True``, a list of six integers, the first three elements of which are the zero-indexed indices into the *input* catalogue .csv file (``cat_csv_file_path``) for the longitudinal coordinate, latitudinal coordinate, and circular astrometric precision respectively, followed by the lon/lat/uncert of the *reference* catalogue (``ref_cat_csv_file_path``). For example, ``[10, 9, 8, 0, 1, 2]`` suggests that the reference catalogue begins with the position and uncertainty of its objects while the catalogue "a" or "b" sources have, in their original .csv file, a backwards list of coordinates and precisions towards the final columns of the filing system. Otherwise (including if ``compute_snr_mag_relation`` is ``True``), then only three integers should be passed, the respective coordinates for its own catalogue (dropping the indices of the reference catalogue); in the above example we would therefore only pass ``[10, 9, 8]``.
+A list of either three, six, or N integers. If ``correct_astrometry`` is ``True``, a list of either six or N integers. If ``use_photometric_uncertainties`` is ``False`` then the first three elements are the zero-indexed indices into the *input* catalogue .csv file (``cat_csv_file_path``) for the longitudinal coordinate, latitudinal coordinate, and circular astrometric precision respectively, followed by the lon/lat/uncert of the *reference* catalogue (``ref_cat_csv_file_path``). For example, ``[10, 9, 8, 0, 1, 2]`` suggests that the reference catalogue begins with the position and uncertainty of its objects while the catalogue "a" or "b" sources have, in their original .csv file, a backwards list of coordinates and precisions towards the final columns of the filing system. If photometric uncertainties are to be used to correct astrometric uncertainties, then the first two elements should be input longitude and latitude, followed by all indices for the input catalogue's photometric uncertainty columns, with the three reference catalogue longitude, latitude, and circular astrometric precision columns. Otherwise for ``correct_astrometry`` being ``False`` then only three integers should be passed, the respective coordinates for its own catalogue (dropping the indices of the reference catalogue and requiring that astrometric uncertainty be the third index); in the above example we would therefore only pass ``[10, 9, 8]``.
 
 ``mag_indices``
 
@@ -237,16 +246,16 @@ Based on ``auf_region_type``, this must either by list of six floats, controllin
 
 A single entry per chunk, to have the same length as ``auf_region_points_per_chunk``, of unique IDs for each chunk. Must agree with the list in ``chunk_id_list`` in the joint-catalogue parameter file, and be a super-set of those chunks to be matched (i.e., no chunks can be in the joint catalogue match file without being in both catalogue-only input files).
 
+``apply_proper_motion``
+
+Boolean flag indicating whether, for this catalogue, we should apply known proper motion information to project the particular epoch (see ``ref_epoch_or_index``) to another time (see ``move_to_epoch``).
+
 ``correct_astrometry``
 
 In cases where catalogues have unreliable *centroid* uncertainties, before catalogue matching occurs the dataset can be fit for systematic corrections to its quoted astrometric precisions through ensemble match separation distance distributions to a higher-precision dataset (see the :doc:`Processing<pre_post_process>` section). This flag controls whether this is performed on a chunk-by-chunk basis during the initialisation step of ``CrossMatch``.
 
 .. note::
     If ``correct_astrometry`` is ``True`` then ``dustmaps`` will be called to obtain line-of-sight extinction values. You will need the SFD dustmaps to be pre-downloaded; to do so before you call the cross-match procedure you must run ``dustmaps.sfd.fetch()``; see the ``dustmaps`` documentation for more details on how to specific a particular download location.
-
-``compute_snr_mag_relation``
-
-This flag can be ``False`` if the relationship between signal-to-noise ratio and magnitude is pre-computed; otherwise it indicates that the functional form of SNR vs brightness should be derived for the particular catalogue in question.
 
 ``fit_gal_flag``
 
@@ -263,10 +272,6 @@ Complementary flag to ``run_fw_auf``, indicates whether to run background-domina
 ``psf_fwhms``
 
 The Full-Width-At-Half-Maximum of each filter's Point Spread Function (PSF), in the same order as in ``filt_names``. These are used to simulate the PSF if ``include_perturb_auf`` is set to ``True``, and are unnecessary otherwise. Should be a list of floats.
-
-``snr_mag_params_file_path``
-
-File path, either absolute or relative to the location of the script the cross-matches are run from, of a binary ``.npy`` file containing the parameterisation of the signal-to-noise ratio of sources as a function of magnitude, in a series of given sightlines. Must contain the necessary ``_{}`` formatting for per-chunk parameters. Must be of shape ``(N, M, 5)`` where ``N`` is the number of filters in ``filt_names`` order, ``M`` is the number of sightlines for which SNR vs mag has been derived, and the 5 entries for each filter-sightline combination must be in order ``a``, ``b``, ``c``, ``coord1`` (e.g. RA), and ``coord2`` (e.g. Dec). See pre-processing for more information on the meaning of those terms and how ``snr_mag_params`` is used.
 
 ``download_tri``
 
@@ -323,6 +328,10 @@ Alongside ``dd_params_path``, path to the ``.npy`` file containing the limiting 
 ``dens_dist``
 
 The radius, in arcseconds, within which to count internal catalogue sources for each object, to calculate the local source density. Used to scale TRILEGAL simulated source counts to match smaller scale density fluctuations. Only required if ``include_perturb_auf`` is ``True``.
+
+``snr_indices``
+
+Similar to ``mag_indices``, a list of ``len(mag_indices)`` integers, one for each column in ``mag_indices`` for where the corresponding signal-to-noise ratio column is held for each magnitude in the input .csv file.
 
 ``gal_wavs``
 
@@ -386,19 +395,15 @@ Similar to ``cat_csv_file_path``, but the path and filename, including extension
 
 ``correct_mag_array``
 
-List of magnitudes at which to evaluate the distribution of matches to the higher-astrometric-precision dataset in the chosen ``correct_astro_mag_indices_index`` filter. Accepts a list of floats.
+List of magnitude arrays at which to evaluate the distribution of matches to the higher-astrometric-precision dataset in each input-catalogue photometric filter. Accepts a list of lists of floats, or two-dimensional array, with the first axis the same length as ``mag_indices``.
 
 ``correct_mag_slice``
 
-Corresponding to each magnitude in ``correct_mag_array``, each element of this list of floats should be a width around each ``correct_mag_array`` element to select sources, ensuring a small sub-set of similar brightness objects are used to determine the Astrometric Uncertainty Function of.
+Corresponding to each magnitude in ``correct_mag_array``, each element of this list of lists of floats should be a width around each ``correct_mag_array`` element to select sources, ensuring a small sub-set of similar brightness objects are used to determine the Astrometric Uncertainty Function of.
 
 ``correct_sig_slice``
 
-Elementwise with ``correct_mag_array`` and ``correct_mag_slice``, a list of floats of widths of astrometric precision to select a robust sub-sample of objects in each magnitude bin for, ensuring a self-similar AUF.
-
-``mag_unc_indices``
-
-Similar to ``mag_indices``, a list of ``len(mag_indices)`` integers, one for each column in ``mag_indices`` for where the corresponding uncertainty column is held for each magnitude in the input .csv file.
+Elementwise with ``correct_mag_array`` and ``correct_mag_slice``, a list of lists of floats of widths of astrometric precision to select a robust sub-sample of objects in each magnitude bin for, ensuring a self-similar AUF.
 
 ``use_photometric_uncertainties``
 
@@ -408,6 +413,25 @@ Boolean flag indicating whether the astrometric or photometric uncertainties of 
 
 A list, one float per filter, of the magnitudes in the given filter at which the telescope or survey saturates, used in the filtering of source counts for model-fitting purposes in ``AstrometricCorrections``.
 
+``pm_indices``
+
+List of integers for the two orthogonal sky indices that contain the proper motion information in the catalogue being cross-matched, used to propagate its given epoch to that declared in the joint-match configuration, ``move_to_epoch``.
+
+``ref_epoch_or_index``
+
+Either a single epoch that all observations are provided at, in which case -- similar to ``move_to_epoch`` -- the string should be formatted such that ``astropy``'s ``Time`` function can parse it (e.g. ``J2000`` or ``2000-01-01``); or an index into the file that contains the epochs of each observation, one per row, to be moved to ``move_to_epoch`` on a case-by-case basis.
+
+``ref_apply_proper_motion``
+
+Boolean flag for whether to apply proper motions to this catalogue's *reference* catalogue during astrometric precision parameterisation and characterisation.
+
+``ref_pm_indices``
+
+A list of integers, the index for the two ortogonal sky proper motion columns in the *reference* catalogue being loaded during astrometric corrections, similar to ``pm_indices``, if supplied, for the catalogue being parameterised and/or cross-matched.
+
+``ref_ref_epoch_or_index``
+
+The *reference* catalogue's "reference" epoch, used to propagate the reference cataloue to ``move_to_epoch`` before this catalogue has its uncertainties parameterised, as necessary. Formats expected are the same as ``ref_epoch_or_index``: single, ``Time``-compatible string, or index into reference catalogue from which an epoch per row can be extracted.
 
 Parameter Dependency Graph
 ==========================
@@ -425,32 +449,32 @@ The inter-dependency of input parameters on one another, and the output ``CrossM
     │                     │             ├─* gal_aboffsets
     │                     │             ├─* gal_filternames
     │                     │             └─* saturation_magnitudes
-    │                     ├─* snr_mag_params_file_path[4] -> snr_mag_params
-    │                     ├─* tri_set_name[3a]
-    │                     ├─* tri_filt_names[3a]
-    │                     ├─* tri_filt_num[3a]
-    │                     ├─* download_tri[3a]
+    │                     ├─* snr_indices
+    │                     ├─* tri_set_name[2a]
+    │                     ├─* tri_filt_names[2a]
+    │                     ├─* tri_filt_num[2a]
+    │                     ├─* download_tri[2a]
     │                     ├─* psf_fwhms
     │                     ├─* run_fw_auf
     │                     ├─* run_psf_auf
     │                     │             ├─* dd_params_path -> dd_params
     │                     │             └─* l_cut_path -> l_cut
-    │                     ├─* tri_maglim_faint[3a]
-    │                     ├─* tri_num_faint[3a]
+    │                     ├─* tri_maglim_faint[2a]
+    │                     ├─* tri_num_faint[2a]
     │                     ├─* gal_al_avs
-    │                     ├─* dens_hist_tri_location[3b, 4] -> dens_hist_tri_list
-    │                     ├─* tri_model_mags_location[3b, 4] -> tri_model_mags_list
-    │                     ├─* tri_model_mag_mids_location[3b, 4] -> tri_model_mag_mids_list
-    │                     ├─* tri_model_mags_interval_location[3b, 4] -> tri_model_mags_interval_list
-    │                     ├─* tri_model_mags_uncert_location[3b, 4] -> tri_model_mags_uncert_list
-    │                     └─* tri_n_bright_sources_star_location[3b, 4] -> tri_n_bright_sources_star_list
+    │                     ├─* dens_hist_tri_location[2b, 3] -> dens_hist_tri_list
+    │                     ├─* tri_model_mags_location[2b, 3] -> tri_model_mags_list
+    │                     ├─* tri_model_mag_mids_location[2b, 3] -> tri_model_mag_mids_list
+    │                     ├─* tri_model_mags_interval_location[2b, 3] -> tri_model_mags_interval_list
+    │                     ├─* tri_model_mags_uncert_location[2b, 3] -> tri_model_mags_uncert_list
+    │                     └─* tri_n_bright_sources_star_location[2b, 3] -> tri_n_bright_sources_star_list
     ├─> include_phot_like
     │                   └─> with_and_without_photometry
     ├─> use_phot_priors
     ├─> cf_region_type
-    ├─> cf_region_frame[2]
-    ├─> cf_region_points_per_chunk[5]
-    ├─> chunk_id_list[5]
+    ├─> cf_region_frame[1]
+    ├─> cf_region_points_per_chunk[4]
+    ├─> chunk_id_list[4]
     ├─> output_save_folder
     ├─> pos_corr_dist
     ├─> real_hankel_points
@@ -458,48 +482,53 @@ The inter-dependency of input parameters on one another, and the output ``CrossM
     ├─> four_max_rho
     ├─> int_fracs
     ├─> make_output_csv
-    │                 ├─> match_out_csv_name[4]
-    │                 ├─> nonmatch_out_csv_name[4]
+    │                 ├─> match_out_csv_name[3]
+    │                 ├─> nonmatch_out_csv_name[3]
     │                 ├─* cat_col_names
     │                 ├─* cat_col_nums
     │                 ├─* extra_col_names
     │                 └─* extra_col_nums
     ├─> n_pool
     ├─* auf_region_type
-    ├─* auf_region_frame[2]
-    ├─* auf_region_points_per_chunk[5]
-    ├─* chunk_id_list[5]
+    ├─* auf_region_frame[1]
+    ├─* auf_region_points_per_chunk[4]
+    ├─* chunk_id_list[4]
     ├─* filt_names
     ├─* cat_name
-    ├─* auf_file_path[3a, 4]
-    ├─* cat_csv_file_path[4]
+    ├─* auf_file_path[2a, 3]
+    ├─* cat_csv_file_path[3]
     ├─* pos_and_err_indices
     ├─* mag_indices
     ├─* chunk_overlap_col
     ├─* best_mag_index_col
     ├─* csv_has_header
-    ├─* correct_astrometry[1]
-    │                    ├─* correct_astro_save_folder[4]
-    │                    ├─* mag_unc_indices
-    │                    ├─* correct_astro_mag_indices_index
-    │                    ├─* nn_radius
-    │                    ├─* ref_cat_csv_file_path[4]
-    │                    ├─* correct_mag_array
-    │                    ├─* correct_mag_slice
-    │                    ├─* correct_sig_slice
-    │                    ├-* use_photometric_uncertainties
-    │                    └─* saturation_magnitudes
-    ├─* compute_snr_mag_relation[1]
-    │                          ├─* correct_astro_save_folder[4]
-                               └─* mag_unc_indices
+    ├─* apply_proper_motion
+    │                     ├─> move_to_epoch[5]
+    │                     ├─* pm_indices
+    │                     └─* ref_epoch_or_index
+    └─* correct_astrometry
+                         ├─* correct_astro_save_folder[3]
+                         ├─* snr_indices
+                         ├─* ref_apply_proper_motion
+                         │                         ├─> move_to_epoch[5]
+                         │                         ├─* ref_pm_indices
+                         │                         └─* ref_ref_epoch_or_index
+                         ├─* correct_astro_mag_indices_index
+                         ├─* nn_radius
+                         ├─* ref_cat_csv_file_path[3]
+                         ├─* correct_mag_array
+                         ├─* correct_mag_slice
+                         ├─* correct_sig_slice
+                         ├─* use_photometric_uncertainties
+                         └─* saturation_magnitudes
 
 List directories end in ``->`` for ``joint`` parameters, ``-*`` for ``catalogue`` parameters. ``catalogue`` level items will have ``a_`` or ``b_`` prepended, depending on which "side" of the cross-match they are from. Items with a second keyword after an arrow ``->`` are the names of the attributes that are saved to ``CrossMatch``, usually when the input parameter is a location on disk.
 
-| [1] - cannot both be ``True``
-| [2] - must be the same
-| [3] - only one set of [3a] and [3b] should be given, the others should be passed as ``None``
-| [4] - must have ``_{}`` in its string, into which the chunk ID will be inserted
-| [5] - must have relevant input entry per chunk, e.g. in a YAML multi-line format, aligned with the chunk ID of ``chunk_id_list`` of the relevant input parameter file
+| [1] - must be the same
+| [2] - only one set of [2a] and [2b] should be given, the others should be passed as ``None``
+| [3] - must have ``_{}`` in its string, into which the chunk ID will be inserted
+| [4] - must have relevant input entry per chunk, e.g. in a YAML multi-line format, aligned with the chunk ID of ``chunk_id_list`` of the relevant input parameter file
+| [5] - must be provided in either ``apply_proper_motion`` or ``ref_apply_proper_motion`` are ``True`` in either input catalogue
 
 .. rubric:: Footnotes
 

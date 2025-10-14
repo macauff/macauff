@@ -11,7 +11,13 @@ import pytest
 from astropy.coordinates import SkyCoord
 from numpy.testing import assert_allclose
 
-from macauff.parse_catalogue import csv_to_npy, npy_to_csv, rect_slice_csv, rect_slice_npy
+from macauff.parse_catalogue import (
+    apply_proper_motion,
+    csv_to_npy,
+    npy_to_csv,
+    rect_slice_csv,
+    rect_slice_npy,
+)
 
 
 class TestParseCatalogue:
@@ -20,7 +26,7 @@ class TestParseCatalogue:
 
         self.n = 100000
         data = rng.standard_normal(size=(self.n, 8))
-        data[:, 6] = np.round(data[:, 6]).astype(int)
+        data[:, 6] = rng.choice(2, size=(self.n,))
         nan_cols = [rng.choice(self.n, size=(100,), replace=False),
                     rng.choice(self.n, size=(100,), replace=False)]
         data[nan_cols[0], 4] = np.nan
@@ -37,6 +43,7 @@ class TestParseCatalogue:
         for header_text, header in zip(['', '# a, b, c, d, e, f, g, h'], [False, True]):
             np.savetxt('test_data.csv', data1, delimiter=',', fmt='%s', header=header_text)
 
+            # pylint: disable-next=unbalanced-tuple-unpacking
             astro, photo, best_index, chunk_overlaps = csv_to_npy(
                 'test_data.csv', [0, 1, 2], [4, 5], 6, None, header=header)
 
@@ -57,6 +64,7 @@ class TestParseCatalogue:
         for header_text, header in zip(['', '# a, b, c, d, e, f, g, h'], [False, True]):
             np.savetxt('test_data.csv', data1, delimiter=',', fmt='%s', header=header_text)
 
+            # pylint: disable-next=unbalanced-tuple-unpacking
             astro, photo, best_index, chunk_overlaps = csv_to_npy(
                 'test_data.csv', [0, 1, 2], [4, 5], 6, 7, header=header)
 
@@ -68,7 +76,7 @@ class TestParseCatalogue:
             assert_allclose(best_index, self.data[:, 6])
             assert np.all(chunk_overlaps == self.data[:, 7])
 
-    def test_csv_to_npy_process_uncert(self):
+    def test_csv_to_npy_process_uncert(self):  # pylint: disable=too-many-statements
         # Convert data to string to get expected Pandas-esque .csv formatting where
         # NaN values are empty strings.
         data1 = self.data.astype(str)
@@ -106,11 +114,9 @@ class TestParseCatalogue:
                        cat_in_radec=False, mn_in_radec=False)
 
         os.makedirs('test_sig_folder')
-        np.save('test_sig_folder/m_sigs_array.npy', np.array([2]))
-        np.save('test_sig_folder/n_sigs_array.npy', np.array([0.01]))
-        np.save('test_sig_folder/snr_mag_params.npy', np.array([[[0, 0, 0, 10.0, 0.0]]]))
+        np.save('test_sig_folder/mn_sigs_array.npy', np.array([[2, 0.01, 10.0, 0.0]]))
 
-        astro, photo, best_index, _ = csv_to_npy(
+        astro, photo, best_index, _ = csv_to_npy(  # pylint: disable=unbalanced-tuple-unpacking
             'test_data.csv', [0, 1, 2], [4, 5], 6, None, header=header, process_uncerts=True,
             astro_sig_fits_filepath='test_sig_folder', cat_in_radec=False, mn_in_radec=False)
 
@@ -123,10 +129,10 @@ class TestParseCatalogue:
         assert_allclose(best_index, self.data[:, 6])
 
         a = SkyCoord(ra=[10.0], dec=[0.0], unit='deg', frame='icrs')
-        np.save('test_sig_folder/snr_mag_params.npy',
-                np.array([[[0, 0, 0, a.galactic.l.degree[0], a.galactic.b.degree[0]]]]))
+        np.save('test_sig_folder/mn_sigs_array.npy', np.array([[
+            2, 0.01, a.galactic.l.degree[0], a.galactic.b.degree[0]]]))
 
-        astro, photo, best_index, _ = csv_to_npy(
+        astro, photo, best_index, _ = csv_to_npy(  # pylint: disable=unbalanced-tuple-unpacking
             'test_data.csv', [0, 1, 2], [4, 5], 6, None, header=header, process_uncerts=True,
             astro_sig_fits_filepath='test_sig_folder', cat_in_radec=False, mn_in_radec=False)
 
@@ -137,6 +143,43 @@ class TestParseCatalogue:
         assert_allclose(astro[:, 2], np.sqrt((2*self.data[:, 2])**2 + 0.01**2))
         assert_allclose(photo, self.data[:, [4, 5]])
         assert_allclose(best_index, self.data[:, 6])
+
+        rng = np.random.default_rng(seed=890124789123)
+        self.n = 100000
+        data = rng.standard_normal(size=(self.n, 10))
+        data[:, 8] = rng.choice(2, size=(self.n,))
+        nan_cols = [rng.choice(self.n, size=(100,), replace=False)]
+        nan_cols.append(rng.choice(np.delete(np.arange(self.n), nan_cols[0]), size=(100,), replace=False))
+        nan_cols.append(rng.choice(np.delete(np.arange(self.n), np.concatenate((nan_cols[0], nan_cols[1]))),
+                        size=(100,), replace=False))
+        nan_cols.append(rng.choice(np.delete(np.arange(self.n),
+                        np.concatenate((nan_cols[0], nan_cols[1], nan_cols[2]))), size=(100,), replace=False))
+        data[nan_cols[0], 4] = np.nan
+        data[nan_cols[1], 5] = np.nan
+        data[nan_cols[2], 6] = np.nan
+        data[nan_cols[3], 7] = np.nan
+        data[:, 9] = rng.choice(2, size=(self.n,))
+        data1 = data.astype(str)
+        data1[data1 == 'nan'] = ''
+        np.savetxt('test_data.csv', data1, delimiter=',', fmt='%s', header=header_text + ', i, j')
+
+        np.save('test_sig_folder/mn_sigs_array.npy',
+                np.array([[[2, 0.01, 10.0, 0.0], [1.1, 0.001, 10.0, 0.0]]]))
+
+        astro, photo, best_index, _ = csv_to_npy(  # pylint: disable=unbalanced-tuple-unpacking
+            'test_data.csv', [0, 1, 5, 7], [4, 6], 8, None, header=header, process_uncerts=True,
+            astro_sig_fits_filepath='test_sig_folder', cat_in_radec=False, mn_in_radec=False)
+
+        assert np.all(astro.shape == (self.n, 3))
+        assert np.all(photo.shape == (self.n, 2))
+        assert np.all(best_index.shape == (self.n,))
+        assert_allclose(astro[:, [0, 1]], data[:, [0, 1]])
+        q = best_index == 0
+        assert_allclose(astro[q, 2], np.sqrt((2*data[q, 5])**2 + 0.01**2))
+        q = best_index == 1
+        assert_allclose(astro[q, 2], np.sqrt((1.1*data[q, 7])**2 + 0.001**2))
+        assert_allclose(photo, data[:, [4, 6]])
+        assert_allclose(best_index, data[:, 8])
 
     def test_rect_slice_npy(self):
         np.save('con_cat_astro.npy', self.data[:, [1, 2, 3]])
@@ -608,3 +651,27 @@ class TestParseCatalogueNpyToCsv:  # pylint: disable=too-many-instance-attribute
         assert_allclose(df['NNM_SEPARATION'], self.bfieldseps)
         assert_allclose(df['NNM_ETA'], self.bfieldeta)
         assert_allclose(df['NNM_XI'], self.bfieldxi)
+
+
+@pytest.mark.filterwarnings("ignore:.*ERFA function.*")
+@pytest.mark.parametrize("time_format", ["J", "Y"])
+@pytest.mark.parametrize("coord_system", ["galactic", "equatorial"])
+@pytest.mark.parametrize("include_nans", [True, False])
+def test_apply_proper_motion(time_format, coord_system, include_nans):
+    if include_nans:
+        ra, dec = [180, 0, 10], [85, 0, 0]
+        pm_ra, pm_dec = [0, 30, np.nan], [5*3600, 0, np.nan]
+    else:
+        ra, dec = [180, 0, 10], [85, 0, 0]
+        pm_ra, pm_dec = [0, 30, 0], [5*3600, 0, 0]
+    if time_format == 'J':
+        ref_epoch = ['J2048.000', 'J2000.000', 'J2048.000']
+        move_to_epoch = 'J2050.000'
+    else:
+        ref_epoch = ['2048-01-01', '2000-01-01', '2048-01-01']
+        move_to_epoch = '2050-01-01'
+
+    x, y = apply_proper_motion(ra, dec, pm_ra, pm_dec, ref_epoch, move_to_epoch, coord_system)
+
+    assert_allclose(x, [0, 0+50*30/3600, 10], rtol=1e-4, atol=1e-10)
+    assert_allclose(y, [85, 0, 0], rtol=0.015, atol=1e-10)

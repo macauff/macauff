@@ -47,10 +47,6 @@ class TestInputs:
         with open(self.b_cat_csv_file_path, "w", encoding='utf-8') as f:
             f.write(self.b_cat)
         os.makedirs('data', exist_ok=True)
-        os.makedirs('a_snr_mag_9', exist_ok=True)
-        os.makedirs('b_snr_mag_9', exist_ok=True)
-        np.save('a_snr_mag_9/snr_mag_params.npy', np.ones((3, 3, 5), float))
-        np.save('b_snr_mag_9/snr_mag_params.npy', np.ones((4, 3, 5), float))
 
         with open(os.path.join(os.path.dirname(__file__), 'data/crossmatch_params.yaml'),
                   encoding='utf-8') as cm_p:
@@ -445,9 +441,6 @@ class TestInputs:
                         mock_filename(cb_p_.encode("utf-8")))
         cm._load_metadata_config(self.chunk_id)
 
-        np.save('a_snr_mag_9/snr_mag_params.npy', np.ones((3, 1, 5), float))
-        np.save('b_snr_mag_9/snr_mag_params.npy', np.ones((4, 1, 5), float))
-
         cm = CrossMatch(mock_filename(cm_p_.encode("utf-8")),
                         mock_filename(ca_p_.encode("utf-8")),
                         mock_filename(cb_p_.encode("utf-8")))
@@ -465,21 +458,16 @@ class TestInputs:
                  'b_psf_fwhms and b_filt_names should contain the same',
                  'psf_fwhms should be a list of floats in catalogue "b".'],
                 ['cat_a_params', 'cat_a_params', 'cat_b_params', 'cat_b_params']):
-            # For the singular filt_names change we need to dummy snr_mag_params
-            # as well, remembering to change it back afterwards
-            if 'G\n' in new_line:
-                np.save('a_snr_mag_9/snr_mag_params.npy', np.ones((2, 1, 5), float))
             _cap = ca_p_.replace(old_line, new_line) if '_a_' in in_file else ca_p_
             _cbp = cb_p_.replace(old_line, new_line) if '_b_' in in_file else cb_p_
             if 'gal_al_avs' in match_text:
                 _cap = _cap.replace('mag_indices: [3, 4, 5]', 'mag_indices: [3, 4]')
+                _cap = _cap.replace('snr_indices: [8, 9, 10]', 'snr_indices: [8, 9]')
             with pytest.raises(ValueError, match=match_text):
                 cm = CrossMatch(mock_filename(cm_p_.encode("utf-8")),
                                 mock_filename(_cap.encode("utf-8")),
                                 mock_filename(_cbp.encode("utf-8")))
                 cm._load_metadata_config(self.chunk_id)
-            if 'G\n' in new_line:
-                np.save('a_snr_mag_9/snr_mag_params.npy', np.ones((3, 1, 5), float))
 
     def test_crossmatch_cat_name_inputs(self):
         cm = CrossMatch(os.path.join(os.path.dirname(__file__), 'data/crossmatch_params.yaml'),
@@ -578,24 +566,15 @@ class TestInputs:
                                 mock_filename(ca_p_.encode("utf-8")),
                                 mock_filename(cb_p_.encode("utf-8")))
 
-        for old_line, var_name in zip(['fit_gal_flag: False', 'run_fw_auf: True', 'run_psf_auf: False',
-                                       'snr_mag_params_file_path: '],
-                                      ['fit_gal_flag', 'run_fw_auf', 'run_psf_auf',
-                                       'snr_mag_params_file_path']):
+        for old_line, var_name in zip(['fit_gal_flag: False', 'run_fw_auf: True', 'run_psf_auf: False'],
+                                      ['fit_gal_flag', 'run_fw_auf', 'run_psf_auf']):
             for cat_reg, fn in zip(['"a"', '"b"'], ['a', 'b']):
-                if 'snr_mag' in var_name:
-                    old_line = f'snr_mag_params_file_path: {fn}_snr_mag_{{}}/snr_mag_params.npy'
                 _cap = ca_p_.replace(old_line, '') if fn == 'a' else ca_p_
                 _cbp = cb_p_.replace(old_line, '') if fn == 'b' else cb_p_
                 with pytest.raises(ValueError, match=f'Missing key {var_name} from catalogue {cat_reg}'):
                     cm = CrossMatch(mock_filename(cm_p_.encode("utf-8")),
                                     mock_filename(_cap.encode("utf-8")),
                                     mock_filename(_cbp.encode("utf-8")))
-
-        os.makedirs('a_snr_mag_9', exist_ok=True)
-        os.makedirs('b_snr_mag_9', exist_ok=True)
-        np.save('a_snr_mag_9/snr_mag_params.npy', np.ones((3, 1, 5), float))
-        np.save('b_snr_mag_9/snr_mag_params.npy', np.ones((4, 1, 5), float))
 
         cm = CrossMatch(mock_filename(cm_p_.encode("utf-8")), mock_filename(ca_p_.encode("utf-8")),
                         mock_filename(cb_p_.encode("utf-8")))
@@ -605,12 +584,9 @@ class TestInputs:
 
         for cat_reg in ['"a"', '"b"']:
             if cat_reg[1] == 'a':
-                x = ca_p_.replace('run_psf_auf: False', 'run_psf_auf: True')
+                x = ca_p_.replace('run_psf_auf: False', 'run_psf_auf: True\ndd_params_path: .\nl_cut_path: .')
             else:
-                x = cb_p_.replace('run_psf_auf: False', 'run_psf_auf: True')
-            x = x.replace(f'snr_mag_params_file_path: {cat_reg[1]}_snr_mag_{{}}/snr_mag_params.npy',
-                          f'snr_mag_params_file_path: {cat_reg[1]}_snr_mag_{{}}/snr_mag_params.npy'
-                          '\ndd_params_path: .\nl_cut_path: .')
+                x = cb_p_.replace('run_psf_auf: False', 'run_psf_auf: True\ndd_params_path: .\nl_cut_path: .')
             for old_line, var_name in zip(['dd_params_path: .', 'l_cut_path: .'],
                                           ['dd_params_path', 'l_cut_path']):
                 x2 = x.replace(old_line, '')
@@ -626,53 +602,26 @@ class TestInputs:
         lc = np.ones(3, float)
         np.save('l_cut.npy', lc)
 
-        ca_p_2 = ca_p_.replace('run_psf_auf: False', 'run_psf_auf: True')
-        ca_p_2 = ca_p_2.replace(r'snr_mag_params_file_path: a_snr_mag_{}/snr_mag_params.npy',
-                                r'snr_mag_params_file_path: a_snr_mag_{}/snr_mag_params.npy'
-                                '\ndd_params_path: .\nl_cut_path: .')
-        cb_p_2 = cb_p_.replace('run_psf_auf: False', 'run_psf_auf: True')
-        cb_p_2 = cb_p_2.replace(r'snr_mag_params_file_path: b_snr_mag_{}/snr_mag_params.npy',
-                                r'snr_mag_params_file_path: b_snr_mag_{}/snr_mag_params.npy'
-                                '\ndd_params_path: .\nl_cut_path: .')
+        ca_p_2 = ca_p_.replace('run_psf_auf: False', 'run_psf_auf: True\ndd_params_path: .\nl_cut_path: .')
+        cb_p_2 = cb_p_.replace('run_psf_auf: False', 'run_psf_auf: True\ndd_params_path: .\nl_cut_path: .')
 
-        cb_p_3 = cb_p_2.replace(r'snr_mag_params_file_path: b_snr_mag_{}/snr_mag_params.npy',
-                                'snr_mag_params_file_path: /some/path/or/other')
-        with pytest.raises(OSError, match="b_snr_mag_params_file_path's folder does not exist."):
-            cm = CrossMatch(mock_filename(cm_p_.encode("utf-8")),
-                            mock_filename(ca_p_2.encode("utf-8")),
-                            mock_filename(cb_p_3.encode("utf-8")))
-            cm._load_metadata_config(self.chunk_id)
-        os.remove('a_snr_mag_9/snr_mag_params.npy')
-        with pytest.raises(FileNotFoundError,
-                           match='file in a_snr_mag_params_file_path does not exist.'):
-            cm = CrossMatch(mock_filename(cm_p_.encode("utf-8")),
-                            mock_filename(ca_p_2.encode("utf-8")),
-                            mock_filename(cb_p_2.encode("utf-8")))
-            cm._load_metadata_config(self.chunk_id)
         for fn, array, err_msg in zip([
-                'snr_mag_params', 'snr_mag_params', 'snr_mag_params', 'dd_params', 'dd_params',
-                'dd_params', 'dd_params', 'l_cut', 'l_cut'],
-                [np.ones(4, float), np.ones((5, 3, 2), float), np.ones((4, 4), float),
-                 np.ones(5, float), np.ones((5, 3), float), np.ones((4, 4, 2), float),
+                'dd_params', 'dd_params', 'dd_params', 'dd_params', 'l_cut', 'l_cut'],
+                [np.ones(5, float), np.ones((5, 3), float), np.ones((4, 4, 2), float),
                  np.ones((5, 3, 1), float), np.ones((4, 2), float), np.ones(4, float)],
-                [r'a_snr_mag_params should be of shape \(X, Y, 5\)',
-                 r'a_snr_mag_params should be of shape \(X, Y, 5\)',
-                 r'a_snr_mag_params should be of shape \(X, Y, 5\)',
-                 r'a_dd_params should be of shape \(5, X, 2\)',
+                [r'a_dd_params should be of shape \(5, X, 2\)',
                  r'a_dd_params should be of shape \(5, X, 2\)',
                  r'a_dd_params should be of shape \(5, X, 2\)',
                  r'a_dd_params should be of shape \(5, X, 2\)',
                  r'a_l_cut should be of shape \(3,\) only.',
                  r'a_l_cut should be of shape \(3,\) only.']):
-            np.save(f"{'a_snr_mag_9/' if 'snr_mag' in fn else ''}{fn}.npy", array)
+            np.save(f"{fn}.npy", array)
             with pytest.raises(ValueError, match=err_msg):
                 cm = CrossMatch(mock_filename(cm_p_.encode("utf-8")),
                                 mock_filename(ca_p_2.encode("utf-8")),
                                 mock_filename(cb_p_2.encode("utf-8")))
                 cm._load_metadata_config(self.chunk_id)
             # Re-make "good" fake arrays
-            snr_mag_params = np.ones((3, 3, 5), float)
-            np.save('a_snr_mag_9/snr_mag_params.npy', snr_mag_params)
             ddp = np.ones((5, 15, 2), float)
             np.save('dd_params.npy', ddp)
             lc = np.ones(3, float)
@@ -1030,9 +979,9 @@ class TestInputs:
         new_line = new_line + '\nnonmatch_out_csv_name: nonmatch.csv'
         cm_p_ = self.cm_p_text.replace('make_output_csv: False', new_line)
 
-        old_line = 'snr_mag_params_file_path: a_snr_mag_{}/snr_mag_params.npy'
-        lines = ['snr_mag_params_file_path: a_snr_mag_{}/snr_mag_params.npy\n',
-                 '\ncat_col_names: [A, B, C]', '\ncat_col_nums: [1, 2, 3]', '\nextra_col_names: None']
+        old_line = 'csv_has_header: False'
+        lines = ['csv_has_header: False\n', '\ncat_col_names: [A, B, C]', '\ncat_col_nums: [1, 2, 3]',
+                 '\nextra_col_names: None']
         for i, key in enumerate(['cat_col_names', 'cat_col_nums', 'extra_col_names', 'extra_col_nums']):
             new_line = ''
             for j in range(i+1):
@@ -1049,7 +998,7 @@ class TestInputs:
             new_line = new_line + line
         new_line = new_line + '\nextra_col_nums: None'
         ca_p_ = self.ca_p_text.replace(old_line, new_line)
-        cb_p_ = self.cb_p_text.replace(old_line.replace('a_snr_mag', 'b_snr_mag'), new_line)
+        cb_p_ = self.cb_p_text.replace(old_line, new_line)
 
         # At this point we should successfully load the csv-related parameters.
         cm = CrossMatch(mock_filename(cm_p_.encode("utf-8")),
@@ -1112,6 +1061,161 @@ class TestInputs:
                 cm._load_metadata_config(self.chunk_id)
 
     @pytest.mark.remote_data
+    @pytest.mark.filterwarnings("ignore:.*ERFA function.*")
+    # pylint: disable-next=too-many-statements,too-many-locals
+    def test_crossmatch_apply_proper_motion(self):
+        cm = CrossMatch(mock_filename(self.cm_p_text.encode("utf-8")),
+                        mock_filename(self.ca_p_text.encode("utf-8")),
+                        mock_filename(self.cb_p_text.encode("utf-8")))
+        cm._load_metadata_config(self.chunk_id)
+        assert cm.a_apply_proper_motion is False  # pylint: disable=no-member
+        assert cm.b_apply_proper_motion is False  # pylint: disable=no-member
+
+        old_line = 'apply_proper_motion: False'
+        lines = ['apply_proper_motion: True\n', '\npm_indices: [1, 2]', '\nref_epoch_or_index: 3']
+        for i, key in enumerate(['pm_indices', 'ref_epoch_or_index']):
+            new_line = ''
+            for j in range(i+1):
+                new_line = new_line + lines[j]
+            ca_p_ = self.ca_p_text.replace(old_line, new_line)
+            with pytest.raises(ValueError, match=f'Missing key {key} from catalogue "a"'):
+                cm = CrossMatch(mock_filename(self.cm_p_text.encode("utf-8")),
+                                mock_filename(ca_p_.encode("utf-8")),
+                                mock_filename(self.cb_p_text.encode("utf-8")))
+                cm._load_metadata_config(self.chunk_id)
+
+        new_line = ''
+        for line in lines:
+            new_line = new_line + line
+        ca_p_ = self.ca_p_text.replace(old_line, new_line)
+
+        with pytest.raises(ValueError, match='Missing key move_to_epoch from joint metadata'):
+            cm = CrossMatch(mock_filename(self.cm_p_text.encode("utf-8")),
+                            mock_filename(ca_p_.encode("utf-8")),
+                            mock_filename(self.cb_p_text.encode("utf-8")))
+            cm._load_metadata_config(self.chunk_id)
+
+        cm_p_ = self.cm_p_text.replace('n_pool: 2', 'n_pool: 2\n\nmove_to_epoch: J2000.000')
+
+        for old_line, new_line, error_msg in zip(
+                ['pm_indices: [1, 2]', 'pm_indices: [1, 2]', 'pm_indices: [1, 2]', 'pm_indices: [1, 2]',
+                 'ref_epoch_or_index: 3', 'ref_epoch_or_index: 3', 'ref_epoch_or_index: 3',
+                 'ref_epoch_or_index: 3', 'ref_epoch_or_index: 3', 'ref_epoch_or_index: 3',
+                 'ref_epoch_or_index: 3', 'move_to_epoch: J2000.000', 'move_to_epoch: J2000.000',
+                 'move_to_epoch: J2000.000'],
+                ['pm_indices: A', 'pm_indices: [A, 1]', 'pm_indices: [1, 2, 3]', 'pm_indices: 1',
+                 'ref_epoch_or_index: J198.a', 'ref_epoch_or_index: F1989.0',
+                 'ref_epoch_or_index: 12-12-1989', 'ref_epoch_or_index: 1.5', 'ref_epoch_or_index: A',
+                 'ref_epoch_or_index: [A]', 'ref_epoch_or_index: [1]', 'move_to_epoch: JYYYY',
+                 'move_to_epoch: Y2000', 'move_to_epoch: A', 'move_to_epoch: [1]'],
+                ['pm_indices should be a list of integers', 'pm_indices should be a list of integers',
+                 'pm_indices should contain two entries', 'pm_indices should be a list of integers',
+                 'ref_epoch_or_index, if given as a constant string input, ',
+                 'ref_epoch_or_index, if given as a constant string input, ',
+                 'ref_epoch_or_index, if given as a constant string input, ',
+                 'ref_epoch_or_index, if indicating a column index, ',
+                 'ref_epoch_or_index, if given as a constant string input, ',
+                 'ref_epoch_or_index, if indicating a column index, ',
+                 'ref_epoch_or_index, if indicating a column index, ',
+                 "move_to_epoch must be a string that astropy's Time",
+                 "move_to_epoch must be a string that astropy's Time",
+                 "move_to_epoch must be a string that astropy's Time",
+                 "move_to_epoch must be a string that astropy's Time"]):
+            if 'move_to' in error_msg:
+                cm_p_2 = cm_p_.replace(old_line, new_line)
+                ca_p_2 = ca_p_
+            else:
+                cm_p_2 = cm_p_
+                ca_p_2 = ca_p_.replace(old_line, new_line)
+            with pytest.raises(ValueError, match=error_msg):
+                cm = CrossMatch(mock_filename(cm_p_2.encode("utf-8")),
+                                mock_filename(ca_p_2.encode("utf-8")),
+                                mock_filename(self.cb_p_text.encode("utf-8")))
+                cm._load_metadata_config(self.chunk_id)
+
+        # Fake some "real" csv data
+        self.rng = np.random.default_rng(seed=924782365)
+        ax1_min, ax1_max, ax2_min, ax2_max = 100, 110, 13, 23
+        cat_args = (self.chunk_id,)
+        t_a_c = TAC()
+        t_a_c.npy_or_csv = 'csv'
+        t_a_c.n = 5000
+        t_a_c.rng = self.rng
+        # Fake sources for fake_catb_cutout. We need all N-25 objects
+        # to be within 0.25 degrees of each of the first 25 data points,
+        # except the 26-100th objects, which can be wherever.
+        x_25 = self.rng.uniform(100, 110, size=25)
+        y_25 = self.rng.uniform(13, 23, size=25)
+        x_25_100 = self.rng.uniform(100, 110, size=75)
+        y_25_100 = self.rng.uniform(13, 23, size=75)
+        spawn_choice = self.rng.choice(25, size=t_a_c.n-100, replace=True)
+        spawn_radius = np.sqrt(self.rng.uniform(0, 1, size=t_a_c.n-100)) * 0.25
+        spawn_angle = self.rng.uniform(0, 2*np.pi, size=t_a_c.n-100)
+        spawn_x = x_25[spawn_choice] + spawn_radius * np.cos(spawn_angle)
+        spawn_y = y_25[spawn_choice] + spawn_radius * np.sin(spawn_angle)
+        t_a_c.apply_proper_motion = False
+        t_a_c.true_ra = np.append(np.append(x_25, x_25_100), spawn_x)
+        t_a_c.true_dec = np.append(np.append(y_25, y_25_100), spawn_y)
+        t_a_c.a_cat_name = 'ref_{}.csv'
+        t_a_c.fake_cata_cutout(ax1_min, ax1_max, ax2_min, ax2_max, *cat_args)
+        # Re-fake data with multiple magnitude columns.
+        x = np.loadtxt('ref_9.csv', delimiter=',')
+        y = np.empty((len(x), 14), object)
+        y[:, [0, 1, 2]] = x[:, [0, 1, 2]]
+        y[:, [3, 4]] = x[:, [3, 4]]
+        y[:, [5, 6]] = x[:, [3, 4]]
+        y[:, [7, 8]] = x[:, [3, 4]]
+        # Pad with both a best index and chunk overlap column
+        y[:, 9] = 2
+        y[:, 10] = 1
+        # Now add proper motions: some sideways at dec=0, some up/down.
+        y[:1000, 1] = 0
+        y[:1000, 11] = self.rng.uniform(-500, 500, size=1000)
+        y[:1000, 12] = 0
+        y[1000:, 11] = 0
+        y[1000:, 12] = self.rng.uniform(-2, 2, size=4000) * 3600
+        epoch_diff = self.rng.uniform(-1, 4, size=5000)
+        y[:, 13] = [f'J{2000 + q:.3f}' for q in epoch_diff]
+        y[0, 13] = y[0, 13][:-1]
+        fmt = ['%.18e'] * 13
+        fmt.append('%5s')
+        np.savetxt('ref_9.csv', y, delimiter=',', fmt=fmt)
+
+        new_line = ''
+        for line in lines:
+            new_line = new_line + line
+        ca_p_ = self.ca_p_text.replace('apply_proper_motion: False', new_line)
+        ca_p_ = ca_p_.replace(r'cat_csv_file_path: gaia_folder/gaia_{}.csv',
+                              r'cat_csv_file_path: ref_{}.csv')
+        ca_p_ = ca_p_.replace('pm_indices: [1, 2]', 'pm_indices: [11, 12]')
+        ca_p_ = ca_p_.replace('ref_epoch_or_index: 3', 'ref_epoch_or_index: J2005.0')
+
+        cm = CrossMatch(mock_filename(cm_p_.encode("utf-8")),
+                        mock_filename(ca_p_.encode("utf-8")),
+                        mock_filename(self.cb_p_text.encode("utf-8")))
+        cm._load_metadata_config(self.chunk_id)
+        cm.chunk_id = self.chunk_id
+        cm._initialise_chunk()
+
+        assert_allclose(cm.a_astro[:, 0], np.array(y[:, 0] + y[:, 11] * -5 / 3600, dtype=float), rtol=1e-4)
+        assert_allclose(cm.a_astro[:, 1], np.array(y[:, 1] + y[:, 12] * -5 / 3600, dtype=float),
+                        rtol=0.03, atol=1e-10)
+
+        ca_p_ = ca_p_.replace('ref_epoch_or_index: J2005.0', 'ref_epoch_or_index: 13')
+
+        cm = CrossMatch(mock_filename(cm_p_.encode("utf-8")),
+                        mock_filename(ca_p_.encode("utf-8")),
+                        mock_filename(self.cb_p_text.encode("utf-8")))
+        cm._load_metadata_config(self.chunk_id)
+        cm.chunk_id = self.chunk_id
+        cm._initialise_chunk()
+
+        assert_allclose(cm.a_astro[:, 0], np.array(y[:, 0] + y[:, 11] * -1*epoch_diff / 3600, dtype=float),
+                        rtol=1e-4)
+        assert_allclose(cm.a_astro[:, 1], np.array(y[:, 1] + y[:, 12] * -1*epoch_diff / 3600, dtype=float),
+                        rtol=0.03, atol=1e-10)
+
+    @pytest.mark.remote_data
     @pytest.mark.filterwarnings("ignore:.*contains more than one AUF sampling point, .*")
     # pylint: disable-next=too-many-statements,too-many-locals
     def test_crossmatch_correct_astrometry_inputs(self):
@@ -1122,19 +1226,6 @@ class TestInputs:
         assert cm.n_pool == 2  # pylint: disable=no-member
         assert cm.a_correct_astrometry is False  # pylint: disable=no-member
         assert cm.b_correct_astrometry is False  # pylint: disable=no-member
-        assert cm.a_compute_snr_mag_relation is False  # pylint: disable=no-member
-
-        for cat_n in ['a', 'b']:
-            x = self.ca_p_text if cat_n == 'a' else self.cb_p_text
-            x = x.replace('correct_astrometry: False', 'correct_astrometry: True')
-            x = x.replace('compute_snr_mag_relation: False', 'compute_snr_mag_relation: True')
-            x = x.replace('pos_and_err_indices: [0, 1, 2]', 'pos_and_err_indices: [0, 1, 2, 0, 1, 2]')
-            b, c = (x, self.cb_p_text) if cat_n == 'a' else (self.ca_p_text, x)
-            with pytest.raises(ValueError, match=f"Ambiguity in catalogue '{cat_n}' hav"):
-                cm = CrossMatch(mock_filename(self.cm_p_text.encode("utf-8")),
-                                mock_filename(b.encode("utf-8")),
-                                mock_filename(c.encode("utf-8")))
-                cm._load_metadata_config(self.chunk_id)
 
         cm_p_ = self.cm_p_text.replace('n_pool: 2', '')
         with pytest.raises(ValueError, match="Missing key n_pool from joint"):
@@ -1186,18 +1277,19 @@ class TestInputs:
                               'tri_model_mag_mids_location: None\ntri_model_mags_interval_location: None\n'
                               'tri_dens_uncert_location: None\ntri_n_bright_sources_star_location: None')
         ca_p_ = ca_p_.replace('pos_and_err_indices: [0, 1, 2]', 'pos_and_err_indices: [0, 1, 2, 0, 1, 2]')
+        ca_p_ = ca_p_.replace('snr_indices: [8, 9, 10]', '')
 
         # Test all of the inputs being needed one by one loading into cat_a_params:
         dd_l_path = os.path.join(os.path.dirname(__file__), 'data')
         lines = [f'correct_astrometry: True\n\ndd_params_path: {dd_l_path}\nl_cut_path: {dd_l_path}',
-                 '\ncorrect_astro_save_folder: ac_folder', '\nmag_unc_indices: [4, 6, 8]',
-                 '\ncorrect_astro_mag_indices_index: 0', '\nnn_radius: 30',
-                 '\nref_cat_csv_file_path: ref_{}.csv',
-                 '\ncorrect_mag_array: [14.07, 14.17, 14.27, 14.37, 14.47]',
-                 '\ncorrect_mag_slice: [0.05, 0.05, 0.05, 0.05, 0.05]',
-                 '\ncorrect_sig_slice: [0.1, 0.1, 0.1, 0.1, 0.1]', '\nuse_photometric_uncertainties: False',
+                 '\nref_apply_proper_motion: False', '\nsnr_indices: [4, 6, 8]',
+                 '\ncorrect_astro_save_folder: ac_folder', '\ncorrect_astro_mag_indices_index: 0',
+                 '\nnn_radius: 30', '\nref_cat_csv_file_path: ref_{}.csv',
+                 '\ncorrect_mag_array: [[14.07, 14.17, 14.27, 14.37, 14.47]]',
+                 '\ncorrect_mag_slice: [[0.05, 0.05, 0.05, 0.05, 0.05]]',
+                 '\ncorrect_sig_slice: [[0.1, 0.1, 0.1, 0.1, 0.1]]', '\nuse_photometric_uncertainties: False',
                  '\nmn_fit_type: quadratic', '\nseeing_ranges: [0.9, 1.1]']
-        for i, key in enumerate(['correct_astro_save_folder', 'mag_unc_indices',
+        for i, key in enumerate(['ref_apply_proper_motion', 'snr_indices', 'correct_astro_save_folder',
                                  'correct_astro_mag_indices_index', 'nn_radius', 'ref_cat_csv_file_path',
                                  'correct_mag_array', 'correct_mag_slice', 'correct_sig_slice',
                                  'use_photometric_uncertainties', 'mn_fit_type', 'seeing_ranges']):
@@ -1242,11 +1334,13 @@ class TestInputs:
             cm._load_metadata_config(self.chunk_id)
         # Set up a completely valid test of cat_a_params and cat_b_params
         cb_p_2 = cb_p_.replace('correct_astrometry: False', new_line)
-        cb_p_2 = cb_p_2.replace('mag_unc_indices: [4, 6, 8]', 'mag_unc_indices: [4, 6, 8, 10]')
+        cb_p_2 = cb_p_2.replace('snr_indices: [9, 10, 11, 12]', '')
+        cb_p_2 = cb_p_2.replace('snr_indices: [4, 6, 8]', 'snr_indices: [4, 6, 8, 10]')
         cb_p_2 = cb_p_2.replace('pos_and_err_indices: [0, 1, 2]', 'pos_and_err_indices: [0, 1, 2, 0, 1, 2]')
         cb_p_2 = cb_p_2.replace(r'cat_csv_file_path: wise_folder/wise_{}.csv',
                                 r'cat_csv_file_path: file_{}.csv')
         cb_p_2 = cb_p_2.replace('[3, 4, 5, 6]', '[3, 5, 7, 9]')
+        cb_p_2 = cb_p_2.replace('best_mag_index_col: 8', 'best_mag_index_col: 11')
         cb_p_2 = cb_p_2.replace('chunk_overlap_col: 7', 'chunk_overlap_col: 12')
         # Fake some TRILEGAL downloads with random data.
         os.makedirs('wise_auf_folder', exist_ok=True)
@@ -1261,7 +1355,7 @@ class TestInputs:
                 '1   6.65 -0.39  0.02415 -2.701 3.397  4.057 14.00  8.354 0.00 25.523 25.839 ' +
                 '24.409 23.524 22.583 22.387 22.292 22.015 21.144 19.380 20.878 '
                 f'{w1} 22.391 21.637 21.342  0.024\n ')
-        with open('wise_auf_folder/trilegal_download_9_131.0_-1.0_faint.dat', "w",
+        with open('wise_auf_folder/trilegal_download_9_131.00_-1.00_faint.dat', "w",
                   encoding='utf-8') as f:
             f.write(text)
         # Fake some "real" csv data
@@ -1283,6 +1377,7 @@ class TestInputs:
         spawn_angle = self.rng.uniform(0, 2*np.pi, size=t_a_c.n-100)
         spawn_x = x_25[spawn_choice] + spawn_radius * np.cos(spawn_angle)
         spawn_y = y_25[spawn_choice] + spawn_radius * np.sin(spawn_angle)
+        t_a_c.apply_proper_motion = False
         t_a_c.true_ra = np.append(np.append(x_25, x_25_100), spawn_x)
         t_a_c.true_dec = np.append(np.append(y_25, y_25_100), spawn_y)
         t_a_c.a_cat_name = 'ref_{}.csv'
@@ -1310,9 +1405,6 @@ class TestInputs:
         y[:, 11] = np.random.default_rng(seed=5673523).choice(4, size=len(x), replace=True)
         y[:, 12] = np.random.default_rng(seed=45645132234).choice(2, size=len(x), replace=True)
         np.savetxt('file_9.csv', y, delimiter=',')
-        # Check for outputs, but first force the removal of ancillary checkpoints.
-        if os.path.isfile('ac_folder/npy/snr_mag_params.npy'):
-            os.remove('ac_folder/npy/snr_mag_params.npy')
         cm_p_ = self.cm_p_text.replace('real_hankel_points: 10000', 'real_hankel_points: 1000')
         cm_p_ = cm_p_.replace('four_max_rho: 100', 'four_max_rho: 30')
         cm_p_ = cm_p_.replace('four_hankel_points: 10000', 'four_hankel_points: 1000')
@@ -1330,23 +1422,21 @@ class TestInputs:
         assert cm.b_correct_astro_save_folder == os.path.abspath('ac_folder')
         assert cm.b_cat_csv_file_path == os.path.abspath('file_9.csv')
         assert cm.b_ref_cat_csv_file_path == os.path.abspath('ref_9.csv')
-        assert_allclose(cm.b_correct_mag_array, np.array([14.07, 14.17, 14.27, 14.37, 14.47]))
-        assert_allclose(cm.b_correct_mag_slice, np.array([0.05, 0.05, 0.05, 0.05, 0.05]))
-        assert_allclose(cm.b_correct_sig_slice, np.array([0.1, 0.1, 0.1, 0.1, 0.1]))
+        assert_allclose(cm.b_correct_mag_array, np.array([[14.07, 14.17, 14.27, 14.37, 14.47]]))
+        assert_allclose(cm.b_correct_mag_slice, np.array([[0.05, 0.05, 0.05, 0.05, 0.05]]))
+        assert_allclose(cm.b_correct_sig_slice, np.array([[0.1, 0.1, 0.1, 0.1, 0.1]]))
         assert np.all(cm.b_pos_and_err_indices == np.array([[0, 1, 2], [0, 1, 2]]))
         assert np.all(cm.b_mag_indices == np.array([3, 5, 7, 9]))
-        assert np.all(cm.b_mag_unc_indices == np.array([4, 6, 8, 10]))
-        marray = np.load('ac_folder/npy/m_sigs_array.npy')
-        narray = np.load('ac_folder/npy/n_sigs_array.npy')
-        assert_allclose([marray[0], narray[0]], [2, 0], rtol=0.1, atol=0.01)
+        assert np.all(cm.b_snr_indices == np.array([4, 6, 8, 10]))
+        mnarray = np.load('ac_folder/npy/mn_sigs_array.npy')
+        assert_allclose([mnarray[0, 0], mnarray[0, 1]], [2, 0], rtol=0.1, atol=0.01)
         # pylint: enable=no-member
         assert np.all(cm.b_in_overlaps == y[:, 12].astype(int))
 
         cb_p_2 = cb_p_2.replace('chunk_overlap_col: 12', 'chunk_overlap_col: None')
 
-        if os.path.isfile('ac_folder/npy/snr_mag_params.npy'):
-            os.remove('ac_folder/npy/snr_mag_params.npy')
-        # Swapped a+b to test a_* versions of things
+        # Swapped a+b to test a_* versions of things, but also test using the
+        # photometric information.
         cm_p_2 = cm_p_.replace('  - 9', '  - 100')
         ca_p_3 = self.ca_p_text.replace('  - 9', '  - 100')
         ca_p_3 = ca_p_3.replace(r'cat_csv_file_path: gaia_folder/gaia_{}.csv',
@@ -1354,13 +1444,30 @@ class TestInputs:
         cb_p_3 = cb_p_2.replace('  - 9', '  - 100')
         cb_p_3 = cb_p_3.replace(r'cat_csv_file_path: wise_folder/wise_{}.csv',
                                 r'cat_csv_file_path: file_{}.csv')
-        os.system('cp -r gaia_folder_9 gaia_folder_100')
-        os.system('cp -r wise_folder_9 wise_folder_100')
-        os.system('cp -r a_snr_mag_9 a_snr_mag_100')
-        os.system('cp -r b_snr_mag_9 b_snr_mag_100')
-        os.system('cp -r wise_auf_folder_9 wise_auf_folder_100')
+        cb_p_3 = cb_p_3.replace('use_photometric_uncertainties: False', 'use_photometric_uncertainties: True')
+        cb_p_3 = cb_p_3.replace('pos_and_err_indices: [0, 1, 2, 0, 1, 2]',
+                                'pos_and_err_indices: [0, 1, 2, 13, 14, 15, 0, 1, 2]')
+        cb_p_3 = cb_p_3.replace('correct_mag_array: [[14.07, 14.17, 14.27, 14.37, 14.47]]',
+                                'correct_mag_array: [[14.07, 14.17, 14.27, 14.37, 14.47], [14.07, 14.17, '
+                                '14.27, 14.37, 14.47], [14.07, 14.17, 14.27, 14.37, 14.47], [14.07, 14.17, '
+                                '14.27, 14.37, 14.47]]')
+        cb_p_3 = cb_p_3.replace('correct_mag_slice: [[0.05, 0.05, 0.05, 0.05, 0.05]]',
+                                'correct_mag_slice: [[0.05, 0.05, 0.05, 0.05, 0.05], [0.05, 0.05, 0.05, '
+                                '0.05, 0.05], [0.05, 0.05, 0.05, 0.05, 0.05], [0.05, 0.05, 0.05, 0.05, '
+                                '0.05]]')
+        cb_p_3 = cb_p_3.replace('correct_sig_slice: [[0.1, 0.1, 0.1, 0.1, 0.1]]',
+                                'correct_sig_slice: [[0.1, 0.1, 0.1, 0.1, 0.1], [0.1, 0.1, 0.1, 0.1, 0.1], '
+                                '[0.1, 0.1, 0.1, 0.1, 0.1], [0.1, 0.1, 0.1, 0.1, 0.1]]')
+
+        os.system('cp -r wise_auf_folder/trilegal_download_9_131.00_-1.00_faint.dat '
+                  'wise_auf_folder/trilegal_download_100_131.00_-1.00_faint.dat')
         os.system('cp ref_9.csv ref_100.csv')
         os.system('cp file_9.csv file_100.csv')
+        x = np.loadtxt('file_100.csv', delimiter=',')
+        y = np.empty((len(x), 16), float)
+        y[:, :13] = x
+        y[:, [13, 14, 15]] = x[:, [2, 2, 2]]
+        np.savetxt('file_100.csv', y, delimiter=',')
         cm = CrossMatch(mock_filename(cm_p_2.encode("utf-8")),
                         mock_filename(cb_p_3.encode("utf-8")),
                         mock_filename(ca_p_3.encode("utf-8")))
@@ -1373,78 +1480,23 @@ class TestInputs:
         assert cm.a_correct_astro_save_folder == os.path.abspath('ac_folder')
         assert cm.a_cat_csv_file_path == os.path.abspath('file_100.csv')
         assert cm.a_ref_cat_csv_file_path == os.path.abspath('ref_100.csv')
-        assert_allclose(cm.a_correct_mag_array, np.array([14.07, 14.17, 14.27, 14.37, 14.47]))
-        assert_allclose(cm.a_correct_mag_slice, np.array([0.05, 0.05, 0.05, 0.05, 0.05]))
-        assert_allclose(cm.a_correct_sig_slice, np.array([0.1, 0.1, 0.1, 0.1, 0.1]))
-        assert np.all(cm.a_pos_and_err_indices == np.array([[0, 1, 2], [0, 1, 2]]))
+        assert_allclose(cm.a_correct_mag_array, np.array([[14.07, 14.17, 14.27, 14.37, 14.47]] * 4))
+        assert_allclose(cm.a_correct_mag_slice, np.array([[0.05, 0.05, 0.05, 0.05, 0.05]] * 4))
+        assert_allclose(cm.a_correct_sig_slice, np.array([[0.1, 0.1, 0.1, 0.1, 0.1]] * 4))
+        assert np.all(cm.a_pos_and_err_indices[0] == np.array([0, 1, 2, 13, 14, 15]))
+        assert np.all(cm.a_pos_and_err_indices[1] == np.array([0, 1, 2]))
         assert np.all(cm.a_mag_indices == np.array([3, 5, 7, 9]))
-        assert np.all(cm.a_mag_unc_indices == np.array([4, 6, 8, 10]))
-        marray = np.load('ac_folder/npy/m_sigs_array.npy')
-        narray = np.load('ac_folder/npy/n_sigs_array.npy')
-        assert_allclose([marray[0], narray[0]], [2, 0], rtol=0.1, atol=0.01)
+        assert np.all(cm.a_snr_indices == np.array([4, 6, 8, 10]))
+        mnarray = np.load('ac_folder/npy/mn_sigs_array.npy')
+        assert np.all(mnarray.shape == (1, 4, 4))
+        assert_allclose([mnarray[0, 0, 0], mnarray[0, 0, 1]], [2, 0], rtol=0.1, atol=0.01)
+        assert_allclose([mnarray[0, 3, 0], mnarray[0, 3, 1]], [2, 0], rtol=0.1, atol=0.01)
         # pylint: enable=no-member
-
         assert np.all(cm.a_in_overlaps == 0)
-
-        # Set up a completely valid test of cat_a_params and cat_b_params
-        # for compute_snr_mag_relation.
-        new_line = (r'compute_snr_mag_relation: True' + '\ncorrect_astro_save_folder: ac_folder\n'
-                    '\nmag_unc_indices: [4, 6, 8, 10]')
-
-        ca_p_ = self.ca_p_text.replace('compute_snr_mag_relation: False', new_line)
-        ca_p_ = ca_p_.replace('chunk_overlap_col: 6', 'chunk_overlap_col: 12')
-        ca_p_ = ca_p_.replace('best_mag_index_col: 7', 'best_mag_index_col: 11')
-        ca_p_ = ca_p_.replace(r'cat_csv_file_path: gaia_folder/gaia_{}.csv',
-                              r'cat_csv_file_path: file_{}.csv')
-        ca_p_ = ca_p_.replace('mag_indices: [3, 4, 5]', 'mag_indices: [3, 5, 7]')
-        ca_p_ = ca_p_.replace('mag_unc_indices: [4, 6, 8, 10]', 'mag_unc_indices: [4, 6, 8]')
-
-        cb_p_ = self.cb_p_text.replace('compute_snr_mag_relation: False', new_line)
-        cb_p_ = cb_p_.replace('mag_indices: [3, 4, 5, 6]', 'mag_indices: [3, 5, 7, 9]')
-        cb_p_ = cb_p_.replace(r'cat_csv_file_path: wise_folder/wise_{}.csv',
-                              r'cat_csv_file_path: file_{}.csv')
-        cb_p_ = cb_p_.replace('chunk_overlap_col: 7', 'chunk_overlap_col: 12')
-        if os.path.isfile('ac_folder/npy/snr_mag_params.npy'):
-            os.remove('ac_folder/npy/snr_mag_params.npy')
-        cm = CrossMatch(mock_filename(cm_p_.encode("utf-8")),
-                        mock_filename(self.ca_p_text.encode("utf-8")),
-                        mock_filename(cb_p_.encode("utf-8")))
-        cm._load_metadata_config(self.chunk_id)
-        cm.chunk_id = self.chunk_id
-        cm._initialise_chunk()
-        # pylint: disable=no-member
-        assert cm.b_compute_snr_mag_relation is True
-        assert not hasattr(cm, 'b_correct_mag_slice')
-        assert cm.b_correct_astro_save_folder == os.path.abspath('ac_folder')
-        assert cm.b_cat_csv_file_path == os.path.abspath('file_9.csv')
-        assert np.all(cm.b_pos_and_err_indices == np.array([[0, 1, 2], [0, 1, 2]]))
-        assert np.all(cm.b_mag_indices == np.array([3, 5, 7, 9]))
-        assert np.all(cm.b_mag_unc_indices == np.array([4, 6, 8, 10]))
-        marray = np.load('ac_folder/npy/m_sigs_array.npy')
-        narray = np.load('ac_folder/npy/n_sigs_array.npy')
-        assert_allclose([marray[0], narray[0]], [2, 0], rtol=0.1, atol=0.01)
-        if os.path.isfile('ac_folder/npy/snr_mag_params.npy'):
-            os.remove('ac_folder/npy/snr_mag_params.npy')
-        cm = CrossMatch(mock_filename(cm_p_.encode("utf-8")),
-                        mock_filename(ca_p_.encode("utf-8")),
-                        mock_filename(self.cb_p_text.encode("utf-8")))
-        cm._load_metadata_config(self.chunk_id)
-        cm.chunk_id = self.chunk_id
-        cm._initialise_chunk()
-        assert cm.a_compute_snr_mag_relation is True
-        assert not hasattr(cm, 'a_correct_astro_mag_indices_index')
-        assert cm.a_correct_astro_save_folder == os.path.abspath('ac_folder')
-        assert cm.a_cat_csv_file_path == os.path.abspath('file_9.csv')
-        assert np.all(cm.a_pos_and_err_indices == np.array([[0, 1, 2], [0, 1, 2]]))
-        assert np.all(cm.a_mag_indices == np.array([3, 5, 7]))
-        assert np.all(cm.a_mag_unc_indices == np.array([4, 6, 8]))
-        marray = np.load('ac_folder/npy/m_sigs_array.npy')
-        narray = np.load('ac_folder/npy/n_sigs_array.npy')
-        assert_allclose([marray[0], narray[0]], [2, 0], rtol=0.1, atol=0.01)
 
         # New test of the AC run, just with pre-made histograms.
         dens, tri_mags, tri_mags_mids, dtri_mags, uncert, num_bright_obj = make_tri_counts(
-            'wise_auf_folder/trilegal_download_9_131.0_-1.0.dat', 'W1', 0.1, 13.5, 16)
+            'wise_auf_folder/trilegal_download_9_131.00_-1.00.dat', 'W1', 0.1, 13.5, 16)
         dhtl = 'ac_folder/npy/dhtl.npy'
         np.save(dhtl, [dens, dens, dens, dens])
         tmml = 'ac_folder/npy/tmml.npy'
@@ -1473,29 +1525,53 @@ class TestInputs:
                 f'tri_dens_uncert_location: {tdul}', f'tri_n_bright_sources_star_location: {tnbssl}']):
             ind = np.where([ol in x for x in lines])[0][0]
             cb_p_3 = cb_p_3.replace(lines[ind], nl)
-        if os.path.isfile('ac_folder/npy/snr_mag_params.npy'):
-            os.remove('ac_folder/npy/snr_mag_params.npy')
         cm = CrossMatch(mock_filename(cm_p_.encode("utf-8")),
                         mock_filename(cb_p_3.encode("utf-8")),
                         mock_filename(self.ca_p_text.encode("utf-8")))
         cm._load_metadata_config(self.chunk_id)
         cm.chunk_id = self.chunk_id
         cm._initialise_chunk()
+        # pylint: disable=no-member
         assert cm.a_correct_astro_mag_indices_index == 0
         assert_allclose(cm.a_nn_radius, 30)
         assert cm.a_correct_astro_save_folder == os.path.abspath('ac_folder')
         assert cm.a_cat_csv_file_path == os.path.abspath('file_9.csv')
         assert cm.a_ref_cat_csv_file_path == os.path.abspath('ref_9.csv')
-        assert_allclose(cm.a_correct_mag_array, np.array([14.07, 14.17, 14.27, 14.37, 14.47]))
-        assert_allclose(cm.a_correct_mag_slice, np.array([0.05, 0.05, 0.05, 0.05, 0.05]))
-        assert_allclose(cm.a_correct_sig_slice, np.array([0.1, 0.1, 0.1, 0.1, 0.1]))
+        assert_allclose(cm.a_correct_mag_array, np.array([[14.07, 14.17, 14.27, 14.37, 14.47]]))
+        assert_allclose(cm.a_correct_mag_slice, np.array([[0.05, 0.05, 0.05, 0.05, 0.05]]))
+        assert_allclose(cm.a_correct_sig_slice, np.array([[0.1, 0.1, 0.1, 0.1, 0.1]]))
         assert np.all(cm.a_pos_and_err_indices == np.array([[0, 1, 2], [0, 1, 2]]))
         assert np.all(cm.a_mag_indices == np.array([3, 5, 7, 9]))
-        assert np.all(cm.a_mag_unc_indices == np.array([4, 6, 8, 10]))
-        marray = np.load('ac_folder/npy/m_sigs_array.npy')
-        narray = np.load('ac_folder/npy/n_sigs_array.npy')
-        assert_allclose([marray[0], narray[0]], [2, 0], rtol=0.1, atol=0.01)
+        assert np.all(cm.a_snr_indices == np.array([4, 6, 8, 10]))
+        mnarray = np.load('ac_folder/npy/mn_sigs_array.npy')
+        assert_allclose([mnarray[0, 0], mnarray[0, 1]], [2, 0], rtol=0.1, atol=0.01)
         # pylint: enable=no-member
+
+        # Include test that runs the proper-motion rewind with astrometric corrections.
+        # This begins with faking ref_9 again to include proper motion columns.
+        x = np.loadtxt('ref_9.csv', delimiter=',')
+        y = np.empty((len(x), 13), float)
+        y[:, [0, 1, 2]] = x[:, [0, 1, 2]]
+        y[:, [3, 4]] = x[:, [3, 4]]
+        y[:, [5, 6]] = x[:, [3, 4]]
+        y[:, [7, 8]] = x[:, [3, 4]]
+        y[:, [9, 10]] = 0.01
+        # Pad with both a best index and chunk overlap column
+        y[:, 11] = 2
+        y[:, 12] = 1
+        np.savetxt('ref_9.csv', y, delimiter=',')
+
+        cm_p_2b = cm_p_.replace('n_pool: 2', 'n_pool: 2\nmove_to_epoch: J2000.000')
+        cb_p_2b = cb_p_2.replace('chunk_overlap_col: None', 'chunk_overlap_col: 12')
+        cb_p_2b = cb_p_2b.replace('ref_apply_proper_motion: False', 'ref_apply_proper_motion: True\n'
+                                  'ref_pm_indices: [9, 10]\nref_ref_epoch_or_index: J2000.5')
+
+        cm = CrossMatch(mock_filename(cm_p_2b.encode("utf-8")),
+                        mock_filename(self.ca_p_text.encode("utf-8")),
+                        mock_filename(cb_p_2b.encode("utf-8")))
+        cm._load_metadata_config(self.chunk_id)
+        cm.chunk_id = self.chunk_id
+        cm._initialise_chunk()
 
         # Dummy folder that won't contain l_cut.npy
         os.makedirs('./l_cut_dummy_folder', exist_ok=True)
@@ -1505,43 +1581,49 @@ class TestInputs:
                 ['correct_astro_mag_indices_index: ', 'correct_astro_mag_indices_index: ',
                  'correct_astro_mag_indices_index: ', 'nn_radius: ', 'nn_radius: ',
                  'correct_mag_array: ', 'correct_mag_slice: ', 'correct_mag_slice: ', 'correct_sig_slice: ',
-                 'correct_sig_slice: ', 'pos_and_err_indices: ', 'pos_and_err_indices: ',
-                 'pos_and_err_indices: ', 'mag_indices:', 'mag_indices:', 'mag_indices:', 'mag_unc_indices:',
-                 'mag_unc_indices:', 'mag_unc_indices:', 'chunk_overlap_col: ', 'chunk_overlap_col: ',
+                 'correct_sig_slice: ', 'correct_sig_slice: ', 'pos_and_err_indices: ',
+                 'pos_and_err_indices: ', 'pos_and_err_indices: ', 'pos_and_err_indices: ',
+                 'pos_and_err_indices: ', 'mag_indices:', 'mag_indices:', 'mag_indices:', 'snr_indices:',
+                 'snr_indices:', 'snr_indices:', 'chunk_overlap_col: ', 'chunk_overlap_col: ',
                  'chunk_overlap_col: ', 'best_mag_index_col: ', 'best_mag_index_col: ', 'dd_params_path: ',
                  'l_cut_path: '],
                 ['correct_astro_mag_indices_index: A', 'correct_astro_mag_indices_index: 2.5',
                  'correct_astro_mag_indices_index: 7', 'nn_radius: A', 'nn_radius: [1, 2]',
-                 'correct_mag_array: [1, 2, A, 4, 5]', 'correct_mag_slice: [0.1, 0.1, 0.1, A, 0.1]',
-                 'correct_mag_slice: [0.1, 0.1, 0.1]', 'correct_sig_slice: [0.1, 0.1, 0.1, A, 0.1]',
-                 'correct_sig_slice: [0.1, 0.1, 0.1]', 'pos_and_err_indices: [1 2 3 4 5 A]',
+                 'correct_mag_array: [[1, 2, A, 4, 5]]', 'correct_mag_slice: [[0.1, 0.1, 0.1, A, 0.1]]',
+                 'correct_mag_slice: [[0.1, 0.1, 0.1]]', 'correct_sig_slice: [[0.1, 0.1, 0.1, A, 0.1]]',
+                 'correct_sig_slice: [[0.1, 0.1, 0.1, 0.1, 0.1], [0.1]]',
+                 'correct_sig_slice: [[0.1, 0.1, 0.1]]', 'pos_and_err_indices: [1 2 3 4 5 A]',
                  'pos_and_err_indices: [1, 2, 3, 4, 5.5, 6]', 'pos_and_err_indices: [1, 2, 3, 4, 5]',
+                 'pos_and_err_indices: [1, 2, 3, 4, 5]', 'pos_and_err_indices: [1, 2, 3, 4, 5, 6, 7]',
                  'mag_indices: [A, 1, 2]', 'mag_indices: [1, 2]', 'mag_indices: [1.2, 2, 3, 4]',
-                 'mag_unc_indices: [A, 1, 2]', 'mag_unc_indices: [1, 2]', 'mag_unc_indices: [1.2, 2, 3]',
+                 'snr_indices: [A, 1, 2]', 'snr_indices: [1, 2]', 'snr_indices: [1.2, 2, 3]',
                  'chunk_overlap_col: Non', 'chunk_overlap_col: A', 'chunk_overlap_col: 1.2',
                  'best_mag_index_col: A', 'best_mag_index_col: 1.2', 'dd_params_path: ./some_folder',
                  'l_cut_path: ./l_cut_dummy_folder'],
-                ['a', 'b', 'a', 'b', 'a', 'a', 'b', 'a', 'b', 'a', 'b', 'a', 'a', 'a', 'b', 'b',
-                 'b', 'a', 'a', 'a', 'b', 'a', 'a', 'b', 'b', 'a'],
+                ['a', 'b', 'a', 'b', 'a', 'a', 'b', 'a', 'b', 'a', 'a', 'b', 'a', 'a', 'b', 'a', 'a', 'b',
+                 'b', 'b', 'a', 'a', 'a', 'b', 'a', 'a', 'b', 'b', 'a'],
                 ['correct_astro_mag_indices_index should be an integer in the catalogue "a"',
                  'correct_astro_mag_indices_index should be an integer in the catalogue "b"',
                  'correct_astro_mag_indices_index cannot be a larger index than the list of filters '
                  'in the catalogue "a', 'nn_radius must be a float in the catalogue "b"',
                  'nn_radius must be a float in the catalogue "a"',
-                 'correct_mag_array should be a list of floats in the catalogue "a"',
-                 'correct_mag_slice should be a list of floats in the catalogue "b"',
+                 'correct_mag_array should be a list of list of floats in the catalogue "a"',
+                 'correct_mag_slice should be a list of list of floats in the catalogue "b"',
                  'a_correct_mag_array and a_correct_mag_slice should contain the same',
-                 'correct_sig_slice should be a list of floats in the catalogue "b"',
+                 'correct_sig_slice should be a list of list of floats in the catalogue "b"',
+                 'a_correct_mag_array and a_correct_sig_slice should contain the same',
                  'a_correct_mag_array and a_correct_sig_slice should contain the same',
                  'pos_and_err_indices should be a list of integers in the catalogue "b"',
                  'All elements of a_pos_and_err_indices should be integers',
                  'a_pos_and_err_indices should contain six elements when correct_astrometry',
+                 'b_pos_and_err_indices should contain at least six elements when correct_astrometry',
+                 'a_pos_and_err_indices should contain the same number of non-reference, non-position',
                  'mag_indices should be a list of integers in the catalogue "a" ',
                  'b_filt_names and b_mag_indices should contain the',
                  'All elements of b_mag_indices should be integers.',
-                 'mag_unc_indices should be a list of integers in the catalogue "b" ',
-                 'a_mag_unc_indices and a_mag_indices should contain the',
-                 'All elements of a_mag_unc_indices should be integers.',
+                 'snr_indices should be a list of integers in catalogue "b" ',
+                 'a_snr_indices and a_mag_indices should contain the',
+                 'All elements of a_snr_indices should be integers.',
                  'chunk_overlap_col should be an integer in the catalogue "a"',
                  'chunk_overlap_col should be an integer in the catalogue "b"',
                  'chunk_overlap_col should be an integer in the catalogue "a"',
@@ -1560,6 +1642,10 @@ class TestInputs:
                 type_of_error = OSError
             else:
                 type_of_error = FileNotFoundError
+            if "contain at least six" in match_text:
+                c = c.replace('use_photometric_uncertainties: False', 'use_photometric_uncertainties: True')
+            if "contain the same number of non-reference" in match_text:
+                b = b.replace('use_photometric_uncertainties: False', 'use_photometric_uncertainties: True')
             with pytest.raises(type_of_error, match=match_text):
                 cm = CrossMatch(mock_filename(self.cm_p_text.encode("utf-8")),
                                 mock_filename(b.encode("utf-8")),
@@ -1567,10 +1653,9 @@ class TestInputs:
                 cm._load_metadata_config(self.chunk_id)
 
         cb_p_3 = cb_p_2.replace('correct_astrometry: True', 'correct_astrometry: False')
-        cb_p_3 = cb_p_3.replace('compute_snr_mag_relation: False', 'compute_snr_mag_relation: True')
         cb_p_3 = cb_p_3.replace('pos_and_err_indices: [0, 1, 2, 0, 1, 2]',
                                 'pos_and_err_indices: [1, 2, 3, 4, 5]')
-        match_text = 'b_pos_and_err_indices should contain three elements when compute_snr_mag_relation '
+        match_text = 'b_pos_and_err_indices should contain three elements when correct_astrometry is F'
         with pytest.raises(ValueError, match=match_text):
             cm = CrossMatch(mock_filename(self.cm_p_text.encode("utf-8")),
                             mock_filename(ca_p_2.encode("utf-8")),

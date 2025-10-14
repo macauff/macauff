@@ -413,8 +413,6 @@ class TestMakePerturbAUFs():
             f.write(text)
         f.close()
 
-        snr_mag_params = np.array([[[0.0109, 46.08, 0.119, 130, 0]]])
-
         self.fake_cm = self.make_class()
         self.fake_cm.b_tri_set_name = 'WISE'
         self.fake_cm.b_tri_filt_num = 11
@@ -430,14 +428,14 @@ class TestMakePerturbAUFs():
         self.fake_cm.b_dens_dist = density_radius
         self.fake_cm.b_run_fw_auf = True
         self.fake_cm.b_run_psf_auf = False
-        self.fake_cm.b_snr_mag_params = snr_mag_params
         self.fake_cm.b_gal_al_avs = [0]
         self.fake_cm.b_download_tri = False
         self.fake_cm.b_astro = np.array([[0.3, 0.3, 0.1]] * 101)
         self.fake_cm.b_astro[0, [0, 1]] = [0.3, 0.31]
         self.fake_cm.b_astro[1, [0, 1]] = [0.31, 0.3]
         self.fake_cm.b_astro[2, [0, 1]] = [0.31, 0.31]
-        self.fake_cm.b_photo = np.array([np.concatenate(([14.99], [100]*100))]).T
+        self.fake_cm.b_photo = np.array([np.concatenate(([14.99], [100]*100))]).T.reshape(-1, 1)
+        self.fake_cm.b_snr = np.array([100] * 101).reshape(-1, 1)
         self.fake_cm.b_magref = np.array([0] * 101)
         self.fake_cm.b_dens_hist_tri_list = [None] * len(self.filters)
         self.fake_cm.b_tri_model_mags_list = [None] * len(self.filters)
@@ -517,7 +515,6 @@ class TestMakePerturbAUFs():
             dfluxes1 = 10**(-(mag_offset-d_mag/2)/2) - 10**(-mag_offset/2.5)
             dfluxes2 = 10**(-mag_offset/2.5) - 10**(-(mag_offset+d_mag/2)/2.5)
 
-            snr_mag_params = np.array([[[0.0109, 46.08, 0.119, 130, 0]]])
             l_cut = np.load(os.path.join(os.path.dirname(__file__), 'data/l_cut.npy'))
             dd_params = np.load(os.path.join(os.path.dirname(__file__), 'data/dd_params.npy'))
             run_fw = mag >= 19
@@ -537,7 +534,6 @@ class TestMakePerturbAUFs():
             self.fake_cm.b_dens_dist = density_radius
             self.fake_cm.b_run_fw_auf = run_fw
             self.fake_cm.b_run_psf_auf = True
-            self.fake_cm.b_snr_mag_params = snr_mag_params
             self.fake_cm.b_dd_params = dd_params
             self.fake_cm.b_l_cut = l_cut
             self.fake_cm.b_gal_al_avs = [0]
@@ -553,8 +549,9 @@ class TestMakePerturbAUFs():
             self.fake_cm.b_astro = np.concatenate(
                 ([0.3, 0.3, 0.1] * 101, [0.1, 0.1, 0.1], [0.1, 0.9, 0.1],
                  [0.9, 0.1, 0.1], [0.9, 0.9, 0.1])).reshape(-1, 3)
-            self.fake_cm.b_photo = photo_array
+            self.fake_cm.b_photo = photo_array.reshape(-1, 1)
             self.fake_cm.b_magref = np.array([0] * 105)
+            self.fake_cm.b_snr = np.array([100] * 105).reshape(-1, 1)
             self.fake_cm.n_pool = 1
             _, p_a_o = make_perturb_aufs(self.fake_cm, 'b')
 
@@ -614,7 +611,8 @@ class TestMakePerturbAUFs():
                             [0.9, 0.1, 0.1], [0.9, 0.9, 0.1])).reshape(-1, 3)
         y = np.array([np.concatenate(([14.99], [100]*100, [10], [10], [10], [10]))]).T
         z = np.array([0] * 105)
-        a = np.hstack((x, y, np.zeros((len(x), 1), bool), z.reshape(-1, 1)))
+        s = np.array([[100] * 105])
+        a = np.hstack((x, y, np.zeros((len(x), 1), bool), z.reshape(-1, 1), s.reshape(-1, 1)))
         with open('cat_folder/cat_9.csv', "w", encoding='utf-8') as f:
             np.savetxt(f, a, delimiter=",")
 
@@ -682,24 +680,21 @@ class TestMakePerturbAUFs():
         for ol, nl in zip(['psf_fwhms: [0.12, 0.12, 0.12]',
                            r'auf_file_path: gaia_auf_folder/trilegal_download_{}.dat',
                            'tri_filt_names: [G_BP, G, G_RP]', 'gal_al_avs: [1.002, 0.789, 0.589]',
-                           'mag_indices: [3, 4, 5]', 'chunk_overlap_col: 6', 'best_mag_index_col: 7'],
+                           'mag_indices: [3, 4, 5]', 'chunk_overlap_col: 6', 'best_mag_index_col: 7',
+                           'snr_indices: [8, 9, 10]'],
                           ['psf_fwhms: [0.12]', r'auf_file_path: auf_folder/trilegal_download_{}.dat',
                            'tri_filt_names: [W1]', 'gal_al_avs: [0]', 'mag_indices: [3]',
-                           'chunk_overlap_col: 4', 'best_mag_index_col: 5']):
+                           'chunk_overlap_col: 4', 'best_mag_index_col: 5', 'snr_indices: [6]']):
             ca_p_ = ca_p_.replace(ol, nl)
         for ol, nl in zip(['psf_fwhms: [6.08, 6.84, 7.36, 11.99]',
                            r'auf_file_path: wise_auf_folder/trilegal_download_{}.dat',
                            'tri_filt_names: [W1, W2, W3, W4]', 'gal_al_avs: [0.039, 0.026, 0.015, 0.005]',
-                           'mag_indices: [3, 4, 5, 6]', 'chunk_overlap_col: 7', 'best_mag_index_col: 8'],
+                           'mag_indices: [3, 4, 5, 6]', 'chunk_overlap_col: 7', 'best_mag_index_col: 8',
+                           'snr_indices: [9, 10, 11, 12]'],
                           ['psf_fwhms: [6.08]', r'auf_file_path: auf_folder/trilegal_download_{}.dat',
                            'tri_filt_names: [W1]', 'gal_al_avs: [0]', 'mag_indices: [3]',
-                           'chunk_overlap_col: 4', 'best_mag_index_col: 5']):
+                           'chunk_overlap_col: 4', 'best_mag_index_col: 5', 'snr_indices: [6]']):
             cb_p_ = cb_p_.replace(ol, nl)
-
-        os.makedirs('a_snr_mag_9', exist_ok=True)
-        os.makedirs('b_snr_mag_9', exist_ok=True)
-        np.save('a_snr_mag_9/snr_mag_params.npy', np.array([[[0.0109, 46.08, 0.119, 130, 0]]]))
-        np.save('b_snr_mag_9/snr_mag_params.npy', np.array([[[0.0109, 46.08, 0.119, 130, 0]]]))
 
         # Fake this the easy way both times, then below correct the parameters
         # for the precompute_hist version of the test.
@@ -812,7 +807,8 @@ class TestMakePerturbAUFs():
         main_mags = rng.uniform(24.95, 25.05, size=100)
         y = np.array([np.concatenate(([14.99], main_mags, [10], [10], [10], [10]))]).T
         z = np.array([0] * 105)
-        a = np.hstack((x, y, np.zeros((len(x), 1), bool), z.reshape(-1, 1)))
+        s = np.array([[100] * 105])
+        a = np.hstack((x, y, np.zeros((len(x), 1), bool), z.reshape(-1, 1), s.reshape(-1, 1)))
         with open('cat_folder/cat_9.csv', "w", encoding='utf-8') as f:
             np.savetxt(f, a, delimiter=",")
 
@@ -877,24 +873,21 @@ class TestMakePerturbAUFs():
         for ol, nl in zip(['psf_fwhms: [0.12, 0.12, 0.12]',
                            r'auf_file_path: gaia_auf_folder/trilegal_download_{}.dat',
                            'tri_filt_names: [G_BP, G, G_RP]', 'gal_al_avs: [1.002, 0.789, 0.589]',
-                           'mag_indices: [3, 4, 5]', 'chunk_overlap_col: 6', 'best_mag_index_col: 7'],
+                           'mag_indices: [3, 4, 5]', 'chunk_overlap_col: 6', 'best_mag_index_col: 7',
+                           'snr_indices: [8, 9, 10]'],
                           ['psf_fwhms: [0.12]', r'auf_file_path: auf_folder/trilegal_download_{}.dat',
                            'tri_filt_names: [W1]', 'gal_al_avs: [0]', 'mag_indices: [3]',
-                           'chunk_overlap_col: 4', 'best_mag_index_col: 5']):
+                           'chunk_overlap_col: 4', 'best_mag_index_col: 5', 'snr_indices: [6]']):
             ca_p_ = ca_p_.replace(ol, nl)
         for ol, nl in zip(['psf_fwhms: [6.08, 6.84, 7.36, 11.99]',
                            r'auf_file_path: wise_auf_folder/trilegal_download_{}.dat',
                            'tri_filt_names: [W1, W2, W3, W4]', 'gal_al_avs: [0.039, 0.026, 0.015, 0.005]',
-                           'mag_indices: [3, 4, 5, 6]', 'chunk_overlap_col: 7', 'best_mag_index_col: 8'],
-                          ['psf_fwhms: [6.08]', 'auf_file_path: auf_folder/trilegal_download_{}.dat',
+                           'mag_indices: [3, 4, 5, 6]', 'chunk_overlap_col: 7', 'best_mag_index_col: 8',
+                           'snr_indices: [9, 10, 11, 12]'],
+                          ['psf_fwhms: [6.08]', r'auf_file_path: auf_folder/trilegal_download_{}.dat',
                            'tri_filt_names: [W1]', 'gal_al_avs: [0]', 'mag_indices: [3]',
-                           'chunk_overlap_col: 4', 'best_mag_index_col: 5']):
+                           'chunk_overlap_col: 4', 'best_mag_index_col: 5', 'snr_indices: [6]']):
             cb_p_ = cb_p_.replace(ol, nl)
-
-        os.makedirs('a_snr_mag_9', exist_ok=True)
-        os.makedirs('b_snr_mag_9', exist_ok=True)
-        np.save('a_snr_mag_9/snr_mag_params.npy', np.array([[[0.0109, 46.08, 0.119, 130, 0]]]))
-        np.save('b_snr_mag_9/snr_mag_params.npy', np.array([[[0.0109, 46.08, 0.119, 130, 0]]]))
 
         old_line = r'auf_file_path: auf_folder/trilegal_download_{}.dat'
         new_line = (r'auf_file_path: auf_folder/trilegal_download_{}.dat' + '\ndens_hist_tri_location: None\n'
@@ -1115,5 +1108,5 @@ def test_trilegal_download():
     tri_area = float(bits[2])
     tri = np.genfromtxt('trilegal_auf_simulation.dat', delimiter=None, names=True,
                         comments='#', skip_header=2)
-    assert np.all(tri[:]['G'] <= 32)
+    assert np.all(tri[:]['Gmag'] <= 32)
     assert tri_area <= 10

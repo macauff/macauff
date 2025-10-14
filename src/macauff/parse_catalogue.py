@@ -8,7 +8,9 @@ import os
 
 import numpy as np
 import pandas as pd
+from astropy import units as u
 from astropy.coordinates import SkyCoord
+from astropy.time import Time
 from numpy.lib.format import open_memmap
 
 # pylint: disable=import-error,no-name-in-module
@@ -20,9 +22,11 @@ from macauff.misc_functions_fortran import misc_functions_fortran as mff
 __all__ = ['csv_to_npy', 'rect_slice_npy', 'npy_to_csv', 'rect_slice_csv']
 
 
+# pylint: disable-next=too-many-branches,too-many-statements,too-many-locals
 def csv_to_npy(input_filename, astro_cols, photo_cols, bestindex_col,
-               chunk_overlap_col, header=False, process_uncerts=False, astro_sig_fits_filepath=None,
-               cat_in_radec=None, mn_in_radec=None):
+               chunk_overlap_col, snr_cols=None, header=False, process_uncerts=False,
+               astro_sig_fits_filepath=None, cat_in_radec=None, mn_in_radec=None,
+               pm_cols=None, pm_ref_epoch=None, pm_move_to_epoch=None):
     '''
     Convert a .csv file representation of a photometric catalogue into the
     appropriate .npy binary files used in the cross-matching process.
@@ -35,11 +39,17 @@ def csv_to_npy(input_filename, astro_cols, photo_cols, bestindex_col,
     astro_cols : list or numpy.array of integers
         List of zero-indexed columns in the input catalogue representing the
         three required astrometric parameters, two orthogonal sky axis
-        coordinates and a single, circular astrometric precision. The precision
-        must be the last column, with the first two columns of ``astro_cols``
-        matching in order to the first two columns of the output astrometry
-        binary file, if ``process_uncerts`` is ``True``.
-    photo_cols : list or numpy.array of integers
+        coordinates and a single, circular astrometric precision. The first two
+        columns of ``astro_cols`` must match in order the first two columns of
+        the output astrometry binary file. For cases where ``process_uncerts``
+        is ``True``, the last ``N`` columns must either be a single astrometric
+        uncertainty, for when catalogue-given astrometric uncertainties are
+        available and were used to parameterise the position-residuals in the
+        catalogue, or a list of ``N`` photometric uncertainty bands, in which
+        case there will be ``N`` band-based parameterisations of the astrometry
+        and the ``bestindex_col`` flags will be used to determine which
+        parameterisation to use for each source individually.
+    photo_cols : list or numpy.ndarray of integers
         List of zero-indexed columns in the input catalogue representing the
         magnitudes of each photometric source to be used in the cross-matching.
     bestindex_col : integer
@@ -52,6 +62,10 @@ def csv_to_npy(input_filename, astro_cols, photo_cols, bestindex_col,
         of the boolean representation of whether sources are in the "halo"
         (``1`` in the .csv) or "core" (``0``) of the region. If ``None`` then all
         objects are assumed to be in the core.
+    snr_cols : list or numpy.ndarray of integers
+        List of zero-indexed columns in the input catalogue representing the
+        signal-to-noise ratios of each detection corresponding to those same
+        magnitudes in ``photo_cols``.
     header : boolean, optional
         Flag indicating whether the .csv file has a first line with the names
         of the columns in it, or whether the first line of the file is the first
@@ -77,6 +91,23 @@ def csv_to_npy(input_filename, astro_cols, photo_cols, bestindex_col,
         compute m-n scaling relations are in RA/Dec or not. If ``mn_in_radec``
         disagrees with ``cat_in_radec`` then m-n coordinates will be converted
         to the coordinate system of the catalogue.
+    pm_cols : list or numpy.ndarray of integers, optional
+        If given, must contain the two orthogonal sky-axis proper motions'
+        indices for the given dataset, to be loaded along with positions,
+        SNRs, photometry, etc. Depending on whether ``pm_ref_epoch`` is also
+        given, must additionally contain the index into the column in the data
+        holding the individial sources' date of observation as the final of
+        three elements. Must be ``None``, as per the default value, to force
+        skipping of element loading.
+    pm_ref_epoch : string, optional
+        If ``pm_cols`` is of length two then this must be given, but if ``pm_cols``
+        is three elements must not be given. If provided, must be a single
+        string, valid for loading into astropy's Time function. Otherwise,
+        ``pm_cols`` index must contain astropy Time-valid strings in its
+        dataset column.
+    pm_move_to_epoch : string, optional
+        If ``pm_cols`` is provided, regardless of its length, this must be
+        given, and must always contain a single, astropy Time valid, string.
 
     Returns
     -------
@@ -94,6 +125,9 @@ def csv_to_npy(input_filename, astro_cols, photo_cols, bestindex_col,
         it has been included in a halo around the primary chunk objects for
         match purposes, but is a primary detection in a different chunk of this
         catalogue.
+    snrs : numpy.ndarray, optional
+        If ``snr_cols`` are provided, also returns the signal-to-noise ratios for
+        each ``photo`` detection for each source.
     '''
     if not (process_uncerts is True or process_uncerts is False):
         raise ValueError("process_uncerts must either be True or False.")
@@ -110,6 +144,15 @@ def csv_to_npy(input_filename, astro_cols, photo_cols, bestindex_col,
     if process_uncerts and not os.path.exists(astro_sig_fits_filepath):
         raise ValueError("process_uncerts is True but astro_sig_fits_filepath does not exist. "
                          "Please ensure file path is correct.")
+    if pm_cols is not None and pm_move_to_epoch is None:
+        raise ValueError("pm_move_to_epoch cannot be None if pm_cols is given.")
+    if pm_cols is not None and (len(pm_cols) < 2 or len(pm_cols) > 3):
+        raise ValueError("pm_cols must either be of length two or three if supplied.")
+    if pm_cols is not None and len(pm_cols) == 2 and pm_ref_epoch is None:
+        raise ValueError("pm_ref_epoch cannot be None if pm_cols is supplied and of length 2.")
+    if pm_cols is not None and len(pm_cols) == 3 and pm_ref_epoch is not None:
+        raise ValueError("If proper motions are to be applied and pm_cols has three elements then "
+                         "pm_ref_epoch cannot be given as well.")
     astro_cols, photo_cols = np.array(astro_cols), np.array(photo_cols)
     with open(input_filename, encoding='utf-8') as fp:
         n_rows = 0 if not header else -1
@@ -120,13 +163,28 @@ def csv_to_npy(input_filename, astro_cols, photo_cols, bestindex_col,
     photo = np.empty((n_rows, len(photo_cols)), float)
     best_index = np.empty(n_rows, int)
     chunk_overlap = np.empty(n_rows, bool)
+    if snr_cols is not None:
+        snrs = np.empty((n_rows, len(photo_cols)), float)
+    if pm_cols is not None:
+        if len(pm_cols) == 2:
+            pms = np.empty((n_rows, len(pm_cols)), float)
+        else:
+            pms = np.empty((n_rows, len(pm_cols)-1), float)
+            pm_epochs = np.empty(n_rows, object)
 
     if process_uncerts:
-        m_sigs = np.load(f'{astro_sig_fits_filepath}/m_sigs_array.npy')
-        n_sigs = np.load(f'{astro_sig_fits_filepath}/n_sigs_array.npy')
-        mn_coords = np.empty((len(m_sigs), 2), float)
-        mn_coords[:, 0] = np.load(f'{astro_sig_fits_filepath}/snr_mag_params.npy')[0, :, 3]
-        mn_coords[:, 1] = np.load(f'{astro_sig_fits_filepath}/snr_mag_params.npy')[0, :, 4]
+        mn_sigs = np.load(f'{astro_sig_fits_filepath}/mn_sigs_array.npy')
+        mn_coords = np.empty((len(mn_sigs), 2), float)
+        # Check the shape of mn_sigs for a third dimension which signals that
+        # we need to perform per-band parameterisation.
+        if len(mn_sigs.shape) == 3:
+            per_band_param = True
+            mn_coords[:, 0] = np.copy(mn_sigs[:, 0, 2])
+            mn_coords[:, 1] = np.copy(mn_sigs[:, 0, 3])
+        else:
+            per_band_param = False
+            mn_coords[:, 0] = np.copy(mn_sigs[:, 2])
+            mn_coords[:, 1] = np.copy(mn_sigs[:, 3])
         if cat_in_radec and not mn_in_radec:
             # Convert mn_coords to RA/Dec if catalogue is in Equatorial coords.
             a = SkyCoord(l=mn_coords[:, 0], b=mn_coords[:, 1], unit='deg', frame='galactic')
@@ -141,40 +199,75 @@ def csv_to_npy(input_filename, astro_cols, photo_cols, bestindex_col,
     used_cols = np.concatenate((astro_cols, photo_cols, [bestindex_col]))
     if chunk_overlap_col is not None:
         used_cols = np.concatenate((used_cols, [chunk_overlap_col]))
+    if snr_cols is not None:
+        used_cols = np.concatenate((used_cols, snr_cols))
+    if pm_cols is not None:
+        used_cols = np.concatenate((used_cols, pm_cols))
     used_cols = np.sort(used_cols)
     new_astro_cols = np.array([np.where(used_cols == a)[0][0] for a in astro_cols])
     new_photo_cols = np.array([np.where(used_cols == a)[0][0] for a in photo_cols])
     new_bestindex_col = np.where(used_cols == bestindex_col)[0][0]
     if chunk_overlap_col is not None:
         new_chunk_overlap_col = np.where(used_cols == chunk_overlap_col)[0][0]
+    if snr_cols is not None:
+        new_snr_cols = np.array([np.where(used_cols == a)[0][0] for a in snr_cols])
+    if pm_cols is not None:
+        new_pm_cols = np.array([np.where(used_cols == a)[0][0] for a in pm_cols])
     n = 0
     for chunk in pd.read_csv(input_filename, chunksize=100000,
                              usecols=used_cols, header=None if not header else 0):
+        best_index[n:n+chunk.shape[0]] = chunk.values[:, new_bestindex_col]
         if not process_uncerts:
             astro[n:n+chunk.shape[0]] = chunk.values[:, new_astro_cols]
         else:
             astro[n:n+chunk.shape[0], 0] = chunk.values[:, new_astro_cols[0]]
             astro[n:n+chunk.shape[0], 1] = chunk.values[:, new_astro_cols[1]]
-            old_sigs = chunk.values[:, new_astro_cols[2]]
             sig_mn_inds = mff.find_nearest_point(chunk.values[:, new_astro_cols[0]],
                                                  chunk.values[:, new_astro_cols[1]],
                                                  mn_coords[:, 0], mn_coords[:, 1])
-            # pylint: disable-next=possibly-used-before-assignment
-            new_sigs = np.sqrt((m_sigs[sig_mn_inds]*old_sigs)**2 + n_sigs[sig_mn_inds]**2)
+            if not per_band_param:  # pylint: disable=possibly-used-before-assignment
+                old_sigs = chunk.values[:, new_astro_cols[2]]
+                # pylint: disable-next=possibly-used-before-assignment
+                new_sigs = np.sqrt((mn_sigs[sig_mn_inds, 0]*old_sigs)**2 + mn_sigs[sig_mn_inds, 1]**2)
+            else:
+                new_sigs = np.empty(chunk.shape[0], float)
+                for i in range(chunk.shape[0]):
+                    old_sig = chunk.values[i, new_astro_cols[2+best_index[i]]]
+                    new_sig = np.sqrt((mn_sigs[sig_mn_inds[i], best_index[i], 0]*old_sig)**2 +
+                                      mn_sigs[sig_mn_inds[i], best_index[i], 1]**2)
+                    new_sigs[i] = new_sig
             astro[n:n+chunk.shape[0], 2] = new_sigs
         photo[n:n+chunk.shape[0]] = chunk.values[:, new_photo_cols]
-        best_index[n:n+chunk.shape[0]] = chunk.values[:, new_bestindex_col]
         if chunk_overlap_col is not None:
             chunk_overlap[n:n+chunk.shape[0]] = chunk.values[:, new_chunk_overlap_col].astype(bool)
         else:
             chunk_overlap[n:n+chunk.shape[0]] = False
+        if snr_cols is not None:
+            snrs[n:n+chunk.shape[0]] = chunk.values[:, new_snr_cols]
+        if pm_cols is not None:
+            if len(pm_cols) == 2:
+                pms[n:n+chunk.shape[0]] = chunk.values[:, new_pm_cols]
+            else:
+                pms[n:n+chunk.shape[0]] = chunk.values[:, new_pm_cols[:-1]]
+                pm_epochs[n:n+chunk.shape[0]] = chunk.values[:, new_pm_cols[-1]]
 
         n += chunk.shape[0]
 
+    if pm_cols is not None:
+        # Since we made the temporary holding place for the individal array
+        # epochs an object dtype, just extract values into a list quickly to
+        # make astropy.time.Time happy later.
+        pm_r_e = pm_ref_epoch if pm_ref_epoch is not None else list(pm_epochs)
+        lon, lat = apply_proper_motion(astro[:, 0], astro[:, 1], pms[:, 0], pms[:, 1], pm_r_e,
+                                       pm_move_to_epoch, 'equatorial' if cat_in_radec else 'galactic')
+        astro[:, 0], astro[:, 1] = lon, lat
+
+    if snr_cols is not None:
+        return astro, photo, best_index, chunk_overlap, snrs
     return astro, photo, best_index, chunk_overlap
 
 
-# pylint: disable-next=dangerous-default-value,too-many-locals,too-many-statements
+# pylint: disable-next=dangerous-default-value,too-many-locals,too-many-statements,dangerous-default-value
 def npy_to_csv(input_csv_file_paths, cm, output_folder, output_filenames, column_name_lists,
                column_num_lists, extra_col_cat_names, correct_astro_flags, headers=[False, False],
                extra_col_name_lists=[None, None], extra_col_num_lists=[None, None], file_extension=''):
@@ -571,3 +664,78 @@ def rect_slice_npy(input_folder, output_folder, rect_coords, padding, mem_chunk_
         # Always assume that a cutout is a single "visit" with no chunk "halo".
         small_chunk_overlap[counter:counter:inside_n] = False
         counter += inside_n
+
+
+def apply_proper_motion(lon, lat, pm_lon, pm_lat, ref_epoch, move_to_epoch, coord_system):
+    '''
+    Functionality to apply proper motions to a dataset with measured on-sky
+    stellar drift.
+
+    Parameters
+    ----------
+    lon : numpy.ndarray or list of floats
+        Longitude coordinate of each object. Should either be Right Ascension
+        or galactic longitude, depending on ``coord_system``.
+    lat: numpy.ndarray or list of floats
+        Declination or galactic latitude (depending on ``coord_system``) of
+        each object to be moved to a new epoch.
+    pm_lon : numpy.ndarray or list of floats
+        Longitudinal drift of each object, corresponding element by element
+        to ``lon`` and ``lat``. Must be in units of arcseconds per year, and
+        account for the latitudinal projection effect (e.g., the "cos dec"
+        effect) already.
+    pm_lat : numpy.ndarray or list of floats
+        The latitudinal drift of the objects, in arcseconds per year.
+    ref_epoch : numpy.ndarray of strings or string
+        The date, or dates, of all observations. Can either be a single value
+        or an array/list of epochs, element-wise with ``lon`` et al. Must be
+        accepted by ``SkyCoord`` as a valid format, such as ``JXXXX.YYY` or
+        ``YYYY-MM-DD``.
+    move_to_epoch : string
+        The new date to which all sources should have their positions moved to.
+        Must be a valid astropy ``Time`` format, expecting either ``JXXXX.YYY``
+        or ``YYYY-MM-DD`.
+    coord_system : string
+        String to determine which coordinate system the data are in, either
+        ``equatorial``, in which case the ICRS frame is used internally, or
+        ``galactic``, where the galactic coordinate system will be applied.
+
+    Returns
+    -------
+    new_lon : numpy.ndarray of floats
+        The new longitudinal coordinates of each object in ``move_to_epoch``
+        dates.
+    new_lat : numpy.ndarray of floats
+        Latitude (Dec or b) of objects at the new epoch.
+    '''
+
+    lon, lat = np.array(lon), np.array(lat)
+    pm_lon, pm_lat = np.array(pm_lon), np.array(pm_lat)
+
+    q = ~np.isnan(pm_lon) & ~np.isnan(pm_lat)
+
+    if not isinstance(ref_epoch, str):
+        ref_epoch = np.array(ref_epoch)[q]
+        time_ref_epoch = [Time(x) for x in ref_epoch]
+    else:
+        time_ref_epoch = Time(ref_epoch)
+
+    # pylint: disable=no-member
+    if coord_system == 'galactic':
+        c = SkyCoord(l=lon[q] * u.degree, b=lat[q] * u.degree, frame='galactic', obstime=time_ref_epoch,
+                     pm_l_cosb=pm_lon[q] * u.arcsecond / u.year, pm_b=pm_lat[q] * u.arcsecond / u.year)
+    else:
+        c = SkyCoord(ra=lon[q] * u.degree, dec=lat[q] * u.degree, frame='icrs', obstime=time_ref_epoch,
+                     pm_ra_cosdec=pm_lon[q] * u.arcsecond / u.year, pm_dec=pm_lat[q] * u.arcsecond / u.year)
+    # pylint: enable=no-member
+
+    d = c.apply_space_motion(new_obstime=Time(move_to_epoch))
+
+    new_lon, new_lat = np.empty(len(lon), float), np.empty(len(lat), float)
+    if coord_system == 'galactic':
+        new_lon[q], new_lat[q] = d.l.degree, d.b.degree
+    else:
+        new_lon[q], new_lat[q] = d.ra.degree, d.dec.degree
+    new_lon[~q], new_lat[~q] = lon[~q], lat[~q]
+
+    return new_lon, new_lat
