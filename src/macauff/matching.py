@@ -952,6 +952,7 @@ class CrossMatch():
         # Always need to check for a/b catalogue PM application, but only check
         # for their respective reference catalogues' PM application if they
         # get a correct_astrometry call at all.
+        # pylint: disable-next=too-many-boolean-expressions
         if (cat_a_config['apply_proper_motion'] or cat_b_config['apply_proper_motion'] or
                 (cat_a_config['correct_astrometry'] and cat_a_config['ref_apply_proper_motion']) or
                 (cat_b_config['correct_astrometry'] and cat_b_config['ref_apply_proper_motion'])):
