@@ -22,6 +22,65 @@ from macauff.misc_functions_fortran import misc_functions_fortran as mff
 __all__ = ['csv_to_npy', 'rect_slice_npy', 'npy_to_csv', 'rect_slice_csv']
 
 
+def load_csv(self, which):
+    """
+    Load one side of the cross-match's .csv catalogue, parsing for whether
+    we previously ran the astrometric correction pipeline and need to create
+    new uncertainties or not.
+
+    Parameters
+    ----------
+    which : string
+        Either an 'a' or a 'b', for which side of the match is being loaded.
+    """
+    if not os.path.isfile(getattr(self, f'{which}_cat_csv_file_path')):
+        raise FileNotFoundError(f'Catalogue file not found in catalogue "{which}" path. '
+                                'Please ensure photometric catalogue is correctly saved.')
+
+    if self.include_perturb_auf or getattr(self, f'{which}_correct_astrometry'):
+        snr_cols = getattr(self, f'{which}_snr_indices')
+    else:
+        snr_cols = None
+    if getattr(self, f'{which}_apply_proper_motion'):
+        if isinstance(getattr(self, f'{which}_ref_epoch_or_index'), str):
+            pm_cols = getattr(self, f'{which}_pm_indices')
+            pm_ref_epoch = getattr(self, f'{which}_ref_epoch_or_index')
+        else:
+            pm_cols = np.append(getattr(self, f'{which}_pm_indices'),
+                                getattr(self, f'{which}_ref_epoch_or_index'))
+            pm_ref_epoch = None
+        pm_move_to_epoch = self.move_to_epoch
+    else:
+        pm_cols, pm_ref_epoch, pm_move_to_epoch = None, None, None
+    if getattr(self, f'{which}_correct_astrometry'):
+        x = csv_to_npy(
+            getattr(self, f'{which}_cat_csv_file_path'), getattr(self, f'{which}_pos_and_err_indices')[0],
+            getattr(self, f'{which}_mag_indices'), getattr(self, f'{which}_best_mag_index_col'),
+            getattr(self, f'{which}_chunk_overlap_col'), snr_cols=snr_cols, header=False,
+            process_uncerts=True,
+            astro_sig_fits_filepath=f'{getattr(self, f"{which}_correct_astro_save_folder")}/npy',
+            cat_in_radec=getattr(self, f'{which}_auf_region_frame') == 'equatorial',
+            mn_in_radec=getattr(self, f'{which}_auf_region_frame') == 'equatorial', pm_cols=pm_cols,
+            pm_ref_epoch=pm_ref_epoch, pm_move_to_epoch=pm_move_to_epoch)
+    else:
+        x = csv_to_npy(
+            getattr(self, f'{which}_cat_csv_file_path'), getattr(self, f'{which}_pos_and_err_indices'),
+            getattr(self, f'{which}_mag_indices'), getattr(self, f'{which}_best_mag_index_col'),
+            getattr(self, f'{which}_chunk_overlap_col'), snr_cols=snr_cols, header=False, pm_cols=pm_cols,
+            pm_ref_epoch=pm_ref_epoch, pm_move_to_epoch=pm_move_to_epoch)
+    if snr_cols is not None:
+        # pylint: disable-next=unbalanced-tuple-unpacking
+        f1, f2, f3, f4, f5 = x
+        setattr(self, f'{which}_snr', f5)
+    else:
+        # pylint: disable-next=unbalanced-tuple-unpacking
+        f1, f2, f3, f4 = x
+    setattr(self, f'{which}_astro', f1)
+    setattr(self, f'{which}_photo', f2)
+    setattr(self, f'{which}_magref', f3)
+    setattr(self, f'{which}_in_overlaps', f4)
+
+
 # pylint: disable-next=too-many-branches,too-many-statements,too-many-locals
 def csv_to_npy(input_filename, astro_cols, photo_cols, bestindex_col,
                chunk_overlap_col, snr_cols=None, header=False, process_uncerts=False,

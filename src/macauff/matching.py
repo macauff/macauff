@@ -8,7 +8,6 @@ This module provides the high-level framework for performing catalogue-catalogue
 import datetime
 import os
 import sys
-import warnings
 from time import sleep
 
 import numpy as np
@@ -19,10 +18,10 @@ except ModuleNotFoundError:
     MPI = None
 
 from macauff.counterpart_pairing import source_pairing
-from macauff.fit_astrometry import AstrometricCorrections
+from macauff.fit_astrometry import derive_astrometric_corrections
 from macauff.group_sources import make_island_groupings
 from macauff.macauff import Macauff
-from macauff.parse_catalogue import csv_to_npy, npy_to_csv
+from macauff.parse_catalogue import load_csv, npy_to_csv
 from macauff.perturbation_auf import make_perturb_aufs
 from macauff.photometric_likelihood import compute_photometric_likelihoods
 from macauff.read_metadata import read_metadata
@@ -145,239 +144,15 @@ class CrossMatch():
     def _initialise_chunk(self):  # pylint: disable=too-many-branches,too-many-statements
         '''
         Initialisation function for a single chunk of sky.
-
-        The function takes three paths, the locations of the metadata files containing
-        all of the necessary parameters for the cross-match, and outputs a file
-        containing the appropriate columns of the datasets plus additional derived
-        parameters.
         '''
 
         # If astrometry of either catalogue needs fixing, do that now.
         if self.a_correct_astrometry:
-            # Generate from current data: just need the singular chunk mid-points
-            # and to leave all other parameters as they are.
-            if len(self.a_auf_region_points) > 1:
-                warnings.warn("a_auf_region_points contains more than one AUF sampling point, but "
-                              "a_correct_astrometry is True. Check results carefully.")
-            ax1_mids = np.array([self.a_auf_region_points[0, 0]])
-            ax2_mids = np.array([self.a_auf_region_points[0, 1]])
-            ax_dimension = 2
-            a_npy_or_csv = 'csv'
-            a_coord_or_chunk = 'chunk'
-        if self.a_correct_astrometry:
-            t = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            print(f"{t} Rank {self.rank}, chunk {self.chunk_id}: Calculating catalogue 'a' "
-                  "uncertainty corrections...")
-            apply_proper_motion = self.a_apply_proper_motion or self.a_ref_apply_proper_motion
-            if apply_proper_motion:
-                pm_cols, pm_ref_epoch_or_index = [None, None], [None, None]
-                pm_move_to_epoch = self.move_to_epoch
-                if self.a_apply_proper_motion:
-                    pm_cols[0] = self.a_pm_indices
-                    pm_ref_epoch_or_index[0] = self.a_ref_epoch_or_index
-                if self.a_ref_apply_proper_motion:
-                    pm_cols[1] = self.a_ref_pm_indices
-                    pm_ref_epoch_or_index[1] = self.a_ref_ref_epoch_or_index
-            else:
-                pm_cols, pm_ref_epoch_or_index, pm_move_to_epoch = None, None, None
-            ac = AstrometricCorrections(
-                self.a_psf_fwhms, self.num_trials, self.a_nn_radius, self.a_dens_dist,
-                self.a_correct_astro_save_folder, self.a_gal_wavs, self.a_gal_aboffsets,
-                self.a_gal_filternames, self.a_gal_al_avs, self.d_mag, self.a_dd_params,
-                self.a_l_cut, ax1_mids, ax2_mids, ax_dimension, self.a_correct_mag_array,
-                self.a_correct_mag_slice, self.a_correct_sig_slice, self.n_pool, a_npy_or_csv,
-                a_coord_or_chunk, self.a_pos_and_err_indices, self.a_mag_indices, self.a_snr_indices,
-                self.a_filt_names, self.a_correct_astro_mag_indices_index, self.a_auf_region_frame,
-                self.a_saturation_magnitudes, trifilepath=self.a_auf_file_path,
-                maglim_f=self.a_tri_maglim_faint, magnum=self.a_tri_filt_num,
-                tri_num_faint=self.a_tri_num_faint, trifilterset=self.a_tri_set_name,
-                trifiltnames=self.a_tri_filt_names, tri_hists=self.a_dens_hist_tri_list,
-                tri_magses=self.a_tri_model_mags_list, dtri_magses=self.a_tri_model_mags_interval_list,
-                tri_uncerts=self.a_tri_dens_uncert_list,
-                use_photometric_uncertainties=self.a_use_photometric_uncertainties, pregenerate_cutouts=True,
-                chunks=[self.chunk_id], n_r=self.real_hankel_points, n_rho=self.four_hankel_points,
-                max_rho=self.four_max_rho, mn_fit_type=self.a_mn_fit_type,
-                apply_proper_motion_flag=apply_proper_motion, pm_indices=pm_cols,
-                pm_ref_epoch_or_index=pm_ref_epoch_or_index, pm_move_to_epoch=pm_move_to_epoch)
-            ac(a_cat_name=self.a_ref_cat_csv_file_path, b_cat_name=self.a_cat_csv_file_path,
-               tri_download=self.a_download_tri, make_plots=True, overwrite_all_sightlines=True,
-               seeing_ranges=self.a_seeing_ranges)
-
-            if not os.path.isfile(self.a_cat_csv_file_path):
-                raise FileNotFoundError('Catalogue file not found in catalogue "a" path. '
-                                        'Please ensure photometric catalogue is correctly saved.')
-
-            if self.include_perturb_auf or self.a_correct_astrometry:
-                snr_cols = self.a_snr_indices
-            else:
-                snr_cols = None
-            if self.a_apply_proper_motion:
-                if isinstance(self.a_ref_epoch_or_index, str):
-                    pm_cols = self.a_pm_indices
-                    pm_ref_epoch = self.a_ref_epoch_or_index
-                else:
-                    pm_cols = np.append(self.a_pm_indices, self.a_ref_epoch_or_index)
-                    pm_ref_epoch = None
-                pm_move_to_epoch = self.move_to_epoch
-            else:
-                pm_cols, pm_ref_epoch, pm_move_to_epoch = None, None, None
-            # Having corrected the astrometry, we have to call csv_to_npy
-            # now, rather than pre-generating our binary input catalogues.
-            x = csv_to_npy(
-                self.a_cat_csv_file_path, self.a_pos_and_err_indices[0], self.a_mag_indices,
-                self.a_best_mag_index_col, self.a_chunk_overlap_col, snr_cols=snr_cols, header=False,
-                process_uncerts=True, astro_sig_fits_filepath=f'{self.a_correct_astro_save_folder}/npy',
-                cat_in_radec=self.a_auf_region_frame == 'equatorial',
-                mn_in_radec=self.a_auf_region_frame == 'equatorial', pm_cols=pm_cols,
-                pm_ref_epoch=pm_ref_epoch, pm_move_to_epoch=pm_move_to_epoch)
-            if snr_cols is not None:
-                # pylint: disable-next=unbalanced-tuple-unpacking
-                self.a_astro, self.a_photo, self.a_magref, self.a_in_overlaps, self.a_snr = x
-            else:
-                # pylint: disable-next=unbalanced-tuple-unpacking
-                self.a_astro, self.a_photo, self.a_magref, self.a_in_overlaps = x
-        else:
-            if not os.path.isfile(self.a_cat_csv_file_path):
-                raise FileNotFoundError('Catalogue file not found in catalogue "a" path. '
-                                        'Please ensure photometric catalogue is correctly saved.')
-
-            if self.include_perturb_auf or self.a_correct_astrometry:
-                snr_cols = self.a_snr_indices
-            else:
-                snr_cols = None
-            if self.a_apply_proper_motion:
-                if isinstance(self.a_ref_epoch_or_index, str):
-                    pm_cols = self.a_pm_indices
-                    pm_ref_epoch = self.a_ref_epoch_or_index
-                else:
-                    pm_cols = np.append(self.a_pm_indices, self.a_ref_epoch_or_index)
-                    pm_ref_epoch = None
-                pm_move_to_epoch = self.move_to_epoch
-            else:
-                pm_cols, pm_ref_epoch, pm_move_to_epoch = None, None, None
-            # Otherwise, just load the files without correcting anything.
-            x = csv_to_npy(
-                self.a_cat_csv_file_path, self.a_pos_and_err_indices, self.a_mag_indices,
-                self.a_best_mag_index_col, self.a_chunk_overlap_col, snr_cols=snr_cols, header=False,
-                pm_cols=pm_cols, pm_ref_epoch=pm_ref_epoch, pm_move_to_epoch=pm_move_to_epoch)
-            if snr_cols is not None:
-                # pylint: disable-next=unbalanced-tuple-unpacking
-                self.a_astro, self.a_photo, self.a_magref, self.a_in_overlaps, self.a_snr = x
-            else:
-                # pylint: disable-next=unbalanced-tuple-unpacking
-                self.a_astro, self.a_photo, self.a_magref, self.a_in_overlaps = x
-
+            derive_astrometric_corrections(self, 'a')
+        load_csv(self, 'a')
         if self.b_correct_astrometry:
-            # Generate from current data: just need the singular chunk mid-points
-            # and to leave all other parameters as they are.
-            if len(self.b_auf_region_points) > 1:
-                warnings.warn("b_auf_region_points contains more than one AUF sampling point, but "
-                              "b_correct_astrometry is True. Check results carefully.")
-            ax1_mids = np.array([self.b_auf_region_points[0, 0]])
-            ax2_mids = np.array([self.b_auf_region_points[0, 1]])
-            ax_dimension = 2
-            b_npy_or_csv = 'csv'
-            b_coord_or_chunk = 'chunk'
-        if self.b_correct_astrometry:
-            t = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            print(f"{t} Rank {self.rank}, chunk {self.chunk_id}: Calculating catalogue 'b' "
-                  "uncertainty corrections...")
-            apply_proper_motion = self.b_apply_proper_motion or self.b_ref_apply_proper_motion
-            if apply_proper_motion:
-                pm_cols, pm_ref_epoch_or_index = [None, None], [None, None]
-                pm_move_to_epoch = self.move_to_epoch
-                if self.b_apply_proper_motion:
-                    pm_cols[0] = self.b_pm_indices
-                    pm_ref_epoch_or_index[0] = self.b_ref_epoch_or_index
-                if self.b_ref_apply_proper_motion:
-                    pm_cols[1] = self.b_ref_pm_indices
-                    pm_ref_epoch_or_index[1] = self.b_ref_ref_epoch_or_index
-            else:
-                pm_cols, pm_ref_epoch_or_index, pm_move_to_epoch = None, None, None
-            ac = AstrometricCorrections(
-                self.b_psf_fwhms, self.num_trials, self.b_nn_radius, self.b_dens_dist,
-                self.b_correct_astro_save_folder, self.b_gal_wavs, self.b_gal_aboffsets,
-                self.b_gal_filternames, self.b_gal_al_avs, self.d_mag, self.b_dd_params,
-                self.b_l_cut, ax1_mids, ax2_mids, ax_dimension, self.b_correct_mag_array,
-                self.b_correct_mag_slice, self.b_correct_sig_slice, self.n_pool, b_npy_or_csv,
-                b_coord_or_chunk, self.b_pos_and_err_indices, self.b_mag_indices, self.b_snr_indices,
-                self.b_filt_names, self.b_correct_astro_mag_indices_index, self.b_auf_region_frame,
-                self.b_saturation_magnitudes, trifilepath=self.b_auf_file_path,
-                maglim_f=self.b_tri_maglim_faint, magnum=self.b_tri_filt_num,
-                tri_num_faint=self.b_tri_num_faint, trifilterset=self.b_tri_set_name,
-                trifiltnames=self.b_tri_filt_names, tri_hists=self.b_dens_hist_tri_list,
-                tri_magses=self.b_tri_model_mags_list, dtri_magses=self.b_tri_model_mags_interval_list,
-                tri_uncerts=self.b_tri_dens_uncert_list,
-                use_photometric_uncertainties=self.b_use_photometric_uncertainties,
-                pregenerate_cutouts=True, chunks=[self.chunk_id],
-                n_r=self.real_hankel_points, n_rho=self.four_hankel_points, max_rho=self.four_max_rho,
-                mn_fit_type=self.b_mn_fit_type, apply_proper_motion_flag=apply_proper_motion,
-                pm_indices=pm_cols, pm_ref_epoch_or_index=pm_ref_epoch_or_index,
-                pm_move_to_epoch=pm_move_to_epoch)
-            ac(a_cat_name=self.b_ref_cat_csv_file_path, b_cat_name=self.b_cat_csv_file_path,
-               tri_download=self.b_download_tri, make_plots=True, overwrite_all_sightlines=True,
-               seeing_ranges=self.b_seeing_ranges)
-
-            if not os.path.isfile(self.b_cat_csv_file_path):
-                raise FileNotFoundError('Catalogue file not found in catalogue "b" path. '
-                                        'Please ensure photometric catalogue is correctly saved.')
-
-            if self.include_perturb_auf or self.b_correct_astrometry:
-                snr_cols = self.b_snr_indices
-            else:
-                snr_cols = None
-            if self.b_apply_proper_motion:
-                if isinstance(self.b_ref_epoch_or_index, str):
-                    pm_cols = self.b_pm_indices
-                    pm_ref_epoch = self.b_ref_epoch_or_index
-                else:
-                    pm_cols = np.append(self.b_pm_indices, self.b_ref_epoch_or_index)
-                    pm_ref_epoch = None
-                pm_move_to_epoch = self.move_to_epoch
-            else:
-                pm_cols, pm_ref_epoch, pm_move_to_epoch = None, None, None
-            x = csv_to_npy(
-                self.b_cat_csv_file_path, self.b_pos_and_err_indices[0], self.b_mag_indices,
-                self.b_best_mag_index_col, self.b_chunk_overlap_col, snr_cols=snr_cols, header=False,
-                process_uncerts=True, astro_sig_fits_filepath=f'{self.b_correct_astro_save_folder}/npy',
-                cat_in_radec=self.b_auf_region_frame == 'equatorial',
-                mn_in_radec=self.b_auf_region_frame == 'equatorial', pm_cols=pm_cols,
-                pm_ref_epoch=pm_ref_epoch, pm_move_to_epoch=pm_move_to_epoch)
-            if snr_cols is not None:
-                # pylint: disable-next=unbalanced-tuple-unpacking
-                self.b_astro, self.b_photo, self.b_magref, self.b_in_overlaps, self.b_snr = x
-            else:
-                # pylint: disable-next=unbalanced-tuple-unpacking
-                self.b_astro, self.b_photo, self.b_magref, self.b_in_overlaps = x
-        else:
-            if not os.path.isfile(self.b_cat_csv_file_path):
-                raise FileNotFoundError('Catalogue file not found in catalogue "b" path. '
-                                        'Please ensure photometric catalogue is correctly saved.')
-
-            if self.include_perturb_auf or self.b_correct_astrometry:
-                snr_cols = self.b_snr_indices
-            else:
-                snr_cols = None
-            if self.b_apply_proper_motion:
-                if isinstance(self.b_ref_epoch_or_index, str):
-                    pm_cols = self.b_pm_indices
-                    pm_ref_epoch = self.b_ref_epoch_or_index
-                else:
-                    pm_cols = np.append(self.b_pm_indices, self.b_ref_epoch_or_index)
-                    pm_ref_epoch = None
-                pm_move_to_epoch = self.move_to_epoch
-            else:
-                pm_cols, pm_ref_epoch, pm_move_to_epoch = None, None, None
-            x = csv_to_npy(
-                self.b_cat_csv_file_path, self.b_pos_and_err_indices, self.b_mag_indices,
-                self.b_best_mag_index_col, self.b_chunk_overlap_col, snr_cols=snr_cols, header=False,
-                pm_cols=pm_cols, pm_ref_epoch=pm_ref_epoch, pm_move_to_epoch=pm_move_to_epoch)
-            if snr_cols is not None:
-                # pylint: disable-next=unbalanced-tuple-unpacking
-                self.b_astro, self.b_photo, self.b_magref, self.b_in_overlaps, self.b_snr = x
-            else:
-                # pylint: disable-next=unbalanced-tuple-unpacking
-                self.b_astro, self.b_photo, self.b_magref, self.b_in_overlaps = x
+            derive_astrometric_corrections(self, 'b')
+        load_csv(self, 'b')
 
         self.make_shared_data()
 

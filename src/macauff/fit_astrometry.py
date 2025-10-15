@@ -7,6 +7,7 @@ catalogue and one for which precisions are less well known.
 # pylint: disable=too-many-lines
 # pylint: disable=duplicate-code
 
+import datetime
 import os
 import shutil
 import sys
@@ -47,6 +48,74 @@ from macauff.perturbation_auf_fortran import perturbation_auf_fortran as paf
 # pylint: enable=wrong-import-position,import-error,no-name-in-module
 
 __all__ = ['AstrometricCorrections']
+
+
+def derive_astrometric_corrections(self, which):
+    """
+    Wrapper to set various parameters and call AstrometricCorrections,
+    for either catalogue "a" or "b".
+
+    Parameters
+    ----------
+    which : string
+        Either 'a' or 'b', indicating which side catalogue to fit.
+    """
+    # Generate from current data: just need the singular chunk mid-points
+    # and to leave all other parameters as they are.
+    if len(getattr(self, f'{which}_auf_region_points')) > 1:
+        warnings.warn(f"{which}_auf_region_points contains more than one AUF sampling point, but "
+                      f"{which}_correct_astrometry is True. Check results carefully.")
+    ax1_mids = np.array([getattr(self, f'{which}_auf_region_points')[0, 0]])
+    ax2_mids = np.array([getattr(self, f'{which}_auf_region_points')[0, 1]])
+    ax_dimension = 2
+    a_npy_or_csv = 'csv'
+    a_coord_or_chunk = 'chunk'
+    t = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    print(f"{t} Rank {self.rank}, chunk {self.chunk_id}: Calculating catalogue 'a' "
+          "uncertainty corrections...")
+    apply_proper_motion = (getattr(self, f'{which}_apply_proper_motion') or
+                           getattr(self, f'{which}_ref_apply_proper_motion'))
+    if apply_proper_motion:
+        pm_cols, pm_ref_epoch_or_index = [None, None], [None, None]
+        pm_move_to_epoch = self.move_to_epoch
+        if getattr(self, f'{which}_apply_proper_motion'):
+            pm_cols[0] = getattr(self, f'{which}_pm_indices')
+            pm_ref_epoch_or_index[0] = getattr(self, f'{which}_ref_epoch_or_index')
+        if getattr(self, f'{which}_ref_apply_proper_motion'):
+            pm_cols[1] = getattr(self, f'{which}_ref_pm_indices')
+            pm_ref_epoch_or_index[1] = getattr(self, f'{which}_ref_ref_epoch_or_index')
+    else:
+        pm_cols, pm_ref_epoch_or_index, pm_move_to_epoch = None, None, None
+    ac = AstrometricCorrections(
+        getattr(self, f'{which}_psf_fwhms'), self.num_trials, getattr(self, f'{which}_nn_radius'),
+        getattr(self, f'{which}_dens_dist'), getattr(self, f'{which}_correct_astro_save_folder'),
+        getattr(self, f'{which}_gal_wavs'), getattr(self, f'{which}_gal_aboffsets'),
+        getattr(self, f'{which}_gal_filternames'), getattr(self, f'{which}_gal_al_avs'), self.d_mag,
+        getattr(self, f'{which}_dd_params'), getattr(self, f'{which}_l_cut'), ax1_mids, ax2_mids,
+        ax_dimension, getattr(self, f'{which}_correct_mag_array'),
+        getattr(self, f'{which}_correct_mag_slice'), getattr(self, f'{which}_correct_sig_slice'), self.n_pool,
+        a_npy_or_csv, a_coord_or_chunk, getattr(self, f'{which}_pos_and_err_indices'),
+        getattr(self, f'{which}_mag_indices'), getattr(self, f'{which}_snr_indices'),
+        getattr(self, f'{which}_filt_names'), getattr(self, f'{which}_correct_astro_mag_indices_index'),
+        getattr(self, f'{which}_auf_region_frame'), getattr(self, f'{which}_saturation_magnitudes'),
+        trifilepath=getattr(self, f'{which}_auf_file_path'),
+        maglim_f=getattr(self, f'{which}_tri_maglim_faint'), magnum=getattr(self, f'{which}_tri_filt_num'),
+        tri_num_faint=getattr(self, f'{which}_tri_num_faint'),
+        trifilterset=getattr(self, f'{which}_tri_set_name'),
+        trifiltnames=getattr(self, f'{which}_tri_filt_names'),
+        tri_hists=getattr(self, f'{which}_dens_hist_tri_list'),
+        tri_magses=getattr(self, f'{which}_tri_model_mags_list'),
+        dtri_magses=getattr(self, f'{which}_tri_model_mags_interval_list'),
+        tri_uncerts=getattr(self, f'{which}_tri_dens_uncert_list'),
+        use_photometric_uncertainties=getattr(self, f'{which}_use_photometric_uncertainties'),
+        pregenerate_cutouts=True, chunks=[self.chunk_id], n_r=self.real_hankel_points,
+        n_rho=self.four_hankel_points, max_rho=self.four_max_rho,
+        mn_fit_type=getattr(self, f'{which}_mn_fit_type'), apply_proper_motion_flag=apply_proper_motion,
+        pm_indices=pm_cols, pm_ref_epoch_or_index=pm_ref_epoch_or_index, pm_move_to_epoch=pm_move_to_epoch)
+    ac(a_cat_name=getattr(self, f'{which}_ref_cat_csv_file_path'),
+       b_cat_name=getattr(self, f'{which}_cat_csv_file_path'),
+       tri_download=getattr(self, f'{which}_download_tri'), make_plots=True, overwrite_all_sightlines=True,
+       seeing_ranges=getattr(self, f'{which}_seeing_ranges'))
 
 
 # pylint: disable=too-many-instance-attributes,too-many-statements,too-many-locals
