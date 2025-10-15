@@ -1282,14 +1282,14 @@ class TestInputs:
         # Test all of the inputs being needed one by one loading into cat_a_params:
         dd_l_path = os.path.join(os.path.dirname(__file__), 'data')
         lines = [f'correct_astrometry: True\n\ndd_params_path: {dd_l_path}\nl_cut_path: {dd_l_path}',
-                 '\nref_apply_proper_motion: False', '\nsnr_indices: [4, 6, 8]',
+                 '\nsnr_indices: [4, 6, 8]', '\nref_apply_proper_motion: False',
                  '\ncorrect_astro_save_folder: ac_folder', '\ncorrect_astro_mag_indices_index: 0',
                  '\nnn_radius: 30', '\nref_cat_csv_file_path: ref_{}.csv',
                  '\ncorrect_mag_array: [[14.07, 14.17, 14.27, 14.37, 14.47]]',
                  '\ncorrect_mag_slice: [[0.05, 0.05, 0.05, 0.05, 0.05]]',
                  '\ncorrect_sig_slice: [[0.1, 0.1, 0.1, 0.1, 0.1]]', '\nuse_photometric_uncertainties: False',
                  '\nmn_fit_type: quadratic', '\nseeing_ranges: [0.9, 1.1]']
-        for i, key in enumerate(['ref_apply_proper_motion', 'snr_indices', 'correct_astro_save_folder',
+        for i, key in enumerate(['snr_indices', 'ref_apply_proper_motion', 'correct_astro_save_folder',
                                  'correct_astro_mag_indices_index', 'nn_radius', 'ref_cat_csv_file_path',
                                  'correct_mag_array', 'correct_mag_slice', 'correct_sig_slice',
                                  'use_photometric_uncertainties', 'mn_fit_type', 'seeing_ranges']):
