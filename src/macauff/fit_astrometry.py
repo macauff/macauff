@@ -73,9 +73,9 @@ def derive_astrometric_corrections(self, which):
     t = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     print(f"{t} Rank {self.rank}, chunk {self.chunk_id}: Calculating catalogue 'a' "
           "uncertainty corrections...")
-    apply_proper_motion = (getattr(self, f'{which}_apply_proper_motion') or
-                           getattr(self, f'{which}_ref_apply_proper_motion'))
-    if apply_proper_motion:
+    apply_pm = (getattr(self, f'{which}_apply_proper_motion') or
+                getattr(self, f'{which}_ref_apply_proper_motion'))
+    if apply_pm:
         pm_cols, pm_ref_epoch_or_index = [None, None], [None, None]
         pm_move_to_epoch = self.move_to_epoch
         if getattr(self, f'{which}_apply_proper_motion'):

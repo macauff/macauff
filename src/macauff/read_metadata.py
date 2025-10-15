@@ -1,8 +1,14 @@
-import os
-import yaml
+# Licensed under a 3-clause BSD style license - see LICENSE
+'''
+Module for reading the metadata that macauff requires to set various flags and input
+parameters for running cross-matches.
+'''
 
-from astropy.time import Time
+import os
+
 import numpy as np
+import yaml
+from astropy.time import Time
 
 
 # pylint: disable=too-many-statements,too-many-branches
@@ -28,30 +34,30 @@ def read_metadata(self):
     with open(self.cat_b_params_file_path, encoding='utf-8') as f:
         cat_b_config = yaml.safe_load(f)
 
-    joint_config, cat_a_config, cat_b_config = _read_metadata_common(
-        self, joint_config, cat_a_config, cat_b_config)
+    joint_config, cat_a_config, cat_b_config = _read_metadata_common(joint_config, cat_a_config, cat_b_config)
 
     joint_config, cat_a_config, cat_b_config = _read_metadata_perturb_auf(
-        self, joint_config, cat_a_config, cat_b_config)
+        joint_config, cat_a_config, cat_b_config)
 
     if cat_a_config['correct_astrometry'] or cat_b_config['correct_astrometry']:
         joint_config, cat_a_config, cat_b_config = _read_metadata_correct_astro(
-            self, joint_config, cat_a_config, cat_b_config)
+            joint_config, cat_a_config, cat_b_config)
 
     if joint_config["make_output_csv"]:
         joint_config, cat_a_config, cat_b_config = _read_metadata_csv(
-            self, joint_config, cat_a_config, cat_b_config)
+            joint_config, cat_a_config, cat_b_config)
 
+    # pylint: disable-next=too-many-boolean-expressions
     if (cat_a_config['apply_proper_motion'] or cat_b_config['apply_proper_motion'] or
             (cat_a_config['correct_astrometry'] and cat_a_config['ref_apply_proper_motion']) or
             (cat_b_config['correct_astrometry'] and cat_b_config['ref_apply_proper_motion'])):
         joint_config, cat_a_config, cat_b_config = _read_metadata_pm(
-            self, joint_config, cat_a_config, cat_b_config)
+            joint_config, cat_a_config, cat_b_config)
 
     return joint_config, cat_a_config, cat_b_config
 
 
-def _read_metadata_common(self, joint_config, cat_a_config, cat_b_config):
+def _read_metadata_common(joint_config, cat_a_config, cat_b_config):
     """
     Read metadata from input config files that are common to all match runs.
 
@@ -256,7 +262,7 @@ def _read_metadata_common(self, joint_config, cat_a_config, cat_b_config):
     return joint_config, cat_a_config, cat_b_config
 
 
-def _read_metadata_perturb_auf(self, joint_config, cat_a_config, cat_b_config):
+def _read_metadata_perturb_auf(joint_config, cat_a_config, cat_b_config):
     """
     Read metadata from input config files relating to the simulation of position
     shifts due to unresolved, contaminant sources inside detections' PSFs.
@@ -561,7 +567,7 @@ def _read_metadata_perturb_auf(self, joint_config, cat_a_config, cat_b_config):
     return joint_config, cat_a_config, cat_b_config
 
 
-def _read_metadata_correct_astro(self, joint_config, cat_a_config, cat_b_config):
+def _read_metadata_correct_astro(joint_config, cat_a_config, cat_b_config):
     """
     Read metadata from input config files relating to the correction of astrometric
     precisions by the use of standard deviations of truth-measured residuals.
@@ -715,7 +721,7 @@ def _read_metadata_correct_astro(self, joint_config, cat_a_config, cat_b_config)
     return joint_config, cat_a_config, cat_b_config
 
 
-def _read_metadata_csv(self, joint_config, cat_a_config, cat_b_config):
+def _read_metadata_csv(joint_config, cat_a_config, cat_b_config):
     """
     Read metadata from input config files relating to outputting combined
     .csv files during the post-process step, if requested.
@@ -809,7 +815,7 @@ def _read_metadata_csv(self, joint_config, cat_a_config, cat_b_config):
     return joint_config, cat_a_config, cat_b_config
 
 
-def _read_metadata_pm(self, joint_config, cat_a_config, cat_b_config):
+def _read_metadata_pm(joint_config, cat_a_config, cat_b_config):
     """
     Read metadata from input config files relating to the handling of
     proper motions, if applied to any catalogues involved in the cross-match.
