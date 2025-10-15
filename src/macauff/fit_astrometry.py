@@ -110,7 +110,7 @@ def derive_astrometric_corrections(self, which):
         use_photometric_uncertainties=getattr(self, f'{which}_use_photometric_uncertainties'),
         pregenerate_cutouts=True, chunks=[self.chunk_id], n_r=self.real_hankel_points,
         n_rho=self.four_hankel_points, max_rho=self.four_max_rho,
-        mn_fit_type=getattr(self, f'{which}_mn_fit_type'), apply_proper_motion_flag=apply_proper_motion,
+        mn_fit_type=getattr(self, f'{which}_mn_fit_type'), apply_proper_motion_flag=apply_pm,
         pm_indices=pm_cols, pm_ref_epoch_or_index=pm_ref_epoch_or_index, pm_move_to_epoch=pm_move_to_epoch)
     ac(a_cat_name=getattr(self, f'{which}_ref_cat_csv_file_path'),
        b_cat_name=getattr(self, f'{which}_cat_csv_file_path'),
