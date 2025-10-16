@@ -9,6 +9,7 @@ import datetime
 import os
 import sys
 from time import sleep
+from importlib import resources
 
 import numpy as np
 
@@ -76,6 +77,8 @@ class CrossMatch():
         self.cat_a_params_file_path = cat_a_params_file_path
         self.cat_b_params_file_path = cat_b_params_file_path
 
+        self.load_psf_auf_params()
+
         # Initialise MPI if available and enabled
         if MPI is not None and use_mpi:
             self.comm = MPI.COMM_WORLD
@@ -140,6 +143,13 @@ class CrossMatch():
             else:
                 self.end_time = None
                 self.end_within = None
+
+    def load_psf_auf_params(self):
+        # Only need dd_params or l_cut if we're using run_psf_auf or
+        # correct_astrometry is True.
+        for name in ['dd_params', 'l_cut']:
+            with resources.files("macauff.data").joinpath(f"{name}.npy").open("rb") as f:
+                setattr(self, name, np.load(f))
 
     def _initialise_chunk(self):  # pylint: disable=too-many-branches,too-many-statements
         '''
