@@ -124,9 +124,9 @@ subroutine perturb_aufs(Narray, magarray, r, dr, rbins, j0s, mag_D, dmag_D, Ds, 
         end do
         write(*, *) dNs
         write(*, *) "===="
-        write(*, *) Ds(mag_Dindex+k-1)
+        write(*, *) Ds(mag_Dindex:mag_Dindex-1+lendm)
         write(*, *) "===="
-        write(*, *) dmag_D(mag_Dindex+k-1)
+        write(*, *) dmag_D(mag_Dindex:mag_Dindex-1+lendm)
         maxk = max(5, int(10*maxval(dNs)))
         write(*, *) "===="
         write(*, *) maxk
