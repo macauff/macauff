@@ -91,7 +91,7 @@ def derive_astrometric_corrections(self, which):
         getattr(self, f'{which}_dens_dist'), getattr(self, f'{which}_correct_astro_save_folder'),
         getattr(self, f'{which}_gal_wavs'), getattr(self, f'{which}_gal_aboffsets'),
         getattr(self, f'{which}_gal_filternames'), getattr(self, f'{which}_gal_al_avs'), self.d_mag,
-        getattr(self, f'{which}_dd_params'), getattr(self, f'{which}_l_cut'), ax1_mids, ax2_mids,
+        getattr(self, 'dd_params'), getattr(self, 'l_cut'), ax1_mids, ax2_mids,
         ax_dimension, getattr(self, f'{which}_correct_mag_array'),
         getattr(self, f'{which}_correct_mag_slice'), getattr(self, f'{which}_correct_sig_slice'), self.n_pool,
         a_npy_or_csv, a_coord_or_chunk, getattr(self, f'{which}_pos_and_err_indices'),
