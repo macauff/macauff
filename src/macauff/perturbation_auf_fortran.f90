@@ -122,7 +122,14 @@ subroutine perturb_aufs(Narray, magarray, r, dr, rbins, j0s, mag_D, dmag_D, Ds, 
             dms(k) = mag_D(mag_Dindex+k-1) - mag
             ddms(k) = dmag_D(mag_Dindex+k-1)
         end do
+        write(*, *) dNs
+        write(*, *) "===="
+        write(*, *) Ds(mag_Dindex+k-1)
+        write(*, *) "===="
+        write(*, *) dmag_D(mag_Dindex+k-1)
         maxk = max(5, int(10*maxval(dNs)))
+        write(*, *) "===="
+        write(*, *) maxk
         call scatter_perturbers(dNs, dms, psfr, maxk, dmcut, psfsig, offsets, fraccontam, fluxcontam, dd_params, l_cut, ddms, &
                                 algorithm_type, lentrials, seed(:, j))
         call histogram1d_dp(offsets, rbins(1), rbins(size(rbins)), size(r), midr, hist)
