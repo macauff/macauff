@@ -8,8 +8,8 @@ This module provides the high-level framework for performing catalogue-catalogue
 import datetime
 import os
 import sys
-from time import sleep
 from importlib import resources
+from time import sleep
 
 import numpy as np
 
@@ -145,6 +145,9 @@ class CrossMatch():
                 self.end_within = None
 
     def load_psf_auf_params(self):
+        '''
+        Load PSF AUF parameters from package data to class attributes.
+        '''
         # Only need dd_params or l_cut if we're using run_psf_auf or
         # correct_astrometry is True.
         for name in ['dd_params', 'l_cut']:
@@ -447,17 +450,10 @@ class CrossMatch():
         if self.rank == 0 and self.resume_file is not None:
             self.resume_file.close()
 
-    def _load_metadata_config_files(self, chunk_id):
+    def _load_metadata_config_files(self):
         '''
         Load per-chunk class variables from the paths in the stored parameter
         metadata files.
-
-        Parameters
-        ----------
-        chunk_id : string
-            Identifier for extraction of single element of metadata parameters
-            that vary on a per-chunk basis, rather than being fixed for the
-            entire catalogue/cross-match run, across all regions.
         '''
         # Ensure that we can save to the folders for outputs.
         try:
@@ -584,7 +580,7 @@ class CrossMatch():
             entire catalogue/cross-match run, across all regions.
         '''
         self._load_metadata_config_params(chunk_id)
-        self._load_metadata_config_files(chunk_id)
+        self._load_metadata_config_files()
 
 
     def _make_regions_points(self, region_type, region_points, chunk_id):
