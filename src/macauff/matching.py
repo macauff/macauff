@@ -447,7 +447,58 @@ class CrossMatch():
         if self.rank == 0 and self.resume_file is not None:
             self.resume_file.close()
 
-    def _load_metadata_config(self, chunk_id):
+    def _load_metadata_config_files(self, chunk_id):
+        '''
+        Load per-chunk class variables from the paths in the stored parameter
+        metadata files.
+
+        Parameters
+        ----------
+        chunk_id : string
+            Identifier for extraction of single element of metadata parameters
+            that vary on a per-chunk basis, rather than being fixed for the
+            entire catalogue/cross-match run, across all regions.
+        '''
+        # Ensure that we can save to the folders for outputs.
+        try:
+            os.makedirs(self.output_save_folder, exist_ok=True)
+        except OSError as exc:
+            raise OSError("Error when trying to create folder to store output csv files in. Please "
+                          "ensure that output_save_folder is correct in joint config file.") from exc
+
+        for catname, flag in zip(['"a"', '"b"'], ['a_', 'b_']):
+            if (not os.path.exists(getattr(self, f'{flag[0]}_cat_csv_file_path')) or
+                    not os.path.isfile(getattr(self, f'{flag[0]}_cat_csv_file_path'))):
+                raise OSError(f'{flag}cat_csv_file_path does not exist. Please ensure that '
+                              f'path for catalogue {catname} is correct.')
+            if getattr(self, f'{flag[0]}_auf_file_path') is not None:
+                try:
+                    os.makedirs(os.path.dirname(getattr(self, f'{flag[0]}_auf_file_path')), exist_ok=True)
+                except OSError as exc:
+                    raise OSError(f"Error when trying to create temporary folder for catalogue {catname} AUF "
+                                  f"outputs. Please ensure that {flag}auf_file_path is correct.") from exc
+        # Force auf_file_path to have two ``_{}`` string formats in it, now
+        # that we have filled in the original one with the chunk ID; these are
+        # for inter-chunk AUF pointings, stored by coordinate in the filename.
+        if self.a_auf_file_path is not None:  # pylint: disable=access-member-before-definition
+            x, y = os.path.splitext(self.a_auf_file_path)  # pylint: disable=access-member-before-definition
+            self.a_auf_file_path = x + r"_{:.2f}_{:.2f}" + y
+        if self.b_auf_file_path is not None:  # pylint: disable=access-member-before-definition
+            x, y = os.path.splitext(self.b_auf_file_path)  # pylint: disable=access-member-before-definition
+            self.b_auf_file_path = x + r"_{:.2f}_{:.2f}" + y
+
+
+        for config, flag in zip([self.cat_a_params_dict, self.cat_b_params_dict], ['a_', 'b_']):
+            if self.crossmatch_params_dict['include_perturb_auf'] or config['correct_astrometry']:
+                for name in ['dens_hist_tri', 'tri_model_mags', 'tri_model_mag_mids',
+                             'tri_model_mags_interval', 'tri_dens_uncert', 'tri_n_bright_sources_star']:
+                    # If location variable was "None" in the first place we set
+                    # {name}_list in config to a list of Nones and it got updated
+                    # above already.
+                    if config[f'{name}_location'] != "None":
+                        setattr(self, f'{flag}{name}_list', np.load(config[f'{name}_location']))
+
+    def _load_metadata_config_params(self, chunk_id):
         '''
         Generate per-chunk class variables from the three stored parameter
         metadata files.
@@ -488,34 +539,6 @@ class CrossMatch():
                     _item = np.array(item) if item is list else item
                     setattr(self, f'{cat_prefix}{key}', _item)
 
-        # Ensure that we can save to the folders for outputs.
-        try:
-            os.makedirs(self.output_save_folder, exist_ok=True)
-        except OSError as exc:
-            raise OSError("Error when trying to create folder to store output csv files in. Please "
-                          "ensure that output_save_folder is correct in joint config file.") from exc
-
-        for catname, flag in zip(['"a"', '"b"'], ['a_', 'b_']):
-            if (not os.path.exists(getattr(self, f'{flag[0]}_cat_csv_file_path')) or
-                    not os.path.isfile(getattr(self, f'{flag[0]}_cat_csv_file_path'))):
-                raise OSError(f'{flag}cat_csv_file_path does not exist. Please ensure that '
-                              f'path for catalogue {catname} is correct.')
-            if getattr(self, f'{flag[0]}_auf_file_path') is not None:
-                try:
-                    os.makedirs(os.path.dirname(getattr(self, f'{flag[0]}_auf_file_path')), exist_ok=True)
-                except OSError as exc:
-                    raise OSError(f"Error when trying to create temporary folder for catalogue {catname} AUF "
-                                  f"outputs. Please ensure that {flag}auf_file_path is correct.") from exc
-        # Force auf_file_path to have two ``_{}`` string formats in it, now
-        # that we have filled in the original one with the chunk ID; these are
-        # for inter-chunk AUF pointings, stored by coordinate in the filename.
-        if self.a_auf_file_path is not None:  # pylint: disable=access-member-before-definition
-            x, y = os.path.splitext(self.a_auf_file_path)  # pylint: disable=access-member-before-definition
-            self.a_auf_file_path = x + r"_{:.2f}_{:.2f}" + y
-        if self.b_auf_file_path is not None:  # pylint: disable=access-member-before-definition
-            x, y = os.path.splitext(self.b_auf_file_path)  # pylint: disable=access-member-before-definition
-            self.b_auf_file_path = x + r"_{:.2f}_{:.2f}" + y
-
         for config, catname in zip([self.cat_a_params_dict, self.cat_b_params_dict], ['a_', 'b_']):
             ind = np.where(chunk_id == np.array(config['chunk_id_list']))[0][0]
             self._make_regions_points([f'{catname}auf_region_type', config['auf_region_type']],
@@ -529,23 +552,6 @@ class CrossMatch():
                                    self.crossmatch_params_dict['cf_region_points_per_chunk'][ind]],
                                   self.crossmatch_params_dict['chunk_id_list'][ind])
 
-        for config, flag in zip([self.cat_a_params_dict, self.cat_b_params_dict], ['a_', 'b_']):
-            # Only need dd_params or l_cut if we're using run_psf_auf or
-            # correct_astrometry is True.
-            if (self.crossmatch_params_dict['include_perturb_auf'] and
-                    config['run_psf_auf']) or config['correct_astrometry']:
-                for check_flag, f in zip(['dd_params_path', 'l_cut_path'], ['dd_params', 'l_cut']):
-                    setattr(self, f'{flag}{f}', np.load(f'{config[check_flag]}/{f}.npy'))
-
-        for config, flag in zip([self.cat_a_params_dict, self.cat_b_params_dict], ['a_', 'b_']):
-            if self.crossmatch_params_dict['include_perturb_auf'] or config['correct_astrometry']:
-                for name in ['dens_hist_tri', 'tri_model_mags', 'tri_model_mag_mids',
-                             'tri_model_mags_interval', 'tri_dens_uncert', 'tri_n_bright_sources_star']:
-                    # If location variable was "None" in the first place we set
-                    # {name}_list in config to a list of Nones and it got updated
-                    # above already.
-                    if config[f'{name}_location'] != "None":
-                        setattr(self, f'{flag}{name}_list', np.load(config[f'{name}_location']))
         for config, flag in zip([self.cat_a_params_dict, self.cat_b_params_dict], ['a_', 'b_']):
             if config['correct_astrometry']:
                 if not config['use_photometric_uncertainties']:
@@ -564,6 +570,22 @@ class CrossMatch():
                 # Otherwise we only need three elements, so we just store them
                 # in a (3,) shape array.
                 setattr(self, f'{flag}pos_and_err_indices', config['pos_and_err_indices'])
+
+    def _load_metadata_config(self, chunk_id):
+        '''
+        Generate per-chunk class variables from the three stored parameter
+        metadata files.
+
+        Parameters
+        ----------
+        chunk_id : string
+            Identifier for extraction of single element of metadata parameters
+            that vary on a per-chunk basis, rather than being fixed for the
+            entire catalogue/cross-match run, across all regions.
+        '''
+        self._load_metadata_config_params(chunk_id)
+        self._load_metadata_config_files(chunk_id)
+
 
     def _make_regions_points(self, region_type, region_points, chunk_id):
         '''
