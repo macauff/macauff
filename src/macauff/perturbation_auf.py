@@ -768,6 +768,8 @@ def create_single_perturb_auf(r, dr, j0s, num_trials, psf_fwhm, density_mag, a_p
 
     psf_sig = psf_fwhm / (2 * np.sqrt(2 * np.log(2)))
 
+    print("python", count_array, model_count)
+
     if run_fw:
         frac_fw, flux_fw, fourieroffset_fw, offset_fw, cumulative_fw = paf.perturb_aufs(
             count_array, mag_array, r[:-1]+dr/2, dr, r, j0s.T,
