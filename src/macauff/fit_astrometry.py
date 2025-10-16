@@ -1175,7 +1175,7 @@ class AstrometricCorrections:
 
         mag_slice = (tri_mags >= minmag) & (tri_mags+dtri_mags <= maxmag)
         n_norm = np.sum(10**log10y[mag_slice] * dtri_mags[mag_slice])
-        print("1 -- ", log10y, 10**log10y, dtri_mags, mag_slice, n_norm)
+        print("1 -- ", log10y, 10**log10y, dtri_mags, mag_slice, n_norm, ";", tri_mags, minmag, maxmag)
         self.log10y, self.dlog10y = log10y, dlog10y
         self.tri_hist, self.tri_mags, self.dtri_mags = tri_hist, tri_mags, dtri_mags
         self.tri_uncert, self.gal_dns = tri_uncert, gal_dns
