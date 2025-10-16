@@ -67,6 +67,8 @@ API Changes
   SNRs are required as inputs and hence it is no longer necessary to compute the
   the scaling with magnitude. [#91]
 
+- Removed the ``SNRMagnitudeRelationship`` class as it is no longer needed. [#91]
+
 - ``correct_mag_array``, ``correct_mag_slice``, and ``correct_sig_slice`` require,
   both as inputs to ``CrossMatch`` but generally through to
   ``AstrometricCorrections``, per-band lists of such parameters if photometric
