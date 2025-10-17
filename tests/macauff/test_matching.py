@@ -1354,7 +1354,7 @@ class TestInputs:
             text = text + (
                 '1   6.65 -0.39  0.02415 -2.701 3.397  4.057 14.00  8.354 0.00 25.523 25.839 ' +
                 '24.409 23.524 22.583 22.387 22.292 22.015 21.144 19.380 20.878 '
-                f'{w1} 22.391 21.637 21.342  0.024\n ')
+                f'{w1} {w1} {w1} {w1}  0.024\n ')
         with open('wise_auf_folder/trilegal_download_9_131.00_-1.00_faint.dat', "w",
                   encoding='utf-8') as f:
             f.write(text)
