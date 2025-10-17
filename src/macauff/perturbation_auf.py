@@ -74,8 +74,8 @@ def make_perturb_aufs(cm, which_cat):
         run_psf = getattr(cm, f'{which_cat}_run_psf_auf')
         al_avs = getattr(cm, f'{which_cat}_gal_al_avs')
         if run_psf:
-            dd_params = getattr(cm, f'{which_cat}_dd_params')
-            l_cut = getattr(cm, f'{which_cat}_l_cut')
+            dd_params = getattr(cm, 'dd_params')
+            l_cut = getattr(cm, 'l_cut')
         else:
             # Fake arrays to pass only to run_fw that fortran will accept:
             dd_params = np.zeros((1, 1), float)

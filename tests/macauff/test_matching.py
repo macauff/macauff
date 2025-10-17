@@ -579,8 +579,8 @@ class TestInputs:
         cm = CrossMatch(mock_filename(cm_p_.encode("utf-8")), mock_filename(ca_p_.encode("utf-8")),
                         mock_filename(cb_p_.encode("utf-8")))
         cm._load_metadata_config(self.chunk_id)
-        assert not hasattr(cm, 'a_dd_params_path')
-        assert not hasattr(cm, 'b_l_cut_path')
+        assert not hasattr(cm, 'dd_params_path')
+        assert not hasattr(cm, 'l_cut_path')
 
         for cat_reg in ['"a"', '"b"']:
             if cat_reg[1] == 'a':
@@ -609,12 +609,12 @@ class TestInputs:
                 'dd_params', 'dd_params', 'dd_params', 'dd_params', 'l_cut', 'l_cut'],
                 [np.ones(5, float), np.ones((5, 3), float), np.ones((4, 4, 2), float),
                  np.ones((5, 3, 1), float), np.ones((4, 2), float), np.ones(4, float)],
-                [r'a_dd_params should be of shape \(5, X, 2\)',
-                 r'a_dd_params should be of shape \(5, X, 2\)',
-                 r'a_dd_params should be of shape \(5, X, 2\)',
-                 r'a_dd_params should be of shape \(5, X, 2\)',
-                 r'a_l_cut should be of shape \(3,\) only.',
-                 r'a_l_cut should be of shape \(3,\) only.']):
+                [r'dd_params should be of shape \(5, X, 2\)',
+                 r'dd_params should be of shape \(5, X, 2\)',
+                 r'dd_params should be of shape \(5, X, 2\)',
+                 r'dd_params should be of shape \(5, X, 2\)',
+                 r'l_cut should be of shape \(3,\) only.',
+                 r'l_cut should be of shape \(3,\) only.']):
             np.save(f"{fn}.npy", array)
             with pytest.raises(ValueError, match=err_msg):
                 cm = CrossMatch(mock_filename(cm_p_.encode("utf-8")),
@@ -1629,7 +1629,7 @@ class TestInputs:
                  'chunk_overlap_col should be an integer in the catalogue "a"',
                  'best_mag_index_col should be an integer in the catalogue "a"',
                  'best_mag_index_col should be an integer in the catalogue "b"',
-                 'b_dd_params_path does not exist. Please ensure that path for catalogue "b"',
+                 'dd_params_path does not exist. Please ensure that path for catalogue "b"',
                  'l_cut file not found in catalogue "a" path. Please ensure PSF ']):
             z, lines = (ca_p_2, lines_a) if x == 'a' else (cb_p_2, lines_b)
             ind = np.where([old_line in x for x in lines])[0][0]
