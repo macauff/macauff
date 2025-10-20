@@ -152,7 +152,12 @@ class CrossMatch():
         # correct_astrometry is True.
         for name in ['dd_params', 'l_cut']:
             with resources.files("macauff.data").joinpath(f"{name}.npy").open("rb") as f:
-                setattr(self, name, np.load(f))
+                a = np.load(f)
+                if name == 'dd_params' and not (len(a.shape) == 3 and a.shape[0] == 5 and a.shape[2] == 2):
+                    raise ValueError('dd_params should be of shape (5, X, 2).')
+                if name == 'l_cut' and not (len(a.shape) == 1 and a.shape[0] == 3):
+                    raise ValueError('l_cut should be of shape (3,) only.')
+                setattr(self, name, a)
 
     def _initialise_chunk(self):  # pylint: disable=too-many-branches,too-many-statements
         '''

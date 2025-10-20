@@ -160,10 +160,6 @@ those that are only required if the `Joint Parameters`_ option ``include_perturb
 
 ``fit_gal_flag``, ``run_fw_auf``, ``run_psf_auf``, ``psf_fwhms``, ``download_tri``, ``tri_set_name``, ``tri_filt_names``, ``tri_filt_num``, ``tri_maglim_faint``, ``tri_num_faint``, ``gal_al_avs``, ``dens_dist``, ``snr_indices``, ``dens_hist_tri_location``, ``tri_model_mags_location``, ``tri_model_mag_mids_location``, ``tri_model_mags_interval_location``, and ``tri_n_bright_sources_star_location``;
 
-parameters required if ``run_psf_auf`` is ``True``:
-
-``dd_params_path`` and ``l_cut_path``;
-
 the inputs required in each catalogue parameters file if ``fit_gal_flag`` is ``True`` (and hence ``include_perturb_auf`` is ``True``):
 
 ``gal_wavs``, ``gal_zmax``, ``gal_nzs``, ``gal_aboffsets``, and ``gal_filternames``;
@@ -177,7 +173,7 @@ the inputs required if ``correct_astrometry`` is ``True``:
 ``correct_astro_save_folder``, ``correct_astro_mag_indices_index``, ``nn_radius``, ``ref_cat_csv_file_path``, ``correct_mag_array``, ``correct_mag_slice``, ``correct_sig_slice``, ``use_photometric_uncertainties``, ``saturation_magnitudes``, and ``ref_apply_proper_motion``;
 
 .. note::
-    ``run_fw_auf``, ``run_psf_auf``, ``psf_fwhms``, ``download_tri``, ``tri_set_name``, ``tri_filt_names``, ``tri_filt_num``, ``tri_maglim_faint``, ``tri_num_faint``, ``dens_dist``, ``dd_params_path``, ``l_cut_path``, ``gal_wavs``, ``gal_zmax``, ``gal_nzs``, ``gal_aboffsets``, ``gal_filternames``, ``gal_al_avs``, and ``snr_indices`` are all currently required if ``correct_astrometry`` is ``True``, bypassing the nested flags above. For example, ``dens_dist`` is required as an input if ``include_perturb_auf`` is ``True``, or if ``correct_astrometry`` is set. This means that ``AstrometricCorrections`` implicitly always runs and fits for a full Astrometric Uncertainty Function.
+    ``run_fw_auf``, ``run_psf_auf``, ``psf_fwhms``, ``download_tri``, ``tri_set_name``, ``tri_filt_names``, ``tri_filt_num``, ``tri_maglim_faint``, ``tri_num_faint``, ``dens_dist``, ``gal_wavs``, ``gal_zmax``, ``gal_nzs``, ``gal_aboffsets``, ``gal_filternames``, ``gal_al_avs``, and ``snr_indices`` are all currently required if ``correct_astrometry`` is ``True``, bypassing the nested flags above. For example, ``dens_dist`` is required as an input if ``include_perturb_auf`` is ``True``, or if ``correct_astrometry`` is set. This means that ``AstrometricCorrections`` implicitly always runs and fits for a full Astrometric Uncertainty Function.
 
 the inputs required if ``apply_proper_motion`` is ``True``:
 
@@ -317,14 +313,6 @@ The location on disk of a numpy array, shape ``(len(filt_names), M)`` where ``M`
 
 The location on disk of a ``.npy`` file containing the number of simulated bright TRILEGAL objects in the input simulation, one per filter. Should be a 1-D numpy array of shape ``(len(filt_names),)``. Alternatively, should be ``None`` if ``auf_file_path`` and associated parameters for the running of TRILEGAL histogram generation within the cross-match run are given. If not ``None``, must have a consistent formatting string which contains ``_{}`` for per-chunk loading with a single string input.
 
-``dd_params_path``
-
-File path containin the ``.npy`` file describing the parameterisations of perturbation offsets due to single hidden contaminating, perturbing objects in the ``run_psf_auf`` background-dominated, PSF photometry algorithm case. See pre-processing documentation for more details on this, and how to generate this file if necessary.
-
-``l_cut_path``
-
-Alongside ``dd_params_path``, path to the ``.npy`` file containing the limiting flux cuts at which various PSF photometry perturbation algorithms apply. See pre-processing documentation for the specifics and how to generate this file if necesssary.
-
 ``dens_dist``
 
 The radius, in arcseconds, within which to count internal catalogue sources for each object, to calculate the local source density. Used to scale TRILEGAL simulated source counts to match smaller scale density fluctuations. Only required if ``include_perturb_auf`` is ``True``.
@@ -457,8 +445,6 @@ The inter-dependency of input parameters on one another, and the output ``CrossM
     │                     ├─* psf_fwhms
     │                     ├─* run_fw_auf
     │                     ├─* run_psf_auf
-    │                     │             ├─* dd_params_path -> dd_params
-    │                     │             └─* l_cut_path -> l_cut
     │                     ├─* tri_maglim_faint[2a]
     │                     ├─* tri_num_faint[2a]
     │                     ├─* gal_al_avs

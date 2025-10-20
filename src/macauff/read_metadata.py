@@ -405,37 +405,6 @@ def _read_metadata_perturb_auf(joint_config, cat_a_config, cat_b_config):
                     raise ValueError(f"Boolean key {auf_run_flag} not set to allowed value in catalogue "
                                      f"{catname} metadata file.")
 
-            # Only need dd_params or l_cut if we're using run_psf_auf or
-            # correct_astrometry is True.
-            if config['run_psf_auf'] or correct_astro:
-                for check_flag, f in zip(['dd_params_path', 'l_cut_path'],
-                                         ['dd_params', 'l_cut']):
-                    if check_flag not in config:
-                        raise ValueError(f"Missing key {check_flag} from catalogue {catname} "
-                                         "metadata file.")
-
-                for check_flag, f in zip(['dd_params_path', 'l_cut_path'],
-                                         ['dd_params', 'l_cut']):
-                    if not os.path.exists(config[check_flag]):
-                        raise OSError(f'{flag}{check_flag} does not exist. Please ensure that path for '
-                                      f'catalogue {catname} is correct.')
-
-                    if not os.path.isfile(f'{config[check_flag]}/{f}.npy'):
-                        raise FileNotFoundError(f'{f} file not found in catalogue {catname} path. '
-                                                'Please ensure PSF photometry perturbations '
-                                                'are pre-generated.')
-
-                    if 'dd_params' in check_flag:
-                        dpp = config['dd_params_path']
-                        a = np.load(f'{dpp}/dd_params.npy')
-                        if not (len(a.shape) == 3 and a.shape[0] == 5 and a.shape[2] == 2):
-                            raise ValueError(f'{flag}dd_params should be of shape (5, X, 2).')
-                    if 'l_cut' in check_flag:
-                        lcp = config['l_cut_path']
-                        a = np.load(f'{lcp}/l_cut.npy')
-                        if not (len(a.shape) == 1 and a.shape[0] == 3):
-                            raise ValueError(f'{flag}l_cut should be of shape (3,) only.')
-
             try:
                 a = config['tri_filt_num']
                 if a == "None":
