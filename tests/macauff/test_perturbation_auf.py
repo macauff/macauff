@@ -7,6 +7,7 @@ Tests for the "perturbation_auf" module.
 
 import math
 import os
+from importlib import resources
 
 import numpy as np
 import pytest
@@ -218,8 +219,10 @@ def test_histogram():
 
 
 def test_psf_perturb():
-    l_cut = np.load(os.path.join(os.path.dirname(__file__), 'data/l_cut.npy'))
-    dd_params = np.load(os.path.join(os.path.dirname(__file__), 'data/dd_params.npy'))
+    with resources.files("macauff.data").joinpath("dd_params.npy").open("rb") as f:
+        dd_params = np.load(f)
+    with resources.files("macauff.data").joinpath("l_cut.npy").open("rb") as f:
+        l_cut = np.load(f)
 
     psf_r = 1.185 * 6.1
     psf_sig = 6.1 / (2 * np.sqrt(2 * np.log(2)))
@@ -515,8 +518,10 @@ class TestMakePerturbAUFs():
             dfluxes1 = 10**(-(mag_offset-d_mag/2)/2) - 10**(-mag_offset/2.5)
             dfluxes2 = 10**(-mag_offset/2.5) - 10**(-(mag_offset+d_mag/2)/2.5)
 
-            l_cut = np.load(os.path.join(os.path.dirname(__file__), 'data/l_cut.npy'))
-            dd_params = np.load(os.path.join(os.path.dirname(__file__), 'data/dd_params.npy'))
+            with resources.files("macauff.data").joinpath("dd_params.npy").open("rb") as f:
+                dd_params = np.load(f)
+            with resources.files("macauff.data").joinpath("l_cut.npy").open("rb") as f:
+                l_cut = np.load(f)
             run_fw = mag >= 19
             self.fake_cm = self.make_class()
             self.fake_cm.b_auf_region_points = new_auf_points

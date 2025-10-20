@@ -6,6 +6,7 @@ Tests for the "matching" module.
 # pylint: disable=too-many-lines,duplicate-code
 
 import os
+from importlib import resources
 
 import numpy as np
 import pandas as pd
@@ -576,34 +577,18 @@ class TestInputs:
                                     mock_filename(_cap.encode("utf-8")),
                                     mock_filename(_cbp.encode("utf-8")))
 
-        cm = CrossMatch(mock_filename(cm_p_.encode("utf-8")), mock_filename(ca_p_.encode("utf-8")),
-                        mock_filename(cb_p_.encode("utf-8")))
-        cm._load_metadata_config(self.chunk_id)
-        assert not hasattr(cm, 'dd_params_path')
-        assert not hasattr(cm, 'l_cut_path')
+        ddp_path = resources.files("macauff.data").joinpath("dd_params.npy")
+        lc_path = resources.files("macauff.data").joinpath("l_cut.npy")
 
-        for cat_reg in ['"a"', '"b"']:
-            if cat_reg[1] == 'a':
-                x = ca_p_.replace('run_psf_auf: False', 'run_psf_auf: True\ndd_params_path: .\nl_cut_path: .')
-            else:
-                x = cb_p_.replace('run_psf_auf: False', 'run_psf_auf: True\ndd_params_path: .\nl_cut_path: .')
-            for old_line, var_name in zip(['dd_params_path: .', 'l_cut_path: .'],
-                                          ['dd_params_path', 'l_cut_path']):
-                x2 = x.replace(old_line, '')
-                b, c = (x2, cb_p_) if cat_reg[1] == 'a' else (ca_p_, x2)
-                with pytest.raises(ValueError, match=f'Missing key {var_name} from catalogue {cat_reg}'):
-                    cm = CrossMatch(mock_filename(cm_p_.encode("utf-8")),
-                                    mock_filename(b.encode("utf-8")),
-                                    mock_filename(c.encode("utf-8")))
-                    cm._load_metadata_config(self.chunk_id)
-
+        os.system(f"mv {ddp_path} {str(ddp_path).replace('.npy', '2.npy')}")
+        os.system(f"mv {lc_path} {str(lc_path).replace('.npy', '2.npy')}")
         ddp = np.ones((5, 15, 2), float)
-        np.save('dd_params.npy', ddp)
+        np.save(ddp_path, ddp)
         lc = np.ones(3, float)
-        np.save('l_cut.npy', lc)
+        np.save(lc_path, lc)
 
-        ca_p_2 = ca_p_.replace('run_psf_auf: False', 'run_psf_auf: True\ndd_params_path: .\nl_cut_path: .')
-        cb_p_2 = cb_p_.replace('run_psf_auf: False', 'run_psf_auf: True\ndd_params_path: .\nl_cut_path: .')
+        ca_p_2 = ca_p_.replace('run_psf_auf: False', 'run_psf_auf: True')
+        cb_p_2 = cb_p_.replace('run_psf_auf: False', 'run_psf_auf: True')
 
         for fn, array, err_msg in zip([
                 'dd_params', 'dd_params', 'dd_params', 'dd_params', 'l_cut', 'l_cut'],
@@ -615,7 +600,7 @@ class TestInputs:
                  r'dd_params should be of shape \(5, X, 2\)',
                  r'l_cut should be of shape \(3,\) only.',
                  r'l_cut should be of shape \(3,\) only.']):
-            np.save(f"{fn}.npy", array)
+            np.save(ddp_path if fn == 'dd_params' else lc_path, array)
             with pytest.raises(ValueError, match=err_msg):
                 cm = CrossMatch(mock_filename(cm_p_.encode("utf-8")),
                                 mock_filename(ca_p_2.encode("utf-8")),
@@ -623,9 +608,11 @@ class TestInputs:
                 cm._load_metadata_config(self.chunk_id)
             # Re-make "good" fake arrays
             ddp = np.ones((5, 15, 2), float)
-            np.save('dd_params.npy', ddp)
+            np.save(ddp_path, ddp)
             lc = np.ones(3, float)
-            np.save('l_cut.npy', lc)
+            np.save(lc_path, lc)
+        os.system(f"mv {str(ddp_path).replace('.npy', '2.npy')} {ddp_path}")
+        os.system(f"mv {str(lc_path).replace('.npy', '2.npy')} {lc_path}")
 
         ca_p_2 = ca_p_.replace('fit_gal_flag: False', 'fit_gal_flag: True\ngal_wavs: [0.513, 0.641, 0.778]\n'
                                'gal_zmax: [4.5, 4.5, 5]\ngal_nzs: [46, 46, 51]\n'
@@ -1251,12 +1238,6 @@ class TestInputs:
                                 mock_filename(self.cb_p_text.encode("utf-8")))
                 cm._load_metadata_config(self.chunk_id)
 
-        # Fake dd_params and l_cut
-        ddp = np.ones((5, 15, 2), float)
-        np.save('dd_params.npy', ddp)
-        lc = np.ones(3, float)
-        np.save('l_cut.npy', lc)
-
         ca_p_ = self.ca_p_text.replace(
             'fit_gal_flag: False', 'gal_wavs: [0.513, 0.641, 0.778]\ngal_zmax: [4.5, 4.5, 5]\n'
             'gal_nzs: [46, 46, 51]\ngal_aboffsets: [0.5, 0.5, 0.5]\n'
@@ -1280,9 +1261,7 @@ class TestInputs:
         ca_p_ = ca_p_.replace('snr_indices: [8, 9, 10]', '')
 
         # Test all of the inputs being needed one by one loading into cat_a_params:
-        dd_l_path = os.path.join(os.path.dirname(__file__), 'data')
-        lines = [f'correct_astrometry: True\n\ndd_params_path: {dd_l_path}\nl_cut_path: {dd_l_path}',
-                 '\nsnr_indices: [4, 6, 8]', '\nref_apply_proper_motion: False',
+        lines = ['correct_astrometry: True\n', '\nsnr_indices: [4, 6, 8]', '\nref_apply_proper_motion: False',
                  '\ncorrect_astro_save_folder: ac_folder', '\ncorrect_astro_mag_indices_index: 0',
                  '\nnn_radius: 30', '\nref_cat_csv_file_path: ref_{}.csv',
                  '\ncorrect_mag_array: [[14.07, 14.17, 14.27, 14.37, 14.47]]',
@@ -1585,8 +1564,7 @@ class TestInputs:
                  'pos_and_err_indices: ', 'pos_and_err_indices: ', 'pos_and_err_indices: ',
                  'pos_and_err_indices: ', 'mag_indices:', 'mag_indices:', 'mag_indices:', 'snr_indices:',
                  'snr_indices:', 'snr_indices:', 'chunk_overlap_col: ', 'chunk_overlap_col: ',
-                 'chunk_overlap_col: ', 'best_mag_index_col: ', 'best_mag_index_col: ', 'dd_params_path: ',
-                 'l_cut_path: '],
+                 'chunk_overlap_col: ', 'best_mag_index_col: ', 'best_mag_index_col: '],
                 ['correct_astro_mag_indices_index: A', 'correct_astro_mag_indices_index: 2.5',
                  'correct_astro_mag_indices_index: 7', 'nn_radius: A', 'nn_radius: [1, 2]',
                  'correct_mag_array: [[1, 2, A, 4, 5]]', 'correct_mag_slice: [[0.1, 0.1, 0.1, A, 0.1]]',
@@ -1598,10 +1576,9 @@ class TestInputs:
                  'mag_indices: [A, 1, 2]', 'mag_indices: [1, 2]', 'mag_indices: [1.2, 2, 3, 4]',
                  'snr_indices: [A, 1, 2]', 'snr_indices: [1, 2]', 'snr_indices: [1.2, 2, 3]',
                  'chunk_overlap_col: Non', 'chunk_overlap_col: A', 'chunk_overlap_col: 1.2',
-                 'best_mag_index_col: A', 'best_mag_index_col: 1.2', 'dd_params_path: ./some_folder',
-                 'l_cut_path: ./l_cut_dummy_folder'],
+                 'best_mag_index_col: A', 'best_mag_index_col: 1.2'],
                 ['a', 'b', 'a', 'b', 'a', 'a', 'b', 'a', 'b', 'a', 'a', 'b', 'a', 'a', 'b', 'a', 'a', 'b',
-                 'b', 'b', 'a', 'a', 'a', 'b', 'a', 'a', 'b', 'b', 'a'],
+                 'b', 'b', 'a', 'a', 'a', 'b', 'a', 'a', 'b'],
                 ['correct_astro_mag_indices_index should be an integer in the catalogue "a"',
                  'correct_astro_mag_indices_index should be an integer in the catalogue "b"',
                  'correct_astro_mag_indices_index cannot be a larger index than the list of filters '
@@ -1628,9 +1605,7 @@ class TestInputs:
                  'chunk_overlap_col should be an integer in the catalogue "b"',
                  'chunk_overlap_col should be an integer in the catalogue "a"',
                  'best_mag_index_col should be an integer in the catalogue "a"',
-                 'best_mag_index_col should be an integer in the catalogue "b"',
-                 'dd_params_path does not exist. Please ensure that path for catalogue "b"',
-                 'l_cut file not found in catalogue "a" path. Please ensure PSF ']):
+                 'best_mag_index_col should be an integer in the catalogue "b"']):
             z, lines = (ca_p_2, lines_a) if x == 'a' else (cb_p_2, lines_b)
             ind = np.where([old_line in x for x in lines])[0][0]
             z = z.replace(lines[ind], new_line)
@@ -1638,8 +1613,6 @@ class TestInputs:
 
             if 'folder' not in new_line:
                 type_of_error = ValueError
-            elif 'dd_params' in new_line:
-                type_of_error = OSError
             else:
                 type_of_error = FileNotFoundError
             if "contain at least six" in match_text:

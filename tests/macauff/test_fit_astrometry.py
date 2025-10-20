@@ -5,6 +5,7 @@ Tests for the "fit_astrometry" module.
 
 
 import os
+from importlib import resources
 
 import numpy as np
 import pytest
@@ -99,8 +100,10 @@ class TestAstroCorrection:
 
     def test_fit_astrometry_load_errors(self):  # pylint: disable=too-many-statements
         self.apply_proper_motion = False
-        dd_params = np.load(os.path.join(os.path.dirname(__file__), 'data/dd_params.npy'))
-        l_cut = np.load(os.path.join(os.path.dirname(__file__), 'data/l_cut.npy'))
+        with resources.files("macauff.data").joinpath("dd_params.npy").open("rb") as f:
+            dd_params = np.load(f)
+        with resources.files("macauff.data").joinpath("l_cut.npy").open("rb") as f:
+            l_cut = np.load(f)
         ax1_mids, ax2_mids = np.array([105], dtype=float), np.array([0], dtype=float)
         magarray = np.array([14.07, 14.17, 14.27, 14.37, 14.47])
         magslice = np.array([0.05, 0.05, 0.05, 0.05, 0.05])
@@ -205,8 +208,10 @@ class TestAstroCorrection:
         with pytest.raises(ValueError, match='b_cat_func must be given if pregenerate_cutouts '):
             ac(a_cat_name=self.a_cat_name, b_cat_name=self.b_cat_name, a_cat_func=self.fake_cata_cutout,
                b_cat_func=None, tri_download=False, make_plots=True, make_summary_plot=True)
-        dd_params = np.load(os.path.join(os.path.dirname(__file__), 'data/dd_params.npy'))
-        l_cut = np.load(os.path.join(os.path.dirname(__file__), 'data/l_cut.npy'))
+        with resources.files("macauff.data").joinpath("dd_params.npy").open("rb") as f:
+            dd_params = np.load(f)
+        with resources.files("macauff.data").joinpath("l_cut.npy").open("rb") as f:
+            l_cut = np.load(f)
         ax1_mids, ax2_mids = np.array([105], dtype=float), np.array([0], dtype=float)
         magarray = [np.array([14.07, 14.17, 14.27, 14.37, 14.47])]
         magslice = [np.array([0.05, 0.05, 0.05, 0.05, 0.05])]
@@ -319,8 +324,10 @@ class TestAstroCorrection:
                             in_memory, use_photometric_uncertainties, apply_proper_motion):
         self.npy_or_csv = npy_or_csv
         self.apply_proper_motion = apply_proper_motion
-        dd_params = np.load(os.path.join(os.path.dirname(__file__), 'data/dd_params.npy'))
-        l_cut = np.load(os.path.join(os.path.dirname(__file__), 'data/l_cut.npy'))
+        with resources.files("macauff.data").joinpath("dd_params.npy").open("rb") as f:
+            dd_params = np.load(f)
+        with resources.files("macauff.data").joinpath("l_cut.npy").open("rb") as f:
+            l_cut = np.load(f)
         # Flag telling us to test for the non-running of all sightlines,
         # but to leave pre-generated ones alone
         half_run_flag = (npy_or_csv == "npy" and coord_or_chunk == "chunk" and
