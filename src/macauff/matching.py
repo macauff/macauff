@@ -541,16 +541,18 @@ class CrossMatch():
 
         for config, catname in zip([self.cat_a_params_dict, self.cat_b_params_dict], ['a_', 'b_']):
             ind = np.where(chunk_id == np.array(config['chunk_id_list']))[0][0]
-            self._make_regions_points([f'{catname}auf_region_type', config['auf_region_type']],
-                                      [f'{catname}auf_region_points',
-                                       config['auf_region_points_per_chunk'][ind]],
-                                      config['chunk_id_list'][ind])
+            p = self._make_regions_points([f'{catname}auf_region_type', config['auf_region_type']],
+                                          [f'{catname}auf_region_points',
+                                           config['auf_region_points_per_chunk'][ind]],
+                                          config['chunk_id_list'][ind])
+            setattr(self, f'{catname}auf_region_points', p)  # pylint: disable=possibly-used-before-assignment
 
         ind = np.where(chunk_id == np.array(self.crossmatch_params_dict['chunk_id_list']))[0][0]
-        self._make_regions_points(['cf_region_type', self.crossmatch_params_dict['cf_region_type']],
-                                  ['cf_region_points',
-                                   self.crossmatch_params_dict['cf_region_points_per_chunk'][ind]],
-                                  self.crossmatch_params_dict['chunk_id_list'][ind])
+        p = self._make_regions_points(['cf_region_type', self.crossmatch_params_dict['cf_region_type']],
+                                      ['cf_region_points',
+                                       self.crossmatch_params_dict['cf_region_points_per_chunk'][ind]],
+                                      self.crossmatch_params_dict['chunk_id_list'][ind])
+        setattr(self, 'cf_region_points', p)  # pylint: disable=possibly-used-before-assignment
 
         for config, flag in zip([self.cat_a_params_dict, self.cat_b_params_dict], ['a_', 'b_']):
             if config['correct_astrometry']:
@@ -586,7 +588,6 @@ class CrossMatch():
         self._load_metadata_config_params(chunk_id)
         self._load_metadata_config_files()
 
-
     def _make_regions_points(self, region_type, region_points, chunk_id):
         '''
         Wrapper function for the creation of "region" coordinate tuples,
@@ -609,6 +610,12 @@ class CrossMatch():
         chunk_id : string
             Unique identifier for particular sub-region being loaded, used to
             inform of errors.
+
+        Returns
+        -------
+        points : numpy.ndarray
+            An array of shape (N, 2), with each second-axis pair being a single
+            sky coordinate for each of the N pointings.
         '''
         rt = region_type[1].lower()
         if rt == 'rectangle':
@@ -635,7 +642,7 @@ class CrossMatch():
                 raise ValueError(f"{region_points[0]} should be a list of two-element lists "
                                  f"'[[a, b], [c, d]]', separated by a comma in chunk {chunk_id}.") from exc
 
-        setattr(self, region_points[0], points)  # pylint: disable=possibly-used-before-assignment
+        return points
 
     def make_shared_data(self):
         """
