@@ -534,8 +534,8 @@ class TestMakePerturbAUFs():
             self.fake_cm.b_dens_dist = density_radius
             self.fake_cm.b_run_fw_auf = run_fw
             self.fake_cm.b_run_psf_auf = True
-            self.fake_cm.b_dd_params = dd_params
-            self.fake_cm.b_l_cut = l_cut
+            self.fake_cm.dd_params = dd_params
+            self.fake_cm.l_cut = l_cut
             self.fake_cm.b_gal_al_avs = [0]
             self.fake_cm.b_download_tri = False
             self.fake_cm.b_dens_hist_tri_list = [None] * len(self.filters)
