@@ -95,7 +95,6 @@ def make_perturb_aufs(cm, which_cat):
         # Extract either dummy or real TRILEGAL histogram lists.
         dens_hist_tri = getattr(cm, f'{which_cat}_dens_hist_tri_list')
         tri_model_mags = getattr(cm, f'{which_cat}_tri_model_mags_list')
-        tri_model_mag_mids = getattr(cm, f'{which_cat}_tri_model_mag_mids_list')
         tri_model_mags_interval = getattr(cm, f'{which_cat}_tri_model_mags_interval_list')
         tri_n_bright_sources_star = getattr(cm, f'{which_cat}_tri_n_bright_sources_star_list')
 
@@ -240,7 +239,7 @@ def make_perturb_aufs(cm, which_cat):
                         nzs[j], alpha0, alpha1, alpha_weight, ab_offsets[j], filter_names[j],
                         tri_file_path=new_auf_file_path, filt_header=tri_filt_names[j],
                         dens_hist_tri=dens_hist_tri[j], model_mags=tri_model_mags[j],
-                        model_mag_mids=tri_model_mag_mids[j], model_mags_interval=tri_model_mags_interval[j],
+                        model_mags_interval=tri_model_mags_interval[j],
                         n_bright_sources_star=tri_n_bright_sources_star[j])
                 else:
                     single_perturb_auf_output = create_single_perturb_auf(
@@ -248,7 +247,7 @@ def make_perturb_aufs(cm, which_cat):
                         d_mag, delta_mag_cuts, dd_params, l_cut, run_fw, run_psf, al_avs[j], avs,
                         fit_gal_flag, tri_file_path=new_auf_file_path, filt_header=tri_filt_names[j],
                         dens_hist_tri=dens_hist_tri[j], model_mags=tri_model_mags[j],
-                        model_mag_mids=tri_model_mag_mids[j], model_mags_interval=tri_model_mags_interval[j],
+                        model_mags_interval=tri_model_mags_interval[j],
                         n_bright_sources_star=tri_n_bright_sources_star[j])
                 perturb_auf_outputs[perturb_auf_combo] = single_perturb_auf_output
             else:
@@ -520,8 +519,8 @@ def create_single_perturb_auf(r, dr, j0s, num_trials, psf_fwhm, density_mag, a_p
                               avs, fit_gal_flag, sky_area=None, saturation_magnitude=None, cmau_array=None,
                               wav=None, z_max=None, nz=None, alpha0=None, alpha1=None, alpha_weight=None,
                               ab_offset=None, filter_name=None, tri_file_path=None, filt_header=None,
-                              dens_hist_tri=None, model_mags=None, model_mag_mids=None,
-                              model_mags_interval=None, n_bright_sources_star=None):
+                              dens_hist_tri=None, model_mags=None, model_mags_interval=None,
+                              n_bright_sources_star=None):
     r'''
     Creates the associated parameters for describing a single perturbation AUF
     component, for a single sky position.
@@ -628,9 +627,6 @@ def create_single_perturb_auf(r, dr, j0s, num_trials, psf_fwhm, density_mag, a_p
     model_mags : list or numpy.ndarray or None, optional
         Left-hand bin edges of magnitudes of star differential source counts.
         Must be given if ``dens_hist_tri`` is given, otherwise be ``None``.
-    model_mag_mids : list or numpy.ndarray or None, optional
-        Magnitude bin centres of star differential source counts. Must be given
-        if ``dens_hist_tri`` is given, otherwise be ``None``.
     model_mags_interval : list or numpy.ndarray or None, optional
         Widths of magnitude bins of star differential source counts. Must be
         given if ``dens_hist_tri`` is given, otherwise be ``None``.
@@ -654,9 +650,9 @@ def create_single_perturb_auf(r, dr, j0s, num_trials, psf_fwhm, density_mag, a_p
     '''
     # TODO: extend to allow a Galactic source model that doesn't depend on TRILEGAL  pylint: disable=fixme
     if tri_file_path is not None:
-        (dens_hist_tri, model_mags, model_mag_mids, model_mags_interval, _,
-         n_bright_sources_star) = make_tri_counts(
+        dens_hist_tri, model_mags, model_mags_interval, n_bright_sources_star = make_tri_counts(
             tri_file_path, filt_header, d_mag, np.amin(a_photo), density_mag, al_av=al_av, av_grid=avs)
+        model_mag_mids = model_mags+model_mags_interval/2
 
     log10y_tri = -np.inf * np.ones_like(dens_hist_tri)
     log10y_tri[dens_hist_tri > 0] = np.log10(dens_hist_tri[dens_hist_tri > 0])
@@ -667,8 +663,8 @@ def create_single_perturb_auf(r, dr, j0s, num_trials, psf_fwhm, density_mag, a_p
     if fit_gal_flag:
         al_grid = al_av * avs
         z_array = np.linspace(0, z_max, nz)
-        gal_dens = create_galaxy_counts(cmau_array, model_mag_mids, z_array, wav, alpha0, alpha1,
-                                        alpha_weight, ab_offset, filter_name, al_grid)
+        gal_dens = create_galaxy_counts(cmau_array, model_mags+model_mags_interval/2, z_array, wav, alpha0,
+                                        alpha1, alpha_weight, ab_offset, filter_name, al_grid)
         gal_count = np.sum(gal_dens[mag_slice] * model_mags_interval[mag_slice])
         log10y_gal = -np.inf * np.ones_like(log10y_tri)
         log10y_gal[gal_dens > 0] = np.log10(gal_dens[gal_dens > 0])
@@ -679,7 +675,7 @@ def create_single_perturb_auf(r, dr, j0s, num_trials, psf_fwhm, density_mag, a_p
         # If we're not generating galaxy counts, we have to solely rely on
         # TRILEGAL counting statistics, so we only want to keep populated bins.
         hc = np.where(dens_hist_tri > 0)[0]
-        model_mag_mids = model_mag_mids[hc]
+        model_mag_mids = (model_mags+model_mags_interval/2)[hc]
         model_mags_interval = model_mags_interval[hc]
         log10y_tri = log10y_tri[hc]
 
@@ -861,16 +857,10 @@ def make_tri_counts(trifilepath, trifiltname, dm, brightest_source_mag,
         The probability density function of the resulting merged differential
         source counts from the two TRILEGAL simulations, weighted by their
         counting-statistic bin uncertainties.
-    tri_mags : numpy.ndarray
+    tri_mag_lefts : numpy.ndarray
         The left-hand bin edges of all bins used to generate ``dens``.
-    tri_mags_mids : numpy.ndarray
-        Middle of each bin generating ``dens``.
-    dtri_mags : numpy.ndarray
+    tri_mag_widths : numpy.ndarray
         Bin widths of all bins corresponding to each element of ``dens``.
-    uncert : numpy.ndarray
-        Propagated Poissonian uncertainties of the PDF of ``dens``, using the
-        weighted average of the individual uncertainties of each run for every
-        bin in ``dens``.
     num_bright_obj : integer
         Number of simulated objects above the given ``density_mag`` brightness
         limit.
@@ -944,7 +934,6 @@ def make_tri_counts(trifilepath, trifiltname, dm, brightest_source_mag,
             tri_mags = np.arange(minmag-al_av*tri_av_bright, maxmag+1e-10, dm)
         elif use_faint:
             tri_mags = np.arange(minmag-al_av*tri_av_faint, maxmag+1e-10, dm)
-    tri_mags_mids = tri_mags[:-1]+np.diff(tri_mags)/2  # pylint: disable=used-before-assignment
     if use_faint:
         if al_av is None:
             hist, tri_mags = np.histogram(tridata_faint, bins=tri_mags)
@@ -1009,31 +998,26 @@ def make_tri_counts(trifilepath, trifiltname, dm, brightest_source_mag,
         dens_uncert_bright[tri_mags[1:] > bright_cutoff_mag] = 1e10
         w_f, w_b = 1 / dens_uncert_faint**2, 1 / dens_uncert_bright**2
         dens = (dens_bright * w_b + dens_faint * w_f) / (w_b + w_f)
-        dens_uncert = (dens_uncert_bright * w_b + dens_uncert_faint * w_f) / (w_b + w_f)
         hc = hc_bright | hc_faint  # pylint: disable=possibly-used-before-assignment
 
         num_bright_obj = max(num_bright_obj_faint, num_bright_obj_bright)
     elif use_bright:
         dens = dens_bright
-        dens_uncert = dens_uncert_bright
         hc = hc_bright
 
         num_bright_obj = num_bright_obj_bright
     elif use_faint:
         dens = dens_faint
-        dens_uncert = dens_uncert_faint
         hc = hc_faint
 
         num_bright_obj = num_bright_obj_faint
 
     dens = dens[hc]  # pylint: disable=used-before-assignment,possibly-used-before-assignment
-    dtri_mags = np.diff(tri_mags)[hc]
-    tri_mags_mids = tri_mags_mids[hc]
-    tri_mags = tri_mags[:-1][hc]
-    uncert = dens_uncert[hc]  # pylint: disable=possibly-used-before-assignment
+    tri_mag_lefts = tri_mags[:-1][hc]
+    tri_mag_widths = np.diff(tri_mags)[hc]
 
     # pylint: disable-next=possibly-used-before-assignment
-    return dens, tri_mags, tri_mags_mids, dtri_mags, uncert, num_bright_obj
+    return dens, tri_mag_lefts, tri_mag_widths, num_bright_obj
 
 
 def _calculate_magnitude_offsets(count_array, mag_array, b, snr, model_mag_mids, log10y,

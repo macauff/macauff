@@ -344,8 +344,7 @@ def _read_metadata_perturb_auf(joint_config, cat_a_config, cat_b_config):
                                'download_tri', 'psf_fwhms', 'run_fw_auf', 'run_psf_auf',
                                'tri_maglim_faint', 'tri_num_faint', 'gal_al_avs',
                                'dens_hist_tri_location', 'tri_model_mags_location',
-                               'tri_model_mag_mids_location', 'tri_model_mags_interval_location',
-                               'tri_n_bright_sources_star_location']:
+                               'tri_model_mags_interval_location', 'tri_n_bright_sources_star_location']:
                 if check_flag not in config:
                     raise ValueError(f"Missing key {check_flag} from catalogue {catname} metadata file.")
 
@@ -442,8 +441,8 @@ def _read_metadata_perturb_auf(joint_config, cat_a_config, cat_b_config):
             # Assume that we input filenames, including full location, for each
             # pre-computed TRILEGAL histogram file, and that they are all shape
             # (len(filters), ...).
-            for name in ['dens_hist_tri', 'tri_model_mags', 'tri_model_mag_mids',
-                         'tri_model_mags_interval', 'tri_dens_uncert', 'tri_n_bright_sources_star']:
+            for name in ['dens_hist_tri', 'tri_model_mags',
+                         'tri_model_mags_interval', 'tri_n_bright_sources_star']:
                 f = config[f'{name}_location']
                 if f == "None":
                     config[f'{name}_list'] = [None] * len(config['filt_names'])
@@ -483,7 +482,7 @@ def _read_metadata_perturb_auf(joint_config, cat_a_config, cat_b_config):
                                  "tri_set_name, etc. -- should be None or zero of them should be None.")
             run_external_none_flag = [config[name] == "None" for name in
                                       ['dens_hist_tri_location', 'tri_model_mags_location',
-                                       'tri_model_mag_mids_location', 'tri_model_mags_interval_location',
+                                       'tri_model_mags_interval_location',
                                        'tri_n_bright_sources_star_location']]
             if not (np.sum(run_external_none_flag) == 0 or
                     np.sum(run_external_none_flag) == len(run_external_none_flag)):

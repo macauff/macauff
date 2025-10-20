@@ -158,7 +158,7 @@ These can be divided into those inputs that are always required:
 
 those that are only required if the `Joint Parameters`_ option ``include_perturb_auf`` is ``True``:
 
-``fit_gal_flag``, ``run_fw_auf``, ``run_psf_auf``, ``psf_fwhms``, ``download_tri``, ``tri_set_name``, ``tri_filt_names``, ``tri_filt_num``, ``tri_maglim_faint``, ``tri_num_faint``, ``gal_al_avs``, ``dens_dist``, ``snr_indices``, ``dens_hist_tri_location``, ``tri_model_mags_location``, ``tri_model_mag_mids_location``, ``tri_model_mags_interval_location``, and ``tri_n_bright_sources_star_location``;
+``fit_gal_flag``, ``run_fw_auf``, ``run_psf_auf``, ``psf_fwhms``, ``download_tri``, ``tri_set_name``, ``tri_filt_names``, ``tri_filt_num``, ``tri_maglim_faint``, ``tri_num_faint``, ``gal_al_avs``, ``dens_dist``, ``snr_indices``, ``dens_hist_tri_location``, ``tri_model_mags_location``, ``tri_model_mags_interval_location``, and ``tri_n_bright_sources_star_location``;
 
 the inputs required in each catalogue parameters file if ``fit_gal_flag`` is ``True`` (and hence ``include_perturb_auf`` is ``True``):
 
@@ -300,10 +300,6 @@ The location on disk of a numpy array, shape ``(len(filt_names), M)`` where ``M`
 ``tri_model_mags_location``
 
 The location on disk of a numpy array, shape ``(len(filt_names), M)`` where ``M`` is a consistent number of magnitude bins, of the left-hand magnitude bin edges of differential source counts for a given TRILEGAL simulation, in each filter for a specific catalogue. Alternatively, should be ``None`` if ``auf_file_path`` and associated parameters for the running of TRILEGAL histogram generation within the cross-match run are given. If not ``None``, must have a consistent formatting string which contains ``_{}`` for per-chunk loading with a single string input.
-
-``tri_model_mag_mids_location``
-
-The location on disk of a numpy array, shape ``(len(filt_names), M)`` where ``M`` is a consistent number of magnitude bins, of magnitude bin-middles of differential source counts for a given TRILEGAL simulation, in each filter for a specific catalogue. Alternatively, should be ``None`` if ``auf_file_path`` and associated parameters for the running of TRILEGAL histogram generation within the cross-match run are given. If not ``None``, must have a consistent formatting string which contains ``_{}`` for per-chunk loading with a single string input.
 
 ``tri_model_mags_interval_location``
 
@@ -450,9 +446,7 @@ The inter-dependency of input parameters on one another, and the output ``CrossM
     │                     ├─* gal_al_avs
     │                     ├─* dens_hist_tri_location[2b, 3] -> dens_hist_tri_list
     │                     ├─* tri_model_mags_location[2b, 3] -> tri_model_mags_list
-    │                     ├─* tri_model_mag_mids_location[2b, 3] -> tri_model_mag_mids_list
     │                     ├─* tri_model_mags_interval_location[2b, 3] -> tri_model_mags_interval_list
-    │                     ├─* tri_model_mags_uncert_location[2b, 3] -> tri_model_mags_uncert_list
     │                     └─* tri_n_bright_sources_star_location[2b, 3] -> tri_n_bright_sources_star_list
     ├─> include_phot_like
     │                   └─> with_and_without_photometry

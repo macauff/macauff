@@ -488,11 +488,10 @@ class CrossMatch():
             x, y = os.path.splitext(self.b_auf_file_path)  # pylint: disable=access-member-before-definition
             self.b_auf_file_path = x + r"_{:.2f}_{:.2f}" + y
 
-
         for config, flag in zip([self.cat_a_params_dict, self.cat_b_params_dict], ['a_', 'b_']):
             if self.crossmatch_params_dict['include_perturb_auf'] or config['correct_astrometry']:
-                for name in ['dens_hist_tri', 'tri_model_mags', 'tri_model_mag_mids',
-                             'tri_model_mags_interval', 'tri_dens_uncert', 'tri_n_bright_sources_star']:
+                for name in ['dens_hist_tri', 'tri_model_mags', 'tri_model_mags_interval',
+                             'tri_n_bright_sources_star']:
                     # If location variable was "None" in the first place we set
                     # {name}_list in config to a list of Nones and it got updated
                     # above already.

@@ -106,7 +106,6 @@ def derive_astrometric_corrections(self, which):
         tri_hists=getattr(self, f'{which}_dens_hist_tri_list'),
         tri_magses=getattr(self, f'{which}_tri_model_mags_list'),
         dtri_magses=getattr(self, f'{which}_tri_model_mags_interval_list'),
-        tri_uncerts=getattr(self, f'{which}_tri_dens_uncert_list'),
         use_photometric_uncertainties=getattr(self, f'{which}_use_photometric_uncertainties'),
         pregenerate_cutouts=True, chunks=[self.chunk_id], n_r=self.real_hankel_points,
         n_rho=self.four_hankel_points, max_rho=self.four_max_rho,
@@ -133,8 +132,8 @@ class AstrometricCorrections:
                  mag_names, correct_astro_mag_indices_index, coord_system, saturation_magnitudes,
                  pregenerate_cutouts, n_r, n_rho, max_rho, mn_fit_type, trifilepath=None, maglim_f=None,
                  magnum=None, tri_num_faint=None, trifilterset=None, trifiltnames=None, tri_hists=None,
-                 tri_magses=None, dtri_magses=None, tri_uncerts=None, use_photometric_uncertainties=False,
-                 cutout_area=None, cutout_height=None, single_sided_auf=True, chunks=None, return_nm=False,
+                 tri_magses=None, dtri_magses=None, use_photometric_uncertainties=False, cutout_area=None,
+                 cutout_height=None, single_sided_auf=True, chunks=None, return_nm=False,
                  apply_proper_motion_flag=False, pm_indices=None, pm_ref_epoch_or_index=None,
                  pm_move_to_epoch=None):
         """
@@ -282,11 +281,11 @@ class AstrometricCorrections:
             uncertainties. Must either be "quadratic" or "linear."
         trifilepath : string, optional
             Filepath of the location into which to save TRILEGAL simulations. If
-            provided ``tri_hists``, ``tri_magses``, ``dtri_magses``, and
-            ``tri_uncerts`` must be ``None``, and ``maglim_fs``, ``magnums``,
-            ``tri_num_faints``, ``trifilterset``, and ``trifiltnames`` must be
-            given. Must contain two format ``{}`` options in string, for unique
-            ax1-ax2 sightline combination downloads.
+            provided ``tri_hists``, ``tri_magses`` and, ``dtri_magses``, must be
+            ``None``, and ``maglim_fs``, ``magnums``, ``tri_num_faints``,
+            ``trifilterset``, and ``trifiltnames`` must be given. Must contain
+            two format ``{}`` options in string, for unique ax1-ax2 sightline
+            combination downloads.
         maglim_f : float, optional
             Magnitude in the ``magnum`` filter down to which sources should be
             drawn for the "faint" sample. Should be ``None`` if ``tri_hists``
@@ -315,10 +314,6 @@ class AstrometricCorrections:
         dtri_magses : list of numpy.ndarray, optional
             Magnitude bin widths for each ``tri_mags`` bin in all filters.
             Must be given if ``tri_hists`` is provided, else ``None``.
-        tri_uncerts : list of numpy.ndarray, optional
-            Differential source count uncertainties, as derived by
-            `~macauff.make_tri_counts`.  Must be given if ``tri_hists`` is
-            provided, else ``None``.
         use_photometric_uncertainties : boolean, optional
             Flag for whether or not to use the photometric uncertainties instead
             of astrometric uncertainties when deriving astrometric uncertainties
@@ -443,7 +438,6 @@ class AstrometricCorrections:
         self.tri_hists = tri_hists
         self.tri_magses = tri_magses
         self.dtri_magses = dtri_magses
-        self.tri_uncerts = tri_uncerts
 
         self.dm = dm
 
@@ -815,7 +809,6 @@ class AstrometricCorrections:
                     self.tri_hist = self.tri_hists[p]
                     self.tri_mags = self.tri_magses[p]
                     self.dtri_mags = self.dtri_magses[p]
-                    self.tri_uncert = self.tri_uncerts[p]
 
                 self.psf_radius = 1.185 * self.psf_fwhm
                 self.psfsig = self.psf_fwhm / (2 * np.sqrt(2 * np.log(2)))
@@ -1136,12 +1129,12 @@ class AstrometricCorrections:
         if self.trifilepath is not None:
             # Don't pass the _faint-appended filepath to make_tri_counts, since it
             # handles that itself.
-            tri_hist, tri_mags, _, dtri_mags, tri_uncert, _ = make_tri_counts(
+            tri_hist, tri_mags, dtri_mags, _ = make_tri_counts(
                 self.trifilepath.format(ax1_mid, ax2_mid), self.trifiltname, self.dm, np.amin(b_mag_data),
                 maxmag, al_av=self.gal_alav, av_grid=avs)
         else:
             tri_hist, tri_mags = self.tri_hist, self.tri_mags
-            dtri_mags, tri_uncert = self.dtri_mags, self.tri_uncert
+            dtri_mags = self.dtri_mags
 
         gal_dns = create_galaxy_counts(
             self.gal_cmau_array, tri_mags+dtri_mags/2, np.linspace(0, 4, 41),
@@ -1170,14 +1163,12 @@ class AstrometricCorrections:
                                                            data_bins[q]+data_dbins[q]/2, tri_hist, gal_dns,
                                                            tri_mags+dtri_mags/2)
         log10y = np.log10(tri_hist * tri_corr + gal_dns * gal_corr)
-        new_uncert = np.sqrt(tri_uncert**2 + (0.05*gal_dns)**2)
-        dlog10y = 1/np.log(10) * new_uncert / (tri_hist + gal_dns)
 
         mag_slice = (tri_mags >= minmag) & (tri_mags+dtri_mags <= maxmag)
         n_norm = np.sum(10**log10y[mag_slice] * dtri_mags[mag_slice])
-        self.log10y, self.dlog10y = log10y, dlog10y
+        self.log10y = log10y
         self.tri_hist, self.tri_mags, self.dtri_mags = tri_hist, tri_mags, dtri_mags
-        self.tri_uncert, self.gal_dns = tri_uncert, gal_dns
+        self.gal_dns = gal_dns
         self.minmag, self.maxmag, self.n_norm = minmag, maxmag, n_norm
         self.tri_corr, self.gal_corr = tri_corr, gal_corr
 
@@ -1195,8 +1186,7 @@ class AstrometricCorrections:
         data_mags = self.b[~np.isnan(self.b[:, mag_ind]), mag_ind]
 
         ax = plt.subplot(gs[0])
-        ax.errorbar(self.tri_mags+self.dtri_mags/2, self.log10y,
-                    yerr=self.dlog10y, c='k', marker='.', zorder=1, ls='None')
+        ax.errorbar(self.tri_mags+self.dtri_mags/2, self.log10y, c='k', marker='.', zorder=1, ls='None')
 
         data_hist, data_bins = np.histogram(data_mags, bins='auto')
         d_hc = np.where(data_hist > 3)[0]
