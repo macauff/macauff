@@ -1193,7 +1193,6 @@ def generate_trilegal_histogram_cube(auf_points, auf_file_path, tri_set_name, tr
                                            auf_points[i, 1] + r * np.sin(t)), frame=auf_region_frame)
 
     cube = np.ones((len(auf_points), len(tri_filt_names), 1, 3), float) * np.nan
-    array = np.empty((len(auf_points), len(tri_filt_names), 3), float)
 
     for i, auf_point in enumerate(auf_points):
         ax1, ax2 = auf_point
@@ -1228,8 +1227,4 @@ def generate_trilegal_histogram_cube(auf_points, auf_file_path, tri_set_name, tr
             cube[i, j, :, 1] = model_mags
             cube[i, j, :, 2] = model_mags_interval
 
-            array[i, j, 0] = ax1
-            array[i, j, 1] = ax2
-            array[i, j, 2] = n_bright_sources_star
-
-    return array, cube
+    return auf_points, cube
