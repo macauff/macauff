@@ -87,14 +87,10 @@ class TestInputs:
         cm_p_ = self.cm_p_text.replace('include_perturb_auf: False', 'include_perturb_auf: True')
         ca_p_ = self.ca_p_text.replace(r'auf_file_path: gaia_auf_folder/trilegal_download_{}.dat',
                                        r'auf_file_path: gaia_auf_folder/trilegal_download_{}.dat'
-                                       '\ndens_hist_tri_location: None\ntri_model_mags_location: None\n'
-                                       'tri_model_mags_interval_location: None\n'
-                                       'tri_n_bright_sources_star_location: None')
+                                       '\ntri_dens_cube_location: None\ntri_dens_array_location: None\n')
         cb_p_ = self.cb_p_text.replace(r'auf_file_path: wise_auf_folder/trilegal_download_{}.dat',
                                        r'auf_file_path: wise_auf_folder/trilegal_download_{}.dat' + '\n'
-                                       'dens_hist_tri_location: None\ntri_model_mags_location: None\n'
-                                       'tri_model_mags_interval_location: None\n'
-                                       'tri_n_bright_sources_star_location: None')
+                                       'tri_dens_cube_location: None\ntri_dens_array_location: None\n')
 
         cm = CrossMatch(mock_filename(cm_p_.encode("utf-8")), mock_filename(ca_p_.encode("utf-8")),
                         mock_filename(cb_p_.encode("utf-8")))
@@ -232,9 +228,7 @@ class TestInputs:
         cm_p_ = self.cm_p_text.replace('include_perturb_auf: False', 'include_perturb_auf: True')
         ca_p_ = self.ca_p_text.replace(r'auf_file_path: gaia_auf_folder/trilegal_download_{}.dat',
                                        r'auf_file_path: None'
-                                       '\ndens_hist_tri_location: None\ntri_model_mags_location: None\n'
-                                       'tri_model_mags_interval_location: None\n'
-                                       'tri_n_bright_sources_star_location: None')
+                                       '\ntri_dens_cube_location: None\ntri_dens_array_location: None\n')
         with pytest.raises(ValueError,
                            match="Either all flags related to running TRILEGAL histogram generation within"):
             cm = CrossMatch(mock_filename(cm_p_.encode("utf-8")),
@@ -244,9 +238,7 @@ class TestInputs:
 
         cb_p_ = self.cb_p_text.replace(r'auf_file_path: wise_auf_folder/trilegal_download_{}.dat',
                                        r'auf_file_path: None'
-                                       '\ndens_hist_tri_location: None\ntri_model_mags_location: None\n'
-                                       'tri_model_mags_interval_location: None\n'
-                                       'tri_n_bright_sources_star_location: None')
+                                       '\ntri_dens_cube_location: None\ntri_dens_array_location: None\n')
         for flag in ['a', 'b']:
             for name in ['tri_set_name', 'tri_filt_names', 'tri_filt_num', 'download_tri',
                          'tri_maglim_faint', 'tri_num_faint']:
@@ -266,42 +258,38 @@ class TestInputs:
                 ['some_fake_folder', 'data/dens_hist_tri.npy',
                  os.path.join(os.path.dirname(__file__), 'data/cat_a_params.yaml'), 'data/dens_hist_tri.npy'],
                 [FileNotFoundError, ValueError, ValueError, ValueError],
-                ['File not found for dens_hist_tri. Please verify',
+                ['File not found for tri_dens_cube. Please verify',
                  'Either all flags related to running TRILEGAL histogram generation externa',
                  'File could not be loaded from dens_hist_tri',
-                 'number of filters in a_filt_names and a_dens_hist_tri']):
+                 'number of filters in a_filt_names and a_tri_dens_cube']):
             if 'npy' in location and 'number of filters in' in match_text:
-                np.save(location, np.ones((5, 10), float))
+                np.save(location, np.ones((3, 5, 10), float))
             elif 'npy' in location:
-                np.save(location, np.ones((3, 10), float))
+                np.save(location, np.ones((3, 3, 10), float))
             lines = ca_p_.split('\n')
-            ind = np.where(['dens_hist_tri_location' in x for x in lines])[0][0]
-            ca_p_2 = ca_p_.replace(lines[ind], f'dens_hist_tri_location: {location}')
+            ind = np.where(['tri_dens_cube_location' in x for x in lines])[0][0]
+            ca_p_2 = ca_p_.replace(lines[ind], f'tri_dens_cube_location: {location}')
             with pytest.raises(error, match=match_text):
                 cm = CrossMatch(mock_filename(cm_p_.encode("utf-8")),
                                 mock_filename(ca_p_2.encode("utf-8")),
                                 mock_filename(cb_p_.encode("utf-8")))
-        np.save('data/dens_hist_tri.npy', np.ones((3, 10), float))
+        np.save('data/dens_hist_tri.npy', np.ones((2, 3, 10), float))
         lines = ca_p_.split('\n')
-        ind = np.where(['dens_hist_tri_location' in x for x in lines])[0][0]
-        ca_p_2 = ca_p_.replace(lines[ind], 'dens_hist_tri_location: data/dens_hist_tri.npy')
-        for file, match_text in zip([np.ones((5, 10), float), np.ones((3, 4), float)],
-                                    ['The number of filter-elements in dens_hist_tri and tri_model_mags',
-                                     'The number of magnitude-elements in dens_hist_tri and tri_model_mags']):
-            np.save('tri_model_mags.npy', file)
+        ind = np.where(['tri_dens_cube_location' in x for x in lines])[0][0]
+        ca_p_2 = ca_p_.replace(lines[ind], 'tri_dens_cube_location: data/dens_hist_tri.npy')
+        for file, match_text in zip([np.ones((5, 2), float)],
+                                    ['The number of sky-elements in dens_hist_tri and tri_model_mags']):
+            np.save('tri_model_coords.npy', file)
             lines = ca_p_2.split('\n')
-            ind = np.where(['tri_model_mags_location' in x for x in lines])[0][0]
-            ca_p_2 = ca_p_2.replace(lines[ind], 'tri_model_mags_location: tri_model_mags.npy')
+            ind = np.where(['tri_dens_array_location' in x for x in lines])[0][0]
+            ca_p_2 = ca_p_2.replace(lines[ind], 'tri_dens_array_location: tri_model_coords.npy')
             with pytest.raises(ValueError, match=match_text):
                 cm = CrossMatch(mock_filename(cm_p_.encode("utf-8")),
                                 mock_filename(ca_p_2.encode("utf-8")),
                                 mock_filename(cb_p_.encode("utf-8")))
         for catname, nfilts in zip(['a', 'b'], [3, 4]):
-            for file, file_name in zip(
-                    [np.ones((nfilts, 10), float), np.ones((nfilts, 10), float),
-                     np.ones((nfilts, 10), float), np.ones((nfilts,), float)],
-                    ['dens_hist_tri', 'tri_model_mags', 'tri_model_mags_interval',
-                     'tri_n_bright_sources_star']):
+            for file, file_name in zip([np.ones((3, nfilts, 10, 3), float), np.ones((3, 2), float)],
+                                       ['tri_dens_cube', 'tri_dens_array']):
                 np.save(f'data/{catname}_{file_name}.npy', file)
                 lines = ca_p_.split('\n') if catname == 'a' else cb_p_.split('\n')
                 ind = np.where([file_name in x for x in lines])[0][0]
@@ -356,14 +344,10 @@ class TestInputs:
         cm_p_ = self.cm_p_text.replace('include_perturb_auf: False', 'include_perturb_auf: True')
         ca_p_ = self.ca_p_text.replace(r'auf_file_path: gaia_auf_folder/trilegal_download_{}.dat',
                                        r'auf_file_path: gaia_auf_folder/trilegal_download_{}.dat'
-                                       '\ndens_hist_tri_location: None\ntri_model_mags_location: None\n'
-                                       'tri_model_mags_interval_location: None\n'
-                                       'tri_n_bright_sources_star_location: None')
+                                       '\ntri_dens_cube_location: None\ntri_dens_array_location: None\n')
         cb_p_ = self.cb_p_text.replace(r'auf_file_path: wise_auf_folder/trilegal_download_{}.dat',
                                        r'auf_file_path: wise_auf_folder/trilegal_download_{}.dat'
-                                       '\ndens_hist_tri_location: None\ntri_model_mags_location: None\n'
-                                       'tri_model_mags_interval_location: None\n'
-                                       'tri_n_bright_sources_star_location: None')
+                                       '\ntri_dens_cube_location: None\ntri_dens_array_location: None\n')
         cm = CrossMatch(mock_filename(cm_p_.encode("utf-8")),
                         mock_filename(ca_p_.encode("utf-8")),
                         mock_filename(cb_p_.encode("utf-8")))
@@ -412,14 +396,10 @@ class TestInputs:
         cm_p_ = self.cm_p_text.replace('include_perturb_auf: False', 'include_perturb_auf: True')
         ca_p_ = self.ca_p_text.replace(r'auf_file_path: gaia_auf_folder/trilegal_download_{}.dat',
                                        r'auf_file_path: gaia_auf_folder/trilegal_download_{}.dat'
-                                       '\ndens_hist_tri_location: None\ntri_model_mags_location: None\n'
-                                       'tri_model_mags_interval_location: None\n'
-                                       'tri_n_bright_sources_star_location: None')
+                                       '\ntri_dens_cube_location: None\ntri_dens_array_location: None\n')
         cb_p_ = self.cb_p_text.replace(r'auf_file_path: wise_auf_folder/trilegal_download_{}.dat',
                                        r'auf_file_path: wise_auf_folder/trilegal_download_{}.dat'
-                                       '\ndens_hist_tri_location: None\ntri_model_mags_location: None\n'
-                                       'tri_model_mags_interval_location: None\n'
-                                       'tri_n_bright_sources_star_location: None')
+                                       '\ntri_dens_cube_location: None\ntri_dens_array_location: None\n')
         cm = CrossMatch(mock_filename(cm_p_.encode("utf-8")),
                         mock_filename(ca_p_.encode("utf-8")),
                         mock_filename(cb_p_.encode("utf-8")))
@@ -477,14 +457,10 @@ class TestInputs:
         cm_p_ = self.cm_p_text.replace('include_perturb_auf: False', 'include_perturb_auf: True')
         ca_p_ = self.ca_p_text.replace(r'auf_file_path: gaia_auf_folder/trilegal_download_{}.dat',
                                        r'auf_file_path: gaia_auf_folder/trilegal_download_{}.dat'
-                                       '\ndens_hist_tri_location: None\ntri_model_mags_location: None\n'
-                                       'tri_model_mags_interval_location: None\n'
-                                       'tri_n_bright_sources_star_location: None')
+                                       '\ntri_dens_cube_location: None\ntri_dens_array_location: None\n')
         cb_p_ = self.cb_p_text.replace(r'auf_file_path: wise_auf_folder/trilegal_download_{}.dat',
                                        r'auf_file_path: wise_auf_folder/trilegal_download_{}.dat'
-                                       '\ndens_hist_tri_location: None\ntri_model_mags_location: None\n'
-                                       'tri_model_mags_interval_location: None\n'
-                                       'tri_n_bright_sources_star_location: None')
+                                      '\ntri_dens_cube_location: None\ntri_dens_array_location: None\n')
 
         cm = CrossMatch(mock_filename(cm_p_.encode("utf-8")), mock_filename(ca_p_.encode("utf-8")),
                         mock_filename(cb_p_.encode("utf-8")))
@@ -513,14 +489,10 @@ class TestInputs:
         cm_p_ = self.cm_p_text.replace('include_perturb_auf: False', 'include_perturb_auf: True')
         ca_p_ = self.ca_p_text.replace(r'auf_file_path: gaia_auf_folder/trilegal_download_{}.dat',
                                        r'auf_file_path: gaia_auf_folder/trilegal_download_{}.dat'
-                                       '\ndens_hist_tri_location: None\ntri_model_mags_location: None\n'
-                                       'tri_model_mags_interval_location: None\n'
-                                       'tri_n_bright_sources_star_location: None')
+                                       '\ntri_dens_cube_location: None\ntri_dens_array_location: None\n')
         cb_p_ = self.cb_p_text.replace(r'auf_file_path: wise_auf_folder/trilegal_download_{}.dat',
                                        r'auf_file_path: wise_auf_folder/trilegal_download_{}.dat'
-                                       '\ndens_hist_tri_location: None\ntri_model_mags_location: None\n'
-                                       'tri_model_mags_interval_location: None\n'
-                                       'tri_n_bright_sources_star_location: None')
+                                       '\ntri_dens_cube_location: None\ntri_dens_array_location: None\n')
 
         cm = CrossMatch(mock_filename(cm_p_.encode("utf-8")), mock_filename(ca_p_.encode("utf-8")),
                         mock_filename(cb_p_.encode("utf-8")))
@@ -1224,14 +1196,10 @@ class TestInputs:
             'saturation_magnitudes: [5, 5, 5, 5]\n')
         ca_p_ = ca_p_.replace(r'auf_file_path: gaia_auf_folder/trilegal_download_{}.dat',
                               r'auf_file_path: gaia_auf_folder/trilegal_download_{}.dat'
-                              '\ndens_hist_tri_location: None\ntri_model_mags_location: None\n'
-                              'tri_model_mags_interval_location: None\n'
-                              'tri_n_bright_sources_star_location: None')
+                              '\ntri_dens_cube_location: None\ntri_dens_array_location: None\n')
         cb_p_ = cb_p_.replace(r'auf_file_path: wise_auf_folder/trilegal_download_{}.dat',
                               r'auf_file_path: wise_auf_folder/trilegal_download_{}.dat'
-                              '\ndens_hist_tri_location: None\ntri_model_mags_location: None\n'
-                              'tri_model_mags_interval_location: None\n'
-                              'tri_n_bright_sources_star_location: None')
+                              '\ntri_dens_cube_location: None\ntri_dens_array_location: None\n')
         ca_p_ = ca_p_.replace('pos_and_err_indices: [0, 1, 2]', 'pos_and_err_indices: [0, 1, 2, 0, 1, 2]')
         ca_p_ = ca_p_.replace('snr_indices: [8, 9, 10]', '')
 
@@ -1451,27 +1419,24 @@ class TestInputs:
         # New test of the AC run, just with pre-made histograms.
         dens, tri_mags, dtri_mags, num_bright_obj = make_tri_counts(
             'wise_auf_folder/trilegal_download_9_131.00_-1.00.dat', 'W1', 0.1, 13.5, 16)
-        dhtl = 'ac_folder/npy/dhtl.npy'
-        np.save(dhtl, [dens, dens, dens, dens])
-        tmml = 'ac_folder/npy/tmml.npy'
-        np.save(tmml, [tri_mags, tri_mags, tri_mags, tri_mags])
-        tmmil = 'ac_folder/npy/tmmil.npy'
-        np.save(tmmil, [dtri_mags, dtri_mags, dtri_mags, dtri_mags])
-        tnbssl = 'ac_folder/npy/tnbssl.npy'
-        np.save(tnbssl, [num_bright_obj, num_bright_obj, num_bright_obj, num_bright_obj])
+        tri_dens_cube = np.empty((3, 4, len(dens), 3), float)
+        for i in range(4):
+            tri_dens_cube[:, i, :, 0] = dens
+            tri_dens_cube[:, i, :, 1] = tri_mags
+            tri_dens_cube[:, i, :, 2] = dtri_mags
+        np.save('ac_folder/npy/tdc.npy', tri_dens_cube)
+        np.save('ac_folder/npy/tda.npy', np.array([[131, -1] * 3]))
 
         cb_p_3 = cb_p_2.replace('auf_file_path: wise_auf_folder/trilegal_download_{}.dat',
                                 'auf_file_path: None')
         lines = cb_p_3.split('\n')
         for ol, nl in zip(['tri_set_name: ', 'tri_filt_names: ', 'tri_filt_num: ', 'download_tri: ',
-                           'tri_maglim_faint: ', 'tri_num_faint: ', 'dens_hist_tri_location: ',
-                           'tri_model_mags_location: ', 'tri_model_mags_interval_location: ',
-                           'tri_n_bright_sources_star_location: '], [
+                           'tri_maglim_faint: ', 'tri_num_faint: ', 'tri_dens_cube: ',
+                           'tri_dens_array: '], [
                 'tri_set_name: None', 'tri_filt_names: None', 'tri_filt_num: None',
                 'download_tri: None', 'tri_maglim_faint: None', 'tri_num_faint: None',
-                f'dens_hist_tri_location: {dhtl}', f'tri_model_mags_location: {tmml}',
-                f'tri_model_mags_interval_location: {tmmil}',
-                f'tri_n_bright_sources_star_location: {tnbssl}']):
+                'tri_dens_cube_location: ac_folder/npy/tdc.npy',
+                'tri_dens_array_location: ac_folder/npy/tda.npy']):
             ind = np.where([ol in x for x in lines])[0][0]
             cb_p_3 = cb_p_3.replace(lines[ind], nl)
         cm = CrossMatch(mock_filename(cm_p_.encode("utf-8")),

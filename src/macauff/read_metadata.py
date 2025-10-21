@@ -343,8 +343,7 @@ def _read_metadata_perturb_auf(joint_config, cat_a_config, cat_b_config):
             for check_flag in ['snr_indices', 'tri_set_name', 'tri_filt_names', 'tri_filt_num',
                                'download_tri', 'psf_fwhms', 'run_fw_auf', 'run_psf_auf',
                                'tri_maglim_faint', 'tri_num_faint', 'gal_al_avs',
-                               'dens_hist_tri_location', 'tri_model_mags_location',
-                               'tri_model_mags_interval_location', 'tri_n_bright_sources_star_location']:
+                               'tri_dens_cube_location', 'tri_dens_array_location']:
                 if check_flag not in config:
                     raise ValueError(f"Missing key {check_flag} from catalogue {catname} metadata file.")
 
@@ -441,11 +440,10 @@ def _read_metadata_perturb_auf(joint_config, cat_a_config, cat_b_config):
             # Assume that we input filenames, including full location, for each
             # pre-computed TRILEGAL histogram file, and that they are all shape
             # (len(filters), ...).
-            for name in ['dens_hist_tri', 'tri_model_mags',
-                         'tri_model_mags_interval', 'tri_n_bright_sources_star']:
+            for name in ['tri_dens_cube', 'tri_dens_array']:
                 f = config[f'{name}_location']
                 if f == "None":
-                    config[f'{name}_list'] = [None] * len(config['filt_names'])
+                    config[name] = None
                 else:
                     if not os.path.isfile(f):
                         raise FileNotFoundError(f"File not found for {name}. Please verify "
@@ -454,19 +452,15 @@ def _read_metadata_perturb_auf(joint_config, cat_a_config, cat_b_config):
                         g = np.load(f)
                     except Exception as exc:
                         raise ValueError(f"File could not be loaded from {name}.") from exc
-                    if name == "dens_hist_tri":
+                    if name == "tri_dens_cube":
                         shape_dht = g.shape
-                        if g.shape[0] != len(config['filt_names']):
+                        if g.shape[1] != len(config['filt_names']):
                             raise ValueError(f"The number of filters in {flag}filt_names and "
-                                             f"{flag}dens_hist_tri do not match.")
+                                             f"{flag}tri_dens_cube do not match.")
                     else:
                         if g.shape[0] != shape_dht[0]:
-                            raise ValueError("The number of filter-elements in dens_hist_tri "
+                            raise ValueError("The number of sky-elements in tri_dens_cube "
                                              f"and {name} do not match.")
-                        if name != "tri_n_bright_sources_star":
-                            if len(g.shape) < 2 or len(shape_dht) < 2 or g.shape[1] != shape_dht[1]:
-                                raise ValueError("The number of magnitude-elements in "
-                                                 f"dens_hist_tri and {name} do not match.")
             # Check for inter- and intra-TRILEGAL parameter compatibility.
             # If any one parameter from option A or B is None, they all
             # should be; and if any (all) options from A are None, zero
@@ -481,14 +475,12 @@ def _read_metadata_perturb_auf(joint_config, cat_a_config, cat_b_config):
                                  f"within the catalogue {catname} cross-match call -- tri_filt_names, "
                                  "tri_set_name, etc. -- should be None or zero of them should be None.")
             run_external_none_flag = [config[name] == "None" for name in
-                                      ['dens_hist_tri_location', 'tri_model_mags_location',
-                                       'tri_model_mags_interval_location',
-                                       'tri_n_bright_sources_star_location']]
+                                      ['tri_dens_cube_location', 'tri_dens_array_location']]
             if not (np.sum(run_external_none_flag) == 0 or
                     np.sum(run_external_none_flag) == len(run_external_none_flag)):
                 raise ValueError("Either all flags related to running TRILEGAL histogram generation "
                                  f"externally to the catalogue {catname} cross-match call -- "
-                                 "dens_hist_tri, tri_model_mags, etc. -- should be None or zero of "
+                                 "tri_dens_cube and tri_dens_array -- should be None or zero of "
                                  "them should be None.")
             if ((np.sum(run_internal_none_flag) == 0 and np.sum(run_external_none_flag) == 0) or
                 (np.sum(run_internal_none_flag) == len(run_internal_none_flag) and

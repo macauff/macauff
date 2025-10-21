@@ -733,6 +733,63 @@ def ball_point_query(iterable):
     return i, kdt_query
 
 
+def _make_regions_points(region_type, region_points, chunk_id):
+    '''
+    Wrapper function for the creation of "region" coordinate tuples,
+    given either a set of rectangular points or a list of coordinates.
+
+    Parameters
+    ----------
+    region_type : list of string and string
+        String containing the kind of system the region pointings are in.
+        Should be "rectangle", regularly sampled points in the two sky
+        coordinates, or "points", individually specified sky coordinates,
+        and the name into which to save the variable in the class.
+    region_points : list of string and list
+        String containing the evaluation points. If ``region_type`` is
+        "rectangle", should be six values, the start and stop values and
+        number of entries of the respective sky coordinates; and if
+        ``region_type`` is "points", ``region_points`` should be tuples
+        of the form ``(a, b)`` separated by whitespace, as well as the
+        class variable name for storage.
+    chunk_id : string
+        Unique identifier for particular sub-region being loaded, used to
+        inform of errors.
+
+    Returns
+    -------
+    points : numpy.ndarray
+        An array of shape (N, 2), with each second-axis pair being a single
+        sky coordinate for each of the N pointings.
+    '''
+    rt = region_type[1].lower()
+    if rt == 'rectangle':
+        try:
+            a = region_points[1]
+            a = [float(point) for point in a]
+        except ValueError as exc:
+            raise ValueError(f"{region_points[0]} should be 6 numbers separated by spaces in chunk "
+                             f"{chunk_id}.") from exc
+        if len(a) == 6:
+            if not a[2].is_integer() or not a[5].is_integer():
+                raise ValueError("Number of steps between start and stop values for "
+                                 f"{region_points[0]} should be integers in chunk {chunk_id}.")
+            ax1_p = np.linspace(a[0], a[1], int(a[2]))
+            ax2_p = np.linspace(a[3], a[4], int(a[5]))
+            points = np.stack(np.meshgrid(ax1_p, ax2_p), -1).reshape(-1, 2)
+        else:
+            raise ValueError(f"{region_points[0]} should be 6 numbers separated by spaces in chunk "
+                             f"{chunk_id}.")
+    elif rt == 'points':
+        try:
+            points = np.array(region_points[1], dtype=float)
+        except ValueError as exc:
+            raise ValueError(f"{region_points[0]} should be a list of two-element lists "
+                             f"'[[a, b], [c, d]]', separated by a comma in chunk {chunk_id}.") from exc
+
+    return points
+
+
 class SharedNumpyArray:
     '''
     Wraps a numpy array so that it can be shared quickly among processes,

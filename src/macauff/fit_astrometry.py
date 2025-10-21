@@ -103,9 +103,8 @@ def derive_astrometric_corrections(self, which):
         tri_num_faint=getattr(self, f'{which}_tri_num_faint'),
         trifilterset=getattr(self, f'{which}_tri_set_name'),
         trifiltnames=getattr(self, f'{which}_tri_filt_names'),
-        tri_hists=getattr(self, f'{which}_dens_hist_tri_list'),
-        tri_magses=getattr(self, f'{which}_tri_model_mags_list'),
-        dtri_magses=getattr(self, f'{which}_tri_model_mags_interval_list'),
+        tri_dens_cube=getattr(self, f'{which}_tri_dens_cube'),
+        tri_dens_array=getattr(self, f'{which}_tri_dens_array'),
         use_photometric_uncertainties=getattr(self, f'{which}_use_photometric_uncertainties'),
         pregenerate_cutouts=True, chunks=[self.chunk_id], n_r=self.real_hankel_points,
         n_rho=self.four_hankel_points, max_rho=self.four_max_rho,
@@ -131,8 +130,8 @@ class AstrometricCorrections:
                  npy_or_csv, coord_or_chunk, pos_and_err_indices, mag_indices, snr_indices,
                  mag_names, correct_astro_mag_indices_index, coord_system, saturation_magnitudes,
                  pregenerate_cutouts, n_r, n_rho, max_rho, mn_fit_type, trifilepath=None, maglim_f=None,
-                 magnum=None, tri_num_faint=None, trifilterset=None, trifiltnames=None, tri_hists=None,
-                 tri_magses=None, dtri_magses=None, use_photometric_uncertainties=False, cutout_area=None,
+                 magnum=None, tri_num_faint=None, trifilterset=None, trifiltnames=None, tri_dens_cube=None,
+                 tri_dens_array=None, use_photometric_uncertainties=False, cutout_area=None,
                  cutout_height=None, single_sided_auf=True, chunks=None, return_nm=False,
                  apply_proper_motion_flag=False, pm_indices=None, pm_ref_epoch_or_index=None,
                  pm_move_to_epoch=None):
@@ -281,39 +280,41 @@ class AstrometricCorrections:
             uncertainties. Must either be "quadratic" or "linear."
         trifilepath : string, optional
             Filepath of the location into which to save TRILEGAL simulations. If
-            provided ``tri_hists``, ``tri_magses`` and, ``dtri_magses``, must be
+            provided ``tri_dens_cube`` and ``tri_dens_array`` must be
             ``None``, and ``maglim_fs``, ``magnums``, ``tri_num_faints``,
             ``trifilterset``, and ``trifiltnames`` must be given. Must contain
             two format ``{}`` options in string, for unique ax1-ax2 sightline
             combination downloads.
         maglim_f : float, optional
             Magnitude in the ``magnum`` filter down to which sources should be
-            drawn for the "faint" sample. Should be ``None`` if ``tri_hists``
-            et al. are provided.
+            drawn for the "faint" sample. Should be ``None`` if ``tri_dens_cube``
+            and ``tri_dens_array`` are provided.
         magnum : float, optional
             Zero-indexed column number of the chosen filter's limiting magnitude.
-            Should be ``None`` if ``tri_hists`` et al. are provided.
+            Should be ``None`` if ``tri_dens_cube`` and ``tri_dens_array`` are
+            provided.
         tri_num_faint : integer, optional
             Approximate number of objects to simulate in the chosen filter for
-            TRILEGAL simulations. Should be ``None`` if ``tri_hists`` et al.
-            are provided.
+            TRILEGAL simulations. Should be ``None`` if ``tri_dens_cube`` and
+            ``tri_dens_array`` are provided.
         trifilterset : string, optional
             Name of the TRILEGAL filter set for which to generate simulations.
-            Should be ``None`` if ``tri_hist`` et al. are provided.
+            Should be ``None`` if ``tri_dens_cube`` and ``tri_dens_array`` are
+            provided.
         trifiltnames : list of string, optional
             Name of the specific filters to generate perturbation AUF component in.
-            Should be ``None`` if ``tri_hists`` et al. are provided.
-        tri_hists : list of numpy.ndarray or None, optional
+            Should be ``None`` if ``tri_dens_cube`` and ``tri_dens_array`` are
+            provided.
+        tri_dens_cube : numpy.ndarray or None, optional
             If given, array of differential source densities, per square degree
-            per magnitude, in the given filters, as computed by
+            per magnitude, along with magnitude bins and intervals, for a set
+            of given filters and sky positions, as computed by
             `~macauff.make_tri_counts`. Must be provided if ``trifilepath`` is
             ``None``, else must itself be ``None``.
-        tri_magses : list of numpy.ndarray, optional
-            Left-hand magnitude bin edges for each bin in ``tri_hist`` for each
-            filter. Must be given if ``tri_hists`` is provided, else ``None``.
-        dtri_magses : list of numpy.ndarray, optional
-            Magnitude bin widths for each ``tri_mags`` bin in all filters.
-            Must be given if ``tri_hists`` is provided, else ``None``.
+        tri_dens_array : numpy.ndarray or None, optional
+            Corresponding sky-coordinate array to extract the relevant column
+            from ``tri_dens_cube``. Must be given if ``tri_dens_cub`` is
+            provided, else ``None``.
         use_photometric_uncertainties : boolean, optional
             Flag for whether or not to use the photometric uncertainties instead
             of astrometric uncertainties when deriving astrometric uncertainties
@@ -435,9 +436,8 @@ class AstrometricCorrections:
         self.gal_filtnames = gal_filtnames
         self.gal_alavs = gal_alavs
 
-        self.tri_hists = tri_hists
-        self.tri_magses = tri_magses
-        self.dtri_magses = dtri_magses
+        self.tri_dens_cube = tri_dens_cube
+        self.tri_dens_array = tri_dens_array
 
         self.dm = dm
 
@@ -574,8 +574,8 @@ class AstrometricCorrections:
             Must be given if ``pregenerate_cutouts`` is ``False``.
         tri_download : boolean or None, optional
             Flag determining if TRILEGAL simulations should be re-downloaded
-            if they already exist on disk. Should be ``None`` if ``tri_hist``
-            et al. were given in initialisation.
+            if they already exist on disk. Should be ``None`` if
+            ``tri_dens_cube`` was given in initialisation.
         overwrite_all_sightlines : boolean, optional
             Flag for whether to create a totally fresh run of astrometric
             corrections, regardless of whether``mn_sigs_array`` is saved on
@@ -627,9 +627,8 @@ class AstrometricCorrections:
             raise ValueError("tri_download must either be True, False, or None.")
         if self.trifilepath is not None and tri_download not in (True, False):
             raise ValueError("tri_download must either be True or False if trifilepath given.")
-        if tri_download is not None and self.tri_hists is not None and (isinstance(
-                self.tri_hists, (list, np.ndarray)) and not np.any([q is None for q in self.tri_hists])):
-            raise ValueError("tri_download must be None if tri_hists is given.")
+        if tri_download is not None and self.tri_dens_cube is not None:
+            raise ValueError("tri_download must be None if tri_dens_cube is given.")
         if make_plots and seeing_ranges is None:
             raise ValueError("seeing_ranges must be provided if make_plots is True.")
         if make_plots:
@@ -806,9 +805,18 @@ class AstrometricCorrections:
                     # selected out of a list.
                     self.trifiltname = self.trifiltnames[p]
                 else:
-                    self.tri_hist = self.tri_hists[p]
-                    self.tri_mags = self.tri_magses[p]
-                    self.dtri_mags = self.dtri_magses[p]
+                    # tri_dens_cube is of shape (S, F, x, 3), and we need to
+                    # determine which index into S and F we want. Assume that
+                    # we put our filter indices in the "right" order, and then
+                    # pull nearest-neighbour sky position.
+                    sky_index = mff.find_nearest_point([ax1_mid], [ax2_mid], self.tri_dens_array[:, 0],
+                                                       self.tri_dens_array[:, 1])[0]
+                    self.tri_hist = self.tri_dens_cube[sky_index, p, :, 0]
+                    self.tri_hist = self.tri_hist[~np.isnan(self.tri_hist)]
+                    self.tri_mags = self.tri_dens_cube[sky_index, p, :, 0]
+                    self.tri_mags = self.tri_mags[~np.isnan(self.tri_mags)]
+                    self.dtri_mags = self.tri_dens_cube[sky_index, p, :, 0]
+                    self.dtri_mags = self.dtri_mags[~np.isnan(self.dtri_mags)]
 
                 self.psf_radius = 1.185 * self.psf_fwhm
                 self.psfsig = self.psf_fwhm / (2 * np.sqrt(2 * np.log(2)))
