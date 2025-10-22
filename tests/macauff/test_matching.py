@@ -260,7 +260,7 @@ class TestInputs:
                 [FileNotFoundError, ValueError, ValueError, ValueError],
                 ['File not found for tri_dens_cube. Please verify',
                  'Either all flags related to running TRILEGAL histogram generation externa',
-                 'File could not be loaded from dens_hist_tri',
+                 'File could not be loaded from tri_dens_cube',
                  'number of filters in a_filt_names and a_tri_dens_cube']):
             if 'npy' in location and 'number of filters in' in match_text:
                 np.save(location, np.ones((3, 5, 10), float))
@@ -278,7 +278,7 @@ class TestInputs:
         ind = np.where(['tri_dens_cube_location' in x for x in lines])[0][0]
         ca_p_2 = ca_p_.replace(lines[ind], 'tri_dens_cube_location: data/dens_hist_tri.npy')
         for file, match_text in zip([np.ones((5, 2), float)],
-                                    ['The number of sky-elements in dens_hist_tri and tri_model_mags']):
+                                    ['The number of sky-elements in tri_dens_cube and tri_dens_array']):
             np.save('tri_model_coords.npy', file)
             lines = ca_p_2.split('\n')
             ind = np.where(['tri_dens_array_location' in x for x in lines])[0][0]
@@ -304,9 +304,9 @@ class TestInputs:
         cm._load_metadata_config(self.chunk_id)
         assert cm.b_auf_file_path is None
         assert np.all([b is None for b in cm.a_tri_filt_names])
-        assert np.all(cm.a_dens_hist_tri_list == np.ones((3, 10), float))  # pylint: disable=no-member
-        # pylint: disable-next=no-member
-        assert np.all(cm.b_tri_n_bright_sources_star_list == np.ones((4,), float))
+        assert np.all(cm.a_tri_dens_cube == np.ones((3, 3, 10, 3), float))  # pylint: disable=no-member
+        assert np.all(cm.b_tri_dens_cube == np.ones((3, 4, 10, 3), float))  # pylint: disable=no-member
+        assert np.all(cm.b_tri_dens_array == np.ones((3, 2), float))
 
     def test_crossmatch_folder_path_inputs(self):
         cm = CrossMatch(os.path.join(os.path.dirname(__file__), 'data/crossmatch_params.yaml'),
@@ -460,7 +460,7 @@ class TestInputs:
                                        '\ntri_dens_cube_location: None\ntri_dens_array_location: None\n')
         cb_p_ = self.cb_p_text.replace(r'auf_file_path: wise_auf_folder/trilegal_download_{}.dat',
                                        r'auf_file_path: wise_auf_folder/trilegal_download_{}.dat'
-                                      '\ntri_dens_cube_location: None\ntri_dens_array_location: None\n')
+                                       '\ntri_dens_cube_location: None\ntri_dens_array_location: None\n')
 
         cm = CrossMatch(mock_filename(cm_p_.encode("utf-8")), mock_filename(ca_p_.encode("utf-8")),
                         mock_filename(cb_p_.encode("utf-8")))
@@ -1417,7 +1417,7 @@ class TestInputs:
         assert np.all(cm.a_in_overlaps == 0)
 
         # New test of the AC run, just with pre-made histograms.
-        dens, tri_mags, dtri_mags, num_bright_obj = make_tri_counts(
+        dens, tri_mags, dtri_mags = make_tri_counts(
             'wise_auf_folder/trilegal_download_9_131.00_-1.00.dat', 'W1', 0.1, 13.5, 16)
         tri_dens_cube = np.empty((3, 4, len(dens), 3), float)
         for i in range(4):
@@ -1425,14 +1425,14 @@ class TestInputs:
             tri_dens_cube[:, i, :, 1] = tri_mags
             tri_dens_cube[:, i, :, 2] = dtri_mags
         np.save('ac_folder/npy/tdc.npy', tri_dens_cube)
-        np.save('ac_folder/npy/tda.npy', np.array([[131, -1] * 3]))
+        np.save('ac_folder/npy/tda.npy', np.array([[131, -1]] * 3))
 
         cb_p_3 = cb_p_2.replace('auf_file_path: wise_auf_folder/trilegal_download_{}.dat',
                                 'auf_file_path: None')
         lines = cb_p_3.split('\n')
         for ol, nl in zip(['tri_set_name: ', 'tri_filt_names: ', 'tri_filt_num: ', 'download_tri: ',
-                           'tri_maglim_faint: ', 'tri_num_faint: ', 'tri_dens_cube: ',
-                           'tri_dens_array: '], [
+                           'tri_maglim_faint: ', 'tri_num_faint: ', 'tri_dens_cube_location: ',
+                           'tri_dens_array_location: '], [
                 'tri_set_name: None', 'tri_filt_names: None', 'tri_filt_num: None',
                 'download_tri: None', 'tri_maglim_faint: None', 'tri_num_faint: None',
                 'tri_dens_cube_location: ac_folder/npy/tdc.npy',

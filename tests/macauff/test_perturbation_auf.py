@@ -386,69 +386,6 @@ class TestMakePerturbAUFs():
         return a
 
     @pytest.mark.remote_data
-    def test_create_single_low_numbers(self):
-        density_radius = np.sqrt(1 / np.pi / np.exp(8.7))
-
-        d_mag = 0.1
-
-        # Fake up a TRILEGAL simulation data file.
-        text = ('#area = 140.0 sq deg\n#Av at infinity = 1\n'
-                'Gc logAge [M/H] m_ini   logL   logTe logg  m-M0   Av    '
-                'm2/m1 mbol   J      H      Ks     IRAC_3.6 IRAC_4.5 IRAC_5.8 IRAC_8.0 MIPS_24 '
-                'MIPS_70 MIPS_160 W1     W2     W3     W4       Mact\n')
-        # This won't be enough objects, so we'll trigger the error message later.
-        for _ in range(3):
-            text = text + (
-                '1   6.65 -0.39  0.02415 -2.701 3.397  4.057 14.00  8.354 0.00 25.523 25.839 '
-                '24.409 23.524 22.583 22.387 22.292 22.015 21.144 19.380 20.878 15.001 22.391 '
-                '21.637 21.342  0.024\n1   6.65 -0.39  0.02415 -2.701 3.397  4.057 14.00 8.354 '
-                '0.00 25.523 25.839 24.409 23.524 22.583 22.387 22.292 22.015 21.144 19.380 20.878 '
-                '15.002 22.391 21.637 21.342  0.024\n 1   6.65 -0.39  0.02415 -2.701 3.397  4.057 '
-                '14.00 8.354 0.00 25.523 25.839 24.409 23.524 22.583 22.387 22.292 22.015 21.144 '
-                '19.380 20.878 15.003 22.391 21.637 21.342  0.024\n 1   6.65 -0.39  0.02415 -2.701 '
-                '3.397  4.057 14.00  8.354 0.00 25.523 25.839 24.409 23.524 22.583 22.387 22.292 '
-                '22.015 21.144 19.380 20.878 15.004 22.391 21.637 21.342  0.024\n\n 1   6.65 -0.39 '
-                ' 0.02415 -2.701 3.397  4.057 14.00  8.354 0.00 25.523 25.839 24.409 23.524 22.583 '
-                '22.387 22.292 22.015 21.144 19.380 20.878 100.99 22.391 21.637 21.342  0.024\n')
-
-        with open(f'{self.auf_folder}/trilegal_auf_simulation_{self.auf_points[0][0]:.2f}_'
-                  f'{self.auf_points[0][1]:.2f}_faint.dat', "w", encoding='utf-8') as f:
-            f.write(text)
-        f.close()
-
-        self.fake_cm = self.make_class()
-        self.fake_cm.b_tri_set_name = 'WISE'
-        self.fake_cm.b_tri_filt_num = 11
-        self.fake_cm.b_tri_filt_names = self.tri_filt_names
-        self.fake_cm.b_tri_maglim_faint = 32
-        self.fake_cm.b_tri_num_faint = 1000000
-        self.fake_cm.b_auf_region_frame = 'galactic'
-        self.fake_cm.b_psf_fwhms = self.psf_fwhms
-        self.fake_cm.num_trials = self.num_trials
-        self.fake_cm.d_mag = d_mag
-        self.fake_cm.delta_mag_cuts = self.delta_mag_cuts
-        self.fake_cm.b_fit_gal_flag = False
-        self.fake_cm.b_dens_dist = density_radius
-        self.fake_cm.b_run_fw_auf = True
-        self.fake_cm.b_run_psf_auf = False
-        self.fake_cm.b_gal_al_avs = [0]
-        self.fake_cm.b_download_tri = False
-        self.fake_cm.b_astro = np.array([[0.3, 0.3, 0.1]] * 101)
-        self.fake_cm.b_astro[0, [0, 1]] = [0.3, 0.31]
-        self.fake_cm.b_astro[1, [0, 1]] = [0.31, 0.3]
-        self.fake_cm.b_astro[2, [0, 1]] = [0.31, 0.31]
-        self.fake_cm.b_photo = np.array([np.concatenate(([14.99], [100]*100))]).T.reshape(-1, 1)
-        self.fake_cm.b_snr = np.array([100] * 101).reshape(-1, 1)
-        self.fake_cm.b_magref = np.array([0] * 101)
-        self.fake_cm.b_dens_hist_tri_list = [None] * len(self.filters)
-        self.fake_cm.b_tri_model_mags_list = [None] * len(self.filters)
-        self.fake_cm.b_tri_model_mags_interval_list = [None] * len(self.filters)
-        self.fake_cm.b_tri_n_bright_sources_star_list = [None] * len(self.filters)
-        self.fake_cm.n_pool = 1
-        with pytest.raises(ValueError, match="The number of simulated objects in this sky patch "):
-            make_perturb_aufs(self.fake_cm, 'b')
-
-    @pytest.mark.remote_data
     def test_psf_algorithm(self):  # pylint: disable=too-many-locals
         # Number of sources per PSF circle, on average, solved backwards to ensure
         # that local density ends up exactly in the middle of a count_array bin.
@@ -542,10 +479,8 @@ class TestMakePerturbAUFs():
             self.fake_cm.l_cut = l_cut
             self.fake_cm.b_gal_al_avs = [0]
             self.fake_cm.b_download_tri = False
-            self.fake_cm.b_dens_hist_tri_list = [None] * len(self.filters)
-            self.fake_cm.b_tri_model_mags_list = [None] * len(self.filters)
-            self.fake_cm.b_tri_model_mags_interval_list = [None] * len(self.filters)
-            self.fake_cm.b_tri_n_bright_sources_star_list = [None] * len(self.filters)
+            self.fake_cm.b_tri_dens_cube = None
+            self.fake_cm.b_tri_dens_array = None
             # Have to fudge extra sources to keep our 15th mag source in the local
             # density cutout.
             # Add extra sources to force a 0.1-0.9 square convex hull cutout.
@@ -725,9 +660,13 @@ class TestMakePerturbAUFs():
                     f'{self.auf_folder}/trilegal_download_9_{self.auf_points[0][0]:.2f}_'
                     f'{self.auf_points[0][1]:.2f}.dat', getattr(cm, f'{flag}tri_filt_names')[0], cm.d_mag,
                     np.amin(a_photo), dens_mag)
-                setattr(cm, f'{flag}dens_hist_tri_list', [dens])
-                setattr(cm, f'{flag}tri_model_mags_list', [tri_mags])
-                setattr(cm, f'{flag}tri_model_mags_interval_list', [dtri_mags])
+                d = np.empty((1, 1, len(dens), 3))
+                d[0, 0, :, 0] = dens
+                d[0, 0, :, 1] = tri_mags
+                d[0, 0, :, 2] = dtri_mags
+                setattr(cm, f'{flag}tri_dens_cube', d)
+                setattr(cm, f'{flag}tri_dens_array',
+                        np.array([[self.auf_points[0][0], self.auf_points[0][1]]]))
 
             cm.a_auf_file_path = None
             cm.b_auf_file_path = None

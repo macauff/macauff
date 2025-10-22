@@ -1137,7 +1137,7 @@ class AstrometricCorrections:
         if self.trifilepath is not None:
             # Don't pass the _faint-appended filepath to make_tri_counts, since it
             # handles that itself.
-            tri_hist, tri_mags, dtri_mags, _ = make_tri_counts(
+            tri_hist, tri_mags, dtri_mags = make_tri_counts(
                 self.trifilepath.format(ax1_mid, ax2_mid), self.trifiltname, self.dm, np.amin(b_mag_data),
                 maxmag, al_av=self.gal_alav, av_grid=avs)
         else:
