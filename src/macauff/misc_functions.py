@@ -578,8 +578,7 @@ def make_pool(n_pool):
     """
     if n_pool == 1:
         return mpd.Pool(n_pool)
-    else:
-        return multiprocessing.Pool(n_pool)
+    return multiprocessing.Pool(n_pool)
 
 
 def calculate_overlap_counts(a, b, minmag, maxmag, search_radius, n_pool, mag_ind, ax1_ind, ax2_ind,
