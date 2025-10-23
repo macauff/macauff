@@ -6,7 +6,6 @@ their respective uncertainties across two catalogues.
 '''
 
 import itertools
-import multiprocessing
 import sys
 import warnings
 
@@ -14,6 +13,8 @@ import numpy as np
 import scipy.special
 
 __all__ = ['set_list']
+
+from macauff.misc_functions import make_pool
 
 
 def set_list(aindices, bindices, aoverlap, boverlap, n_pool):
@@ -80,7 +81,7 @@ def set_list(aindices, bindices, aoverlap, boverlap, n_pool):
     grouplengthexceeded = np.zeros(dtype=bool, shape=(len(agrouplengths),))
     counter = np.arange(0, len(agrouplengths))
     iter_group = zip(counter, agrouplengths, bgrouplengths, itertools.repeat(maxiters))
-    with multiprocessing.Pool(n_pool) as pool:
+    with make_pool(n_pool) as pool:
         for return_items in pool.imap_unordered(_calc_group_length_exceeded, iter_group,
                                                 chunksize=max(1, len(counter) // n_pool)):
             i, len_exceeded_flag = return_items
