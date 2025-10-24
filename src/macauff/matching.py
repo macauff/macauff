@@ -492,10 +492,7 @@ class CrossMatch():
         for config, flag in zip([self.cat_a_params_dict, self.cat_b_params_dict], ['a_', 'b_']):
             if self.crossmatch_params_dict['include_perturb_auf'] or config['correct_astrometry']:
                 for name in ['tri_dens_cube', 'tri_dens_array']:
-                    # If location variable was "None" in the first place we set
-                    # {name}_list in config to a list of Nones and it got updated
-                    # above already.
-                    if config[f'{name}_location'] != "None":
+                    if f'{name}_location' in config:
                         setattr(self, f'{flag}{name}', np.load(config[f'{name}_location']))
 
     def _load_metadata_config_params(self, chunk_id):

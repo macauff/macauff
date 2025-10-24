@@ -85,15 +85,9 @@ class TestInputs:
                                   [131, 1], [132, 1], [133, 1], [134, 1]]))
 
         cm_p_ = self.cm_p_text.replace('include_perturb_auf: False', 'include_perturb_auf: True')
-        ca_p_ = self.ca_p_text.replace(r'auf_file_path: gaia_auf_folder/trilegal_download_{}.dat',
-                                       r'auf_file_path: gaia_auf_folder/trilegal_download_{}.dat'
-                                       '\ntri_dens_cube_location: None\ntri_dens_array_location: None\n')
-        cb_p_ = self.cb_p_text.replace(r'auf_file_path: wise_auf_folder/trilegal_download_{}.dat',
-                                       r'auf_file_path: wise_auf_folder/trilegal_download_{}.dat' + '\n'
-                                       'tri_dens_cube_location: None\ntri_dens_array_location: None\n')
 
-        cm = CrossMatch(mock_filename(cm_p_.encode("utf-8")), mock_filename(ca_p_.encode("utf-8")),
-                        mock_filename(cb_p_.encode("utf-8")))
+        cm = CrossMatch(mock_filename(cm_p_.encode("utf-8")), mock_filename(self.ca_p_text.encode("utf-8")),
+                        mock_filename(self.cb_p_text.encode("utf-8")))
         cm._load_metadata_config(self.chunk_id)
         assert cm.a_auf_region_frame == 'equatorial'  # pylint: disable=no-member
         assert_allclose(cm.a_auf_region_points,
@@ -229,26 +223,27 @@ class TestInputs:
         ca_p_ = self.ca_p_text.replace(r'auf_file_path: gaia_auf_folder/trilegal_download_{}.dat',
                                        r'auf_file_path: None'
                                        '\ntri_dens_cube_location: None\ntri_dens_array_location: None\n')
-        with pytest.raises(ValueError,
-                           match="Either all flags related to running TRILEGAL histogram generation within"):
+        with pytest.raises(ValueError, match="Ambiguity in whether TRILEGAL histogram generation is being "):
             cm = CrossMatch(mock_filename(cm_p_.encode("utf-8")),
                             mock_filename(ca_p_.encode("utf-8")),
                             os.path.join(os.path.dirname(__file__), 'data/cat_b_params.yaml'))
             cm._load_metadata_config(self.chunk_id)
 
-        cb_p_ = self.cb_p_text.replace(r'auf_file_path: wise_auf_folder/trilegal_download_{}.dat',
-                                       r'auf_file_path: None'
-                                       '\ntri_dens_cube_location: None\ntri_dens_array_location: None\n')
+        # Force some copies.
+        ca_p_ = self.ca_p_text.replace('auf_file_path: ', 'auf_file_path: ')
+        cb_p_ = self.cb_p_text.replace('auf_file_path: ', 'auf_file_path: ')
+        # Remove all file-based inputs altogether.
         for flag in ['a', 'b']:
-            for name in ['tri_set_name', 'tri_filt_names', 'tri_filt_num', 'download_tri',
+            for name in ['auf_file_path', 'tri_set_name', 'tri_filt_names', 'tri_filt_num', 'download_tri',
                          'tri_maglim_faint', 'tri_num_faint']:
                 lines = ca_p_.split('\n') if flag == 'a' else cb_p_.split('\n')
                 ind = np.where([name in x for x in lines])[0][0]
                 if flag == 'a':
-                    ca_p_ = ca_p_.replace(lines[ind], f'{lines[ind].split(":")[0]}: None')
+                    ca_p_ = ca_p_.replace(lines[ind], '')
                 else:
-                    cb_p_ = cb_p_.replace(lines[ind], f'{lines[ind].split(":")[0]}: None')
-        # With everything set to None we hit the "can't have anything set" error:
+                    cb_p_ = cb_p_.replace(lines[ind], '')
+        # This should hit an error due to having neither option provided while
+        # include_perturb_auf is True.
         with pytest.raises(ValueError, match="Ambiguity in whether TRILEGAL histogram generation is being "):
             cm = CrossMatch(mock_filename(cm_p_.encode("utf-8")),
                             mock_filename(ca_p_.encode("utf-8")),
@@ -259,48 +254,43 @@ class TestInputs:
                  os.path.join(os.path.dirname(__file__), 'data/cat_a_params.yaml'), 'data/dens_hist_tri.npy'],
                 [FileNotFoundError, ValueError, ValueError, ValueError],
                 ['File not found for tri_dens_cube. Please verify',
-                 'Either all flags related to running TRILEGAL histogram generation externa',
+                 'Missing key tri_dens_array_location from catalogue "a" ',
                  'File could not be loaded from tri_dens_cube',
                  'number of filters in a_filt_names and a_tri_dens_cube']):
             if 'npy' in location and 'number of filters in' in match_text:
                 np.save(location, np.ones((3, 5, 10), float))
             elif 'npy' in location:
                 np.save(location, np.ones((3, 3, 10), float))
-            lines = ca_p_.split('\n')
-            ind = np.where(['tri_dens_cube_location' in x for x in lines])[0][0]
-            ca_p_2 = ca_p_.replace(lines[ind], f'tri_dens_cube_location: {location}')
+            if 'npy' in location and 'Missing key ' in match_text:
+                ca_p_2 = ca_p_ + f'\n\ntri_dens_cube_location: {location}\n'
+            else:
+                ca_p_2 = ca_p_ + (f'\n\ntri_dens_cube_location: {location}\n'
+                                  f'tri_dens_array_location: {location}')
             with pytest.raises(error, match=match_text):
                 cm = CrossMatch(mock_filename(cm_p_.encode("utf-8")),
                                 mock_filename(ca_p_2.encode("utf-8")),
                                 mock_filename(cb_p_.encode("utf-8")))
         np.save('data/dens_hist_tri.npy', np.ones((2, 3, 10), float))
-        lines = ca_p_.split('\n')
-        ind = np.where(['tri_dens_cube_location' in x for x in lines])[0][0]
-        ca_p_2 = ca_p_.replace(lines[ind], 'tri_dens_cube_location: data/dens_hist_tri.npy')
+        ca_p_2 = ca_p_ + '\n\ntri_dens_cube_location: data/dens_hist_tri.npy'
         for file, match_text in zip([np.ones((5, 2), float)],
                                     ['The number of sky-elements in tri_dens_cube and tri_dens_array']):
             np.save('tri_model_coords.npy', file)
-            lines = ca_p_2.split('\n')
-            ind = np.where(['tri_dens_array_location' in x for x in lines])[0][0]
-            ca_p_2 = ca_p_2.replace(lines[ind], 'tri_dens_array_location: tri_model_coords.npy')
+            ca_p_3 = ca_p_2 + '\n\ntri_dens_array_location: tri_model_coords.npy'
             with pytest.raises(ValueError, match=match_text):
                 cm = CrossMatch(mock_filename(cm_p_.encode("utf-8")),
-                                mock_filename(ca_p_2.encode("utf-8")),
+                                mock_filename(ca_p_3.encode("utf-8")),
                                 mock_filename(cb_p_.encode("utf-8")))
         for catname, nfilts in zip(['a', 'b'], [3, 4]):
             for file, file_name in zip([np.ones((3, nfilts, 10, 3), float), np.ones((3, 2), float)],
                                        ['tri_dens_cube', 'tri_dens_array']):
                 np.save(f'data/{catname}_{file_name}.npy', file)
-                lines = ca_p_.split('\n') if catname == 'a' else cb_p_.split('\n')
-                ind = np.where([file_name in x for x in lines])[0][0]
-                location = f'data/{catname}_{file_name}.npy'
-                if catname == 'a':
-                    ca_p_ = ca_p_.replace(lines[ind], f'{file_name}_location: {location}')
-                else:
-                    cb_p_ = cb_p_.replace(lines[ind], f'{file_name}_location: {location}')
+        ca_p_2 = ca_p_ + ('\n\ntri_dens_cube_location: data/a_tri_dens_cube.npy\n'
+                          'tri_dens_array_location: data/a_tri_dens_array.npy')
+        cb_p_2 = cb_p_ + ('\n\ntri_dens_cube_location: data/b_tri_dens_cube.npy\n'
+                          'tri_dens_array_location: data/b_tri_dens_array.npy')
         cm = CrossMatch(mock_filename(cm_p_.encode("utf-8")),
-                        mock_filename(ca_p_.encode("utf-8")),
-                        mock_filename(cb_p_.encode("utf-8")))
+                        mock_filename(ca_p_2.encode("utf-8")),
+                        mock_filename(cb_p_2.encode("utf-8")))
         cm._load_metadata_config(self.chunk_id)
         assert cm.b_auf_file_path is None
         assert np.all([b is None for b in cm.a_tri_filt_names])
@@ -322,14 +312,9 @@ class TestInputs:
 
         # List of simple one line config file replacements for error message checking
         for old_line, new_line, match_text, error, fn in zip(
-                ['output_save_folder: test_path', 'output_save_folder: test_path',
-                 r'auf_file_path: gaia_auf_folder/trilegal_download_{}.dat',
-                 r'auf_file_path: wise_auf_folder/trilegal_download_{}.dat'],
-                ['', 'output_save_folder: /User/test/some/path/\n', '',
-                 'auf_file_path: /User/test/some/path\n'],
-                ['Missing key', 'Error when trying to create folder',
-                 'Missing key auf_file_path from catalogue "a"',
-                 'folder for catalogue "b" AUF outputs. Please ensure that b_auf_file_path'],
+                ['output_save_folder: test_path', 'output_save_folder: test_path'],
+                ['', 'output_save_folder: /User/test/some/path/\n'],
+                ['Missing key', 'Error when trying to create folder'],
                 [ValueError, OSError, ValueError, OSError], ['c', 'c', 'a', 'b']):
             _cmp = self.cm_p_text.replace(old_line, new_line) if fn == 'c' else self.cm_p_text
             _cap = self.ca_p_text.replace(old_line, new_line) if fn == 'a' else self.ca_p_text
@@ -342,15 +327,9 @@ class TestInputs:
 
     def test_crossmatch_tri_inputs(self):
         cm_p_ = self.cm_p_text.replace('include_perturb_auf: False', 'include_perturb_auf: True')
-        ca_p_ = self.ca_p_text.replace(r'auf_file_path: gaia_auf_folder/trilegal_download_{}.dat',
-                                       r'auf_file_path: gaia_auf_folder/trilegal_download_{}.dat'
-                                       '\ntri_dens_cube_location: None\ntri_dens_array_location: None\n')
-        cb_p_ = self.cb_p_text.replace(r'auf_file_path: wise_auf_folder/trilegal_download_{}.dat',
-                                       r'auf_file_path: wise_auf_folder/trilegal_download_{}.dat'
-                                       '\ntri_dens_cube_location: None\ntri_dens_array_location: None\n')
         cm = CrossMatch(mock_filename(cm_p_.encode("utf-8")),
-                        mock_filename(ca_p_.encode("utf-8")),
-                        mock_filename(cb_p_.encode("utf-8")))
+                        mock_filename(self.ca_p_text.encode("utf-8")),
+                        mock_filename(self.cb_p_text.encode("utf-8")))
         cm._load_metadata_config(self.chunk_id)
         assert cm.a_tri_set_name == 'gaiaDR2'
         assert np.all(cm.b_tri_filt_names == np.array(['W1', 'W2', 'W3', 'W4']))  # pylint: disable=no-member
@@ -378,8 +357,8 @@ class TestInputs:
                  'tri_num_faint should be a single integer number in catalogue "a"'],
                 ['cat_a_params', 'cat_b_params', 'cat_b_params', 'cat_a_params', 'cat_a_params',
                  'cat_b_params', 'cat_b_params', 'cat_a_params', 'cat_a_params']):
-            _cap = ca_p_.replace(old_line, new_line) if '_a_' in in_file else ca_p_
-            _cbp = cb_p_.replace(old_line, new_line) if '_b_' in in_file else cb_p_
+            _cap = self.ca_p_text.replace(old_line, new_line) if '_a_' in in_file else self.ca_p_text
+            _cbp = self.cb_p_text.replace(old_line, new_line) if '_b_' in in_file else self.cb_p_text
             with pytest.raises(ValueError, match=match_text):
                 cm = CrossMatch(mock_filename(cm_p_.encode("utf-8")),
                                 mock_filename(_cap.encode("utf-8")),
@@ -394,20 +373,9 @@ class TestInputs:
         assert np.all(cm.b_filt_names == np.array(['W1', 'W2', 'W3', 'W4']))
 
         cm_p_ = self.cm_p_text.replace('include_perturb_auf: False', 'include_perturb_auf: True')
-        ca_p_ = self.ca_p_text.replace(r'auf_file_path: gaia_auf_folder/trilegal_download_{}.dat',
-                                       r'auf_file_path: gaia_auf_folder/trilegal_download_{}.dat'
-                                       '\ntri_dens_cube_location: None\ntri_dens_array_location: None\n')
-        cb_p_ = self.cb_p_text.replace(r'auf_file_path: wise_auf_folder/trilegal_download_{}.dat',
-                                       r'auf_file_path: wise_auf_folder/trilegal_download_{}.dat'
-                                       '\ntri_dens_cube_location: None\ntri_dens_array_location: None\n')
         cm = CrossMatch(mock_filename(cm_p_.encode("utf-8")),
-                        mock_filename(ca_p_.encode("utf-8")),
-                        mock_filename(cb_p_.encode("utf-8")))
-        cm._load_metadata_config(self.chunk_id)
-
-        cm = CrossMatch(mock_filename(cm_p_.encode("utf-8")),
-                        mock_filename(ca_p_.encode("utf-8")),
-                        mock_filename(cb_p_.encode("utf-8")))
+                        mock_filename(self.ca_p_text.encode("utf-8")),
+                        mock_filename(self.cb_p_text.encode("utf-8")))
         cm._load_metadata_config(self.chunk_id)
         assert np.all(cm.a_psf_fwhms == np.array([0.12, 0.12, 0.12]))  # pylint: disable=no-member
 
@@ -422,8 +390,8 @@ class TestInputs:
                  'b_psf_fwhms and b_filt_names should contain the same',
                  'psf_fwhms should be a list of floats in catalogue "b".'],
                 ['cat_a_params', 'cat_a_params', 'cat_b_params', 'cat_b_params']):
-            _cap = ca_p_.replace(old_line, new_line) if '_a_' in in_file else ca_p_
-            _cbp = cb_p_.replace(old_line, new_line) if '_b_' in in_file else cb_p_
+            _cap = self.ca_p_text.replace(old_line, new_line) if '_a_' in in_file else self.ca_p_text
+            _cbp = self.cb_p_text.replace(old_line, new_line) if '_b_' in in_file else self.cb_p_text
             if 'gal_al_avs' in match_text:
                 _cap = _cap.replace('mag_indices: [3, 4, 5]', 'mag_indices: [3, 4]')
                 _cap = _cap.replace('snr_indices: [8, 9, 10]', 'snr_indices: [8, 9]')
@@ -455,15 +423,9 @@ class TestInputs:
         assert cm.pos_corr_dist == 11
 
         cm_p_ = self.cm_p_text.replace('include_perturb_auf: False', 'include_perturb_auf: True')
-        ca_p_ = self.ca_p_text.replace(r'auf_file_path: gaia_auf_folder/trilegal_download_{}.dat',
-                                       r'auf_file_path: gaia_auf_folder/trilegal_download_{}.dat'
-                                       '\ntri_dens_cube_location: None\ntri_dens_array_location: None\n')
-        cb_p_ = self.cb_p_text.replace(r'auf_file_path: wise_auf_folder/trilegal_download_{}.dat',
-                                       r'auf_file_path: wise_auf_folder/trilegal_download_{}.dat'
-                                       '\ntri_dens_cube_location: None\ntri_dens_array_location: None\n')
 
-        cm = CrossMatch(mock_filename(cm_p_.encode("utf-8")), mock_filename(ca_p_.encode("utf-8")),
-                        mock_filename(cb_p_.encode("utf-8")))
+        cm = CrossMatch(mock_filename(cm_p_.encode("utf-8")), mock_filename(self.ca_p_text.encode("utf-8")),
+                        mock_filename(self.cb_p_text.encode("utf-8")))
         cm._load_metadata_config(self.chunk_id)
         assert np.all(cm.a_psf_fwhms == np.array([0.12, 0.12, 0.12]))  # pylint: disable=no-member
         assert cm.b_dens_dist == 0.25
@@ -476,8 +438,8 @@ class TestInputs:
                  'Missing key dens_dist from catalogue "b"', 'dens_dist in catalogue "a" must'],
                 ['c', 'c', 'b', 'a']):
             _cmp = cm_p_.replace(old_line, new_line) if fn == 'c' else cm_p_
-            _cap = ca_p_.replace(old_line, new_line) if fn == 'a' else ca_p_
-            _cbp = cb_p_.replace(old_line, new_line) if fn == 'b' else cb_p_
+            _cap = self.ca_p_text.replace(old_line, new_line) if fn == 'a' else self.ca_p_text
+            _cbp = self.cb_p_text.replace(old_line, new_line) if fn == 'b' else self.cb_p_text
             with pytest.raises(ValueError, match=match_text):
                 cm = CrossMatch(mock_filename(_cmp.encode("utf-8")),
                                 mock_filename(_cap.encode("utf-8")),
@@ -487,15 +449,9 @@ class TestInputs:
     # pylint: disable-next=too-many-statements
     def test_crossmatch_perturb_auf_inputs(self):
         cm_p_ = self.cm_p_text.replace('include_perturb_auf: False', 'include_perturb_auf: True')
-        ca_p_ = self.ca_p_text.replace(r'auf_file_path: gaia_auf_folder/trilegal_download_{}.dat',
-                                       r'auf_file_path: gaia_auf_folder/trilegal_download_{}.dat'
-                                       '\ntri_dens_cube_location: None\ntri_dens_array_location: None\n')
-        cb_p_ = self.cb_p_text.replace(r'auf_file_path: wise_auf_folder/trilegal_download_{}.dat',
-                                       r'auf_file_path: wise_auf_folder/trilegal_download_{}.dat'
-                                       '\ntri_dens_cube_location: None\ntri_dens_array_location: None\n')
 
-        cm = CrossMatch(mock_filename(cm_p_.encode("utf-8")), mock_filename(ca_p_.encode("utf-8")),
-                        mock_filename(cb_p_.encode("utf-8")))
+        cm = CrossMatch(mock_filename(cm_p_.encode("utf-8")), mock_filename(self.ca_p_text.encode("utf-8")),
+                        mock_filename(self.cb_p_text.encode("utf-8")))
         cm._load_metadata_config(self.chunk_id)
         assert cm.num_trials == 10000
         assert cm.d_mag == 0.1  # pylint: disable=no-member
@@ -511,14 +467,14 @@ class TestInputs:
             _cmp = cm_p_.replace(old_line, new_line)
             with pytest.raises(ValueError, match=match_text):
                 cm = CrossMatch(mock_filename(_cmp.encode("utf-8")),
-                                mock_filename(ca_p_.encode("utf-8")),
-                                mock_filename(cb_p_.encode("utf-8")))
+                                mock_filename(self.ca_p_text.encode("utf-8")),
+                                mock_filename(self.cb_p_text.encode("utf-8")))
 
         for old_line, var_name in zip(['fit_gal_flag: False', 'run_fw_auf: True', 'run_psf_auf: False'],
                                       ['fit_gal_flag', 'run_fw_auf', 'run_psf_auf']):
             for cat_reg, fn in zip(['"a"', '"b"'], ['a', 'b']):
-                _cap = ca_p_.replace(old_line, '') if fn == 'a' else ca_p_
-                _cbp = cb_p_.replace(old_line, '') if fn == 'b' else cb_p_
+                _cap = self.ca_p_text.replace(old_line, '') if fn == 'a' else self.ca_p_text
+                _cbp = self.cb_p_text.replace(old_line, '') if fn == 'b' else self.cb_p_text
                 with pytest.raises(ValueError, match=f'Missing key {var_name} from catalogue {cat_reg}'):
                     cm = CrossMatch(mock_filename(cm_p_.encode("utf-8")),
                                     mock_filename(_cap.encode("utf-8")),
@@ -534,8 +490,8 @@ class TestInputs:
         lc = np.ones(3, float)
         np.save(lc_path, lc)
 
-        ca_p_2 = ca_p_.replace('run_psf_auf: False', 'run_psf_auf: True')
-        cb_p_2 = cb_p_.replace('run_psf_auf: False', 'run_psf_auf: True')
+        ca_p_2 = self.ca_p_text.replace('run_psf_auf: False', 'run_psf_auf: True')
+        cb_p_2 = self.cb_p_text.replace('run_psf_auf: False', 'run_psf_auf: True')
 
         for fn, array, err_msg in zip([
                 'dd_params', 'dd_params', 'dd_params', 'dd_params', 'l_cut', 'l_cut'],
@@ -561,16 +517,15 @@ class TestInputs:
         os.system(f"mv {str(ddp_path).replace('.npy', '2.npy')} {ddp_path}")
         os.system(f"mv {str(lc_path).replace('.npy', '2.npy')} {lc_path}")
 
-        ca_p_2 = ca_p_.replace('fit_gal_flag: False', 'fit_gal_flag: True\ngal_wavs: [0.513, 0.641, 0.778]\n'
-                               'gal_zmax: [4.5, 4.5, 5]\ngal_nzs: [46, 46, 51]\n'
-                               'gal_aboffsets: [0.5, 0.5, 0.5]\n'
-                               'gal_filternames: [gaiadr2-BP, gaiadr2-G, gaiadr2-RP]\n'
-                               'saturation_magnitudes: [5, 5, 5]\n')
-        cb_p_2 = cb_p_.replace('fit_gal_flag: False', 'fit_gal_flag: True\n'
-                               'gal_wavs: [3.37, 4.62, 12.08, 22.19]\ngal_zmax: [3.2, 4.0, 1, 4]\n'
-                               'gal_nzs: [33, 41, 11, 41]\ngal_aboffsets: [0.5, 0.5, 0.5, 0.5]\n'
-                               'gal_filternames: [wise2010-W1, wise2010-W2, wise2010-W3, wise2010-W4]\n'
-                               'saturation_magnitudes: [5, 5, 5, 5]\n')
+        ca_p_2 = self.ca_p_text.replace(
+            'fit_gal_flag: False', 'fit_gal_flag: True\ngal_wavs: [0.513, 0.641, 0.778]\n'
+            'gal_zmax: [4.5, 4.5, 5]\ngal_nzs: [46, 46, 51]\ngal_aboffsets: [0.5, 0.5, 0.5]\n'
+            'gal_filternames: [gaiadr2-BP, gaiadr2-G, gaiadr2-RP]\nsaturation_magnitudes: [5, 5, 5]\n')
+        cb_p_2 = self.cb_p_text.replace(
+            'fit_gal_flag: False', 'fit_gal_flag: True\ngal_wavs: [3.37, 4.62, 12.08, 22.19]\n'
+            'gal_zmax: [3.2, 4.0, 1, 4]\ngal_nzs: [33, 41, 11, 41]\ngal_aboffsets: [0.5, 0.5, 0.5, 0.5]\n'
+            'gal_filternames: [wise2010-W1, wise2010-W2, wise2010-W3, wise2010-W4]\n'
+            'saturation_magnitudes: [5, 5, 5, 5]\n')
         cm = CrossMatch(mock_filename(cm_p_.encode("utf-8")),
                         mock_filename(ca_p_2.encode("utf-8")),
                         mock_filename(cb_p_2.encode("utf-8")))
@@ -1194,12 +1149,6 @@ class TestInputs:
             'gal_nzs: [33, 41, 11, 41]\ngal_aboffsets: [0.5, 0.5, 0.5, 0.5]\n'
             'gal_filternames: [wise2010-W1, wise2010-W2, wise2010-W3, wise2010-W4]\n'
             'saturation_magnitudes: [5, 5, 5, 5]\n')
-        ca_p_ = ca_p_.replace(r'auf_file_path: gaia_auf_folder/trilegal_download_{}.dat',
-                              r'auf_file_path: gaia_auf_folder/trilegal_download_{}.dat'
-                              '\ntri_dens_cube_location: None\ntri_dens_array_location: None\n')
-        cb_p_ = cb_p_.replace(r'auf_file_path: wise_auf_folder/trilegal_download_{}.dat',
-                              r'auf_file_path: wise_auf_folder/trilegal_download_{}.dat'
-                              '\ntri_dens_cube_location: None\ntri_dens_array_location: None\n')
         ca_p_ = ca_p_.replace('pos_and_err_indices: [0, 1, 2]', 'pos_and_err_indices: [0, 1, 2, 0, 1, 2]')
         ca_p_ = ca_p_.replace('snr_indices: [8, 9, 10]', '')
 
@@ -1427,18 +1376,17 @@ class TestInputs:
         np.save('ac_folder/npy/tdc.npy', tri_dens_cube)
         np.save('ac_folder/npy/tda.npy', np.array([[131, -1]] * 3))
 
-        cb_p_3 = cb_p_2.replace('auf_file_path: wise_auf_folder/trilegal_download_{}.dat',
-                                'auf_file_path: None')
-        lines = cb_p_3.split('\n')
-        for ol, nl in zip(['tri_set_name: ', 'tri_filt_names: ', 'tri_filt_num: ', 'download_tri: ',
-                           'tri_maglim_faint: ', 'tri_num_faint: ', 'tri_dens_cube_location: ',
-                           'tri_dens_array_location: '], [
-                'tri_set_name: None', 'tri_filt_names: None', 'tri_filt_num: None',
-                'download_tri: None', 'tri_maglim_faint: None', 'tri_num_faint: None',
-                'tri_dens_cube_location: ac_folder/npy/tdc.npy',
-                'tri_dens_array_location: ac_folder/npy/tda.npy']):
-            ind = np.where([ol in x for x in lines])[0][0]
-            cb_p_3 = cb_p_3.replace(lines[ind], nl)
+        # Remove all file-based inputs altogether.
+        cb_p_3 = cb_p_2.replace('auf_file_path: ', 'auf_file_path: ')
+        for name in ['auf_file_path', 'tri_set_name', 'tri_filt_names', 'tri_filt_num', 'download_tri',
+                     'tri_maglim_faint', 'tri_num_faint']:
+            lines = cb_p_3.split('\n')
+            ind = np.where([name in x for x in lines])[0][0]
+            cb_p_3 = cb_p_3.replace(lines[ind], '')
+        ind = np.where([name in x for x in lines])[0][0]
+        cb_p_3 = cb_p_3 + ('tri_dens_cube_location: ac_folder/npy/tdc.npy\n'
+                           'tri_dens_array_location: ac_folder/npy/tda.npy')
+
         cm = CrossMatch(mock_filename(cm_p_.encode("utf-8")),
                         mock_filename(cb_p_3.encode("utf-8")),
                         mock_filename(self.ca_p_text.encode("utf-8")))

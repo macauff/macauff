@@ -636,11 +636,6 @@ class TestMakePerturbAUFs():
 
         # Fake this the easy way both times, then below correct the parameters
         # for the precompute_hist version of the test.
-        old_line = r'auf_file_path: auf_folder/trilegal_download_{}.dat'
-        new_line = (r'auf_file_path: auf_folder/trilegal_download_{}.dat' + '\ntri_dens_cube_location: None\n'
-                    'tri_dens_array_location: None')
-        ca_p_ = ca_p_.replace(old_line, new_line)
-        cb_p_ = cb_p_.replace(old_line, new_line)
         ca_p_ = ca_p_.replace(r'cat_csv_file_path: gaia_folder/gaia_{}.csv',
                               r'cat_csv_file_path: cat_folder/cat_{}.csv')
         cb_p_ = cb_p_.replace(r'cat_csv_file_path: wise_folder/wise_{}.csv',
@@ -827,11 +822,6 @@ class TestMakePerturbAUFs():
                            'chunk_overlap_col: 4', 'best_mag_index_col: 5', 'snr_indices: [6]']):
             cb_p_ = cb_p_.replace(ol, nl)
 
-        old_line = r'auf_file_path: auf_folder/trilegal_download_{}.dat'
-        new_line = (r'auf_file_path: auf_folder/trilegal_download_{}.dat' + '\ntri_dens_cube_location: None\n'
-                    'tri_dens_array_location: None')
-        ca_p_ = ca_p_.replace(old_line, new_line)
-        cb_p_ = cb_p_.replace(old_line, new_line)
         ca_p_ = ca_p_.replace(r'cat_csv_file_path: gaia_folder/gaia_{}.csv',
                               r'cat_csv_file_path: cat_folder/cat_{}.csv')
         cb_p_ = cb_p_.replace(r'cat_csv_file_path: wise_folder/wise_{}.csv',
