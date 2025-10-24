@@ -6,6 +6,7 @@ framework.
 
 import itertools
 import multiprocessing
+import multiprocessing.dummy as mpd
 from multiprocessing import shared_memory
 
 import numpy as np
@@ -560,6 +561,26 @@ def create_densities(b, minmag, maxmag, hull, hull_x_shift, search_radius, n_poo
     return narray
 
 
+def make_pool(n_pool):
+    """
+    Create a multiprocessing pool, either of real processes or threads.
+
+    Parameters
+    ----------
+    n_pool : integer
+        Number of parallel threads to run when calculating densities via
+        ``multiprocessing``. If 1, use threads instead of processes.
+
+    Returns
+    -------
+    pool : multiprocessing.Pool or multiprocessing.dummy.Pool
+        The created pool of processes or threads.
+    """
+    if n_pool == 1:
+        return mpd.Pool(n_pool)
+    return multiprocessing.Pool(n_pool)
+
+
 def calculate_overlap_counts(a, b, minmag, maxmag, search_radius, n_pool, mag_ind, ax1_ind, ax2_ind,
                              coord_system, len_or_inds, unique_shared_id):
     """
@@ -664,7 +685,7 @@ def calculate_overlap_counts(a, b, minmag, maxmag, search_radius, n_pool, mag_in
 
     counter = np.arange(0, len(a))
     iter_group = zip(counter, full_ucoords, itertools.repeat([mag_cut_kdt, r, len_or_inds]))
-    with multiprocessing.Pool(n_pool) as pool:
+    with make_pool(n_pool) as pool:
         for stuff in pool.imap_unordered(ball_point_query, iter_group, chunksize=len(a)//n_pool):
             i, result = stuff
             if len_or_inds == 'len':

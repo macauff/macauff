@@ -6,11 +6,12 @@ stars.
 '''
 
 import itertools
-import multiprocessing
 
 import numpy as np
 
 __all__ = ['calculate_proper_motions']
+
+from macauff.misc_functions import make_pool
 
 
 def calculate_proper_motions(d, l, b, temp, n):
@@ -92,7 +93,7 @@ def calculate_proper_motions(d, l, b, temp, n):
                      itertools.repeat([l, b, d]), itertools.repeat(n), itertools.repeat([r, z]),
                      itertools.repeat([r_sol, z_sol]), itertools.repeat([oort_a, oort_b]),
                      itertools.repeat([l_thin, l_thick]))
-    with multiprocessing.Pool(n_pool) as pool:
+    with make_pool(n_pool) as pool:
         for stuff in pool.imap_unordered(calc_pm, iter_group,
                                          chunksize=max(1, len(d) // n_pool)):
             j, mu_a, mu_d, mu_l, mu_b = stuff

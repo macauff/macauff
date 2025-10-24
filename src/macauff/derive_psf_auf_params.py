@@ -7,7 +7,6 @@ the detector.
 '''
 
 import itertools
-import multiprocessing
 import os
 import shutil
 
@@ -17,6 +16,8 @@ from matplotlib import cm, gridspec
 from matplotlib.colors import Normalize
 from scipy.optimize import basinhopping, minimize
 from scipy.special import erf  # pylint: disable=no-name-in-module
+
+from macauff.misc_functions import make_pool
 
 # Assume that usetex = False only applies for tests where no TeX is installed
 # at all, instead of users having half-installed TeX, dvipng et al. somewhere.
@@ -131,7 +132,7 @@ class FitPSFPerturbations:
 
         ij = itertools.product(np.arange(len(self.li)), np.arange(len(self.di)))
         iter_array = zip(ij, itertools.repeat([self.li, self.di, self.psf_sig]))
-        with multiprocessing.Pool(self.n_pool) as pool:
+        with make_pool(self.n_pool) as pool:
             for return_values in pool.imap_unordered(
                     self.min_parallel_dd_fit, iter_array,
                     chunksize=int(len(self.li) * len(self.di)/self.n_pool)):
@@ -322,7 +323,7 @@ class FitPSFPerturbations:
             iter_group = zip(counter, iter_rep)
             res = None
             min_val = None
-            with multiprocessing.Pool(n_pools) as pool:
+            with make_pool(n_pools) as pool:
                 for return_res in pool.imap_unordered(self.dd_fitting_wrapper, iter_group,
                                                       chunksize=n_overloop):
                     if min_val is None or return_res.fun < min_val:
@@ -509,7 +510,7 @@ class FitPSFPerturbations:
             ij = np.arange(len(ns))
             iter_array = zip(ij, itertools.repeat([ns, dd_skew_pars[q, :], self.li[q],
                                                    self.di[-1]/self.psf_sig]))
-            with multiprocessing.Pool(self.n_pool) as pool:
+            with make_pool(self.n_pool) as pool:
                 for results in pool.imap_unordered(self.min_parallel_dd_param_fit, iter_array,
                                                    chunksize=max(1, int(len(ns)/self.n_pool))):
                     j, n, resses = results
@@ -851,7 +852,7 @@ class FitPSFPerturbations:
         ij = np.arange(diff.shape[0])
         iter_array = zip(ij, itertools.repeat([self.psf_fwhm, self.psf_sig, l_cut,
                                                dd_params_full, ns[n_ind], n_ind]))
-        with multiprocessing.Pool(self.n_pool) as pool:
+        with make_pool(self.n_pool) as pool:
             for results in pool.imap_unordered(self.loop_ind_fit, iter_array,
                                                chunksize=int(diff.shape[0]/self.n_pool)):
                 i, dx, _li, x, ddparams = results
