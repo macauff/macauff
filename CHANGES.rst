@@ -4,6 +4,10 @@
 General
 ^^^^^^^
 
+- Pre-generated TRILEGAL histogram requirements changed, from single-pointing
+  differential source counts per chunk to a cube of all pointings, loaded
+  prior to chunk-parallelisation. [#97]
+
 - Refactored folder structure and input parameter file workflow, removing the
   parameter file, AUF files, and saved output sub-folders. [#90]
 
@@ -15,6 +19,10 @@ General
 
 New Features
 ^^^^^^^^^^^^
+
+- New function ``generate_trilegal_histogram_cube`` to pre-create the
+  multi-dimensional array of TRILEGAL differential source counts and corresponding
+  magnitudes per sky pointing and filter. [#97]
 
 - New function ``apply_proper_motion``, allowing for catalogues with motion data
   to be moved forwards or backwards in time, to align with a dataset with
@@ -53,6 +61,20 @@ Bug Fixes
 
 API Changes
 ^^^^^^^^^^^
+
+- Removed ``dens_hist_tri_location``, ``tri_model_mags_location``,
+  ``tri_model_mag_mids_location``, ``tri_model_mags_interval_location``,
+  ``tri_model_mags_uncert_location``, ``tri_n_bright_sources_star_location``, and
+  added ``tri_dens_cube_location`` and ``tri_dens_array_location`` as input catalogue
+  parameters. [#97]
+
+- ``auf_file_path``, ``tri_set_name``, et al., should no longer be passed as ``None``
+  when ``tri_dens_cube`` is used, instead no longer being passed to ``CrossMatch``
+  at all; similarly, when passing the file-based parameters, do not pass
+  ``tri_dens_array_location``, instead of passing ``None``. [#97]
+
+- Removed ``dd_params_path`` and ``l_cut_path``, always reading the files from
+  within the package location. [#93]
 
 - Added catalogue-specific parameters ``apply_proper_motion``, ``pm_indices``,
   and ``ref_epoch_or_index``, along with joint-parameter
