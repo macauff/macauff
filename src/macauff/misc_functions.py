@@ -787,7 +787,7 @@ def _make_regions_points(region_type, region_points, chunk_id):
             raise ValueError(f"{region_points[0]} should be a list of two-element lists "
                              f"'[[a, b], [c, d]]', separated by a comma in chunk {chunk_id}.") from exc
 
-    return points
+    return points  # pylint: disable=possibly-used-before-assignment
 
 
 class SharedNumpyArray:

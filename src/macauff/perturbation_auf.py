@@ -657,8 +657,8 @@ def create_single_perturb_auf(r, dr, j0s, num_trials, psf_fwhm, density_mag, a_p
     # TODO: extend to allow a Galactic source model that doesn't depend on TRILEGAL  pylint: disable=fixme
     if tri_file_path is not None:
         dens_hist_tri, model_mags, model_mags_interval = make_tri_counts(
-            tri_file_path, filt_header, d_mag, np.amin(a_photo), density_mag, al_av=al_av, av_grid=avs)
-        model_mag_mids = model_mags+model_mags_interval/2
+            tri_file_path, filt_header, d_mag, np.amin(a_photo), al_av=al_av, av_grid=avs)
+    model_mag_mids = model_mags+model_mags_interval/2
 
     log10y_tri = -np.inf * np.ones_like(dens_hist_tri)
     log10y_tri[dens_hist_tri > 0] = np.log10(dens_hist_tri[dens_hist_tri > 0])
@@ -681,7 +681,7 @@ def create_single_perturb_auf(r, dr, j0s, num_trials, psf_fwhm, density_mag, a_p
         # If we're not generating galaxy counts, we have to solely rely on
         # TRILEGAL counting statistics, so we only want to keep populated bins.
         hc = np.where(dens_hist_tri > 0)[0]
-        model_mag_mids = (model_mags+model_mags_interval/2)[hc]
+        model_mag_mids = model_mag_mids[hc]
         model_mags_interval = model_mags_interval[hc]
         log10y_tri = log10y_tri[hc]
 
@@ -800,7 +800,7 @@ def create_single_perturb_auf(r, dr, j0s, num_trials, psf_fwhm, density_mag, a_p
 
 # pylint: disable=too-many-locals,too-many-statements
 def make_tri_counts(trifilepath, trifiltname, dm, brightest_source_mag,
-                    density_mag, use_bright=False, use_faint=True, al_av=None, av_grid=None):
+                    use_bright=False, use_faint=True, al_av=None, av_grid=None):
     """
     Combine TRILEGAL simulations for a given line of sight in the Galaxy, using
     both a "bright" simulation, with a brighter magnitude limit that allows for
@@ -822,10 +822,6 @@ def make_tri_counts(trifilepath, trifiltname, dm, brightest_source_mag,
     brightest_source_mag : float
         Magnitude in the appropriate ``trifiltname`` bandpass of the brightest
         source that these simulations are relevant for.
-    density_mag : float
-        The magnitude at which the counts of the corresponding dataset this
-        TRILEGAL simulation is for turns over, suffering completeness limit
-        effects.
     use_bright : boolean, optional
         Controls whether we load a "bright" set of TRILEGAL sources or not.
     use_faint : boolean, optional
@@ -1065,7 +1061,7 @@ def _calculate_magnitude_offsets(count_array, mag_array, b, snr, model_mag_mids,
 
 def generate_trilegal_histogram_cube(auf_points, auf_file_path, tri_set_name, tri_filt_names, tri_filt_num,
                                      tri_maglim_faint, tri_num_faint, tri_download_flag, auf_region_frame,
-                                     auf_region_type, min_area, min_mag, d_mag, dens_mags, al_avs, avs=None,
+                                     auf_region_type, min_area, min_mag, d_mag, al_avs, avs=None,
                                      avs_random_sample_radius=None):
     r"""
     Convenience function to generate the hyper-cube and accompanying ID
@@ -1118,10 +1114,6 @@ def generate_trilegal_histogram_cube(auf_points, auf_file_path, tri_set_name, tr
         TRILEGAL densities for.
     d_mag : float
         Width of the magnitude bins to generate density histograms with.
-    dens_mags : list or numpy.ndarray of floats
-        For each ``tri_filt_names`` filter, the magnitude brighter than which
-        to compute the normalising source density and calculate
-        ``num_bright_obj`` within `~macauff.make_tri_counts`.
     al_avs : list or numpy.ndarray of floats
         The extinction vector, :math:`\frac{A_\lambda}{A_V}`, for each filter
         in ``tri_filt_names``.
@@ -1187,10 +1179,9 @@ def generate_trilegal_histogram_cube(auf_points, auf_file_path, tri_set_name, tr
                                          av=1, sigma_av=0, total_objs=tri_num_faint,
                                          rank=0, chunk_id=1)
 
-        for j in range(len(tri_filt_names)):
+        for j, tri_filt_name in enumerate(tri_filt_names):
             dens_hist_tri, model_mags, model_mags_interval = make_tri_counts(
-                new_auf_file_path, tri_filt_names[j], d_mag, min_mag, dens_mags[j],
-                al_av=al_avs[j], av_grid=avs[i])
+                new_auf_file_path, tri_filt_name, d_mag, min_mag, al_av=al_avs[j], av_grid=avs[i])
 
             if len(dens_hist_tri) > cube.shape[2]:
                 temp_cube = np.copy(cube)

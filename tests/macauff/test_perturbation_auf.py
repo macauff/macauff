@@ -648,13 +648,10 @@ class TestMakePerturbAUFs():
 
         if precompute_tri_hists:
             for flag in ['a_', 'b_']:
-                _a_photo = y
-                hist, bins = np.histogram(_a_photo[~np.isnan(_a_photo)], bins='auto')
-                dens_mag = (bins[:-1]+np.diff(bins)/2)[np.argmax(hist)] - 0.5
                 dens, tri_mags, dtri_mags = make_tri_counts(
                     f'{self.auf_folder}/trilegal_download_9_{self.auf_points[0][0]:.2f}_'
                     f'{self.auf_points[0][1]:.2f}.dat', getattr(cm, f'{flag}tri_filt_names')[0], cm.d_mag,
-                    np.amin(a_photo), dens_mag)
+                    np.amin(a_photo))
                 d = np.empty((1, 1, len(dens), 3))
                 d[0, 0, :, 0] = dens
                 d[0, 0, :, 1] = tri_mags
@@ -929,7 +926,7 @@ def test_make_tri_counts(run_type):  # pylint: disable=too-many-branches
             out.writelines(script)
     if run_type != "neither":
         dens, tri_mags, tri_mag_intervals = make_tri_counts(
-            'trilegal_auf_simulation.dat', 'W1', 0.1, 5 if run_type != "faint" else 10, 20,
+            'trilegal_auf_simulation.dat', 'W1', 0.1, 5 if run_type != "faint" else 10,
             use_bright=run_type != "faint", use_faint=run_type != "bright")
         if run_type == "both":
             assert_allclose(tri_mags[0], 5, atol=0.1)
@@ -969,17 +966,17 @@ def test_make_tri_counts(run_type):  # pylint: disable=too-many-branches
     else:
         with pytest.raises(ValueError, match="use_bright and use_faint cannot both be "):
             dens, tri_mags, _ = make_tri_counts(
-                'trilegal_auf_simulation.dat', 'W1', 0.1, 10, 20, use_bright=False,
+                'trilegal_auf_simulation.dat', 'W1', 0.1, 10, use_bright=False,
                 use_faint=False)
 
     if run_type == "both":
         with pytest.raises(ValueError, match="If one of al_av or av_grid is provided "):
             dens, tri_mags, _ = make_tri_counts(
-                'trilegal_auf_simulation.dat', 'W1', 0.1, 5, 20,
+                'trilegal_auf_simulation.dat', 'W1', 0.1, 5,
                 use_bright=False, use_faint=True, al_av=0.9)
 
         dens, tri_mags, tri_mag_intervals = make_tri_counts(
-            'trilegal_auf_simulation.dat', 'W1', 0.1, 5, 20, use_bright=True, use_faint=True,
+            'trilegal_auf_simulation.dat', 'W1', 0.1, 5, use_bright=True, use_faint=True,
             al_av=0.9, av_grid=np.array([2, 2, 2, 2, 2]))
         assert_allclose(tri_mags[0], 5 + 0.9, atol=0.1)
         assert_allclose(tri_mags[-1], 19 + 0.9, atol=0.1)
@@ -1011,7 +1008,7 @@ def test_make_tri_counts(run_type):  # pylint: disable=too-many-branches
             out.writelines(lines)
         with pytest.raises(ValueError, match="tri_av_inf_faint cannot be smaller than 0.1 while"):
             dens, tri_mags, _ = make_tri_counts(
-                'trilegal_auf_simulation.dat', 'W1', 0.1, 10, 20,
+                'trilegal_auf_simulation.dat', 'W1', 0.1, 10,
                 use_bright=False, use_faint=True, al_av=0.9, av_grid=np.array([2, 2, 2, 2]))
     if run_type == "bright":
         ol = '#Av at infinity = 1'
@@ -1026,7 +1023,7 @@ def test_make_tri_counts(run_type):  # pylint: disable=too-many-branches
             out.writelines(lines)
         with pytest.raises(ValueError, match="tri_av_inf_bright cannot be smaller than 0.1 while"):
             dens, tri_mags, _ = make_tri_counts(
-                'trilegal_auf_simulation.dat', 'W1', 0.1, 5, 20,
+                'trilegal_auf_simulation.dat', 'W1', 0.1, 5,
                 use_bright=True, use_faint=False, al_av=0.9, av_grid=np.array([2, 2, 2, 2]))
 
 

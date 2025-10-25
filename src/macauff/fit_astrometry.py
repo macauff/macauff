@@ -1139,7 +1139,7 @@ class AstrometricCorrections:
             # handles that itself.
             tri_hist, tri_mags, dtri_mags = make_tri_counts(
                 self.trifilepath.format(ax1_mid, ax2_mid), self.trifiltname, self.dm, np.amin(b_mag_data),
-                maxmag, al_av=self.gal_alav, av_grid=avs)
+                al_av=self.gal_alav, av_grid=avs)
         else:
             tri_hist, tri_mags = self.tri_hist, self.tri_mags
             dtri_mags = self.dtri_mags

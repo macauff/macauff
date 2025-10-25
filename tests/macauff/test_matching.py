@@ -296,7 +296,7 @@ class TestInputs:
         assert np.all([b is None for b in cm.a_tri_filt_names])
         assert np.all(cm.a_tri_dens_cube == np.ones((3, 3, 10, 3), float))  # pylint: disable=no-member
         assert np.all(cm.b_tri_dens_cube == np.ones((3, 4, 10, 3), float))  # pylint: disable=no-member
-        assert np.all(cm.b_tri_dens_array == np.ones((3, 2), float))
+        assert np.all(cm.b_tri_dens_array == np.ones((3, 2), float))  # pylint: disable=no-member
 
     def test_crossmatch_folder_path_inputs(self):
         cm = CrossMatch(os.path.join(os.path.dirname(__file__), 'data/crossmatch_params.yaml'),
@@ -1367,7 +1367,7 @@ class TestInputs:
 
         # New test of the AC run, just with pre-made histograms.
         dens, tri_mags, dtri_mags = make_tri_counts(
-            'wise_auf_folder/trilegal_download_9_131.00_-1.00.dat', 'W1', 0.1, 13.5, 16)
+            'wise_auf_folder/trilegal_download_9_131.00_-1.00.dat', 'W1', 0.1, 13.5)
         tri_dens_cube = np.empty((3, 4, len(dens), 3), float)
         for i in range(4):
             tri_dens_cube[:, i, :, 0] = dens
