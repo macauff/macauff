@@ -813,9 +813,9 @@ class AstrometricCorrections:
                                                        self.tri_dens_array[:, 1])[0]
                     self.tri_hist = self.tri_dens_cube[sky_index, p, :, 0]
                     self.tri_hist = self.tri_hist[~np.isnan(self.tri_hist)]
-                    self.tri_mags = self.tri_dens_cube[sky_index, p, :, 0]
+                    self.tri_mags = self.tri_dens_cube[sky_index, p, :, 1]
                     self.tri_mags = self.tri_mags[~np.isnan(self.tri_mags)]
-                    self.dtri_mags = self.tri_dens_cube[sky_index, p, :, 0]
+                    self.dtri_mags = self.tri_dens_cube[sky_index, p, :, 2]
                     self.dtri_mags = self.dtri_mags[~np.isnan(self.dtri_mags)]
 
                 self.psf_radius = 1.185 * self.psf_fwhm
