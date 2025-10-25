@@ -1088,7 +1088,7 @@ def generate_trilegal_histogram_cube(auf_points, auf_file_path, tri_set_name, tr
         ``tri_set_name``, that we wish to extract differential sky counts for.
     tri_filt_num : int
         The one-indexed filter index, for all magnitudes simulated in
-        ``tri_set_name`, that defines the maximum magnitude used in the
+        ``tri_set_name``, that defines the maximum magnitude used in the
         simulation.
     tri_maglim_faint : float
         Corresponding magnitude down to which the ``tri_filt_num`` filter is to
@@ -1117,7 +1117,7 @@ def generate_trilegal_histogram_cube(auf_points, auf_file_path, tri_set_name, tr
     al_avs : list or numpy.ndarray of floats
         The extinction vector, :math:`\frac{A_\lambda}{A_V}`, for each filter
         in ``tri_filt_names``.
-    avs: list of list of floats, or numpy.ndarray, optional
+    avs : list of list of floats, or numpy.ndarray, optional
         Either a nested list or shape (N, M) array of V-band extinctions, such
         that ``avs[i]`` is a list of the reddenings for the ``i``th position in
         ``auf_points``. If not supplied then it will be computed at each coord;
@@ -1132,9 +1132,7 @@ def generate_trilegal_histogram_cube(auf_points, auf_file_path, tri_set_name, tr
     Returns
     -------
     array : numpy.ndarray
-        Shape (N, M, 3) array, containing the sky coordinates and bright-N
-        calculation from `~macauff.make_tri_counts` for each pointing-filter
-        combination.
+        Shape (N, 2) array, containing the sky coordinates for each pointing.
     cube : numpy.ndarray
         Shape (N, M, X, 3) array, containing the counts per magnitude per
         square degree histogram, left-hand magnitude bins, and bin widths, for
