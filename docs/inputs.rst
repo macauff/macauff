@@ -158,11 +158,7 @@ These can be divided into those inputs that are always required:
 
 those that are only required if the `Joint Parameters`_ option ``include_perturb_auf`` is ``True``:
 
-``fit_gal_flag``, ``run_fw_auf``, ``run_psf_auf``, ``psf_fwhms``, ``download_tri``, ``tri_set_name``, ``tri_filt_names``, ``tri_filt_num``, ``tri_maglim_faint``, ``tri_num_faint``, ``gal_al_avs``, ``dens_dist``, ``snr_indices``, ``dens_hist_tri_location``, ``tri_model_mags_location``, ``tri_model_mag_mids_location``, ``tri_model_mags_interval_location``, and ``tri_n_bright_sources_star_location``;
-
-parameters required if ``run_psf_auf`` is ``True``:
-
-``dd_params_path`` and ``l_cut_path``;
+``fit_gal_flag``, ``run_fw_auf``, ``run_psf_auf``, ``psf_fwhms``, ``download_tri``, ``tri_set_name``, ``tri_filt_names``, ``tri_filt_num``, ``tri_maglim_faint``, ``tri_num_faint``, ``gal_al_avs``, ``dens_dist``, ``snr_indices``, ``tri_dens_cube_location``, and ``tri_dens_array_location``;
 
 the inputs required in each catalogue parameters file if ``fit_gal_flag`` is ``True`` (and hence ``include_perturb_auf`` is ``True``):
 
@@ -177,7 +173,7 @@ the inputs required if ``correct_astrometry`` is ``True``:
 ``correct_astro_save_folder``, ``correct_astro_mag_indices_index``, ``nn_radius``, ``ref_cat_csv_file_path``, ``correct_mag_array``, ``correct_mag_slice``, ``correct_sig_slice``, ``use_photometric_uncertainties``, ``saturation_magnitudes``, and ``ref_apply_proper_motion``;
 
 .. note::
-    ``run_fw_auf``, ``run_psf_auf``, ``psf_fwhms``, ``download_tri``, ``tri_set_name``, ``tri_filt_names``, ``tri_filt_num``, ``tri_maglim_faint``, ``tri_num_faint``, ``dens_dist``, ``dd_params_path``, ``l_cut_path``, ``gal_wavs``, ``gal_zmax``, ``gal_nzs``, ``gal_aboffsets``, ``gal_filternames``, ``gal_al_avs``, and ``snr_indices`` are all currently required if ``correct_astrometry`` is ``True``, bypassing the nested flags above. For example, ``dens_dist`` is required as an input if ``include_perturb_auf`` is ``True``, or if ``correct_astrometry`` is set. This means that ``AstrometricCorrections`` implicitly always runs and fits for a full Astrometric Uncertainty Function.
+    ``run_fw_auf``, ``run_psf_auf``, ``psf_fwhms``, ``download_tri``, ``tri_set_name``, ``tri_filt_names``, ``tri_filt_num``, ``tri_maglim_faint``, ``tri_num_faint``, ``dens_dist``, ``gal_wavs``, ``gal_zmax``, ``gal_nzs``, ``gal_aboffsets``, ``gal_filternames``, ``gal_al_avs``, and ``snr_indices`` are all currently required if ``correct_astrometry`` is ``True``, bypassing the nested flags above. For example, ``dens_dist`` is required as an input if ``include_perturb_auf`` is ``True``, or if ``correct_astrometry`` is set. This means that ``AstrometricCorrections`` implicitly always runs and fits for a full Astrometric Uncertainty Function.
 
 the inputs required if ``apply_proper_motion`` is ``True``:
 
@@ -225,7 +221,7 @@ The filter names of the photometric bandpasses used in this catalogue, in the or
 
 ``auf_file_path``
 
-The folder and file name into which the Astrometric Uncertainty Function (AUF) related files will be, or have been, saved. Can also either be an absolute or relative path, like ``cat_csv_file_path``. Alternatively, this can (and must) be ``None`` if all parameters related to loading pre-computed TRILEGAL histograms (``dens_hist_tri_location`` et al.) are provided. Requires ``_{}`` in the string for chunking purposes.
+The folder and file name into which the Astrometric Uncertainty Function (AUF) related files will be, or have been, saved. Can also either be an absolute or relative path, like ``cat_csv_file_path``. Alternatively, this can (and must) be ``None`` if all parameters related to loading pre-computed TRILEGAL histograms (``tri_dens_cube_location``) are provided. Requires ``_{}`` in the string for chunking purposes.
 
 ``auf_region_type``
 
@@ -275,55 +271,35 @@ The Full-Width-At-Half-Maximum of each filter's Point Spread Function (PSF), in 
 
 ``download_tri``
 
-Boolean flag, indicating whether to re-download a TRILEGAL simulation in a given ``auf_region_points`` sky coordinate, once it has successfully been run, and to overwrite the original simulation data or not. Optional if ``include_perturb_aufs`` is ``False``. Alternatively, this can (and must) be ``None`` if all parameters related to loading pre-computed TRILEGAL histograms (``dens_hist_tri_location`` et al.) are provided.
+Boolean flag, indicating whether to re-download a TRILEGAL simulation in a given ``auf_region_points`` sky coordinate, once it has successfully been run, and to overwrite the original simulation data or not. Optional if ``include_perturb_aufs`` is ``False``. Alternatively, this can (and must) be ``None`` if all parameters related to loading pre-computed TRILEGAL histograms (``tri_dens_cube_location``) are provided.
 
 ``tri_set_name``
 
-The name of the filter set used to simulate the catalogue's sources in TRILEGAL [#]_. Used to interact with the TRILEGAL API; optional if ``include_perturb_aufs`` is ``False``. Alternatively, this can (and must) be ``None`` if all parameters related to loading pre-computed TRILEGAL histograms (``dens_hist_tri_location`` et al.) are provided.
+The name of the filter set used to simulate the catalogue's sources in TRILEGAL [#]_. Used to interact with the TRILEGAL API; optional if ``include_perturb_aufs`` is ``False``. Alternatively, this can (and must) be ``None`` if all parameters related to loading pre-computed TRILEGAL histograms (``tri_dens_cube_location``) are provided.
 
 ``tri_filt_names``
 
-The names of the filters, in the same order as ``filt_names``, as given in the data ``tri_set_name`` calls. Optional if ``include_perturb_aufs`` is ``False``. Alternatively, this can (and must) be ``None`` if all parameters related to loading pre-computed TRILEGAL histograms (``dens_hist_tri_location`` et al.) are provided.
+The names of the filters, in the same order as ``filt_names``, as given in the data ``tri_set_name`` calls. Optional if ``include_perturb_aufs`` is ``False``. Alternatively, this can (and must) be ``None`` if all parameters related to loading pre-computed TRILEGAL histograms (``tri_dens_cube_location``) are provided.
 
 ``tri_filt_num``
 
-The one-indexed column number of the magnitude, as determined by the column order of the saved data returned by the TRILEGAL API, to which to set the maximum magnitude limit for the simulation. Optional if ``include_perturb_aufs`` is ``False``. Alternatively, this can (and must) be ``None`` if all parameters related to loading pre-computed TRILEGAL histograms (``dens_hist_tri_location`` et al.) are provided.
+The one-indexed column number of the magnitude, as determined by the column order of the saved data returned by the TRILEGAL API, to which to set the maximum magnitude limit for the simulation. Optional if ``include_perturb_aufs`` is ``False``. Alternatively, this can (and must) be ``None`` if all parameters related to loading pre-computed TRILEGAL histograms (``tri_dens_cube_location``) are provided.
 
 ``tri_maglim_faint``
 
-This is the float that represents the magnitude down to which to simulate TRILEGAL sources in the full-scale simulation, bearing in mind the limiting magnitude cut of the public API but also making sure this value is sufficiently faint that it contains all potentially perturbing objects for the dynamic range of this catalogue (approximately 10 magnitudes fainter than the limiting magnitude of the survey). Alternatively, this can (and must) be ``None`` if all parameters related to loading pre-computed TRILEGAL histograms (``dens_hist_tri_location`` et al.) are provided.
+This is the float that represents the magnitude down to which to simulate TRILEGAL sources in the full-scale simulation, bearing in mind the limiting magnitude cut of the public API but also making sure this value is sufficiently faint that it contains all potentially perturbing objects for the dynamic range of this catalogue (approximately 10 magnitudes fainter than the limiting magnitude of the survey). Alternatively, this can (and must) be ``None`` if all parameters related to loading pre-computed TRILEGAL histograms (``tri_dens_cube_location``) are provided.
 
 ``tri_num_faint``
 
-Integer number of objects to draw from the TRILEGAL simulation -- affecting the area of simulation, up to the limit imposed by TRILEGAL -- down to the full ``tri_maglim_faint`` magnitude. Alternatively, this can (and must) be ``None`` if all parameters related to loading pre-computed TRILEGAL histograms (``dens_hist_tri_location`` et al.) are provided.
+Integer number of objects to draw from the TRILEGAL simulation -- affecting the area of simulation, up to the limit imposed by TRILEGAL -- down to the full ``tri_maglim_faint`` magnitude. Alternatively, this can (and must) be ``None`` if all parameters related to loading pre-computed TRILEGAL histograms (``tri_dens_cube_location``) are provided.
 
-``dens_hist_tri_location``
+``tri_dens_cube_location``
 
-The location on disk of a numpy array, shape ``(len(filt_names), M)`` where ``M`` is a consistent number of magnitude bins, of differential source counts for a given TRILEGAL simulation, in each filter for a specific catalogue. Alternatively, should be ``None`` if ``auf_file_path`` and associated parameters for the running of TRILEGAL histogram generation within the cross-match run are given. If not ``None``, must have a consistent formatting string which contains ``_{}`` for per-chunk loading with a single string input.
+The location on disk of a numpy array, shape ``(A, len(filt_names), B, M)``, of differential source counts, magnitudes bins, and magnitude bin widths for a series TRILEGAL simulations at ``A`` number of sky positions, in each filter, for a specific catalogue. Alternatively, should be ``None`` if ``auf_file_path`` and associated parameters for the running of TRILEGAL histogram generation within the cross-match run are given.
 
-``tri_model_mags_location``
+``tri_dens_array_location``
 
-The location on disk of a numpy array, shape ``(len(filt_names), M)`` where ``M`` is a consistent number of magnitude bins, of the left-hand magnitude bin edges of differential source counts for a given TRILEGAL simulation, in each filter for a specific catalogue. Alternatively, should be ``None`` if ``auf_file_path`` and associated parameters for the running of TRILEGAL histogram generation within the cross-match run are given. If not ``None``, must have a consistent formatting string which contains ``_{}`` for per-chunk loading with a single string input.
-
-``tri_model_mag_mids_location``
-
-The location on disk of a numpy array, shape ``(len(filt_names), M)`` where ``M`` is a consistent number of magnitude bins, of magnitude bin-middles of differential source counts for a given TRILEGAL simulation, in each filter for a specific catalogue. Alternatively, should be ``None`` if ``auf_file_path`` and associated parameters for the running of TRILEGAL histogram generation within the cross-match run are given. If not ``None``, must have a consistent formatting string which contains ``_{}`` for per-chunk loading with a single string input.
-
-``tri_model_mags_interval_location``
-
-The location on disk of a numpy array, shape ``(len(filt_names), M)`` where ``M`` is a consistent number of magnitude bins, of magnitude bin widths of differential source counts for a given TRILEGAL simulation, in each filter for a specific catalogue. Alternatively, should be ``None`` if ``auf_file_path`` and associated parameters for the running of TRILEGAL histogram generation within the cross-match run are given. If not ``None``, must have a consistent formatting string which contains ``_{}`` for per-chunk loading with a single string input.
-
-``tri_n_bright_sources_star_location``
-
-The location on disk of a ``.npy`` file containing the number of simulated bright TRILEGAL objects in the input simulation, one per filter. Should be a 1-D numpy array of shape ``(len(filt_names),)``. Alternatively, should be ``None`` if ``auf_file_path`` and associated parameters for the running of TRILEGAL histogram generation within the cross-match run are given. If not ``None``, must have a consistent formatting string which contains ``_{}`` for per-chunk loading with a single string input.
-
-``dd_params_path``
-
-File path containin the ``.npy`` file describing the parameterisations of perturbation offsets due to single hidden contaminating, perturbing objects in the ``run_psf_auf`` background-dominated, PSF photometry algorithm case. See pre-processing documentation for more details on this, and how to generate this file if necessary.
-
-``l_cut_path``
-
-Alongside ``dd_params_path``, path to the ``.npy`` file containing the limiting flux cuts at which various PSF photometry perturbation algorithms apply. See pre-processing documentation for the specifics and how to generate this file if necesssary.
+Location on disk of a numpy array to accompany ``tri_dens_cube_location``, of shape ``(A, 2)``, with the corresponding sky coordinates for each simulation.
 
 ``dens_dist``
 
@@ -443,31 +419,25 @@ The inter-dependency of input parameters on one another, and the output ``CrossM
     │                     ├─> d_mag
     │                     ├─* dens_dist
     │                     ├─* fit_gal_flag
-    │                     │             ├─* gal_wavs
-    │                     │             ├─* gal_zmax
-    │                     │             ├─* gal_nzs
-    │                     │             ├─* gal_aboffsets
-    │                     │             ├─* gal_filternames
-    │                     │             └─* saturation_magnitudes
+    │                     │              ├─* gal_wavs
+    │                     │              ├─* gal_zmax
+    │                     │              ├─* gal_nzs
+    │                     │              ├─* gal_aboffsets
+    │                     │              ├─* gal_filternames
+    │                     │              └─* saturation_magnitudes
     │                     ├─* snr_indices
     │                     ├─* tri_set_name[2a]
     │                     ├─* tri_filt_names[2a]
     │                     ├─* tri_filt_num[2a]
+    │                     ├─* tri_maglim_faint[2a]
+    │                     ├─* tri_num_faint[2a]
     │                     ├─* download_tri[2a]
     │                     ├─* psf_fwhms
     │                     ├─* run_fw_auf
     │                     ├─* run_psf_auf
-    │                     │             ├─* dd_params_path -> dd_params
-    │                     │             └─* l_cut_path -> l_cut
-    │                     ├─* tri_maglim_faint[2a]
-    │                     ├─* tri_num_faint[2a]
     │                     ├─* gal_al_avs
-    │                     ├─* dens_hist_tri_location[2b, 3] -> dens_hist_tri_list
-    │                     ├─* tri_model_mags_location[2b, 3] -> tri_model_mags_list
-    │                     ├─* tri_model_mag_mids_location[2b, 3] -> tri_model_mag_mids_list
-    │                     ├─* tri_model_mags_interval_location[2b, 3] -> tri_model_mags_interval_list
-    │                     ├─* tri_model_mags_uncert_location[2b, 3] -> tri_model_mags_uncert_list
-    │                     └─* tri_n_bright_sources_star_location[2b, 3] -> tri_n_bright_sources_star_list
+    │                     ├─* tri_dens_cube_location[2b] => tri_dens_cube
+    │                     └─* tri_dens_array_location[2b] => tri_dens_array
     ├─> include_phot_like
     │                   └─> with_and_without_photometry
     ├─> use_phot_priors
@@ -522,10 +492,10 @@ The inter-dependency of input parameters on one another, and the output ``CrossM
                          ├─* use_photometric_uncertainties
                          └─* saturation_magnitudes
 
-List directories end in ``->`` for ``joint`` parameters, ``-*`` for ``catalogue`` parameters. ``catalogue`` level items will have ``a_`` or ``b_`` prepended, depending on which "side" of the cross-match they are from. Items with a second keyword after an arrow ``->`` are the names of the attributes that are saved to ``CrossMatch``, usually when the input parameter is a location on disk.
+List directories end in ``->`` for ``joint`` parameters, ``-*`` for ``catalogue`` parameters. ``catalogue`` level items will have ``a_`` or ``b_`` prepended, depending on which "side" of the cross-match they are from. Items with a second keyword after an arrow ``=>`` are the names of the attributes that are saved to ``CrossMatch``, usually when the input parameter is a location on disk.
 
 | [1] - must be the same
-| [2] - only one set of [2a] and [2b] should be given, the others should be passed as ``None``
+| [2] - only one set of [2a] and [2b] should be given, if one or more from both sets is provided an error will be raised
 | [3] - must have ``_{}`` in its string, into which the chunk ID will be inserted
 | [4] - must have relevant input entry per chunk, e.g. in a YAML multi-line format, aligned with the chunk ID of ``chunk_id_list`` of the relevant input parameter file
 | [5] - must be provided in either ``apply_proper_motion`` or ``ref_apply_proper_motion`` are ``True`` in either input catalogue

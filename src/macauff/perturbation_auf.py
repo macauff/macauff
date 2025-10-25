@@ -19,8 +19,9 @@ from scipy.stats import binned_statistic
 
 # pylint: disable=import-error,no-name-in-module
 from macauff.galaxy_counts import create_galaxy_counts
-from macauff.get_trilegal_wrapper import get_trilegal
+from macauff.get_trilegal_wrapper import get_av_infinity, get_trilegal
 from macauff.misc_functions import (
+    _make_regions_points,
     convex_hull_area,
     create_auf_params_grid,
     create_densities,
@@ -32,7 +33,7 @@ from macauff.perturbation_auf_fortran import perturbation_auf_fortran as paf
 
 # pylint: enable=import-error,no-name-in-module
 
-__all__ = ['make_perturb_aufs', 'create_single_perturb_auf']
+__all__ = ['make_perturb_aufs', 'create_single_perturb_auf', 'generate_trilegal_histogram_cube']
 
 
 # pylint: disable-next=too-many-locals,too-many-statements
@@ -93,11 +94,8 @@ def make_perturb_aufs(cm, which_cat):
             saturation_magnitudes = getattr(cm, f'{which_cat}_saturation_magnitudes')
 
         # Extract either dummy or real TRILEGAL histogram lists.
-        dens_hist_tri = getattr(cm, f'{which_cat}_dens_hist_tri_list')
-        tri_model_mags = getattr(cm, f'{which_cat}_tri_model_mags_list')
-        tri_model_mag_mids = getattr(cm, f'{which_cat}_tri_model_mag_mids_list')
-        tri_model_mags_interval = getattr(cm, f'{which_cat}_tri_model_mags_interval_list')
-        tri_n_bright_sources_star = getattr(cm, f'{which_cat}_tri_n_bright_sources_star_list')
+        tri_dens_cube = getattr(cm, f'{which_cat}_tri_dens_cube')
+        tri_dens_array = getattr(cm, f'{which_cat}_tri_dens_array')
 
         n_pool = cm.n_pool
 
@@ -232,6 +230,20 @@ def make_perturb_aufs(cm, which_cat):
                 # to just over-write this N times if there happen to be N
                 # good detections of a source.
                 local_n[med_index_slice[good_mag_snr_slice], j] = localn
+
+                # Extract the TRILEGAL histograms, as appropriate.
+                if tri_dens_cube is not None:
+                    sky_index = mff.find_nearest_point([ax1], [ax2],
+                                                       tri_dens_array[:, 0], tri_dens_array[:, 1])
+                    dens_hist_tri = tri_dens_cube[sky_index, j, :, 0]
+                    dens_hist_tri = dens_hist_tri[~np.isnan(dens_hist_tri)]
+                    tri_model_mags = tri_dens_cube[sky_index, j, :, 1]
+                    tri_model_mags = tri_model_mags[~np.isnan(tri_model_mags)]
+                    tri_model_mags_interval = tri_dens_cube[sky_index, j, :, 2]
+                    tri_model_mags_interval = tri_model_mags_interval[~np.isnan(tri_model_mags_interval)]
+                else:
+                    dens_hist_tri, tri_model_mags, tri_model_mags_interval = None, None, None
+
                 if fit_gal_flag:
                     single_perturb_auf_output = create_single_perturb_auf(
                         cm.r, cm.dr, cm.j0s, num_trials, psf_fwhms[j], dens_mags[j], a_photo, a_snr, localn,
@@ -239,17 +251,15 @@ def make_perturb_aufs(cm, which_cat):
                         fit_gal_flag, sky_area, saturation_magnitudes[j], cmau_array, wavs[j], z_maxs[j],
                         nzs[j], alpha0, alpha1, alpha_weight, ab_offsets[j], filter_names[j],
                         tri_file_path=new_auf_file_path, filt_header=tri_filt_names[j],
-                        dens_hist_tri=dens_hist_tri[j], model_mags=tri_model_mags[j],
-                        model_mag_mids=tri_model_mag_mids[j], model_mags_interval=tri_model_mags_interval[j],
-                        n_bright_sources_star=tri_n_bright_sources_star[j])
+                        dens_hist_tri=dens_hist_tri, model_mags=tri_model_mags,
+                        model_mags_interval=tri_model_mags_interval)
                 else:
                     single_perturb_auf_output = create_single_perturb_auf(
                         cm.r, cm.dr, cm.j0s, num_trials, psf_fwhms[j], dens_mags[j], a_photo, a_snr, localn,
                         d_mag, delta_mag_cuts, dd_params, l_cut, run_fw, run_psf, al_avs[j], avs,
                         fit_gal_flag, tri_file_path=new_auf_file_path, filt_header=tri_filt_names[j],
-                        dens_hist_tri=dens_hist_tri[j], model_mags=tri_model_mags[j],
-                        model_mag_mids=tri_model_mag_mids[j], model_mags_interval=tri_model_mags_interval[j],
-                        n_bright_sources_star=tri_n_bright_sources_star[j])
+                        dens_hist_tri=dens_hist_tri, model_mags=tri_model_mags,
+                        model_mags_interval=tri_model_mags_interval)
                 perturb_auf_outputs[perturb_auf_combo] = single_perturb_auf_output
             else:
                 # Without the simulations to force local normalising density N or
@@ -520,8 +530,7 @@ def create_single_perturb_auf(r, dr, j0s, num_trials, psf_fwhm, density_mag, a_p
                               avs, fit_gal_flag, sky_area=None, saturation_magnitude=None, cmau_array=None,
                               wav=None, z_max=None, nz=None, alpha0=None, alpha1=None, alpha_weight=None,
                               ab_offset=None, filter_name=None, tri_file_path=None, filt_header=None,
-                              dens_hist_tri=None, model_mags=None, model_mag_mids=None,
-                              model_mags_interval=None, n_bright_sources_star=None):
+                              dens_hist_tri=None, model_mags=None, model_mags_interval=None):
     r'''
     Creates the associated parameters for describing a single perturbation AUF
     component, for a single sky position.
@@ -628,16 +637,9 @@ def create_single_perturb_auf(r, dr, j0s, num_trials, psf_fwhm, density_mag, a_p
     model_mags : list or numpy.ndarray or None, optional
         Left-hand bin edges of magnitudes of star differential source counts.
         Must be given if ``dens_hist_tri`` is given, otherwise be ``None``.
-    model_mag_mids : list or numpy.ndarray or None, optional
-        Magnitude bin centres of star differential source counts. Must be given
-        if ``dens_hist_tri`` is given, otherwise be ``None``.
     model_mags_interval : list or numpy.ndarray or None, optional
         Widths of magnitude bins of star differential source counts. Must be
         given if ``dens_hist_tri`` is given, otherwise be ``None``.
-    n_bright_sources_star : integer or None, optional
-        Number of sources above a specified magnitude limit ``density_mag``
-        for resolution purposes, as given by ``make_tri_counts``. Must be given
-        if ``dens_hist_tri`` is given, otherwise be ``None``.
 
     Returns
     -------
@@ -654,9 +656,9 @@ def create_single_perturb_auf(r, dr, j0s, num_trials, psf_fwhm, density_mag, a_p
     '''
     # TODO: extend to allow a Galactic source model that doesn't depend on TRILEGAL  pylint: disable=fixme
     if tri_file_path is not None:
-        (dens_hist_tri, model_mags, model_mag_mids, model_mags_interval, _,
-         n_bright_sources_star) = make_tri_counts(
-            tri_file_path, filt_header, d_mag, np.amin(a_photo), density_mag, al_av=al_av, av_grid=avs)
+        dens_hist_tri, model_mags, model_mags_interval = make_tri_counts(
+            tri_file_path, filt_header, d_mag, np.amin(a_photo), al_av=al_av, av_grid=avs)
+    model_mag_mids = model_mags+model_mags_interval/2
 
     log10y_tri = -np.inf * np.ones_like(dens_hist_tri)
     log10y_tri[dens_hist_tri > 0] = np.log10(dens_hist_tri[dens_hist_tri > 0])
@@ -667,8 +669,8 @@ def create_single_perturb_auf(r, dr, j0s, num_trials, psf_fwhm, density_mag, a_p
     if fit_gal_flag:
         al_grid = al_av * avs
         z_array = np.linspace(0, z_max, nz)
-        gal_dens = create_galaxy_counts(cmau_array, model_mag_mids, z_array, wav, alpha0, alpha1,
-                                        alpha_weight, ab_offset, filter_name, al_grid)
+        gal_dens = create_galaxy_counts(cmau_array, model_mags+model_mags_interval/2, z_array, wav, alpha0,
+                                        alpha1, alpha_weight, ab_offset, filter_name, al_grid)
         gal_count = np.sum(gal_dens[mag_slice] * model_mags_interval[mag_slice])
         log10y_gal = -np.inf * np.ones_like(log10y_tri)
         log10y_gal[gal_dens > 0] = np.log10(gal_dens[gal_dens > 0])
@@ -713,23 +715,6 @@ def create_single_perturb_auf(r, dr, j0s, num_trials, psf_fwhm, density_mag, a_p
     else:
         tri_corr, gal_corr = 1, 0
     model_count = tri_count * tri_corr + gal_count * gal_corr
-
-    if fit_gal_flag:
-        # If we have both galaxies and stars to consider, both can be sufficiently
-        # high number counts to make a valid model density. Simply scale the
-        # number of simulated Galactic sources by the ratio of bright-magnitude
-        # densities to get an effective "number" of galaxies.
-        n_bright_sources_gal = int(gal_count / tri_count * n_bright_sources_star)
-        tot_n_bright_sources = n_bright_sources_star + n_bright_sources_gal
-    else:
-        # More straightforward, without any galaxy counts we simply check for
-        # if we returned a good number of Galactic sources in our simulation.
-        tot_n_bright_sources = n_bright_sources_star
-
-    if tot_n_bright_sources < 100:
-        raise ValueError("The number of simulated objects in this sky patch is too low to "
-                         "reliably derive a model source density. Please include "
-                         "more simulated objects.")
 
     log10y = np.log10(10**log10y_tri * tri_corr + 10**log10y_gal * gal_corr)
 
@@ -815,7 +800,7 @@ def create_single_perturb_auf(r, dr, j0s, num_trials, psf_fwhm, density_mag, a_p
 
 # pylint: disable=too-many-locals,too-many-statements
 def make_tri_counts(trifilepath, trifiltname, dm, brightest_source_mag,
-                    density_mag, use_bright=False, use_faint=True, al_av=None, av_grid=None):
+                    use_bright=False, use_faint=True, al_av=None, av_grid=None):
     """
     Combine TRILEGAL simulations for a given line of sight in the Galaxy, using
     both a "bright" simulation, with a brighter magnitude limit that allows for
@@ -837,10 +822,6 @@ def make_tri_counts(trifilepath, trifiltname, dm, brightest_source_mag,
     brightest_source_mag : float
         Magnitude in the appropriate ``trifiltname`` bandpass of the brightest
         source that these simulations are relevant for.
-    density_mag : float
-        The magnitude at which the counts of the corresponding dataset this
-        TRILEGAL simulation is for turns over, suffering completeness limit
-        effects.
     use_bright : boolean, optional
         Controls whether we load a "bright" set of TRILEGAL sources or not.
     use_faint : boolean, optional
@@ -861,19 +842,10 @@ def make_tri_counts(trifilepath, trifiltname, dm, brightest_source_mag,
         The probability density function of the resulting merged differential
         source counts from the two TRILEGAL simulations, weighted by their
         counting-statistic bin uncertainties.
-    tri_mags : numpy.ndarray
+    tri_mag_lefts : numpy.ndarray
         The left-hand bin edges of all bins used to generate ``dens``.
-    tri_mags_mids : numpy.ndarray
-        Middle of each bin generating ``dens``.
-    dtri_mags : numpy.ndarray
+    tri_mag_widths : numpy.ndarray
         Bin widths of all bins corresponding to each element of ``dens``.
-    uncert : numpy.ndarray
-        Propagated Poissonian uncertainties of the PDF of ``dens``, using the
-        weighted average of the individual uncertainties of each run for every
-        bin in ``dens``.
-    num_bright_obj : integer
-        Number of simulated objects above the given ``density_mag`` brightness
-        limit.
     """
     if not use_bright and not use_faint:
         raise ValueError("use_bright and use_faint cannot both be 'False'.")
@@ -944,7 +916,6 @@ def make_tri_counts(trifilepath, trifiltname, dm, brightest_source_mag,
             tri_mags = np.arange(minmag-al_av*tri_av_bright, maxmag+1e-10, dm)
         elif use_faint:
             tri_mags = np.arange(minmag-al_av*tri_av_faint, maxmag+1e-10, dm)
-    tri_mags_mids = tri_mags[:-1]+np.diff(tri_mags)/2  # pylint: disable=used-before-assignment
     if use_faint:
         if al_av is None:
             hist, tri_mags = np.histogram(tridata_faint, bins=tri_mags)
@@ -973,11 +944,6 @@ def make_tri_counts(trifilepath, trifiltname, dm, brightest_source_mag,
             dens_faint = dens_faint / len(av_grid)
             dens_uncert_faint = dens_uncert_faint / np.sqrt(len(av_grid))
         dens_uncert_faint[dens_uncert_faint == 0] = 1e10
-        # Now check whether there are sufficient sources at the bright end of
-        # the simulation, counting the sources brighter than density_mag.
-        num_bright_obj_faint = np.sum(hist[tri_mags[:-1] < density_mag])
-        if av_grid is not None:
-            num_bright_obj_faint /= len(av_grid)
     if use_bright:
         if al_av is None:
             hist, tri_mags = np.histogram(tridata_bright, bins=tri_mags)
@@ -995,9 +961,6 @@ def make_tri_counts(trifilepath, trifiltname, dm, brightest_source_mag,
             dens_bright = dens_bright / len(av_grid)
             dens_uncert_bright = dens_uncert_bright / np.sqrt(len(av_grid))
         dens_uncert_bright[dens_uncert_bright == 0] = 1e10
-        num_bright_obj_bright = np.sum(hist[tri_mags[:-1] < density_mag])
-        if av_grid is not None:
-            num_bright_obj_bright /= len(av_grid)
     if use_bright and use_faint:
         # Assume that the number of objects in the bright dataset is truncated such
         # that it should be most dense at its faintest magnitude, and ignore cases
@@ -1009,31 +972,20 @@ def make_tri_counts(trifilepath, trifiltname, dm, brightest_source_mag,
         dens_uncert_bright[tri_mags[1:] > bright_cutoff_mag] = 1e10
         w_f, w_b = 1 / dens_uncert_faint**2, 1 / dens_uncert_bright**2
         dens = (dens_bright * w_b + dens_faint * w_f) / (w_b + w_f)
-        dens_uncert = (dens_uncert_bright * w_b + dens_uncert_faint * w_f) / (w_b + w_f)
         hc = hc_bright | hc_faint  # pylint: disable=possibly-used-before-assignment
-
-        num_bright_obj = max(num_bright_obj_faint, num_bright_obj_bright)
     elif use_bright:
         dens = dens_bright
-        dens_uncert = dens_uncert_bright
         hc = hc_bright
-
-        num_bright_obj = num_bright_obj_bright
     elif use_faint:
         dens = dens_faint
-        dens_uncert = dens_uncert_faint
         hc = hc_faint
 
-        num_bright_obj = num_bright_obj_faint
-
     dens = dens[hc]  # pylint: disable=used-before-assignment,possibly-used-before-assignment
-    dtri_mags = np.diff(tri_mags)[hc]
-    tri_mags_mids = tri_mags_mids[hc]
-    tri_mags = tri_mags[:-1][hc]
-    uncert = dens_uncert[hc]  # pylint: disable=possibly-used-before-assignment
+    tri_mag_lefts = tri_mags[:-1][hc]
+    tri_mag_widths = np.diff(tri_mags)[hc]
 
     # pylint: disable-next=possibly-used-before-assignment
-    return dens, tri_mags, tri_mags_mids, dtri_mags, uncert, num_bright_obj
+    return dens, tri_mag_lefts, tri_mag_widths
 
 
 def _calculate_magnitude_offsets(count_array, mag_array, b, snr, model_mag_mids, log10y,
@@ -1105,3 +1057,137 @@ def _calculate_magnitude_offsets(count_array, mag_array, b, snr, model_mag_mids,
     dm = np.maximum(dm_max_snr, dm_max_no_perturb)
 
     return dm
+
+
+def generate_trilegal_histogram_cube(auf_points, auf_file_path, tri_set_name, tri_filt_names, tri_filt_num,
+                                     tri_maglim_faint, tri_num_faint, tri_download_flag, auf_region_frame,
+                                     auf_region_type, min_area, min_mag, d_mag, al_avs, avs=None,
+                                     avs_random_sample_radius=None):
+    r"""
+    Convenience function to generate the hyper-cube and accompanying ID
+    array that wraps the TRILEGAL-simulation-generated sky density maps,
+    generated for a series of sky pointings and filters relevant to a
+    particular cross-match.
+
+    Parameters
+    ----------
+    auf_points : list of lists or numpy.ndarray
+        Following the same inputs as `~macauff.CrossMatch`, either a list
+        of two-element lists or (N, 2)-shape array, or a six-element list
+        that determines the start-stop-element of two orthogonal sky
+        coordinates that expand into a grid of positions.
+    auf_file_path : string
+        Full path, including filename, out to which all TRILEGAL files will be
+        saved. Will have two ``{}`` format options inserted into the string
+        that sky coordinates use to distinguish each pointing call.
+    tri_set_name : string
+        The name of the filterset that should have a TRILEGAL simulation called
+        for it.
+    tri_filt_names : list of strings
+        The names of the filters, out of all of those generated in
+        ``tri_set_name``, that we wish to extract differential sky counts for.
+    tri_filt_num : int
+        The one-indexed filter index, for all magnitudes simulated in
+        ``tri_set_name``, that defines the maximum magnitude used in the
+        simulation.
+    tri_maglim_faint : float
+        Corresponding magnitude down to which the ``tri_filt_num`` filter is to
+        be simulated.
+    tri_num_faint : int
+        Number of objects, roughly, to simulate for each call, scaling by input
+        sky area, down to the ``tri_maglim_faint`` limit.
+    tri_download_flag : boolean
+        Flag indicating whether to re-download TRILEGAL files already on
+        disk (``True``), or re-use those saved already (``False``).
+    auf_region_frame : string, "equatorial" or "galactic"
+        Sky coordinate frame, either in galactic coordinates, l and b, or
+        equatorial coordinates, right ascension and declination.
+    auf_region_type : string, "rectangle" or "points"
+        Flag for whether ``auf_points`` is defined by two-1D linspace
+        arrays that expand into a grid, or a series of coordinate tuples.
+    min_area : float
+        Area to begin requesting from the TRILEGAL simulator, the smallest
+        acceptable region coverage for e.g. good number statistics on the
+        results. Area will be capped at 10 square degrees on simulation call.
+    min_mag : list or numpy.ndarray of floats
+        For each filter, the brightest magnitude it is necessary to generate
+        TRILEGAL densities for.
+    d_mag : float
+        Width of the magnitude bins to generate density histograms with.
+    al_avs : list or numpy.ndarray of floats
+        The extinction vector, :math:`\frac{A_\lambda}{A_V}`, for each filter
+        in ``tri_filt_names``.
+    avs : list of list of floats, or numpy.ndarray, optional
+        Either a nested list or shape (N, M) array of V-band extinctions, such
+        that ``avs[i]`` is a list of the reddenings for the ``i``th position in
+        ``auf_points``. If not supplied then it will be computed at each coord;
+        supplying separately allows for a grid to be passed for each
+        ``auf_point`` coordinate, to represent differential reddening in each
+        sky region.
+    avs_random_sample_radius : float
+        If ``avs`` is ``None`` and this parameter is provided, scatter around
+        the ``auf_point`` will be generated for each sky coordinate, in degrees,
+        to generate an approximate differential reddening vector.
+
+    Returns
+    -------
+    array : numpy.ndarray
+        Shape (N, 2) array, containing the sky coordinates for each pointing.
+    cube : numpy.ndarray
+        Shape (N, M, X, 3) array, containing the counts per magnitude per
+        square degree histogram, left-hand magnitude bins, and bin widths, for
+        each NxM sky-filter combination.
+    """
+    x, y = os.path.splitext(auf_file_path)
+    auf_file_path = x + r"_{:.2f}_{:.2f}" + y
+
+    auf_points = _make_regions_points(['auf_region_type', auf_region_type],
+                                      ['auf_region_points', auf_points], 0)
+
+    if avs is None:
+        if avs_random_sample_radius is None:
+            avs = get_av_infinity(auf_points[:, 0], auf_points[:, 1], frame=auf_region_frame)
+        else:
+            rng = np.random.default_rng()
+            avs = []
+            for i in range(len(auf_points)):
+                r = avs_random_sample_radius * np.sqrt(rng.uniform(size=10))
+                t = rng.uniform(0, 2*np.pi, size=10)
+                avs.append(get_av_infinity(auf_points[i, 0] + r * np.cos(t),
+                                           auf_points[i, 1] + r * np.sin(t)), frame=auf_region_frame)
+
+    cube = np.ones((len(auf_points), len(tri_filt_names), 1, 3), float) * np.nan
+
+    for i, auf_point in enumerate(auf_points):
+        ax1, ax2 = auf_point
+
+        new_auf_file_path = auf_file_path.format(ax1, ax2)
+        if not os.path.exists(os.path.dirname(new_auf_file_path)):
+            os.makedirs(os.path.dirname(new_auf_file_path), exist_ok=True)
+        x, y = os.path.splitext(new_auf_file_path)
+        full_file = x + '_faint' + y
+
+        if tri_download_flag or not os.path.isfile(full_file):
+            # Hard-coding the AV=1 trick to allow for using av_grid later.
+            # pylint: disable-next=possibly-used-before-assignment
+            download_trilegal_simulation(full_file, tri_set_name, ax1, ax2, tri_filt_num,
+                                         # pylint: disable-next=possibly-used-before-assignment
+                                         auf_region_frame, tri_maglim_faint, min_area,
+                                         # pylint: disable-next=possibly-used-before-assignment
+                                         av=1, sigma_av=0, total_objs=tri_num_faint,
+                                         rank=0, chunk_id=1)
+
+        for j, tri_filt_name in enumerate(tri_filt_names):
+            dens_hist_tri, model_mags, model_mags_interval = make_tri_counts(
+                new_auf_file_path, tri_filt_name, d_mag, min_mag, al_av=al_avs[j], av_grid=avs[i])
+
+            if len(dens_hist_tri) > cube.shape[2]:
+                temp_cube = np.copy(cube)
+                cube = np.empty((cube.shape[0], cube.shape[1], len(dens_hist_tri), cube.shape[3]), float)
+                cube[:, :, :temp_cube.shape[2], :] = temp_cube
+                del temp_cube
+            cube[i, j, :, 0] = dens_hist_tri
+            cube[i, j, :, 1] = model_mags
+            cube[i, j, :, 2] = model_mags_interval
+
+    return auf_points, cube

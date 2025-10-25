@@ -7,6 +7,7 @@ Tests for the "perturbation_auf" module.
 
 import math
 import os
+from importlib import resources
 
 import numpy as np
 import pytest
@@ -218,8 +219,10 @@ def test_histogram():
 
 
 def test_psf_perturb():
-    l_cut = np.load(os.path.join(os.path.dirname(__file__), 'data/l_cut.npy'))
-    dd_params = np.load(os.path.join(os.path.dirname(__file__), 'data/dd_params.npy'))
+    with resources.files("macauff.data").joinpath("dd_params.npy").open("rb") as f:
+        dd_params = np.load(f)
+    with resources.files("macauff.data").joinpath("l_cut.npy").open("rb") as f:
+        l_cut = np.load(f)
 
     psf_r = 1.185 * 6.1
     psf_sig = 6.1 / (2 * np.sqrt(2 * np.log(2)))
@@ -383,70 +386,6 @@ class TestMakePerturbAUFs():
         return a
 
     @pytest.mark.remote_data
-    def test_create_single_low_numbers(self):
-        density_radius = np.sqrt(1 / np.pi / np.exp(8.7))
-
-        d_mag = 0.1
-
-        # Fake up a TRILEGAL simulation data file.
-        text = ('#area = 140.0 sq deg\n#Av at infinity = 1\n'
-                'Gc logAge [M/H] m_ini   logL   logTe logg  m-M0   Av    '
-                'm2/m1 mbol   J      H      Ks     IRAC_3.6 IRAC_4.5 IRAC_5.8 IRAC_8.0 MIPS_24 '
-                'MIPS_70 MIPS_160 W1     W2     W3     W4       Mact\n')
-        # This won't be enough objects, so we'll trigger the error message later.
-        for _ in range(3):
-            text = text + (
-                '1   6.65 -0.39  0.02415 -2.701 3.397  4.057 14.00  8.354 0.00 25.523 25.839 '
-                '24.409 23.524 22.583 22.387 22.292 22.015 21.144 19.380 20.878 15.001 22.391 '
-                '21.637 21.342  0.024\n1   6.65 -0.39  0.02415 -2.701 3.397  4.057 14.00 8.354 '
-                '0.00 25.523 25.839 24.409 23.524 22.583 22.387 22.292 22.015 21.144 19.380 20.878 '
-                '15.002 22.391 21.637 21.342  0.024\n 1   6.65 -0.39  0.02415 -2.701 3.397  4.057 '
-                '14.00 8.354 0.00 25.523 25.839 24.409 23.524 22.583 22.387 22.292 22.015 21.144 '
-                '19.380 20.878 15.003 22.391 21.637 21.342  0.024\n 1   6.65 -0.39  0.02415 -2.701 '
-                '3.397  4.057 14.00  8.354 0.00 25.523 25.839 24.409 23.524 22.583 22.387 22.292 '
-                '22.015 21.144 19.380 20.878 15.004 22.391 21.637 21.342  0.024\n\n 1   6.65 -0.39 '
-                ' 0.02415 -2.701 3.397  4.057 14.00  8.354 0.00 25.523 25.839 24.409 23.524 22.583 '
-                '22.387 22.292 22.015 21.144 19.380 20.878 100.99 22.391 21.637 21.342  0.024\n')
-
-        with open(f'{self.auf_folder}/trilegal_auf_simulation_{self.auf_points[0][0]:.2f}_'
-                  f'{self.auf_points[0][1]:.2f}_faint.dat', "w", encoding='utf-8') as f:
-            f.write(text)
-        f.close()
-
-        self.fake_cm = self.make_class()
-        self.fake_cm.b_tri_set_name = 'WISE'
-        self.fake_cm.b_tri_filt_num = 11
-        self.fake_cm.b_tri_filt_names = self.tri_filt_names
-        self.fake_cm.b_tri_maglim_faint = 32
-        self.fake_cm.b_tri_num_faint = 1000000
-        self.fake_cm.b_auf_region_frame = 'galactic'
-        self.fake_cm.b_psf_fwhms = self.psf_fwhms
-        self.fake_cm.num_trials = self.num_trials
-        self.fake_cm.d_mag = d_mag
-        self.fake_cm.delta_mag_cuts = self.delta_mag_cuts
-        self.fake_cm.b_fit_gal_flag = False
-        self.fake_cm.b_dens_dist = density_radius
-        self.fake_cm.b_run_fw_auf = True
-        self.fake_cm.b_run_psf_auf = False
-        self.fake_cm.b_gal_al_avs = [0]
-        self.fake_cm.b_download_tri = False
-        self.fake_cm.b_astro = np.array([[0.3, 0.3, 0.1]] * 101)
-        self.fake_cm.b_astro[0, [0, 1]] = [0.3, 0.31]
-        self.fake_cm.b_astro[1, [0, 1]] = [0.31, 0.3]
-        self.fake_cm.b_astro[2, [0, 1]] = [0.31, 0.31]
-        self.fake_cm.b_photo = np.array([np.concatenate(([14.99], [100]*100))]).T.reshape(-1, 1)
-        self.fake_cm.b_snr = np.array([100] * 101).reshape(-1, 1)
-        self.fake_cm.b_magref = np.array([0] * 101)
-        self.fake_cm.b_dens_hist_tri_list = [None] * len(self.filters)
-        self.fake_cm.b_tri_model_mags_list = [None] * len(self.filters)
-        self.fake_cm.b_tri_model_mag_mids_list = [None] * len(self.filters)
-        self.fake_cm.b_tri_model_mags_interval_list = [None] * len(self.filters)
-        self.fake_cm.b_tri_n_bright_sources_star_list = [None] * len(self.filters)
-        self.fake_cm.n_pool = 1
-        with pytest.raises(ValueError, match="The number of simulated objects in this sky patch "):
-            make_perturb_aufs(self.fake_cm, 'b')
-
-    @pytest.mark.remote_data
     def test_psf_algorithm(self):  # pylint: disable=too-many-locals
         # Number of sources per PSF circle, on average, solved backwards to ensure
         # that local density ends up exactly in the middle of a count_array bin.
@@ -515,8 +454,10 @@ class TestMakePerturbAUFs():
             dfluxes1 = 10**(-(mag_offset-d_mag/2)/2) - 10**(-mag_offset/2.5)
             dfluxes2 = 10**(-mag_offset/2.5) - 10**(-(mag_offset+d_mag/2)/2.5)
 
-            l_cut = np.load(os.path.join(os.path.dirname(__file__), 'data/l_cut.npy'))
-            dd_params = np.load(os.path.join(os.path.dirname(__file__), 'data/dd_params.npy'))
+            with resources.files("macauff.data").joinpath("dd_params.npy").open("rb") as f:
+                dd_params = np.load(f)
+            with resources.files("macauff.data").joinpath("l_cut.npy").open("rb") as f:
+                l_cut = np.load(f)
             run_fw = mag >= 19
             self.fake_cm = self.make_class()
             self.fake_cm.b_auf_region_points = new_auf_points
@@ -538,11 +479,8 @@ class TestMakePerturbAUFs():
             self.fake_cm.l_cut = l_cut
             self.fake_cm.b_gal_al_avs = [0]
             self.fake_cm.b_download_tri = False
-            self.fake_cm.b_dens_hist_tri_list = [None] * len(self.filters)
-            self.fake_cm.b_tri_model_mags_list = [None] * len(self.filters)
-            self.fake_cm.b_tri_model_mag_mids_list = [None] * len(self.filters)
-            self.fake_cm.b_tri_model_mags_interval_list = [None] * len(self.filters)
-            self.fake_cm.b_tri_n_bright_sources_star_list = [None] * len(self.filters)
+            self.fake_cm.b_tri_dens_cube = None
+            self.fake_cm.b_tri_dens_array = None
             # Have to fudge extra sources to keep our 15th mag source in the local
             # density cutout.
             # Add extra sources to force a 0.1-0.9 square convex hull cutout.
@@ -698,13 +636,6 @@ class TestMakePerturbAUFs():
 
         # Fake this the easy way both times, then below correct the parameters
         # for the precompute_hist version of the test.
-        old_line = r'auf_file_path: auf_folder/trilegal_download_{}.dat'
-        new_line = (r'auf_file_path: auf_folder/trilegal_download_{}.dat' + '\ndens_hist_tri_location: None\n'
-                    'tri_model_mags_location: None\ntri_model_mag_mids_location: None\n'
-                    'tri_model_mags_interval_location: None\ntri_dens_uncert_location: None\n'
-                    'tri_n_bright_sources_star_location: None')
-        ca_p_ = ca_p_.replace(old_line, new_line)
-        cb_p_ = cb_p_.replace(old_line, new_line)
         ca_p_ = ca_p_.replace(r'cat_csv_file_path: gaia_folder/gaia_{}.csv',
                               r'cat_csv_file_path: cat_folder/cat_{}.csv')
         cb_p_ = cb_p_.replace(r'cat_csv_file_path: wise_folder/wise_{}.csv',
@@ -717,18 +648,17 @@ class TestMakePerturbAUFs():
 
         if precompute_tri_hists:
             for flag in ['a_', 'b_']:
-                _a_photo = y
-                hist, bins = np.histogram(_a_photo[~np.isnan(_a_photo)], bins='auto')
-                dens_mag = (bins[:-1]+np.diff(bins)/2)[np.argmax(hist)] - 0.5
-                dens, tri_mags, tri_mags_mids, dtri_mags, _, num_bright_obj = make_tri_counts(
+                dens, tri_mags, dtri_mags = make_tri_counts(
                     f'{self.auf_folder}/trilegal_download_9_{self.auf_points[0][0]:.2f}_'
                     f'{self.auf_points[0][1]:.2f}.dat', getattr(cm, f'{flag}tri_filt_names')[0], cm.d_mag,
-                    np.amin(a_photo), dens_mag)
-                setattr(cm, f'{flag}dens_hist_tri_list', [dens])
-                setattr(cm, f'{flag}tri_model_mags_list', [tri_mags])
-                setattr(cm, f'{flag}tri_model_mag_mids_list', [tri_mags_mids])
-                setattr(cm, f'{flag}tri_model_mags_interval_list', [dtri_mags])
-                setattr(cm, f'{flag}tri_n_bright_sources_star_list', [num_bright_obj])
+                    np.amin(a_photo))
+                d = np.empty((1, 1, len(dens), 3))
+                d[0, 0, :, 0] = dens
+                d[0, 0, :, 1] = tri_mags
+                d[0, 0, :, 2] = dtri_mags
+                setattr(cm, f'{flag}tri_dens_cube', d)
+                setattr(cm, f'{flag}tri_dens_array',
+                        np.array([[self.auf_points[0][0], self.auf_points[0][1]]]))
 
             cm.a_auf_file_path = None
             cm.b_auf_file_path = None
@@ -889,13 +819,6 @@ class TestMakePerturbAUFs():
                            'chunk_overlap_col: 4', 'best_mag_index_col: 5', 'snr_indices: [6]']):
             cb_p_ = cb_p_.replace(ol, nl)
 
-        old_line = r'auf_file_path: auf_folder/trilegal_download_{}.dat'
-        new_line = (r'auf_file_path: auf_folder/trilegal_download_{}.dat' + '\ndens_hist_tri_location: None\n'
-                    'tri_model_mags_location: None\ntri_model_mag_mids_location: None\n'
-                    'tri_model_mags_interval_location: None\ntri_dens_uncert_location: None\n'
-                    'tri_n_bright_sources_star_location: None')
-        ca_p_ = ca_p_.replace(old_line, new_line)
-        cb_p_ = cb_p_.replace(old_line, new_line)
         ca_p_ = ca_p_.replace(r'cat_csv_file_path: gaia_folder/gaia_{}.csv',
                               r'cat_csv_file_path: cat_folder/cat_{}.csv')
         cb_p_ = cb_p_.replace(r'cat_csv_file_path: wise_folder/wise_{}.csv',
@@ -1002,10 +925,9 @@ def test_make_tri_counts(run_type):  # pylint: disable=too-many-branches
         with open('trilegal_auf_simulation_bright.dat', 'w', encoding='utf-8') as out:
             out.writelines(script)
     if run_type != "neither":
-        dens, tri_mags, tri_mags_mids, _, uncert, n = make_tri_counts(
-            'trilegal_auf_simulation.dat', 'W1', 0.1, 5 if run_type != "faint" else 10, 20,
+        dens, tri_mags, tri_mag_intervals = make_tri_counts(
+            'trilegal_auf_simulation.dat', 'W1', 0.1, 5 if run_type != "faint" else 10,
             use_bright=run_type != "faint", use_faint=run_type != "bright")
-        assert n
         if run_type == "both":
             assert_allclose(tri_mags[0], 5, atol=0.1)
             assert_allclose(tri_mags[-1], 20, atol=0.1)
@@ -1015,57 +937,64 @@ def test_make_tri_counts(run_type):  # pylint: disable=too-many-branches
         if run_type == "bright":
             assert_allclose(tri_mags[0], 5, atol=0.1)
             assert_allclose(tri_mags[-1], 15, atol=0.1)
-        for i, tri_mag_mid in enumerate(tri_mags_mids):
+        for i, tri_mag_mid in enumerate(tri_mags+tri_mag_intervals/2):
             if tri_mag_mid < 10:
                 # 10-20 vs 5-15 mags with 0.1 mag bins for N/100. This is
                 # not len(tri_mags) since each gets its density separately
                 # from where its 10 mags of dynamic range get placed in the
                 # larger bin set!
                 expect_dens = n_b/100 / 0.1 / 1
+                expect_dens_uncert = np.sqrt(n_b/100) / 0.1 / 1
             elif tri_mag_mid > 15:
                 expect_dens = n_f/100 / 0.1 / 1
+                expect_dens_uncert = np.sqrt(n_f/100) / 0.1 / 1
             else:
                 if run_type == 'faint':
                     expect_dens = n_f/100 / 0.1 / 1
+                    expect_dens_uncert = np.sqrt(n_f/100) / 0.1 / 1
                 elif run_type == 'bright':
                     expect_dens = n_b/100 / 0.1 / 1
+                    expect_dens_uncert = np.sqrt(n_b/100) / 0.1 / 1
                 else:
                     d_u_f = np.sqrt(n_f/100) / 0.1 / 1
                     d_u_b = np.sqrt(n_b/100) / 0.1 / 1
                     w_f, w_b = 1 / d_u_f**2, 1 / d_u_b**2
                     d_f, d_b = n_f/100 / 0.1 / 1, n_b/100 / 0.1 / 1
                     expect_dens = (d_b * w_b + d_f * w_f) / (w_b + w_f)
-            assert_allclose(expect_dens, dens[i], atol=3*uncert[i], rtol=0.01)
+                    expect_dens_uncert = (d_u_b * w_b + d_u_f * w_f) / (w_b + w_f)
+            assert_allclose(expect_dens, dens[i], atol=3*expect_dens_uncert, rtol=0.01)
     else:
         with pytest.raises(ValueError, match="use_bright and use_faint cannot both be "):
-            dens, tri_mags, tri_mags_mids, _, uncert, n = make_tri_counts(
-                'trilegal_auf_simulation.dat', 'W1', 0.1, 10, 20, use_bright=False,
+            dens, tri_mags, _ = make_tri_counts(
+                'trilegal_auf_simulation.dat', 'W1', 0.1, 10, use_bright=False,
                 use_faint=False)
 
     if run_type == "both":
         with pytest.raises(ValueError, match="If one of al_av or av_grid is provided "):
-            dens, tri_mags, tri_mags_mids, _, uncert, n = make_tri_counts(
-                'trilegal_auf_simulation.dat', 'W1', 0.1, 5, 20,
+            dens, tri_mags, _ = make_tri_counts(
+                'trilegal_auf_simulation.dat', 'W1', 0.1, 5,
                 use_bright=False, use_faint=True, al_av=0.9)
 
-        dens, tri_mags, tri_mags_mids, _, uncert, n = make_tri_counts(
-            'trilegal_auf_simulation.dat', 'W1', 0.1, 5, 20, use_bright=True, use_faint=True,
+        dens, tri_mags, tri_mag_intervals = make_tri_counts(
+            'trilegal_auf_simulation.dat', 'W1', 0.1, 5, use_bright=True, use_faint=True,
             al_av=0.9, av_grid=np.array([2, 2, 2, 2, 2]))
-        assert n
         assert_allclose(tri_mags[0], 5 + 0.9, atol=0.1)
         assert_allclose(tri_mags[-1], 19 + 0.9, atol=0.1)
-        for i, tri_mag_mid in enumerate(tri_mags_mids):
+        for i, tri_mag_mid in enumerate(tri_mags+tri_mag_intervals/2):
             if tri_mag_mid < 10 + 0.9:
                 expect_dens = n_b/100 / 0.1 / 1
+                expect_dens_uncert = np.sqrt(n_b/100) / 0.1 / 1
             elif tri_mag_mid > 15 + 0.9:
                 expect_dens = n_f/100 / 0.1 / 1
+                expect_dens_uncert = np.sqrt(n_f/100) / 0.1 / 1
             else:
                 d_u_f = np.sqrt(n_f/100) / 0.1 / 1
                 d_u_b = np.sqrt(n_b/100) / 0.1 / 1
                 w_f, w_b = 1 / d_u_f**2, 1 / d_u_b**2
                 d_f, d_b = n_f/100 / 0.1 / 1, n_b/100 / 0.1 / 1
                 expect_dens = (d_b * w_b + d_f * w_f) / (w_b + w_f)
-            assert_allclose(expect_dens, dens[i], atol=3*uncert[i], rtol=0.01)
+                expect_dens_uncert = (d_u_b * w_b + d_u_f * w_f) / (w_b + w_f)
+            assert_allclose(expect_dens, dens[i], atol=3*expect_dens_uncert, rtol=0.01)
     if run_type == "faint":
         ol = '#Av at infinity = 1'
         nl = '#Av at infinity = 0.05\n'
@@ -1078,8 +1007,8 @@ def test_make_tri_counts(run_type):  # pylint: disable=too-many-branches
         with open('trilegal_auf_simulation_faint.dat', 'w', encoding='utf-8') as out:
             out.writelines(lines)
         with pytest.raises(ValueError, match="tri_av_inf_faint cannot be smaller than 0.1 while"):
-            dens, tri_mags, tri_mags_mids, _, uncert, n = make_tri_counts(
-                'trilegal_auf_simulation.dat', 'W1', 0.1, 10, 20,
+            dens, tri_mags, _ = make_tri_counts(
+                'trilegal_auf_simulation.dat', 'W1', 0.1, 10,
                 use_bright=False, use_faint=True, al_av=0.9, av_grid=np.array([2, 2, 2, 2]))
     if run_type == "bright":
         ol = '#Av at infinity = 1'
@@ -1093,8 +1022,8 @@ def test_make_tri_counts(run_type):  # pylint: disable=too-many-branches
         with open('trilegal_auf_simulation_bright.dat', 'w', encoding='utf-8') as out:
             out.writelines(lines)
         with pytest.raises(ValueError, match="tri_av_inf_bright cannot be smaller than 0.1 while"):
-            dens, tri_mags, tri_mags_mids, _, uncert, n = make_tri_counts(
-                'trilegal_auf_simulation.dat', 'W1', 0.1, 5, 20,
+            dens, tri_mags, _ = make_tri_counts(
+                'trilegal_auf_simulation.dat', 'W1', 0.1, 5,
                 use_bright=True, use_faint=False, al_av=0.9, av_grid=np.array([2, 2, 2, 2]))
 
 

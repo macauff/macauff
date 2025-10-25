@@ -22,6 +22,7 @@ from macauff.counterpart_pairing import source_pairing
 from macauff.fit_astrometry import derive_astrometric_corrections
 from macauff.group_sources import make_island_groupings
 from macauff.macauff import Macauff
+from macauff.misc_functions import _make_regions_points
 from macauff.parse_catalogue import load_csv, npy_to_csv
 from macauff.perturbation_auf import make_perturb_aufs
 from macauff.photometric_likelihood import compute_photometric_likelihoods
@@ -152,7 +153,12 @@ class CrossMatch():
         # correct_astrometry is True.
         for name in ['dd_params', 'l_cut']:
             with resources.files("macauff.data").joinpath(f"{name}.npy").open("rb") as f:
-                setattr(self, name, np.load(f))
+                a = np.load(f)
+                if name == 'dd_params' and not (len(a.shape) == 3 and a.shape[0] == 5 and a.shape[2] == 2):
+                    raise ValueError('dd_params should be of shape (5, X, 2).')
+                if name == 'l_cut' and not (len(a.shape) == 1 and a.shape[0] == 3):
+                    raise ValueError('l_cut should be of shape (3,) only.')
+                setattr(self, name, a)
 
     def _initialise_chunk(self):  # pylint: disable=too-many-branches,too-many-statements
         '''
@@ -483,16 +489,11 @@ class CrossMatch():
             x, y = os.path.splitext(self.b_auf_file_path)  # pylint: disable=access-member-before-definition
             self.b_auf_file_path = x + r"_{:.2f}_{:.2f}" + y
 
-
         for config, flag in zip([self.cat_a_params_dict, self.cat_b_params_dict], ['a_', 'b_']):
             if self.crossmatch_params_dict['include_perturb_auf'] or config['correct_astrometry']:
-                for name in ['dens_hist_tri', 'tri_model_mags', 'tri_model_mag_mids',
-                             'tri_model_mags_interval', 'tri_dens_uncert', 'tri_n_bright_sources_star']:
-                    # If location variable was "None" in the first place we set
-                    # {name}_list in config to a list of Nones and it got updated
-                    # above already.
-                    if config[f'{name}_location'] != "None":
-                        setattr(self, f'{flag}{name}_list', np.load(config[f'{name}_location']))
+                for name in ['tri_dens_cube', 'tri_dens_array']:
+                    if f'{name}_location' in config:
+                        setattr(self, f'{flag}{name}', np.load(config[f'{name}_location']))
 
     def _load_metadata_config_params(self, chunk_id):
         '''
@@ -537,16 +538,18 @@ class CrossMatch():
 
         for config, catname in zip([self.cat_a_params_dict, self.cat_b_params_dict], ['a_', 'b_']):
             ind = np.where(chunk_id == np.array(config['chunk_id_list']))[0][0]
-            self._make_regions_points([f'{catname}auf_region_type', config['auf_region_type']],
-                                      [f'{catname}auf_region_points',
-                                       config['auf_region_points_per_chunk'][ind]],
-                                      config['chunk_id_list'][ind])
+            p = _make_regions_points([f'{catname}auf_region_type', config['auf_region_type']],
+                                     [f'{catname}auf_region_points',
+                                      config['auf_region_points_per_chunk'][ind]],
+                                     config['chunk_id_list'][ind])
+            setattr(self, f'{catname}auf_region_points', p)  # pylint: disable=possibly-used-before-assignment
 
         ind = np.where(chunk_id == np.array(self.crossmatch_params_dict['chunk_id_list']))[0][0]
-        self._make_regions_points(['cf_region_type', self.crossmatch_params_dict['cf_region_type']],
-                                  ['cf_region_points',
-                                   self.crossmatch_params_dict['cf_region_points_per_chunk'][ind]],
-                                  self.crossmatch_params_dict['chunk_id_list'][ind])
+        p = _make_regions_points(['cf_region_type', self.crossmatch_params_dict['cf_region_type']],
+                                 ['cf_region_points',
+                                  self.crossmatch_params_dict['cf_region_points_per_chunk'][ind]],
+                                 self.crossmatch_params_dict['chunk_id_list'][ind])
+        setattr(self, 'cf_region_points', p)  # pylint: disable=possibly-used-before-assignment
 
         for config, flag in zip([self.cat_a_params_dict, self.cat_b_params_dict], ['a_', 'b_']):
             if config['correct_astrometry']:
@@ -581,57 +584,6 @@ class CrossMatch():
         '''
         self._load_metadata_config_params(chunk_id)
         self._load_metadata_config_files()
-
-
-    def _make_regions_points(self, region_type, region_points, chunk_id):
-        '''
-        Wrapper function for the creation of "region" coordinate tuples,
-        given either a set of rectangular points or a list of coordinates.
-
-        Parameters
-        ----------
-        region_type : list of string and string
-            String containing the kind of system the region pointings are in.
-            Should be "rectangle", regularly sampled points in the two sky
-            coordinates, or "points", individually specified sky coordinates,
-            and the name into which to save the variable in the class.
-        region_points : list of string and list
-            String containing the evaluation points. If ``region_type`` is
-            "rectangle", should be six values, the start and stop values and
-            number of entries of the respective sky coordinates; and if
-            ``region_type`` is "points", ``region_points`` should be tuples
-            of the form ``(a, b)`` separated by whitespace, as well as the
-            class variable name for storage.
-        chunk_id : string
-            Unique identifier for particular sub-region being loaded, used to
-            inform of errors.
-        '''
-        rt = region_type[1].lower()
-        if rt == 'rectangle':
-            try:
-                a = region_points[1]
-                a = [float(point) for point in a]
-            except ValueError as exc:
-                raise ValueError(f"{region_points[0]} should be 6 numbers separated by spaces in chunk "
-                                 f"{chunk_id}.") from exc
-            if len(a) == 6:
-                if not a[2].is_integer() or not a[5].is_integer():
-                    raise ValueError("Number of steps between start and stop values for "
-                                     f"{region_points[0]} should be integers in chunk {chunk_id}.")
-                ax1_p = np.linspace(a[0], a[1], int(a[2]))
-                ax2_p = np.linspace(a[3], a[4], int(a[5]))
-                points = np.stack(np.meshgrid(ax1_p, ax2_p), -1).reshape(-1, 2)
-            else:
-                raise ValueError(f"{region_points[0]} should be 6 numbers separated by spaces in chunk "
-                                 f"{chunk_id}.")
-        elif rt == 'points':
-            try:
-                points = np.array(region_points[1], dtype=float)
-            except ValueError as exc:
-                raise ValueError(f"{region_points[0]} should be a list of two-element lists "
-                                 f"'[[a, b], [c, d]]', separated by a comma in chunk {chunk_id}.") from exc
-
-        setattr(self, region_points[0], points)  # pylint: disable=possibly-used-before-assignment
 
     def make_shared_data(self):
         """

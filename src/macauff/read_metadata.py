@@ -91,7 +91,7 @@ def _read_metadata_common(joint_config, cat_a_config, cat_b_config):
 
     for config, catname in zip([cat_a_config, cat_b_config], ['"a"', '"b"']):
         for check_flag in ['auf_region_type', 'auf_region_frame', 'auf_region_points_per_chunk',
-                           'filt_names', 'cat_name', 'auf_file_path', 'cat_csv_file_path',
+                           'filt_names', 'cat_name', 'cat_csv_file_path',
                            'correct_astrometry', 'chunk_id_list', 'pos_and_err_indices', 'mag_indices',
                            'chunk_overlap_col', 'best_mag_index_col', 'csv_has_header',
                            'apply_proper_motion']:
@@ -203,19 +203,13 @@ def _read_metadata_common(joint_config, cat_a_config, cat_b_config):
             cat_a_config['auf_region_frame'] != joint_config['cf_region_frame']):
         raise ValueError("Region frames for c/f and AUF creation must all be the same.")
 
-    joint_config['output_save_folder'] = os.path.abspath(joint_config['output_save_folder'])
+    if 'output_save_folder' in joint_config:
+        joint_config['output_save_folder'] = os.path.abspath(joint_config['output_save_folder'])
 
-    if cat_a_config['auf_file_path'] == "None":
-        cat_a_config['auf_file_path'] = None
-    else:
-        cat_a_config['auf_file_path'] = os.path.abspath(cat_a_config['auf_file_path'])
-    if cat_b_config['auf_file_path'] == "None":
-        cat_b_config['auf_file_path'] = None
-    else:
-        cat_b_config['auf_file_path'] = os.path.abspath(cat_b_config['auf_file_path'])
-
-    cat_a_config['cat_csv_file_path'] = os.path.abspath(cat_a_config['cat_csv_file_path'])
-    cat_b_config['cat_csv_file_path'] = os.path.abspath(cat_b_config['cat_csv_file_path'])
+    if 'cat_csv_file_path' in cat_a_config:
+        cat_a_config['cat_csv_file_path'] = os.path.abspath(cat_a_config['cat_csv_file_path'])
+    if 'cat_csv_file_path' in cat_b_config:
+        cat_b_config['cat_csv_file_path'] = os.path.abspath(cat_b_config['cat_csv_file_path'])
 
     try:
         a = float(joint_config['pos_corr_dist'])
@@ -340,12 +334,7 @@ def _read_metadata_perturb_auf(joint_config, cat_a_config, cat_b_config):
                                  f"{catname} metadata file.")
 
         if joint_config['include_perturb_auf'] or correct_astro:
-            for check_flag in ['snr_indices', 'tri_set_name', 'tri_filt_names', 'tri_filt_num',
-                               'download_tri', 'psf_fwhms', 'run_fw_auf', 'run_psf_auf',
-                               'tri_maglim_faint', 'tri_num_faint', 'gal_al_avs',
-                               'dens_hist_tri_location', 'tri_model_mags_location',
-                               'tri_model_mag_mids_location', 'tri_model_mags_interval_location',
-                               'tri_n_bright_sources_star_location']:
+            for check_flag in ['snr_indices', 'psf_fwhms', 'run_fw_auf', 'run_psf_auf', 'gal_al_avs']:
                 if check_flag not in config:
                     raise ValueError(f"Missing key {check_flag} from catalogue {catname} metadata file.")
 
@@ -374,22 +363,6 @@ def _read_metadata_perturb_auf(joint_config, cat_a_config, cat_b_config):
                     raise ValueError(f'{flag}{var} and {flag}filt_names should contain the same '
                                      'number of entries.')
 
-            if config['download_tri'] == "None":
-                config['download_tri'] = None
-            else:
-                if config['download_tri'] not in (True, False):
-                    raise ValueError("Boolean key download_tri not set to allowed value in catalogue "
-                                     f"{catname} metadata file.")
-
-            if config['tri_set_name'] == "None":
-                config['tri_set_name'] = None
-            if config['tri_filt_names'] == "None":
-                config['tri_filt_names'] = [None] * len(config['filt_names'])
-            else:
-                if len(config['tri_filt_names']) != len(config['filt_names']):
-                    raise ValueError(f'{flag}tri_filt_names and {flag}filt_names should contain the '
-                                     'same number of entries.')
-
             a = config['psf_fwhms']
             try:
                 b = np.array([float(f) for f in a])
@@ -405,130 +378,102 @@ def _read_metadata_perturb_auf(joint_config, cat_a_config, cat_b_config):
                     raise ValueError(f"Boolean key {auf_run_flag} not set to allowed value in catalogue "
                                      f"{catname} metadata file.")
 
-            # Only need dd_params or l_cut if we're using run_psf_auf or
-            # correct_astrometry is True.
-            if config['run_psf_auf'] or correct_astro:
-                for check_flag, f in zip(['dd_params_path', 'l_cut_path'],
-                                         ['dd_params', 'l_cut']):
+            run_internal_tri_count = np.sum(
+                [name in config for name in ['auf_file_path', 'tri_set_name', 'tri_filt_names',
+                 'tri_filt_num', 'download_tri', 'tri_maglim_faint', 'tri_num_faint']])
+            run_external_tri_count = np.sum(
+                [name in config for name in ['tri_dens_cube_location', 'tri_dens_array_location']])
+            if ((run_internal_tri_count > 0 and run_external_tri_count > 0) or
+                    (run_internal_tri_count == 0 and run_external_tri_count == 0)):
+                raise ValueError("Ambiguity in whether TRILEGAL histogram generation is being run "
+                                 f"within or prior to cross-match run in catalogue {catname}. Please "
+                                 "pass one set of parameters to CrossMatch.")
+
+            if run_internal_tri_count > 0:
+                for check_flag in ['auf_file_path', 'tri_set_name', 'tri_filt_names',
+                                   'tri_filt_num', 'download_tri', 'tri_maglim_faint', 'tri_num_faint']:
                     if check_flag not in config:
-                        raise ValueError(f"Missing key {check_flag} from catalogue {catname} "
-                                         "metadata file.")
+                        raise ValueError(f"Missing key {check_flag} from catalogue {catname} metadata file.")
+                # Skip tri_set_name for not being verifiable easily; auf_file_path
+                # is set outside of the include_perturb_auf flag for now.
+                if len(config['tri_filt_names']) != len(config['filt_names']):
+                    raise ValueError(f'{flag}tri_filt_names and {flag}filt_names should contain the '
+                                     'same number of entries.')
 
-                for check_flag, f in zip(['dd_params_path', 'l_cut_path'],
-                                         ['dd_params', 'l_cut']):
-                    if not os.path.exists(config[check_flag]):
-                        raise OSError(f'{flag}{check_flag} does not exist. Please ensure that path for '
-                                      f'catalogue {catname} is correct.')
-
-                    if not os.path.isfile(f'{config[check_flag]}/{f}.npy'):
-                        raise FileNotFoundError(f'{f} file not found in catalogue {catname} path. '
-                                                'Please ensure PSF photometry perturbations '
-                                                'are pre-generated.')
-
-                    if 'dd_params' in check_flag:
-                        dpp = config['dd_params_path']
-                        a = np.load(f'{dpp}/dd_params.npy')
-                        if not (len(a.shape) == 3 and a.shape[0] == 5 and a.shape[2] == 2):
-                            raise ValueError(f'{flag}dd_params should be of shape (5, X, 2).')
-                    if 'l_cut' in check_flag:
-                        lcp = config['l_cut_path']
-                        a = np.load(f'{lcp}/l_cut.npy')
-                        if not (len(a.shape) == 1 and a.shape[0] == 3):
-                            raise ValueError(f'{flag}l_cut should be of shape (3,) only.')
-
-            try:
-                a = config['tri_filt_num']
-                if a == "None":
-                    config['tri_filt_num'] = None
-                else:
+                try:
+                    a = config['tri_filt_num']
                     if not float(a).is_integer():
                         raise ValueError("tri_filt_num should be a single integer number in "
                                          f"catalogue {catname} metadata file, or None.")
-            except (ValueError, TypeError) as exc:
-                raise ValueError("tri_filt_num should be a single integer number in "
-                                 f"catalogue {catname} metadata file, or None.") from exc
-
-            for suffix in ['_faint']:
-                try:
-                    a = config[f'tri_num{suffix}']
-                    if a == "None":
-                        config[f'tri_num{suffix}'] = None
-                    else:
-                        if not float(a).is_integer():
-                            raise ValueError(f"tri_num{suffix} should be a single integer number in "
-                                             f"catalogue {catname} metadata file, or None.")
                 except (ValueError, TypeError) as exc:
-                    raise ValueError(f"tri_num{suffix} should be a single integer number in "
+                    raise ValueError("tri_filt_num should be a single integer number in "
                                      f"catalogue {catname} metadata file, or None.") from exc
 
-                try:
-                    if config[f'tri_maglim{suffix}'] == "None":
-                        config[f'tri_maglim{suffix}'] = None
-                    else:
-                        a = float(config[f'tri_maglim{suffix}'])
-                except (ValueError, TypeError) as exc:
-                    raise ValueError(f"tri_maglim{suffix} in catalogue {catname} must be a "
-                                     "float, or None.") from exc
-
-            # Assume that we input filenames, including full location, for each
-            # pre-computed TRILEGAL histogram file, and that they are all shape
-            # (len(filters), ...).
-            for name in ['dens_hist_tri', 'tri_model_mags', 'tri_model_mag_mids',
-                         'tri_model_mags_interval', 'tri_dens_uncert', 'tri_n_bright_sources_star']:
-                f = config[f'{name}_location']
-                if f == "None":
-                    config[f'{name}_list'] = [None] * len(config['filt_names'])
-                else:
-                    if not os.path.isfile(f):
-                        raise FileNotFoundError(f"File not found for {name}. Please verify "
-                                                "the input location on disk.")
+                for suffix in ['_faint']:
                     try:
-                        g = np.load(f)
-                    except Exception as exc:
-                        raise ValueError(f"File could not be loaded from {name}.") from exc
-                    if name == "dens_hist_tri":
-                        shape_dht = g.shape
-                        if g.shape[0] != len(config['filt_names']):
-                            raise ValueError(f"The number of filters in {flag}filt_names and "
-                                             f"{flag}dens_hist_tri do not match.")
+                        a = config[f'tri_num{suffix}']
+                        if a == "None":
+                            config[f'tri_num{suffix}'] = None
+                        else:
+                            if not float(a).is_integer():
+                                raise ValueError(f"tri_num{suffix} should be a single integer number in "
+                                                 f"catalogue {catname} metadata file, or None.")
+                    except (ValueError, TypeError) as exc:
+                        raise ValueError(f"tri_num{suffix} should be a single integer number in "
+                                         f"catalogue {catname} metadata file, or None.") from exc
+
+                    try:
+                        if config[f'tri_maglim{suffix}'] == "None":
+                            config[f'tri_maglim{suffix}'] = None
+                        else:
+                            a = float(config[f'tri_maglim{suffix}'])
+                    except (ValueError, TypeError) as exc:
+                        raise ValueError(f"tri_maglim{suffix} in catalogue {catname} must be a "
+                                         "float, or None.") from exc
+
+                if config['download_tri'] not in (True, False):
+                    raise ValueError("Boolean key download_tri not set to allowed value in catalogue "
+                                     f"{catname} metadata file.")
+
+                config['tri_dens_cube'] = None
+                config['tri_dens_array'] = None
+            if run_external_tri_count:
+                for check_flag in ['tri_dens_cube_location', 'tri_dens_array_location']:
+                    if check_flag not in config:
+                        raise ValueError(f"Missing key {check_flag} from catalogue {catname} metadata file.")
+                # Assume that we input filenames, including full location, for each
+                # pre-computed TRILEGAL histogram file, and that they are of fixed
+                # shape.
+                for name in ['tri_dens_cube', 'tri_dens_array']:
+                    f = config[f'{name}_location']
+                    if f == "None":
+                        config[name] = None
                     else:
-                        if g.shape[0] != shape_dht[0]:
-                            raise ValueError("The number of filter-elements in dens_hist_tri "
-                                             f"and {name} do not match.")
-                        if name != "tri_n_bright_sources_star":
-                            if len(g.shape) < 2 or len(shape_dht) < 2 or g.shape[1] != shape_dht[1]:
-                                raise ValueError("The number of magnitude-elements in "
-                                                 f"dens_hist_tri and {name} do not match.")
-            # Check for inter- and intra-TRILEGAL parameter compatibility.
-            # If any one parameter from option A or B is None, they all
-            # should be; and if any (all) options from A are None, zero
-            # options from B should be None, and vice versa.
-            run_internal_none_flag = [config[name] is None for name in
-                                      ['auf_file_path', 'tri_set_name', 'tri_maglim_faint',
-                                      'tri_num_faint', 'download_tri', 'tri_filt_num']]
-            run_internal_none_flag.append(np.all([b is None for b in config['tri_filt_names']]))
-            if not (np.sum(run_internal_none_flag) == 0 or
-                    np.sum(run_internal_none_flag) == len(run_internal_none_flag)):
-                raise ValueError("Either all flags related to running TRILEGAL histogram generation "
-                                 f"within the catalogue {catname} cross-match call -- tri_filt_names, "
-                                 "tri_set_name, etc. -- should be None or zero of them should be None.")
-            run_external_none_flag = [config[name] == "None" for name in
-                                      ['dens_hist_tri_location', 'tri_model_mags_location',
-                                       'tri_model_mag_mids_location', 'tri_model_mags_interval_location',
-                                       'tri_n_bright_sources_star_location']]
-            if not (np.sum(run_external_none_flag) == 0 or
-                    np.sum(run_external_none_flag) == len(run_external_none_flag)):
-                raise ValueError("Either all flags related to running TRILEGAL histogram generation "
-                                 f"externally to the catalogue {catname} cross-match call -- "
-                                 "dens_hist_tri, tri_model_mags, etc. -- should be None or zero of "
-                                 "them should be None.")
-            if ((np.sum(run_internal_none_flag) == 0 and np.sum(run_external_none_flag) == 0) or
-                (np.sum(run_internal_none_flag) == len(run_internal_none_flag) and
-                 np.sum(run_external_none_flag) == len(run_external_none_flag))):
-                raise ValueError("Ambiguity in whether TRILEGAL histogram generation is being run "
-                                 f"within or prior to cross-match run in catalogue {catname}. Please "
-                                 "flag one set of parameters as None and only pass the other set "
-                                 "into CrossMatch.")
+                        if not os.path.isfile(f):
+                            raise FileNotFoundError(f"File not found for {name}. Please verify "
+                                                    "the input location on disk.")
+                        try:
+                            g = np.load(f)
+                        except Exception as exc:
+                            raise ValueError(f"File could not be loaded from {name}.") from exc
+                        if name == "tri_dens_cube":
+                            shape_dht = g.shape
+                            if g.shape[1] != len(config['filt_names']):
+                                raise ValueError(f"The number of filters in {flag}filt_names and "
+                                                 f"{flag}tri_dens_cube do not match.")
+                        else:
+                            if g.shape[0] != shape_dht[0]:
+                                raise ValueError("The number of sky-elements in tri_dens_cube "
+                                                 f"and {name} do not match.")
+
+                config['auf_file_path'] = None
+                config['tri_set_name'] = None
+                config['tri_filt_names'] = [None] * len(config['filt_names'])
+                config['tri_filt_num'] = None
+                for suffix in ['_faint']:
+                    config[f'tri_maglim{suffix}'] = None
+                    config[f'tri_num{suffix}'] = None
+                config['download_tri'] = None
 
             if correct_astro or config['fit_gal_flag']:
                 for check_flag in ['gal_wavs', 'gal_zmax', 'gal_nzs',
@@ -563,6 +508,14 @@ def _read_metadata_perturb_auf(joint_config, cat_a_config, cat_b_config):
                 if len(b) != len(config['filt_names']):
                     raise ValueError(f'{flag}gal_filternames and {flag}filt_names should contain the '
                                      'same number of entries.')
+
+        if 'auf_file_path' in config and config['auf_file_path'] is not None:
+            config['auf_file_path'] = os.path.abspath(config['auf_file_path'])
+        else:
+            # Force auf_file_path to be None unless it was passed explicitly
+            # as a filepath before, since we currently require it to always
+            # be set.
+            config['auf_file_path'] = None
 
     return joint_config, cat_a_config, cat_b_config
 
