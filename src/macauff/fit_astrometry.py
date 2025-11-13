@@ -1375,8 +1375,10 @@ class AstrometricCorrections:
             sig = np.percentile(b_matches[mag_cut, self.pos_and_err_indices[0][2]], 50)
             sig_cut = ((b_matches[:, self.pos_and_err_indices[0][2]] <= sig+self.sig_slice[i]) &
                        (b_matches[:, self.pos_and_err_indices[0][2]] >= sig-self.sig_slice[i]))
-            n_cut = (self.narray[self.bmatch] >= self.moden-self.dn) & (
-                self.narray[self.bmatch] <= self.moden+self.dn)
+            _h, _b = np.histogram(self.narray[self.bmatch][mag_cut & sig_cut], bins='auto')
+            moden = (_b[:-1]+np.diff(_b)/2)[np.argmax(_h)]
+            dn = 0.05*moden
+            n_cut = (self.narray[self.bmatch] >= moden-dn) & (self.narray[self.bmatch] <= moden+dn)
 
             # Since we expect the astrometric/photometric scaling to be roughly
             # a factor FWHM/(2 * sqrt(2 * ln(2))), i.e. the sigma of a
@@ -1670,8 +1672,10 @@ class AstrometricCorrections:
             bsig = np.percentile(b_matches[mag_cut, pos_err_ind], 50)
             sig_cut = ((b_matches[:, pos_err_ind] <= bsig+self.sig_slice[i]) &
                        (b_matches[:, pos_err_ind] >= bsig-self.sig_slice[i]))
-            n_cut = (self.narray[self.bmatch] >= self.moden-self.dn) & (
-                self.narray[self.bmatch] <= self.moden+self.dn)
+            _h, _b = np.histogram(self.narray[self.bmatch][mag_cut & sig_cut], bins='auto')
+            moden = (_b[:-1]+np.diff(_b)/2)[np.argmax(_h)]
+            dn = 0.05*moden
+            n_cut = (self.narray[self.bmatch] >= moden-dn) & (self.narray[self.bmatch] <= moden+dn)
             if not self.use_photometric_uncertainties:
                 final_slice = sig_cut & mag_cut & n_cut & (self.dists <= 20*bsig)
             else:
