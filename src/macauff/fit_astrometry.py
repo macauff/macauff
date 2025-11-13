@@ -1357,6 +1357,7 @@ class AstrometricCorrections:
         avg_sig = np.empty((len(self.mag_array), 3), float)
         avg_snr = np.empty((len(self.mag_array), 3), float)
         avg_mag = np.empty((len(self.mag_array), 3), float)
+        dist_stds = np.empty(len(self.mag_array), float)
 
         p_ind = self.unc_index if self.use_photometric_uncertainties else self.correct_astro_mag_indices_index
         mag_ind = self.mag_indices[p_ind]
@@ -1406,6 +1407,7 @@ class AstrometricCorrections:
             avg_sig[i, 0] = np.median(bm[:, self.pos_and_err_indices[0][2]])
             avg_sig[i, [1, 2]] = np.abs(np.percentile(bm[:, self.pos_and_err_indices[0][2]], [16, 84]) -
                                         np.median(bm[:, self.pos_and_err_indices[0][2]]))
+            dist_stds[i] = np.std(final_dists)
 
             h, bins = np.histogram(final_dists, bins='auto')
             num = np.sum(h)
@@ -1426,6 +1428,7 @@ class AstrometricCorrections:
         self.pdfs, self.pdf_uncerts = pdfs, pdf_uncerts
         self.q_pdfs, self.pdf_bins = q_pdfs, pdf_bins
         self.skip_flags = skip_flags
+        self.dist_stds = dist_stds
 
     def fit_uncertainty(self):
         """
@@ -1464,9 +1467,9 @@ class AstrometricCorrections:
                 new_sig = m * sig_orig + n
             self.fit_sigs[i, 0] = new_sig
 
-            (y, q, bins, sig, snr, num) = (pdf, self.q_pdfs[i], self.pdf_bins[i],
-                                           self.avg_sig[i, 0], self.avg_snr[i, 0], self.nums[i])
-            res = minimize(self.calc_single_joint_auf, x0=[sig], args=(i, bins, y, q, num, snr),
+            y, q, bins, snr, num = pdf, self.q_pdfs[i], self.pdf_bins[i], self.avg_snr[i, 0], self.nums[i]
+            sig_est = self.dist_stds[i] / 0.655
+            res = minimize(self.calc_single_joint_auf, x0=[sig_est], args=(i, bins, y, q, num, snr),
                            method='L-BFGS-B', options={'ftol': 1e-9}, bounds=[(0, None)])
 
             self.fit_sigs[i, 1] = res.x[0]
