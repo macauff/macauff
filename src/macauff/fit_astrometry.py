@@ -1892,7 +1892,7 @@ class AstrometricCorrections:
             ax.set_xlabel(r'$\log_{10}$(1 / SNR)')
         else:
             ax.set_xlabel(r'log10(1 / SNR)')
-        ax.set_xlabel(f'{self.mag_names[self.unc_index]} / mag')
+        ax.set_ylabel(f'{self.mag_names[p_ind]} / mag')
 
         ax = plt.subplot(gs[2])
         q = (obj_err < 1) & (_snr > 1) & (obj_err > 0) & ~np.isnan(obj_mag)
@@ -1917,7 +1917,7 @@ class AstrometricCorrections:
 
         ax.set_xlim(*xlims)
         ax.set_ylim(*ylims)
-        ax.set_xlabel(f'{self.mag_names[self.unc_index]} / mag')
+        ax.set_xlabel(f'{self.mag_names[p_ind]} / mag')
         if usetex:
             ax.set_ylabel(rf'$\log_{10}$(Quoted{mag_label} uncertainty / arcsecond)')
         else:
