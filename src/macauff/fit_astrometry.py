@@ -50,6 +50,9 @@ from macauff.perturbation_auf_fortran import perturbation_auf_fortran as paf
 __all__ = ['AstrometricCorrections']
 
 
+warnings.filterwarnings("ignore", message="ERFA function .* yielded")
+
+
 def derive_astrometric_corrections(self, which):
     """
     Wrapper to set various parameters and call AstrometricCorrections,
@@ -791,6 +794,10 @@ class AstrometricCorrections:
                 # magnitude-related terms; however, if we are using photometry,
                 # then unc_index loops as intended.
                 p = unc_index if self.use_photometric_uncertainties else self.correct_astro_mag_indices_index
+                if self.use_photometric_uncertainties:
+                    # Skip any magnitudes that are never detected!
+                    if np.sum(~np.isnan(self.b[:, self.mag_indices[p]])) == 0:
+                        continue
                 self.psf_fwhm = self.psf_fwhms[p]
                 self.gal_wav_micron = self.gal_wavs_micron[p]
                 self.gal_ab_offset = self.gal_ab_offsets[p]
