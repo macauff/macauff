@@ -74,7 +74,7 @@ def derive_astrometric_corrections(self, which):
     a_npy_or_csv = 'csv'
     a_coord_or_chunk = 'chunk'
     t = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    print(f"{t} Rank {self.rank}, chunk {self.chunk_id}: Calculating catalogue 'a' "
+    print(f"{t} Rank {self.rank}, chunk {self.chunk_id}: Calculating catalogue '{which}' "
           "uncertainty corrections...")
     apply_pm = (getattr(self, f'{which}_apply_proper_motion') or
                 getattr(self, f'{which}_ref_apply_proper_motion'))
@@ -734,6 +734,9 @@ class AstrometricCorrections:
             self.mn_poisson_cdfs = np.empty(shape, object)
             self.ind_poisson_cdfs = np.empty(shape, object)
 
+        self.input_sigs = []
+        self.derived_sigs = []
+
         for index_, list_of_things in enumerate(zip(*zip_list)):
             if np.all(mn_sigs[index_, :] != -9999):
                 continue
@@ -919,6 +922,10 @@ class AstrometricCorrections:
                                                  np.amin(self.fit_sigs[~self.skip_flags, 1]))
                         self.ylims_sing[1] = max(self.ylims_sing[1],
                                                  np.amax(self.fit_sigs[~self.skip_flags, 1]))
+
+                        self.input_sigs.append(self.avg_sig[~self.skip_flags, 0])
+                        self.derived_sigs.append(self.fit_sigs[~self.skip_flags, 1])
+
                     self.plot_snr_mag_sig()
 
         self.mn_sigs = mn_sigs
