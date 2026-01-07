@@ -557,6 +557,7 @@ def create_densities(b, minmag, maxmag, hull, hull_x_shift, search_radius, n_poo
         np.append(hull[:, 0], hull[0, 0]), np.append(hull[:, 1], hull[0, 1]), seed)
 
     narray = overlap_number / area
+    narray[area == 0] = 0
 
     return narray
 
