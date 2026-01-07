@@ -6,6 +6,7 @@ used in the cross-matching of the two catalogues.
 
 import datetime
 import sys
+import warnings
 
 import numpy as np
 from scipy.optimize import minimize
@@ -136,6 +137,31 @@ def compute_photometric_likelihoods(cm):
                     b_mag_cut = b_photo_cut[:, j]
                     b_flags = ~np.isnan(b_mag)
                     b_flags_cut = b_flags[b_sky_cut]
+
+                    # Before calling c&f creation routines, check if either
+                    # catalogue's band is significantly under-populated
+                    # relative to the main catalogue. The obvious case is the
+                    # verification of "empty" bands where surveys are made of
+                    # portions of sky where bands were not used and others,
+                    # but more generally cases where a band detects very few
+                    # objects from the overall survey will be caught here too.
+                    if (np.sum(b_flags_cut) / len(b_mag_cut) < 0.001 or
+                            np.sum(a_flags_cut) / len(a_mag_cut) < 0.001):
+                        warnings.warn(f"{t} Rank {cm.rank}, chunk {cm.chunk_id}: Catalogue a's "
+                                      f"{cm.a_filt_names[i]} and b's {cm.b_filt_names[j]} have poor overlap, "
+                                      "skipping c and f generation and falling back to default values.")
+                        a_num_photo_cut = np.sum(~np.isnan(a_photo_cut[:, i]))
+                        # Pad densities against a literally empty band, just in
+                        # case. It should cancel in the c/f ratio of the smaller
+                        # of the two -- the one we actually want to pad.
+                        na = a_num_photo_cut / area + 1e-10
+                        b_num_photo_cut = np.sum(~np.isnan(b_photo_cut[:, j]))
+                        nb = b_num_photo_cut / area + 1e-10
+                        c_prior = min(na, nb) / 2
+                        fa_prior = na - c_prior
+                        fb_prior = nb - c_prior
+                        c_like, fa_like, fb_like = (1-1e-10)**2, 1-1e-10, 1-1e-10
+                        continue
 
                     bright_frac, field_frac = cm.int_fracs[[0, 1]]
                     c_prior, c_like, fa_prior, fa_like, fb_prior, fb_like = create_c_and_f(
