@@ -687,7 +687,7 @@ def calculate_overlap_counts(a, b, minmag, maxmag, search_radius, n_pool, mag_in
     counter = np.arange(0, len(a))
     iter_group = zip(counter, full_ucoords, itertools.repeat([mag_cut_kdt, r, len_or_inds]))
     with make_pool(n_pool) as pool:
-        for stuff in pool.imap_unordered(ball_point_query, iter_group, chunksize=len(a)//n_pool):
+        for stuff in pool.imap_unordered(ball_point_query, iter_group, chunksize=max(1, len(a)//n_pool)):
             i, result = stuff
             if len_or_inds == 'len':
                 overlap_number[i] = result
