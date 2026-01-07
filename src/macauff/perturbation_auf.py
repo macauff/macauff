@@ -727,9 +727,13 @@ def create_single_perturb_auf(r, dr, j0s, num_trials, psf_fwhm, density_mag, a_p
     # logarithmic bins, accepting a log-difference maximum. This is slightly
     # lop-sided, but for 20% results in +18%/-22% limits, which is fine.
     dlogn = 0.2
+    # Since we take the logarithm, quickly filter for zero densities. These occur
+    # if an object is outside of the minmag-maxmag range and is somehow isolated
+    # from any object in that magnitude range within its search area, for which
+    # we'll just end up taking the lowest density bin from the ensemble.
     lognvals = np.log(localn)
-    logn_min = dlogn * np.floor(np.amin(lognvals)/dlogn)
-    logn_max = dlogn * np.ceil(np.amax(lognvals)/dlogn)
+    logn_min = dlogn * np.floor(np.amin(lognvals[localn > 0])/dlogn)
+    logn_max = dlogn * np.ceil(np.amax(lognvals[localn > 0])/dlogn)
     lognbins = np.arange(logn_min, logn_max+1e-10, dlogn)
 
     counts, lognbins, magbins = np.histogram2d(lognvals, a_photo, bins=[lognbins, magbins])
