@@ -55,7 +55,7 @@ those options which only need to be supplied if ``include_perturb_auf`` is ``Tru
 
 and those options which need to be supplied if either of ``apply_proper_motion`` or ``ref_apply_proper_motion`` is ``True``, in either catalogue:
 
-``move_to_epoch``.
+``move_to_epoch`` or ``move_to_epoch_per_chunk``.
 
 Common Parameter Description
 ----------------------------
@@ -144,7 +144,11 @@ Bin sizes for magnitudes used to represent the source number density used in the
 
 ``move_to_epoch``
 
-The epoch to which proper motions should be fast-forwarded or re-wound, in either catalogue (and astrometric correction reference catalogues, as appropriate). Should be a single string formatted in such a way that it can be read by ``astropy``'s ``Time`` function, such as ``J2000`` or ``2000-01-01``.
+The epoch to which proper motions should be fast-forwarded or re-wound, in either catalogue (and astrometric correction reference catalogues, as appropriate). Should be a single string formatted in such a way that it can be read by ``astropy``'s ``Time`` function, such as ``J2000`` or ``2000-01-01``. If ``move_to_epoch_per_chunk`` is given this should not be supplied.
+
+``move_to_epoch_per_chunk``
+
+A per-chunk version of ``move_to_epoch``, ``Time``-valid strings for each parallelised match separately. Only one of the two entries should be given in the joint config file.
 
 
 Catalogue-specific Parameters
@@ -473,14 +477,16 @@ The inter-dependency of input parameters on one another, and the output ``CrossM
     ├─* best_mag_index_col
     ├─* csv_has_header
     ├─* apply_proper_motion
-    │                     ├─> move_to_epoch[5]
+    │                     ├─> move_to_epoch[5,6]
+    │                     ├─> move_to_epoch_per_chunk[5,6]
     │                     ├─* pm_indices
     │                     └─* ref_epoch_or_index
     └─* correct_astrometry
                          ├─* correct_astro_save_folder[3]
                          ├─* snr_indices
                          ├─* ref_apply_proper_motion
-                         │                         ├─> move_to_epoch[5]
+                         │                         ├─> move_to_epoch[5,6]
+                         │                         ├─> move_to_epoch_per_chunk[5,6]
                          │                         ├─* ref_pm_indices
                          │                         └─* ref_ref_epoch_or_index
                          ├─* correct_astro_mag_indices_index
@@ -499,6 +505,7 @@ List directories end in ``->`` for ``joint`` parameters, ``-*`` for ``catalogue`
 | [3] - must have ``_{}`` in its string, into which the chunk ID will be inserted
 | [4] - must have relevant input entry per chunk, e.g. in a YAML multi-line format, aligned with the chunk ID of ``chunk_id_list`` of the relevant input parameter file
 | [5] - must be provided in either ``apply_proper_motion`` or ``ref_apply_proper_motion`` are ``True`` in either input catalogue
+| [6] - only one of ``move_to_epoch`` or ``move_to_epoch_per_chunk`` should be given
 
 .. rubric:: Footnotes
 

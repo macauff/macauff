@@ -88,6 +88,8 @@ def _read_metadata_common(joint_config, cat_a_config, cat_b_config):
                        'four_hankel_points', 'four_max_rho', 'int_fracs', 'make_output_csv', 'n_pool']:
         if check_flag not in joint_config:
             raise ValueError(f"Missing key {check_flag} from joint metadata file.")
+    if not isinstance(joint_config['cf_region_points_per_chunk'], list):
+        raise TypeError("cf_region_points_per_chunk must be a list in the joint metadata file.")
 
     for config, catname in zip([cat_a_config, cat_b_config], ['"a"', '"b"']):
         for check_flag in ['auf_region_type', 'auf_region_frame', 'auf_region_points_per_chunk',
@@ -97,6 +99,8 @@ def _read_metadata_common(joint_config, cat_a_config, cat_b_config):
                            'apply_proper_motion']:
             if check_flag not in config:
                 raise ValueError(f"Missing key {check_flag} from catalogue {catname} metadata file.")
+        if not isinstance(config['auf_region_points_per_chunk'], list):
+            raise TypeError(f"auf_region_points_per_chunk must be a list in the {catname} metadata file.")
 
     for config, flag, correct_astro in zip(
             [cat_a_config, cat_b_config], ['a_', 'b_'], [cat_a_config['correct_astrometry'],
@@ -872,14 +876,28 @@ def _read_metadata_pm(joint_config, cat_a_config, cat_b_config):
     if (cat_a_config['apply_proper_motion'] or cat_b_config['apply_proper_motion'] or
             (cat_a_config['correct_astrometry'] and cat_a_config['ref_apply_proper_motion']) or
             (cat_b_config['correct_astrometry'] and cat_b_config['ref_apply_proper_motion'])):
-        if 'move_to_epoch' not in joint_config:
-            raise ValueError("Missing key move_to_epoch from joint metadata file.")
+        if 'move_to_epoch' not in joint_config and 'move_to_epoch_per_chunk' not in joint_config:
+            raise ValueError("Missing key move_to_epoch or move_to_epoch_per_chunk from joint metadata file.")
+        if 'move_to_epoch' in joint_config and 'move_to_epoch_per_chunk' in joint_config:
+            raise ValueError("Both move_to_epoch and move_to_epoch_per_chunk found in joint metadata file, "
+                             "please only supply one or the other.")
 
-        a = joint_config['move_to_epoch']
-        try:
-            Time(a)
-        except ValueError as exc:
-            raise ValueError("move_to_epoch must be a string that astropy's Time "
-                             "function accepts, such as JYYYY or YYYY-MM-DD.") from exc
+        if 'move_to_epoch' in joint_config:
+            a = joint_config['move_to_epoch']
+            try:
+                Time(a)
+            except ValueError as exc:
+                raise ValueError("move_to_epoch must be a string that astropy's Time "
+                                 "function accepts, such as JYYYY or YYYY-MM-DD.") from exc
+        else:
+            a = joint_config['move_to_epoch_per_chunk']
+            if not isinstance(a, list):
+                raise TypeError("move_to_epoch_per_chunk must be a list in the joint metadata file.")
+            for date in a:
+                try:
+                    Time(date)
+                except ValueError as exc:
+                    raise ValueError("All entries in move_to_epoch_per_chunk must be a string that astropy's "
+                                     "Time function accepts, such as JYYYY or YYYY-MM-DD.") from exc
 
     return joint_config, cat_a_config, cat_b_config
