@@ -1029,8 +1029,13 @@ def _calculate_magnitude_offsets(count_array, mag_array, b, snr, model_mag_mids,
         Maximum magnitude offset required for simulations, based on SNR and
         empty simulation fraction.
     '''
-    flim = b / snr
-    dm_max_snr = -2.5 * np.log10(flim)
+    # If SNR is either zero or NaN, then we can't use the delta-mag from
+    # considering SNRs, and set it to zero to be filtered later by
+    # np.maximum.
+    q = ~np.isnan(snr) & (snr > 0)
+    flim = b / snr[q]
+    dm_max_snr = np.zeros_like(snr)
+    dm_max_snr[q] = -2.5 * np.log10(flim)
 
     dm_max_no_perturb = np.empty_like(mag_array)
     for i, mag in enumerate(mag_array):
