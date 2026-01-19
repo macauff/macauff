@@ -887,7 +887,12 @@ class AstrometricCorrections:
                 if not (np.sum([q[0] == -1 for q in self.pdfs]) <= len(self.pdfs)-5):
                     # Fall back to not correcting anything if data still too poor
                     # to draw any meaningful conclusions from.
-                    m_sig, n_sig = 1, 0
+                    if not self.use_photometric_uncertainties:
+                        m_sig, n_sig = 1, 0
+                    else:
+                        # For photometric uncertainties, we know we at minimum
+                        # have a PSF FWHM correction factor to include.
+                        m_sig, n_sig = self.psf_fwhm, 0
                     # Keep fit_sigs[:, 1] as the individual fits we
                     # were able to make.
                     self.fit_sigs[:, 0] = self.avg_sig[:, 0]
@@ -1710,8 +1715,10 @@ class AstrometricCorrections:
             ind_fit_sig = self.fit_sigs[i, 1]
             if self.make_plots:
                 ax = ax1s[i]
+            _quoted_sig = (self.avg_sig[i, 0] if not self.use_photometric_uncertainties else
+                           self.psf_fwhm * self.avg_sig[i, 0])
             for j, (sig, _h, ls) in enumerate(zip(
-                    [fit_sig, fit_sig, fit_sig, self.avg_sig[i, 0], self.avg_sig[i, 0], self.avg_sig[i, 0],
+                    [fit_sig, fit_sig, fit_sig, _quoted_sig, _quoted_sig, _quoted_sig,
                      ind_fit_sig, ind_fit_sig, ind_fit_sig],
                     [h, 1, 0, h, 1, 0, h, 1, 0], ['r-', 'r-.', 'r:', 'k-', 'k-.', 'k:', 'c-', 'c-.', 'c:'])):
                 if not self.make_plots and j != 0:
@@ -1773,7 +1780,7 @@ class AstrometricCorrections:
                 if self.make_plots:
                     if j in [0, 3, 6]:
                         sig_type = 'fit' if j == 0 else 'quoted' if j == 3 else 'ind'
-                        sig_val = fit_sig if j == 0 else self.avg_sig[i, 0] if j == 3 else ind_fit_sig
+                        sig_val = fit_sig if j == 0 else _quoted_sig if j == 3 else ind_fit_sig
                         f_val = nn_frac_mn if j == 0 else nn_frac_quot if j == 3 else nn_frac_ind
                         h_str = f', H = {h:.2f}' if j == 0 else ''
                         if usetex:
@@ -1842,7 +1849,8 @@ class AstrometricCorrections:
         q = ~self.skip_flags
         if np.sum(q) > 0:
             man_snr = self.avg_snr[q, 0]
-            man_sig_quoted = self.avg_sig[q, 0]
+            man_sig_quoted = (self.avg_sig[q, 0] if not self.use_photometric_uncertainties else
+                              self.psf_fwhm * self.avg_sig[q, 0])
             # Here we want the second column of fit_sigs, the individual
             # derivations of astrometric uncertainty.
             man_sig_fit = self.fit_sigs[q, 1]
@@ -1918,7 +1926,8 @@ class AstrometricCorrections:
         q = ~self.skip_flags
         if np.sum(q) > 0:
             man_mag = self.mag_array[q]
-            man_sig_quoted = self.avg_sig[q, 0]
+            man_sig_quoted = (self.avg_sig[q, 0] if not self.use_photometric_uncertainties else
+                              self.psf_fwhm * self.avg_sig[q, 0])
             # Remember, individually fit not parameterisation.
             man_sig_fit = self.fit_sigs[q, 1]
             man_log_err_fit = np.log10(man_sig_fit)
