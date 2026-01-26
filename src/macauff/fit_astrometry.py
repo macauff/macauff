@@ -1404,7 +1404,16 @@ class AstrometricCorrections:
             if not self.use_photometric_uncertainties:
                 final_slice = sig_cut & mag_cut & n_cut & (self.dists <= 20*sig)
             else:
-                final_slice = sig_cut & mag_cut & n_cut & (self.dists <= 20*self.psfsig*sig)
+                # Compare the photometric-error-based astrometric uncertainty for
+                # a 20-sigma cut, but in cases where this is disconnected from
+                # the astrometry we floor this at the median distance of the
+                # first three cuts.
+                if np.sum(sig_cut & mag_cut & n_cut) > 0:
+                    med_dist = np.median(self.dists[sig_cut & mag_cut & n_cut])
+                    compare_sig = max(self.psfsig*sig, med_dist)
+                    final_slice = sig_cut & mag_cut & n_cut & (self.dists <= 20*compare_sig)
+                else:
+                    final_slice = sig_cut & mag_cut & n_cut
             final_dists = self.dists[final_slice]
             if len(final_dists) < min_hist_cut:
                 skip_flags[i] = 1
@@ -1490,9 +1499,9 @@ class AstrometricCorrections:
             y, q, bins, snr, num = pdf, self.q_pdfs[i], self.pdf_bins[i], self.avg_snr[i, 0], self.nums[i]
             sig_est = self.dist_stds[i] / 0.655
             res = minimize(self.calc_single_joint_auf, x0=[sig_est], args=(i, bins, y, q, num, snr),
-                           method='L-BFGS-B', options={'ftol': 1e-9}, bounds=[(0, None)])
+                           method='L-BFGS-B', options={'ftol': 1e-9})  # , bounds=[(0, None)])
 
-            self.fit_sigs[i, 1] = res.x[0]
+            self.fit_sigs[i, 1] = np.abs(res.x[0])
 
         return m, n
 
@@ -1697,7 +1706,16 @@ class AstrometricCorrections:
             if not self.use_photometric_uncertainties:
                 final_slice = sig_cut & mag_cut & n_cut & (self.dists <= 20*bsig)
             else:
-                final_slice = sig_cut & mag_cut & n_cut & (self.dists <= 20*self.psfsig*bsig)
+                # Compare the photometric-error-based astrometric uncertainty for
+                # a 20-sigma cut, but in cases where this is disconnected from
+                # the astrometry we floor this at the median distance of the
+                # first three cuts.
+                if np.sum(sig_cut & mag_cut & n_cut) > 0:
+                    med_dist = np.median(self.dists[sig_cut & mag_cut & n_cut])
+                    compare_sig = max(self.psfsig*bsig, med_dist)
+                    final_slice = sig_cut & mag_cut & n_cut & (self.dists <= 20*compare_sig)
+                else:
+                    final_slice = sig_cut & mag_cut & n_cut
 
             avg_a_dens = len(self.a) / self.area
             density = (np.percentile(self.narray[self.bmatch][final_slice], 50) +
@@ -1789,7 +1807,12 @@ class AstrometricCorrections:
                             lab = rf'sigma_{sig_type} = {sig_val:.4f}", F = {f_val:.2f}{h_str}'
                     else:
                         lab = ''
-                    modely_norm = np.sum(modely * np.diff(pdf_bin))
+                    # Have to make a new "q" filter variable here, since we want
+                    # to use the full-resolution model rather than a binned one
+                    # for calculating our normalisation.
+                    model_q = self.r[:-1] < pdf_bin[1:][pdf > 0][-1]
+                    full_modely = nn_frac * nn_model + (1 - nn_frac) * m_conv_plus_nn
+                    modely_norm = np.sum(full_modely[model_q] * self.dr[model_q])
                     ax.plot((pdf_bin[:-1]+np.diff(pdf_bin)/2)[q_pdf], modely[q_pdf] / modely_norm,
                             ls, label=lab)
 
