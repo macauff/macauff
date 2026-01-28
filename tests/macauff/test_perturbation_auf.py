@@ -291,7 +291,7 @@ def test_calc_mag_offsets():
     r = 1.185 * 6.1
     n_norm = 1
     b = 0.05
-    snr = 19.91
+    snr = np.array([19.91])
     count_array = np.array([1])
     dm = _calculate_magnitude_offsets(count_array, mag_array, b, snr, model_mag_mids, log10y,
                                       model_mags_interval, r, n_norm)
@@ -301,7 +301,7 @@ def test_calc_mag_offsets():
     # Second, verify the outputs of no perturber 1% of the time. For this we need
     # to fake slightly more involved data, though.
     # B / snr = 1 gives dm_max_snr = 0
-    snr = 0.05
+    snr = np.array([0.05])
     for n in [0.5, 0.15]:
         model_mag_mids = np.arange(14, 20, 0.1)
         model_mags_interval = 0.1 * np.ones_like(model_mag_mids)
