@@ -35,6 +35,65 @@ def test_initial_group_numbering():
         [18, 1, 2, 19, 3, 4, 5, 6, 7, 8, 9, 10, 20, 11, 12, 16, 17, 20, 19]))
 
 
+def test_initial_group_numbering_catch_recursion():
+    a_num = np.array([2] * 600)
+    b_num = np.array([2] * 600)
+    a_overlaps = np.empty((2, 600), int)
+    a_overlaps[0] = np.arange(600, dtype=int)
+    a_overlaps[1] = np.arange(600, dtype=int)
+    b_overlaps = np.empty((2, 600), int)
+    b_overlaps[0] = np.arange(1, 601, dtype=int)
+    b_overlaps[1] = np.arange(1, 601, dtype=int)
+    b_overlaps = np.arange(1, 601, dtype=int).reshape(1, -1)
+    b_overlaps[:, -1] = -1
+
+    agroup, bgroup, nfl = _initial_group_numbering(a_overlaps, b_overlaps, a_num, b_num)
+
+    fake_agroup = np.ones(600, int)
+    fake_agroup[:119] = 0
+    fake_bgroup = np.ones(600, int)
+    fake_bgroup[:119] = 0
+    assert np.all(agroup == fake_agroup)
+    assert np.all(bgroup == fake_bgroup)
+    assert np.all(nfl[0] == np.arange(0, 119))
+    assert np.all(nfl[1] == np.arange(0, 119))
+
+
+def test_set_list_catch_recursion():
+    a_num = np.array([2] * 600)
+    b_num = np.array([2] * 600)
+    a_overlaps = np.empty((2, 600), int)
+    a_overlaps[0] = np.arange(600, dtype=int)
+    a_overlaps[1] = np.arange(600, dtype=int)
+    b_overlaps = np.empty((2, 600), int)
+    b_overlaps[0] = np.arange(1, 601, dtype=int)
+    b_overlaps[1] = np.arange(1, 601, dtype=int)
+    b_overlaps[:, -1] = -1
+
+    alist, blist, agrplen, bgrplen, arej, brej = set_list(a_overlaps, b_overlaps, a_num, b_num, 2)
+    assert len(alist) == 0
+    assert len(bgrplen) == 0
+    assert np.all(arej == np.concatenate((np.arange(120, 600), np.arange(120))))
+    assert np.all(brej == np.concatenate((np.arange(120, 600), np.arange(120))))
+
+    # Move one pointing so we get a single valid island at the end.
+    x = np.copy(a_overlaps[:, 114])
+    a_overlaps[:, 114:-1] = a_overlaps[:, 115:]
+    a_overlaps[:, -1] = x
+    b_overlaps[:, 113] = 599
+    b_overlaps[:, 114:-1] = b_overlaps[:, 114:-1] - 1
+    b_overlaps[:, -1] = 598
+
+    alist, blist, agrplen, bgrplen, arej, brej = set_list(a_overlaps, b_overlaps, a_num, b_num, 2)
+    # Changing the order of sequences above fails all but the final six
+    # objects in each catalogue now. So we have one valid island and
+    # some rejections.
+    assert np.all(alist == np.array([594, 595, 596, 597, 598]).reshape(-1, 1))
+    assert np.all(blist == np.array([594, 595, 596, 597, 598, 599]).reshape(-1, 1))
+    assert np.all(arej == np.append(np.arange(594), 599))
+    assert np.all(brej == np.arange(594))
+
+
 def test_set_list_maximum_exceeded():
     os.makedirs('./group', exist_ok=True)
     for i, (n_a, n_b) in enumerate(zip([21, 10, 7], [5, 10, 6])):

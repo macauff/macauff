@@ -52,16 +52,33 @@ def set_list(aindices, bindices, aoverlap, boverlap, n_pool):
     bgrouplengths : numpy.ndarray
         The number of catalogue "b" sources in each island grouping.
     '''
-    agroup, bgroup = _initial_group_numbering(aindices, bindices, aoverlap, boverlap)
+    things = _initial_group_numbering(aindices, bindices, aoverlap, boverlap)
+    if len(things) == 3:
+        agroup, bgroup, no_fly_list = things
+    else:
+        agroup, bgroup = things
     groupmax = max(np.amax(agroup), np.amax(bgroup))
+
+    if len(things) == 3:
+        no_fly_flag = True
+        a_no_fly = no_fly_list[0]
+        b_no_fly = no_fly_list[1]
+        warnings.warn(f"{len(a_no_fly)}/{len(aoverlap)} catalogue a and {len(b_no_fly)}/{len(boverlap)} "
+                      "catalogue b stars were removed for failing to have their island solutions solved. "
+                      "Please check any results carefully.")
+        sys.stdout.flush()
+    else:
+        no_fly_flag = False
 
     agrouplengths = np.zeros(dtype=int, shape=(groupmax,))
     bgrouplengths = np.zeros(dtype=int, shape=(groupmax,))
 
     for agrp in agroup:
-        agrouplengths[agrp-1] += 1
+        if agrp > 0:
+            agrouplengths[agrp-1] += 1
     for bgrp in bgroup:
-        bgrouplengths[bgrp-1] += 1
+        if bgrp > 0:
+            bgrouplengths[bgrp-1] += 1
 
     # Search for any island groupings which are too large to calculate the
     # permutations of reasonably (limiting at 50,000). When considering a set,
@@ -105,35 +122,54 @@ def set_list(aindices, bindices, aoverlap, boverlap, n_pool):
     else:
         reject_flag = False
 
+    # Combine the potential "no fly" rejections with the island-too-long ones.
+    if reject_flag and no_fly_flag:
+        areject = np.concatenate((areject, a_no_fly))
+        breject = np.concatenate((breject, b_no_fly))
+    elif no_fly_flag:
+        # If no-fly rejections but no too-big-island rejections, move the
+        # variables across. Update the flag variable to match.
+        areject = a_no_fly
+        breject = b_no_fly
+        reject_flag = True
+    # If no no-fly objects but we have some too-big-island rejected objects
+    # then we can just do nothing, since we already set that up above.
+
     # Keep track of which sources have "good" group sizes, and the size of each
     # group in the two catalogues (e.g., group 1 has 2 "a" and 3 "b" sources).
     goodlength = np.logical_not(grouplengthexceeded)
     acounters = np.zeros(dtype=int, shape=(groupmax,))
     bcounters = np.zeros(dtype=int, shape=(groupmax,))
 
-    amaxlen = int(np.amax(agrouplengths[goodlength]))
-    bmaxlen = int(np.amax(bgrouplengths[goodlength]))
-    alist = np.full(dtype=int, shape=(amaxlen, groupmax), fill_value=-1, order='F')
-    blist = np.full(dtype=int, shape=(bmaxlen, groupmax), fill_value=-1, order='F')
-    # Remember that we started groups from one, so convert to zero-indexing.
-    # Loop over each source in turn, skipping any which belong to an island
-    # too large to run, updating alist or blist with the corresponding island
-    # number the source belongs to.
-    for i, agrp in enumerate(agroup):
-        if goodlength[agrp-1]:
-            alist[acounters[agrp-1], agrp-1] = i
-            acounters[agrp-1] += 1
-    for i, bgrp in enumerate(bgroup):
-        if goodlength[bgrp-1]:
-            blist[bcounters[bgrp-1], bgrp-1] = i
-            bcounters[bgrp-1] += 1
+    if np.sum(goodlength) > 0:
+        amaxlen = int(np.amax(agrouplengths[goodlength]))
+        bmaxlen = int(np.amax(bgrouplengths[goodlength]))
+        alist = np.full(dtype=int, shape=(amaxlen, groupmax), fill_value=-1, order='F')
+        blist = np.full(dtype=int, shape=(bmaxlen, groupmax), fill_value=-1, order='F')
+        # Remember that we started groups from one, so convert to zero-indexing.
+        # Loop over each source in turn, skipping any which belong to an island
+        # too large to run, updating alist or blist with the corresponding island
+        # number the source belongs to.
+        for i, agrp in enumerate(agroup):
+            if agrp > 0 and goodlength[agrp-1]:
+                alist[acounters[agrp-1], agrp-1] = i
+                acounters[agrp-1] += 1
+        for i, bgrp in enumerate(bgroup):
+            if bgrp > 0 and goodlength[bgrp-1]:
+                blist[bcounters[bgrp-1], bgrp-1] = i
+                bcounters[bgrp-1] += 1
 
-    # Now, we simply want to remove any sources from the list with islands too
-    # large to run.
-    alist = alist[:, goodlength]
-    blist = blist[:, goodlength]
-    agrouplengths = agrouplengths[goodlength]
-    bgrouplengths = bgrouplengths[goodlength]
+        # Now, we simply want to remove any sources from the list with islands too
+        # large to run.
+        alist = alist[:, goodlength]
+        blist = blist[:, goodlength]
+        agrouplengths = agrouplengths[goodlength]
+        bgrouplengths = bgrouplengths[goodlength]
+    else:
+        # If we don't have any valid islands at all, then we just need to fake
+        # some variables.
+        alist, blist = [], []
+        agrouplengths, bgrouplengths = [], []
 
     if reject_flag:
         # pylint: disable-next=possibly-used-before-assignment
@@ -170,6 +206,10 @@ def _initial_group_numbering(aindices, bindices, aoverlap, boverlap):
         Array detailing the group number of each catalogue "a" source.
     bgroup : numpy.ndarray
         Array detailing the group number of each catalogue "b" source.
+    no_fly_list : list of lists, optional
+        List containing any groups that hit a recursive limit and could
+        not be assigned a group number. Only returned if something is in
+        it.
     '''
     agroup = np.zeros(dtype=int, shape=(len(aoverlap),))
     bgroup = np.zeros(dtype=int, shape=(len(boverlap),))
@@ -193,12 +233,50 @@ def _initial_group_numbering(aindices, bindices, aoverlap, boverlap):
             group_num += 1
             bgroup[i] = group_num
 
+    # Keep track of a "no fly" list, in which the python recursion limit
+    # has been reached. Objects should be removed from it if they succeed
+    # in getting put in an island in a future run.
+    no_fly_list = [[], []]
     for i, agrp in enumerate(agroup):
         if agrp == 0:
             group_num += 1
-            _a_to_b(i, group_num, aoverlap[i], aindices, bindices,
-                    aoverlap, boverlap, agroup, bgroup)
+            try:
+                _a_to_b(i, group_num, aoverlap[i], aindices, bindices,
+                        aoverlap, boverlap, agroup, bgroup)
+                # If we succeed, check the no fly list for removals:
+                successful_a = np.argwhere(agroup == group_num)
+                successful_b = np.argwhere(bgroup == group_num)
 
+                for j in successful_a:
+                    if j in no_fly_list[0]:
+                        k = np.nonzero(no_fly_list[0] == j)[0][0]
+                        no_fly_list[0] = np.concatenate((no_fly_list[0][:k], no_fly_list[0][k+1:]))
+                for j in successful_b:
+                    if j in no_fly_list[1]:
+                        k = np.nonzero(no_fly_list[1] == j)[0][0]
+                        no_fly_list[1] = np.concatenate((no_fly_list[1][:k], no_fly_list[1][k+1:]))
+                sys.stdout.flush()
+            except RecursionError:
+                too_many_a = np.nonzero(agroup == group_num)[0]
+                too_many_b = np.nonzero(bgroup == group_num)[0]
+                no_fly_list[0] = np.unique(np.concatenate((no_fly_list[0], too_many_a)))
+                no_fly_list[1] = np.unique(np.concatenate((no_fly_list[1], too_many_b)))
+                sys.stdout.flush()
+                agroup[too_many_a] = 0
+                bgroup[too_many_b] = 0
+                group_num -= 1
+    # Usually the fact that we entirely iterate over agroup is fine, as we
+    # should touch every detection in both catalogues. However, in cases where
+    # we hit recursive depths we may either fail to hit a source, or mess around
+    # with sources, in catalogue b. We then just need to assign any "missed"
+    # catalogue b entries as no-fly list in these cases, as we can't do
+    # anything else.
+    if np.any(bgroup == 0):
+        failed_b_indices = np.nonzero(bgroup == 0)[0]
+        no_fly_list[1] = np.unique(np.concatenate((no_fly_list[1], failed_b_indices)))
+
+    if len(no_fly_list[0]) > 0 or len(no_fly_list[1]) > 0:
+        return agroup, bgroup, no_fly_list
     return agroup, bgroup
 
 
