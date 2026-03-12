@@ -720,8 +720,8 @@ def create_single_perturb_auf(r, dr, j0s, num_trials, psf_fwhm, density_mag, a_p
 
     # Set a magnitude bin width of 0.25 mags, to avoid oversampling.
     dmag = 0.25
-    mag_min = dmag * np.floor(np.amin(a_photo)/dmag)
-    mag_max = dmag * np.ceil(np.amax(a_photo)/dmag)
+    mag_min = max(-5, dmag * np.floor(np.amin(a_photo)/dmag))
+    mag_max = min(35, dmag * np.ceil(np.amax(a_photo)/dmag))
     magbins = np.arange(mag_min, mag_max+1e-10, dmag)
     # For local densities, we want a percentage offset, given that we're in
     # logarithmic bins, accepting a log-difference maximum. This is slightly

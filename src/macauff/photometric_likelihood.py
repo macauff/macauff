@@ -282,8 +282,8 @@ def make_bins(input_mags):
     minamag = np.amin(input_mags)
     maxamag = np.amax(input_mags)
     da = 0.1
-    maxa = da*np.ceil(maxamag/da)
-    mina = da*np.floor(minamag/da)
+    maxa = min(35, da*np.ceil(maxamag/da))
+    mina = max(-5, da*np.floor(minamag/da))
     na = int(np.ceil((maxa - mina)/da) + 1)
     output_bins = np.linspace(mina, maxa, na)
     # If min/max magnitudes that define magnitude bins happen to lie exactly
