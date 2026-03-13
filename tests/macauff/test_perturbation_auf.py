@@ -419,7 +419,7 @@ class TestMakePerturbAUFs():
                     f'24.409 23.524 22.583 22.387 22.292 22.015 21.144 19.380 20.878 {mag+0.003} 22.391 '
                     '21.637 21.342  0.024\n\n 1   6.65 -0.39  0.02415 -2.701 3.397  4.057 14.00  '
                     '8.354 0.00 25.523 25.839 24.409 23.524 22.583 22.387 22.292 22.015 21.144 '
-                    '19.380 20.878 100.99 22.391 21.637 21.342  0.024\n')
+                    '19.380 20.878 34.99 22.391 21.637 21.342  0.024\n')
             for new_auf_point in new_auf_points:
                 with open(f'{self.auf_folder}/trilegal_auf_simulation_{new_auf_point[0]:.2f}_'
                           f'{new_auf_point[1]:.2f}_faint.dat', "w", encoding='utf-8') as f:
@@ -435,7 +435,7 @@ class TestMakePerturbAUFs():
             if mag > 17:
                 keep_flux = np.zeros((1,), float)
 
-            photo_array = np.array([np.concatenate(([14.99], [100]*100, [10], [10], [10], [10]))]).T
+            photo_array = np.array([np.concatenate(([14.99], [34]*100, [10], [10], [10], [10]))]).T
             # Catalogue bins for the source:
             a_photo = photo_array[0, :]
             dmag = 0.25
@@ -489,7 +489,7 @@ class TestMakePerturbAUFs():
                  [0.9, 0.1, 0.1], [0.9, 0.9, 0.1])).reshape(-1, 3)
             self.fake_cm.b_photo = photo_array.reshape(-1, 1)
             self.fake_cm.b_magref = np.array([0] * 105)
-            self.fake_cm.b_snr = np.array([100] * 105).reshape(-1, 1)
+            self.fake_cm.b_snr = np.array([34] * 105).reshape(-1, 1)
             self.fake_cm.n_pool = 1
             _, p_a_o = make_perturb_aufs(self.fake_cm, 'b')
 
@@ -547,9 +547,9 @@ class TestMakePerturbAUFs():
         # Force the 0.1-0.9 square with extra objects for the convex hull to pick up.
         x = np.concatenate(([0.3, 0.3, 0.1] * 101, [0.1, 0.1, 0.1], [0.1, 0.9, 0.1],
                             [0.9, 0.1, 0.1], [0.9, 0.9, 0.1])).reshape(-1, 3)
-        y = np.array([np.concatenate(([14.99], [100]*100, [10], [10], [10], [10]))]).T
+        y = np.array([np.concatenate(([14.99], [34]*100, [10], [10], [10], [10]))]).T
         z = np.array([0] * 105)
-        s = np.array([[100] * 105])
+        s = np.array([[34] * 105])
         a = np.hstack((x, y, np.zeros((len(x), 1), bool), z.reshape(-1, 1), s.reshape(-1, 1)))
         with open('cat_folder/cat_9.csv', "w", encoding='utf-8') as f:
             np.savetxt(f, a, delimiter=",")
@@ -571,7 +571,7 @@ class TestMakePerturbAUFs():
                 '3.397  4.057 14.00  8.354 0.00 25.523 25.839 24.409 23.524 22.583 22.387 22.292 '
                 '22.015 21.144 19.380 20.878 15.004 22.391 21.637 21.342  0.024\n\n 1   6.65 -0.39 '
                 ' 0.02415 -2.701 3.397  4.057 14.00  8.354 0.00 25.523 25.839 24.409 23.524 22.583 '
-                '22.387 22.292 22.015 21.144 19.380 20.878 100.99 22.391 21.637 21.342  0.024\n')
+                '22.387 22.292 22.015 21.144 19.380 20.878 34.99 22.391 21.637 21.342  0.024\n')
         for new_auf_point in new_auf_points:
             with open(f'{self.auf_folder}/trilegal_download_9_{new_auf_point[0]:.2f}_'
                       f'{new_auf_point[1]:.2f}_faint.dat', "w", encoding='utf-8') as f:
@@ -737,7 +737,7 @@ class TestMakePerturbAUFs():
         main_mags = rng.uniform(24.95, 25.05, size=100)
         y = np.array([np.concatenate(([14.99], main_mags, [10], [10], [10], [10]))]).T
         z = np.array([0] * 105)
-        s = np.array([[100] * 105])
+        s = np.array([[34] * 105])
         a = np.hstack((x, y, np.zeros((len(x), 1), bool), z.reshape(-1, 1), s.reshape(-1, 1)))
         with open('cat_folder/cat_9.csv', "w", encoding='utf-8') as f:
             np.savetxt(f, a, delimiter=",")
