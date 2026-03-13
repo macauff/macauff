@@ -231,6 +231,11 @@ def make_perturb_aufs(cm, which_cat):
                 # good detections of a source.
                 local_n[med_index_slice[good_mag_snr_slice], j] = localn
 
+            # We always run the local-density calculation, but if we end up with
+            # normalising densities that are all zero then we can skip the
+            # computation of perturbation AUF components, so we have a second
+            # criterion in the if statement at this point.
+            if cm.include_perturb_auf and not np.all(localn == 0):
                 # Extract the TRILEGAL histograms, as appropriate.
                 if tri_dens_cube is not None:
                     sky_index = mff.find_nearest_point([ax1], [ax2],
@@ -331,15 +336,14 @@ def make_perturb_aufs(cm, which_cat):
 
     if cm.include_perturb_auf:
         a = getattr(cm, f'{which_cat}_photo')
-        localn = local_n
     magref = getattr(cm, f'{which_cat}_magref')
 
     if cm.include_perturb_auf:
         for i in range(0, len(a)):
             axind = modelrefinds[2, i]
             filterind = magref[i]
-            nmind = np.argmin((localn[i, filterind] - narrays[:arraylengths[filterind, axind],
-                                                              filterind, axind])**2 +
+            nmind = np.argmin((local_n[i, filterind] - narrays[:arraylengths[filterind, axind],
+                                                               filterind, axind])**2 +
                               (a[i, filterind] - magarrays[:arraylengths[filterind, axind],
                                                            filterind, axind])**2)
             modelrefinds[0, i] = nmind
