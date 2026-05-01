@@ -740,9 +740,6 @@ class AstrometricCorrections:
         for index_, list_of_things in enumerate(zip(*zip_list)):
             if np.all(mn_sigs[index_, :] != -9999):
                 continue
-            print(f'Running astrometry fits for sightline {index_+1}/{len(self.ax1_mids)}...')
-            sys.stdout.flush()
-
             if self.coord_or_chunk == 'coord':
                 ax1_mid, ax2_mid = list_of_things
                 cat_args = (ax1_mid, ax2_mid)
@@ -754,6 +751,11 @@ class AstrometricCorrections:
             self.list_of_things = list_of_things
             self.cat_args = cat_args
             self.file_name = file_name
+
+            t = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            print(f'{t}, {self.file_name}: Running astrometry fits for sightline '
+                  f'{index_+1}/{len(self.ax1_mids)}...')
+            sys.stdout.flush()
 
             if self.pregenerate_cutouts is None:
                 self.a = self.a_cat[index_]
@@ -1039,7 +1041,9 @@ class AstrometricCorrections:
         else:
             zip_list = (self.chunks, self.ax1_mins, self.ax1_maxs, self.ax2_mins, self.ax2_maxs)
         for index_, list_of_things in enumerate(zip(*zip_list)):
-            print(f'Creating catalogue cutouts... {index_+1}/{len(self.ax1_mids)}', end='\r')
+            t = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            print(f'{t}, {self.file_name}: Creating catalogue cutouts... {index_+1}/{len(self.ax1_mids)}',
+                  end='\r')
             sys.stdout.flush()
 
             if self.coord_or_chunk == 'coord':
@@ -1115,7 +1119,8 @@ class AstrometricCorrections:
         self.gal_alphaweight = [[3.47e+09, 3.31e+06, 2.13e+09, 1.64e+10, 1.01e+09],
                                 [3.84e+09, 1.57e+06, 3.91e+08, 4.66e+10, 3.03e+07]]
 
-        print('Creating simulated star+galaxy counts...')
+        t = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        print(f'{t}, {self.file_name}: Creating simulated star+galaxy counts...')
         sys.stdout.flush()
         if self.coord_or_chunk == 'coord':
             ax1_mid, ax2_mid = self.list_of_things
@@ -1204,7 +1209,8 @@ class AstrometricCorrections:
         for verification purposes.
         """
         gs = self.make_gridspec('123123', 1, 1, 0.8, 5)
-        print('Plotting data and model counts...')
+        t = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        print(f'{t}, {self.file_name}: Plotting data and model counts...')
         sys.stdout.flush()
 
         p_ind = self.unc_index if self.use_photometric_uncertainties else self.correct_astro_mag_indices_index
@@ -1260,7 +1266,8 @@ class AstrometricCorrections:
         Calculate local normalising catalogue densities and catalogue-catalogue
         nearest neighbour match pairings for each cutout region.
         """
-        print('Creating local densities and nearest neighbour matches...')
+        t = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        print(f'{t}, {self.file_name}: Creating local densities and nearest neighbour matches...')
         sys.stdout.flush()
 
         p_ind = self.unc_index if self.use_photometric_uncertainties else self.correct_astro_mag_indices_index
@@ -1314,7 +1321,8 @@ class AstrometricCorrections:
         combination, for both aperture photometry and background-dominated PSF
         algorithms.
         """
-        print('Creating AUF simulations...')
+        t = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        print(f'{t}, {self.file_name}: Creating AUF simulations...')
         sys.stdout.flush()
 
         b_ratio = 0.05
@@ -1363,7 +1371,8 @@ class AstrometricCorrections:
             Number of data points in each magnitude-uncertainty slice to be
             considered for fitting for scaling relations.
         """
-        print('Creating catalogue AUF probability densities...')
+        t = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        print(f'{t}, {self.file_name}: Creating catalogue AUF probability densities...')
         sys.stdout.flush()
         b_matches = self.b[self.bmatch]
 
@@ -1475,7 +1484,8 @@ class AstrometricCorrections:
             input and output uncertainties.
         """
 
-        print('Creating joint H/sig fits...')
+        t = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        print(f'{t}, {self.file_name}: Creating joint H/sig fits...')
         sys.stdout.flush()
 
         self.fit_sigs = np.zeros((len(self.mag_array), 2), float)
@@ -1667,10 +1677,12 @@ class AstrometricCorrections:
         mn_poisson_cdfs = np.array([], float)
         ind_poisson_cdfs = np.array([], float)
 
+        t = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         if self.make_plots:
-            print('Creating individual AUF figures and calculating goodness-of-fits...')
+            print(f'{t}, {self.file_name}: Creating individual AUF figures and calculating '
+                  'goodness-of-fits...')
         else:
-            print('Calculating goodness-of-fits...')
+            print(f'{t}, {self.file_name}: Calculating goodness-of-fits...')
         sys.stdout.flush()
 
         if self.make_plots:
@@ -1836,7 +1848,8 @@ class AstrometricCorrections:
         Generate 2-D histograms of SNR, quoted/fit astrometric uncertainty, and
         photometric magnitude.
         """
-        print("Plotting SNR-Magnitude-Uncertainty scaling relations...")
+        t = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        print(f"{t}, {self.file_name}: Plotting SNR-Magnitude-Uncertainty scaling relations...")
         sys.stdout.flush()
         p_ind = self.unc_index if self.use_photometric_uncertainties else self.correct_astro_mag_indices_index
         p = ((self.b[:, self.snr_indices[p_ind]] > 0) & ~np.isnan(self.b[:, self.snr_indices[p_ind]]) &
