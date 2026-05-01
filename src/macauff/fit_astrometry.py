@@ -1041,15 +1041,17 @@ class AstrometricCorrections:
         else:
             zip_list = (self.chunks, self.ax1_mins, self.ax1_maxs, self.ax2_mins, self.ax2_maxs)
         for index_, list_of_things in enumerate(zip(*zip_list)):
-            t = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            print(f'{t}, {self.file_name}: Creating catalogue cutouts... {index_+1}/{len(self.ax1_mids)}',
-                  end='\r')
-            sys.stdout.flush()
-
             if self.coord_or_chunk == 'coord':
                 ax1_mid, ax2_mid, ax1_min, ax1_max, ax2_min, ax2_max = list_of_things
+                file_name = f'{ax1_mid}_{ax2_mid}'
             else:
                 chunk, ax1_min, ax1_max, ax2_min, ax2_max = list_of_things
+                file_name = f'{chunk}'
+
+            t = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            print(f'{t}, {file_name}: Creating catalogue cutouts... {index_+1}/{len(self.ax1_mids)}',
+                  end='\r')
+            sys.stdout.flush()
 
             if self.coord_or_chunk == 'coord':
                 cat_args = (ax1_mid, ax2_mid)

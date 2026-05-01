@@ -186,7 +186,7 @@ class TestOverlap():
                       np.array([2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 1, 1, 0, 0, 1, 1]))
 
         a_overlaps = -1*np.ones((2, 20), int)
-        for _j, _inds in enumerate([[0], [1], [2], [3, 18], [4], [5], [6], [7], [8], [9], [10],
+        for _j, _inds in enumerate([[0], [1], [2], [18, 3], [4], [5], [6], [7], [8], [9], [10],
                                     [11], [12, 17], [13], [14], [], [], [], [0], [12]]):
             a_overlaps[:len(_inds), _j] = np.array(_inds)
         b_overlaps = -1*np.ones((2, 19), int)

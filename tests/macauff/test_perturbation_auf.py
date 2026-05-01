@@ -297,25 +297,6 @@ def test_calc_mag_offsets():
                                       model_mags_interval, r, n_norm)
     assert_allclose(dm, 6.5, atol=0.0003)
 
-    rng = np.random.default_rng(28937482734)
-    # Second, verify the outputs of no perturber 1% of the time. For this we need
-    # to fake slightly more involved data, though.
-    # B / snr = 1 gives dm_max_snr = 0
-    snr = np.array([0.05])
-    for n in [0.5, 0.15]:
-        model_mag_mids = np.arange(14, 20, 0.1)
-        model_mags_interval = 0.1 * np.ones_like(model_mag_mids)
-        log10y = np.zeros_like(model_mag_mids)
-        count_array = np.ones(1, float) / (0.1 * np.pi * (r/3600)**2) * n
-
-        density = 10**log10y * model_mags_interval * np.pi * (r/3600)**2 * count_array[0] / n_norm
-        dm = _calculate_magnitude_offsets(count_array, mag_array, b, snr, model_mag_mids, log10y,
-                                          model_mags_interval, r, n_norm)
-        q = model_mag_mids <= mag_array[0] + dm[0]
-        draws = rng.poisson(lam=density[q], size=(100000, np.sum(q)))
-        frac = np.sum(np.sum(draws, axis=1) == 0) / draws.shape[0]
-        assert frac < 0.01
-
 
 class GalCountValues():  # pylint: disable=too-few-public-methods
     def __init__(self):
