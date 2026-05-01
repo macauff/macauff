@@ -886,7 +886,7 @@ class AstrometricCorrections:
                     warnings.warn("Reduced PDF histogram counts to 50.")
                     self.create_auf_pdfs(min_hist_cut=50)
                 m_sig, n_sig = self.fit_uncertainty()
-                if not (np.sum([q[0] == -1 for q in self.pdfs]) <= len(self.pdfs)-5):
+                if not np.sum([q[0] == -1 for q in self.pdfs]) <= len(self.pdfs)-5:
                     # Fall back to not correcting anything if data still too poor
                     # to draw any meaningful conclusions from.
                     if not self.use_photometric_uncertainties:
@@ -1337,9 +1337,7 @@ class AstrometricCorrections:
         snr, _, _ = binned_statistic(_mag[p], _snr[p], statistic='median',
                                      bins=np.append(self.mag_array-self.mag_slice,
                                                     self.mag_array[-1]+self.mag_slice[-1]))
-        dm_max = _calculate_magnitude_offsets(
-            self.moden*np.ones_like(self.mag_array), self.mag_array, b_ratio, snr, self.tri_mags,
-            self.log10y, self.dtri_mags, self.psf_radius, self.n_norm)
+        dm_max = _calculate_magnitude_offsets(b_ratio, snr)
 
         seed = np.random.default_rng().choice(100000, size=(mff.get_random_seed_size(),
                                                             len(self.mag_array)))

@@ -284,17 +284,9 @@ def test_fit_skew():
 def test_calc_mag_offsets():
     # First, test the results where relative flux of secondary vs noise is
     # the dominant contributor.
-    mag_array = np.array([13.99])
-    model_mag_mids = np.array([14])
-    model_mags_interval = np.array([0.1])
-    log10y = np.array([0])
-    r = 1.185 * 6.1
-    n_norm = 1
     b = 0.05
     snr = np.array([19.91])
-    count_array = np.array([1])
-    dm = _calculate_magnitude_offsets(count_array, mag_array, b, snr, model_mag_mids, log10y,
-                                      model_mags_interval, r, n_norm)
+    dm = _calculate_magnitude_offsets(b, snr)
     assert_allclose(dm, 6.5, atol=0.0003)
 
 

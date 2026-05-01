@@ -753,8 +753,7 @@ def create_single_perturb_auf(r, dr, j0s, num_trials, psf_fwhm, density_mag, a_p
     snr = snr[magi]
 
     b = 0.05
-    dm_max = _calculate_magnitude_offsets(count_array, mag_array, b, snr, model_mag_mids, log10y,
-                                          model_mags_interval, psf_r, model_count)
+    dm_max = _calculate_magnitude_offsets(b, snr)
 
     seed = np.random.default_rng().choice(100000, size=(mff.get_random_seed_size(),
                                                         len(count_array)))
@@ -996,8 +995,7 @@ def make_tri_counts(trifilepath, trifiltname, dm, brightest_source_mag,
     return dens, tri_mag_lefts, tri_mag_widths
 
 
-def _calculate_magnitude_offsets(count_array, mag_array, b, snr, model_mag_mids, log10y,
-                                 model_mags_interval, r, n_norm):
+def _calculate_magnitude_offsets(b, snr):
     '''
     Derive minimum relative fluxes, or largest magnitude offsets, down to which
     simulated perturbers need to be simulated, based on both considerations of
@@ -1006,26 +1004,11 @@ def _calculate_magnitude_offsets(count_array, mag_array, b, snr, model_mag_mids,
 
     Parameters
     ----------
-    count_array : numpy.ndarray
-        Local normalising densities of simulations.
-    mag_array : numpy.ndarray
-        Magnitudes of central objects to have perturbations simulated for.
     b : float
         Fraction of ``snr`` the flux of the perturber should be; e.g. for
         1/20th ``B`` should be 0.05.
     snr : numpy.ndarray
         Theoretical signal-to-noise ratios of each object in ``mag_array``.
-    model_mag_mids : numpy.ndarray
-        Model magnitudes for simulated densities of background objects.
-    log10y : numpy.ndarray
-        log-10 source densities of simulated objects in the given line of sight.
-    model_mags_interval : numpy.ndarray
-        Widths of the bins for each ``log10y``.
-    r : float
-        Radius of the PSF of the given simulation, in arcseconds.
-    n_norm : float
-        Normalising local density of simulations, to scale to each
-        ``count_array``.
 
     Returns
     -------

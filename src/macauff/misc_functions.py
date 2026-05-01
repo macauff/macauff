@@ -4,7 +4,6 @@ This module provides miscellaneous scripts, called in other parts of the cross-m
 framework.
 '''
 
-import itertools
 import multiprocessing
 import multiprocessing.dummy as mpd
 from multiprocessing import shared_memory
@@ -683,11 +682,10 @@ def calculate_overlap_counts(a, b, minmag, maxmag, search_radius, n_pool, mag_in
         overlap_number = mag_cut_kdt.query_ball_point(full_ucoords.cartesian.xyz.T, r, return_length=True,
                                                       workers=n_pool-1 if n_pool > 1 else 1)
         return overlap_number
-    else:
-        overlap_inds = mag_cut_kdt.query_ball_point(full_ucoords.cartesian.xyz.T, r, return_sorted=False,
-                                                    workers=n_pool-1 if n_pool > 1 else 1)
+    overlap_inds = mag_cut_kdt.query_ball_point(full_ucoords.cartesian.xyz.T, r, return_sorted=False,
+                                                workers=n_pool-1 if n_pool > 1 else 1)
 
-        return overlap_inds
+    return overlap_inds
 
 
 def _make_regions_points(region_type, region_points, chunk_id):

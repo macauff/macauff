@@ -986,7 +986,9 @@ class TestInputs:
 
         cm_p_ = self.cm_p_text.replace('n_pool: 2', 'n_pool: 2\n\nmove_to_epoch: J2000.000')
 
-        cm_p_2 = cm_p_.replace('move_to_epoch: J2000.000', 'move_to_epoch: J2000.000\nmove_to_epoch_per_chunk:\n  - J2000.000\n  - J2000.000')
+        cm_p_2 = cm_p_.replace('move_to_epoch: J2000.000',
+                               'move_to_epoch: J2000.000\nmove_to_epoch_per_chunk:\n  - '
+                               'J2000.000\n  - J2000.000')
         with pytest.raises(ValueError, match='Both move_to_epoch and move_to_epoch_per_chunk found in joint'):
             cm = CrossMatch(mock_filename(cm_p_2.encode("utf-8")),
                             mock_filename(ca_p_.encode("utf-8")),

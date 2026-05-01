@@ -70,7 +70,7 @@ def test_set_list_catch_recursion():
     b_overlaps[1] = np.arange(1, 601, dtype=int)
     b_overlaps[:, -1] = -1
 
-    alist, blist, agrplen, bgrplen, arej, brej = set_list(a_overlaps, b_overlaps, a_num, b_num, 2)
+    alist, blist, _, bgrplen, arej, brej = set_list(a_overlaps, b_overlaps, a_num, b_num, 2)
     assert len(alist) == 0
     assert len(bgrplen) == 0
     assert np.all(arej == np.concatenate((np.arange(120, 600), np.arange(120))))
@@ -84,7 +84,7 @@ def test_set_list_catch_recursion():
     b_overlaps[:, 114:-1] = b_overlaps[:, 114:-1] - 1
     b_overlaps[:, -1] = 598
 
-    alist, blist, agrplen, bgrplen, arej, brej = set_list(a_overlaps, b_overlaps, a_num, b_num, 2)
+    alist, blist, _, bgrplen, arej, brej = set_list(a_overlaps, b_overlaps, a_num, b_num, 2)
     # Changing the order of sequences above fails all but the final six
     # objects in each catalogue now. So we have one valid island and
     # some rejections.

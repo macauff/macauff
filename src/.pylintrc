@@ -423,6 +423,8 @@ disable=raw-checker-failed,
         use-symbolic-message-instead,
         unnecessary-pass,
         attribute-defined-outside-init,
+        possibly-used-before-assignment,
+        used-before-assignment,
 
 
 # Enable the message, report, category or checker with the given id(s). You can

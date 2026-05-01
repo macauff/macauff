@@ -103,7 +103,7 @@ def compute_photometric_likelihoods(cm):
             b_b_area_cut, b_f_area_cut, b_inds_cut, b_size_cut = (
                 cm.bb_area[b_sky_cut], cm.bf_area[b_sky_cut], cm.binds[:, b_sky_cut], cm.bsize[b_sky_cut])
 
-        for i in range(0, len(cm.a_filt_names)):
+        for i in range(0, len(cm.a_filt_names)):  # pylint: disable=consider-using-enumerate
             if not cm.include_phot_like and not cm.use_phot_priors:
                 a_num_photo_cut = np.sum(~np.isnan(a_photo_cut[:, i]))
                 na = a_num_photo_cut / area
@@ -113,7 +113,7 @@ def compute_photometric_likelihoods(cm):
                 a_mag_cut = a_photo_cut[:, i]
                 a_flags = ~np.isnan(a_mag)
                 a_flags_cut = a_flags[a_sky_cut]
-            for j in range(0, len(cm.b_filt_names)):
+            for j in range(0, len(cm.b_filt_names)):  # pylint: disable=consider-using-enumerate
                 if not cm.include_phot_like and not cm.use_phot_priors:
                     b_num_photo_cut = np.sum(~np.isnan(b_photo_cut[:, j]))
                     nb = b_num_photo_cut / area
