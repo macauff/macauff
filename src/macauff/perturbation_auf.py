@@ -1029,47 +1029,19 @@ def _calculate_magnitude_offsets(count_array, mag_array, b, snr, model_mag_mids,
 
     Returns
     -------
-    dm : numpy.ndarray
-        Maximum magnitude offset required for simulations, based on SNR and
-        empty simulation fraction.
+    dm_max_snr : numpy.ndarray
+        Maximum magnitude offset required for simulations, based on SNR
+        considerations.
     '''
     # If SNR is either zero or NaN, then we can't use the delta-mag from
     # considering SNRs, and set it to zero to be filtered later by
     # np.maximum.
     q = ~np.isnan(snr) & (snr > 0)
     flim = b / snr[q]
-    dm_max_snr = np.zeros_like(snr)
+    dm_max_snr = np.ones_like(snr) * 10
     dm_max_snr[q] = -2.5 * np.log10(flim)
 
-    dm_max_no_perturb = np.empty_like(mag_array)
-    for i, mag in enumerate(mag_array):
-        q = model_mag_mids >= mag
-        if np.sum(q) == 0:
-            dm_max_no_perturb[i] = 0
-            continue
-        _x = model_mag_mids[q]
-        _y = 10**log10y[q] * model_mags_interval[q] * np.pi * (r/3600)**2 * count_array[i] / n_norm
-
-        # Convolution of Poissonian distributions each with l_i is a Poissonian
-        # with mean of sum_i l_i.
-        lamb = np.cumsum(_y)
-        # CDF of Poissonian is regularised gamma Q(floor(k + 1), lambda), and we
-        # want k = 0; we wish to find the dm that gives sufficiently large lambda
-        # that k = 0 only occurs <= x% of the time. If lambda is too small then
-        # k = 0 is too likely. P(X <= 0; lambda) = exp(-lambda).
-        # For 1% chance of no perturber we want 0.01 = exp(-lambda); rearranging
-        # lambda = -ln(0.01).
-        q = np.where(lamb >= -np.log(0.01))[0]
-        if len(q) > 0:
-            dm_max_no_perturb[i] = _x[q[0]] - mag
-        else:
-            # In the case that we can't go deep enough in our simulated counts to
-            # get <1% chance of no perturber, just do the best we can.
-            dm_max_no_perturb[i] = _x[-1] - mag
-
-    dm = np.maximum(dm_max_snr, dm_max_no_perturb)
-
-    return dm
+    return dm_max_snr
 
 
 def generate_trilegal_histogram_cube(auf_points, auf_file_path, tri_set_name, tri_filt_names, tri_filt_num,
