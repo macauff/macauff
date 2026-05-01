@@ -680,58 +680,14 @@ def calculate_overlap_counts(a, b, minmag, maxmag, search_radius, n_pool, mag_in
     # pylint: disable-next=no-member
     r = (2 * np.sin(Angle(search_radius * u.degree) / 2.0)).value
     if len_or_inds == 'len':
-        overlap_number = np.empty(len(a), int)
-    else:
-        overlap_inds = [0] * len(a)
-
-    counter = np.arange(0, len(a))
-    iter_group = zip(counter, full_ucoords, itertools.repeat([mag_cut_kdt, r, len_or_inds]))
-    with make_pool(n_pool) as pool:
-        for stuff in pool.imap_unordered(ball_point_query, iter_group, chunksize=max(1, len(a)//n_pool)):
-            i, result = stuff
-            if len_or_inds == 'len':
-                overlap_number[i] = result
-            else:
-                overlap_inds[i] = result
-
-    pool.join()
-
-    if len_or_inds == 'len':
+        overlap_number = mag_cut_kdt.query_ball_point(full_ucoords.cartesian.xyz.T, r, return_length=True,
+                                                      workers=n_pool-1 if n_pool > 1 else 1)
         return overlap_number
-    return overlap_inds
+    else:
+        overlap_inds = mag_cut_kdt.query_ball_point(full_ucoords.cartesian.xyz.T, r, return_sorted=False,
+                                                    workers=n_pool-1 if n_pool > 1 else 1)
 
-
-def ball_point_query(iterable):
-    """
-    Wrapper function to distribute calculation of the number of neighbours
-    around a particular sky coordinate via KDTree query.
-
-    Parameters
-    ----------
-    iterable : list
-        List of variables passed through ``multiprocessing``, including index
-        into object having its neighbours determined, the Spherical Cartesian
-        representation of objects to search for neighbours around, the KDTree
-        containing all potential neighbours, the Cartesian angle
-        representing the maximum on-sky separation, and the length-or-array
-        flag.
-
-    Returns
-    -------
-    i : integer
-        The index of the object whose neighbour count was calculated.
-    integer or numpy.ndarray
-        Either number of neighbours in ``mag_cut_kdt`` within ``r`` of
-        ``full_ucoords[i]``, or the indices into ``mag_cut_kdt`` that are
-        within the specified range.
-    """
-    i, full_ucoord, (mag_cut_kdt, r, len_or_inds) = iterable
-    # query_ball_point returns the neighbours of x (full_ucoords) around self
-    # (mag_cut_kdt) within r.
-    kdt_query = mag_cut_kdt.query_ball_point(full_ucoord.cartesian.xyz, r, return_sorted=True)
-    if len_or_inds == 'len':
-        return i, len(kdt_query)
-    return i, kdt_query
+        return overlap_inds
 
 
 def _make_regions_points(region_type, region_points, chunk_id):
