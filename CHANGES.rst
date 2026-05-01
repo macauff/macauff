@@ -47,6 +47,12 @@ New Features
 Bug Fixes
 ^^^^^^^^^
 
+- Fall-back photometric likelihood and priors computed in cases of very little
+  overlap between particular pairs of cross-catalogue filters. [#98]
+
+- Island generation in ``set_list`` has an escape clause to avoid hitting
+  recursion depths for very dense sky regions. [#98]
+
 - Issue resolved with ``convex_hull_area`` negative longitude resulting in
   coordinates higher than 360 degrees. [#90]
 
@@ -61,6 +67,8 @@ Bug Fixes
 
 API Changes
 ^^^^^^^^^^^
+
+- Added ``move_to_epoch_per_chunk`` as an input parameter. [#98]
 
 - Removed ``dens_hist_tri_location``, ``tri_model_mags_location``,
   ``tri_model_mag_mids_location``, ``tri_model_mags_interval_location``,
@@ -225,6 +233,8 @@ API Changes
 
 Other Changes
 ^^^^^^^^^^^^^
+
+- Pinned ``scipy`` to minimum v1.6.0 to ensure feature availability. [#98]
 
 - Pinned ``numpy`` to minimum v2.0 for compatibility with new features. [#85]
 

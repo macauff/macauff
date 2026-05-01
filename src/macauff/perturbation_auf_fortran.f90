@@ -192,6 +192,8 @@ subroutine scatter_perturbers(dNs, dms, psfr, maxk, dmcut, psfsig, offsets, frac
     real(dp) :: fluxes(size(dNs)), dfluxes(2, size(dNs)), df(maxk), f0, normf
     ! Variables related to the parameterisation of the background-dominated PSF algorithm case.
     real(dp) :: recorded_x(maxk, size(dNs)), recorded_y(maxk, size(dNs)), recorded_f(maxk, size(dNs))
+    ! Temporary placeholder array to store uniform random numbers in.
+    real(dp) :: numchance_array(size(dNs))
 
     factorial(1) = 1.0_dp
     do i = 1, maxk
@@ -227,9 +229,9 @@ subroutine scatter_perturbers(dNs, dms, psfr, maxk, dmcut, psfsig, offsets, frac
             recorded_y(:, :) = 0.0d0
             recorded_f(:, :) = -1.0d0 ! initialise fluxes as negative to skip in the fitting process
         end if
+        call random_number(numchance_array)
         do j = 1, size(dNs)
-            call random_number(numchance)
-            numchance = numchance / expdns(j)
+            numchance = numchance_array(j) / expdns(j)
             if (cumulativepoisson(1, j) > numchance) then
                 loopk = 0
             else

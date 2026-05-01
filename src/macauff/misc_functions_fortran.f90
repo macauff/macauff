@@ -95,12 +95,18 @@ subroutine get_circle_area_overlap(cat_ax1, cat_ax2, density_radius, hull_ax1, h
     ! Flags for forks in the logic of calculating circle area.
     logical :: circle_too_near_edge
     ! Area of circle inside rectangle, coordinates and variables of various calculations.
-    real(dp) :: area, x0, y0, x0s(100), y0s(100), x1, y1, x2, y2, cross_prod, dot_prod, fraction
+    real(dp) :: area, x0, y0, x1, y1, x2, y2, cross_prod, dot_prod, fraction
+    real(dp), allocatable :: x0s(:), y0s(:)
     ! Sampled radius and position angles of objects.
-    real(dp) :: r(100), t(100)
+    real(dp), allocatable :: r(:), t(:)
     ! Distance between circle and a particular rectangle edge; Haversine distance; minimum-vector coordinates;
     ! amount of circle outside a particular rectangle edge; and point-inside-hull parameters.
     real(dp) :: h, d, z, s, xn, yn, chord_area_overlap, sum_of_angles, theta
+
+    allocate(x0s(100))
+    allocate(y0s(100))
+    allocate(r(100))
+    allocate(t(100))
 
 !$OMP PARALLEL DO DEFAULT(NONE) PRIVATE(i, j, k, area, h, d, z, s, xn, yn, chord_area_overlap, sum_of_angles, theta, x0, y0, x0s, &
 !$OMP& y0s, x1, y1, x2, y2, circle_too_near_edge, cross_prod, dot_prod, fraction, r, t) &
@@ -174,7 +180,52 @@ subroutine get_circle_area_overlap(cat_ax1, cat_ax2, density_radius, hull_ax1, h
                     fraction = fraction + 1.0_dp
                 end if
             end do
-            fraction = fraction / real(size(t), dp)
+            if (fraction > 0.0_dp) then
+                fraction = fraction / real(size(t), dp)
+            else
+                deallocate(x0s, y0s, r, t)
+                allocate(x0s(1000))
+                allocate(y0s(1000))
+                allocate(r(1000))
+                allocate(t(1000))
+
+                do k = 1, size(t)
+                    t(k) = 2.0_dp * pi * real(k, dp) / ((sqrt(5.0_dp)+1.0_dp)/2.0_dp)**2  ! golden ratio phi
+                end do
+                do k = 1, size(r)
+                    ! Note that these are angular offsets and hence convert from degrees to radians!
+                    r(k) = sqrt(real(k, dp) - 0.5_dp)/sqrt(real(size(r), dp) - 0.5_dp) * density_radius / 180.0_dp * pi
+                end do
+
+                call distribute_objects_in_circle(cat_ax1(j), cat_ax2(j), r, t, x0s, y0s)
+
+                fraction = 0.0_dp
+                do k = 1, size(t)
+                    x0 = x0s(k)
+                    y0 = y0s(k)
+                    sum_of_angles = 0.0_dp
+                    do i = 1, size(hull_ax1)-1
+                        x1 = hull_ax1(i) - x0
+                        y1 = hull_ax2(i) - y0
+                        x2 = hull_ax1(i+1) - x0
+                        y2 = hull_ax2(i+1) - y0
+
+                        dot_prod = x1*x2 + y1*y2
+                        cross_prod = x1*y2 - x2*y1
+                        theta = atan2(cross_prod, dot_prod)
+                        sum_of_angles = sum_of_angles + theta
+                    end do
+                    if (abs(sum_of_angles) > pi) then
+                        fraction = fraction + 1.0_dp
+                    end if
+                end do
+
+                deallocate(x0s, y0s, r, t)
+                allocate(x0s(100))
+                allocate(y0s(100))
+                allocate(r(100))
+                allocate(t(100))
+            end if
             area = fraction * pi * density_radius**2
         else
             area = pi * density_radius**2

@@ -260,8 +260,8 @@ class Macauff():
         sys.stdout.flush()
 
         min_lon = max(np.amin(self.cm.a_hull_points[:, 0] - self.cm.a_hull_x_shift),
-                      np.amin(self.cm.b_hull_points[:, 0] - self.cm.a_hull_x_shift))
-        max_lon = min(np.amax(self.cm.a_hull_points[:, 0] - self.cm.b_hull_x_shift),
+                      np.amin(self.cm.b_hull_points[:, 0] - self.cm.b_hull_x_shift))
+        max_lon = min(np.amax(self.cm.a_hull_points[:, 0] - self.cm.a_hull_x_shift),
                       np.amax(self.cm.b_hull_points[:, 0] - self.cm.b_hull_x_shift))
         min_lat = max(np.amin(self.cm.a_hull_points[:, 1]), np.amin(self.cm.b_hull_points[:, 1]))
         max_lat = min(np.amax(self.cm.a_hull_points[:, 1]), np.amax(self.cm.b_hull_points[:, 1]))

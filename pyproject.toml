@@ -19,7 +19,7 @@ dependencies = [
     "matplotlib",
     # We need to build a binary compatible with numpy 1.21
     "numpy>=1.21",
-    "scipy",
+    "scipy>=1.6.0",
     "pandas",
     "skypy",
     "speclite>=0.18",

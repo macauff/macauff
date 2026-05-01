@@ -978,7 +978,7 @@ class TestInputs:
             new_line = new_line + line
         ca_p_ = self.ca_p_text.replace(old_line, new_line)
 
-        with pytest.raises(ValueError, match='Missing key move_to_epoch from joint metadata'):
+        with pytest.raises(ValueError, match='Missing key move_to_epoch or move_to_epoch_per_chunk from'):
             cm = CrossMatch(mock_filename(self.cm_p_text.encode("utf-8")),
                             mock_filename(ca_p_.encode("utf-8")),
                             mock_filename(self.cb_p_text.encode("utf-8")))
@@ -986,17 +986,27 @@ class TestInputs:
 
         cm_p_ = self.cm_p_text.replace('n_pool: 2', 'n_pool: 2\n\nmove_to_epoch: J2000.000')
 
+        cm_p_2 = cm_p_.replace('move_to_epoch: J2000.000',
+                               'move_to_epoch: J2000.000\nmove_to_epoch_per_chunk:\n  - '
+                               'J2000.000\n  - J2000.000')
+        with pytest.raises(ValueError, match='Both move_to_epoch and move_to_epoch_per_chunk found in joint'):
+            cm = CrossMatch(mock_filename(cm_p_2.encode("utf-8")),
+                            mock_filename(ca_p_.encode("utf-8")),
+                            mock_filename(self.cb_p_text.encode("utf-8")))
+            cm._load_metadata_config(self.chunk_id)
+
         for old_line, new_line, error_msg in zip(
                 ['pm_indices: [1, 2]', 'pm_indices: [1, 2]', 'pm_indices: [1, 2]', 'pm_indices: [1, 2]',
                  'ref_epoch_or_index: 3', 'ref_epoch_or_index: 3', 'ref_epoch_or_index: 3',
                  'ref_epoch_or_index: 3', 'ref_epoch_or_index: 3', 'ref_epoch_or_index: 3',
                  'ref_epoch_or_index: 3', 'move_to_epoch: J2000.000', 'move_to_epoch: J2000.000',
-                 'move_to_epoch: J2000.000'],
+                 'move_to_epoch: J2000.000', 'move_to_epoch: J2000.000'],
                 ['pm_indices: A', 'pm_indices: [A, 1]', 'pm_indices: [1, 2, 3]', 'pm_indices: 1',
                  'ref_epoch_or_index: J198.a', 'ref_epoch_or_index: F1989.0',
                  'ref_epoch_or_index: 12-12-1989', 'ref_epoch_or_index: 1.5', 'ref_epoch_or_index: A',
                  'ref_epoch_or_index: [A]', 'ref_epoch_or_index: [1]', 'move_to_epoch: JYYYY',
-                 'move_to_epoch: Y2000', 'move_to_epoch: A', 'move_to_epoch: [1]'],
+                 'move_to_epoch: Y2000', 'move_to_epoch: A', 'move_to_epoch: [1]',
+                 'move_to_epoch_per_chunk:\n  - J2000.000\n  - A'],
                 ['pm_indices should be a list of integers', 'pm_indices should be a list of integers',
                  'pm_indices should contain two entries', 'pm_indices should be a list of integers',
                  'ref_epoch_or_index, if given as a constant string input, ',
@@ -1009,7 +1019,8 @@ class TestInputs:
                  "move_to_epoch must be a string that astropy's Time",
                  "move_to_epoch must be a string that astropy's Time",
                  "move_to_epoch must be a string that astropy's Time",
-                 "move_to_epoch must be a string that astropy's Time"]):
+                 "move_to_epoch must be a string that astropy's Time",
+                 "All entries in move_to_epoch_per_chunk must be a string that astropy's Time"]):
             if 'move_to' in error_msg:
                 cm_p_2 = cm_p_.replace(old_line, new_line)
                 ca_p_2 = ca_p_

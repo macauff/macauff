@@ -231,6 +231,11 @@ def make_perturb_aufs(cm, which_cat):
                 # good detections of a source.
                 local_n[med_index_slice[good_mag_snr_slice], j] = localn
 
+            # We always run the local-density calculation, but if we end up with
+            # normalising densities that are all zero then we can skip the
+            # computation of perturbation AUF components, so we have a second
+            # criterion in the if statement at this point.
+            if cm.include_perturb_auf and not np.all(localn == 0):
                 # Extract the TRILEGAL histograms, as appropriate.
                 if tri_dens_cube is not None:
                     sky_index = mff.find_nearest_point([ax1], [ax2],
@@ -331,15 +336,14 @@ def make_perturb_aufs(cm, which_cat):
 
     if cm.include_perturb_auf:
         a = getattr(cm, f'{which_cat}_photo')
-        localn = local_n
     magref = getattr(cm, f'{which_cat}_magref')
 
     if cm.include_perturb_auf:
         for i in range(0, len(a)):
             axind = modelrefinds[2, i]
             filterind = magref[i]
-            nmind = np.argmin((localn[i, filterind] - narrays[:arraylengths[filterind, axind],
-                                                              filterind, axind])**2 +
+            nmind = np.argmin((local_n[i, filterind] - narrays[:arraylengths[filterind, axind],
+                                                               filterind, axind])**2 +
                               (a[i, filterind] - magarrays[:arraylengths[filterind, axind],
                                                            filterind, axind])**2)
             modelrefinds[0, i] = nmind
@@ -720,16 +724,20 @@ def create_single_perturb_auf(r, dr, j0s, num_trials, psf_fwhm, density_mag, a_p
 
     # Set a magnitude bin width of 0.25 mags, to avoid oversampling.
     dmag = 0.25
-    mag_min = dmag * np.floor(np.amin(a_photo)/dmag)
-    mag_max = dmag * np.ceil(np.amax(a_photo)/dmag)
+    mag_min = max(-5, dmag * np.floor(np.amin(a_photo)/dmag))
+    mag_max = min(35, dmag * np.ceil(np.amax(a_photo)/dmag))
     magbins = np.arange(mag_min, mag_max+1e-10, dmag)
     # For local densities, we want a percentage offset, given that we're in
     # logarithmic bins, accepting a log-difference maximum. This is slightly
     # lop-sided, but for 20% results in +18%/-22% limits, which is fine.
     dlogn = 0.2
+    # Since we take the logarithm, quickly filter for zero densities. These occur
+    # if an object is outside of the minmag-maxmag range and is somehow isolated
+    # from any object in that magnitude range within its search area, for which
+    # we'll just end up taking the lowest density bin from the ensemble.
     lognvals = np.log(localn)
-    logn_min = dlogn * np.floor(np.amin(lognvals)/dlogn)
-    logn_max = dlogn * np.ceil(np.amax(lognvals)/dlogn)
+    logn_min = dlogn * np.floor(np.amin(lognvals[localn > 0])/dlogn)
+    logn_max = dlogn * np.ceil(np.amax(lognvals[localn > 0])/dlogn)
     lognbins = np.arange(logn_min, logn_max+1e-10, dlogn)
 
     counts, lognbins, magbins = np.histogram2d(lognvals, a_photo, bins=[lognbins, magbins])
@@ -745,8 +753,7 @@ def create_single_perturb_auf(r, dr, j0s, num_trials, psf_fwhm, density_mag, a_p
     snr = snr[magi]
 
     b = 0.05
-    dm_max = _calculate_magnitude_offsets(count_array, mag_array, b, snr, model_mag_mids, log10y,
-                                          model_mags_interval, psf_r, model_count)
+    dm_max = _calculate_magnitude_offsets(b, snr)
 
     seed = np.random.default_rng().choice(100000, size=(mff.get_random_seed_size(),
                                                         len(count_array)))
@@ -988,8 +995,7 @@ def make_tri_counts(trifilepath, trifiltname, dm, brightest_source_mag,
     return dens, tri_mag_lefts, tri_mag_widths
 
 
-def _calculate_magnitude_offsets(count_array, mag_array, b, snr, model_mag_mids, log10y,
-                                 model_mags_interval, r, n_norm):
+def _calculate_magnitude_offsets(b, snr):
     '''
     Derive minimum relative fluxes, or largest magnitude offsets, down to which
     simulated perturbers need to be simulated, based on both considerations of
@@ -998,65 +1004,27 @@ def _calculate_magnitude_offsets(count_array, mag_array, b, snr, model_mag_mids,
 
     Parameters
     ----------
-    count_array : numpy.ndarray
-        Local normalising densities of simulations.
-    mag_array : numpy.ndarray
-        Magnitudes of central objects to have perturbations simulated for.
     b : float
         Fraction of ``snr`` the flux of the perturber should be; e.g. for
         1/20th ``B`` should be 0.05.
     snr : numpy.ndarray
         Theoretical signal-to-noise ratios of each object in ``mag_array``.
-    model_mag_mids : numpy.ndarray
-        Model magnitudes for simulated densities of background objects.
-    log10y : numpy.ndarray
-        log-10 source densities of simulated objects in the given line of sight.
-    model_mags_interval : numpy.ndarray
-        Widths of the bins for each ``log10y``.
-    r : float
-        Radius of the PSF of the given simulation, in arcseconds.
-    n_norm : float
-        Normalising local density of simulations, to scale to each
-        ``count_array``.
 
     Returns
     -------
-    dm : numpy.ndarray
-        Maximum magnitude offset required for simulations, based on SNR and
-        empty simulation fraction.
+    dm_max_snr : numpy.ndarray
+        Maximum magnitude offset required for simulations, based on SNR
+        considerations.
     '''
-    flim = b / snr
-    dm_max_snr = -2.5 * np.log10(flim)
+    # If SNR is either zero or NaN, then we can't use the delta-mag from
+    # considering SNRs, and set it to zero to be filtered later by
+    # np.maximum.
+    q = ~np.isnan(snr) & (snr > 0)
+    flim = b / snr[q]
+    dm_max_snr = np.ones_like(snr) * 10
+    dm_max_snr[q] = -2.5 * np.log10(flim)
 
-    dm_max_no_perturb = np.empty_like(mag_array)
-    for i, mag in enumerate(mag_array):
-        q = model_mag_mids >= mag
-        if np.sum(q) == 0:
-            dm_max_no_perturb[i] = 0
-            continue
-        _x = model_mag_mids[q]
-        _y = 10**log10y[q] * model_mags_interval[q] * np.pi * (r/3600)**2 * count_array[i] / n_norm
-
-        # Convolution of Poissonian distributions each with l_i is a Poissonian
-        # with mean of sum_i l_i.
-        lamb = np.cumsum(_y)
-        # CDF of Poissonian is regularised gamma Q(floor(k + 1), lambda), and we
-        # want k = 0; we wish to find the dm that gives sufficiently large lambda
-        # that k = 0 only occurs <= x% of the time. If lambda is too small then
-        # k = 0 is too likely. P(X <= 0; lambda) = exp(-lambda).
-        # For 1% chance of no perturber we want 0.01 = exp(-lambda); rearranging
-        # lambda = -ln(0.01).
-        q = np.where(lamb >= -np.log(0.01))[0]
-        if len(q) > 0:
-            dm_max_no_perturb[i] = _x[q[0]] - mag
-        else:
-            # In the case that we can't go deep enough in our simulated counts to
-            # get <1% chance of no perturber, just do the best we can.
-            dm_max_no_perturb[i] = _x[-1] - mag
-
-    dm = np.maximum(dm_max_snr, dm_max_no_perturb)
-
-    return dm
+    return dm_max_snr
 
 
 def generate_trilegal_histogram_cube(auf_points, auf_file_path, tri_set_name, tri_filt_names, tri_filt_num,

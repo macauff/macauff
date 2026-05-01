@@ -50,6 +50,9 @@ from macauff.perturbation_auf_fortran import perturbation_auf_fortran as paf
 __all__ = ['AstrometricCorrections']
 
 
+warnings.filterwarnings("ignore", message="ERFA function .* yielded")
+
+
 def derive_astrometric_corrections(self, which):
     """
     Wrapper to set various parameters and call AstrometricCorrections,
@@ -71,7 +74,7 @@ def derive_astrometric_corrections(self, which):
     a_npy_or_csv = 'csv'
     a_coord_or_chunk = 'chunk'
     t = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    print(f"{t} Rank {self.rank}, chunk {self.chunk_id}: Calculating catalogue 'a' "
+    print(f"{t} Rank {self.rank}, chunk {self.chunk_id}: Calculating catalogue '{which}' "
           "uncertainty corrections...")
     apply_pm = (getattr(self, f'{which}_apply_proper_motion') or
                 getattr(self, f'{which}_ref_apply_proper_motion'))
@@ -731,12 +734,12 @@ class AstrometricCorrections:
             self.mn_poisson_cdfs = np.empty(shape, object)
             self.ind_poisson_cdfs = np.empty(shape, object)
 
+        self.input_sigs = []
+        self.derived_sigs = []
+
         for index_, list_of_things in enumerate(zip(*zip_list)):
             if np.all(mn_sigs[index_, :] != -9999):
                 continue
-            print(f'Running astrometry fits for sightline {index_+1}/{len(self.ax1_mids)}...')
-            sys.stdout.flush()
-
             if self.coord_or_chunk == 'coord':
                 ax1_mid, ax2_mid = list_of_things
                 cat_args = (ax1_mid, ax2_mid)
@@ -748,6 +751,11 @@ class AstrometricCorrections:
             self.list_of_things = list_of_things
             self.cat_args = cat_args
             self.file_name = file_name
+
+            t = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            print(f'{t}, {self.file_name}: Running astrometry fits for sightline '
+                  f'{index_+1}/{len(self.ax1_mids)}...')
+            sys.stdout.flush()
 
             if self.pregenerate_cutouts is None:
                 self.a = self.a_cat[index_]
@@ -791,6 +799,10 @@ class AstrometricCorrections:
                 # magnitude-related terms; however, if we are using photometry,
                 # then unc_index loops as intended.
                 p = unc_index if self.use_photometric_uncertainties else self.correct_astro_mag_indices_index
+                if self.use_photometric_uncertainties:
+                    # Skip any magnitudes that are never detected!
+                    if np.sum(~np.isnan(self.b[:, self.mag_indices[p]])) == 0:
+                        continue
                 self.psf_fwhm = self.psf_fwhms[p]
                 self.gal_wav_micron = self.gal_wavs_micron[p]
                 self.gal_ab_offset = self.gal_ab_offsets[p]
@@ -873,15 +885,19 @@ class AstrometricCorrections:
                 if np.sum([q[0] == -1 for q in self.pdfs]) > len(self.pdfs)-5:
                     warnings.warn("Reduced PDF histogram counts to 50.")
                     self.create_auf_pdfs(min_hist_cut=50)
-                if np.sum([q[0] == -1 for q in self.pdfs]) <= len(self.pdfs)-5:
-                    m_sig, n_sig = self.fit_uncertainty()
-                else:
+                m_sig, n_sig = self.fit_uncertainty()
+                if not np.sum([q[0] == -1 for q in self.pdfs]) <= len(self.pdfs)-5:
                     # Fall back to not correcting anything if data still too poor
                     # to draw any meaningful conclusions from.
-                    m_sig, n_sig = 1, 0
-                    self.fit_sigs = np.zeros((len(self.mag_array), 2), float)
+                    if not self.use_photometric_uncertainties:
+                        m_sig, n_sig = 1, 0
+                    else:
+                        # For photometric uncertainties, we know we at minimum
+                        # have a PSF FWHM correction factor to include.
+                        m_sig, n_sig = self.psf_fwhm, 0
+                    # Keep fit_sigs[:, 1] as the individual fits we
+                    # were able to make.
                     self.fit_sigs[:, 0] = self.avg_sig[:, 0]
-                    self.fit_sigs[:, 1] = self.avg_sig[:, 0]
                 if self.use_photometric_uncertainties:
                     mn_sigs[index_, unc_index, 0] = m_sig
                     mn_sigs[index_, unc_index, 1] = n_sig
@@ -913,6 +929,10 @@ class AstrometricCorrections:
                                                  np.amin(self.fit_sigs[~self.skip_flags, 1]))
                         self.ylims_sing[1] = max(self.ylims_sing[1],
                                                  np.amax(self.fit_sigs[~self.skip_flags, 1]))
+
+                        self.input_sigs.append(self.avg_sig[~self.skip_flags, 0])
+                        self.derived_sigs.append(self.fit_sigs[~self.skip_flags, 1])
+
                     self.plot_snr_mag_sig()
 
         self.mn_sigs = mn_sigs
@@ -1021,13 +1041,17 @@ class AstrometricCorrections:
         else:
             zip_list = (self.chunks, self.ax1_mins, self.ax1_maxs, self.ax2_mins, self.ax2_maxs)
         for index_, list_of_things in enumerate(zip(*zip_list)):
-            print(f'Creating catalogue cutouts... {index_+1}/{len(self.ax1_mids)}', end='\r')
-            sys.stdout.flush()
-
             if self.coord_or_chunk == 'coord':
                 ax1_mid, ax2_mid, ax1_min, ax1_max, ax2_min, ax2_max = list_of_things
+                file_name = f'{ax1_mid}_{ax2_mid}'
             else:
                 chunk, ax1_min, ax1_max, ax2_min, ax2_max = list_of_things
+                file_name = f'{chunk}'
+
+            t = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            print(f'{t}, {file_name}: Creating catalogue cutouts... {index_+1}/{len(self.ax1_mids)}',
+                  end='\r')
+            sys.stdout.flush()
 
             if self.coord_or_chunk == 'coord':
                 cat_args = (ax1_mid, ax2_mid)
@@ -1097,7 +1121,8 @@ class AstrometricCorrections:
         self.gal_alphaweight = [[3.47e+09, 3.31e+06, 2.13e+09, 1.64e+10, 1.01e+09],
                                 [3.84e+09, 1.57e+06, 3.91e+08, 4.66e+10, 3.03e+07]]
 
-        print('Creating simulated star+galaxy counts...')
+        t = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        print(f'{t}, {self.file_name}: Creating simulated star+galaxy counts...')
         sys.stdout.flush()
         if self.coord_or_chunk == 'coord':
             ax1_mid, ax2_mid = self.list_of_things
@@ -1186,7 +1211,8 @@ class AstrometricCorrections:
         for verification purposes.
         """
         gs = self.make_gridspec('123123', 1, 1, 0.8, 5)
-        print('Plotting data and model counts...')
+        t = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        print(f'{t}, {self.file_name}: Plotting data and model counts...')
         sys.stdout.flush()
 
         p_ind = self.unc_index if self.use_photometric_uncertainties else self.correct_astro_mag_indices_index
@@ -1242,7 +1268,8 @@ class AstrometricCorrections:
         Calculate local normalising catalogue densities and catalogue-catalogue
         nearest neighbour match pairings for each cutout region.
         """
-        print('Creating local densities and nearest neighbour matches...')
+        t = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        print(f'{t}, {self.file_name}: Creating local densities and nearest neighbour matches...')
         sys.stdout.flush()
 
         p_ind = self.unc_index if self.use_photometric_uncertainties else self.correct_astro_mag_indices_index
@@ -1296,7 +1323,8 @@ class AstrometricCorrections:
         combination, for both aperture photometry and background-dominated PSF
         algorithms.
         """
-        print('Creating AUF simulations...')
+        t = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        print(f'{t}, {self.file_name}: Creating AUF simulations...')
         sys.stdout.flush()
 
         b_ratio = 0.05
@@ -1309,9 +1337,7 @@ class AstrometricCorrections:
         snr, _, _ = binned_statistic(_mag[p], _snr[p], statistic='median',
                                      bins=np.append(self.mag_array-self.mag_slice,
                                                     self.mag_array[-1]+self.mag_slice[-1]))
-        dm_max = _calculate_magnitude_offsets(
-            self.moden*np.ones_like(self.mag_array), self.mag_array, b_ratio, snr, self.tri_mags,
-            self.log10y, self.dtri_mags, self.psf_radius, self.n_norm)
+        dm_max = _calculate_magnitude_offsets(b_ratio, snr)
 
         seed = np.random.default_rng().choice(100000, size=(mff.get_random_seed_size(),
                                                             len(self.mag_array)))
@@ -1345,7 +1371,8 @@ class AstrometricCorrections:
             Number of data points in each magnitude-uncertainty slice to be
             considered for fitting for scaling relations.
         """
-        print('Creating catalogue AUF probability densities...')
+        t = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        print(f'{t}, {self.file_name}: Creating catalogue AUF probability densities...')
         sys.stdout.flush()
         b_matches = self.b[self.bmatch]
 
@@ -1357,6 +1384,7 @@ class AstrometricCorrections:
         avg_sig = np.empty((len(self.mag_array), 3), float)
         avg_snr = np.empty((len(self.mag_array), 3), float)
         avg_mag = np.empty((len(self.mag_array), 3), float)
+        dist_stds = np.empty(len(self.mag_array), float)
 
         p_ind = self.unc_index if self.use_photometric_uncertainties else self.correct_astro_mag_indices_index
         mag_ind = self.mag_indices[p_ind]
@@ -1374,8 +1402,10 @@ class AstrometricCorrections:
             sig = np.percentile(b_matches[mag_cut, self.pos_and_err_indices[0][2]], 50)
             sig_cut = ((b_matches[:, self.pos_and_err_indices[0][2]] <= sig+self.sig_slice[i]) &
                        (b_matches[:, self.pos_and_err_indices[0][2]] >= sig-self.sig_slice[i]))
-            n_cut = (self.narray[self.bmatch] >= self.moden-self.dn) & (
-                self.narray[self.bmatch] <= self.moden+self.dn)
+            _h, _b = np.histogram(self.narray[self.bmatch][mag_cut & sig_cut], bins='auto')
+            moden = (_b[:-1]+np.diff(_b)/2)[np.argmax(_h)]
+            dn = 0.05*moden
+            n_cut = (self.narray[self.bmatch] >= moden-dn) & (self.narray[self.bmatch] <= moden+dn)
 
             # Since we expect the astrometric/photometric scaling to be roughly
             # a factor FWHM/(2 * sqrt(2 * ln(2))), i.e. the sigma of a
@@ -1383,7 +1413,16 @@ class AstrometricCorrections:
             if not self.use_photometric_uncertainties:
                 final_slice = sig_cut & mag_cut & n_cut & (self.dists <= 20*sig)
             else:
-                final_slice = sig_cut & mag_cut & n_cut & (self.dists <= 20*self.psfsig*sig)
+                # Compare the photometric-error-based astrometric uncertainty for
+                # a 20-sigma cut, but in cases where this is disconnected from
+                # the astrometry we floor this at the median distance of the
+                # first three cuts.
+                if np.sum(sig_cut & mag_cut & n_cut) > 0:
+                    med_dist = np.median(self.dists[sig_cut & mag_cut & n_cut])
+                    compare_sig = max(self.psfsig*sig, med_dist)
+                    final_slice = sig_cut & mag_cut & n_cut & (self.dists <= 20*compare_sig)
+                else:
+                    final_slice = sig_cut & mag_cut & n_cut
             final_dists = self.dists[final_slice]
             if len(final_dists) < min_hist_cut:
                 skip_flags[i] = 1
@@ -1406,6 +1445,7 @@ class AstrometricCorrections:
             avg_sig[i, 0] = np.median(bm[:, self.pos_and_err_indices[0][2]])
             avg_sig[i, [1, 2]] = np.abs(np.percentile(bm[:, self.pos_and_err_indices[0][2]], [16, 84]) -
                                         np.median(bm[:, self.pos_and_err_indices[0][2]]))
+            dist_stds[i] = np.std(final_dists)
 
             h, bins = np.histogram(final_dists, bins='auto')
             num = np.sum(h)
@@ -1426,6 +1466,7 @@ class AstrometricCorrections:
         self.pdfs, self.pdf_uncerts = pdfs, pdf_uncerts
         self.q_pdfs, self.pdf_bins = q_pdfs, pdf_bins
         self.skip_flags = skip_flags
+        self.dist_stds = dist_stds
 
     def fit_uncertainty(self):
         """
@@ -1443,7 +1484,8 @@ class AstrometricCorrections:
             input and output uncertainties.
         """
 
-        print('Creating joint H/sig fits...')
+        t = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        print(f'{t}, {self.file_name}: Creating joint H/sig fits...')
         sys.stdout.flush()
 
         self.fit_sigs = np.zeros((len(self.mag_array), 2), float)
@@ -1464,12 +1506,12 @@ class AstrometricCorrections:
                 new_sig = m * sig_orig + n
             self.fit_sigs[i, 0] = new_sig
 
-            (y, q, bins, sig, snr, num) = (pdf, self.q_pdfs[i], self.pdf_bins[i],
-                                           self.avg_sig[i, 0], self.avg_snr[i, 0], self.nums[i])
-            res = minimize(self.calc_single_joint_auf, x0=[sig], args=(i, bins, y, q, num, snr),
-                           method='L-BFGS-B', options={'ftol': 1e-9}, bounds=[(0, None)])
+            y, q, bins, snr, num = pdf, self.q_pdfs[i], self.pdf_bins[i], self.avg_snr[i, 0], self.nums[i]
+            sig_est = self.dist_stds[i] / 0.655
+            res = minimize(self.calc_single_joint_auf, x0=[sig_est], args=(i, bins, y, q, num, snr),
+                           method='L-BFGS-B', options={'ftol': 1e-9})  # , bounds=[(0, None)])
 
-            self.fit_sigs[i, 1] = res.x[0]
+            self.fit_sigs[i, 1] = np.abs(res.x[0])
 
         return m, n
 
@@ -1635,10 +1677,12 @@ class AstrometricCorrections:
         mn_poisson_cdfs = np.array([], float)
         ind_poisson_cdfs = np.array([], float)
 
+        t = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         if self.make_plots:
-            print('Creating individual AUF figures and calculating goodness-of-fits...')
+            print(f'{t}, {self.file_name}: Creating individual AUF figures and calculating '
+                  'goodness-of-fits...')
         else:
-            print('Calculating goodness-of-fits...')
+            print(f'{t}, {self.file_name}: Calculating goodness-of-fits...')
         sys.stdout.flush()
 
         if self.make_plots:
@@ -1667,12 +1711,23 @@ class AstrometricCorrections:
             bsig = np.percentile(b_matches[mag_cut, pos_err_ind], 50)
             sig_cut = ((b_matches[:, pos_err_ind] <= bsig+self.sig_slice[i]) &
                        (b_matches[:, pos_err_ind] >= bsig-self.sig_slice[i]))
-            n_cut = (self.narray[self.bmatch] >= self.moden-self.dn) & (
-                self.narray[self.bmatch] <= self.moden+self.dn)
+            _h, _b = np.histogram(self.narray[self.bmatch][mag_cut & sig_cut], bins='auto')
+            moden = (_b[:-1]+np.diff(_b)/2)[np.argmax(_h)]
+            dn = 0.05*moden
+            n_cut = (self.narray[self.bmatch] >= moden-dn) & (self.narray[self.bmatch] <= moden+dn)
             if not self.use_photometric_uncertainties:
                 final_slice = sig_cut & mag_cut & n_cut & (self.dists <= 20*bsig)
             else:
-                final_slice = sig_cut & mag_cut & n_cut & (self.dists <= 20*self.psfsig*bsig)
+                # Compare the photometric-error-based astrometric uncertainty for
+                # a 20-sigma cut, but in cases where this is disconnected from
+                # the astrometry we floor this at the median distance of the
+                # first three cuts.
+                if np.sum(sig_cut & mag_cut & n_cut) > 0:
+                    med_dist = np.median(self.dists[sig_cut & mag_cut & n_cut])
+                    compare_sig = max(self.psfsig*bsig, med_dist)
+                    final_slice = sig_cut & mag_cut & n_cut & (self.dists <= 20*compare_sig)
+                else:
+                    final_slice = sig_cut & mag_cut & n_cut
 
             avg_a_dens = len(self.a) / self.area
             density = (np.percentile(self.narray[self.bmatch][final_slice], 50) +
@@ -1690,8 +1745,10 @@ class AstrometricCorrections:
             ind_fit_sig = self.fit_sigs[i, 1]
             if self.make_plots:
                 ax = ax1s[i]
+            _quoted_sig = (self.avg_sig[i, 0] if not self.use_photometric_uncertainties else
+                           self.psf_fwhm * self.avg_sig[i, 0])
             for j, (sig, _h, ls) in enumerate(zip(
-                    [fit_sig, fit_sig, fit_sig, self.avg_sig[i, 0], self.avg_sig[i, 0], self.avg_sig[i, 0],
+                    [fit_sig, fit_sig, fit_sig, _quoted_sig, _quoted_sig, _quoted_sig,
                      ind_fit_sig, ind_fit_sig, ind_fit_sig],
                     [h, 1, 0, h, 1, 0, h, 1, 0], ['r-', 'r-.', 'r:', 'k-', 'k-.', 'k:', 'c-', 'c-.', 'c:'])):
                 if not self.make_plots and j != 0:
@@ -1753,7 +1810,7 @@ class AstrometricCorrections:
                 if self.make_plots:
                     if j in [0, 3, 6]:
                         sig_type = 'fit' if j == 0 else 'quoted' if j == 3 else 'ind'
-                        sig_val = fit_sig if j == 0 else self.avg_sig[i, 0] if j == 3 else ind_fit_sig
+                        sig_val = fit_sig if j == 0 else _quoted_sig if j == 3 else ind_fit_sig
                         f_val = nn_frac_mn if j == 0 else nn_frac_quot if j == 3 else nn_frac_ind
                         h_str = f', H = {h:.2f}' if j == 0 else ''
                         if usetex:
@@ -1762,7 +1819,12 @@ class AstrometricCorrections:
                             lab = rf'sigma_{sig_type} = {sig_val:.4f}", F = {f_val:.2f}{h_str}'
                     else:
                         lab = ''
-                    modely_norm = np.sum(modely * np.diff(pdf_bin))
+                    # Have to make a new "q" filter variable here, since we want
+                    # to use the full-resolution model rather than a binned one
+                    # for calculating our normalisation.
+                    model_q = self.r[:-1] < pdf_bin[1:][pdf > 0][-1]
+                    full_modely = nn_frac * nn_model + (1 - nn_frac) * m_conv_plus_nn
+                    modely_norm = np.sum(full_modely[model_q] * self.dr[model_q])
                     ax.plot((pdf_bin[:-1]+np.diff(pdf_bin)/2)[q_pdf], modely[q_pdf] / modely_norm,
                             ls, label=lab)
 
@@ -1786,7 +1848,8 @@ class AstrometricCorrections:
         Generate 2-D histograms of SNR, quoted/fit astrometric uncertainty, and
         photometric magnitude.
         """
-        print("Plotting SNR-Magnitude-Uncertainty scaling relations...")
+        t = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        print(f"{t}, {self.file_name}: Plotting SNR-Magnitude-Uncertainty scaling relations...")
         sys.stdout.flush()
         p_ind = self.unc_index if self.use_photometric_uncertainties else self.correct_astro_mag_indices_index
         p = ((self.b[:, self.snr_indices[p_ind]] > 0) & ~np.isnan(self.b[:, self.snr_indices[p_ind]]) &
@@ -1822,7 +1885,8 @@ class AstrometricCorrections:
         q = ~self.skip_flags
         if np.sum(q) > 0:
             man_snr = self.avg_snr[q, 0]
-            man_sig_quoted = self.avg_sig[q, 0]
+            man_sig_quoted = (self.avg_sig[q, 0] if not self.use_photometric_uncertainties else
+                              self.psf_fwhm * self.avg_sig[q, 0])
             # Here we want the second column of fit_sigs, the individual
             # derivations of astrometric uncertainty.
             man_sig_fit = self.fit_sigs[q, 1]
@@ -1885,7 +1949,7 @@ class AstrometricCorrections:
             ax.set_xlabel(r'$\log_{10}$(1 / SNR)')
         else:
             ax.set_xlabel(r'log10(1 / SNR)')
-        ax.set_xlabel(f'{self.mag_names[self.unc_index]} / mag')
+        ax.set_ylabel(f'{self.mag_names[p_ind]} / mag')
 
         ax = plt.subplot(gs[2])
         q = (obj_err < 1) & (_snr > 1) & (obj_err > 0) & ~np.isnan(obj_mag)
@@ -1898,7 +1962,8 @@ class AstrometricCorrections:
         q = ~self.skip_flags
         if np.sum(q) > 0:
             man_mag = self.mag_array[q]
-            man_sig_quoted = self.avg_sig[q, 0]
+            man_sig_quoted = (self.avg_sig[q, 0] if not self.use_photometric_uncertainties else
+                              self.psf_fwhm * self.avg_sig[q, 0])
             # Remember, individually fit not parameterisation.
             man_sig_fit = self.fit_sigs[q, 1]
             man_log_err_fit = np.log10(man_sig_fit)
@@ -1910,7 +1975,7 @@ class AstrometricCorrections:
 
         ax.set_xlim(*xlims)
         ax.set_ylim(*ylims)
-        ax.set_xlabel(f'{self.mag_names[self.unc_index]} / mag')
+        ax.set_xlabel(f'{self.mag_names[p_ind]} / mag')
         if usetex:
             ax.set_ylabel(rf'$\log_{10}$(Quoted{mag_label} uncertainty / arcsecond)')
         else:

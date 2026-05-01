@@ -224,7 +224,7 @@ class CrossMatch():
                                 t = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                                 print(f'{t} Rank {self.rank}: reaching job walltime. Cancelling all further '
                                       f'work. {self.num_chunks_to_process} chunks remain unprocessed.')
-                                self.chunk_queue.clear()
+                                self.chunk_queue = []
                                 # Blank end time so we don't re-enter polling loop
                                 self.end_time = None
                                 break
