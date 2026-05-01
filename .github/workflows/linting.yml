@@ -37,6 +37,13 @@ jobs:
       uses: actions/setup-python@v4
       with:
         python-version: ${{ matrix.python-version }}
+    - name: Force IPv4 for Linux
+      if: runner.os == 'Linux'
+      shell: bash
+      run: |
+        sudo sysctl -w net.ipv6.conf.all.disable_ipv6=1
+        sudo sysctl -w net.ipv6.conf.default.disable_ipv6=1
+        sudo sysctl -w net.ipv6.conf.lo.disable_ipv6=1
     - name: Set up gfortran ${{ matrix.gfortran-compiler}}-${{ matrix.gfortran-version }}
       uses: fortran-lang/setup-fortran@v1
       id: setup-fortran
