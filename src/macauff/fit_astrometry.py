@@ -281,13 +281,14 @@ class AstrometricCorrections:
             Determines whether we perform quadratic or linear scaling for
             hyper-parameter fits to data-driven vs quoted astrometric
             uncertainties. Must either be "quadratic" or "linear."
-        trifilepath : string, optional
-            Filepath of the location into which to save TRILEGAL simulations. If
+        trifilepath : string or list of strings, optional
+            Filepath(s) of the location into which to save TRILEGAL simulations. If
             provided ``tri_dens_cube`` and ``tri_dens_array`` must be
             ``None``, and ``maglim_fs``, ``magnums``, ``tri_num_faints``,
             ``trifilterset``, and ``trifiltnames`` must be given. Must contain
             two format ``{}`` options in string, for unique ax1-ax2 sightline
-            combination downloads.
+            combination downloads. If a list of strings, must be one file path
+            per sightline run in the list.
         maglim_f : float, optional
             Magnitude in the ``magnum`` filter down to which sources should be
             drawn for the "faint" sample. Should be ``None`` if ``tri_dens_cube``
@@ -428,7 +429,7 @@ class AstrometricCorrections:
 
         self.save_folder = save_folder
 
-        self.trifilepath = trifilepath
+        self.trifilepath_holder = trifilepath
         self.maglim_f = maglim_f
         self.magnum = magnum
         self.tri_num_faint = tri_num_faint
@@ -628,7 +629,7 @@ class AstrometricCorrections:
             raise ValueError("b_cat_func must be given if pregenerate_cutouts is 'False'.")
         if tri_download not in (None, True, False):
             raise ValueError("tri_download must either be True, False, or None.")
-        if self.trifilepath is not None and tri_download not in (True, False):
+        if self.trifilepath_holder is not None and tri_download not in (True, False):
             raise ValueError("tri_download must either be True or False if trifilepath given.")
         if tri_download is not None and self.tri_dens_cube is not None:
             raise ValueError("tri_download must be None if tri_dens_cube is given.")
@@ -737,6 +738,11 @@ class AstrometricCorrections:
         self.input_sigs = []
         self.derived_sigs = []
 
+        # If one single TRILEGAL filepath was given, just hold on to it.
+        # Else, below, we have a list, one per index_, to loop through.
+        if not isinstance(self.trifilepath_holder, list):
+            self.trifilepath = self.trifilepath_holder
+
         for index_, list_of_things in enumerate(zip(*zip_list)):
             if np.all(mn_sigs[index_, :] != -9999):
                 continue
@@ -751,6 +757,9 @@ class AstrometricCorrections:
             self.list_of_things = list_of_things
             self.cat_args = cat_args
             self.file_name = file_name
+
+            if isinstance(self.trifilepath_holder, list):
+                self.trifilepath = self.trifilepath_holder[index_]
 
             t = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             print(f'{t}, {self.file_name}: Running astrometry fits for sightline '
