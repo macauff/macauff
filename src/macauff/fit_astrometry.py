@@ -932,6 +932,9 @@ class AstrometricCorrections:
 
                         self.input_sigs.append(self.avg_sig[~self.skip_flags, 0])
                         self.derived_sigs.append(self.fit_sigs[~self.skip_flags, 1])
+                    else:
+                        self.input_sigs.append(None)
+                        self.derived_sigs.append(None)
 
                     self.plot_snr_mag_sig()
 
