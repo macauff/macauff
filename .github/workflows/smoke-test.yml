@@ -16,31 +16,31 @@ jobs:
     strategy:
       matrix:
         include:
-          - name: Linux, Python 3.8
+          - name: Linux, Python 3.13
             os: ubuntu-latest
-            python-version: 3.8
-            toxenv: py38-test
+            python-version: 3.13
+            toxenv: py313-test
             gfortran-version: 13
-          - name: Linux, Python 3.9
+          - name: Linux, Python 3.12
             os: ubuntu-22.04
-            python-version: 3.9
-            toxenv: py39-test
+            python-version: 3.12
+            toxenv: py312-test
             gfortran-version: 12
-          - name: Linux, Python 3.11
+          - name: Linux, Python 3.14
             os: ubuntu-22.04
-            python-version: "3.11"
-            toxenv: py311-test
+            python-version: "3.14"
+            toxenv: py314-test
             gfortran-version: 12
-          - name: macOS, Python 3.8
+          - name: macOS, Python 3.12
             os: macOS-13
-            python-version: 3.8
-            toxenv: py38-test
+            python-version: 3.12
+            toxenv: py312-test
             gfortran-version: 12
-          - name: macOS, Python 3.10, coverage
+          - name: macOS, Python 3.13, coverage
             os: macOS-13
-            python-version: "3.10"
+            python-version: "3.13"
             # Include at least one coverage option for codecov.
-            toxenv: py310-test-cov
+            toxenv: py313-test-cov
             gfortran-version: 13
     steps:
     - uses: actions/checkout@v3
