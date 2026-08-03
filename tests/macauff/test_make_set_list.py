@@ -50,13 +50,13 @@ def test_initial_group_numbering_catch_recursion():
     agroup, bgroup, nfl = _initial_group_numbering(a_overlaps, b_overlaps, a_num, b_num)
 
     fake_agroup = np.ones(600, int)
-    fake_agroup[:119] = 0
+    fake_agroup[:116] = 0
     fake_bgroup = np.ones(600, int)
-    fake_bgroup[:119] = 0
+    fake_bgroup[:116] = 0
     assert np.all(agroup == fake_agroup)
     assert np.all(bgroup == fake_bgroup)
-    assert np.all(nfl[0] == np.arange(0, 119))
-    assert np.all(nfl[1] == np.arange(0, 119))
+    assert np.all(nfl[0] == np.arange(0, 116))
+    assert np.all(nfl[1] == np.arange(0, 116))
 
 
 def test_set_list_catch_recursion():
@@ -73,8 +73,8 @@ def test_set_list_catch_recursion():
     alist, blist, _, bgrplen, arej, brej = set_list(a_overlaps, b_overlaps, a_num, b_num, 2)
     assert len(alist) == 0
     assert len(bgrplen) == 0
-    assert np.all(arej == np.concatenate((np.arange(120, 600), np.arange(120))))
-    assert np.all(brej == np.concatenate((np.arange(120, 600), np.arange(120))))
+    assert np.all(arej == np.concatenate((np.arange(117, 600), np.arange(117))))
+    assert np.all(brej == np.concatenate((np.arange(117, 600), np.arange(117))))
 
     # Move one pointing so we get a single valid island at the end.
     x = np.copy(a_overlaps[:, 114])
@@ -88,10 +88,10 @@ def test_set_list_catch_recursion():
     # Changing the order of sequences above fails all but the final six
     # objects in each catalogue now. So we have one valid island and
     # some rejections.
-    assert np.all(alist == np.array([594, 595, 596, 597, 598]).reshape(-1, 1))
-    assert np.all(blist == np.array([594, 595, 596, 597, 598, 599]).reshape(-1, 1))
-    assert np.all(arej == np.append(np.arange(594), 599))
-    assert np.all(brej == np.arange(594))
+    assert np.all(alist == np.array([597, 598]).reshape(-1, 1))
+    assert np.all(blist == np.array([597, 598, 599]).reshape(-1, 1))
+    assert np.all(arej == np.append(np.arange(597), 599))
+    assert np.all(brej == np.arange(597))
 
 
 def test_set_list_maximum_exceeded():

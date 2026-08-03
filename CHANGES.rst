@@ -240,6 +240,8 @@ API Changes
 Other Changes
 ^^^^^^^^^^^^^
 
+- Pinned ``python`` to minimum 3.12.3 for feature stability. [#99]
+
 - Pinned ``scipy`` to minimum v1.6.0 to ensure feature availability. [#98]
 
 - Pinned ``numpy`` to minimum v2.0 for compatibility with new features. [#85]

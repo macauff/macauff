@@ -5,7 +5,7 @@ Installation
 Package Requirements
 ====================
 
-Currently there are no strict criteria for installation; it is suggested that you use the most up-to-date package versions available. The one exception there is that the minimum version of Python is set to 3.8, and development is currently focused on Python 3.9+.
+Currently there are no strict criteria for installation; it is suggested that you use the most up-to-date package versions available. The one exception there is that the minimum version of Python is set to 3.12.3, and development is currently focused on Python 3.13+.
 
 The current package requirements, and citations to give for use of ``macauff`` in your work where available, are:
 
@@ -49,9 +49,9 @@ As of now, the main way to install this package is by downloading it from the `G
 
 Once you have installed your choice of conda, then you can create an initial conda environment::
 
-    conda create -n your_environment_name -c conda-forge python=3.9 numpy scipy astropy matplotlib skypy speclite pandas dustmaps scikit-build-core cmake
+    conda create -n your_environment_name -c conda-forge python=3.13 numpy scipy astropy matplotlib skypy speclite pandas dustmaps scikit-build-core cmake
 
-although you can drop the ``=3.9``, or chose another (later) Python version -- remembering the minimum version is 3.8 -- if you desire to do so. Then activate this as our Python environment::
+although you can drop the ``=3.13``, or chose another (later) Python version -- remembering the minimum version is 3.12 -- if you desire to do so. Then activate this as our Python environment::
 
     conda activate your_environment_name
 
@@ -64,7 +64,7 @@ To build the ``jupyter`` notebooks you will require `Pandoc <https://pandoc.org/
 
 Once you have the required packages installed -- whether in a new ``conda`` environment or otherwise -- you can clone the repository::
 
-    git clone git://github.com/onoddil/macauff.git
+    git clone git://github.com/macauff/macauff.git
 
 which will place the repository in the folder from which you invoked the ``git`` command. Now, from inside the folder that was just created (``cd macauff`` or equivalent), you can either run::
 
