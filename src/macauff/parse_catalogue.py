@@ -291,9 +291,11 @@ def csv_to_npy(input_filename, astro_cols, photo_cols, bestindex_col,
             else:
                 new_sigs = np.empty(chunk.shape[0], float)
                 for i in range(chunk.shape[0]):
-                    old_sig = chunk.values[i, new_astro_cols[2+best_index[i]]]
-                    new_sig = np.sqrt((mn_sigs[sig_mn_inds[i], best_index[i], 0]*old_sig)**2 +
-                                      mn_sigs[sig_mn_inds[i], best_index[i], 1]**2)
+                    # chunk and mn_sigs are chunksize in length, but best_index
+                    # is n_rows in length, so track n in the i indexing.
+                    old_sig = chunk.values[i, new_astro_cols[2+best_index[i+n]]]
+                    new_sig = np.sqrt((mn_sigs[sig_mn_inds[i], best_index[i+n], 0]*old_sig)**2 +
+                                      mn_sigs[sig_mn_inds[i], best_index[i+n], 1]**2)
                     new_sigs[i] = new_sig
             astro[n:n+chunk.shape[0], 2] = new_sigs
         photo[n:n+chunk.shape[0]] = chunk.values[:, new_photo_cols]
