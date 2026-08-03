@@ -1888,7 +1888,10 @@ class AstrometricCorrections:
         log_inv_snr = np.log10(1 / _snr[q])
         log_err = np.log10(obj_err[q])
         h, x, y = np.histogram2d(log_inv_snr, log_err, bins=(100, 101))
-        ax.pcolormesh(x, y, h.T, edgecolors='face', cmap='viridis', rasterized=True)
+        _h = np.ma.array(h, mask=(h == 0))
+        cmap = cm.inferno_r
+        cmap.set_bad('w', 1.)
+        ax.pcolormesh(x, y, _h.T, edgecolors='face', cmap=cmap, rasterized=True)
         ylims = ax.get_ylim()
         xlims = ax.get_xlim()
         if len(self.seeing_ranges) == 1:
@@ -1938,7 +1941,10 @@ class AstrometricCorrections:
         q = (obj_err < 1) & (_snr > 1) & (obj_err > 0) & ~np.isnan(obj_mag)
         log_inv_snr = np.log10(1 / _snr[q])
         h, x, y = np.histogram2d(log_inv_snr, obj_mag[q], bins=(100, 101))
-        ax.pcolormesh(x, y, h.T, edgecolors='face', cmap='viridis', rasterized=True)
+        _h = np.ma.array(h, mask=(h == 0))
+        cmap = cm.inferno_r
+        cmap.set_bad('w', 1.)
+        ax.pcolormesh(x, y, _h.T, edgecolors='face', cmap=cmap, rasterized=True)
         ylims = ax.get_ylim()
         xlims = ax.get_xlim()
 
@@ -1978,7 +1984,10 @@ class AstrometricCorrections:
         q = (obj_err < 1) & (_snr > 1) & (obj_err > 0) & ~np.isnan(obj_mag)
         log_err = np.log10(obj_err[q])
         h, x, y = np.histogram2d(obj_mag[q], log_err, bins=(100, 101))
-        ax.pcolormesh(x, y, h.T, edgecolors='face', cmap='viridis', rasterized=True)
+        _h = np.ma.array(h, mask=(h == 0))
+        cmap = cm.inferno_r
+        cmap.set_bad('w', 1.)
+        ax.pcolormesh(x, y, _h.T, edgecolors='face', cmap=cmap, rasterized=True)
         ylims = ax.get_ylim()
         xlims = ax.get_xlim()
 
