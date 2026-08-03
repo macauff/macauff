@@ -150,7 +150,7 @@ def trilegal_webcall(trilegal_version, l, b, area, binaries, av, sigma_av, filte
            f"trilegal_version={trilegal_version}&gal_coord=1&gc_l={l}&gc_b={b}&eq_alpha=0&eq_delta=0&"
            f"field={area}&photsys_file=tab_mag_odfnew%2Ftab_mag_{filterset}.dat&icm_lim={magnum}&"
            f"mag_lim={maglim}&mag_res=0.1&binary_kind={binaries}&{mainparams}' "
-           f"{webserver}/cgi-bin/trilegal_{trilegal_version}")
+           f"{webserver}/cgi-bin/trilegal_{trilegal_version} --no-check-certificate")
     complete = False
     while not complete:  # pylint: disable=too-many-nested-blocks
         notconnected = True
@@ -186,7 +186,8 @@ def trilegal_webcall(trilegal_version, l, b, area, binaries, av, sigma_av, filte
                 sys.stdout.flush()
                 while not complete:
                     time.sleep(40)
-                    modcmd = f'wget -o {outfolder}/lixo -O {outfolder}/{filename} {webserver}/tmp/{filename}'
+                    modcmd = (f'wget -o {outfolder}/lixo -O {outfolder}/{filename} '
+                              f'{webserver}/tmp/{filename} --no-check-certificate')
                     sp.Popen(modcmd, shell=True).wait()  # pylint: disable=consider-using-with
                     if os.path.getsize(f'{outfolder}/{filename}') > 0:
                         with open(f'{outfolder}/{filename}', 'r', encoding='utf-8') as f:
