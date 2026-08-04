@@ -4,6 +4,7 @@ Tests for the "make_set_list" module.
 '''
 
 import os
+import sys
 import warnings
 
 import numpy as np
@@ -49,14 +50,17 @@ def test_initial_group_numbering_catch_recursion():
 
     agroup, bgroup, nfl = _initial_group_numbering(a_overlaps, b_overlaps, a_num, b_num)
 
+    # pytest-cov takes one of our recursion calls so we fail at a different
+    # time depending on if we're using it or not.
+    x = 116 if 'coverage' not in sys.modules else 117
     fake_agroup = np.ones(600, int)
-    fake_agroup[:116] = 0
+    fake_agroup[:x] = 0
     fake_bgroup = np.ones(600, int)
-    fake_bgroup[:116] = 0
+    fake_bgroup[:x] = 0
     assert np.all(agroup == fake_agroup)
     assert np.all(bgroup == fake_bgroup)
-    assert np.all(nfl[0] == np.arange(0, 116))
-    assert np.all(nfl[1] == np.arange(0, 116))
+    assert np.all(nfl[0] == np.arange(0, x))
+    assert np.all(nfl[1] == np.arange(0, x))
 
 
 def test_set_list_catch_recursion():
@@ -88,9 +92,10 @@ def test_set_list_catch_recursion():
     # Changing the order of sequences above fails all but the final six
     # objects in each catalogue now. So we have one valid island and
     # some rejections.
-    assert np.all(alist == np.array([597, 598]).reshape(-1, 1))
+    x = [597, 598] if 'coverage' not in sys.modules else [596, 597, 598]
+    assert np.all(alist == np.array([*x]).reshape(-1, 1))
     assert np.all(blist == np.array([597, 598, 599]).reshape(-1, 1))
-    assert np.all(arej == np.append(np.arange(597), 599))
+    assert np.all(arej == np.append(np.arange(x[0]), 599))
     assert np.all(brej == np.arange(597))
 
 
