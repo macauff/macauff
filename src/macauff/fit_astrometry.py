@@ -16,7 +16,7 @@ import warnings
 import matplotlib.pyplot as plt
 import numpy as np
 from astropy.coordinates import SkyCoord, match_coordinates_sky
-from matplotlib import gridspec
+from matplotlib import cm, gridspec
 from numpy.lib.format import open_memmap
 from scipy.optimize import minimize
 from scipy.special import factorial
@@ -281,13 +281,14 @@ class AstrometricCorrections:
             Determines whether we perform quadratic or linear scaling for
             hyper-parameter fits to data-driven vs quoted astrometric
             uncertainties. Must either be "quadratic" or "linear."
-        trifilepath : string, optional
-            Filepath of the location into which to save TRILEGAL simulations. If
+        trifilepath : string or list of strings, optional
+            Filepath(s) of the location into which to save TRILEGAL simulations. If
             provided ``tri_dens_cube`` and ``tri_dens_array`` must be
             ``None``, and ``maglim_fs``, ``magnums``, ``tri_num_faints``,
             ``trifilterset``, and ``trifiltnames`` must be given. Must contain
             two format ``{}`` options in string, for unique ax1-ax2 sightline
-            combination downloads.
+            combination downloads. If a list of strings, must be one file path
+            per sightline run in the list.
         maglim_f : float, optional
             Magnitude in the ``magnum`` filter down to which sources should be
             drawn for the "faint" sample. Should be ``None`` if ``tri_dens_cube``
@@ -428,7 +429,7 @@ class AstrometricCorrections:
 
         self.save_folder = save_folder
 
-        self.trifilepath = trifilepath
+        self.trifilepath_holder = trifilepath
         self.maglim_f = maglim_f
         self.magnum = magnum
         self.tri_num_faint = tri_num_faint
@@ -628,7 +629,7 @@ class AstrometricCorrections:
             raise ValueError("b_cat_func must be given if pregenerate_cutouts is 'False'.")
         if tri_download not in (None, True, False):
             raise ValueError("tri_download must either be True, False, or None.")
-        if self.trifilepath is not None and tri_download not in (True, False):
+        if self.trifilepath_holder is not None and tri_download not in (True, False):
             raise ValueError("tri_download must either be True or False if trifilepath given.")
         if tri_download is not None and self.tri_dens_cube is not None:
             raise ValueError("tri_download must be None if tri_dens_cube is given.")
@@ -737,6 +738,11 @@ class AstrometricCorrections:
         self.input_sigs = []
         self.derived_sigs = []
 
+        # If one single TRILEGAL filepath was given, just hold on to it.
+        # Else, below, we have a list, one per index_, to loop through.
+        if not isinstance(self.trifilepath_holder, list):
+            self.trifilepath = self.trifilepath_holder
+
         for index_, list_of_things in enumerate(zip(*zip_list)):
             if np.all(mn_sigs[index_, :] != -9999):
                 continue
@@ -751,6 +757,9 @@ class AstrometricCorrections:
             self.list_of_things = list_of_things
             self.cat_args = cat_args
             self.file_name = file_name
+
+            if isinstance(self.trifilepath_holder, list):
+                self.trifilepath = self.trifilepath_holder[index_]
 
             t = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             print(f'{t}, {self.file_name}: Running astrometry fits for sightline '
@@ -932,6 +941,9 @@ class AstrometricCorrections:
 
                         self.input_sigs.append(self.avg_sig[~self.skip_flags, 0])
                         self.derived_sigs.append(self.fit_sigs[~self.skip_flags, 1])
+                    else:
+                        self.input_sigs.append(None)
+                        self.derived_sigs.append(None)
 
                     self.plot_snr_mag_sig()
 
@@ -1447,12 +1459,12 @@ class AstrometricCorrections:
                                         np.median(bm[:, self.pos_and_err_indices[0][2]]))
             dist_stds[i] = np.std(final_dists)
 
-            h, bins = np.histogram(final_dists, bins='auto')
+            # To avoid binned_statistic NaNing when the data are beyond the
+            # edge of the model, we want to limit our bins to the maximum r value.
+            h, bins = np.histogram(final_dists[final_dists <= self.r[-1]], bins='auto')
             num = np.sum(h)
             pdf = h / np.diff(bins) / num
             pdf_uncert = np.sqrt(h) / np.diff(bins) / num
-            # To avoid binned_statistic NaNing when the data are beyond the
-            # edge of the model, we want to limit our bins to the maximum r value.
             q_pdf = bins[1:] <= self.r[-1]
 
             pdfs.append(pdf)
@@ -1460,6 +1472,15 @@ class AstrometricCorrections:
             q_pdfs.append(q_pdf)
             pdf_bins.append(bins)
             nums.append(num)
+
+            if np.sum(h[q_pdf] > 0) < 5:
+                skip_flags[i] = 1
+                pdfs.append([-1])
+                pdf_uncerts.append([-1])
+                q_pdfs.append([-1])
+                pdf_bins.append([-1])
+                nums.append([-1])
+                continue
 
         self.nums = nums
         self.avg_snr, self.avg_mag, self.avg_sig = avg_snr, avg_mag, avg_sig
@@ -1509,7 +1530,7 @@ class AstrometricCorrections:
             y, q, bins, snr, num = pdf, self.q_pdfs[i], self.pdf_bins[i], self.avg_snr[i, 0], self.nums[i]
             sig_est = self.dist_stds[i] / 0.655
             res = minimize(self.calc_single_joint_auf, x0=[sig_est], args=(i, bins, y, q, num, snr),
-                           method='L-BFGS-B', options={'ftol': 1e-9})  # , bounds=[(0, None)])
+                           method='L-BFGS-B', options={'ftol': 1e-9})
 
             self.fit_sigs[i, 1] = np.abs(res.x[0])
 
@@ -1825,8 +1846,10 @@ class AstrometricCorrections:
                     model_q = self.r[:-1] < pdf_bin[1:][pdf > 0][-1]
                     full_modely = nn_frac * nn_model + (1 - nn_frac) * m_conv_plus_nn
                     modely_norm = np.sum(full_modely[model_q] * self.dr[model_q])
-                    ax.plot((pdf_bin[:-1]+np.diff(pdf_bin)/2)[q_pdf], modely[q_pdf] / modely_norm,
-                            ls, label=lab)
+
+                    _r = (self.r[:-1]+self.dr/2)[model_q]
+                    plot_modely = full_modely[model_q]
+                    ax.plot(_r, plot_modely / modely_norm, ls, label=lab)
 
             if self.make_plots:
                 ax.legend(fontsize=8)
@@ -1865,7 +1888,9 @@ class AstrometricCorrections:
         log_inv_snr = np.log10(1 / _snr[q])
         log_err = np.log10(obj_err[q])
         h, x, y = np.histogram2d(log_inv_snr, log_err, bins=(100, 101))
-        ax.pcolormesh(x, y, h.T, edgecolors='face', cmap='viridis', rasterized=True)
+        _h = np.ma.array(h, mask=h == 0)
+        cmap = cm.inferno_r.with_extremes(bad='w')  # pylint: disable=no-member
+        ax.pcolormesh(x, y, _h.T, edgecolors='face', cmap=cmap, rasterized=True)
         ylims = ax.get_ylim()
         xlims = ax.get_xlim()
         if len(self.seeing_ranges) == 1:
@@ -1915,7 +1940,9 @@ class AstrometricCorrections:
         q = (obj_err < 1) & (_snr > 1) & (obj_err > 0) & ~np.isnan(obj_mag)
         log_inv_snr = np.log10(1 / _snr[q])
         h, x, y = np.histogram2d(log_inv_snr, obj_mag[q], bins=(100, 101))
-        ax.pcolormesh(x, y, h.T, edgecolors='face', cmap='viridis', rasterized=True)
+        _h = np.ma.array(h, mask=h == 0)
+        cmap = cm.inferno_r.with_extremes(bad='w')  # pylint: disable=no-member
+        ax.pcolormesh(x, y, _h.T, edgecolors='face', cmap=cmap, rasterized=True)
         ylims = ax.get_ylim()
         xlims = ax.get_xlim()
 
@@ -1955,7 +1982,9 @@ class AstrometricCorrections:
         q = (obj_err < 1) & (_snr > 1) & (obj_err > 0) & ~np.isnan(obj_mag)
         log_err = np.log10(obj_err[q])
         h, x, y = np.histogram2d(obj_mag[q], log_err, bins=(100, 101))
-        ax.pcolormesh(x, y, h.T, edgecolors='face', cmap='viridis', rasterized=True)
+        _h = np.ma.array(h, mask=h == 0)
+        cmap = cm.inferno_r.with_extremes(bad='w')  # pylint: disable=no-member
+        ax.pcolormesh(x, y, _h.T, edgecolors='face', cmap=cmap, rasterized=True)
         ylims = ax.get_ylim()
         xlims = ax.get_xlim()
 

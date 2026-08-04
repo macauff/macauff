@@ -47,6 +47,9 @@ New Features
 Bug Fixes
 ^^^^^^^^^
 
+- Fixed minor indexing clash in ``csv_to_npy`` with photometric parameterisations
+  of astrometric uncertainties, with ``best_index`` indexing. [#99]
+
 - Fall-back photometric likelihood and priors computed in cases of very little
   overlap between particular pairs of cross-catalogue filters. [#98]
 
@@ -67,6 +70,9 @@ Bug Fixes
 
 API Changes
 ^^^^^^^^^^^
+
+- Allow for multiple TRILEGAL filepaths within ``trifilepath`` in
+  ``AstrometricCorrections``. [#99]
 
 - Added ``move_to_epoch_per_chunk`` as an input parameter. [#98]
 
@@ -233,6 +239,8 @@ API Changes
 
 Other Changes
 ^^^^^^^^^^^^^
+
+- Pinned ``python`` to minimum 3.12.3 for feature stability. [#99]
 
 - Pinned ``scipy`` to minimum v1.6.0 to ensure feature availability. [#98]
 
