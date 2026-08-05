@@ -10,7 +10,7 @@ build:
   apt_packages:
     - gfortran
   tools:
-    python: "3.10"
+    python: "3.13"
 
 # Build documentation in the docs/ directory with Sphinx
 sphinx:
